@@ -30,9 +30,9 @@ export const siteConfig = {
 
     // Refresh Token Configuration
     refreshToken: {
-      expiresInDays: 15, // 15 days
+      expiresInDays: 20, // 20 days
       cookieName: "moodio_refresh_token",
-      maxAge: 15 * 24 * 60 * 60, // 15 days in seconds
+      maxAge: 20 * 24 * 60 * 60, // 20 days in seconds
     },
 
     // OTP Configuration
