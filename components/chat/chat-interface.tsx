@@ -6,7 +6,7 @@ import { Button } from "@heroui/button";
 import { Textarea } from "@heroui/input";
 import { Card, CardBody } from "@heroui/card";
 import { Spinner } from "@heroui/spinner";
-import { Send, Bot, User as UserIcon, X, ImagePlus } from "lucide-react";
+import { Send, Bot, User as UserIcon, X, ImagePlus, Mic, Square } from "lucide-react";
 import clsx from "clsx";
 import ReactMarkdown from "react-markdown";
 import { useRouter } from "next/navigation";
@@ -37,10 +37,14 @@ export default function ChatInterface({
     !!initialChatId && initialMessages.length === 0
   );
   const [isSending, setIsSending] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -100,18 +104,91 @@ export default function ChatInterface({
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, {
+          type: "audio/webm",
+        });
+        await handleTranscription(audioBlob);
+        
+        // Stop all tracks to release microphone
+        stream.getTracks().forEach(track => track.stop());
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+    } catch (error) {
+      console.error("Error accessing microphone:", error);
+      alert("Unable to access microphone. Please check permissions.");
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+    }
+  };
+
+  const handleTranscription = async (audioBlob: Blob) => {
+    setIsTranscribing(true);
+    try {
+      // Create a File object from the Blob
+      const file = new File([audioBlob], "recording.webm", {
+        type: "audio/webm",
+      });
+
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await fetch("/api/transcribe", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) {
+        throw new Error("Transcription failed");
+      }
+
+      const data = await res.json();
+      if (data.text) {
+        setInput((prev) => (prev ? `${prev} ${data.text}` : data.text));
+      }
+    } catch (error) {
+      console.error("Transcription error:", error);
+      alert("Failed to transcribe audio.");
+    } finally {
+      setIsTranscribing(false);
+    }
+  };
+
   const handleSend = async () => {
     if ((!input.trim() && !selectedFile) || isSending) return;
 
     const currentInput = input;
+    const currentFile = selectedFile;
+    const currentPreviewUrl = previewUrl; // Store the preview URL to use for optimistic update
+
     let userMessage: Message;
 
-    if (selectedFile && previewUrl) {
+    if (currentFile && currentPreviewUrl) {
       userMessage = {
         role: "user",
         content: [
           { type: "text", text: currentInput },
-          { type: "image_url", image_url: { url: previewUrl } },
+          { type: "image_url", image_url: { url: currentPreviewUrl } },
         ],
       };
     } else {
@@ -120,8 +197,21 @@ export default function ChatInterface({
 
     setMessages((prev) => [...prev, userMessage]);
     setInput("");
-    const fileToSend = selectedFile;
-    clearFile();
+    // Only clear file input, but keep previewUrl alive for the optimistic message rendering if needed
+    // Actually we need to clear selectedFile state so the UI resets, 
+    // but we used the local variable `currentPreviewUrl` in the message state above.
+    // The message state now holds the blob URL.
+    
+    // However, we should NOT revoke the object URL immediately if it's being used in the message list.
+    // React will render the message using this blob URL.
+    // If we revoke it now, the image won't load.
+    // We can rely on garbage collection or cleanup when the component unmounts, 
+    // or ideally revoke it when we replace this message with the real one from server (if we were doing that).
+    // For now, let's just clear the state.
+    setSelectedFile(null);
+    setPreviewUrl(null); 
+    if (fileInputRef.current) fileInputRef.current.value = "";
+
     setIsSending(true);
 
     try {
@@ -145,10 +235,10 @@ export default function ChatInterface({
       let body;
       let headers: Record<string, string> = {};
 
-      if (fileToSend) {
+      if (currentFile) {
         const formData = new FormData();
         formData.append("message", currentInput);
-        formData.append("file", fileToSend);
+        formData.append("file", currentFile);
         body = formData;
       } else {
         body = JSON.stringify({ content: currentInput });
@@ -166,11 +256,12 @@ export default function ChatInterface({
       }
 
       // Create a placeholder for the assistant message
-      setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
+      // setMessages((prev) => [...prev, { role: "assistant", content: "" }]); // Removed: We now show spinner first
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let assistantMessageContent = "";
+      let isFirstChunk = true;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -179,14 +270,24 @@ export default function ChatInterface({
         const chunk = decoder.decode(value, { stream: true });
         assistantMessageContent += chunk;
 
-        setMessages((prev) => {
-          const newMessages = [...prev];
-          const lastMsg = newMessages[newMessages.length - 1];
-          if (lastMsg.role === "assistant") {
-            lastMsg.content = assistantMessageContent;
-          }
-          return newMessages;
-        });
+        if (isFirstChunk) {
+          // On first chunk, add the assistant message
+          setMessages((prev) => [
+            ...prev,
+            { role: "assistant", content: assistantMessageContent },
+          ]);
+          isFirstChunk = false;
+        } else {
+          // Update existing message
+          setMessages((prev) => {
+            const newMessages = [...prev];
+            const lastMsg = newMessages[newMessages.length - 1];
+            if (lastMsg.role === "assistant") {
+              lastMsg.content = assistantMessageContent;
+            }
+            return newMessages;
+          });
+        }
       }
 
       // If this was the first exchange (total messages <= 2),
@@ -313,6 +414,21 @@ export default function ChatInterface({
             </div>
           );
         })}
+        {isSending && messages[messages.length - 1]?.role === "user" && (
+          <div className="flex gap-3 max-w-3xl mx-auto justify-start">
+            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-1">
+              <Bot size={16} className="text-primary" />
+            </div>
+            <Card className="max-w-[80%] shadow-none bg-default-100 dark:bg-default-50/10">
+              <CardBody className="p-3 overflow-hidden">
+                <Spinner
+                  variant="dots"
+                  size="md"
+                />
+              </CardBody>
+            </Card>
+          </div>
+        )}
         <div ref={messagesEndRef} />
       </div>
 
@@ -355,6 +471,18 @@ export default function ChatInterface({
                 </Button>
               </>
             )}
+
+            <Button
+              isIconOnly
+              variant={isRecording ? "solid" : "flat"}
+              color={isRecording ? "danger" : "default"}
+              onPress={isRecording ? stopRecording : startRecording}
+              className="mb-[2px]"
+              aria-label="Record voice"
+              isLoading={isTranscribing}
+            >
+              {isRecording ? <Square size={20} /> : <Mic size={24} className="text-default-500" />}
+            </Button>
 
             <Textarea
               placeholder="Type a message..."
