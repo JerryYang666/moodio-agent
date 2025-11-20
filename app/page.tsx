@@ -1,59 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { Button } from "@heroui/button";
 import { Card } from "@heroui/card";
 import { Spinner } from "@heroui/spinner";
-import { api } from "@/lib/api/client";
-
-interface User {
-  id: string;
-  email: string;
-  firstName?: string | null;
-  lastName?: string | null;
-  roles: string[];
-  authProvider: string;
-  createdAt: string;
-  updatedAt: string;
-}
+import { useAuth } from "@/hooks/use-auth";
 
 export default function Home() {
-  const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [loggingOut, setLoggingOut] = useState(false);
+  const { user, loading, error, logout, loggingOut } = useAuth();
   const [testResult, setTestResult] = useState<any>(null);
   const [testLoading, setTestLoading] = useState(false);
-
-  useEffect(() => {
-    fetchUser();
-  }, []);
-
-  const fetchUser = async () => {
-    try {
-      const data = await api.get("/api/auth/me");
-      setUser(data.user);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load user");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleLogout = async () => {
-    setLoggingOut(true);
-
-    try {
-      await api.post("/api/auth/logout");
-      router.push("/auth/login");
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to logout");
-      setLoggingOut(false);
-    }
-  };
 
   const handleTestProtectedAPI = async () => {
     setTestLoading(true);
@@ -205,7 +161,7 @@ export default function Home() {
               color="danger"
               variant="flat"
               size="lg"
-              onPress={handleLogout}
+              onPress={logout}
               isLoading={loggingOut}
             >
               Logout

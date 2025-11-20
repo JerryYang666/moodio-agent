@@ -17,6 +17,14 @@ function getJWTSecret(): Uint8Array {
   return new TextEncoder().encode(secret);
 }
 
+export interface AccessTokenPayload {
+  userId: string;
+  email?: string;
+  roles?: string[];
+  firstName?: string;
+  lastName?: string;
+}
+
 /**
  * Generate an access token (JWT) for a user
  */
@@ -51,7 +59,7 @@ export async function generateAccessToken(
  */
 export async function verifyAccessToken(
   token: string
-): Promise<{ userId: string } | null> {
+): Promise<AccessTokenPayload | null> {
   try {
     const secret = getJWTSecret();
     const { payload } = await jwtVerify(token, secret);
@@ -60,7 +68,25 @@ export async function verifyAccessToken(
       return null;
     }
 
-    return { userId: payload.userId };
+    const result: AccessTokenPayload = { userId: payload.userId };
+    
+    if (payload.email && typeof payload.email === "string") {
+      result.email = payload.email;
+    }
+    
+    if (Array.isArray(payload.roles)) {
+      result.roles = payload.roles as string[];
+    }
+    
+    if (payload.firstName && typeof payload.firstName === "string") {
+      result.firstName = payload.firstName;
+    }
+    
+    if (payload.lastName && typeof payload.lastName === "string") {
+      result.lastName = payload.lastName;
+    }
+
+    return result;
   } catch (error) {
     // Token is invalid or expired
     return null;
