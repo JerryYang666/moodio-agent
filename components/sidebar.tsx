@@ -276,7 +276,7 @@ export const Sidebar = () => {
             onPress={() => setIsCollapsed(!isCollapsed)}
             className="text-default-500"
           >
-            {isCollapsed ? <PanelRightOpen size={20} /> : <PanelRightClose size={20} />}
+            {isCollapsed ? <PanelRightClose size={20} /> : <PanelRightOpen size={20} />}
           </Button>
           <ThemeSwitch />
         </div>
