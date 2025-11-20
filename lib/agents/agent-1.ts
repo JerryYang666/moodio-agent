@@ -220,6 +220,14 @@ Note: "suggestions" can be an empty array [] if no suggestions are appropriate.
         };
       }
 
+      let userImageBase64: string | undefined;
+      if (userImageId) {
+        const buffer = await downloadImage(userImageId);
+        if (buffer) {
+          userImageBase64 = buffer.toString("base64");
+        }
+      }
+
       const tasks = suggestions.map(async (suggestion, index) => {
         try {
           let finalImageId: string;
@@ -229,15 +237,13 @@ Note: "suggestions" can be an empty array [] if no suggestions are appropriate.
 
           if (userImageId) {
             // Image editing with Gemini (text-and-image-to-image)
-            const imageBuffer = await downloadImage(userImageId);
-            if (!imageBuffer) throw new Error("Failed to download user image");
-            const base64Image = imageBuffer.toString("base64");
+            if (!userImageBase64) throw new Error("Failed to download user image");
             const prompt = [
               { text: suggestion.prompt },
               {
                 inlineData: {
                   mimeType: "image/png",
-                  data: base64Image,
+                  data: userImageBase64,
                 },
               },
             ];

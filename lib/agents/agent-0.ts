@@ -221,14 +221,18 @@ Note: "suggestions" can be an empty array [] if no suggestions are appropriate.
         };
       }
 
+      let userImageBuffer: Buffer | null | undefined;
+      if (userImageId) {
+        userImageBuffer = await downloadImage(userImageId);
+      }
+
       const tasks = suggestions.map(async (suggestion, index) => {
         try {
           let finalImageId: string;
 
           if (userImageId) {
-            const imageBuffer = await downloadImage(userImageId);
-            if (!imageBuffer) throw new Error("Failed to download user image");
-            const file = await toFile(imageBuffer, "image.png", {
+            if (!userImageBuffer) throw new Error("Failed to download user image");
+            const file = await toFile(userImageBuffer, "image.png", {
               type: "image/png",
             });
             console.log("editing image");
