@@ -22,7 +22,7 @@ export class OpenAIProvider implements LLMProvider {
     options?: ChatOptions
   ): AsyncIterable<StreamChunk> {
     const model = options?.model || this.defaultModel;
-    const maxTokens = options?.maxTokens || 1000;
+    const maxTokens = options?.maxTokens || 3000;
     const temperature = options?.temperature || 1;
 
     const stream = await this.client.chat.completions.create({
@@ -49,7 +49,7 @@ export class OpenAIProvider implements LLMProvider {
     options?: ChatOptions
   ): Promise<string> {
     const model = options?.model || this.defaultModel;
-    const maxTokens = options?.maxTokens || 1000;
+    const maxTokens = options?.maxTokens || 3000;
     const temperature = options?.temperature || 1;
 
     const response = await this.client.chat.completions.create({
