@@ -14,6 +14,7 @@ import {
   ModalFooter,
   useDisclosure,
 } from "@heroui/modal";
+import { Avatar } from "@heroui/avatar";
 import {
   Send,
   Bot,
@@ -589,9 +590,16 @@ export default function ChatInterface({
               </div>
 
               {isUser && (
-                <div className="w-8 h-8 rounded-full bg-default-200 flex items-center justify-center shrink-0 mt-1">
-                  <UserIcon size={16} className="text-default-500" />
-                </div>
+                <Avatar
+                  name={
+                    user?.firstName?.charAt(0) ||
+                    user?.email?.charAt(0).toUpperCase() ||
+                    "U"
+                  }
+                  color="primary"
+                  size="sm"
+                  className="shrink-0 mt-1"
+                />
               )}
             </div>
           );
