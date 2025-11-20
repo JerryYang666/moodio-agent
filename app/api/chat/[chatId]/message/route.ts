@@ -53,15 +53,25 @@ export async function POST(
     // Handle FormData or JSON
     let content = "";
     let file: File | null = null;
+    let selection: { messageIndex: number; partIndex: number } | null = null;
 
     const contentType = request.headers.get("content-type") || "";
     if (contentType.includes("multipart/form-data")) {
       const formData = await request.formData();
       content = (formData.get("message") as string) || "";
       file = formData.get("file") as File | null;
+      const selectionStr = formData.get("selection") as string;
+      if (selectionStr) {
+        try {
+          selection = JSON.parse(selectionStr);
+        } catch (e) {
+          console.error("Failed to parse selection from FormData", e);
+        }
+      }
     } else {
       const json = await request.json();
       content = json.content;
+      selection = json.selection;
     }
 
     if (!content && !file) {
@@ -89,7 +99,40 @@ export async function POST(
     }
 
     // Get existing history
-    const history = await getChatHistory(chatId);
+    let history = await getChatHistory(chatId);
+
+    // Update history if selection is present
+    if (selection) {
+      const { messageIndex, partIndex } = selection;
+      if (
+        history[messageIndex] &&
+        Array.isArray(history[messageIndex].content) &&
+        history[messageIndex].content[partIndex]
+      ) {
+        const part = history[messageIndex].content[partIndex];
+        if (part.type === "agent_image") {
+          // Create a deep copy of history to modify
+          history = history.map((msg, mIdx) => {
+            if (mIdx !== messageIndex) return msg;
+            
+            const newContent = [...(msg.content as MessageContentPart[])];
+            newContent[partIndex] = {
+              ...newContent[partIndex],
+              // @ts-ignore - isSelected is optional
+              isSelected: true,
+            };
+            
+            return {
+              ...msg,
+              content: newContent,
+            };
+          });
+          
+          // We should save the updated history, but we can do it along with the new message
+          // to minimize S3 writes.
+        }
+      }
+    }
 
     // Handle image upload
     let imageId: string | undefined;

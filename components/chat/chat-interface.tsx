@@ -108,6 +108,14 @@ export default function ChatInterface({
     title: string;
     prompt: string;
   } | null>(null);
+  
+  // State for selected agent image (for sending in next message)
+  const [selectedAgentPart, setSelectedAgentPart] = useState<{
+    url: string;
+    title: string;
+    messageIndex: number;
+    partIndex: number;
+  } | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -272,9 +280,20 @@ export default function ChatInterface({
   };
 
   const handleSend = async () => {
-    if ((!input.trim() && !selectedFile) || isSending || isRecording || isTranscribing) return;
+    if (
+      (!input.trim() && !selectedFile && !selectedAgentPart) ||
+      isSending ||
+      isRecording ||
+      isTranscribing
+    )
+      return;
 
-    const currentInput = input;
+    let currentInput = input;
+    if (selectedAgentPart) {
+      const prefix = `I select ${selectedAgentPart.title}`;
+      currentInput = currentInput ? `${prefix}\n\n${currentInput}` : prefix;
+    }
+
     const currentFile = selectedFile;
     const currentPreviewUrl = previewUrl;
 
@@ -291,10 +310,35 @@ export default function ChatInterface({
       createdAt: Date.now(),
     };
 
-    setMessages((prev) => [...prev, userMessage]);
+    // Optimistically update previous message if selection exists
+    if (selectedAgentPart) {
+      setMessages((prev) => {
+        const newMessages = [...prev];
+        const msgIndex = selectedAgentPart.messageIndex;
+        if (newMessages[msgIndex]) {
+          const msg = newMessages[msgIndex];
+          if (Array.isArray(msg.content)) {
+            const newContent = [...msg.content];
+            const partIndex = selectedAgentPart.partIndex;
+            if (newContent[partIndex] && newContent[partIndex].type === "agent_image") {
+              newContent[partIndex] = {
+                ...newContent[partIndex],
+                isSelected: true,
+              };
+              newMessages[msgIndex] = { ...msg, content: newContent };
+            }
+          }
+        }
+        return [...newMessages, userMessage];
+      });
+    } else {
+      setMessages((prev) => [...prev, userMessage]);
+    }
+
     setInput("");
     setSelectedFile(null);
     setPreviewUrl(null);
+    setSelectedAgentPart(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
 
     setIsSending(true);
@@ -319,9 +363,22 @@ export default function ChatInterface({
         const formData = new FormData();
         formData.append("message", currentInput);
         formData.append("file", currentFile);
+        if (selectedAgentPart) {
+          formData.append("selection", JSON.stringify({
+            messageIndex: selectedAgentPart.messageIndex,
+            partIndex: selectedAgentPart.partIndex
+          }));
+        }
         body = formData;
       } else {
-        body = JSON.stringify({ content: currentInput });
+        const payload: any = { content: currentInput };
+        if (selectedAgentPart) {
+          payload.selection = {
+            messageIndex: selectedAgentPart.messageIndex,
+            partIndex: selectedAgentPart.partIndex
+          };
+        }
+        body = JSON.stringify(payload);
         headers = { "Content-Type": "application/json" };
       }
 
@@ -424,7 +481,7 @@ export default function ChatInterface({
     }
   };
 
-  const handleImageClick = (part: any) => {
+  const handleAgentTitleClick = (part: any) => {
     if (part.status === "generated") {
       setSelectedImage({
         url: part.imageUrl || getImageUrl(part.imageId),
@@ -432,6 +489,29 @@ export default function ChatInterface({
         prompt: part.prompt,
       });
       onOpen();
+    }
+  };
+
+  const handleAgentImageSelect = (
+    part: any,
+    messageIndex: number,
+    partIndex: number
+  ) => {
+    if (part.status === "generated") {
+      const url = part.imageUrl || getImageUrl(part.imageId);
+      if (
+        selectedAgentPart?.url === url &&
+        selectedAgentPart?.messageIndex === messageIndex
+      ) {
+        setSelectedAgentPart(null);
+      } else {
+        setSelectedAgentPart({
+          url,
+          title: part.title,
+          messageIndex,
+          partIndex,
+        });
+      }
     }
   };
 
@@ -445,7 +525,7 @@ export default function ChatInterface({
     });
   };
 
-  const renderContent = (content: string | MessageContentPart[]) => {
+  const renderContent = (content: string | MessageContentPart[], messageIndex?: number) => {
     if (typeof content === "string") {
       return <ReactMarkdown>{content}</ReactMarkdown>;
     }
@@ -483,39 +563,70 @@ export default function ChatInterface({
 
         {agentParts.length > 0 && (
           <div className="grid grid-cols-2 gap-3 mt-2">
-            {agentParts.map((part: any, i) => (
-              <Card
-                key={`agent-${i}`}
-                isPressable={part.status === "generated"}
-                onPress={() => handleImageClick(part)}
-                className="w-full aspect-square"
-              >
-                <CardBody className="p-0 overflow-hidden relative group">
-                  {part.status === "loading" && (
-                    <div className="w-full h-full flex items-center justify-center bg-default-100">
-                      <Spinner />
-                    </div>
+            {agentParts.map((part: any, i) => {
+              const url =
+                part.imageUrl ||
+                (part.imageId ? getImageUrl(part.imageId) : "");
+              const isSelected =
+                (selectedAgentPart?.url === url &&
+                  selectedAgentPart?.messageIndex === messageIndex) ||
+                part.isSelected;
+
+              const realPartIndex = (content as MessageContentPart[]).indexOf(
+                part
+              );
+
+              return (
+                <Card
+                  key={`agent-${i}`}
+                  className={clsx(
+                    "w-full",
+                    isSelected && "border-2 border-primary"
                   )}
-                  {part.status === "error" && (
-                    <div className="w-full h-full flex items-center justify-center bg-danger-50 text-danger">
-                      <X />
-                    </div>
-                  )}
-                  {part.status === "generated" && (
-                    <>
+                >
+                  <CardBody
+                    className="p-0 overflow-hidden relative aspect-square cursor-pointer"
+                    onClick={() =>
+                      part.status === "generated" &&
+                      messageIndex !== undefined &&
+                      handleAgentImageSelect(
+                        part,
+                        messageIndex,
+                        realPartIndex
+                      )
+                    }
+                  >
+                    {part.status === "loading" && (
+                      <div className="w-full h-full flex items-center justify-center bg-default-100">
+                        <Spinner />
+                      </div>
+                    )}
+                    {part.status === "error" && (
+                      <div className="w-full h-full flex items-center justify-center bg-danger-50 text-danger">
+                        <X />
+                      </div>
+                    )}
+                    {part.status === "generated" && (
                       <img
-                        src={part.imageUrl || getImageUrl(part.imageId)}
+                        src={url}
                         alt={part.title}
                         className="w-full h-full object-cover"
                       />
-                      <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white p-2 text-xs truncate opacity-0 group-hover:opacity-100 transition-opacity">
+                    )}
+                  </CardBody>
+                  {part.status === "generated" && (
+                    <CardFooter
+                      className="p-2 cursor-pointer hover:bg-default-100 justify-center bg-content1"
+                      onClick={() => handleAgentTitleClick(part)}
+                    >
+                      <span className="text-xs font-medium truncate w-full text-center">
                         {part.title}
-                      </div>
-                    </>
+                      </span>
+                    </CardFooter>
                   )}
-                </CardBody>
-              </Card>
-            ))}
+                </Card>
+              );
+            })}
           </div>
         )}
       </div>
@@ -573,7 +684,7 @@ export default function ChatInterface({
                           "prose-headings:text-primary-foreground prose-p:text-primary-foreground prose-strong:text-primary-foreground prose-code:text-primary-foreground"
                       )}
                     >
-                      {renderContent(msg.content)}
+                      {renderContent(msg.content, idx)}
                     </div>
                   </CardBody>
                 </Card>
@@ -621,21 +732,45 @@ export default function ChatInterface({
 
       <div className="sticky bottom-0 bg-background/80 backdrop-blur-md pt-4 pb-2 border-t border-divider z-10">
         <div className="max-w-3xl mx-auto flex flex-col gap-2">
-          {previewUrl && (
-            <div className="relative w-fit">
-              <img
-                src={previewUrl}
-                alt="Preview"
-                className="h-20 rounded-lg border border-divider"
-              />
-              <button
-                onClick={clearFile}
-                className="absolute -top-2 -right-2 bg-default-100 rounded-full p-1 hover:bg-default-200"
-              >
-                <X size={14} />
-              </button>
-            </div>
-          )}
+          <div className="flex gap-2 flex-wrap">
+            {previewUrl && (
+              <div className="relative w-fit">
+                <img
+                  src={previewUrl}
+                  alt="Preview"
+                  className="h-20 rounded-lg border border-divider"
+                />
+                <button
+                  onClick={clearFile}
+                  className="absolute -top-2 -right-2 bg-default-100 rounded-full p-1 hover:bg-default-200"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            )}
+            {selectedAgentPart && (
+              <div className="relative w-fit group">
+                <div className="h-20 w-20 rounded-lg border border-divider overflow-hidden relative">
+                  <img
+                    src={selectedAgentPart.url}
+                    alt={selectedAgentPart.title}
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute inset-0 bg-black/50 flex items-center justify-center p-1">
+                    <span className="text-white text-[10px] text-center leading-tight font-medium line-clamp-3">
+                      Select: {selectedAgentPart.title}
+                    </span>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setSelectedAgentPart(null)}
+                  className="absolute -top-2 -right-2 bg-default-100 rounded-full p-1 hover:bg-default-200 shadow-sm border border-divider"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            )}
+          </div>
 
           <div className="flex gap-2 items-start">
             {messages.length === 0 && (

@@ -11,6 +11,7 @@ export type MessageContentPart =
       title: string;
       prompt: string;
       status: "loading" | "generated" | "error";
+      isSelected?: boolean;
     };
 
 export interface Message {
