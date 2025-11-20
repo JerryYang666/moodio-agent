@@ -4,9 +4,34 @@ import { verifyAccessToken } from "@/lib/auth/jwt";
 import { db } from "@/lib/db";
 import { chats } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
-import { getChatHistory, saveChatHistory } from "@/lib/storage/s3";
+import { getChatHistory, saveChatHistory, uploadImage } from "@/lib/storage/s3";
 import { createLLMClient } from "@/lib/llm/client";
-import { Message } from "@/lib/llm/types";
+import { Message, MessageContentPart } from "@/lib/llm/types";
+
+const AWS_S3_PUBLIC_URL = process.env.NEXT_PUBLIC_AWS_S3_PUBLIC_URL || "";
+
+function convertToLLMFormat(message: Message): Message {
+  if (typeof message.content === "string") {
+    return message;
+  }
+
+  const newContent: MessageContentPart[] = message.content.map((part) => {
+    if (part.type === "image") {
+      return {
+        type: "image_url",
+        image_url: {
+          url: `${AWS_S3_PUBLIC_URL}/${part.imageId}`,
+        },
+      };
+    }
+    return part;
+  });
+
+  return {
+    ...message,
+    content: newContent,
+  };
+}
 
 export async function POST(
   request: NextRequest,
@@ -24,10 +49,23 @@ export async function POST(
       return NextResponse.json({ error: "Invalid token" }, { status: 401 });
     }
 
-    const { content } = await request.json();
-    if (!content) {
+    // Handle FormData or JSON
+    let content = "";
+    let file: File | null = null;
+
+    const contentType = request.headers.get("content-type") || "";
+    if (contentType.includes("multipart/form-data")) {
+      const formData = await request.formData();
+      content = (formData.get("message") as string) || "";
+      file = formData.get("file") as File | null;
+    } else {
+      const json = await request.json();
+      content = json.content;
+    }
+
+    if (!content && !file) {
       return NextResponse.json(
-        { error: "Content is required" },
+        { error: "Content or file is required" },
         { status: 400 }
       );
     }
@@ -37,10 +75,7 @@ export async function POST(
     let chat;
 
     if (isAdmin) {
-      [chat] = await db
-        .select()
-        .from(chats)
-        .where(eq(chats.id, chatId));
+      [chat] = await db.select().from(chats).where(eq(chats.id, chatId));
     } else {
       [chat] = await db
         .select()
@@ -55,9 +90,45 @@ export async function POST(
     // Get existing history
     const history = await getChatHistory(chatId);
 
-    // Construct new messages
-    const userMessage: Message = { role: "user", content };
-    const messagesForLLM = [...history, userMessage];
+    // Handle image upload
+    let imageId: string | undefined;
+    if (file) {
+      // Check if it's the first message
+      if (history.length > 0) {
+        return NextResponse.json(
+          { error: "Image upload is only allowed in the first message" },
+          { status: 400 }
+        );
+      }
+
+      if (file.size > 5 * 1024 * 1024) {
+        return NextResponse.json(
+          { error: "Image size limit is 5MB" },
+          { status: 400 }
+        );
+      }
+      imageId = await uploadImage(file, file.type);
+    }
+
+    // Construct new user message
+    let userMessage: Message;
+    if (imageId) {
+      userMessage = {
+        role: "user",
+        content: [
+          { type: "text", text: content },
+          { type: "image", imageId: imageId },
+        ],
+      };
+    } else {
+      userMessage = { role: "user", content };
+    }
+
+    // Combine history + new message (Storage Format)
+    const messagesForStorage = [...history, userMessage];
+
+    // Convert to LLM Format
+    const messagesForLLM = messagesForStorage.map(convertToLLMFormat);
 
     // Initialize LLM Client
     const llmClient = createLLMClient({
@@ -88,15 +159,12 @@ export async function POST(
             content: fullResponse,
           };
 
-          const updatedHistory = [...messagesForLLM, assistantMessage];
+          const updatedHistory = [...messagesForStorage, assistantMessage];
           await saveChatHistory(chatId, updatedHistory);
 
           // Generate chat name if this is the first conversation round (User + Assistant = 2 messages)
-          // Note: updatedHistory includes the new user message and assistant response
           let newChatName = chat.name;
 
-          // If we just completed the first round (user msg + assistant msg)
-          // We check if history was empty before (length was 0), so new history length should be 2
           if (history.length === 0 && updatedHistory.length === 2) {
             try {
               const namePrompt: Message[] = [
@@ -109,13 +177,13 @@ export async function POST(
                     "Give the name in the same language as the messages. " +
                     'Output JSON only. Format: {"chat_name": "Your Chat Name"}',
                 },
-                ...updatedHistory,
+                // We need to convert updatedHistory to LLM format for this call too
+                ...updatedHistory.map(convertToLLMFormat),
               ];
 
               const nameResponse = await llmClient.chatComplete(namePrompt);
               if (nameResponse) {
                 try {
-                  // Attempt to parse JSON, handling potential code block wrappers
                   const cleanResponse = nameResponse
                     .replace(/```json\n?|```/g, "")
                     .trim();
@@ -128,8 +196,6 @@ export async function POST(
                     "Failed to parse chat name JSON, using raw response fallback",
                     e
                   );
-                  // Fallback: if JSON parse fails, use raw response if it looks like a name
-                  // but since we asked for JSON, it might be safer to just ignore or cleanup
                   if (
                     nameResponse.length < 255 &&
                     !nameResponse.includes("{")
@@ -140,7 +206,6 @@ export async function POST(
               }
             } catch (err) {
               console.error("Failed to generate chat name:", err);
-              // Fallback or keep null, handled gracefully
             }
           }
 

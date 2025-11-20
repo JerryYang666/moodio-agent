@@ -7,9 +7,6 @@ import { Providers } from "./providers";
 
 import { siteConfig } from "@/config/site";
 import { fontSans } from "@/config/fonts";
-import { Navbar } from "@/components/navbar";
-import { Sidebar } from "@/components/sidebar";
-import { OnboardingModal } from "@/components/onboarding-modal";
 
 export const metadata: Metadata = {
   title: {
@@ -44,20 +41,7 @@ export default function RootLayout({
         )}
       >
         <Providers themeProps={{ attribute: "class", defaultTheme: "dark" }}>
-          <div className="relative flex h-screen w-full overflow-hidden">
-            <Sidebar />
-            <div className="flex flex-col flex-1 h-full overflow-hidden">
-              <div className="md:hidden">
-                <Navbar />
-              </div>
-              <main className="flex-1 overflow-y-auto p-6">
-                <div className="container mx-auto max-w-7xl h-full">
-                  {children}
-                </div>
-              </main>
-            </div>
-            <OnboardingModal />
-          </div>
+          {children}
         </Providers>
       </body>
     </html>

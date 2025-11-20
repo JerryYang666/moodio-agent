@@ -1,8 +1,13 @@
 // Common types for LLM integration
 
+export type MessageContentPart =
+  | { type: "text"; text: string }
+  | { type: "image_url"; image_url: { url: string } }
+  | { type: "image"; imageId: string };
+
 export interface Message {
   role: "system" | "user" | "assistant";
-  content: string;
+  content: string | MessageContentPart[];
 }
 
 export interface LLMConfig {
@@ -28,4 +33,3 @@ export interface ChatOptions {
   temperature?: number;
   stream?: boolean;
 }
-

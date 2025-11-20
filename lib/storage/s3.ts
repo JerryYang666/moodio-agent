@@ -1,5 +1,6 @@
 import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
 import { Message } from "@/lib/llm/types";
+import { randomUUID } from "crypto";
 
 const s3Client = new S3Client({
   region: process.env.AWS_REGION!,
@@ -13,6 +14,33 @@ const BUCKET_NAME = process.env.AWS_S3_BUCKET_NAME!;
 
 export interface ChatHistory {
   messages: Message[];
+}
+
+export async function uploadImage(
+  file: Buffer | Blob,
+  contentType: string
+): Promise<string> {
+  const imageId = randomUUID();
+  const key = `images/${imageId}`;
+
+  let body;
+  if (file instanceof Blob) {
+    body = Buffer.from(await file.arrayBuffer());
+  } else {
+    body = file;
+  }
+
+  await s3Client.send(
+    new PutObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: key,
+      Body: body,
+      ContentType: contentType,
+      ACL: "public-read",
+    })
+  );
+
+  return imageId;
 }
 
 export async function saveChatHistory(chatId: string, messages: Message[]) {

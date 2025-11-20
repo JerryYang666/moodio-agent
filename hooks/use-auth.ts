@@ -34,7 +34,11 @@ export function useAuth(): UseAuthReturn {
   const fetchUser = useCallback(async () => {
     try {
       setLoading(true);
-      const data = await api.get("/api/auth/me");
+      const response = await fetch("/api/auth/me");
+      if (!response.ok) {
+        throw new Error("Failed to fetch user");
+      }
+      const data = await response.json();
       setUser(data.user);
       setError("");
     } catch (err) {
