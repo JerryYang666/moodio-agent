@@ -35,6 +35,48 @@ const getImageUrl = (imageId: string) => {
   return `${AWS_S3_PUBLIC_URL}/${imageId}`;
 };
 
+// Helper to detect supported audio MIME type for MediaRecorder (iOS Safari compatibility)
+const getSupportedMimeType = (): string | null => {
+  // Check if MediaRecorder is available
+  if (typeof MediaRecorder === "undefined") {
+    return null;
+  }
+
+  const types = [
+    "audio/webm",
+    "audio/webm;codecs=opus",
+    "audio/ogg;codecs=opus",
+    "audio/mp4",
+    "audio/mp4;codecs=mp4a.40.2",
+    "audio/mpeg",
+  ];
+
+  for (const type of types) {
+    if (MediaRecorder.isTypeSupported(type)) {
+      console.log(`Using audio format: ${type}`);
+      return type;
+    }
+  }
+  
+  console.warn("No supported audio format found");
+  return null;
+};
+
+// Helper to get file extension from MIME type
+const getFileExtension = (mimeType: string): string => {
+  const mimeToExtension: Record<string, string> = {
+    "audio/webm": "webm",
+    "audio/webm;codecs=opus": "webm",
+    "audio/ogg;codecs=opus": "ogg",
+    "audio/ogg": "ogg",
+    "audio/mp4": "mp4",
+    "audio/mp4;codecs=mp4a.40.2": "mp4",
+    "audio/mpeg": "mp3",
+  };
+
+  return mimeToExtension[mimeType] || "webm";
+};
+
 interface ChatInterfaceProps {
   chatId?: string;
   initialMessages?: Message[];
@@ -129,8 +171,28 @@ export default function ChatInterface({
 
   const startRecording = async () => {
     try {
+      // Check if MediaRecorder is supported
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        alert("Audio recording is not supported on this browser. Please use HTTPS or a supported browser.");
+        return;
+      }
+
+      if (typeof MediaRecorder === "undefined") {
+        alert("MediaRecorder is not supported on this browser.");
+        return;
+      }
+
+      // Detect supported MIME type for iOS Safari compatibility
+      const mimeType = getSupportedMimeType();
+      if (!mimeType) {
+        alert("Audio recording format is not supported on this device. Please try a different browser.");
+        return;
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
+
+      const options = mimeType ? { mimeType } : undefined;
+      const mediaRecorder = new MediaRecorder(stream, options);
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
 
@@ -142,9 +204,9 @@ export default function ChatInterface({
 
       mediaRecorder.onstop = async () => {
         const audioBlob = new Blob(audioChunksRef.current, {
-          type: "audio/webm",
+          type: mimeType,
         });
-        await handleTranscription(audioBlob);
+        await handleTranscription(audioBlob, mimeType);
         stream.getTracks().forEach((track) => track.stop());
       };
 
@@ -152,7 +214,19 @@ export default function ChatInterface({
       setIsRecording(true);
     } catch (error) {
       console.error("Error accessing microphone:", error);
-      alert("Unable to access microphone. Please check permissions.");
+      if (error instanceof Error) {
+        if (error.name === "NotAllowedError" || error.name === "PermissionDeniedError") {
+          alert("Microphone permission denied. Please allow microphone access in your browser settings.");
+        } else if (error.name === "NotFoundError" || error.name === "DevicesNotFoundError") {
+          alert("No microphone found. Please connect a microphone and try again.");
+        } else if (error.name === "NotReadableError" || error.name === "TrackStartError") {
+          alert("Microphone is already in use by another application.");
+        } else {
+          alert(`Unable to access microphone: ${error.message}`);
+        }
+      } else {
+        alert("Unable to access microphone. Please check permissions and try again.");
+      }
     }
   };
 
@@ -163,11 +237,13 @@ export default function ChatInterface({
     }
   };
 
-  const handleTranscription = async (audioBlob: Blob) => {
+  const handleTranscription = async (audioBlob: Blob, mimeType: string) => {
     setIsTranscribing(true);
     try {
-      const file = new File([audioBlob], "recording.webm", {
-        type: "audio/webm",
+      // Determine file extension based on MIME type
+      const extension = getFileExtension(mimeType);
+      const file = new File([audioBlob], `recording.${extension}`, {
+        type: mimeType,
       });
 
       const formData = new FormData();
