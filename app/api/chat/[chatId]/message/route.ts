@@ -7,7 +7,7 @@ import { eq, and } from "drizzle-orm";
 import { getChatHistory, saveChatHistory, uploadImage } from "@/lib/storage/s3";
 import { createLLMClient } from "@/lib/llm/client";
 import { Message, MessageContentPart } from "@/lib/llm/types";
-import { agent0 } from "@/lib/agents/agent-0";
+import { agent1 } from "@/lib/agents/agent-1";
 
 const AWS_S3_PUBLIC_URL = process.env.NEXT_PUBLIC_AWS_S3_PUBLIC_URL || "";
 
@@ -134,8 +134,8 @@ export async function POST(
     // However, standard chat usually saves user message immediately.
     // Let's proceed with creating the Agent stream.
 
-    // Use Agent 0
-    const { stream: agentStream, completion } = await agent0.processRequest(
+    // Use Agent 1
+    const { stream: agentStream, completion } = await agent1.processRequest(
       history,
       userMessage,
       payload.userId

@@ -1,7 +1,8 @@
 import { Agent, AgentResponse } from "./types";
 import { Message, MessageContentPart } from "@/lib/llm/types";
 import { downloadImage, uploadImage } from "@/lib/storage/s3";
-import OpenAI, { toFile } from "openai";
+import OpenAI from "openai";
+import { GoogleGenAI } from "@google/genai";
 import { v4 as uuidv4 } from "uuid";
 
 interface Suggestion {
@@ -14,9 +15,9 @@ interface AgentOutput {
   suggestions: Suggestion[];
 }
 
-export class Agent0 implements Agent {
-  id = "agent-0";
-  name = "Creative Assistant";
+export class Agent1 implements Agent {
+  id = "agent-1";
+  name = "Creative Assistant (Gemini)";
 
   async processRequest(
     history: Message[],
@@ -146,16 +147,14 @@ Note: "suggestions" can be an empty array [] if no suggestions are appropriate.
 
     const { stream, completion } = this.createStreamAndCompletion(
       parsed,
-      userImageId,
-      client
+      userImageId
     );
     return { stream, completion };
   }
 
   private createStreamAndCompletion(
     parsed: AgentOutput,
-    userImageId: string | undefined,
-    client: OpenAI
+    userImageId: string | undefined
   ) {
     const encoder = new TextEncoder();
     let controller: any = null;
@@ -224,50 +223,76 @@ Note: "suggestions" can be an empty array [] if no suggestions are appropriate.
       const tasks = suggestions.map(async (suggestion, index) => {
         try {
           let finalImageId: string;
+          const ai = new GoogleGenAI({
+            apiKey: process.env.GOOGLE_API_KEY,
+          });
 
           if (userImageId) {
+            // Image editing with Gemini (text-and-image-to-image)
             const imageBuffer = await downloadImage(userImageId);
             if (!imageBuffer) throw new Error("Failed to download user image");
-            const file = await toFile(imageBuffer, "image.png", {
-              type: "image/png",
-            });
-            console.log("editing image");
-            const response = await client.images.edit({
-              model: "gpt-image-1",
-              image: file,
-              prompt: suggestion.prompt,
-              n: 1,
-              size: "1024x1024",
+            const base64Image = imageBuffer.toString("base64");
+            const prompt = [
+              { text: suggestion.prompt },
+              {
+                inlineData: {
+                  mimeType: "image/png",
+                  data: base64Image,
+                },
+              },
+            ];
+
+            const response = await ai.models.generateContent({
+              model: "gemini-2.5-flash-image",
+              contents: prompt,
             });
 
-            const data = response.data?.[0];
-            if (!data) throw new Error("No image data");
-
-            if (data.b64_json) {
-              const buf = Buffer.from(data.b64_json, "base64");
-              finalImageId = await uploadImage(buf, "image/png");
-            } else if (data.url) {
-              const res = await fetch(data.url);
-              const arrayBuf = await res.arrayBuffer();
-              finalImageId = await uploadImage(
-                Buffer.from(arrayBuf),
-                "image/png"
-              );
-            } else {
-              throw new Error("No image data in response");
+            let generatedImageData: string | undefined;
+            const candidates = (response as any).candidates;
+            if (candidates && candidates.length > 0) {
+              const parts = candidates[0].content?.parts;
+              if (parts) {
+                for (const part of parts) {
+                  if (part.inlineData) {
+                    generatedImageData = part.inlineData.data;
+                    break;
+                  }
+                }
+              }
             }
+
+            if (!generatedImageData) {
+              throw new Error("No image data in Gemini response");
+            }
+
+            const buf = Buffer.from(generatedImageData, "base64");
+            finalImageId = await uploadImage(buf, "image/png");
           } else {
-            const response = await client.images.generate({
-              model: "gpt-image-1",
-              prompt: suggestion.prompt,
-              n: 1,
-              size: "1024x1024",
+            // Image generation with Gemini (text-to-image)
+            const response = await ai.models.generateContent({
+              model: "gemini-2.5-flash-image",
+              contents: suggestion.prompt,
             });
 
-            const data = response.data?.[0];
-            if (!data || !data.b64_json) throw new Error("No image data");
+            let generatedImageData: string | undefined;
+            const candidates = (response as any).candidates;
+            if (candidates && candidates.length > 0) {
+              const parts = candidates[0].content?.parts;
+              if (parts) {
+                for (const part of parts) {
+                  if (part.inlineData) {
+                    generatedImageData = part.inlineData.data;
+                    break;
+                  }
+                }
+              }
+            }
 
-            const buf = Buffer.from(data.b64_json, "base64");
+            if (!generatedImageData) {
+              throw new Error("No image data in Gemini response");
+            }
+
+            const buf = Buffer.from(generatedImageData, "base64");
             finalImageId = await uploadImage(buf, "image/png");
           }
 
@@ -330,4 +355,5 @@ Note: "suggestions" can be an empty array [] if no suggestions are appropriate.
   }
 }
 
-export const agent0 = new Agent0();
+export const agent1 = new Agent1();
+

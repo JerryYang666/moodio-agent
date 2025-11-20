@@ -195,7 +195,7 @@ export default function ChatInterface({
   };
 
   const handleSend = async () => {
-    if ((!input.trim() && !selectedFile) || isSending) return;
+    if ((!input.trim() && !selectedFile) || isSending || isRecording) return;
 
     const currentInput = input;
     const currentFile = selectedFile;
@@ -602,6 +602,7 @@ export default function ChatInterface({
               classNames={{
                 input: "text-base",
               }}
+              isDisabled={isRecording}
             />
             <Button
               isIconOnly
@@ -609,6 +610,7 @@ export default function ChatInterface({
               aria-label="Send"
               onPress={handleSend}
               isLoading={isSending}
+              isDisabled={isRecording}
               className="mb-[2px]"
             >
               <Send size={20} />
