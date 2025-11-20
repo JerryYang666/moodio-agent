@@ -31,6 +31,7 @@ export const siteConfig = {
     // Refresh Token Configuration
     refreshToken: {
       expiresInDays: 20, // 20 days
+      gracePeriodSeconds: 3600, // 1 hour grace period for old tokens
       cookieName: "moodio_refresh_token",
       maxAge: 20 * 24 * 60 * 60, // 20 days in seconds
     },

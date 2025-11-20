@@ -5,7 +5,7 @@
 
 import { db } from "@/lib/db";
 import { refreshTokens, users } from "@/lib/db/schema";
-import { eq, and, gt } from "drizzle-orm";
+import { eq, and, gt, lt } from "drizzle-orm";
 import { v4 as uuidv4 } from "uuid";
 import { siteConfig } from "@/config/site";
 import { generateAccessToken } from "./jwt";
@@ -107,7 +107,7 @@ export async function deleteAllUserRefreshTokens(
  * Returns new tokens or error
  *
  * This is the shared logic used by both the middleware and the refresh API endpoint
- * Note: Refresh tokens are single-use - old token is deleted when creating new one
+ * Note: Refresh tokens are single-use - old token is marked to expire shortly
  */
 export async function refreshAccessToken(
   refreshTokenValue: string
@@ -147,8 +147,19 @@ export async function refreshAccessToken(
       };
     }
 
-    // Delete old refresh token (single-use)
-    await db.delete(refreshTokens).where(eq(refreshTokens.id, tokenRecord.id));
+    // Capture original expiration for the NEW token
+    const originalExpiresAt = tokenRecord.expiresAt;
+
+    // Update old refresh token expiration (grace period) instead of deleting
+    const gracePeriodExpiresAt = new Date();
+    gracePeriodExpiresAt.setSeconds(
+      gracePeriodExpiresAt.getSeconds() + siteConfig.auth.refreshToken.gracePeriodSeconds
+    );
+
+    await db
+      .update(refreshTokens)
+      .set({ expiresAt: gracePeriodExpiresAt })
+      .where(eq(refreshTokens.id, tokenRecord.id));
 
     // Generate new tokens
     const newAccessToken = await generateAccessToken(
@@ -161,16 +172,11 @@ export async function refreshAccessToken(
 
     const newRefreshToken = generateRefreshToken();
 
-    // Store new refresh token in database
-    const expiresAt = new Date();
-    expiresAt.setDate(
-      expiresAt.getDate() + siteConfig.auth.refreshToken.expiresInDays
-    );
-
+    // Store new refresh token in database with inherited expiration
     await db.insert(refreshTokens).values({
       userId: user.id,
       token: newRefreshToken,
-      expiresAt,
+      expiresAt: originalExpiresAt,
     });
 
     return {
@@ -184,5 +190,19 @@ export async function refreshAccessToken(
       success: false,
       error: "Failed to refresh token",
     };
+  }
+}
+
+/**
+ * Delete all expired refresh tokens from the database
+ */
+export async function deleteExpiredRefreshTokens(): Promise<void> {
+  try {
+    await db
+      .delete(refreshTokens)
+      .where(lt(refreshTokens.expiresAt, new Date()));
+  } catch (error) {
+    console.error("Error deleting expired refresh tokens:", error);
+    throw error;
   }
 }

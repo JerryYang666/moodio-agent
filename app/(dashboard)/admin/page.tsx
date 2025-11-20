@@ -5,7 +5,7 @@ import { Card, CardBody, CardFooter, CardHeader } from "@heroui/card";
 import { Button } from "@heroui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { Spinner } from "@heroui/spinner";
-import { Users, MessageSquare } from "lucide-react";
+import { Users, MessageSquare, Settings } from "lucide-react";
 
 export default function AdminPage() {
   const { user, loading: authLoading } = useAuth();
@@ -23,7 +23,7 @@ export default function AdminPage() {
     <div className="space-y-8">
       <h1 className="text-3xl font-bold">Admin Dashboard</h1>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {/* User Management Card */}
         <Card className="py-4 cursor-pointer hover:scale-[1.02] transition-transform" onPress={() => router.push("/admin/user-management")}>
           <CardHeader className="pb-0 pt-2 px-4 flex-row gap-2 items-center">
@@ -58,6 +58,25 @@ export default function AdminPage() {
           <CardFooter>
             <Button color="primary" variant="flat" onPress={() => router.push("/admin/chat-management")}>
               Go to Chat Management
+            </Button>
+          </CardFooter>
+        </Card>
+
+        {/* System Management Card */}
+        <Card className="py-4 cursor-pointer hover:scale-[1.02] transition-transform" onPress={() => router.push("/admin/system-management")}>
+          <CardHeader className="pb-0 pt-2 px-4 flex-row gap-2 items-center">
+            <Settings className="w-6 h-6 text-primary" />
+            <div className="flex flex-col">
+               <p className="text-tiny uppercase font-bold">Management</p>
+               <h4 className="font-bold text-large">System</h4>
+            </div>
+          </CardHeader>
+          <CardBody className="overflow-visible py-2">
+             <p className="text-default-500">Manage system settings, cleanup tokens, and maintenance.</p>
+          </CardBody>
+          <CardFooter>
+            <Button color="primary" variant="flat" onPress={() => router.push("/admin/system-management")}>
+              Go to System Management
             </Button>
           </CardFooter>
         </Card>
