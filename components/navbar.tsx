@@ -31,48 +31,27 @@ import {
 import { User } from "@heroui/user";
 import { Card, CardBody } from "@heroui/card";
 import { useAuth } from "@/hooks/use-auth";
+import { useChat } from "@/hooks/use-chat";
 import { Divider } from "@heroui/divider";
-
-interface Chat {
-  id: string;
-  name: string | null;
-  updatedAt: string;
-}
 
 export const Navbar = () => {
   const pathname = usePathname();
   const router = useRouter();
   const { user } = useAuth();
-  const [chats, setChats] = useState<Chat[]>([]);
+  const { chats, refreshChats } = useChat();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
-  const fetchChats = async () => {
-    try {
-      const res = await fetch("/api/chat");
-      if (res.ok) {
-        const data = await res.json();
-        setChats(data.chats);
-      }
-    } catch (error) {
-      console.error("Failed to fetch chats", error);
-    }
-  };
-
   useEffect(() => {
-    if (user) {
-      fetchChats();
-    }
-    
     // Listen for custom event to refresh chats
     const handleRefreshChats = () => {
-      fetchChats();
+      refreshChats();
     };
     
     window.addEventListener("refresh-chats", handleRefreshChats);
     return () => {
       window.removeEventListener("refresh-chats", handleRefreshChats);
     };
-  }, [user, pathname]);
+  }, [refreshChats]);
 
   const handleNewChat = () => {
     router.push("/chat");
