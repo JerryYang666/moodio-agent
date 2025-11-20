@@ -41,10 +41,13 @@ export async function createRefreshToken(
     expiresAt.getDate() + siteConfig.auth.refreshToken.expiresInDays
   );
 
+  // Initial creation: sessionExpiresAt matches expiresAt
+  // This establishes the maximum duration of the login session
   await db.insert(refreshTokens).values({
     userId,
     token,
     expiresAt,
+    sessionExpiresAt: expiresAt,
   });
 }
 
@@ -147,8 +150,9 @@ export async function refreshAccessToken(
       };
     }
 
-    // Capture original expiration for the NEW token
-    const originalExpiresAt = tokenRecord.expiresAt;
+    // Capture original session expiration for the NEW token
+    // If sessionExpiresAt is missing (legacy records), fall back to expiresAt
+    const originalSessionExpiresAt = tokenRecord.sessionExpiresAt || tokenRecord.expiresAt;
 
     // Update old refresh token expiration (grace period) instead of deleting
     const gracePeriodExpiresAt = new Date();
@@ -172,11 +176,12 @@ export async function refreshAccessToken(
 
     const newRefreshToken = generateRefreshToken();
 
-    // Store new refresh token in database with inherited expiration
+    // Store new refresh token in database with inherited session expiration
     await db.insert(refreshTokens).values({
       userId: user.id,
       token: newRefreshToken,
-      expiresAt: originalExpiresAt,
+      expiresAt: originalSessionExpiresAt, // New token is valid until the session expires
+      sessionExpiresAt: originalSessionExpiresAt, // Pass down the session expiration
     });
 
     return {
