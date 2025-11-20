@@ -1,0 +1,218 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { Button } from "@heroui/button";
+import { Card } from "@heroui/card";
+import { Spinner } from "@heroui/spinner";
+import { api } from "@/lib/api/client";
+
+interface User {
+  id: string;
+  email: string;
+  firstName?: string | null;
+  lastName?: string | null;
+  roles: string[];
+  authProvider: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export default function Home() {
+  const router = useRouter();
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [loggingOut, setLoggingOut] = useState(false);
+  const [testResult, setTestResult] = useState<any>(null);
+  const [testLoading, setTestLoading] = useState(false);
+
+  useEffect(() => {
+    fetchUser();
+  }, []);
+
+  const fetchUser = async () => {
+    try {
+      const data = await api.get("/api/auth/me");
+      setUser(data.user);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load user");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    setLoggingOut(true);
+
+    try {
+      await api.post("/api/auth/logout");
+      router.push("/auth/login");
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to logout");
+      setLoggingOut(false);
+    }
+  };
+
+  const handleTestProtectedAPI = async () => {
+    setTestLoading(true);
+    setTestResult(null);
+
+    try {
+      const data = await fetch("/api/test/protected", {
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+      setTestResult(await data.json());
+    } catch (err) {
+      setTestResult({
+        error:
+          err instanceof Error ? err.message : "Failed to fetch protected data",
+      });
+    } finally {
+      setTestLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Spinner size="lg" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Card className="p-6 max-w-md">
+          <p className="text-red-600 dark:text-red-400">{error}</p>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return null;
+  }
+
+  const displayName =
+    user.firstName && user.lastName
+      ? `${user.firstName} ${user.lastName}`
+      : user.firstName || user.email.split("@")[0];
+
+  return (
+    <div className="flex items-center justify-center min-h-[60vh]">
+      <Card className="w-full max-w-2xl p-8">
+        <div className="space-y-6">
+          <div className="text-center">
+            <h1 className="text-4xl font-bold mb-2">Welcome back!</h1>
+            <p className="text-xl text-gray-600 dark:text-gray-400">
+              {displayName}
+            </p>
+          </div>
+
+          <div className="space-y-4 p-6 bg-gray-50 dark:bg-gray-900 rounded-lg">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Email
+                </p>
+                <p className="font-medium">{user.email}</p>
+              </div>
+
+              {user.firstName && (
+                <div>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    First Name
+                  </p>
+                  <p className="font-medium">{user.firstName}</p>
+                </div>
+              )}
+
+              {user.lastName && (
+                <div>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    Last Name
+                  </p>
+                  <p className="font-medium">{user.lastName}</p>
+                </div>
+              )}
+
+              <div>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Auth Provider
+                </p>
+                <p className="font-medium capitalize">{user.authProvider}</p>
+              </div>
+
+              <div>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Roles
+                </p>
+                <div className="flex gap-2 flex-wrap">
+                  {user.roles.map((role) => (
+                    <span
+                      key={role}
+                      className="px-2 py-1 text-xs rounded-full bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300"
+                    >
+                      {role}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Member Since
+                </p>
+                <p className="font-medium">
+                  {new Date(user.createdAt).toLocaleDateString()}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <div className="flex justify-center pt-4">
+              <Button
+                color="primary"
+                variant="flat"
+                size="lg"
+                onPress={handleTestProtectedAPI}
+                isLoading={testLoading}
+              >
+                Test Protected API
+              </Button>
+            </div>
+
+            {testResult && (
+              <div className="p-4 rounded-lg bg-gray-100 dark:bg-gray-800">
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-2 font-mono">
+                  Response from /api/test/protected:
+                </p>
+                <pre className="text-sm overflow-x-auto">
+                  {JSON.stringify(testResult, null, 2)}
+                </pre>
+              </div>
+            )}
+          </div>
+
+          <div className="flex justify-center pt-4 border-t border-gray-200 dark:border-gray-700 mt-6">
+            <Button
+              color="danger"
+              variant="flat"
+              size="lg"
+              onPress={handleLogout}
+              isLoading={loggingOut}
+            >
+              Logout
+            </Button>
+          </div>
+        </div>
+      </Card>
+    </div>
+  );
+}
