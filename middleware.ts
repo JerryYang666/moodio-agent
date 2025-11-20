@@ -80,6 +80,21 @@ function getRefreshToken(request: NextRequest): string | null {
   );
 }
 
+/**
+ * Check if the request is a browser prefetch or Next.js prefetch
+ */
+function isPrefetch(request: NextRequest): boolean {
+  const headers = request.headers;
+  return (
+    headers.get("purpose") === "prefetch" ||
+    headers.get("sec-purpose") === "prefetch" ||
+    headers.get("sec-purpose") === "prerender" ||
+    headers.get("x-purpose") === "prefetch" ||
+    headers.get("x-moz") === "prefetch" ||
+    headers.get("x-middleware-prefetch") === "1"
+  );
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -111,6 +126,18 @@ export async function middleware(request: NextRequest) {
   // Access token is invalid, expired, or missing - try to refresh
   const refreshToken = getRefreshToken(request);
   const isApiRoute = pathname.startsWith("/api/");
+
+  // Check for prefetch headers - DO NOT refresh tokens on prefetch
+  // This prevents consuming the single-use refresh token for a speculative request
+  // where the browser might not persist the new cookies
+  if (isPrefetch(request) && !accessToken) {
+    return new NextResponse(null, { 
+      status: 204,
+      headers: {
+        "Cache-Control": "no-store, must-revalidate"
+      }
+    });
+  }
 
   if (refreshToken) {
     try {
