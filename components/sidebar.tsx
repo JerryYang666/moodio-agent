@@ -16,10 +16,12 @@ import {
   User as UserIcon,
   Shield,
   SquarePen,
-  MessageSquare
+  MessageSquare,
+  LogOut
 } from "lucide-react";
 import { User } from "@heroui/user";
 import { Card, CardBody } from "@heroui/card";
+import { Popover, PopoverTrigger, PopoverContent } from "@heroui/popover";
 import { useAuth } from "@/hooks/use-auth";
 import { useChat } from "@/hooks/use-chat";
 import { Button } from "@heroui/button";
@@ -29,9 +31,10 @@ import { Divider } from "@heroui/divider";
 export const Sidebar = () => {
   const pathname = usePathname();
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const { chats, refreshChats } = useChat();
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isLogoHovered, setIsLogoHovered] = useState(false);
 
   useEffect(() => {
     // Listen for custom event to refresh chats
@@ -83,23 +86,45 @@ export const Sidebar = () => {
       transition={{ duration: 0.3, type: "spring", stiffness: 200, damping: 25 }}
       className="hidden md:flex flex-col h-screen sticky top-0 border-r border-divider bg-background z-40 overflow-hidden"
     >
-      <div className={clsx("p-6 flex items-center gap-2", isCollapsed && "justify-center px-2")}>
-        <BotMessageSquare className="text-primary shrink-0" size={24} />
-        <AnimatePresence>
-          {!isCollapsed && (
-            <motion.p 
-              initial={{ opacity: 0, width: 0 }}
-              animate={{ opacity: 1, width: "auto" }}
-              exit={{ opacity: 0, width: 0 }}
-              className="font-bold text-inherit whitespace-nowrap overflow-hidden"
-            >
-              moodio agent
-            </motion.p>
+      <div className={clsx("p-4 flex items-center", isCollapsed ? "justify-center" : "justify-between")}>
+        <div 
+          className={clsx("flex items-center gap-2", isCollapsed && "cursor-pointer")}
+          onMouseEnter={() => isCollapsed && setIsLogoHovered(true)}
+          onMouseLeave={() => isCollapsed && setIsLogoHovered(false)}
+          onClick={() => isCollapsed && setIsCollapsed(false)}
+        >
+          {isCollapsed && isLogoHovered ? (
+            <PanelRightClose className="text-default-500 shrink-0" size={24} />
+          ) : (
+            <BotMessageSquare className="text-primary shrink-0" size={24} />
           )}
-        </AnimatePresence>
+          <AnimatePresence>
+            {!isCollapsed && (
+              <motion.p 
+                initial={{ opacity: 0, width: 0 }}
+                animate={{ opacity: 1, width: "auto" }}
+                exit={{ opacity: 0, width: 0 }}
+                className="font-bold text-inherit whitespace-nowrap overflow-hidden"
+              >
+                moodio agent
+              </motion.p>
+            )}
+          </AnimatePresence>
+        </div>
+        {!isCollapsed && (
+          <Button
+            isIconOnly
+            variant="light"
+            size="sm"
+            onPress={() => setIsCollapsed(!isCollapsed)}
+            className="text-default-500 shrink-0"
+          >
+            <PanelRightOpen size={20} />
+          </Button>
+        )}
       </div>
 
-      <div className="flex flex-col gap-1 px-3 py-2 grow overflow-y-auto overflow-x-hidden">
+      <div className="flex flex-col gap-1 pl-3 pr-2 py-2 grow overflow-y-auto overflow-x-hidden sidebar-scrollbar">
         {/* New Chat Button */}
         <button
           onClick={handleNewChat}
@@ -222,43 +247,55 @@ export const Sidebar = () => {
         </div>
       </div>
 
-      <div className="p-3 border-t border-divider mt-auto space-y-4">
+      <div className="p-3 border-t border-divider mt-auto">
         {user && (
-          <Card shadow="sm" className={clsx("bg-default-50 dark:bg-default-100/50", isCollapsed ? "p-1" : "")}>
-            <CardBody className={clsx("p-2 overflow-hidden", isCollapsed && "flex justify-center items-center")}>
-               <User
-                name={!isCollapsed ? displayName : ""}
-                description={!isCollapsed ? user.email : ""}
-                avatarProps={{
-                  src: undefined,
-                  name: user.firstName?.charAt(0) || user.email.charAt(0).toUpperCase(),
-                  isBordered: true,
-                  color: "primary",
-                  size: "sm",
-                  className: "shrink-0"
-                }}
-                classNames={{
-                  name: "text-sm font-semibold truncate",
-                  description: "text-xs text-default-500 truncate",
-                  base: isCollapsed ? "gap-0" : ""
-                }}
-              />
-            </CardBody>
-          </Card>
+          <Popover placement="top" showArrow>
+            <PopoverTrigger>
+              <Card 
+                isPressable 
+                shadow="sm" 
+                className={clsx("bg-default-50 dark:bg-default-100/50 cursor-pointer hover:bg-default-100 transition-colors w-full", isCollapsed ? "p-1" : "")}
+              >
+                <CardBody className={clsx("p-2 overflow-hidden", isCollapsed && "flex justify-center items-center")}>
+                  <User
+                    name={!isCollapsed ? displayName : ""}
+                    description={!isCollapsed ? user.email : ""}
+                    avatarProps={{
+                      src: undefined,
+                      name: user.firstName?.charAt(0) || user.email.charAt(0).toUpperCase(),
+                      isBordered: true,
+                      color: "primary",
+                      size: "sm",
+                      className: "shrink-0"
+                    }}
+                    classNames={{
+                      name: "text-sm font-semibold truncate",
+                      description: "text-xs text-default-500 truncate",
+                      base: isCollapsed ? "gap-0" : ""
+                    }}
+                  />
+                </CardBody>
+              </Card>
+            </PopoverTrigger>
+            <PopoverContent className="w-full">
+              <div className="flex items-center justify-between gap-20 px-3 py-2 w-full">
+                <Button
+                  size="sm"
+                  variant="flat"
+                  color="danger"
+                  startContent={<LogOut size={16} />}
+                  onPress={logout}
+                  className="flex-1"
+                >
+                  Logout
+                </Button>
+                <div className="flex items-center">
+                  <ThemeSwitch />
+                </div>
+              </div>
+            </PopoverContent>
+          </Popover>
         )}
-        
-        <div className={clsx("flex items-center px-2", isCollapsed ? "flex-col-reverse gap-4 justify-center" : "justify-between")}>
-          <Button
-            isIconOnly
-            variant="light"
-            size="sm"
-            onPress={() => setIsCollapsed(!isCollapsed)}
-            className="text-default-500"
-          >
-            {isCollapsed ? <PanelRightClose size={20} /> : <PanelRightOpen size={20} />}
-          </Button>
-          <ThemeSwitch />
-        </div>
       </div>
     </motion.aside>
   );

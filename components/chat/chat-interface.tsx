@@ -597,12 +597,12 @@ export default function ChatInterface({
           );
         })}
         {isSending && messages[messages.length - 1]?.role === "user" && (
-          <div className="flex gap-3 max-w-3xl mx-auto justify-start">
-            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-1">
+          <div className="flex gap-3 max-w-3xl mx-auto justify-start items-center">
+            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
               <Bot size={16} className="text-primary" />
             </div>
             <Card className="max-w-[80%] shadow-none bg-default-100 dark:bg-default-50/10">
-              <CardBody className="p-3 overflow-hidden">
+              <CardBody className="px-4 pt-[2px] pb-1 overflow-hidden flex justify-center">
                 <Spinner variant="dots" size="md" />
               </CardBody>
             </Card>

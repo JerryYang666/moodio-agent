@@ -64,9 +64,9 @@ export default function LoginPage() {
         throw new Error(data.error || "Failed to verify OTP");
       }
 
-      // Redirect to home page
-      router.push("/");
-      router.refresh();
+      // Hard redirect to home page to ensure cookies are properly loaded
+      // Using window.location instead of router.push to force a full page reload
+      window.location.href = "/";
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to verify OTP");
       setOtp("");

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Button } from "@heroui/button";
 import { Card } from "@heroui/card";
 import { Spinner } from "@heroui/spinner";
+import { Chip } from "@heroui/chip";
 import { useAuth } from "@/hooks/use-auth";
 
 export default function Home() {
@@ -110,12 +111,14 @@ export default function Home() {
                 </p>
                 <div className="flex gap-2 flex-wrap">
                   {user.roles.map((role) => (
-                    <span
+                    <Chip
                       key={role}
-                      className="px-2 py-1 text-xs rounded-full bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300"
+                      color="primary"
+                      size="sm"
+                      variant="flat"
                     >
                       {role}
-                    </span>
+                    </Chip>
                   ))}
                 </div>
               </div>
