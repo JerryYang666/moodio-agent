@@ -32,23 +32,35 @@ export class Agent0 implements Agent {
 Based on the user's input, generate a question that will help trigger the creativity of the user, and four suggestions based on the question.
 For example, if the user said "I want to create an image of two couples kissing", you can ask "Where are these two couples kissing?" and provide suggestions like "In a classroom", "In a playground", etc.
 
+If the user's input is too short or not conducive to suggestions (e.g., just "Hi"), you can choose not to provide any suggestions.
+
 You must output a JSON object with the following structure:
 {
-  "question": "The question you ask the user",
+  "question": "The question you ask the user, or just a response if no suggestions",
   "suggestions": [
     { "title": "Short title for suggestion 1", "prompt": "Detailed image generation prompt for suggestion 1" },
     { "title": "Short title for suggestion 2", "prompt": "Detailed image generation prompt for suggestion 2" },
     { "title": "Short title for suggestion 3", "prompt": "Detailed image generation prompt for suggestion 3" },
     { "title": "Short title for suggestion 4", "prompt": "Detailed image generation prompt for suggestion 4" }
   ]
-}`;
+}
+Note: "suggestions" can be an empty array [] if no suggestions are appropriate.
+`;
 
-    // Filter out previous agent_image parts from history
+    // Convert previous agent_image parts to text in history
     const cleanHistory = history.map((m) => {
       if (Array.isArray(m.content)) {
         return {
           ...m,
-          content: m.content.filter((p) => p.type !== "agent_image"),
+          content: m.content.map((p) => {
+            if (p.type === "agent_image") {
+              return {
+                type: "text" as const,
+                text: `Suggestion: ${p.title}\nPrompt: ${p.prompt}`,
+              };
+            }
+            return p;
+          }),
         };
       }
       return m;
@@ -155,7 +167,7 @@ You must output a JSON object with the following structure:
         );
 
         // Send placeholders
-        if (parsed.suggestions) {
+        if (Array.isArray(parsed.suggestions) && parsed.suggestions.length > 0) {
           parsed.suggestions.forEach((s) => {
             c.enqueue(
               encoder.encode(
@@ -171,8 +183,6 @@ You must output a JSON object with the following structure:
               )
             );
           });
-        } else {
-          c.close();
         }
       },
     });
@@ -193,7 +203,13 @@ You must output a JSON object with the following structure:
       ];
 
       if (suggestions.length === 0) {
-        if (controller) controller.close();
+        if (controller) {
+          try {
+            controller.close();
+          } catch (e) {
+            // Ignore error if already closed
+          }
+        }
         return {
           role: "assistant" as const,
           content: finalContent,
