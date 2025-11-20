@@ -639,7 +639,7 @@ export default function ChatInterface({
     <div className="flex flex-col h-full relative">
       <div className="flex-1 overflow-y-auto space-y-6 pb-4 pr-2 scrollbar-hide">
         {messages.length === 0 && (
-          <div className="text-center text-default-500 mt-20">
+          <div className="text-center text-default-500 mt-60">
             <Bot size={48} className="mx-auto mb-4 opacity-20" />
             <p>Start a conversation with Moodio Agent</p>
           </div>
@@ -729,7 +729,7 @@ export default function ChatInterface({
         <div ref={messagesEndRef} />
       </div>
 
-      <div className="sticky bottom-0 bg-background/80 backdrop-blur-md pt-4 pb-2 border-t border-divider z-10">
+      <div className="sticky bottom-0 bg-background/80 backdrop-blur-md pt-3 pb-0 border-t border-divider z-10">
         <div className="max-w-3xl mx-auto flex flex-col gap-2">
           <div className="flex gap-2 flex-wrap">
             {previewUrl && (
