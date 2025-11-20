@@ -22,11 +22,21 @@ export async function GET(
       return NextResponse.json({ error: "Invalid token" }, { status: 401 });
     }
 
-    // Verify ownership
-    const [chat] = await db
-      .select()
-      .from(chats)
-      .where(and(eq(chats.id, chatId), eq(chats.userId, payload.userId)));
+    // Verify ownership or admin status
+    const isAdmin = payload.roles?.includes("admin");
+    let chat;
+
+    if (isAdmin) {
+      [chat] = await db
+        .select()
+        .from(chats)
+        .where(eq(chats.id, chatId));
+    } else {
+      [chat] = await db
+        .select()
+        .from(chats)
+        .where(and(eq(chats.id, chatId), eq(chats.userId, payload.userId)));
+    }
 
     if (!chat) {
       return NextResponse.json({ error: "Chat not found" }, { status: 404 });

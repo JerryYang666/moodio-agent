@@ -120,12 +120,12 @@ export const Sidebar = () => {
         </AnimatePresence>
       </div>
 
-      <div className="flex flex-col gap-2 px-3 py-2 grow overflow-y-auto overflow-x-hidden">
+      <div className="flex flex-col gap-1 px-3 py-2 grow overflow-y-auto overflow-x-hidden">
         {/* New Chat Button */}
         <button
           onClick={handleNewChat}
           className={clsx(
-            "flex items-center gap-2 px-3 py-3 rounded-xl transition-colors whitespace-nowrap text-default-500 hover:bg-default-100 hover:text-default-900",
+            "flex items-center gap-2 px-3 py-2 rounded-xl transition-colors whitespace-nowrap text-default-500 hover:bg-default-100 hover:text-default-900",
             isCollapsed && "justify-center"
           )}
         >
@@ -136,7 +136,7 @@ export const Sidebar = () => {
                 initial={{ opacity: 0, width: 0 }}
                 animate={{ opacity: 1, width: "auto" }}
                 exit={{ opacity: 0, width: 0 }}
-                className="overflow-hidden"
+                className="overflow-hidden text-sm"
               >
                 New Chat
               </motion.span>
@@ -151,7 +151,7 @@ export const Sidebar = () => {
               key={item.href}
               href={item.href}
               className={clsx(
-                "flex items-center gap-2 px-3 py-3 rounded-xl transition-colors whitespace-nowrap",
+                "flex items-center gap-2 px-3 py-2 rounded-xl transition-colors whitespace-nowrap",
                 isActive 
                   ? "bg-primary/10 text-primary font-medium" 
                   : "text-default-500 hover:bg-default-100 hover:text-default-900",
@@ -165,7 +165,7 @@ export const Sidebar = () => {
                     initial={{ opacity: 0, width: 0 }}
                     animate={{ opacity: 1, width: "auto" }}
                     exit={{ opacity: 0, width: 0 }}
-                    className="overflow-hidden"
+                    className="overflow-hidden text-sm"
                   >
                     {item.label}
                   </motion.span>
@@ -178,9 +178,9 @@ export const Sidebar = () => {
         {/* Admin Link */}
         {user && user.roles.includes("admin") && (
           <NextLink
-            href="/admin/user-management"
+            href="/admin"
             className={clsx(
-              "flex items-center gap-2 px-3 py-3 rounded-xl transition-colors whitespace-nowrap",
+              "flex items-center gap-2 px-3 py-2 rounded-xl transition-colors whitespace-nowrap",
               pathname?.startsWith("/admin")
                 ? "bg-primary/10 text-primary font-medium" 
                 : "text-default-500 hover:bg-default-100 hover:text-default-900",
@@ -194,7 +194,7 @@ export const Sidebar = () => {
                   initial={{ opacity: 0, width: 0 }}
                   animate={{ opacity: 1, width: "auto" }}
                   exit={{ opacity: 0, width: 0 }}
-                  className="overflow-hidden"
+                  className="overflow-hidden text-sm"
                 >
                   Admin
                 </motion.span>
