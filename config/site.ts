@@ -23,9 +23,9 @@ export const siteConfig = {
   auth: {
     // JWT Access Token Configuration
     accessToken: {
-      expiresIn: "1m", // 15 minutes (jose format: "15m", "1h", "1d", etc.)
+      expiresIn: "15m", // 15 minutes (jose format: "15m", "1h", "1d", etc.)
       cookieName: "moodio_access_token",
-      maxAge: 1 * 60, // 15 minutes in seconds
+      maxAge: 15 * 60, // 15 minutes in seconds
     },
 
     // Refresh Token Configuration
