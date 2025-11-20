@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import {
   Table,
   TableHeader,
@@ -27,6 +27,8 @@ import { api } from "@/lib/api/client";
 import { useAuth } from "@/hooks/use-auth";
 import { Spinner } from "@heroui/spinner";
 import { User } from "@/hooks/use-auth";
+import { Pagination } from "@heroui/pagination";
+import { SearchIcon } from "@/components/icons";
 
 interface InvitationCode {
   code: string;
@@ -40,6 +42,11 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   
+  // Pagination & Search State
+  const [filterValue, setFilterValue] = useState("");
+  const [page, setPage] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+
   // Invite Email State
   const {
     isOpen: isInviteOpen,
@@ -90,6 +97,44 @@ export default function AdminPage() {
       setLoading(false);
     }
   };
+
+  // Filter logic
+  const filteredItems = useMemo(() => {
+    let filteredUsers = [...users];
+
+    if (filterValue) {
+      filteredUsers = filteredUsers.filter((user) =>
+        user.email.toLowerCase().includes(filterValue.toLowerCase()) ||
+        (user.firstName && user.firstName.toLowerCase().includes(filterValue.toLowerCase())) ||
+        (user.lastName && user.lastName.toLowerCase().includes(filterValue.toLowerCase()))
+      );
+    }
+
+    return filteredUsers;
+  }, [users, filterValue]);
+
+  // Pagination logic
+  const pages = Math.ceil(filteredItems.length / rowsPerPage);
+  const items = useMemo(() => {
+    const start = (page - 1) * rowsPerPage;
+    const end = start + rowsPerPage;
+
+    return filteredItems.slice(start, end);
+  }, [page, filteredItems, rowsPerPage]);
+
+  const onSearchChange = useCallback((value?: string) => {
+    if (value) {
+      setFilterValue(value);
+      setPage(1);
+    } else {
+      setFilterValue("");
+    }
+  }, []);
+
+  const onClear = useCallback(() => {
+    setFilterValue("");
+    setPage(1);
+  }, []);
 
   const handleSendInvites = async () => {
     setSendingInvites(true);
@@ -182,76 +227,106 @@ export default function AdminPage() {
           <h2 className="text-lg font-semibold">User Management</h2>
         </CardHeader>
         <CardBody>
-          <Table aria-label="User table">
-            <TableHeader>
-              <TableColumn>USER</TableColumn>
-              <TableColumn>ROLES</TableColumn>
-              <TableColumn>PROVIDER</TableColumn>
-              <TableColumn>JOINED</TableColumn>
-              <TableColumn>ACTIONS</TableColumn>
-            </TableHeader>
-            <TableBody
-              emptyContent={loading ? <Spinner /> : "No users found"}
-              items={users}
-            >
-              {(item) => (
-                <TableRow key={item.id}>
-                  <TableCell>
-                    <UserAvatar
-                      name={
-                        item.firstName && item.lastName
-                          ? `${item.firstName} ${item.lastName}`
-                          : item.firstName || item.email
-                      }
-                      description={item.email}
-                      avatarProps={{
-                        name: (
-                          item.firstName?.charAt(0) ||
-                          item.email.charAt(0)
-                        ).toUpperCase(),
-                        color: "primary",
-                      }}
+          <div className="flex flex-col gap-4">
+            <div className="flex justify-between gap-3 items-end">
+              <Input
+                isClearable
+                className="w-full sm:max-w-[44%]"
+                placeholder="Search by name or email..."
+                startContent={<SearchIcon />}
+                value={filterValue}
+                onClear={() => onClear()}
+                onValueChange={onSearchChange}
+              />
+            </div>
+            <Table 
+              aria-label="User table"
+              bottomContent={
+                pages > 0 ? (
+                  <div className="flex w-full justify-center">
+                    <Pagination
+                      isCompact
+                      showControls
+                      showShadow
+                      color="primary"
+                      page={page}
+                      total={pages}
+                      onChange={(page) => setPage(page)}
                     />
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap gap-1">
-                      {item.roles.map((role) => (
-                        <Chip
-                          key={role}
-                          size="sm"
-                          variant="flat"
-                          color={
-                            role === "admin"
-                              ? "danger"
-                              : role === "new_user"
-                              ? "warning"
-                              : "primary"
-                          }
-                        >
-                          {role}
-                        </Chip>
-                      ))}
-                    </div>
-                  </TableCell>
-                  <TableCell className="capitalize">
-                    {item.authProvider}
-                  </TableCell>
-                  <TableCell>
-                    {new Date(item.createdAt).toLocaleDateString()}
-                  </TableCell>
-                  <TableCell>
-                    <Button
-                      size="sm"
-                      variant="flat"
-                      onPress={() => handleEditUser(item)}
-                    >
-                      Edit
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
+                  </div>
+                ) : null
+              }
+            >
+              <TableHeader>
+                <TableColumn>USER</TableColumn>
+                <TableColumn>ROLES</TableColumn>
+                <TableColumn>PROVIDER</TableColumn>
+                <TableColumn>JOINED</TableColumn>
+                <TableColumn>ACTIONS</TableColumn>
+              </TableHeader>
+              <TableBody
+                emptyContent={loading ? <Spinner /> : "No users found"}
+                items={items}
+              >
+                {(item) => (
+                  <TableRow key={item.id}>
+                    <TableCell>
+                      <UserAvatar
+                        name={
+                          item.firstName && item.lastName
+                            ? `${item.firstName} ${item.lastName}`
+                            : item.firstName || item.email
+                        }
+                        description={item.email}
+                        avatarProps={{
+                          name: (
+                            item.firstName?.charAt(0) ||
+                            item.email.charAt(0)
+                          ).toUpperCase(),
+                          color: "primary",
+                        }}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-1">
+                        {item.roles.map((role) => (
+                          <Chip
+                            key={role}
+                            size="sm"
+                            variant="flat"
+                            color={
+                              role === "admin"
+                                ? "danger"
+                                : role === "new_user"
+                                ? "warning"
+                                : "primary"
+                            }
+                          >
+                            {role}
+                          </Chip>
+                        ))}
+                      </div>
+                    </TableCell>
+                    <TableCell className="capitalize">
+                      {item.authProvider}
+                    </TableCell>
+                    <TableCell>
+                      {new Date(item.createdAt).toLocaleDateString()}
+                    </TableCell>
+                    <TableCell>
+                      <Button
+                        size="sm"
+                        variant="flat"
+                        onPress={() => handleEditUser(item)}
+                      >
+                        Edit
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </CardBody>
       </Card>
 
@@ -432,4 +507,3 @@ export default function AdminPage() {
     </div>
   );
 }
-
