@@ -85,13 +85,18 @@ function getRefreshToken(request: NextRequest): string | null {
  */
 function isPrefetch(request: NextRequest): boolean {
   const headers = request.headers;
+  const purpose = headers.get("purpose");
+  const secPurpose = headers.get("sec-purpose");
+  const xPurpose = headers.get("x-purpose");
+  const xMoz = headers.get("x-moz");
+  const xMiddlewarePrefetch = headers.get("x-middleware-prefetch");
+
   return (
-    headers.get("purpose") === "prefetch" ||
-    headers.get("sec-purpose") === "prefetch" ||
-    headers.get("sec-purpose") === "prerender" ||
-    headers.get("x-purpose") === "prefetch" ||
-    headers.get("x-moz") === "prefetch" ||
-    headers.get("x-middleware-prefetch") === "1"
+    (purpose !== null && purpose.includes("prefetch")) ||
+    (secPurpose !== null && (secPurpose.includes("prefetch") || secPurpose.includes("prerender"))) ||
+    (xPurpose !== null && xPurpose.includes("prefetch")) ||
+    (xMoz !== null && xMoz.includes("prefetch")) ||
+    xMiddlewarePrefetch === "1"
   );
 }
 
