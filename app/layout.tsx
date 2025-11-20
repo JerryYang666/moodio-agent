@@ -51,7 +51,7 @@ export default function RootLayout({
                 <Navbar />
               </div>
               <main className="flex-1 overflow-y-auto p-6">
-                <div className="container mx-auto max-w-7xl">
+                <div className="container mx-auto max-w-7xl h-full">
                   {children}
                 </div>
               </main>

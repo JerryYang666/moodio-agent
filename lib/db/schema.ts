@@ -55,6 +55,35 @@ export const refreshTokens = pgTable("refresh_tokens", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+/**
+ * Invitation Codes table
+ * Stores generated invitation codes (not linked to specific emails)
+ */
+export const invitationCodes = pgTable("invitation_codes", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  code: varchar("code", { length: 6 }).notNull().unique(),
+  createdBy: uuid("created_by")
+    .notNull()
+    .references(() => users.id),
+  status: varchar("status", { length: 20 }).default("unused").notNull(), // 'unused', 'used'
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+/**
+ * Chats table
+ * Stores chat session metadata
+ * Actual chat content is stored in S3
+ */
+export const chats = pgTable("chats", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 255 }), // Can be null/empty initially
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 // Export types for TypeScript
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
@@ -64,3 +93,9 @@ export type NewOTP = typeof otps.$inferInsert;
 
 export type RefreshToken = typeof refreshTokens.$inferSelect;
 export type NewRefreshToken = typeof refreshTokens.$inferInsert;
+
+export type InvitationCode = typeof invitationCodes.$inferSelect;
+export type NewInvitationCode = typeof invitationCodes.$inferInsert;
+
+export type Chat = typeof chats.$inferSelect;
+export type NewChat = typeof chats.$inferInsert;

@@ -98,6 +98,73 @@ function getOTPEmailTemplate(code: string, firstName?: string): string {
   `.trim();
 }
 
+function getInviteEmailTemplate(): string {
+  return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>You're Invited!</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f5f5f5;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f5f5f5; padding: 40px 20px;">
+    <tr>
+      <td align="center">
+        <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 600px; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+          <!-- Header -->
+          <tr>
+            <td style="padding: 40px 40px 20px 40px; text-align: center;">
+              <h1 style="margin: 0; font-size: 28px; font-weight: 600; color: #1a1a1a;">
+                You've been invited to Moodio Agent!
+              </h1>
+            </td>
+          </tr>
+          
+          <!-- Content -->
+          <tr>
+            <td style="padding: 0 40px 30px 40px;">
+              <p style="margin: 0 0 20px 0; font-size: 16px; line-height: 24px; color: #4a4a4a;">
+                Hello!
+              </p>
+              <p style="margin: 0 0 30px 0; font-size: 16px; line-height: 24px; color: #4a4a4a;">
+                You have been invited to join Moodio Agent. Click the button below to get started:
+              </p>
+              
+              <table width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td align="center">
+                    <a href="${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}" style="background-color: #0070f3; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px; display: inline-block;">
+                      Join Moodio Agent
+                    </a>
+                  </td>
+                </tr>
+              </table>
+              
+              <p style="margin: 30px 0 0 0; font-size: 14px; line-height: 20px; color: #6b7280;">
+                If the button doesn't work, copy and paste this link into your browser:<br>
+                ${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}
+              </p>
+            </td>
+          </tr>
+          
+          <!-- Footer -->
+          <tr>
+            <td style="padding: 30px 40px 40px 40px; border-top: 1px solid #e5e7eb;">
+              <p style="margin: 0; font-size: 14px; line-height: 20px; color: #9ca3af; text-align: center;">
+                This is an automated message, please do not reply to this email.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `.trim();
+}
+
 /**
  * Send OTP email to a user
  */
@@ -122,5 +189,30 @@ export async function sendOTPEmail(
   } catch (error) {
     console.error("Error sending OTP email:", error);
     throw new Error("Failed to send OTP email");
+  }
+}
+
+/**
+ * Send invitation email to multiple users via BCC
+ */
+export async function sendGeneralInviteEmail(emails: string[]): Promise<void> {
+  if (!emails.length) return;
+
+  try {
+    const transporter = createTransporter();
+    const htmlContent = getInviteEmailTemplate();
+
+    await transporter.sendMail({
+      from: process.env.SMTP_USER,
+      bcc: emails, // Send to all recipients in BCC
+      subject: "You've been invited to Moodio Agent",
+      html: htmlContent,
+      text: `You've been invited to Moodio Agent. Join here: ${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}`,
+    });
+
+    console.log(`Invitation email sent to ${emails.length} recipients`);
+  } catch (error) {
+    console.error("Error sending invitation email:", error);
+    throw new Error("Failed to send invitation email");
   }
 }

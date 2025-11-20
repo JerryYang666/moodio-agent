@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { usePathname } from "next/navigation";
+import { useState, useEffect } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import NextLink from "next/link";
 import clsx from "clsx";
 import { siteConfig } from "@/config/site";
@@ -13,18 +13,61 @@ import {
   Home,
   LayoutDashboard,
   Settings,
-  User as UserIcon
+  User as UserIcon,
+  Shield,
+  SquarePen,
+  MessageSquare
 } from "lucide-react";
 import { User } from "@heroui/user";
 import { Card, CardBody } from "@heroui/card";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@heroui/button";
 import { motion, AnimatePresence } from "framer-motion";
+import { Divider } from "@heroui/divider";
+
+interface Chat {
+  id: string;
+  name: string | null;
+  updatedAt: string;
+}
 
 export const Sidebar = () => {
   const pathname = usePathname();
+  const router = useRouter();
   const { user } = useAuth();
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [chats, setChats] = useState<Chat[]>([]);
+
+  const fetchChats = async () => {
+    try {
+      const res = await fetch("/api/chat");
+      if (res.ok) {
+        const data = await res.json();
+        setChats(data.chats);
+      }
+    } catch (error) {
+      console.error("Failed to fetch chats", error);
+    }
+  };
+
+  useEffect(() => {
+    if (user) {
+      fetchChats();
+    }
+  }, [user, pathname]); // Refresh on navigation (e.g. creating new chat)
+
+  const handleNewChat = async () => {
+    try {
+      const res = await fetch("/api/chat", { method: "POST" });
+      if (res.ok) {
+        const data = await res.json();
+        router.push(`/chat/${data.chat.id}`);
+        fetchChats();
+      }
+    } catch (error) {
+      console.error("Failed to create new chat", error);
+    }
+  };
 
   const displayName = user
     ? (user.firstName && user.lastName)
@@ -43,10 +86,15 @@ export const Sidebar = () => {
         return <Settings size={20} />;
       case "profile":
         return <UserIcon size={20} />;
+      case "admin":
+        return <Shield size={20} />;
       default:
         return <BotMessageSquare size={20} />;
     }
   };
+
+  // Filter out "Home" from navItems as we have "New Chat"
+  const navItems = siteConfig.navItems.filter(item => item.label !== "Home");
 
   return (
     <motion.aside 
@@ -72,7 +120,30 @@ export const Sidebar = () => {
       </div>
 
       <div className="flex flex-col gap-2 px-3 py-2 grow overflow-y-auto overflow-x-hidden">
-        {siteConfig.navItems.map((item) => {
+        {/* New Chat Button */}
+        <button
+          onClick={handleNewChat}
+          className={clsx(
+            "flex items-center gap-2 px-3 py-3 rounded-xl transition-colors whitespace-nowrap text-default-500 hover:bg-default-100 hover:text-default-900",
+            isCollapsed && "justify-center"
+          )}
+        >
+          <span className="shrink-0"><SquarePen size={20} /></span>
+          <AnimatePresence>
+            {!isCollapsed && (
+              <motion.span
+                initial={{ opacity: 0, width: 0 }}
+                animate={{ opacity: 1, width: "auto" }}
+                exit={{ opacity: 0, width: 0 }}
+                className="overflow-hidden"
+              >
+                New Chat
+              </motion.span>
+            )}
+          </AnimatePresence>
+        </button>
+
+        {navItems.map((item) => {
           const isActive = pathname === item.href;
           return (
             <NextLink
@@ -102,6 +173,70 @@ export const Sidebar = () => {
             </NextLink>
           );
         })}
+
+        {/* Admin Link */}
+        {user && user.roles.includes("admin") && (
+          <NextLink
+            href="/admin/user-management"
+            className={clsx(
+              "flex items-center gap-2 px-3 py-3 rounded-xl transition-colors whitespace-nowrap",
+              pathname?.startsWith("/admin")
+                ? "bg-primary/10 text-primary font-medium" 
+                : "text-default-500 hover:bg-default-100 hover:text-default-900",
+              isCollapsed && "justify-center"
+            )}
+          >
+            <span className="shrink-0"><Shield size={20} /></span>
+            <AnimatePresence>
+              {!isCollapsed && (
+                <motion.span
+                  initial={{ opacity: 0, width: 0 }}
+                  animate={{ opacity: 1, width: "auto" }}
+                  exit={{ opacity: 0, width: 0 }}
+                  className="overflow-hidden"
+                >
+                  Admin
+                </motion.span>
+              )}
+            </AnimatePresence>
+          </NextLink>
+        )}
+        
+        <Divider className="my-2" />
+        
+        {/* Recent Chats */}
+        <div className="space-y-1">
+          {chats.map((chat) => {
+             const isActive = pathname === `/chat/${chat.id}`;
+             return (
+              <NextLink
+                key={chat.id}
+                href={`/chat/${chat.id}`}
+                className={clsx(
+                  "flex items-center gap-2 px-3 py-2 rounded-xl transition-colors whitespace-nowrap text-sm",
+                  isActive 
+                    ? "bg-primary/10 text-primary font-medium" 
+                    : "text-default-500 hover:bg-default-100 hover:text-default-900",
+                  isCollapsed && "justify-center"
+                )}
+              >
+                <span className="shrink-0"><MessageSquare size={16} /></span>
+                <AnimatePresence>
+                  {!isCollapsed && (
+                    <motion.span
+                      initial={{ opacity: 0, width: 0 }}
+                      animate={{ opacity: 1, width: "auto" }}
+                      exit={{ opacity: 0, width: 0 }}
+                      className="overflow-hidden truncate"
+                    >
+                      {chat.name || chat.id}
+                    </motion.span>
+                  )}
+                </AnimatePresence>
+              </NextLink>
+             )
+          })}
+        </div>
       </div>
 
       <div className="p-3 border-t border-divider mt-auto space-y-4">
