@@ -6,14 +6,7 @@ import { Button } from "@heroui/button";
 import { Textarea } from "@heroui/input";
 import { Card, CardBody, CardFooter } from "@heroui/card";
 import { Spinner } from "@heroui/spinner";
-import {
-  Modal,
-  ModalContent,
-  ModalHeader,
-  ModalBody,
-  ModalFooter,
-  useDisclosure,
-} from "@heroui/modal";
+import { useDisclosure } from "@heroui/modal";
 import { Avatar } from "@heroui/avatar";
 import {
   Send,
@@ -28,6 +21,7 @@ import clsx from "clsx";
 import ReactMarkdown from "react-markdown";
 import { useRouter } from "next/navigation";
 import { Message, MessageContentPart } from "@/lib/llm/types";
+import ImageDetailModal from "./image-detail-modal";
 
 const AWS_S3_PUBLIC_URL = process.env.NEXT_PUBLIC_AWS_S3_PUBLIC_URL || "";
 
@@ -102,7 +96,7 @@ export default function ChatInterface({
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   // Modal state for agent images
-  const { isOpen, onOpen, onOpenChange } = useDisclosure();
+  const { isOpen, onOpen, onOpenChange, onClose } = useDisclosure();
   const [selectedImage, setSelectedImage] = useState<{
     url: string;
     title: string;
@@ -662,12 +656,17 @@ export default function ChatInterface({
               )}
             >
               {!isUser && (
-                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-1">
+                <div className="hidden md:flex w-8 h-8 rounded-full bg-primary/10 items-center justify-center shrink-0 mt-1">
                   <Bot size={16} className="text-primary" />
                 </div>
               )}
 
-              <div className={clsx("flex flex-col gap-1 max-w-[80%]")}>
+              <div
+                className={clsx(
+                  "flex flex-col gap-1",
+                  isUser ? "max-w-[80%]" : "max-w-full md:max-w-[80%]"
+                )}
+              >
                 <Card
                   className={clsx(
                     "shadow-none",
@@ -709,7 +708,7 @@ export default function ChatInterface({
                   }
                   color="primary"
                   size="sm"
-                  className="shrink-0 mt-1"
+                  className="hidden md:flex shrink-0 mt-1"
                 />
               )}
             </div>
@@ -717,10 +716,10 @@ export default function ChatInterface({
         })}
         {isSending && messages[messages.length - 1]?.role === "user" && (
           <div className="flex gap-3 max-w-3xl mx-auto justify-start items-center">
-            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+            <div className="hidden md:flex w-8 h-8 rounded-full bg-primary/10 items-center justify-center shrink-0">
               <Bot size={16} className="text-primary" />
             </div>
-            <Card className="max-w-[80%] shadow-none bg-default-100 dark:bg-default-50/10">
+            <Card className="max-w-full md:max-w-[80%] shadow-none bg-default-100 dark:bg-default-50/10">
               <CardBody className="px-4 pt-[2px] pb-1 overflow-hidden flex justify-center">
                 <Spinner variant="dots" size="md" />
               </CardBody>
@@ -838,48 +837,12 @@ export default function ChatInterface({
         </div>
       </div>
 
-      <Modal
+      <ImageDetailModal
         isOpen={isOpen}
         onOpenChange={onOpenChange}
-        size="4xl"
-        backdrop="blur"
-      >
-        <ModalContent>
-          {(onClose) => (
-            <>
-              <ModalHeader className="flex flex-col gap-1">
-                {selectedImage?.title}
-              </ModalHeader>
-              <ModalBody>
-                {selectedImage && (
-                  <div className="flex gap-6">
-                    <div className="w-1/2">
-                      <img
-                        src={selectedImage.url}
-                        alt={selectedImage.title}
-                        className="w-full rounded-lg object-contain max-h-[70vh]"
-                      />
-                    </div>
-                    <div className="w-1/2 flex flex-col">
-                      <div className="bg-default-100 p-4 rounded-lg text-sm flex-1 overflow-y-auto">
-                        <p className="font-semibold mb-2 text-base">Prompt:</p>
-                        <p className="text-default-600 leading-relaxed whitespace-pre-wrap">
-                          {selectedImage.prompt}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </ModalBody>
-              <ModalFooter>
-                <Button color="primary" onPress={onClose}>
-                  Close
-                </Button>
-              </ModalFooter>
-            </>
-          )}
-        </ModalContent>
-      </Modal>
+        selectedImage={selectedImage}
+        onClose={onClose}
+      />
     </div>
   );
 }
