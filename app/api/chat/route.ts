@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
       .insert(chats)
       .values({
         userId: payload.userId,
-        name: null, // Name is initially empty
+        name: "New Chat", // Default name, explicitly set
       })
       .returning();
 
@@ -64,4 +64,3 @@ export async function GET(request: NextRequest) {
     );
   }
 }
-

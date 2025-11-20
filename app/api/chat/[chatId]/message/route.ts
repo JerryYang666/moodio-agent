@@ -81,9 +81,65 @@ export async function POST(
           const updatedHistory = [...messagesForLLM, assistantMessage];
           await saveChatHistory(chatId, updatedHistory);
 
+          // Generate chat name if this is the first conversation round (User + Assistant = 2 messages)
+          // Note: updatedHistory includes the new user message and assistant response
+          let newChatName = chat.name;
+
+          // If we just completed the first round (user msg + assistant msg)
+          // We check if history was empty before (length was 0), so new history length should be 2
+          if (history.length === 0 && updatedHistory.length === 2) {
+            try {
+              const namePrompt: Message[] = [
+                {
+                  role: "system",
+                  content:
+                    "You are a helpful assistant that generates concise names for chat sessions. " +
+                    "Based on the first two messages of a conversation, generate a short, descriptive name. " +
+                    "The name MUST be very concise and no longer than 50 characters. " +
+                    "Give the name in the same language as the messages. " +
+                    'Output JSON only. Format: {"chat_name": "Your Chat Name"}',
+                },
+                ...updatedHistory,
+              ];
+
+              const nameResponse = await llmClient.chatComplete(namePrompt);
+              if (nameResponse) {
+                try {
+                  // Attempt to parse JSON, handling potential code block wrappers
+                  const cleanResponse = nameResponse
+                    .replace(/```json\n?|```/g, "")
+                    .trim();
+                  const parsed = JSON.parse(cleanResponse);
+                  if (parsed && parsed.chat_name) {
+                    newChatName = parsed.chat_name.trim().slice(0, 255);
+                  }
+                } catch (e) {
+                  console.warn(
+                    "Failed to parse chat name JSON, using raw response fallback",
+                    e
+                  );
+                  // Fallback: if JSON parse fails, use raw response if it looks like a name
+                  // but since we asked for JSON, it might be safer to just ignore or cleanup
+                  if (
+                    nameResponse.length < 255 &&
+                    !nameResponse.includes("{")
+                  ) {
+                    newChatName = nameResponse.trim();
+                  }
+                }
+              }
+            } catch (err) {
+              console.error("Failed to generate chat name:", err);
+              // Fallback or keep null, handled gracefully
+            }
+          }
+
           await db
             .update(chats)
-            .set({ updatedAt: new Date() })
+            .set({
+              updatedAt: new Date(),
+              name: newChatName,
+            })
             .where(eq(chats.id, chatId));
 
           controller.close();

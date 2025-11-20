@@ -54,19 +54,20 @@ export const Sidebar = () => {
     if (user) {
       fetchChats();
     }
-  }, [user, pathname]); // Refresh on navigation (e.g. creating new chat)
+    
+    // Listen for custom event to refresh chats
+    const handleRefreshChats = () => {
+      fetchChats();
+    };
+    
+    window.addEventListener("refresh-chats", handleRefreshChats);
+    return () => {
+      window.removeEventListener("refresh-chats", handleRefreshChats);
+    };
+  }, [user, pathname]); 
 
-  const handleNewChat = async () => {
-    try {
-      const res = await fetch("/api/chat", { method: "POST" });
-      if (res.ok) {
-        const data = await res.json();
-        router.push(`/chat/${data.chat.id}`);
-        fetchChats();
-      }
-    } catch (error) {
-      console.error("Failed to create new chat", error);
-    }
+  const handleNewChat = () => {
+    router.push("/chat");
   };
 
   const displayName = user
@@ -208,6 +209,9 @@ export const Sidebar = () => {
         <div className="space-y-1">
           {chats.map((chat) => {
              const isActive = pathname === `/chat/${chat.id}`;
+             // Display name, default to "New Chat" if null, but NEVER show ID
+             const chatName = chat.name || "New Chat";
+             
              return (
               <NextLink
                 key={chat.id}
@@ -229,7 +233,7 @@ export const Sidebar = () => {
                       exit={{ opacity: 0, width: 0 }}
                       className="overflow-hidden truncate"
                     >
-                      {chat.name || chat.id}
+                      {chatName}
                     </motion.span>
                   )}
                 </AnimatePresence>
