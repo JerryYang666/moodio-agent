@@ -1,4 +1,8 @@
-import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
+import {
+  S3Client,
+  PutObjectCommand,
+  GetObjectCommand,
+} from "@aws-sdk/client-s3";
 import { Message } from "@/lib/llm/types";
 import { randomUUID } from "crypto";
 
@@ -83,3 +87,21 @@ export async function getChatHistory(chatId: string): Promise<Message[]> {
   }
 }
 
+export async function downloadImage(imageId: string): Promise<Buffer | null> {
+  const key = `images/${imageId}`;
+  try {
+    const response = await s3Client.send(
+      new GetObjectCommand({
+        Bucket: BUCKET_NAME,
+        Key: key,
+      })
+    );
+
+    if (!response.Body) return null;
+    const byteArray = await response.Body.transformToByteArray();
+    return Buffer.from(byteArray);
+  } catch (error) {
+    console.error("Error downloading image:", error);
+    return null;
+  }
+}

@@ -3,11 +3,21 @@
 export type MessageContentPart =
   | { type: "text"; text: string }
   | { type: "image_url"; image_url: { url: string } }
-  | { type: "image"; imageId: string };
+  | { type: "image"; imageId: string }
+  | {
+      type: "agent_image";
+      imageId?: string;
+      imageUrl?: string; // For display before S3 upload or if using external URL
+      title: string;
+      prompt: string;
+      status: "loading" | "generated" | "error";
+    };
 
 export interface Message {
   role: "system" | "user" | "assistant";
   content: string | MessageContentPart[];
+  agentId?: string;
+  createdAt?: number; // Unix timestamp in milliseconds
 }
 
 export interface LLMConfig {

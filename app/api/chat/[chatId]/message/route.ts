@@ -7,6 +7,7 @@ import { eq, and } from "drizzle-orm";
 import { getChatHistory, saveChatHistory, uploadImage } from "@/lib/storage/s3";
 import { createLLMClient } from "@/lib/llm/client";
 import { Message, MessageContentPart } from "@/lib/llm/types";
+import { agent0 } from "@/lib/agents/agent-0";
 
 const AWS_S3_PUBLIC_URL = process.env.NEXT_PUBLIC_AWS_S3_PUBLIC_URL || "";
 
@@ -119,53 +120,44 @@ export async function POST(
           { type: "text", text: content },
           { type: "image", imageId: imageId },
         ],
+        createdAt: Date.now(),
       };
     } else {
-      userMessage = { role: "user", content };
+      userMessage = { role: "user", content, createdAt: Date.now() };
     }
 
     // Combine history + new message (Storage Format)
-    const messagesForStorage = [...history, userMessage];
+    // Wait, we shouldn't save userMessage to history YET if we want the agent to process it?
+    // Actually we save it now so we have the full context.
+    // But wait, if agent fails, we might want to rollback?
+    // Let's assume we save user message first.
+    // However, standard chat usually saves user message immediately.
+    // Let's proceed with creating the Agent stream.
 
-    // Convert to LLM Format
-    const messagesForLLM = messagesForStorage.map(convertToLLMFormat);
+    // Use Agent 0
+    const { stream: agentStream, completion } = await agent0.processRequest(
+      history,
+      userMessage,
+      payload.userId
+    );
 
-    // Initialize LLM Client
-    const llmClient = createLLMClient({
-      apiKey: process.env.LLM_API_KEY,
-      provider: "openai",
-      model: "gpt-5-mini",
-    });
+    // Handle background completion (saving history)
+    completion
+      .then(async (finalMessage) => {
+        // Add timestamp to the final message from agent if not present (agent might not add it)
+        const messageToSave = { ...finalMessage, createdAt: finalMessage.createdAt || Date.now() };
+        
+        const updatedHistory = [...history, userMessage, messageToSave];
+        await saveChatHistory(chatId, updatedHistory);
 
-    // Create a stream
-    const stream = new ReadableStream({
-      async start(controller) {
-        const encoder = new TextEncoder();
-        let fullResponse = "";
+        // Generate chat name if needed
+        if (history.length === 0 && updatedHistory.length === 2) {
+          const llmClient = createLLMClient({
+            apiKey: process.env.LLM_API_KEY,
+            provider: "openai",
+            model: "gpt-5-mini",
+          });
 
-        try {
-          const iterator = llmClient.chat(messagesForLLM);
-
-          for await (const chunk of iterator) {
-            if (chunk.content) {
-              fullResponse += chunk.content;
-              controller.enqueue(encoder.encode(chunk.content));
-            }
-          }
-
-          // After streaming is complete, save to S3 and DB
-          const assistantMessage: Message = {
-            role: "assistant",
-            content: fullResponse,
-          };
-
-          const updatedHistory = [...messagesForStorage, assistantMessage];
-          await saveChatHistory(chatId, updatedHistory);
-
-          // Generate chat name if this is the first conversation round (User + Assistant = 2 messages)
-          let newChatName = chat.name;
-
-          if (history.length === 0 && updatedHistory.length === 2) {
             try {
               const namePrompt: Message[] = [
                 {
@@ -177,58 +169,68 @@ export async function POST(
                     "Give the name in the same language as the messages. " +
                     'Output JSON only. Format: {"chat_name": "Your Chat Name"}',
                 },
-                // We need to convert updatedHistory to LLM format for this call too
-                ...updatedHistory.map(convertToLLMFormat),
+                ...updatedHistory.map((msg) => {
+                  if (typeof msg.content === "string") {
+                    return msg;
+                  }
+                  const textContent = msg.content
+                    .filter((c) => c.type === "text")
+                    .map((c) => (c as { type: "text"; text: string }).text)
+                    .join("\n");
+
+                  return {
+                    role: msg.role,
+                    content: textContent,
+                  };
+                }),
               ];
 
               const nameResponse = await llmClient.chatComplete(namePrompt);
-              if (nameResponse) {
-                try {
-                  const cleanResponse = nameResponse
-                    .replace(/```json\n?|```/g, "")
-                    .trim();
-                  const parsed = JSON.parse(cleanResponse);
-                  if (parsed && parsed.chat_name) {
-                    newChatName = parsed.chat_name.trim().slice(0, 255);
-                  }
-                } catch (e) {
-                  console.warn(
-                    "Failed to parse chat name JSON, using raw response fallback",
-                    e
-                  );
-                  if (
-                    nameResponse.length < 255 &&
-                    !nameResponse.includes("{")
-                  ) {
-                    newChatName = nameResponse.trim();
-                  }
+            let newChatName = chat.name;
+
+            if (nameResponse) {
+              try {
+                const cleanResponse = nameResponse
+                  .replace(/```json\n?|```/g, "")
+                  .trim();
+                const parsed = JSON.parse(cleanResponse);
+                if (parsed && parsed.chat_name) {
+                  newChatName = parsed.chat_name.trim().slice(0, 255);
+                }
+              } catch (e) {
+                if (nameResponse.length < 255 && !nameResponse.includes("{")) {
+                  newChatName = nameResponse.trim();
                 }
               }
-            } catch (err) {
-              console.error("Failed to generate chat name:", err);
             }
-          }
 
+            await db
+              .update(chats)
+              .set({
+                updatedAt: new Date(),
+                name: newChatName,
+              })
+              .where(eq(chats.id, chatId));
+          } catch (err) {
+            console.error("Failed to generate chat name:", err);
+          }
+        } else {
           await db
             .update(chats)
             .set({
               updatedAt: new Date(),
-              name: newChatName,
             })
             .where(eq(chats.id, chatId));
-
-          controller.close();
-        } catch (error) {
-          console.error("Streaming error:", error);
-          controller.error(error);
         }
-      },
-    });
+      })
+      .catch((err) => {
+        console.error("Agent completion failed:", err);
+      });
 
-    return new NextResponse(stream, {
+    return new NextResponse(agentStream, {
       headers: {
         "Content-Type": "text/plain; charset=utf-8",
-        "Transfer-Encoding": "chunked",
+        // "Transfer-Encoding": "chunked", // Next.js handles this
       },
     });
   } catch (error) {

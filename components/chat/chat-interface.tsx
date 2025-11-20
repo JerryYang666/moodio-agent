@@ -4,9 +4,25 @@ import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@heroui/button";
 import { Textarea } from "@heroui/input";
-import { Card, CardBody } from "@heroui/card";
+import { Card, CardBody, CardFooter } from "@heroui/card";
 import { Spinner } from "@heroui/spinner";
-import { Send, Bot, User as UserIcon, X, ImagePlus, Mic, Square } from "lucide-react";
+import {
+  Modal,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
+  useDisclosure,
+} from "@heroui/modal";
+import {
+  Send,
+  Bot,
+  User as UserIcon,
+  X,
+  ImagePlus,
+  Mic,
+  Square,
+} from "lucide-react";
 import clsx from "clsx";
 import ReactMarkdown from "react-markdown";
 import { useRouter } from "next/navigation";
@@ -41,6 +57,15 @@ export default function ChatInterface({
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+  // Modal state for agent images
+  const { isOpen, onOpen, onOpenChange } = useDisclosure();
+  const [selectedImage, setSelectedImage] = useState<{
+    url: string;
+    title: string;
+    prompt: string;
+  } | null>(null);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -57,8 +82,6 @@ export default function ChatInterface({
   useEffect(() => {
     const fetchChat = async () => {
       if (!chatId) return;
-
-      // If we already have messages (passed from props), don't fetch unless it's a different chat logic (which it isn't here)
       if (messages.length > 0) {
         setIsLoading(false);
         return;
@@ -122,9 +145,7 @@ export default function ChatInterface({
           type: "audio/webm",
         });
         await handleTranscription(audioBlob);
-        
-        // Stop all tracks to release microphone
-        stream.getTracks().forEach(track => track.stop());
+        stream.getTracks().forEach((track) => track.stop());
       };
 
       mediaRecorder.start();
@@ -145,7 +166,6 @@ export default function ChatInterface({
   const handleTranscription = async (audioBlob: Blob) => {
     setIsTranscribing(true);
     try {
-      // Create a File object from the Blob
       const file = new File([audioBlob], "recording.webm", {
         type: "audio/webm",
       });
@@ -179,37 +199,25 @@ export default function ChatInterface({
 
     const currentInput = input;
     const currentFile = selectedFile;
-    const currentPreviewUrl = previewUrl; // Store the preview URL to use for optimistic update
+    const currentPreviewUrl = previewUrl;
 
-    let userMessage: Message;
-
-    if (currentFile && currentPreviewUrl) {
-      userMessage = {
-        role: "user",
-        content: [
-          { type: "text", text: currentInput },
-          { type: "image_url", image_url: { url: currentPreviewUrl } },
-        ],
-      };
-    } else {
-      userMessage = { role: "user", content: currentInput };
-    }
+    // Optimistic message with current timestamp
+    const userMessage: Message = {
+      role: "user",
+      content:
+        currentFile && currentPreviewUrl
+          ? [
+              { type: "text", text: currentInput },
+              { type: "image_url", image_url: { url: currentPreviewUrl } },
+            ]
+          : currentInput,
+      createdAt: Date.now(),
+    };
 
     setMessages((prev) => [...prev, userMessage]);
     setInput("");
-    // Only clear file input, but keep previewUrl alive for the optimistic message rendering if needed
-    // Actually we need to clear selectedFile state so the UI resets, 
-    // but we used the local variable `currentPreviewUrl` in the message state above.
-    // The message state now holds the blob URL.
-    
-    // However, we should NOT revoke the object URL immediately if it's being used in the message list.
-    // React will render the message using this blob URL.
-    // If we revoke it now, the image won't load.
-    // We can rely on garbage collection or cleanup when the component unmounts, 
-    // or ideally revoke it when we replace this message with the real one from server (if we were doing that).
-    // For now, let's just clear the state.
     setSelectedFile(null);
-    setPreviewUrl(null); 
+    setPreviewUrl(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
 
     setIsSending(true);
@@ -217,18 +225,13 @@ export default function ChatInterface({
     try {
       let currentChatId = chatId;
 
-      // If no chat ID, create chat first
       if (!currentChatId) {
         const createRes = await fetch("/api/chat", { method: "POST" });
         if (!createRes.ok) throw new Error("Failed to create chat");
         const createData = await createRes.json();
         currentChatId = createData.chat.id;
         setChatId(currentChatId);
-
-        // Update URL without reloading
         window.history.replaceState(null, "", `/chat/${currentChatId}`);
-
-        // Dispatch event to refresh sidebar immediately upon creation
         window.dispatchEvent(new Event("refresh-chats"));
       }
 
@@ -255,46 +258,77 @@ export default function ChatInterface({
         throw new Error("Failed to send message");
       }
 
-      // Create a placeholder for the assistant message
-      // setMessages((prev) => [...prev, { role: "assistant", content: "" }]); // Removed: We now show spinner first
-
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
-      let assistantMessageContent = "";
+      let buffer = "";
       let isFirstChunk = true;
+
+      // Temporary storage for the message content parts
+      let currentContent: MessageContentPart[] = [];
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
 
-        const chunk = decoder.decode(value, { stream: true });
-        assistantMessageContent += chunk;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
 
-        if (isFirstChunk) {
-          // On first chunk, add the assistant message
-          setMessages((prev) => [
-            ...prev,
-            { role: "assistant", content: assistantMessageContent },
-          ]);
-          isFirstChunk = false;
-        } else {
-          // Update existing message
-          setMessages((prev) => {
-            const newMessages = [...prev];
-            const lastMsg = newMessages[newMessages.length - 1];
-            if (lastMsg.role === "assistant") {
-              lastMsg.content = assistantMessageContent;
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          try {
+            const event = JSON.parse(line);
+
+            if (isFirstChunk) {
+              setMessages((prev) => [
+                ...prev,
+                {
+                  role: "assistant",
+                  content: [],
+                  createdAt: Date.now(),
+                },
+              ]);
+              isFirstChunk = false;
             }
-            return newMessages;
-          });
+
+            if (event.type === "text") {
+              // Append text to the first part if it's text, or create new
+              if (
+                currentContent.length === 0 ||
+                currentContent[0].type !== "text"
+              ) {
+                currentContent = [
+                  { type: "text", text: event.content },
+                  ...currentContent,
+                ];
+              } else {
+                currentContent[0] = { type: "text", text: event.content };
+              }
+            } else if (event.type === "part") {
+              // Add new part
+              currentContent.push(event.part);
+            } else if (event.type === "part_update") {
+              // Update existing part
+              if (currentContent[event.index + 1]) {
+                currentContent[event.index + 1] = event.part;
+              }
+            }
+
+            setMessages((prev) => {
+              const newMessages = [...prev];
+              const lastMsg = newMessages[newMessages.length - 1];
+              if (lastMsg.role === "assistant") {
+                lastMsg.content = [...currentContent];
+              }
+              return newMessages;
+            });
+          } catch (e) {
+            console.error("Parse error", e);
+          }
         }
       }
 
-      // If this was the first exchange (total messages <= 2),
-      // wait for 3 seconds then signal the sidebar to refresh (to pick up the generated name)
       if (messages.length <= 1) {
-        // checks length BEFORE this exchange is fully added to state logic wise, effectively 0 or 1 user message
-        // We use a timeout to give the backend LLM name generation time to finish/propagate
         setTimeout(() => {
           window.dispatchEvent(new Event("refresh-chats"));
         }, 3000);
@@ -313,40 +347,100 @@ export default function ChatInterface({
     }
   };
 
+  const handleImageClick = (part: any) => {
+    if (part.status === "generated") {
+      setSelectedImage({
+        url: part.imageUrl || getImageUrl(part.imageId),
+        title: part.title,
+        prompt: part.prompt,
+      });
+      onOpen();
+    }
+  };
+
+  const formatTime = (timestamp?: number) => {
+    if (!timestamp) return "";
+    const date = new Date(timestamp);
+    return date.toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+  };
+
   const renderContent = (content: string | MessageContentPart[]) => {
     if (typeof content === "string") {
       return <ReactMarkdown>{content}</ReactMarkdown>;
     }
+
+    // Group agent images to render them in a grid
+    const textParts = content.filter((p) => p.type === "text");
+    const imageParts = content.filter(
+      (p) => p.type === "image" || p.type === "image_url"
+    );
+    const agentParts = content.filter((p) => p.type === "agent_image");
+
     return (
-      <div className="space-y-2">
-        {content.map((part, i) => {
-          if (part.type === "text") {
-            return <ReactMarkdown key={i}>{part.text}</ReactMarkdown>;
-          }
-          if (part.type === "image") {
-            return (
+      <div className="space-y-4">
+        {textParts.map((part: any, i) => (
+          <ReactMarkdown key={`text-${i}`}>{part.text}</ReactMarkdown>
+        ))}
+
+        {imageParts.length > 0 && (
+          <div className="space-y-2">
+            {imageParts.map((part: any, i) => (
               <img
-                key={i}
-                src={getImageUrl(part.imageId)}
+                key={`img-${i}`}
+                src={
+                  part.type === "image"
+                    ? getImageUrl(part.imageId)
+                    : part.image_url.url
+                }
                 alt="User upload"
                 className="max-w-full rounded-lg"
                 style={{ maxHeight: "300px", objectFit: "contain" }}
               />
-            );
-          }
-          if (part.type === "image_url") {
-            return (
-              <img
-                key={i}
-                src={part.image_url.url}
-                alt="User upload"
-                className="max-w-full rounded-lg"
-                style={{ maxHeight: "300px", objectFit: "contain" }}
-              />
-            );
-          }
-          return null;
-        })}
+            ))}
+          </div>
+        )}
+
+        {agentParts.length > 0 && (
+          <div className="grid grid-cols-2 gap-3 mt-2">
+            {agentParts.map((part: any, i) => (
+              <Card
+                key={`agent-${i}`}
+                isPressable={part.status === "generated"}
+                onPress={() => handleImageClick(part)}
+                className="w-full aspect-square"
+              >
+                <CardBody className="p-0 overflow-hidden relative group">
+                  {part.status === "loading" && (
+                    <div className="w-full h-full flex items-center justify-center bg-default-100">
+                      <Spinner />
+                    </div>
+                  )}
+                  {part.status === "error" && (
+                    <div className="w-full h-full flex items-center justify-center bg-danger-50 text-danger">
+                      <X />
+                    </div>
+                  )}
+                  {part.status === "generated" && (
+                    <>
+                      <img
+                        src={part.imageUrl || getImageUrl(part.imageId)}
+                        alt={part.title}
+                        className="w-full h-full object-cover"
+                      />
+                      <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white p-2 text-xs truncate opacity-0 group-hover:opacity-100 transition-opacity">
+                        {part.title}
+                      </div>
+                    </>
+                  )}
+                </CardBody>
+              </Card>
+            ))}
+          </div>
+        )}
       </div>
     );
   };
@@ -385,26 +479,38 @@ export default function ChatInterface({
                 </div>
               )}
 
-              <Card
-                className={clsx(
-                  "max-w-[80%] shadow-none",
-                  isUser
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-default-100 dark:bg-default-50/10"
-                )}
-              >
-                <CardBody className="p-3 overflow-x-auto">
-                  <div
+              <div className={clsx("flex flex-col gap-1 max-w-[80%]")}>
+                <Card
+                  className={clsx(
+                    "shadow-none",
+                    isUser
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-default-100 dark:bg-default-50/10"
+                  )}
+                >
+                  <CardBody className="p-3 overflow-x-auto">
+                    <div
+                      className={clsx(
+                        "prose dark:prose-invert prose-sm max-w-none",
+                        isUser &&
+                          "prose-headings:text-primary-foreground prose-p:text-primary-foreground prose-strong:text-primary-foreground prose-code:text-primary-foreground"
+                      )}
+                    >
+                      {renderContent(msg.content)}
+                    </div>
+                  </CardBody>
+                </Card>
+                {msg.createdAt && (
+                  <span
                     className={clsx(
-                      "prose dark:prose-invert prose-sm max-w-none",
-                      isUser &&
-                        "prose-headings:text-primary-foreground prose-p:text-primary-foreground prose-strong:text-primary-foreground prose-code:text-primary-foreground"
+                      "text-xs text-default-400 px-1",
+                      isUser ? "text-right" : "text-left"
                     )}
                   >
-                    {renderContent(msg.content)}
-                  </div>
-                </CardBody>
-              </Card>
+                    {formatTime(msg.createdAt)}
+                  </span>
+                )}
+              </div>
 
               {isUser && (
                 <div className="w-8 h-8 rounded-full bg-default-200 flex items-center justify-center shrink-0 mt-1">
@@ -421,10 +527,7 @@ export default function ChatInterface({
             </div>
             <Card className="max-w-[80%] shadow-none bg-default-100 dark:bg-default-50/10">
               <CardBody className="p-3 overflow-hidden">
-                <Spinner
-                  variant="dots"
-                  size="md"
-                />
+                <Spinner variant="dots" size="md" />
               </CardBody>
             </Card>
           </div>
@@ -481,7 +584,11 @@ export default function ChatInterface({
               aria-label="Record voice"
               isLoading={isTranscribing}
             >
-              {isRecording ? <Square size={20} /> : <Mic size={24} className="text-default-500" />}
+              {isRecording ? (
+                <Square size={20} />
+              ) : (
+                <Mic size={24} className="text-default-500" />
+              )}
             </Button>
 
             <Textarea
@@ -509,6 +616,49 @@ export default function ChatInterface({
           </div>
         </div>
       </div>
+
+      <Modal
+        isOpen={isOpen}
+        onOpenChange={onOpenChange}
+        size="4xl"
+        backdrop="blur"
+      >
+        <ModalContent>
+          {(onClose) => (
+            <>
+              <ModalHeader className="flex flex-col gap-1">
+                {selectedImage?.title}
+              </ModalHeader>
+              <ModalBody>
+                {selectedImage && (
+                  <div className="flex gap-6">
+                    <div className="w-1/2">
+                      <img
+                        src={selectedImage.url}
+                        alt={selectedImage.title}
+                        className="w-full rounded-lg object-contain max-h-[70vh]"
+                      />
+                    </div>
+                    <div className="w-1/2 flex flex-col">
+                      <div className="bg-default-100 p-4 rounded-lg text-sm flex-1 overflow-y-auto">
+                        <p className="font-semibold mb-2 text-base">Prompt:</p>
+                        <p className="text-default-600 leading-relaxed whitespace-pre-wrap">
+                          {selectedImage.prompt}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </ModalBody>
+              <ModalFooter>
+                <Button color="primary" onPress={onClose}>
+                  Close
+                </Button>
+              </ModalFooter>
+            </>
+          )}
+        </ModalContent>
+      </Modal>
     </div>
   );
 }
