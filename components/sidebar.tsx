@@ -495,8 +495,8 @@ export const Sidebar = () => {
               </Card>
             </PopoverTrigger>
             <PopoverContent className="w-full p-2">
-              <div className="flex flex-col gap-2 w-full min-w-[240px]">
-                <NextLink href="/profile" className="w-full">
+              <div className="flex flex-col gap-2 w-full min-w-[180px]">
+                <NextLink href="/profile" className="w-full mb-2">
                   <Button
                     size="sm"
                     variant="flat"
@@ -506,7 +506,7 @@ export const Sidebar = () => {
                     Profile
                   </Button>
                 </NextLink>
-                <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center justify-between gap-12">
                   <Button
                     size="sm"
                     variant="flat"

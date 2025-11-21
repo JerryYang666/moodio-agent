@@ -153,28 +153,6 @@ export default function LoginPage() {
 
           {step === "email" ? (
             <div className="space-y-4">
-              <Button
-                type="button"
-                color="secondary"
-                variant="flat"
-                size="lg"
-                className="w-full"
-                onPress={handlePasskeyLogin}
-                isLoading={passkeyLoading}
-                isDisabled={loading}
-                startContent={<Key size={20} />}
-              >
-                Sign in with Passkey
-              </Button>
-
-              <div className="relative flex py-2 items-center">
-                <div className="flex-grow border-t border-default-200"></div>
-                <span className="flex-shrink-0 mx-4 text-default-400 text-xs uppercase">
-                  Or with Email
-                </span>
-                <div className="flex-grow border-t border-default-200"></div>
-              </div>
-
               <form onSubmit={handleRequestOTP} className="space-y-4">
                 <Input
                   type="email"
@@ -198,6 +176,24 @@ export default function LoginPage() {
                   Send Login Code
                 </Button>
               </form>
+
+              <div className="relative flex py-2 items-center">
+                <div className="grow border-t border-default-200"></div>
+              </div>
+
+              <Button
+                type="button"
+                color="secondary"
+                variant="flat"
+                size="lg"
+                className="w-full"
+                onPress={handlePasskeyLogin}
+                isLoading={passkeyLoading}
+                isDisabled={loading}
+                startContent={<Key size={20} />}
+              >
+                Sign in with Passkey
+              </Button>
             </div>
           ) : (
             <div className="space-y-6">
