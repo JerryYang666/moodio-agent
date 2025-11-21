@@ -61,7 +61,7 @@ export default function Home() {
       : user.firstName || user.email.split("@")[0];
 
   return (
-    <div className="flex items-center justify-center min-h-[60vh]">
+    <div className="flex items-center justify-center min-h-[60vh] pt-20">
       <Card className="w-full max-w-2xl p-8">
         <div className="space-y-6">
           <div className="text-center">
