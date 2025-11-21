@@ -1,0 +1,318 @@
+"use client";
+
+import React, { createContext, useState, useEffect, useCallback } from "react";
+import { useAuth } from "@/hooks/use-auth";
+
+export interface Collection {
+  id: string;
+  userId: string;
+  name: string;
+  createdAt: Date;
+  updatedAt: Date;
+  permission: "owner" | "collaborator" | "viewer";
+  isOwner: boolean;
+  sharedAt?: Date;
+}
+
+export interface CollectionImage {
+  id: string;
+  collectionId: string;
+  imageId: string;
+  chatId: string | null;
+  generationDetails: {
+    title: string;
+    prompt: string;
+    status: "loading" | "generated" | "error";
+    imageUrl?: string;
+  };
+  addedAt: Date;
+}
+
+export interface CollectionShare {
+  id: string;
+  collectionId: string;
+  sharedWithUserId: string;
+  permission: "viewer" | "collaborator";
+  sharedAt: Date;
+}
+
+interface CollectionsContextValue {
+  collections: Collection[];
+  loading: boolean;
+  error: string;
+  refreshCollections: () => Promise<void>;
+  createCollection: (name: string) => Promise<Collection | null>;
+  renameCollection: (collectionId: string, name: string) => Promise<boolean>;
+  deleteCollection: (collectionId: string) => Promise<boolean>;
+  addImageToCollection: (
+    collectionId: string,
+    imageId: string,
+    chatId: string | null,
+    generationDetails: any
+  ) => Promise<boolean>;
+  removeImageFromCollection: (
+    collectionId: string,
+    imageId: string
+  ) => Promise<boolean>;
+  shareCollection: (
+    collectionId: string,
+    userId: string,
+    permission: "viewer" | "collaborator"
+  ) => Promise<boolean>;
+  removeShare: (collectionId: string, userId: string) => Promise<boolean>;
+  getDefaultCollectionName: () => string;
+}
+
+export const CollectionsContext = createContext<
+  CollectionsContextValue | undefined
+>(undefined);
+
+export function CollectionsProvider({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const { user } = useAuth();
+  const [collections, setCollections] = useState<Collection[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const getDefaultCollectionName = useCallback(() => {
+    if (!user) return "My Collection";
+    
+    let baseName = "";
+    if (user.firstName) {
+      baseName = user.firstName.length > 32 
+        ? user.firstName.substring(0, 32) 
+        : user.firstName;
+    } else {
+      const emailPrefix = user.email.split("@")[0];
+      baseName = emailPrefix.length > 32 
+        ? emailPrefix.substring(0, 32) 
+        : emailPrefix;
+    }
+    
+    return `${baseName}'s Collection`;
+  }, [user]);
+
+  const refreshCollections = useCallback(async () => {
+    if (!user) {
+      setCollections([]);
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+
+    try {
+      const res = await fetch("/api/collection");
+      if (!res.ok) {
+        throw new Error("Failed to fetch collections");
+      }
+
+      const data = await res.json();
+      setCollections(data.collections || []);
+    } catch (err) {
+      console.error("Error fetching collections:", err);
+      setError(err instanceof Error ? err.message : "Failed to fetch collections");
+    } finally {
+      setLoading(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    refreshCollections();
+  }, [refreshCollections]);
+
+  const createCollection = useCallback(async (name: string) => {
+    try {
+      const res = await fetch("/api/collection", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+
+      if (!res.ok) {
+        throw new Error("Failed to create collection");
+      }
+
+      const data = await res.json();
+      setCollections((prev) => [data.collection, ...prev]);
+      return data.collection;
+    } catch (err) {
+      console.error("Error creating collection:", err);
+      return null;
+    }
+  }, []);
+
+  const renameCollection = useCallback(async (collectionId: string, name: string) => {
+    try {
+      const res = await fetch(`/api/collection/${collectionId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+
+      if (!res.ok) {
+        throw new Error("Failed to rename collection");
+      }
+
+      const data = await res.json();
+      setCollections((prev) =>
+        prev.map((col) =>
+          col.id === collectionId ? { ...col, name: data.collection.name, updatedAt: data.collection.updatedAt } : col
+        )
+      );
+      return true;
+    } catch (err) {
+      console.error("Error renaming collection:", err);
+      return false;
+    }
+  }, []);
+
+  const deleteCollection = useCallback(async (collectionId: string) => {
+    try {
+      const res = await fetch(`/api/collection/${collectionId}`, {
+        method: "DELETE",
+      });
+
+      if (!res.ok) {
+        throw new Error("Failed to delete collection");
+      }
+
+      setCollections((prev) => prev.filter((col) => col.id !== collectionId));
+      return true;
+    } catch (err) {
+      console.error("Error deleting collection:", err);
+      return false;
+    }
+  }, []);
+
+  const addImageToCollection = useCallback(
+    async (
+      collectionId: string,
+      imageId: string,
+      chatId: string | null,
+      generationDetails: any
+    ) => {
+      try {
+        const res = await fetch(`/api/collection/${collectionId}/images`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ imageId, chatId, generationDetails }),
+        });
+
+        if (!res.ok) {
+          const data = await res.json();
+          throw new Error(data.error || "Failed to add image to collection");
+        }
+
+        // Update collection's updatedAt
+        setCollections((prev) =>
+          prev.map((col) =>
+            col.id === collectionId ? { ...col, updatedAt: new Date() } : col
+          )
+        );
+        return true;
+      } catch (err) {
+        console.error("Error adding image to collection:", err);
+        return false;
+      }
+    },
+    []
+  );
+
+  const removeImageFromCollection = useCallback(
+    async (collectionId: string, imageId: string) => {
+      try {
+        const res = await fetch(
+          `/api/collection/${collectionId}/images/${imageId}`,
+          {
+            method: "DELETE",
+          }
+        );
+
+        if (!res.ok) {
+          throw new Error("Failed to remove image from collection");
+        }
+
+        return true;
+      } catch (err) {
+        console.error("Error removing image from collection:", err);
+        return false;
+      }
+    },
+    []
+  );
+
+  const shareCollection = useCallback(
+    async (
+      collectionId: string,
+      userId: string,
+      permission: "viewer" | "collaborator"
+    ) => {
+      try {
+        const res = await fetch(`/api/collection/${collectionId}/share`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sharedWithUserId: userId, permission }),
+        });
+
+        if (!res.ok) {
+          throw new Error("Failed to share collection");
+        }
+
+        return true;
+      } catch (err) {
+        console.error("Error sharing collection:", err);
+        return false;
+      }
+    },
+    []
+  );
+
+  const removeShare = useCallback(
+    async (collectionId: string, userId: string) => {
+      try {
+        const res = await fetch(
+          `/api/collection/${collectionId}/share/${userId}`,
+          {
+            method: "DELETE",
+          }
+        );
+
+        if (!res.ok) {
+          throw new Error("Failed to remove share");
+        }
+
+        return true;
+      } catch (err) {
+        console.error("Error removing share:", err);
+        return false;
+      }
+    },
+    []
+  );
+
+  const value: CollectionsContextValue = {
+    collections,
+    loading,
+    error,
+    refreshCollections,
+    createCollection,
+    renameCollection,
+    deleteCollection,
+    addImageToCollection,
+    removeImageFromCollection,
+    shareCollection,
+    removeShare,
+    getDefaultCollectionName,
+  };
+
+  return (
+    <CollectionsContext.Provider value={value}>
+      {children}
+    </CollectionsContext.Provider>
+  );
+}
+

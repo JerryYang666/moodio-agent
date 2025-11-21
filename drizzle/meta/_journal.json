@@ -29,6 +29,13 @@
       "when": 1763682504220,
       "tag": "0003_giant_carlie_cooper",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1763710532035,
+      "tag": "0004_red_living_tribunal",
+      "breakpoints": true
     }
   ]
 }

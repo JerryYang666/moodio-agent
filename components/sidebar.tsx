@@ -20,7 +20,10 @@ import {
   LogOut,
   Pencil,
   Check,
-  MoreHorizontal
+  MoreHorizontal,
+  Folder,
+  ChevronDown,
+  ChevronRight
 } from "lucide-react";
 import { User } from "@heroui/user";
 import { Card, CardBody } from "@heroui/card";
@@ -29,6 +32,7 @@ import { Dropdown, DropdownTrigger, DropdownMenu, DropdownItem } from "@heroui/d
 import { Spinner } from "@heroui/spinner";
 import { useAuth } from "@/hooks/use-auth";
 import { useChat } from "@/hooks/use-chat";
+import { useCollections } from "@/hooks/use-collections";
 import { Button } from "@heroui/button";
 import { Input } from "@heroui/input";
 import { motion, AnimatePresence } from "framer-motion";
@@ -182,8 +186,10 @@ export const Sidebar = () => {
   const router = useRouter();
   const { user, logout } = useAuth();
   const { chats, refreshChats } = useChat();
+  const { collections } = useCollections();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isLogoHovered, setIsLogoHovered] = useState(false);
+  const [isCollectionsExpanded, setIsCollectionsExpanded] = useState(false);
 
   useEffect(() => {
     // Listen for custom event to refresh chats
@@ -296,6 +302,86 @@ export const Sidebar = () => {
             )}
           </AnimatePresence>
         </button>
+
+        {/* Collections Button */}
+        <div className="relative" id="collections-button">
+          <div
+            className={clsx(
+              "flex items-center gap-2 px-3 py-2 rounded-xl transition-colors whitespace-nowrap",
+              pathname?.startsWith("/collection")
+                ? "bg-primary/10 text-primary font-medium"
+                : "text-default-500 hover:bg-default-100 hover:text-default-900",
+              isCollapsed && "justify-center"
+            )}
+          >
+            <button
+              onClick={() => setIsCollectionsExpanded(!isCollectionsExpanded)}
+              className="shrink-0 flex items-center"
+            >
+              <Folder size={20} />
+            </button>
+            <AnimatePresence>
+              {!isCollapsed && (
+                <>
+                  <motion.button
+                    initial={{ opacity: 0, width: 0 }}
+                    animate={{ opacity: 1, width: "auto" }}
+                    exit={{ opacity: 0, width: 0 }}
+                    onClick={() => router.push("/collection")}
+                    className="overflow-hidden text-sm flex-1 text-left"
+                  >
+                    Collections
+                  </motion.button>
+                  <motion.button
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    onClick={() => setIsCollectionsExpanded(!isCollectionsExpanded)}
+                    className="shrink-0"
+                  >
+                    {isCollectionsExpanded ? (
+                      <ChevronDown size={16} />
+                    ) : (
+                      <ChevronRight size={16} />
+                    )}
+                  </motion.button>
+                </>
+              )}
+            </AnimatePresence>
+          </div>
+
+          {/* Collections Dropdown */}
+          {!isCollapsed && isCollectionsExpanded && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              className="ml-6 mt-1 space-y-1"
+            >
+              {collections.length === 0 ? (
+                <div className="px-3 py-2 text-xs text-default-400">
+                  No collections yet
+                </div>
+              ) : (
+                collections.map((collection) => (
+                  <NextLink
+                    key={collection.id}
+                    href={`/collection/${collection.id}`}
+                    className={clsx(
+                      "flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors text-xs",
+                      pathname === `/collection/${collection.id}`
+                        ? "bg-primary/10 text-primary"
+                        : "text-default-500 hover:bg-default-100 hover:text-default-900"
+                    )}
+                  >
+                    <Folder size={14} className="shrink-0" />
+                    <span className="truncate">{collection.name}</span>
+                  </NextLink>
+                ))
+              )}
+            </motion.div>
+          )}
+        </div>
 
         {navItems.map((item) => {
           const isActive = pathname === item.href;

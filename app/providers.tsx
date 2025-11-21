@@ -9,6 +9,7 @@ import { ThemeProvider as NextThemesProvider } from "next-themes";
 import { ToastProvider } from "@heroui/toast";
 import { AuthProvider } from "@/components/auth-provider";
 import { ChatProvider } from "@/components/chat-provider";
+import { CollectionsProvider } from "@/components/collections-provider";
 
 export interface ProvidersProps {
   children: React.ReactNode;
@@ -31,8 +32,10 @@ export function Providers({ children, themeProps }: ProvidersProps) {
       <NextThemesProvider {...themeProps}>
         <AuthProvider>
           <ChatProvider>
-            <ToastProvider />
-            {children}
+            <CollectionsProvider>
+              <ToastProvider />
+              {children}
+            </CollectionsProvider>
           </ChatProvider>
         </AuthProvider>
       </NextThemesProvider>

@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@heroui/button";
 import { Textarea } from "@heroui/input";
-import { Card, CardBody, CardFooter } from "@heroui/card";
+import { Card, CardBody } from "@heroui/card";
 import { Spinner } from "@heroui/spinner";
 import { useDisclosure } from "@heroui/modal";
 import { Avatar } from "@heroui/avatar";
@@ -26,6 +26,7 @@ import { useChat } from "@/hooks/use-chat";
 import { NotificationPermissionModal, NotificationPermissionModalRef } from "@/components/notification-permission-modal";
 import { Message, MessageContentPart } from "@/lib/llm/types";
 import ImageDetailModal from "./image-detail-modal";
+import ImageWithMenu from "@/components/collection/image-with-menu";
 
 const AWS_S3_PUBLIC_URL = process.env.NEXT_PUBLIC_AWS_S3_PUBLIC_URL || "";
 
@@ -619,54 +620,61 @@ export default function ChatInterface({
               );
 
               return (
-                <Card
+                <ImageWithMenu
                   key={`agent-${i}`}
-                  className={clsx(
-                    "w-full",
-                    isSelected && "border-2 border-primary"
-                  )}
+                  imageId={part.imageId || ""}
+                  imageUrl={url}
+                  chatId={chatId}
+                  generationDetails={{
+                    title: part.title,
+                    prompt: part.prompt,
+                    status: part.status,
+                  }}
+                  onViewDetails={() => handleAgentTitleClick(part)}
                 >
-                  <CardBody
-                    className="p-0 overflow-hidden relative aspect-square cursor-pointer"
-                    onClick={() =>
-                      part.status === "generated" &&
-                      messageIndex !== undefined &&
-                      handleAgentImageSelect(
-                        part,
-                        messageIndex,
-                        realPartIndex
-                      )
-                    }
+                  <Card
+                    className={clsx(
+                      "w-full",
+                      isSelected && "border-4 border-primary"
+                    )}
                   >
-                    {part.status === "loading" && (
-                      <div className="w-full h-full flex items-center justify-center bg-default-100">
-                        <Spinner />
-                      </div>
-                    )}
-                    {part.status === "error" && (
-                      <div className="w-full h-full flex items-center justify-center bg-danger-50 text-danger">
-                        <X />
-                      </div>
-                    )}
-                    {part.status === "generated" && (
-                      <img
-                        src={url}
-                        alt={part.title}
-                        className="w-full h-full object-cover"
-                      />
-                    )}
-                  </CardBody>
-                  {(part.status === "generated" || part.status === "error") && (
-                    <CardFooter
-                      className="p-2 cursor-pointer hover:bg-default-100 justify-center bg-content1"
-                      onClick={() => handleAgentTitleClick(part)}
+                    <CardBody
+                      className="p-0 overflow-hidden relative aspect-square cursor-pointer group/image rounded-lg"
+                      onClick={() =>
+                        part.status === "generated" &&
+                        messageIndex !== undefined &&
+                        handleAgentImageSelect(
+                          part,
+                          messageIndex,
+                          realPartIndex
+                        )
+                      }
                     >
-                      <span className="text-xs font-medium truncate w-full text-center">
-                        {part.title}
-                      </span>
-                    </CardFooter>
-                  )}
-                </Card>
+                      {part.status === "loading" && (
+                        <div className="w-full h-full flex items-center justify-center bg-default-100">
+                          <Spinner />
+                        </div>
+                      )}
+                      {part.status === "error" && (
+                        <div className="w-full h-full flex items-center justify-center bg-danger-50 text-danger">
+                          <X />
+                        </div>
+                      )}
+                      {part.status === "generated" && (
+                        <img
+                          src={url}
+                          alt={part.title}
+                          className="w-full h-full object-cover"
+                        />
+                      )}
+                      {(part.status === "generated" || part.status === "error") && (
+                        <div className="absolute bottom-0 left-0 right-0 bg-white/90 dark:bg-black/60 text-black dark:text-white p-2 text-xs truncate opacity-0 group-hover/image:opacity-100 transition-opacity">
+                          {part.title}
+                        </div>
+                      )}
+                    </CardBody>
+                  </Card>
+                </ImageWithMenu>
               );
             })}
           </div>
