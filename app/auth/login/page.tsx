@@ -11,7 +11,6 @@ import { startAuthentication } from "@simplewebauthn/browser";
 import { Key } from "lucide-react";
 
 export default function LoginPage() {
-  const router = useRouter();
   const [step, setStep] = useState<"email" | "otp">("email");
   const [email, setEmail] = useState("");
   const [otp, setOtp] = useState("");
@@ -80,7 +79,7 @@ export default function LoginPage() {
   const handlePasskeyLogin = async () => {
     setPasskeyLoading(true);
     setError("");
-    
+
     try {
       // 1. Get options
       const resp = await fetch("/api/auth/passkey/login/options", {
@@ -88,7 +87,7 @@ export default function LoginPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: email || undefined }),
       });
-      
+
       const options = await resp.json();
       if (options.error) throw new Error(options.error);
 
@@ -97,8 +96,8 @@ export default function LoginPage() {
       try {
         asseResp = await startAuthentication(options);
       } catch (err) {
-        if ((err as Error).name === 'NotAllowedError') {
-           throw new Error("Passkey authentication cancelled.");
+        if ((err as Error).name === "NotAllowedError") {
+          throw new Error("Passkey authentication cancelled.");
         }
         throw err;
       }
@@ -113,7 +112,7 @@ export default function LoginPage() {
       const verification = await verifyResp.json();
 
       if (verification.verified) {
-         window.location.href = "/";
+        window.location.href = "/";
       } else {
         throw new Error(verification.error || "Verification failed");
       }
@@ -170,7 +169,9 @@ export default function LoginPage() {
 
               <div className="relative flex py-2 items-center">
                 <div className="flex-grow border-t border-default-200"></div>
-                <span className="flex-shrink-0 mx-4 text-default-400 text-xs uppercase">Or with Email</span>
+                <span className="flex-shrink-0 mx-4 text-default-400 text-xs uppercase">
+                  Or with Email
+                </span>
                 <div className="flex-grow border-t border-default-200"></div>
               </div>
 

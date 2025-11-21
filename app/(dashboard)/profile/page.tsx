@@ -7,13 +7,13 @@ import { Card, CardBody, CardHeader } from "@heroui/card";
 import { useAuth } from "@/hooks/use-auth";
 import { startRegistration } from "@simplewebauthn/browser";
 import { Key } from "lucide-react";
+import { addToast } from "@heroui/toast";
 
 export default function ProfilePage() {
   const { user, refreshUser } = useAuth();
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState({ type: "", content: "" });
   
   const [passkeys, setPasskeys] = useState<any[]>([]);
   const [passkeyLoading, setPasskeyLoading] = useState(false);
@@ -41,7 +41,6 @@ export default function ProfilePage() {
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setMessage({ type: "", content: "" });
 
     try {
       const res = await fetch("/api/users/profile", {
@@ -51,13 +50,13 @@ export default function ProfilePage() {
       });
 
       if (res.ok) {
-        setMessage({ type: "success", content: "Profile updated successfully" });
+        addToast({ title: "Profile updated successfully", color: "success" });
         refreshUser();
       } else {
-        setMessage({ type: "error", content: "Failed to update profile" });
+        addToast({ title: "Failed to update profile", color: "danger" });
       }
     } catch (error) {
-      setMessage({ type: "error", content: "An error occurred" });
+      addToast({ title: "An error occurred", color: "danger" });
     } finally {
       setLoading(false);
     }
@@ -65,7 +64,6 @@ export default function ProfilePage() {
 
   const handleAddPasskey = async () => {
     setPasskeyLoading(true);
-    setMessage({ type: "", content: "" });
     try {
       // 1. Get options
       const resp = await fetch("/api/auth/passkey/register/options", { method: "POST" });
@@ -86,14 +84,17 @@ export default function ProfilePage() {
       const verification = await verifyResp.json();
 
       if (verification.verified) {
-        setMessage({ type: "success", content: "Passkey added successfully" });
+        addToast({ title: "Passkey added successfully", color: "success" });
         fetchPasskeys();
       } else {
         throw new Error(verification.error || "Verification failed");
       }
     } catch (error) {
       console.error(error);
-      setMessage({ type: "error", content: error instanceof Error ? error.message : "Failed to add passkey" });
+      addToast({ 
+        title: error instanceof Error ? error.message : "Failed to add passkey", 
+        color: "danger" 
+      });
     } finally {
       setPasskeyLoading(false);
     }
@@ -126,14 +127,7 @@ export default function ProfilePage() {
                 variant="bordered"
               />
             </div>
-            <div className="flex justify-between items-center">
-               <div className="text-sm">
-                 {message.content && (
-                   <span className={message.type === "error" ? "text-danger" : "text-success"}>
-                     {message.content}
-                   </span>
-                 )}
-               </div>
+            <div className="flex justify-end items-center">
                <Button color="primary" type="submit" isLoading={loading}>
                  Save Changes
                </Button>
@@ -183,4 +177,3 @@ export default function ProfilePage() {
     </div>
   );
 }
-
