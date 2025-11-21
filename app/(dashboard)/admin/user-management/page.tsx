@@ -42,7 +42,7 @@ export default function AdminPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
-  
+
   // Pagination & Search State
   const [filterValue, setFilterValue] = useState("");
   const [page, setPage] = useState(1);
@@ -72,7 +72,7 @@ export default function AdminPage() {
     isOpen: isEditOpen,
     onOpen: onEditOpen,
     onOpenChange: onEditOpenChange,
-    onClose: onEditClose
+    onClose: onEditClose,
   } = useDisclosure();
   const [editFormData, setEditFormData] = useState({
     firstName: "",
@@ -103,10 +103,13 @@ export default function AdminPage() {
     let filteredUsers = [...users];
 
     if (filterValue) {
-      filteredUsers = filteredUsers.filter((user) =>
-        user.email.toLowerCase().includes(filterValue.toLowerCase()) ||
-        (user.firstName && user.firstName.toLowerCase().includes(filterValue.toLowerCase())) ||
-        (user.lastName && user.lastName.toLowerCase().includes(filterValue.toLowerCase()))
+      filteredUsers = filteredUsers.filter(
+        (user) =>
+          user.email.toLowerCase().includes(filterValue.toLowerCase()) ||
+          (user.firstName &&
+            user.firstName.toLowerCase().includes(filterValue.toLowerCase())) ||
+          (user.lastName &&
+            user.lastName.toLowerCase().includes(filterValue.toLowerCase()))
       );
     }
 
@@ -155,7 +158,8 @@ export default function AdminPage() {
     } catch (error) {
       addToast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to send invitations",
+        description:
+          error instanceof Error ? error.message : "Failed to send invitations",
         color: "danger",
       });
     } finally {
@@ -235,13 +239,22 @@ export default function AdminPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 sm:gap-0">
         <h1 className="text-2xl font-bold">Admin Dashboard</h1>
-        <div className="flex gap-2">
-          <Button color="primary" variant="flat" onPress={onCodeOpen}>
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+          <Button
+            color="primary"
+            variant="flat"
+            onPress={onCodeOpen}
+            className="w-full sm:w-auto"
+          >
             Generate Codes
           </Button>
-          <Button color="primary" onPress={onInviteOpen}>
+          <Button
+            color="primary"
+            onPress={onInviteOpen}
+            className="w-full sm:w-auto"
+          >
             Invite Users
           </Button>
         </div>
@@ -264,7 +277,7 @@ export default function AdminPage() {
                 onValueChange={onSearchChange}
               />
             </div>
-            <Table 
+            <Table
               aria-label="User table"
               bottomContent={
                 pages > 0 ? (
@@ -305,8 +318,7 @@ export default function AdminPage() {
                         description={item.email}
                         avatarProps={{
                           name: (
-                            item.firstName?.charAt(0) ||
-                            item.email.charAt(0)
+                            item.firstName?.charAt(0) || item.email.charAt(0)
                           ).toUpperCase(),
                           color: "primary",
                         }}
@@ -323,8 +335,8 @@ export default function AdminPage() {
                               role === "admin"
                                 ? "danger"
                                 : role === "new_user"
-                                ? "warning"
-                                : "primary"
+                                  ? "warning"
+                                  : "primary"
                             }
                           >
                             {role}
@@ -363,9 +375,9 @@ export default function AdminPage() {
               <ModalHeader>Invite Users via Email</ModalHeader>
               <ModalBody>
                 <p className="text-sm text-gray-500">
-                  Enter email addresses separated by newlines, commas, or spaces.
-                  This will send a blind copy (BCC) invitation email to all
-                  recipients.
+                  Enter email addresses separated by newlines, commas, or
+                  spaces. This will send a blind copy (BCC) invitation email to
+                  all recipients.
                 </p>
                 <Textarea
                   label="Emails"

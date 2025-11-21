@@ -483,7 +483,7 @@ export const Sidebar = () => {
                       isBordered: true,
                       color: "primary",
                       size: "sm",
-                      className: "shrink-0"
+                      className: "shrink-0 mr-2"
                     }}
                     classNames={{
                       name: "text-sm font-semibold truncate",

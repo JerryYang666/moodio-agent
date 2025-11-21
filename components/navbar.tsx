@@ -18,7 +18,7 @@ import clsx from "clsx";
 
 import { siteConfig } from "@/config/site";
 import { ThemeSwitch } from "@/components/theme-switch";
-import { 
+import {
   BotMessageSquare,
   Home,
   LayoutDashboard,
@@ -27,10 +27,13 @@ import {
   Shield,
   SquarePen,
   MessageSquare,
-  Folder
+  Folder,
+  LogOut,
 } from "lucide-react";
 import { User } from "@heroui/user";
 import { Card, CardBody } from "@heroui/card";
+import { Popover, PopoverTrigger, PopoverContent } from "@heroui/popover";
+import { Button } from "@heroui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { useChat } from "@/hooks/use-chat";
 import { Divider } from "@heroui/divider";
@@ -38,7 +41,7 @@ import { Divider } from "@heroui/divider";
 export const Navbar = () => {
   const pathname = usePathname();
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const { chats, refreshChats } = useChat();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
@@ -47,7 +50,7 @@ export const Navbar = () => {
     const handleRefreshChats = () => {
       refreshChats();
     };
-    
+
     window.addEventListener("refresh-chats", handleRefreshChats);
     return () => {
       window.removeEventListener("refresh-chats", handleRefreshChats);
@@ -60,7 +63,7 @@ export const Navbar = () => {
   };
 
   const displayName = user
-    ? (user.firstName && user.lastName)
+    ? user.firstName && user.lastName
       ? `${user.firstName} ${user.lastName}`
       : user.firstName || user.email
     : "";
@@ -84,11 +87,11 @@ export const Navbar = () => {
   };
 
   // Filter out "Home" from navItems as we have "New Chat"
-  const navItems = siteConfig.navItems.filter(item => item.label !== "Home");
+  const navItems = siteConfig.navItems.filter((item) => item.label !== "Home");
 
   return (
-    <HeroUINavbar 
-      maxWidth="xl" 
+    <HeroUINavbar
+      maxWidth="xl"
       position="sticky"
       isMenuOpen={isMenuOpen}
       onMenuOpenChange={setIsMenuOpen}
@@ -118,139 +121,193 @@ export const Navbar = () => {
         </ul>
       </NavbarContent>
 
-      <NavbarContent
-        className="hidden"
-        justify="end"
-      >
+      <NavbarContent className="hidden" justify="end">
         <NavbarItem className="hidden gap-2">
           <ThemeSwitch />
         </NavbarItem>
       </NavbarContent>
 
       <NavbarContent className="basis-1 pl-4" justify="end">
-        <ThemeSwitch />
         <NavbarMenuToggle />
       </NavbarContent>
 
       <NavbarMenu>
-        <div className="mx-4 mt-2 flex flex-col gap-3 max-h-[calc(100vh-80px)] overflow-y-auto">
-          {/* New Chat Button */}
-          <button
-            onClick={handleNewChat}
-            className="flex items-center gap-2 px-3 py-2 rounded-xl transition-colors text-default-500 hover:bg-default-100 hover:text-default-900"
-          >
-            <SquarePen size={20} />
-            <span className="text-sm">New Chat</span>
-          </button>
+        <div className="flex flex-col h-full pb-6">
+          <div className="flex-1 overflow-y-auto px-4 flex flex-col gap-3 mt-2">
+            {/* New Chat Button */}
+            <button
+              onClick={handleNewChat}
+              className="flex items-center gap-2 px-3 py-2 rounded-xl transition-colors text-default-500 hover:bg-default-100 hover:text-default-900 shrink-0"
+            >
+              <SquarePen size={20} />
+              <span className="text-sm">New Chat</span>
+            </button>
 
-          {/* Collections Button */}
-          <NextLink
-            href="/collection"
-            onClick={() => setIsMenuOpen(false)}
-            className={clsx(
-              "flex items-center gap-2 px-3 py-2 rounded-xl transition-colors",
-              pathname?.startsWith("/collection")
-                ? "bg-primary/10 text-primary font-medium"
-                : "text-default-500 hover:bg-default-100 hover:text-default-900"
-            )}
-          >
-            <Folder size={20} />
-            <span className="text-sm">Collections</span>
-          </NextLink>
-
-          {/* Navigation Items */}
-          {navItems.map((item) => {
-            const isActive = pathname === item.href;
-            return (
-              <NextLink
-                key={item.href}
-                href={item.href}
-                onClick={() => setIsMenuOpen(false)}
-                className={clsx(
-                  "flex items-center gap-2 px-3 py-2 rounded-xl transition-colors",
-                  isActive 
-                    ? "bg-primary/10 text-primary font-medium" 
-                    : "text-default-500 hover:bg-default-100 hover:text-default-900"
-                )}
-              >
-                {getIcon(item.label)}
-                <span className="text-sm">{item.label}</span>
-              </NextLink>
-            );
-          })}
-
-          {/* Admin Link */}
-          {user && user.roles.includes("admin") && (
+            {/* Collections Button */}
             <NextLink
-              href="/admin"
+              href="/collection"
               onClick={() => setIsMenuOpen(false)}
               className={clsx(
-                "flex items-center gap-2 px-3 py-2 rounded-xl transition-colors",
-                pathname?.startsWith("/admin")
-                  ? "bg-primary/10 text-primary font-medium" 
+                "flex items-center gap-2 px-3 py-2 rounded-xl transition-colors shrink-0",
+                pathname?.startsWith("/collection")
+                  ? "bg-primary/10 text-primary font-medium"
                   : "text-default-500 hover:bg-default-100 hover:text-default-900"
               )}
             >
-              <Shield size={20} />
-              <span className="text-sm">Admin</span>
+              <Folder size={20} />
+              <span className="text-sm">Collections</span>
             </NextLink>
-          )}
 
-          <Divider className="my-2" />
+            {/* Navigation Items */}
+            {navItems.map((item) => {
+              const isActive = pathname === item.href;
+              return (
+                <NextLink
+                  key={item.href}
+                  href={item.href}
+                  onClick={() => setIsMenuOpen(false)}
+                  className={clsx(
+                    "flex items-center gap-2 px-3 py-2 rounded-xl transition-colors shrink-0",
+                    isActive
+                      ? "bg-primary/10 text-primary font-medium"
+                      : "text-default-500 hover:bg-default-100 hover:text-default-900"
+                  )}
+                >
+                  {getIcon(item.label)}
+                  <span className="text-sm">{item.label}</span>
+                </NextLink>
+              );
+            })}
 
-          {/* Recent Chats */}
-          <div className="space-y-1">
-            <p className="px-3 text-xs text-default-400 font-semibold uppercase">Recent Chats</p>
-            {chats.length > 0 ? (
-              chats.map((chat) => {
-                const isActive = pathname === `/chat/${chat.id}`;
-                const chatName = chat.name || "New Chat";
-                
-                return (
-                  <NextLink
-                    key={chat.id}
-                    href={`/chat/${chat.id}`}
-                    onClick={() => setIsMenuOpen(false)}
-                    className={clsx(
-                      "flex items-center gap-2 px-3 py-2 rounded-xl transition-colors text-sm",
-                      isActive 
-                        ? "bg-primary/10 text-primary font-medium" 
-                        : "text-default-500 hover:bg-default-100 hover:text-default-900"
-                    )}
-                  >
-                    <MessageSquare size={16} />
-                    <span className="truncate">{chatName}</span>
-                  </NextLink>
-                );
-              })
-            ) : (
-              <p className="px-3 py-2 text-sm text-default-400">No recent chats</p>
+            {/* Admin Link */}
+            {user && user.roles.includes("admin") && (
+              <NextLink
+                href="/admin"
+                onClick={() => setIsMenuOpen(false)}
+                className={clsx(
+                  "flex items-center gap-2 px-3 py-2 rounded-xl transition-colors shrink-0",
+                  pathname?.startsWith("/admin")
+                    ? "bg-primary/10 text-primary font-medium"
+                    : "text-default-500 hover:bg-default-100 hover:text-default-900"
+                )}
+              >
+                <Shield size={20} />
+                <span className="text-sm">Admin</span>
+              </NextLink>
             )}
+
+            <Divider className="my-2" />
+
+            {/* Recent Chats */}
+            <div className="space-y-1">
+              <p className="px-3 text-xs text-default-400 font-semibold uppercase">
+                Recent Chats
+              </p>
+              {chats.length > 0 ? (
+                chats.map((chat) => {
+                  const isActive = pathname === `/chat/${chat.id}`;
+                  const chatName = chat.name || "New Chat";
+
+                  return (
+                    <NextLink
+                      key={chat.id}
+                      href={`/chat/${chat.id}`}
+                      onClick={() => setIsMenuOpen(false)}
+                      className={clsx(
+                        "flex items-center gap-2 px-3 py-2 rounded-xl transition-colors text-sm",
+                        isActive
+                          ? "bg-primary/10 text-primary font-medium"
+                          : "text-default-500 hover:bg-default-100 hover:text-default-900"
+                      )}
+                    >
+                      <MessageSquare size={16} />
+                      <span className="truncate">{chatName}</span>
+                    </NextLink>
+                  );
+                })
+              ) : (
+                <p className="px-3 py-2 text-sm text-default-400">
+                  No recent chats
+                </p>
+              )}
+            </div>
           </div>
 
-          <Divider className="my-2" />
-
-          {/* User Profile */}
+          {/* Pinned User Card */}
           {user && (
-            <Card shadow="sm" className="bg-default-50 dark:bg-default-100/50">
-              <CardBody className="p-2">
-                <User
-                  name={displayName}
-                  description={user.email}
-                  avatarProps={{
-                    src: undefined,
-                    name: user.firstName?.charAt(0) || user.email.charAt(0).toUpperCase(),
-                    isBordered: true,
-                    color: "primary",
-                    size: "sm",
-                  }}
-                  classNames={{
-                    name: "text-sm font-semibold truncate",
-                    description: "text-xs text-default-500 truncate",
-                  }}
-                />
-              </CardBody>
-            </Card>
+            <div className="mt-auto px-4 pt-4 border-t border-divider">
+              <Popover
+                placement="top"
+                showArrow
+                offset={10}
+                className="w-[calc(100vw-48px)] max-w-[380px]"
+              >
+                <PopoverTrigger>
+                  <Card
+                    isPressable
+                    shadow="sm"
+                    className="bg-default-50 dark:bg-default-100/50 w-full"
+                  >
+                    <CardBody className="p-2 flex-row items-center gap-3">
+                      <User
+                        name={displayName}
+                        description={user.email}
+                        avatarProps={{
+                          src: undefined,
+                          name:
+                            user.firstName?.charAt(0) ||
+                            user.email.charAt(0).toUpperCase(),
+                          isBordered: true,
+                          color: "primary",
+                          size: "sm",
+                          className: "mr-2",
+                        }}
+                        classNames={{
+                          name: "text-sm font-semibold truncate",
+                          description: "text-xs text-default-500 truncate",
+                        }}
+                      />
+                    </CardBody>
+                  </Card>
+                </PopoverTrigger>
+                <PopoverContent className="w-full p-2">
+                  <div className="flex flex-col gap-8 w-full min-w-[200px] p-2">
+                    <NextLink
+                      href="/profile"
+                      onClick={() => setIsMenuOpen(false)}
+                      className="w-full"
+                    >
+                      <Button
+                        size="md"
+                        variant="flat"
+                        className="w-full justify-start h-12 text-base"
+                        startContent={<UserIcon size={20} />}
+                      >
+                        Profile
+                      </Button>
+                    </NextLink>
+                    <div className="flex items-center justify-between gap-24">
+                      <Button
+                        size="md"
+                        variant="flat"
+                        color="danger"
+                        startContent={<LogOut size={20} />}
+                        onPress={() => {
+                          logout();
+                          setIsMenuOpen(false);
+                        }}
+                        className="flex-1 h-12 text-base"
+                      >
+                        Logout
+                      </Button>
+                      <div className="p-2">
+                        <ThemeSwitch />
+                      </div>
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            </div>
           )}
         </div>
       </NavbarMenu>

@@ -176,7 +176,9 @@ export default function CollectionPage({
     setSearchedUser(null);
 
     try {
-      const res = await fetch(`/api/users/search?email=${encodeURIComponent(searchEmail.trim())}`);
+      const res = await fetch(
+        `/api/users/search?email=${encodeURIComponent(searchEmail.trim())}`
+      );
       if (res.ok) {
         const data = await res.json();
         if (data.user) {
@@ -241,7 +243,9 @@ export default function CollectionPage({
           prev
             ? {
                 ...prev,
-                images: prev.images.filter((img) => img.imageId !== imageToRemoveId),
+                images: prev.images.filter(
+                  (img) => img.imageId !== imageToRemoveId
+                ),
               }
             : null
         );
@@ -347,9 +351,9 @@ export default function CollectionPage({
           Back to Collections
         </Button>
 
-        <div className="flex justify-between items-start">
+        <div className="flex flex-col sm:flex-row justify-between sm:items-start gap-4 sm:gap-0">
           <div className="flex-1">
-            <div className="flex items-center gap-3 mb-2">
+            <div className="flex flex-wrap items-center gap-3 mb-2">
               <h1 className="text-3xl font-bold">{collection.name}</h1>
               <Chip
                 size="sm"
@@ -365,11 +369,12 @@ export default function CollectionPage({
           </div>
 
           {canEdit && (
-            <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
               <Button
                 variant="flat"
                 startContent={<Pencil size={18} />}
                 onPress={onRenameOpen}
+                className="w-full sm:w-auto"
               >
                 Rename
               </Button>
@@ -377,6 +382,7 @@ export default function CollectionPage({
                 variant="flat"
                 startContent={<Share2 size={18} />}
                 onPress={onShareOpen}
+                className="w-full sm:w-auto"
               >
                 Share
               </Button>
@@ -385,6 +391,7 @@ export default function CollectionPage({
                 variant="flat"
                 startContent={<Trash2 size={18} />}
                 onPress={onDeleteOpen}
+                className="w-full sm:w-auto"
               >
                 Delete
               </Button>
@@ -396,9 +403,7 @@ export default function CollectionPage({
       {/* Images Grid */}
       {images.length === 0 ? (
         <div className="text-center py-20">
-          <p className="text-default-500">
-            No images in this collection yet
-          </p>
+          <p className="text-default-500">No images in this collection yet</p>
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
@@ -529,11 +534,7 @@ export default function CollectionPage({
       </Modal>
 
       {/* Share Modal */}
-      <Modal
-        isOpen={isShareOpen}
-        onOpenChange={onShareOpenChange}
-        size="2xl"
-      >
+      <Modal isOpen={isShareOpen} onOpenChange={onShareOpenChange} size="2xl">
         <ModalContent>
           {(onClose) => (
             <>
@@ -638,9 +639,7 @@ export default function CollectionPage({
                               className="flex items-center justify-between p-3 bg-default-100 rounded-lg"
                             >
                               <div>
-                                <p className="font-medium">
-                                  {share.email}
-                                </p>
+                                <p className="font-medium">{share.email}</p>
                                 <p className="text-xs text-default-500 capitalize">
                                   {share.permission}
                                 </p>
@@ -682,7 +681,8 @@ export default function CollectionPage({
               <ModalHeader>Remove Image</ModalHeader>
               <ModalBody>
                 <p>
-                  Are you sure you want to remove this image from the collection?
+                  Are you sure you want to remove this image from the
+                  collection?
                 </p>
               </ModalBody>
               <ModalFooter>
@@ -708,4 +708,3 @@ export default function CollectionPage({
     </div>
   );
 }
-
