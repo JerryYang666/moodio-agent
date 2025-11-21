@@ -95,12 +95,18 @@ export const Navbar = () => {
       position="sticky"
       isMenuOpen={isMenuOpen}
       onMenuOpenChange={setIsMenuOpen}
+      classNames={{
+        base: "md:h-auto h-12",
+        wrapper: "md:px-6 px-3 md:h-auto h-12",
+      }}
     >
       <NavbarContent className="basis-1/5 sm:basis-full" justify="start">
-        <NavbarBrand as="li" className="gap-3 max-w-fit">
+        <NavbarBrand as="li" className="gap-2 max-w-fit">
           <NextLink className="flex justify-start items-center gap-1" href="/">
-            <BotMessageSquare />
-            <p className="font-bold text-inherit">moodio agent</p>
+            <BotMessageSquare className="md:w-6 md:h-6 w-5 h-5" />
+            <p className="font-bold text-inherit md:text-base text-sm">
+              moodio agent
+            </p>
           </NextLink>
         </NavbarBrand>
         <ul className="hidden lg:flex gap-4 justify-start ml-2">
@@ -127,12 +133,12 @@ export const Navbar = () => {
         </NavbarItem>
       </NavbarContent>
 
-      <NavbarContent className="basis-1 pl-4" justify="end">
-        <NavbarMenuToggle />
+      <NavbarContent className="basis-1 md:pl-4 pl-2" justify="end">
+        <NavbarMenuToggle className="md:w-auto md:h-auto w-8 h-8" />
       </NavbarContent>
 
-      <NavbarMenu>
-        <div className="flex flex-col h-full">
+      <NavbarMenu className="pt-0 mt-0 top-12 md:top-auto">
+        <div className="flex flex-col h-full pt-4">
           {/* Pinned User Card - Moved to Top */}
           {user && (
             <div className="px-4 pb-0">
