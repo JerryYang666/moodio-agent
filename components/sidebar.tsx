@@ -17,16 +17,156 @@ import {
   Shield,
   SquarePen,
   MessageSquare,
-  LogOut
+  LogOut,
+  Pencil,
+  Check,
+  MoreHorizontal
 } from "lucide-react";
 import { User } from "@heroui/user";
 import { Card, CardBody } from "@heroui/card";
 import { Popover, PopoverTrigger, PopoverContent } from "@heroui/popover";
+import { Dropdown, DropdownTrigger, DropdownMenu, DropdownItem } from "@heroui/dropdown";
 import { useAuth } from "@/hooks/use-auth";
 import { useChat } from "@/hooks/use-chat";
 import { Button } from "@heroui/button";
+import { Input } from "@heroui/input";
 import { motion, AnimatePresence } from "framer-motion";
 import { Divider } from "@heroui/divider";
+import { Chat } from "@/components/chat-provider";
+
+interface ChatItemProps {
+  chat: Chat;
+  isActive: boolean;
+  isCollapsed: boolean;
+}
+
+const ChatItem = ({ chat, isActive, isCollapsed }: ChatItemProps) => {
+  const { renameChat } = useChat();
+  const [isRenameOpen, setIsRenameOpen] = useState(false);
+  const [newName, setNewName] = useState(chat.name || "");
+  const [isRenaming, setIsRenaming] = useState(false);
+
+  const handleRename = async () => {
+    if (!newName.trim()) return;
+    setIsRenaming(true);
+    try {
+      await renameChat(chat.id, newName);
+      setIsRenameOpen(false);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsRenaming(false);
+    }
+  };
+
+  const chatName = chat.name || "New Chat";
+
+  return (
+    <div className="relative group">
+      <Popover
+        isOpen={isRenameOpen}
+        onOpenChange={(open) => {
+          setIsRenameOpen(open);
+          if (!open) setNewName(chat.name || "");
+        }}
+        placement="right"
+      >
+        <PopoverTrigger>
+           {/* Anchor for the popover - positioned at the end of the item */}
+           <div className="absolute right-2 top-1/2 w-1 h-1 opacity-0 pointer-events-none" />
+        </PopoverTrigger>
+        <PopoverContent>
+          <div className="px-1 py-2 w-64">
+            <p className="text-small font-bold text-foreground mb-2">Rename Chat</p>
+            <div className="flex gap-2">
+              <Input
+                size="sm"
+                value={newName}
+                onValueChange={setNewName}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleRename();
+                }}
+                autoFocus
+              />
+              <Button
+                size="sm"
+                color="primary"
+                isIconOnly
+                isLoading={isRenaming}
+                onPress={handleRename}
+              >
+                <Check size={16} />
+              </Button>
+            </div>
+          </div>
+        </PopoverContent>
+      </Popover>
+
+      <NextLink
+        href={`/chat/${chat.id}`}
+        className={clsx(
+          "flex items-center gap-2 px-3 py-2 rounded-xl transition-colors whitespace-nowrap text-sm pr-8 relative",
+          isActive
+            ? "bg-primary/10 text-primary font-medium"
+            : "text-default-500 hover:bg-default-100 hover:text-default-900",
+          isCollapsed && "justify-center pr-3"
+        )}
+      >
+        <span className="shrink-0">
+          <MessageSquare size={16} />
+        </span>
+        <AnimatePresence>
+          {!isCollapsed && (
+            <motion.span
+              initial={{ opacity: 0, width: 0 }}
+              animate={{ opacity: 1, width: "auto" }}
+              exit={{ opacity: 0, width: 0 }}
+              className="overflow-hidden truncate"
+            >
+              {chatName}
+            </motion.span>
+          )}
+        </AnimatePresence>
+
+        {!isCollapsed && (
+          <div className="absolute right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+             <Dropdown>
+               <DropdownTrigger>
+                 <Button
+                   isIconOnly
+                   size="sm"
+                   variant="light"
+                   className="min-w-6 w-6 h-6 p-0 text-default-500"
+                   onPress={(e) => {
+                     // Prevent navigation
+                     // Note: NextLink might still capture click if we are not careful, 
+                     // but Button inside usually handles its own events.
+                     // We might need to use e.continuePropagation() equivalent or just rely on button behavior.
+                   }}
+                   onClick={(e) => {
+                     e.preventDefault();
+                     e.stopPropagation();
+                   }}
+                 >
+                   <MoreHorizontal size={16} />
+                 </Button>
+               </DropdownTrigger>
+               <DropdownMenu aria-label="Chat Actions">
+                 <DropdownItem 
+                   key="rename" 
+                   startContent={<Pencil size={16} />}
+                   onPress={() => setIsRenameOpen(true)}
+                 >
+                   Rename
+                 </DropdownItem>
+               </DropdownMenu>
+             </Dropdown>
+          </div>
+        )}
+      </NextLink>
+    </div>
+  );
+};
 
 export const Sidebar = () => {
   const pathname = usePathname();
@@ -124,7 +264,7 @@ export const Sidebar = () => {
         )}
       </div>
 
-      <div className="flex flex-col gap-1 pl-3 pr-2 py-2 grow overflow-y-auto overflow-x-hidden sidebar-scrollbar">
+      <div className={clsx("flex flex-col gap-1 py-2 grow overflow-y-auto overflow-x-hidden sidebar-scrollbar", isCollapsed ? "px-2" : "pl-3 pr-2")}>
         {/* New Chat Button */}
         <button
           onClick={handleNewChat}
@@ -207,44 +347,26 @@ export const Sidebar = () => {
           </NextLink>
         )}
         
-        <Divider className="my-2" />
-        
-        {/* Recent Chats */}
-        <div className="space-y-1">
-          {chats.map((chat) => {
-             const isActive = pathname === `/chat/${chat.id}`;
-             // Display name, default to "New Chat" if null, but NEVER show ID
-             const chatName = chat.name || "New Chat";
-             
-             return (
-              <NextLink
-                key={chat.id}
-                href={`/chat/${chat.id}`}
-                className={clsx(
-                  "flex items-center gap-2 px-3 py-2 rounded-xl transition-colors whitespace-nowrap text-sm",
-                  isActive 
-                    ? "bg-primary/10 text-primary font-medium" 
-                    : "text-default-500 hover:bg-default-100 hover:text-default-900",
-                  isCollapsed && "justify-center"
-                )}
-              >
-                <span className="shrink-0"><MessageSquare size={16} /></span>
-                <AnimatePresence>
-                  {!isCollapsed && (
-                    <motion.span
-                      initial={{ opacity: 0, width: 0 }}
-                      animate={{ opacity: 1, width: "auto" }}
-                      exit={{ opacity: 0, width: 0 }}
-                      className="overflow-hidden truncate"
-                    >
-                      {chatName}
-                    </motion.span>
-                  )}
-                </AnimatePresence>
-              </NextLink>
-             )
-          })}
-        </div>
+        {!isCollapsed && (
+          <>
+            <Divider className="my-2" />
+            
+            {/* Recent Chats */}
+            <div className="space-y-1">
+              {chats.map((chat) => {
+                 const isActive = pathname === `/chat/${chat.id}`;
+                 return (
+                   <ChatItem 
+                     key={chat.id} 
+                     chat={chat} 
+                     isActive={isActive} 
+                     isCollapsed={isCollapsed} 
+                   />
+                 );
+              })}
+            </div>
+          </>
+        )}
       </div>
 
       <div className="p-3 border-t border-divider mt-auto">

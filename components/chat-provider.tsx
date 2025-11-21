@@ -17,6 +17,7 @@ interface ChatContextType {
   error: string;
   refreshChats: () => Promise<void>;
   monitorChat: (chatId: string, startCount: number) => void;
+  renameChat: (chatId: string, name: string) => Promise<void>;
 }
 
 export const ChatContext = createContext<ChatContextType | undefined>(undefined);
@@ -61,6 +62,36 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       setLoading(false);
     }
   }, [user]);
+
+  const renameChat = useCallback(async (chatId: string, name: string) => {
+    try {
+      const res = await fetch(`/api/chat/${chatId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ name }),
+      });
+
+      if (res.ok) {
+        setChats((prevChats) =>
+          prevChats.map((chat) =>
+            chat.id === chatId ? { ...chat, name } : chat
+          )
+        );
+      } else {
+        throw new Error("Failed to rename chat");
+      }
+    } catch (error) {
+      console.error("Error renaming chat:", error);
+      addToast({
+        title: "Error",
+        description: "Failed to rename chat",
+        color: "danger",
+      });
+      throw error;
+    }
+  }, []);
 
   useEffect(() => {
     fetchChats();
@@ -171,6 +202,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         error,
         refreshChats: fetchChats,
         monitorChat,
+        renameChat,
       }}
     >
       {children}

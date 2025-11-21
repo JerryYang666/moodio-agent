@@ -54,3 +54,50 @@ export async function GET(
   }
 }
 
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ chatId: string }> }
+) {
+  try {
+    const { chatId } = await params;
+    const accessToken = getAccessToken(request);
+    if (!accessToken) {
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    }
+
+    const payload = await verifyAccessToken(accessToken);
+    if (!payload) {
+      return NextResponse.json({ error: "Invalid token" }, { status: 401 });
+    }
+
+    const body = await request.json();
+    const { name } = body;
+
+    if (!name || typeof name !== 'string') {
+      return NextResponse.json({ error: "Invalid name" }, { status: 400 });
+    }
+
+    // Verify ownership
+    const [chat] = await db
+      .select()
+      .from(chats)
+      .where(and(eq(chats.id, chatId), eq(chats.userId, payload.userId)));
+
+    if (!chat) {
+      return NextResponse.json({ error: "Chat not found" }, { status: 404 });
+    }
+
+    await db
+      .update(chats)
+      .set({ name, updatedAt: new Date() })
+      .where(eq(chats.id, chatId));
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Error updating chat:", error);
+    return NextResponse.json(
+      { error: "Failed to update chat" },
+      { status: 500 }
+    );
+  }
+}
