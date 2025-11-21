@@ -26,7 +26,8 @@ import {
   User as UserIcon,
   Shield,
   SquarePen,
-  MessageSquare
+  MessageSquare,
+  Folder
 } from "lucide-react";
 import { User } from "@heroui/user";
 import { Card, CardBody } from "@heroui/card";
@@ -141,6 +142,21 @@ export const Navbar = () => {
             <SquarePen size={20} />
             <span className="text-sm">New Chat</span>
           </button>
+
+          {/* Collections Button */}
+          <NextLink
+            href="/collection"
+            onClick={() => setIsMenuOpen(false)}
+            className={clsx(
+              "flex items-center gap-2 px-3 py-2 rounded-xl transition-colors",
+              pathname?.startsWith("/collection")
+                ? "bg-primary/10 text-primary font-medium"
+                : "text-default-500 hover:bg-default-100 hover:text-default-900"
+            )}
+          >
+            <Folder size={20} />
+            <span className="text-sm">Collections</span>
+          </NextLink>
 
           {/* Navigation Items */}
           {navItems.map((item) => {
