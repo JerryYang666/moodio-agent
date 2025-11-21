@@ -104,6 +104,7 @@ export default function ChatInterface({
     url: string;
     title: string;
     prompt: string;
+    status?: "loading" | "generated" | "error";
   } | null>(null);
   
   // State for selected agent image (for sending in next message)
@@ -490,11 +491,12 @@ export default function ChatInterface({
   };
 
   const handleAgentTitleClick = (part: any) => {
-    if (part.status === "generated") {
+    if (part.status === "generated" || part.status === "error") {
       setSelectedImage({
-        url: part.imageUrl || getImageUrl(part.imageId),
+        url: part.imageUrl || (part.imageId ? getImageUrl(part.imageId) : ""),
         title: part.title,
         prompt: part.prompt,
+        status: part.status,
       });
       onOpen();
     }
@@ -622,7 +624,7 @@ export default function ChatInterface({
                       />
                     )}
                   </CardBody>
-                  {part.status === "generated" && (
+                  {(part.status === "generated" || part.status === "error") && (
                     <CardFooter
                       className="p-2 cursor-pointer hover:bg-default-100 justify-center bg-content1"
                       onClick={() => handleAgentTitleClick(part)}

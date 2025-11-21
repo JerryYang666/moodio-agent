@@ -8,6 +8,7 @@ import {
   ModalFooter,
 } from "@heroui/modal";
 import { Button } from "@heroui/button";
+import { X } from "lucide-react";
 
 interface ImageDetailModalProps {
   isOpen: boolean;
@@ -16,6 +17,7 @@ interface ImageDetailModalProps {
     url: string;
     title: string;
     prompt: string;
+    status?: "loading" | "generated" | "error";
   } | null;
   onClose: () => void;
 }
@@ -47,11 +49,17 @@ export default function ImageDetailModal({
               {selectedImage && (
                 <div className="flex flex-col md:flex-row gap-6 md:h-full">
                   <div className="w-full md:w-1/2 flex items-center justify-center bg-black/5 rounded-lg min-h-[200px] md:min-h-[400px]">
-                    <img
-                      src={selectedImage.url}
-                      alt={selectedImage.title}
-                      className="max-w-full max-h-[40vh] md:max-h-[60vh] object-contain rounded-lg"
-                    />
+                    {selectedImage.status === "error" ? (
+                      <div className="w-full h-full flex items-center justify-center bg-danger-50 text-danger rounded-lg min-h-[200px]">
+                        <X size={48} />
+                      </div>
+                    ) : (
+                      <img
+                        src={selectedImage.url}
+                        alt={selectedImage.title}
+                        className="max-w-full max-h-[40vh] md:max-h-[60vh] object-contain rounded-lg"
+                      />
+                    )}
                   </div>
                   <div className="w-full md:w-1/2 flex flex-col">
                     <div className="bg-default-100 p-4 rounded-lg text-sm md:flex-1 md:overflow-y-auto">
