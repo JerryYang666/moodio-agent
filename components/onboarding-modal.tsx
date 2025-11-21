@@ -1,7 +1,14 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, useDisclosure } from "@heroui/modal";
+import {
+  Modal,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
+  useDisclosure,
+} from "@heroui/modal";
 import { Button } from "@heroui/button";
 import { Input } from "@heroui/input";
 import { useAuth } from "@/hooks/use-auth";
@@ -36,7 +43,11 @@ export const OnboardingModal = () => {
       const trimmedName = name.trim();
       const nameParts = trimmedName.split(" ");
       const firstName = skipNameUpdate ? undefined : nameParts[0];
-      const lastName = skipNameUpdate ? undefined : (nameParts.length > 1 ? nameParts.slice(1).join(" ") : undefined);
+      const lastName = skipNameUpdate
+        ? undefined
+        : nameParts.length > 1
+          ? nameParts.slice(1).join(" ")
+          : undefined;
 
       await api.post("/api/auth/onboarding", {
         firstName: firstName || undefined,
@@ -65,9 +76,11 @@ export const OnboardingModal = () => {
     setPasskeyLoading(true);
     try {
       // 1. Get options
-      const resp = await fetch("/api/auth/passkey/register/options", { method: "POST" });
+      const resp = await fetch("/api/auth/passkey/register/options", {
+        method: "POST",
+      });
       const options = await resp.json();
-      
+
       if (options.error) throw new Error(options.error);
 
       // 2. Start registration
@@ -90,9 +103,9 @@ export const OnboardingModal = () => {
       }
     } catch (error) {
       console.error(error);
-      addToast({ 
-        title: error instanceof Error ? error.message : "Failed to add passkey", 
-        color: "danger" 
+      addToast({
+        title: error instanceof Error ? error.message : "Failed to add passkey",
+        color: "danger",
       });
     } finally {
       setPasskeyLoading(false);
@@ -100,8 +113,8 @@ export const OnboardingModal = () => {
   };
 
   return (
-    <Modal 
-      isOpen={isOpen} 
+    <Modal
+      isOpen={isOpen}
       onOpenChange={onOpenChange}
       isDismissable={false}
       hideCloseButton={true}
@@ -111,13 +124,15 @@ export const OnboardingModal = () => {
         {(onClose) => (
           <>
             <ModalHeader className="flex flex-col gap-1">
-              {step === 1 ? "Welcome to moodio agent!" : "Enhance your Security"}
+              {step === 1
+                ? "Welcome to moodio agent!"
+                : "Enhance your Security"}
             </ModalHeader>
             <ModalBody>
               {step === 1 ? (
                 <>
                   <p className="text-default-500 text-sm mb-2">
-                    How should Moodio call you?
+                    What should moodio agent call you?
                   </p>
                   <div className="flex flex-col gap-4">
                     <Input
@@ -137,7 +152,9 @@ export const OnboardingModal = () => {
               ) : (
                 <>
                   <p className="text-default-500 text-sm mb-2">
-                    Want an easier and faster way to login? Add a passkey to sign in without a password, and no more waiting for the email code.
+                    Want an easier and faster way to login? Add a passkey to
+                    sign in without a password, and no more waiting for the
+                    email code.
                   </p>
                   <div className="flex flex-col gap-4 items-center py-4">
                     {passkeyAdded ? (
@@ -148,10 +165,10 @@ export const OnboardingModal = () => {
                         <p className="font-medium">Passkey Added!</p>
                       </div>
                     ) : (
-                      <Button 
-                        size="lg" 
-                        color="primary" 
-                        variant="flat" 
+                      <Button
+                        size="lg"
+                        color="primary"
+                        variant="flat"
                         className="w-full max-w-xs"
                         onPress={handleAddPasskey}
                         isLoading={passkeyLoading}
@@ -167,26 +184,34 @@ export const OnboardingModal = () => {
             <ModalFooter>
               {step === 1 ? (
                 <>
-                  <Button color="danger" variant="light" onPress={handleStep1Skip}>
+                  <Button
+                    color="danger"
+                    variant="light"
+                    onPress={handleStep1Skip}
+                  >
                     Skip
                   </Button>
-                  <Button color="primary" onPress={handleStep1Next} isDisabled={!name.trim()}>
+                  <Button
+                    color="primary"
+                    onPress={handleStep1Next}
+                    isDisabled={!name.trim()}
+                  >
                     Next
                   </Button>
                 </>
               ) : (
                 <>
-                  <Button 
-                    color="default" 
-                    variant="light" 
-                    onPress={() => handleFinalize(false)} 
+                  <Button
+                    color="default"
+                    variant="light"
+                    onPress={() => handleFinalize(false)}
                     isDisabled={loading}
                   >
                     {passkeyAdded ? "Skip" : "Skip"}
                   </Button>
-                  <Button 
-                    color="primary" 
-                    onPress={() => handleFinalize(false)} 
+                  <Button
+                    color="primary"
+                    onPress={() => handleFinalize(false)}
                     isLoading={loading}
                   >
                     Finish
