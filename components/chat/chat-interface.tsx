@@ -21,7 +21,7 @@ import clsx from "clsx";
 import ReactMarkdown from "react-markdown";
 import { useRouter } from "next/navigation";
 import { useChat } from "@/hooks/use-chat";
-import { NotificationPermissionModal } from "@/components/notification-permission-modal";
+import { NotificationPermissionModal, NotificationPermissionModalRef } from "@/components/notification-permission-modal";
 import { Message, MessageContentPart } from "@/lib/llm/types";
 import ImageDetailModal from "./image-detail-modal";
 
@@ -118,6 +118,7 @@ export default function ChatInterface({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  const notificationModalRef = useRef<NotificationPermissionModalRef>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -339,6 +340,9 @@ export default function ChatInterface({
     if (fileInputRef.current) fileInputRef.current.value = "";
 
     setIsSending(true);
+
+    // Check for notification permission when user sends a message
+    notificationModalRef.current?.checkPermission();
 
     try {
       let currentChatId = chatId;
@@ -853,7 +857,7 @@ export default function ChatInterface({
         selectedImage={selectedImage}
         onClose={onClose}
       />
-      <NotificationPermissionModal />
+      <NotificationPermissionModal ref={notificationModalRef} />
     </div>
   );
 }

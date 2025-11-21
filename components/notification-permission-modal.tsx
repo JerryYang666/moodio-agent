@@ -3,25 +3,28 @@
 import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter } from "@heroui/modal";
 import { Button } from "@heroui/button";
 import { Bell } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState, forwardRef, useImperativeHandle } from "react";
 
-export function NotificationPermissionModal() {
+const NOTIFICATION_ASKED_KEY = "moodio_notification_asked";
+
+export interface NotificationPermissionModalRef {
+  checkPermission: () => void;
+}
+
+export const NotificationPermissionModal = forwardRef<NotificationPermissionModalRef>((props, ref) => {
   const [isOpen, setIsOpen] = useState(false);
 
-  useEffect(() => {
-    // Check if browser supports notifications
-    if (!("Notification" in window)) return;
+  useImperativeHandle(ref, () => ({
+    checkPermission: () => {
+      if (!("Notification" in window)) return;
 
-    // Only show if permission is default (not granted or denied)
-    // and we haven't asked in this session (optional, or rely on local storage)
-    const hasAsked = localStorage.getItem("notification_asked");
-    
-    if (Notification.permission === "default" && !hasAsked) {
-      // Small delay to not annoy immediately on load
-      const timer = setTimeout(() => setIsOpen(true), 2000);
-      return () => clearTimeout(timer);
+      const hasAsked = localStorage.getItem(NOTIFICATION_ASKED_KEY);
+      
+      if (Notification.permission === "default" && !hasAsked) {
+        setIsOpen(true);
+      }
     }
-  }, []);
+  }));
 
   const handleAllow = async () => {
     try {
@@ -29,12 +32,12 @@ export function NotificationPermissionModal() {
     } catch (e) {
       console.error(e);
     }
-    localStorage.setItem("notification_asked", "true");
+    localStorage.setItem(NOTIFICATION_ASKED_KEY, "true");
     setIsOpen(false);
   };
 
   const handleDecline = () => {
-    localStorage.setItem("notification_asked", "true");
+    localStorage.setItem(NOTIFICATION_ASKED_KEY, "true");
     setIsOpen(false);
   };
 
@@ -63,5 +66,6 @@ export function NotificationPermissionModal() {
       </ModalContent>
     </Modal>
   );
-}
+});
 
+NotificationPermissionModal.displayName = "NotificationPermissionModal";
