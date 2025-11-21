@@ -18,6 +18,8 @@ function isPublicPath(pathname: string): boolean {
     "/api/auth/verify-otp",
     "/api/auth/refresh",
     "/api/auth/me",
+    "/api/auth/passkey/login/options",
+    "/api/auth/passkey/login/verify",
   ];
 
   if (publicPaths.includes(pathname)) {

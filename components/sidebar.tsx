@@ -494,19 +494,29 @@ export const Sidebar = () => {
                 </CardBody>
               </Card>
             </PopoverTrigger>
-            <PopoverContent className="w-full">
-              <div className="flex items-center justify-between gap-20 px-3 py-2 w-full">
-                <Button
-                  size="sm"
-                  variant="flat"
-                  color="danger"
-                  startContent={<LogOut size={16} />}
-                  onPress={logout}
-                  className="flex-1"
-                >
-                  Logout
-                </Button>
-                <div className="flex items-center">
+            <PopoverContent className="w-full p-2">
+              <div className="flex flex-col gap-2 w-full min-w-[180px]">
+                <NextLink href="/profile" className="w-full mb-2">
+                  <Button
+                    size="sm"
+                    variant="flat"
+                    className="w-full justify-start"
+                    startContent={<UserIcon size={16} />}
+                  >
+                    Profile
+                  </Button>
+                </NextLink>
+                <div className="flex items-center justify-between gap-12">
+                  <Button
+                    size="sm"
+                    variant="flat"
+                    color="danger"
+                    startContent={<LogOut size={16} />}
+                    onPress={logout}
+                    className="flex-1"
+                  >
+                    Logout
+                  </Button>
                   <ThemeSwitch />
                 </div>
               </div>
