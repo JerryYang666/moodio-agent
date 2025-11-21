@@ -135,7 +135,7 @@ export const Navbar = () => {
         <div className="flex flex-col h-full">
           {/* Pinned User Card - Moved to Top */}
           {user && (
-            <div className="px-4 pb-1">
+            <div className="px-4 pb-0">
               <Popover
                 placement="bottom"
                 offset={10}
