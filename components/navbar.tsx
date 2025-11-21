@@ -132,8 +132,85 @@ export const Navbar = () => {
       </NavbarContent>
 
       <NavbarMenu>
-        <div className="flex flex-col h-full pb-6">
-          <div className="flex-1 overflow-y-auto px-4 flex flex-col gap-3 mt-2">
+        <div className="flex flex-col h-full">
+          {/* Pinned User Card - Moved to Top */}
+          {user && (
+            <div className="px-4 pb-4 border-b border-divider">
+              <Popover
+                placement="bottom"
+                showArrow
+                offset={10}
+                className="w-[calc(100vw-48px)] max-w-[380px]"
+              >
+                <PopoverTrigger>
+                  <Card
+                    isPressable
+                    shadow="sm"
+                    className="bg-default-50 dark:bg-default-100/50 w-full"
+                  >
+                    <CardBody className="p-2 flex-row items-center gap-3">
+                      <User
+                        name={displayName}
+                        description={user.email}
+                        avatarProps={{
+                          src: undefined,
+                          name:
+                            user.firstName?.charAt(0) ||
+                            user.email.charAt(0).toUpperCase(),
+                          isBordered: true,
+                          color: "primary",
+                          size: "sm",
+                          className: "mr-2",
+                        }}
+                        classNames={{
+                          name: "text-sm font-semibold truncate",
+                          description: "text-xs text-default-500 truncate",
+                        }}
+                      />
+                    </CardBody>
+                  </Card>
+                </PopoverTrigger>
+                <PopoverContent className="w-full p-2">
+                  <div className="flex flex-col gap-8 w-full min-w-[200px] p-2">
+                    <NextLink
+                      href="/profile"
+                      onClick={() => setIsMenuOpen(false)}
+                      className="w-full"
+                    >
+                      <Button
+                        size="md"
+                        variant="flat"
+                        className="w-full justify-start h-12 text-base"
+                        startContent={<UserIcon size={20} />}
+                      >
+                        Profile
+                      </Button>
+                    </NextLink>
+                    <div className="flex items-center justify-between gap-24">
+                      <Button
+                        size="md"
+                        variant="flat"
+                        color="danger"
+                        startContent={<LogOut size={20} />}
+                        onPress={() => {
+                          logout();
+                          setIsMenuOpen(false);
+                        }}
+                        className="flex-1 h-12 text-base"
+                      >
+                        Logout
+                      </Button>
+                      <div className="p-2">
+                        <ThemeSwitch />
+                      </div>
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            </div>
+          )}
+
+          <div className="flex-1 overflow-y-auto px-4 flex flex-col gap-3 mt-4">
             {/* New Chat Button */}
             <button
               onClick={handleNewChat}
@@ -232,83 +309,6 @@ export const Navbar = () => {
               )}
             </div>
           </div>
-
-          {/* Pinned User Card */}
-          {user && (
-            <div className="mt-auto px-4 pt-4 border-t border-divider">
-              <Popover
-                placement="top"
-                showArrow
-                offset={10}
-                className="w-[calc(100vw-48px)] max-w-[380px]"
-              >
-                <PopoverTrigger>
-                  <Card
-                    isPressable
-                    shadow="sm"
-                    className="bg-default-50 dark:bg-default-100/50 w-full"
-                  >
-                    <CardBody className="p-2 flex-row items-center gap-3">
-                      <User
-                        name={displayName}
-                        description={user.email}
-                        avatarProps={{
-                          src: undefined,
-                          name:
-                            user.firstName?.charAt(0) ||
-                            user.email.charAt(0).toUpperCase(),
-                          isBordered: true,
-                          color: "primary",
-                          size: "sm",
-                          className: "mr-2",
-                        }}
-                        classNames={{
-                          name: "text-sm font-semibold truncate",
-                          description: "text-xs text-default-500 truncate",
-                        }}
-                      />
-                    </CardBody>
-                  </Card>
-                </PopoverTrigger>
-                <PopoverContent className="w-full p-2">
-                  <div className="flex flex-col gap-8 w-full min-w-[200px] p-2">
-                    <NextLink
-                      href="/profile"
-                      onClick={() => setIsMenuOpen(false)}
-                      className="w-full"
-                    >
-                      <Button
-                        size="md"
-                        variant="flat"
-                        className="w-full justify-start h-12 text-base"
-                        startContent={<UserIcon size={20} />}
-                      >
-                        Profile
-                      </Button>
-                    </NextLink>
-                    <div className="flex items-center justify-between gap-24">
-                      <Button
-                        size="md"
-                        variant="flat"
-                        color="danger"
-                        startContent={<LogOut size={20} />}
-                        onPress={() => {
-                          logout();
-                          setIsMenuOpen(false);
-                        }}
-                        className="flex-1 h-12 text-base"
-                      >
-                        Logout
-                      </Button>
-                      <div className="p-2">
-                        <ThemeSwitch />
-                      </div>
-                    </div>
-                  </div>
-                </PopoverContent>
-              </Popover>
-            </div>
-          )}
         </div>
       </NavbarMenu>
     </HeroUINavbar>
