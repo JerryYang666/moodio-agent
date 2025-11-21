@@ -466,7 +466,7 @@ export const Sidebar = () => {
 
       <div className="p-3 border-t border-divider mt-auto">
         {user && (
-          <Popover placement="top" showArrow>
+          <Popover placement="top">
             <PopoverTrigger>
               <Card 
                 isPressable 

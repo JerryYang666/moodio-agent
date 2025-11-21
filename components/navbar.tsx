@@ -138,7 +138,6 @@ export const Navbar = () => {
             <div className="px-4 pb-1">
               <Popover
                 placement="bottom"
-                showArrow
                 offset={10}
                 className="w-[calc(100vw-48px)] max-w-[380px]"
               >
