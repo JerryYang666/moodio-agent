@@ -16,12 +16,16 @@ export const NotificationPermissionModal = forwardRef<NotificationPermissionModa
 
   useImperativeHandle(ref, () => ({
     checkPermission: () => {
-      if (!("Notification" in window)) return;
+      try {
+        if (!("Notification" in window)) return;
 
-      const hasAsked = localStorage.getItem(NOTIFICATION_ASKED_KEY);
-      
-      if (Notification.permission === "default" && !hasAsked) {
-        setIsOpen(true);
+        const hasAsked = localStorage.getItem(NOTIFICATION_ASKED_KEY);
+        
+        if (Notification.permission === "default" && !hasAsked) {
+          setIsOpen(true);
+        }
+      } catch (error) {
+        console.error("Error checking notification permission:", error);
       }
     }
   }));

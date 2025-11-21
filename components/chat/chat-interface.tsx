@@ -375,10 +375,10 @@ export default function ChatInterface({
 
     setIsSending(true);
 
-    // Check for notification permission when user sends a message
-    notificationModalRef.current?.checkPermission();
-
     try {
+      // Check for notification permission when user sends a message
+      notificationModalRef.current?.checkPermission();
+
       let currentChatId = chatId;
 
       if (!currentChatId) {

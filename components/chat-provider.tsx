@@ -109,7 +109,12 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
   const monitorChat = useCallback((chatId: string, startCount: number) => {
     // Only monitor if we have permission or might get it (don't spam if denied)
-    if (Notification.permission === "denied") return;
+    try {
+      if ("Notification" in window && Notification.permission === "denied") return;
+    } catch (e) {
+      // Ignore potential errors accessing Notification API
+      console.warn("Error checking notification permission:", e);
+    }
 
     setMonitoredChats(prev => ({
       ...prev,
@@ -147,18 +152,22 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
               // Notify if: Tab is hidden OR User is not on the specific chat page
               if (isHidden || !isChatOpen) {
-                if (Notification.permission === "granted") {
-                  const notification = new Notification("Moodio Agent", {
-                    body: "Your image generation is complete!",
-                    icon: "/favicon.ico",
-                    tag: chatId // Tag allows replacing old notifications if needed
-                  });
-                  
-                  notification.onclick = () => {
-                    window.focus();
-                    router.push(`/chat/${chatId}`);
-                    notification.close();
-                  };
+                try {
+                  if ("Notification" in window && Notification.permission === "granted") {
+                    const notification = new Notification("Moodio Agent", {
+                      body: "Your image generation is complete!",
+                      icon: "/favicon.ico",
+                      tag: chatId // Tag allows replacing old notifications if needed
+                    });
+                    
+                    notification.onclick = () => {
+                      window.focus();
+                      router.push(`/chat/${chatId}`);
+                      notification.close();
+                    };
+                  }
+                } catch (e) {
+                  console.error("Error showing notification:", e);
                 }
                 
                 // Also show toast if user is active in app but on different page
