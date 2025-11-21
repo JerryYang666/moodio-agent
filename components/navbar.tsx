@@ -135,7 +135,7 @@ export const Navbar = () => {
         <div className="flex flex-col h-full">
           {/* Pinned User Card - Moved to Top */}
           {user && (
-            <div className="px-4 pb-4 border-b border-divider">
+            <div className="px-4 pb-1">
               <Popover
                 placement="bottom"
                 showArrow
@@ -160,7 +160,7 @@ export const Navbar = () => {
                           isBordered: true,
                           color: "primary",
                           size: "sm",
-                          className: "mr-2",
+                          className: "mx-2",
                         }}
                         classNames={{
                           name: "text-sm font-semibold truncate",
