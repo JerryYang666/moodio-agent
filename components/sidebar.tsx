@@ -107,7 +107,7 @@ const ChatItem = ({ chat, isActive, isCollapsed }: ChatItemProps) => {
       <NextLink
         href={`/chat/${chat.id}`}
         className={clsx(
-          "flex items-center gap-2 px-3 py-2 rounded-xl transition-colors whitespace-nowrap text-sm pr-8 relative",
+          "flex items-center gap-2 px-3 py-2 rounded-xl transition-colors whitespace-nowrap text-sm relative",
           isActive
             ? "bg-primary/10 text-primary font-medium"
             : "text-default-500 hover:bg-default-100 hover:text-default-900",
@@ -135,7 +135,10 @@ const ChatItem = ({ chat, isActive, isCollapsed }: ChatItemProps) => {
         </AnimatePresence>
 
         {!isCollapsed && (
-          <div className="absolute right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className={clsx(
+            "absolute right-2 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg",
+            isActive ? "bg-primary/20 backdrop-blur-md" : "bg-default-100/80 backdrop-blur-md"
+          )}>
              <Dropdown>
                <DropdownTrigger>
                  <Button
