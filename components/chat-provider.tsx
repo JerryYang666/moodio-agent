@@ -18,6 +18,7 @@ interface ChatContextType {
   refreshChats: () => Promise<void>;
   monitorChat: (chatId: string, startCount: number) => void;
   renameChat: (chatId: string, name: string) => Promise<void>;
+  isChatMonitored: (chatId: string) => boolean;
 }
 
 export const ChatContext = createContext<ChatContextType | undefined>(undefined);
@@ -116,6 +117,10 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     }));
   }, []);
 
+  const isChatMonitored = useCallback((chatId: string) => {
+    return !!monitoredChats[chatId];
+  }, [monitoredChats]);
+
   // Polling for monitored chats
   useEffect(() => {
     const pollInterval = setInterval(async () => {
@@ -203,6 +208,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         refreshChats: fetchChats,
         monitorChat,
         renameChat,
+        isChatMonitored,
       }}
     >
       {children}

@@ -26,6 +26,7 @@ import { User } from "@heroui/user";
 import { Card, CardBody } from "@heroui/card";
 import { Popover, PopoverTrigger, PopoverContent } from "@heroui/popover";
 import { Dropdown, DropdownTrigger, DropdownMenu, DropdownItem } from "@heroui/dropdown";
+import { Spinner } from "@heroui/spinner";
 import { useAuth } from "@/hooks/use-auth";
 import { useChat } from "@/hooks/use-chat";
 import { Button } from "@heroui/button";
@@ -41,7 +42,7 @@ interface ChatItemProps {
 }
 
 const ChatItem = ({ chat, isActive, isCollapsed }: ChatItemProps) => {
-  const { renameChat } = useChat();
+  const { renameChat, isChatMonitored } = useChat();
   const [isRenameOpen, setIsRenameOpen] = useState(false);
   const [newName, setNewName] = useState(chat.name || "");
   const [isRenaming, setIsRenaming] = useState(false);
@@ -60,6 +61,7 @@ const ChatItem = ({ chat, isActive, isCollapsed }: ChatItemProps) => {
   };
 
   const chatName = chat.name || "New Chat";
+  const isMonitored = isChatMonitored(chat.id);
 
   return (
     <div className="relative group">
@@ -112,8 +114,12 @@ const ChatItem = ({ chat, isActive, isCollapsed }: ChatItemProps) => {
           isCollapsed && "justify-center pr-3"
         )}
       >
-        <span className="shrink-0">
-          <MessageSquare size={16} />
+        <span className="shrink-0 flex items-center justify-center w-4 h-4">
+          {isMonitored ? (
+            <Spinner size="sm" color="current" classNames={{ wrapper: "w-4 h-4", circle1: "border-b-current", circle2: "border-b-current" }} />
+          ) : (
+            <MessageSquare size={16} />
+          )}
         </span>
         <AnimatePresence>
           {!isCollapsed && (
