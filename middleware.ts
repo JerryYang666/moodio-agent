@@ -100,42 +100,95 @@ function isPrefetch(request: NextRequest): boolean {
   );
 }
 
+/**
+ * Attempt to refresh the session using the refresh token
+ * Returns the set-cookie header and new access token if successful
+ */
+async function refreshSession(request: NextRequest): Promise<{ setCookie: string | null; newAccessToken: string | null }> {
+  const refreshToken = getRefreshToken(request);
+  if (!refreshToken) {
+    return { setCookie: null, newAccessToken: null };
+  }
+
+  try {
+    // Call the refresh API endpoint
+    const refreshUrl = new URL("/api/auth/refresh", request.url);
+    const refreshResponse = await fetch(refreshUrl.toString(), {
+      method: "POST",
+      headers: {
+        Cookie: `${siteConfig.auth.refreshToken.cookieName}=${refreshToken}`,
+      },
+    });
+
+    if (refreshResponse.ok) {
+      // Refresh succeeded, get the new access token cookie
+      const setCookieHeader = refreshResponse.headers.get("set-cookie");
+
+      if (setCookieHeader) {
+        // Extract the new access token value to update the request
+        const accessTokenName = siteConfig.auth.accessToken.cookieName;
+        // Simple regex to find the cookie value: name=value;
+        const match = setCookieHeader.match(
+          new RegExp(`${accessTokenName}=([^;]+)`)
+        );
+        const newAccessToken = match ? match[1] : null;
+        
+        return { setCookie: setCookieHeader, newAccessToken };
+      }
+    }
+  } catch (error) {
+    console.error("Error refreshing token in middleware:", error);
+  }
+
+  return { setCookie: null, newAccessToken: null };
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Get access token from cookie
+  // 1. Verify existing access token
   const accessToken = getAccessToken(request);
+  const isValidAccessToken = accessToken ? await verifyAccessToken(accessToken) : null;
 
-  // If user is on login page and has valid access token, redirect to home
-  if (pathname === "/auth/login" && accessToken) {
-    const payload = await verifyAccessToken(accessToken);
-    if (payload) {
+  // 2. Handle Login Page logic
+  // If user is on login page:
+  // - If valid access token -> Redirect to home
+  // - If invalid access token -> Try to refresh. If success -> Redirect to home. If fail -> Stay on login
+  if (pathname === "/auth/login") {
+    if (isValidAccessToken) {
       return NextResponse.redirect(new URL("/", request.url));
     }
+
+    // No valid access token, try to refresh
+    // Do not refresh on prefetch
+    if (!isPrefetch(request)) {
+      const { setCookie } = await refreshSession(request);
+      if (setCookie) {
+        const response = NextResponse.redirect(new URL("/", request.url));
+        response.headers.set("set-cookie", setCookie);
+        return response;
+      }
+    }
+    
+    // If refresh failed or no refresh token, allow to proceed to login page
+    return NextResponse.next();
   }
 
-  // Allow public paths
+  // 3. Allow other public paths
   if (isPublicPath(pathname)) {
     return NextResponse.next();
   }
 
-  // Verify access token if present
-  if (accessToken) {
-    const payload = await verifyAccessToken(accessToken);
-    if (payload) {
-      // Valid access token, allow request
-      return NextResponse.next();
-    }
+  // 4. Protected Paths - Valid Access Token
+  if (isValidAccessToken) {
+    return NextResponse.next();
   }
 
-  // Access token is invalid, expired, or missing - try to refresh
-  const refreshToken = getRefreshToken(request);
+  // 5. Protected Paths - Invalid/Missing Access Token -> Try Refresh
   const isApiRoute = pathname.startsWith("/api/");
 
   // Check for prefetch headers - DO NOT refresh tokens on prefetch
-  // This prevents consuming the single-use refresh token for a speculative request
-  // where the browser might not persist the new cookies
-  if (isPrefetch(request) && !accessToken) {
+  if (isPrefetch(request)) {
     return new NextResponse(null, { 
       status: 204,
       headers: {
@@ -144,47 +197,19 @@ export async function middleware(request: NextRequest) {
     });
   }
 
-  if (refreshToken) {
-    try {
-      // Call the refresh API endpoint
-      const refreshUrl = new URL("/api/auth/refresh", request.url);
-      const refreshResponse = await fetch(refreshUrl.toString(), {
-        method: "POST",
-        headers: {
-          Cookie: `${siteConfig.auth.refreshToken.cookieName}=${refreshToken}`,
-        },
-      });
+  const { setCookie, newAccessToken } = await refreshSession(request);
 
-      if (refreshResponse.ok) {
-        // Refresh succeeded, get the new access token cookie
-        const setCookieHeader = refreshResponse.headers.get("set-cookie");
+  if (setCookie && newAccessToken) {
+    // Update the request cookies so downstream middleware/handlers see the new token
+    request.cookies.set(siteConfig.auth.accessToken.cookieName, newAccessToken);
 
-        if (setCookieHeader) {
-          // Extract the new access token value to update the request
-          const accessTokenName = siteConfig.auth.accessToken.cookieName;
-          // Simple regex to find the cookie value: name=value;
-          const match = setCookieHeader.match(
-            new RegExp(`${accessTokenName}=([^;]+)`)
-          );
-          const newAccessToken = match ? match[1] : null;
-          if (newAccessToken) {
-            // Update the request cookies so downstream middleware/handlers see the new token
-            request.cookies.set(accessTokenName, newAccessToken);
-          }
-
-          // Continue with the request, attaching the new Set-Cookie header to the response
-          // so the client (browser) also gets the updated token
-          const response = NextResponse.next();
-          response.headers.set("set-cookie", setCookieHeader);
-          return response;
-        }
-      }
-    } catch (error) {
-      console.error("Error refreshing token in middleware:", error);
-    }
+    // Continue with the request, attaching the new Set-Cookie header to the response
+    const response = NextResponse.next();
+    response.headers.set("set-cookie", setCookie);
+    return response;
   }
 
-  // No valid tokens (or refresh failed), redirect to login or return 401
+  // 6. No valid tokens (or refresh failed), redirect to login or return 401
   let response: NextResponse;
 
   if (isApiRoute) {
