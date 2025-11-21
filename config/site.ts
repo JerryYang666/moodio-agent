@@ -50,4 +50,10 @@ export const siteConfig = {
       path: "/",
     },
   },
+  
+  // Audio Recording Configuration
+  audioRecording: {
+    maxDuration: 120, // 2 minutes in seconds
+    countdownThreshold: 15, // Show countdown 15 seconds before max duration
+  },
 };

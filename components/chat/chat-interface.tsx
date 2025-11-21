@@ -8,6 +8,8 @@ import { Card, CardBody, CardFooter } from "@heroui/card";
 import { Spinner } from "@heroui/spinner";
 import { useDisclosure } from "@heroui/modal";
 import { Avatar } from "@heroui/avatar";
+import { Popover, PopoverTrigger, PopoverContent } from "@heroui/popover";
+import { siteConfig } from "@/config/site";
 import {
   Send,
   Bot,
@@ -115,6 +117,9 @@ export default function ChatInterface({
     partIndex: number;
   } | null>(null);
 
+  const [recordingTime, setRecordingTime] = useState(0);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -128,6 +133,22 @@ export default function ChatInterface({
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // Clean up timer on unmount
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+    };
+  }, []);
+
+  // Check for max recording duration
+  useEffect(() => {
+    if (isRecording && recordingTime >= siteConfig.audioRecording.maxDuration) {
+      stopRecording();
+    }
+  }, [recordingTime, isRecording]);
 
   useEffect(() => {
     const fetchChat = async () => {
@@ -220,6 +241,12 @@ export default function ChatInterface({
 
       mediaRecorder.start();
       setIsRecording(true);
+      setRecordingTime(0);
+      
+      if (timerRef.current) clearInterval(timerRef.current);
+      timerRef.current = setInterval(() => {
+        setRecordingTime((prev) => prev + 1);
+      }, 1000);
     } catch (error) {
       console.error("Error accessing microphone:", error);
       if (error instanceof Error) {
@@ -242,6 +269,11 @@ export default function ChatInterface({
     if (mediaRecorderRef.current && isRecording) {
       mediaRecorderRef.current.stop();
       setIsRecording(false);
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+      setRecordingTime(0);
     }
   };
 
@@ -809,21 +841,37 @@ export default function ChatInterface({
               </>
             )}
 
-            <Button
-              isIconOnly
-              variant={isRecording ? "solid" : "flat"}
-              color={isRecording ? "danger" : "default"}
-              onPress={isRecording ? stopRecording : startRecording}
-              className="mb-[2px]"
-              aria-label="Record voice"
-              isLoading={isTranscribing}
+            <Popover 
+              isOpen={isRecording && (siteConfig.audioRecording.maxDuration - recordingTime <= siteConfig.audioRecording.countdownThreshold)} 
+              placement="top"
             >
-              {isRecording ? (
-                <Square size={20} />
-              ) : (
-                <Mic size={24} className="text-default-500" />
-              )}
-            </Button>
+              <PopoverTrigger>
+                <div className="inline-block">
+                  <Button
+                    isIconOnly
+                    variant={isRecording ? "solid" : "flat"}
+                    color={isRecording ? "danger" : "default"}
+                    onPress={isRecording ? stopRecording : startRecording}
+                    className="mb-[2px]"
+                    aria-label="Record voice"
+                    isLoading={isTranscribing}
+                  >
+                    {isRecording ? (
+                      <Square size={20} />
+                    ) : (
+                      <Mic size={24} className="text-default-500" />
+                    )}
+                  </Button>
+                </div>
+              </PopoverTrigger>
+              <PopoverContent className="bg-danger text-danger-foreground">
+                <div className="px-1 py-1">
+                  <div className="text-small font-bold">
+                    {Math.max(0, siteConfig.audioRecording.maxDuration - recordingTime)}s remaining
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
 
             <Textarea
               placeholder="Type a message..."
