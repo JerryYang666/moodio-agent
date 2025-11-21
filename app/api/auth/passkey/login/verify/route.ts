@@ -48,9 +48,9 @@ export async function POST(request: NextRequest) {
       expectedChallenge: challengeRecord.challenge,
       expectedOrigin: origin,
       expectedRPID: rpID,
-      authenticator: {
-        credentialID: passkey.credentialId,
-        credentialPublicKey: Buffer.from(passkey.publicKey, 'base64'), // stored as base64
+      credential: {
+        id: passkey.credentialId,
+        publicKey: new Uint8Array(Buffer.from(passkey.publicKey, 'base64')),
         counter: Number(passkey.counter),
         transports: passkey.transports ? JSON.parse(passkey.transports) : undefined,
       },

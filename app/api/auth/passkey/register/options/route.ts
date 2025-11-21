@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
     const options = await generateRegistrationOptions({
       rpName,
       rpID,
-      userID: user.id,
+      userID: new TextEncoder().encode(user.id),
       userName: user.email,
       // Don't allow user to register same authenticator twice
       excludeCredentials: userPasskeys.map(passkey => ({

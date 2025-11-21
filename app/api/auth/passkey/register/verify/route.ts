@@ -37,14 +37,14 @@ export async function POST(request: NextRequest) {
     });
 
     if (verification.verified && verification.registrationInfo) {
-      const { credentialPublicKey, credentialID, counter, credentialDeviceType, credentialBackedUp } = verification.registrationInfo;
+      const { credential, credentialDeviceType, credentialBackedUp } = verification.registrationInfo;
       
       // Save passkey
       await savePasskey({
         userId: payload.userId,
-        credentialId: credentialID, 
-        publicKey: Buffer.from(credentialPublicKey).toString('base64'),
-        counter: BigInt(counter),
+        credentialId: credential.id, 
+        publicKey: Buffer.from(credential.publicKey).toString('base64'),
+        counter: Number(credential.counter),
         transports: body.response.transports ? JSON.stringify(body.response.transports) : undefined,
         deviceType: credentialDeviceType,
         backedUp: credentialBackedUp,
