@@ -6,20 +6,27 @@ import { Card, CardBody, CardHeader } from "@heroui/card";
 import { api } from "@/lib/api/client";
 import { useAuth } from "@/hooks/use-auth";
 import { Spinner } from "@heroui/spinner";
+import { addToast } from "@heroui/toast";
 
 export default function SystemManagementPage() {
   const { user, loading: authLoading } = useAuth();
   const [cleaningTokens, setCleaningTokens] = useState(false);
-  const [cleanupResult, setCleanupResult] = useState<string | null>(null);
 
   const handleCleanupTokens = async () => {
     setCleaningTokens(true);
-    setCleanupResult(null);
     try {
       await api.post("/api/admin/cleanup-tokens", {});
-      setCleanupResult("Successfully deleted expired refresh tokens.");
+      addToast({
+        title: "Success",
+        description: "Successfully deleted expired refresh tokens.",
+        color: "success",
+      });
     } catch (error) {
-      setCleanupResult("Failed to delete expired refresh tokens.");
+      addToast({
+        title: "Error",
+        description: "Failed to delete expired refresh tokens.",
+        color: "danger",
+      });
       console.error(error);
     } finally {
       setCleaningTokens(false);
@@ -56,11 +63,6 @@ export default function SystemManagementPage() {
               >
                 Delete Expired Refresh Tokens
               </Button>
-              {cleanupResult && (
-                <p className={`text-sm ${cleanupResult.includes("Failed") ? "text-red-500" : "text-green-500"}`}>
-                  {cleanupResult}
-                </p>
-              )}
             </div>
           </div>
         </CardBody>

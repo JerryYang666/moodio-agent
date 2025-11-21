@@ -29,6 +29,7 @@ import { Spinner } from "@heroui/spinner";
 import { User } from "@/hooks/use-auth";
 import { Pagination } from "@heroui/pagination";
 import { SearchIcon } from "@/components/icons";
+import { addToast } from "@heroui/toast";
 
 interface InvitationCode {
   code: string;
@@ -55,7 +56,6 @@ export default function AdminPage() {
   } = useDisclosure();
   const [inviteEmails, setInviteEmails] = useState("");
   const [sendingInvites, setSendingInvites] = useState(false);
-  const [inviteResult, setInviteResult] = useState<string | null>(null);
 
   // Generate Code State
   const {
@@ -138,7 +138,6 @@ export default function AdminPage() {
 
   const handleSendInvites = async () => {
     setSendingInvites(true);
-    setInviteResult(null);
     try {
       // Split by newlines, commas, spaces
       const emails = inviteEmails
@@ -147,12 +146,18 @@ export default function AdminPage() {
         .filter((e) => e.length > 0);
 
       const response = await api.post("/api/admin/invite-email", { emails });
-      setInviteResult(`Successfully sent ${response.count} invitations.`);
+      addToast({
+        title: "Success",
+        description: `Successfully sent ${response.count} invitations.`,
+        color: "success",
+      });
       setInviteEmails("");
     } catch (error) {
-      setInviteResult(
-        error instanceof Error ? error.message : "Failed to send invitations"
-      );
+      addToast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to send invitations",
+        color: "danger",
+      });
     } finally {
       setSendingInvites(false);
     }
@@ -165,8 +170,18 @@ export default function AdminPage() {
         count: parseInt(codeCount),
       });
       setGeneratedCodes(response.codes);
+      addToast({
+        title: "Success",
+        description: "Successfully generated invitation codes.",
+        color: "success",
+      });
     } catch (error) {
       console.error("Failed to generate codes:", error);
+      addToast({
+        title: "Error",
+        description: "Failed to generate codes",
+        color: "danger",
+      });
     } finally {
       setGeneratingCodes(false);
     }
@@ -193,8 +208,18 @@ export default function AdminPage() {
       });
       await fetchUsers();
       onEditClose();
+      addToast({
+        title: "Success",
+        description: "User updated successfully.",
+        color: "success",
+      });
     } catch (error) {
       console.error("Failed to update user:", error);
+      addToast({
+        title: "Error",
+        description: "Failed to update user",
+        color: "danger",
+      });
     } finally {
       setSavingUser(false);
     }
@@ -349,17 +374,6 @@ export default function AdminPage() {
                   value={inviteEmails}
                   onValueChange={setInviteEmails}
                 />
-                {inviteResult && (
-                  <p
-                    className={`text-sm ${
-                      inviteResult.includes("Failed")
-                        ? "text-red-500"
-                        : "text-green-500"
-                    }`}
-                  >
-                    {inviteResult}
-                  </p>
-                )}
               </ModalBody>
               <ModalFooter>
                 <Button variant="light" onPress={onClose}>
@@ -423,6 +437,11 @@ export default function AdminPage() {
                             .map((c) => c.code)
                             .join("\n");
                           navigator.clipboard.writeText(text);
+                          addToast({
+                            title: "Copied",
+                            description: "Codes copied to clipboard",
+                            color: "default",
+                          });
                         }}
                       >
                         Copy All
