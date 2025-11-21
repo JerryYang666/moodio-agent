@@ -6,6 +6,7 @@ import {
   boolean,
   text,
   jsonb,
+  bigint,
 } from "drizzle-orm/pg-core";
 
 /**
@@ -130,6 +131,37 @@ export const collectionShares = pgTable("collection_shares", {
   sharedAt: timestamp("shared_at").defaultNow().notNull(),
 });
 
+/**
+ * Passkeys table
+ * Stores WebAuthn credentials for passwordless authentication
+ */
+export const passkeys = pgTable("passkeys", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  credentialId: text("credential_id").notNull().unique(),
+  publicKey: text("public_key").notNull(),
+  counter: bigint("counter", { mode: "number" }).notNull().default(0),
+  transports: text("transports"), // JSON string of transports array
+  deviceType: varchar("device_type", { length: 32 }).notNull().default("singleDevice"),
+  backedUp: boolean("backed_up").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  lastUsedAt: timestamp("last_used_at").defaultNow().notNull(),
+});
+
+/**
+ * Auth Challenges table
+ * Stores temporary challenges for WebAuthn ceremonies
+ */
+export const authChallenges = pgTable("auth_challenges", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  challenge: text("challenge").notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // Export types for TypeScript
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
@@ -154,3 +186,9 @@ export type NewCollectionImage = typeof collectionImages.$inferInsert;
 
 export type CollectionShare = typeof collectionShares.$inferSelect;
 export type NewCollectionShare = typeof collectionShares.$inferInsert;
+
+export type Passkey = typeof passkeys.$inferSelect;
+export type NewPasskey = typeof passkeys.$inferInsert;
+
+export type AuthChallenge = typeof authChallenges.$inferSelect;
+export type NewAuthChallenge = typeof authChallenges.$inferInsert;

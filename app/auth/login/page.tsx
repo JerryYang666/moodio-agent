@@ -7,6 +7,8 @@ import { InputOtp } from "@heroui/input-otp";
 import { Button } from "@heroui/button";
 import { Card } from "@heroui/card";
 import { siteConfig } from "@/config/site";
+import { startAuthentication } from "@simplewebauthn/browser";
+import { Key } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -14,6 +16,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [otp, setOtp] = useState("");
   const [loading, setLoading] = useState(false);
+  const [passkeyLoading, setPasskeyLoading] = useState(false);
   const [error, setError] = useState("");
 
   const OTP_LENGTH = siteConfig.auth.otp.length;
@@ -65,13 +68,60 @@ export default function LoginPage() {
       }
 
       // Hard redirect to home page to ensure cookies are properly loaded
-      // Using window.location instead of router.push to force a full page reload
       window.location.href = "/";
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to verify OTP");
       setOtp("");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handlePasskeyLogin = async () => {
+    setPasskeyLoading(true);
+    setError("");
+    
+    try {
+      // 1. Get options
+      const resp = await fetch("/api/auth/passkey/login/options", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email || undefined }),
+      });
+      
+      const options = await resp.json();
+      if (options.error) throw new Error(options.error);
+
+      // 2. Start authentication
+      let asseResp;
+      try {
+        asseResp = await startAuthentication(options);
+      } catch (err) {
+        if ((err as Error).name === 'NotAllowedError') {
+           throw new Error("Passkey authentication cancelled.");
+        }
+        throw err;
+      }
+
+      // 3. Verify
+      const verifyResp = await fetch("/api/auth/passkey/login/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(asseResp),
+      });
+
+      const verification = await verifyResp.json();
+
+      if (verification.verified) {
+         window.location.href = "/";
+      } else {
+        throw new Error(verification.error || "Verification failed");
+      }
+    } catch (err) {
+      console.error(err);
+      setError(err instanceof Error ? err.message : "Passkey login failed");
+    } finally {
+      setPasskeyLoading(false);
     }
   };
 
@@ -91,7 +141,7 @@ export default function LoginPage() {
             <h1 className="text-3xl font-bold mb-2">Welcome</h1>
             <p className="text-gray-600 dark:text-gray-400">
               {step === "email"
-                ? "Enter your email to receive a login code"
+                ? "Sign in to access your account"
                 : `Enter the ${OTP_LENGTH}-digit code sent to your email`}
             </p>
           </div>
@@ -103,29 +153,51 @@ export default function LoginPage() {
           )}
 
           {step === "email" ? (
-            <form onSubmit={handleRequestOTP} className="space-y-4">
-              <Input
-                type="email"
-                label="Email"
-                placeholder="you@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                isRequired
-                autoFocus
-                size="lg"
-              />
-
+            <div className="space-y-4">
               <Button
-                type="submit"
-                color="primary"
+                type="button"
+                color="secondary"
+                variant="flat"
                 size="lg"
                 className="w-full"
-                isLoading={loading}
-                isDisabled={!email || loading}
+                onPress={handlePasskeyLogin}
+                isLoading={passkeyLoading}
+                isDisabled={loading}
+                startContent={<Key size={20} />}
               >
-                Send Login Code
+                Sign in with Passkey
               </Button>
-            </form>
+
+              <div className="relative flex py-2 items-center">
+                <div className="flex-grow border-t border-default-200"></div>
+                <span className="flex-shrink-0 mx-4 text-default-400 text-xs uppercase">Or with Email</span>
+                <div className="flex-grow border-t border-default-200"></div>
+              </div>
+
+              <form onSubmit={handleRequestOTP} className="space-y-4">
+                <Input
+                  type="email"
+                  label="Email"
+                  placeholder="you@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  isRequired
+                  size="lg"
+                  isDisabled={loading || passkeyLoading}
+                />
+
+                <Button
+                  type="submit"
+                  color="primary"
+                  size="lg"
+                  className="w-full"
+                  isLoading={loading}
+                  isDisabled={!email || loading || passkeyLoading}
+                >
+                  Send Login Code
+                </Button>
+              </form>
+            </div>
           ) : (
             <div className="space-y-6">
               <div className="flex flex-col items-center space-y-4">

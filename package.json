@@ -59,6 +59,8 @@
     "@heroui/user": "2.2.22",
     "@react-aria/ssr": "3.9.10",
     "@react-aria/visually-hidden": "3.8.28",
+    "@simplewebauthn/browser": "^13.2.2",
+    "@simplewebauthn/server": "^13.2.2",
     "@types/prismjs": "^1.26.5",
     "@vercel/functions": "^3.3.3",
     "clsx": "2.1.1",
