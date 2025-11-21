@@ -116,7 +116,7 @@ export const OnboardingModal = () => {
             <ModalBody>
               {step === 1 ? (
                 <>
-                  <p className="text-default-500 text-sm mb-4">
+                  <p className="text-default-500 text-sm mb-2">
                     How should Moodio call you?
                   </p>
                   <div className="flex flex-col gap-4">
@@ -136,8 +136,8 @@ export const OnboardingModal = () => {
                 </>
               ) : (
                 <>
-                  <p className="text-default-500 text-sm mb-4">
-                    Want an easier way to login? Add a passkey to sign in without a password.
+                  <p className="text-default-500 text-sm mb-2">
+                    Want an easier and faster way to login? Add a passkey to sign in without a password, and no more waiting for the email code.
                   </p>
                   <div className="flex flex-col gap-4 items-center py-4">
                     {passkeyAdded ? (
