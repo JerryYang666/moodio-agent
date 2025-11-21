@@ -20,6 +20,8 @@ import {
 import clsx from "clsx";
 import ReactMarkdown from "react-markdown";
 import { useRouter } from "next/navigation";
+import { useChat } from "@/hooks/use-chat";
+import { NotificationPermissionModal } from "@/components/notification-permission-modal";
 import { Message, MessageContentPart } from "@/lib/llm/types";
 import ImageDetailModal from "./image-detail-modal";
 
@@ -82,6 +84,7 @@ export default function ChatInterface({
   initialMessages = [],
 }: ChatInterfaceProps) {
   const { user } = useAuth();
+  const { monitorChat } = useChat();
   const router = useRouter();
   const [chatId, setChatId] = useState<string | undefined>(initialChatId);
   const [messages, setMessages] = useState<Message[]>(initialMessages);
@@ -350,6 +353,13 @@ export default function ChatInterface({
         window.dispatchEvent(new Event("refresh-chats"));
       }
 
+      // Start monitoring for background completion (in case user leaves)
+      // messages.length is current count. We added optimistic user message (+1).
+      // We expect assistant message (+1). So threshold is current + 1.
+      if (currentChatId) {
+        monitorChat(currentChatId, messages.length + 1);
+      }
+
       let body;
       let headers: Record<string, string> = {};
 
@@ -544,8 +554,8 @@ export default function ChatInterface({
                 key={`img-${i}`}
                 src={
                   part.type === "image"
-                    ? getImageUrl(part.imageId)
-                    : part.image_url.url
+                  ? getImageUrl(part.imageId)
+                  : part.image_url.url
                 }
                 alt="User upload"
                 className="max-w-full rounded-lg"
@@ -843,6 +853,7 @@ export default function ChatInterface({
         selectedImage={selectedImage}
         onClose={onClose}
       />
+      <NotificationPermissionModal />
     </div>
   );
 }
