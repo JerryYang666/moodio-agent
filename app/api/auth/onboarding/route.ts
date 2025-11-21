@@ -32,11 +32,7 @@ export async function POST(request: NextRequest) {
       .set({
         firstName: firstName || null,
         lastName: lastName || null,
-        // Remove 'new_user' role if present, or we can just rely on checking if names are set
-        // For now, let's update the roles to remove new_user if we want to be explicit,
-        // or we can just use the presence of names as the indicator.
-        // Let's assuming 'new_user' role is the flag.
-        roles: payload.roles?.filter((r: string) => r !== "new_user") || ["user"],
+        roles: [...(payload.roles || []).filter((r: string) => r !== "new_user" && r !== "user"), "user"],
         updatedAt: new Date(),
       })
       .where(eq(users.id, payload.userId))
