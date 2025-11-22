@@ -175,7 +175,7 @@ Example without suggestions:
 
     // 2. Call LLM with stream
     const llmStream = await client.chat.completions.create({
-      model: "gpt-5-mini",
+      model: "gpt-4.1",
       messages: messages as any,
       stream: true,
     });
