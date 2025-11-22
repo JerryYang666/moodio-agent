@@ -53,11 +53,14 @@ export class Agent1 implements Agent {
 
     // 1. Prepare messages
     const systemPrompt = `You are a creative assistant.
-Based on the user's input, generate a question that will help trigger the creativity of the user, and four suggestions based on the question.
+Based on the user's input, generate a question that will help trigger the creativity of the user, and four suggestions based on the question. You must give exactly four suggestions unless the user explicitly asks for fewer or more.
+The absolute maximum number of suggestions you can give is eight (8). If the user asks for more than eight, you should give eight suggestions.
+The absolute maximum number of suggestions you can give is eight (8). If the user asks for more than eight, you should give eight suggestions.
 For example, if the user said "I want to create an image of two couples kissing", you can ask "Where are these two couples kissing?" and provide suggestions like "In a classroom", "In a playground", etc.
 
 If the user's input is too short or not conducive to suggestions (e.g., just "Hi"), you can choose not to provide any suggestions.
 If the user's input includes an image, you should make sure your prompts are editing prompts that are referring to an edit of the image. For example, "Change the man in the image's shirt to red...".
+If the user's input does not contain an image, make sure your prompts are image generation prompts.
 
 For each suggestion, you must also specify an appropriate aspect ratio for the image. Choose the aspect ratio that best fits the content being described.
 Supported aspect ratios: ${SUPPORTED_ASPECT_RATIOS.join(", ")}
@@ -201,8 +204,8 @@ Example without suggestions:
           `[${Date.now() - startTime}ms]`
         );
         let buffer = "";
+        let fullLlmResponse = ""; // Track complete LLM response
         let questionSent = false;
-        let hasSentPlaceholders = false;
         let suggestionIndex = 0;
         const imageTasks: Promise<void>[] = [];
 
@@ -218,6 +221,7 @@ Example without suggestions:
           for await (const chunk of llmStream) {
             const delta = chunk.choices[0]?.delta?.content || "";
             buffer += delta;
+            fullLlmResponse += delta; // Accumulate full response
 
             // 1. Parse Question
             if (!questionSent) {
@@ -237,36 +241,7 @@ Example without suggestions:
               }
             }
 
-            // 2. Send Placeholders if we detect suggestions starting
-            if (
-              questionSent &&
-              !hasSentPlaceholders &&
-              (buffer.includes("<JSON>") || buffer.includes("<JSON"))
-            ) {
-              // Only send if we are fairly sure suggestions are coming.
-              // Checking for <JSON is a bit eager but helps speed.
-              // Let's wait for full <JSON> to be safe against hallucinations or partials,
-              // OR just wait for <JSON>
-              if (buffer.includes("<JSON>")) {
-                const placeholders = Array(4)
-                  .fill(null)
-                  .map((_, i) => ({
-                    type: "agent_image" as const,
-                    title: "Loading...",
-                    aspectRatio: "1:1" as const,
-                    prompt: "",
-                    status: "loading" as const,
-                  }));
-
-                placeholders.forEach((p) => {
-                  send({ type: "part", part: p });
-                  finalContent.push(p);
-                });
-                hasSentPlaceholders = true;
-              }
-            }
-
-            // 3. Parse Suggestions
+            // 2. Parse Suggestions (max 8)
             while (buffer.includes("</JSON>")) {
               const sStart = buffer.indexOf("<JSON>");
               const sEnd = buffer.indexOf("</JSON>");
@@ -276,12 +251,26 @@ Example without suggestions:
                   const jsonStr = buffer.substring(sStart + 6, sEnd);
                   try {
                     const suggestion = JSON.parse(jsonStr);
-                    const currentIndex = suggestionIndex;
-                    suggestionIndex++;
+                    
+                    // Hard limit: only start up to 8 image generation tasks
+                    if (suggestionIndex < 8) {
+                      const currentIndex = suggestionIndex;
+                      suggestionIndex++;
 
-                    // Start image generation
-                    const task = (async () => {
+                      // Start image generation
+                      const task = (async () => {
                       try {
+                        // Send placeholder when image generation starts
+                        const placeholder: MessageContentPart = {
+                          type: "agent_image",
+                          title: "Loading...",
+                          aspectRatio: suggestion.aspectRatio as AspectRatio,
+                          prompt: suggestion.prompt,
+                          status: "loading",
+                        };
+                        send({ type: "part", part: placeholder });
+                        finalContent.push(placeholder);
+
                         console.log(
                           "[Perf] Agent image generation start",
                           `[${Date.now() - startTime}ms]`
@@ -322,9 +311,14 @@ Example without suggestions:
                         });
                         finalContent[currentIndex + 1] = errorPart;
                       }
-                    })();
+                      })();
 
-                    imageTasks.push(task);
+                      imageTasks.push(task);
+                    } else {
+                      console.log(
+                        `[Agent-1] Skipping suggestion beyond limit of 8. Title: ${suggestion.title}`
+                      );
+                    }
                   } catch (e) {
                     console.error("Failed to parse suggestion JSON", e);
                   }
@@ -339,6 +333,11 @@ Example without suggestions:
 
           // Stream ended
           await Promise.all(imageTasks);
+
+          // Log final LLM response
+          console.log("=== FINAL AI LLM RESPONSE ===");
+          console.log(fullLlmResponse);
+          console.log("=== END FINAL AI LLM RESPONSE ===");
 
           // If no question found (fallback)
           if (finalContent.length === 0) {
