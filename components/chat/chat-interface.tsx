@@ -568,10 +568,13 @@ export default function ChatInterface({
     });
   };
 
-  const renderContent = (content: string | MessageContentPart[], messageIndex?: number) => {
+  const renderContent = (content: string | MessageContentPart[], messageIndex?: number, messageTimestamp?: number) => {
     if (typeof content === "string") {
       return <ReactMarkdown>{content}</ReactMarkdown>;
     }
+
+    // Check if message is more than 10 minutes old (10 * 60 * 1000 ms)
+    const isStaleMessage = messageTimestamp && (Date.now() - messageTimestamp > 10 * 60 * 1000);
 
     // Group agent images to render them in a grid
     const textParts = content.filter((p) => p.type === "text");
@@ -619,6 +622,9 @@ export default function ChatInterface({
                 part
               );
 
+              // Show error if image is loading but message is more than 10 minutes old
+              const effectiveStatus = (part.status === "loading" && isStaleMessage) ? "error" : part.status;
+
               return (
                 <ImageWithMenu
                   key={`agent-${i}`}
@@ -628,7 +634,7 @@ export default function ChatInterface({
                   generationDetails={{
                     title: part.title,
                     prompt: part.prompt,
-                    status: part.status,
+                    status: effectiveStatus,
                   }}
                   onViewDetails={() => handleAgentTitleClick(part)}
                 >
@@ -641,7 +647,7 @@ export default function ChatInterface({
                     <CardBody
                       className="p-0 overflow-hidden relative aspect-square cursor-pointer group/image rounded-lg"
                       onClick={() =>
-                        part.status === "generated" &&
+                        effectiveStatus === "generated" &&
                         messageIndex !== undefined &&
                         handleAgentImageSelect(
                           part,
@@ -650,24 +656,24 @@ export default function ChatInterface({
                         )
                       }
                     >
-                      {part.status === "loading" && (
+                      {effectiveStatus === "loading" && (
                         <div className="w-full h-full flex items-center justify-center bg-default-100">
                           <Spinner />
                         </div>
                       )}
-                      {part.status === "error" && (
+                      {effectiveStatus === "error" && (
                         <div className="w-full h-full flex items-center justify-center bg-danger-50 text-danger">
                           <X />
                         </div>
                       )}
-                      {part.status === "generated" && (
+                      {effectiveStatus === "generated" && (
                         <img
                           src={url}
                           alt={part.title}
                           className="w-full h-full object-contain bg-default-100 dark:bg-black"
                         />
                       )}
-                      {(part.status === "generated" || part.status === "error") && (
+                      {(effectiveStatus === "generated" || effectiveStatus === "error") && (
                         <div className="absolute bottom-0 left-0 right-0 bg-white/90 dark:bg-black/60 text-black dark:text-white p-2 text-xs truncate opacity-0 group-hover/image:opacity-100 transition-opacity">
                           {part.title}
                         </div>
@@ -739,7 +745,7 @@ export default function ChatInterface({
                           "prose-headings:text-primary-foreground prose-p:text-primary-foreground prose-strong:text-primary-foreground prose-code:text-primary-foreground"
                       )}
                     >
-                      {renderContent(msg.content, idx)}
+                      {renderContent(msg.content, idx, msg.createdAt)}
                     </div>
                   </CardBody>
                 </Card>
