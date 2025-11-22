@@ -8,6 +8,7 @@ import { getChatHistory, saveChatHistory, uploadImage } from "@/lib/storage/s3";
 import { createLLMClient } from "@/lib/llm/client";
 import { Message, MessageContentPart } from "@/lib/llm/types";
 import { agent1 } from "@/lib/agents/agent-1";
+import { waitUntil } from "@vercel/functions";
 
 const AWS_S3_PUBLIC_URL = process.env.NEXT_PUBLIC_AWS_S3_PUBLIC_URL || "";
 
@@ -38,6 +39,8 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ chatId: string }> }
 ) {
+  const requestStartTime = Date.now();
+  console.log("[Perf] Request received", "[0ms]");
   try {
     const { chatId } = await params;
     const accessToken = getAccessToken(request);
@@ -93,6 +96,10 @@ export async function POST(
         .from(chats)
         .where(and(eq(chats.id, chatId), eq(chats.userId, payload.userId)));
     }
+    console.log(
+      "[Perf] Ownership verified",
+      `[${Date.now() - requestStartTime}ms]`
+    );
 
     if (!chat) {
       return NextResponse.json({ error: "Chat not found" }, { status: 404 });
@@ -100,6 +107,10 @@ export async function POST(
 
     // Get existing history
     let history = await getChatHistory(chatId);
+    console.log(
+      "[Perf] Chat history Got",
+      `[${Date.now() - requestStartTime}ms]`
+    );
 
     // Update history if selection is present
     if (selection) {
@@ -114,25 +125,30 @@ export async function POST(
           // Create a deep copy of history to modify
           history = history.map((msg, mIdx) => {
             if (mIdx !== messageIndex) return msg;
-            
+
             const newContent = [...(msg.content as MessageContentPart[])];
             newContent[partIndex] = {
               ...newContent[partIndex],
               // @ts-ignore - isSelected is optional
               isSelected: true,
             };
-            
+
             return {
               ...msg,
               content: newContent,
             };
           });
-          
+
           // We should save the updated history, but we can do it along with the new message
           // to minimize S3 writes.
         }
       }
     }
+
+    console.log(
+      "[Perf] Image upload start",
+      `[${Date.now() - requestStartTime}ms]`
+    );
 
     // Handle image upload
     let imageId: string | undefined;
@@ -153,6 +169,11 @@ export async function POST(
       }
       imageId = await uploadImage(file, file.type);
     }
+
+    console.log(
+      "[Perf] Image upload end",
+      `[${Date.now() - requestStartTime}ms]`
+    );
 
     // Construct new user message
     let userMessage: Message;
@@ -176,30 +197,36 @@ export async function POST(
     // Let's assume we save user message first.
     // However, standard chat usually saves user message immediately.
     // Let's proceed with creating the Agent stream.
+    console.log("[Perf] Calling agent", `[${Date.now() - requestStartTime}ms]`);
 
     // Use Agent 1
     const { stream: agentStream, completion } = await agent1.processRequest(
       history,
       userMessage,
-      payload.userId
+      payload.userId,
+      requestStartTime
     );
 
     // Handle background completion (saving history)
-    completion
-      .then(async (finalMessage) => {
-        // Add timestamp to the final message from agent if not present (agent might not add it)
-        const messageToSave = { ...finalMessage, createdAt: finalMessage.createdAt || Date.now() };
-        
-        const updatedHistory = [...history, userMessage, messageToSave];
-        await saveChatHistory(chatId, updatedHistory);
+    waitUntil(
+      completion
+        .then(async (finalMessage) => {
+          // Add timestamp to the final message from agent if not present (agent might not add it)
+          const messageToSave = {
+            ...finalMessage,
+            createdAt: finalMessage.createdAt || Date.now(),
+          };
 
-        // Generate chat name if needed
-        if (history.length === 0 && updatedHistory.length === 2) {
-          const llmClient = createLLMClient({
-            apiKey: process.env.LLM_API_KEY,
-            provider: "openai",
-            model: "gpt-5-mini",
-          });
+          const updatedHistory = [...history, userMessage, messageToSave];
+          await saveChatHistory(chatId, updatedHistory);
+
+          // Generate chat name if needed
+          if (history.length === 0 && updatedHistory.length === 2) {
+            const llmClient = createLLMClient({
+              apiKey: process.env.LLM_API_KEY,
+              provider: "openai",
+              model: "gpt-5-mini",
+            });
 
             try {
               const namePrompt: Message[] = [
@@ -229,46 +256,50 @@ export async function POST(
               ];
 
               const nameResponse = await llmClient.chatComplete(namePrompt);
-            let newChatName = chat.name;
+              let newChatName = chat.name;
 
-            if (nameResponse) {
-              try {
-                const cleanResponse = nameResponse
-                  .replace(/```json\n?|```/g, "")
-                  .trim();
-                const parsed = JSON.parse(cleanResponse);
-                if (parsed && parsed.chat_name) {
-                  newChatName = parsed.chat_name.trim().slice(0, 255);
-                }
-              } catch (e) {
-                if (nameResponse.length < 255 && !nameResponse.includes("{")) {
-                  newChatName = nameResponse.trim();
+              if (nameResponse) {
+                try {
+                  const cleanResponse = nameResponse
+                    .replace(/```json\n?|```/g, "")
+                    .trim();
+                  const parsed = JSON.parse(cleanResponse);
+                  if (parsed && parsed.chat_name) {
+                    newChatName = parsed.chat_name.trim().slice(0, 255);
+                  }
+                } catch (e) {
+                  if (
+                    nameResponse.length < 255 &&
+                    !nameResponse.includes("{")
+                  ) {
+                    newChatName = nameResponse.trim();
+                  }
                 }
               }
-            }
 
+              await db
+                .update(chats)
+                .set({
+                  updatedAt: new Date(),
+                  name: newChatName,
+                })
+                .where(eq(chats.id, chatId));
+            } catch (err) {
+              console.error("Failed to generate chat name:", err);
+            }
+          } else {
             await db
               .update(chats)
               .set({
                 updatedAt: new Date(),
-                name: newChatName,
               })
               .where(eq(chats.id, chatId));
-          } catch (err) {
-            console.error("Failed to generate chat name:", err);
           }
-        } else {
-          await db
-            .update(chats)
-            .set({
-              updatedAt: new Date(),
-            })
-            .where(eq(chats.id, chatId));
-        }
-      })
-      .catch((err) => {
-        console.error("Agent completion failed:", err);
-      });
+        })
+        .catch((err) => {
+          console.error("Agent completion failed:", err);
+        })
+    );
 
     return new NextResponse(agentStream, {
       headers: {

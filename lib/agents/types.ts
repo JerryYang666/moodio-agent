@@ -11,6 +11,7 @@ export interface Agent {
   processRequest(
     history: Message[],
     userMessage: Message,
-    userId: string
+    userId: string,
+    requestStartTime?: number
   ): Promise<AgentResponse>;
 }

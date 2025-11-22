@@ -19,7 +19,7 @@ const SUPPORTED_ASPECT_RATIOS = [
   "21:9",
 ] as const;
 
-type AspectRatio = typeof SUPPORTED_ASPECT_RATIOS[number];
+type AspectRatio = (typeof SUPPORTED_ASPECT_RATIOS)[number];
 
 interface Suggestion {
   title: string;
@@ -39,13 +39,19 @@ export class Agent1 implements Agent {
   async processRequest(
     history: Message[],
     userMessage: Message,
-    userId: string
+    userId: string,
+    requestStartTime?: number
   ): Promise<AgentResponse> {
+    const startTime = requestStartTime || Date.now();
+    console.log(
+      "[Perf] Agent processRequest start",
+      `[${Date.now() - startTime}ms]`
+    );
     const client = new OpenAI({
       apiKey: process.env.LLM_API_KEY,
     });
 
-    // 1. Prepare messages for the LLM to generate JSON
+    // 1. Prepare messages
     const systemPrompt = `You are a creative assistant.
 Based on the user's input, generate a question that will help trigger the creativity of the user, and four suggestions based on the question.
 For example, if the user said "I want to create an image of two couples kissing", you can ask "Where are these two couples kissing?" and provide suggestions like "In a classroom", "In a playground", etc.
@@ -62,18 +68,22 @@ Supported aspect ratios: ${SUPPORTED_ASPECT_RATIOS.join(", ")}
 - Use "21:9" for ultra-wide cinematic scenes
 Choose the most appropriate ratio based on the subject matter and composition.
 
-You must output a JSON object with the following structure:
-{
-  "question": "The question you ask the user, or just a response if no suggestions",
-  "suggestions": [
-    { "title": "Short title for suggestion 1", "aspectRatio": "1:1", "prompt": "Detailed image generation prompt for suggestion 1" },
-    { "title": "Short title for suggestion 2", "aspectRatio": "1:1", "prompt": "Detailed image generation prompt for suggestion 2" },
-    { "title": "Short title for suggestion 3", "aspectRatio": "1:1", "prompt": "Detailed image generation prompt for suggestion 3" },
-    { "title": "Short title for suggestion 4", "aspectRatio": "1:1", "prompt": "Detailed image generation prompt for suggestion 4" }
-  ]
-}
-Note: "suggestions" can be an empty array [] if no suggestions are appropriate.
-Note: "aspectRatio" must be one of the supported aspect ratios listed above.
+Output Format:
+1. Wrap your question/response in <TEXT>...</TEXT> tags.
+2. If you are providing suggestions, output them one by one.
+3. Wrap each suggestion in <JSON>...</JSON> tags.
+4. Inside <JSON>, provide a JSON object with "title", "aspectRatio", and "prompt".
+5. Do NOT output markdown code blocks. Just the raw tags.
+
+Example with suggestions:
+<TEXT>The question you ask the user, or just a response if no suggestions</TEXT>
+<JSON>{"title": "Short title for suggestion 1", "aspectRatio": "1:1", "prompt": "Detailed image generation prompt for suggestion 1"}</JSON>
+<JSON>{"title": "Short title for suggestion 2", "aspectRatio": "1:1", "prompt": "Detailed image generation prompt for suggestion 2"}</JSON>
+<JSON>{"title": "Short title for suggestion 3", "aspectRatio": "1:1", "prompt": "Detailed image generation prompt for suggestion 3"}</JSON>
+<JSON>{"title": "Short title for suggestion 4", "aspectRatio": "1:1", "prompt": "Detailed image generation prompt for suggestion 4"}</JSON>
+
+Example without suggestions:
+<TEXT>Hello! How can I help you today?</TEXT>
 `;
 
     // Convert previous agent_image parts to text in history
@@ -108,6 +118,16 @@ Note: "aspectRatio" must be one of the supported aspect ratios listed above.
         }
       }
     }
+
+    // Pre-fetch user image base64 if needed
+    const userImageBase64Promise = userImageId
+      ? downloadImage(userImageId).then((buf) => buf?.toString("base64"))
+      : Promise.resolve(undefined);
+
+    console.log(
+      "[Perf] User image base64 prepared",
+      `[${Date.now() - startTime}ms]`
+    );
 
     const formattedUserMessage: any = {
       role: userMessage.role,
@@ -148,274 +168,331 @@ Note: "aspectRatio" must be one of the supported aspect ratios listed above.
       }),
       formattedUserMessage,
     ];
+    console.log(
+      "[Perf] Agent messages prepared",
+      `[${Date.now() - startTime}ms]`
+    );
 
-    // 2. Call LLM to get JSON
-    const jsonCompletion = await client.chat.completions.create({
+    // 2. Call LLM with stream
+    const llmStream = await client.chat.completions.create({
       model: "gpt-5-mini",
       messages: messages as any,
-      response_format: { type: "json_object" },
+      stream: true,
+    });
+    console.log(
+      "[Perf] Agent LLM stream started",
+      `[${Date.now() - startTime}ms]`
+    );
+
+    const encoder = new TextEncoder();
+    let resolveCompletion: (value: Message) => void;
+    const completion = new Promise<Message>((resolve) => {
+      resolveCompletion = resolve;
     });
 
-    const content = jsonCompletion.choices[0].message.content;
-    if (!content) {
-      throw new Error("No content received from LLM");
-    }
-
-    let parsed: AgentOutput;
-    try {
-      parsed = JSON.parse(content);
-    } catch (e) {
-      console.error("Failed to parse JSON", e);
-      parsed = {
-        question: content,
-        suggestions: [],
-      };
-    }
-
-    const { stream, completion } = this.createStreamAndCompletion(
-      parsed,
-      userImageId
-    );
-    return { stream, completion };
-  }
-
-  private createStreamAndCompletion(
-    parsed: AgentOutput,
-    userImageId: string | undefined
-  ) {
-    const encoder = new TextEncoder();
-    let controller: any = null;
+    // Track final content for completion
+    const finalContent: MessageContentPart[] = [];
+    const self = this;
 
     const stream = new ReadableStream({
-      start(c) {
-        controller = c;
-        // Send text immediately
-        c.enqueue(
-          encoder.encode(
-            JSON.stringify({ type: "text", content: parsed.question }) + "\n"
-          )
+      async start(controller) {
+        console.log(
+          "[Perf] Agent output stream start",
+          `[${Date.now() - startTime}ms]`
         );
+        let buffer = "";
+        let questionSent = false;
+        let hasSentPlaceholders = false;
+        let suggestionIndex = 0;
+        const imageTasks: Promise<void>[] = [];
 
-        // Send placeholders
-        if (Array.isArray(parsed.suggestions) && parsed.suggestions.length > 0) {
-          parsed.suggestions.forEach((s) => {
-            c.enqueue(
-              encoder.encode(
-                JSON.stringify({
-                  type: "part",
-                  part: {
-                    type: "agent_image",
-                    title: s.title,
-                    aspectRatio: s.aspectRatio || "1:1",
-                    prompt: s.prompt,
-                    status: "loading",
-                  },
-                }) + "\n"
-              )
-            );
+        const send = (data: any) => {
+          try {
+            controller.enqueue(encoder.encode(JSON.stringify(data) + "\n"));
+          } catch (e) {
+            // Controller might be closed
+          }
+        };
+
+        try {
+          for await (const chunk of llmStream) {
+            const delta = chunk.choices[0]?.delta?.content || "";
+            buffer += delta;
+
+            // 1. Parse Question
+            if (!questionSent) {
+              const qStart = buffer.indexOf("<TEXT>");
+              const qEnd = buffer.indexOf("</TEXT>");
+
+              if (qStart !== -1 && qEnd !== -1) {
+                const questionText = buffer.substring(qStart + 6, qEnd).trim();
+                send({ type: "text", content: questionText });
+                console.log(
+                  "[Perf] Agent question sent",
+                  `[${Date.now() - startTime}ms]`
+                );
+                finalContent.push({ type: "text", text: questionText });
+                questionSent = true;
+                buffer = buffer.substring(qEnd + 7);
+              }
+            }
+
+            // 2. Send Placeholders if we detect suggestions starting
+            if (
+              questionSent &&
+              !hasSentPlaceholders &&
+              (buffer.includes("<JSON>") || buffer.includes("<JSON"))
+            ) {
+              // Only send if we are fairly sure suggestions are coming.
+              // Checking for <JSON is a bit eager but helps speed.
+              // Let's wait for full <JSON> to be safe against hallucinations or partials,
+              // OR just wait for <JSON>
+              if (buffer.includes("<JSON>")) {
+                const placeholders = Array(4)
+                  .fill(null)
+                  .map((_, i) => ({
+                    type: "agent_image" as const,
+                    title: "Loading...",
+                    aspectRatio: "1:1" as const,
+                    prompt: "",
+                    status: "loading" as const,
+                  }));
+
+                placeholders.forEach((p) => {
+                  send({ type: "part", part: p });
+                  finalContent.push(p);
+                });
+                hasSentPlaceholders = true;
+              }
+            }
+
+            // 3. Parse Suggestions
+            while (buffer.includes("</JSON>")) {
+              const sStart = buffer.indexOf("<JSON>");
+              const sEnd = buffer.indexOf("</JSON>");
+
+              if (sStart !== -1 && sEnd !== -1) {
+                if (sStart < sEnd) {
+                  const jsonStr = buffer.substring(sStart + 6, sEnd);
+                  try {
+                    const suggestion = JSON.parse(jsonStr);
+                    const currentIndex = suggestionIndex;
+                    suggestionIndex++;
+
+                    // Start image generation
+                    const task = (async () => {
+                      try {
+                        console.log(
+                          "[Perf] Agent image generation start",
+                          `[${Date.now() - startTime}ms]`
+                        );
+                        const part = await self.generateImage(
+                          suggestion,
+                          userImageId,
+                          userImageBase64Promise,
+                          currentIndex,
+                          startTime
+                        );
+
+                        // Send update
+                        send({
+                          type: "part_update",
+                          index: currentIndex,
+                          part: part,
+                        });
+
+                        // Update final content (index + 1 because of text part)
+                        finalContent[currentIndex + 1] = part;
+                      } catch (err) {
+                        console.error(
+                          `Image gen error for index ${currentIndex}`,
+                          err
+                        );
+                        const errorPart: MessageContentPart = {
+                          type: "agent_image",
+                          title: suggestion.title || "Error",
+                          aspectRatio: "1:1",
+                          prompt: suggestion.prompt || "",
+                          status: "error",
+                        };
+                        send({
+                          type: "part_update",
+                          index: currentIndex,
+                          part: errorPart,
+                        });
+                        finalContent[currentIndex + 1] = errorPart;
+                      }
+                    })();
+
+                    imageTasks.push(task);
+                  } catch (e) {
+                    console.error("Failed to parse suggestion JSON", e);
+                  }
+                }
+                // Remove processed part
+                buffer = buffer.substring(sEnd + 7);
+              } else {
+                break;
+              }
+            }
+          }
+
+          // Stream ended
+          await Promise.all(imageTasks);
+
+          // If no question found (fallback)
+          if (finalContent.length === 0) {
+            // Maybe buffer has text?
+            const text = buffer.replace(/<[^>]*>/g, "").trim();
+            if (text) {
+              send({ type: "text", content: text });
+              finalContent.push({ type: "text", text });
+            }
+          }
+
+          resolveCompletion({
+            role: "assistant",
+            content: finalContent,
+            agentId: "agent-1",
           });
+          controller.close();
+        } catch (err) {
+          console.error("Stream processing error", err);
+          resolveCompletion({
+            role: "assistant",
+            content: [{ type: "text", text: "Error processing request." }],
+            agentId: "agent-1",
+          });
+          try {
+            controller.close();
+          } catch (e) {}
         }
       },
     });
 
-    const completion = (async () => {
-      const suggestions = parsed.suggestions || [];
-      const finalContent: MessageContentPart[] = [
-        { type: "text", text: parsed.question },
-        ...suggestions.map(
-          (s) =>
-            ({
-              type: "agent_image",
-              title: s.title,
-              aspectRatio: s.aspectRatio || "1:1",
-              prompt: s.prompt,
-              status: "loading",
-            }) as MessageContentPart
-        ),
+    return { stream, completion };
+  }
+
+  private async generateImage(
+    suggestion: Suggestion,
+    userImageId: string | undefined,
+    userImageBase64Promise: Promise<string | undefined>,
+    index: number,
+    startTime: number
+  ): Promise<MessageContentPart> {
+    console.log(
+      `[Perf] Image generation start index=${index}`,
+      `[${Date.now() - startTime}ms]`
+    );
+    const ai = new GoogleGenAI({
+      apiKey: process.env.GOOGLE_API_KEY,
+    });
+
+    const aspectRatio: AspectRatio = SUPPORTED_ASPECT_RATIOS.includes(
+      suggestion.aspectRatio as AspectRatio
+    )
+      ? (suggestion.aspectRatio as AspectRatio)
+      : "1:1";
+
+    let finalImageId: string;
+    const userImageBase64 = await userImageBase64Promise;
+
+    if (userImageId && userImageBase64) {
+      // Image editing
+      const prompt = [
+        { text: suggestion.prompt },
+        {
+          inlineData: {
+            mimeType: "image/png",
+            data: userImageBase64,
+          },
+        },
       ];
 
-      if (suggestions.length === 0) {
-        if (controller) {
-          try {
-            controller.close();
-          } catch (e) {
-            // Ignore error if already closed
-          }
-        }
-        return {
-          role: "assistant" as const,
-          content: finalContent,
-          agentId: this.id,
-        };
-      }
-
-      let userImageBase64: string | undefined;
-      if (userImageId) {
-        const buffer = await downloadImage(userImageId);
-        if (buffer) {
-          userImageBase64 = buffer.toString("base64");
-        }
-      }
-
-      const tasks = suggestions.map(async (suggestion, index) => {
-        try {
-          let finalImageId: string;
-          const ai = new GoogleGenAI({
-            apiKey: process.env.GOOGLE_API_KEY,
-          });
-
-          // Validate and use aspect ratio (default to 1:1 if invalid)
-          const aspectRatio: AspectRatio = SUPPORTED_ASPECT_RATIOS.includes(
-            suggestion.aspectRatio as AspectRatio
-          )
-            ? (suggestion.aspectRatio as AspectRatio)
-            : "1:1";
-
-          if (userImageId) {
-            // Image editing with Gemini (text-and-image-to-image)
-            if (!userImageBase64) throw new Error("Failed to download user image");
-            const prompt = [
-              { text: suggestion.prompt },
-              {
-                inlineData: {
-                  mimeType: "image/png",
-                  data: userImageBase64,
-                },
-              },
-            ];
-
-            const response = await ai.models.generateContent({
-              model: "gemini-2.5-flash-image",
-              contents: prompt,
-              config: {
-                imageConfig: {
-                  aspectRatio: aspectRatio,
-                },
-              },
-            });
-
-            let generatedImageData: string | undefined;
-            const candidates = (response as any).candidates;
-            if (candidates && candidates.length > 0) {
-              const parts = candidates[0].content?.parts;
-              if (parts) {
-                for (const part of parts) {
-                  if (part.inlineData) {
-                    generatedImageData = part.inlineData.data;
-                    break;
-                  }
-                }
-              }
-            }
-
-            if (!generatedImageData) {
-              console.log("[Agent-1] No image data in Gemini response (image editing). Full response:", JSON.stringify(response, null, 2));
-              throw new Error("No image data in Gemini response");
-            }
-
-            const buf = Buffer.from(generatedImageData, "base64");
-            finalImageId = await uploadImage(buf, "image/png");
-          } else {
-            // Image generation with Gemini (text-to-image)
-            const response = await ai.models.generateContent({
-              model: "gemini-2.5-flash-image",
-              contents: suggestion.prompt,
-              config: {
-                imageConfig: {
-                  aspectRatio: aspectRatio,
-                },
-              },
-            });
-
-            let generatedImageData: string | undefined;
-            const candidates = (response as any).candidates;
-            if (candidates && candidates.length > 0) {
-              const parts = candidates[0].content?.parts;
-              if (parts) {
-                for (const part of parts) {
-                  if (part.inlineData) {
-                    generatedImageData = part.inlineData.data;
-                    break;
-                  }
-                }
-              }
-            }
-
-            if (!generatedImageData) {
-              console.log("[Agent-1] No image data in Gemini response (text-to-image). Full response:", JSON.stringify(response, null, 2));
-              throw new Error("No image data in Gemini response");
-            }
-
-            const buf = Buffer.from(generatedImageData, "base64");
-            finalImageId = await uploadImage(buf, "image/png");
-          }
-
-          const part: MessageContentPart = {
-            type: "agent_image",
-            imageId: finalImageId,
-            title: suggestion.title,
+      const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash-image",
+        contents: prompt,
+        config: {
+          imageConfig: {
             aspectRatio: aspectRatio,
-            prompt: suggestion.prompt,
-            status: "generated",
-          };
-
-          // Update stream
-          if (controller) {
-            controller.enqueue(
-              encoder.encode(
-                JSON.stringify({
-                  type: "part_update",
-                  index: index,
-                  part: part,
-                }) + "\n"
-              )
-            );
-          }
-
-          finalContent[index + 1] = part;
-        } catch (e) {
-          console.error(e);
-          // Validate aspect ratio for error case too
-          const aspectRatio: AspectRatio = SUPPORTED_ASPECT_RATIOS.includes(
-            suggestion.aspectRatio as AspectRatio
-          )
-            ? (suggestion.aspectRatio as AspectRatio)
-            : "1:1";
-          const part: MessageContentPart = {
-            type: "agent_image",
-            title: suggestion.title,
-            aspectRatio: aspectRatio,
-            prompt: suggestion.prompt,
-            status: "error",
-          };
-          if (controller) {
-            controller.enqueue(
-              encoder.encode(
-                JSON.stringify({
-                  type: "part_update",
-                  index: index,
-                  part: part,
-                }) + "\n"
-              )
-            );
-          }
-          finalContent[index + 1] = part;
-        }
+          },
+        },
       });
 
-      await Promise.all(tasks);
-      if (controller) controller.close();
+      const candidates = (response as any).candidates;
+      let generatedImageData: string | undefined;
+      if (candidates && candidates.length > 0) {
+        const parts = candidates[0].content?.parts;
+        if (parts) {
+          for (const part of parts) {
+            if (part.inlineData) {
+              generatedImageData = part.inlineData.data;
+              break;
+            }
+          }
+        }
+      }
 
-      return {
-        role: "assistant" as const,
-        content: finalContent,
-        agentId: this.id,
-      };
-    })();
+      if (!generatedImageData) {
+        console.log(
+          "[Agent-1] No image data in Gemini response (image editing). Full response:",
+          JSON.stringify(response, null, 2)
+        );
+        throw new Error("No image data in Gemini response");
+      }
+      const buf = Buffer.from(generatedImageData, "base64");
+      finalImageId = await uploadImage(buf, "image/png");
+    } else {
+      // Text to image
+      const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash-image",
+        contents: suggestion.prompt,
+        config: {
+          imageConfig: {
+            aspectRatio: aspectRatio,
+          },
+        },
+      });
 
-    return { stream, completion };
+      const candidates = (response as any).candidates;
+      let generatedImageData: string | undefined;
+      if (candidates && candidates.length > 0) {
+        const parts = candidates[0].content?.parts;
+        if (parts) {
+          for (const part of parts) {
+            if (part.inlineData) {
+              generatedImageData = part.inlineData.data;
+              break;
+            }
+          }
+        }
+      }
+
+      if (!generatedImageData) {
+        console.log(
+          "[Agent-1] No image data in Gemini response (text-to-image). Full response:",
+          JSON.stringify(response, null, 2)
+        );
+        throw new Error("No image data in Gemini response");
+      }
+      const buf = Buffer.from(generatedImageData, "base64");
+      finalImageId = await uploadImage(buf, "image/png");
+    }
+
+    const result: MessageContentPart = {
+      type: "agent_image",
+      imageId: finalImageId,
+      title: suggestion.title,
+      aspectRatio: aspectRatio,
+      prompt: suggestion.prompt,
+      status: "generated",
+    };
+    console.log(
+      `[Perf] Image generation end index=${index}`,
+      `[${Date.now() - startTime}ms]`
+    );
+    return result;
   }
 }
 
 export const agent1 = new Agent1();
-
