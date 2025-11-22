@@ -268,6 +268,7 @@ Note: "suggestions" can be an empty array [] if no suggestions are appropriate.
             }
 
             if (!generatedImageData) {
+              console.log("[Agent-1] No image data in Gemini response (image editing). Full response:", JSON.stringify(response, null, 2));
               throw new Error("No image data in Gemini response");
             }
 
@@ -295,6 +296,7 @@ Note: "suggestions" can be an empty array [] if no suggestions are appropriate.
             }
 
             if (!generatedImageData) {
+              console.log("[Agent-1] No image data in Gemini response (text-to-image). Full response:", JSON.stringify(response, null, 2));
               throw new Error("No image data in Gemini response");
             }
 
