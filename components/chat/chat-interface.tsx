@@ -664,7 +664,7 @@ export default function ChatInterface({
                         <img
                           src={url}
                           alt={part.title}
-                          className="w-full h-full object-cover"
+                          className="w-full h-full object-contain bg-default-100 dark:bg-black"
                         />
                       )}
                       {(part.status === "generated" || part.status === "error") && (
