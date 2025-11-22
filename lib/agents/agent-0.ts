@@ -21,8 +21,14 @@ export class Agent0 implements Agent {
   async processRequest(
     history: Message[],
     userMessage: Message,
-    userId: string
+    userId: string,
+    requestStartTime?: number
   ): Promise<AgentResponse> {
+    const startTime = requestStartTime || Date.now();
+    console.log(
+      "[Perf] Agent processRequest start",
+      `[${Date.now() - startTime}ms]`
+    );
     const client = new OpenAI({
       apiKey: process.env.LLM_API_KEY,
     });
@@ -81,6 +87,11 @@ Note: "suggestions" can be an empty array [] if no suggestions are appropriate.
       }
     }
 
+    console.log(
+      "[Perf] User image check completed",
+      `[${Date.now() - startTime}ms]`
+    );
+
     const formattedUserMessage: any = {
       role: userMessage.role,
       content: Array.isArray(userMessage.content)
@@ -121,12 +132,22 @@ Note: "suggestions" can be an empty array [] if no suggestions are appropriate.
       formattedUserMessage,
     ];
 
+    console.log(
+      "[Perf] Agent messages prepared",
+      `[${Date.now() - startTime}ms]`
+    );
+
     // 2. Call LLM to get JSON
     const jsonCompletion = await client.chat.completions.create({
       model: "gpt-5-mini",
       messages: messages as any,
       response_format: { type: "json_object" },
     });
+
+    console.log(
+      "[Perf] Agent LLM response received",
+      `[${Date.now() - startTime}ms]`
+    );
 
     const content = jsonCompletion.choices[0].message.content;
     if (!content) {
@@ -144,10 +165,16 @@ Note: "suggestions" can be an empty array [] if no suggestions are appropriate.
       };
     }
 
+    console.log(
+      "[Perf] Agent JSON parsed",
+      `[${Date.now() - startTime}ms]`
+    );
+
     const { stream, completion } = this.createStreamAndCompletion(
       parsed,
       userImageId,
-      client
+      client,
+      startTime
     );
     return { stream, completion };
   }
@@ -155,7 +182,8 @@ Note: "suggestions" can be an empty array [] if no suggestions are appropriate.
   private createStreamAndCompletion(
     parsed: AgentOutput,
     userImageId: string | undefined,
-    client: OpenAI
+    client: OpenAI,
+    startTime: number
   ) {
     const encoder = new TextEncoder();
     let controller: any = null;
@@ -163,11 +191,19 @@ Note: "suggestions" can be an empty array [] if no suggestions are appropriate.
     const stream = new ReadableStream({
       start(c) {
         controller = c;
+        console.log(
+          "[Perf] Agent output stream start",
+          `[${Date.now() - startTime}ms]`
+        );
         // Send text immediately
         c.enqueue(
           encoder.encode(
             JSON.stringify({ type: "text", content: parsed.question }) + "\n"
           )
+        );
+        console.log(
+          "[Perf] Agent question sent",
+          `[${Date.now() - startTime}ms]`
         );
 
         // Send placeholders
@@ -223,11 +259,23 @@ Note: "suggestions" can be an empty array [] if no suggestions are appropriate.
 
       let userImageBuffer: Buffer | null | undefined;
       if (userImageId) {
+        console.log(
+          "[Perf] Downloading user image",
+          `[${Date.now() - startTime}ms]`
+        );
         userImageBuffer = await downloadImage(userImageId);
+        console.log(
+          "[Perf] User image downloaded",
+          `[${Date.now() - startTime}ms]`
+        );
       }
 
       const tasks = suggestions.map(async (suggestion, index) => {
         try {
+          console.log(
+            `[Perf] Image generation start index=${index}`,
+            `[${Date.now() - startTime}ms]`
+          );
           let finalImageId: string;
 
           if (userImageId) {
@@ -274,6 +322,11 @@ Note: "suggestions" can be an empty array [] if no suggestions are appropriate.
             const buf = Buffer.from(data.b64_json, "base64");
             finalImageId = await uploadImage(buf, "image/png");
           }
+
+          console.log(
+            `[Perf] Image generation end index=${index}`,
+            `[${Date.now() - startTime}ms]`
+          );
 
           const part: MessageContentPart = {
             type: "agent_image",
