@@ -5,8 +5,25 @@ import OpenAI from "openai";
 import { GoogleGenAI } from "@google/genai";
 import { v4 as uuidv4 } from "uuid";
 
+// Supported aspect ratios for Gemini image generation
+const SUPPORTED_ASPECT_RATIOS = [
+  "1:1",
+  "2:3",
+  "3:2",
+  "3:4",
+  "4:3",
+  "4:5",
+  "5:4",
+  "9:16",
+  "16:9",
+  "21:9",
+] as const;
+
+type AspectRatio = typeof SUPPORTED_ASPECT_RATIOS[number];
+
 interface Suggestion {
   title: string;
+  aspectRatio: string;
   prompt: string;
 }
 
@@ -36,17 +53,27 @@ For example, if the user said "I want to create an image of two couples kissing"
 If the user's input is too short or not conducive to suggestions (e.g., just "Hi"), you can choose not to provide any suggestions.
 If the user's input includes an image, you should make sure your prompts are editing prompts that are referring to an edit of the image. For example, "Change the man in the image's shirt to red...".
 
+For each suggestion, you must also specify an appropriate aspect ratio for the image. Choose the aspect ratio that best fits the content being described.
+Supported aspect ratios: ${SUPPORTED_ASPECT_RATIOS.join(", ")}
+- Use "1:1" for square/profile images
+- Use "16:9" for wide landscape/cinematic scenes
+- Use "9:16" for tall portrait/mobile content
+- Use "3:2" or "2:3" for standard photography
+- Use "21:9" for ultra-wide cinematic scenes
+Choose the most appropriate ratio based on the subject matter and composition.
+
 You must output a JSON object with the following structure:
 {
   "question": "The question you ask the user, or just a response if no suggestions",
   "suggestions": [
-    { "title": "Short title for suggestion 1", "prompt": "Detailed image generation prompt for suggestion 1" },
-    { "title": "Short title for suggestion 2", "prompt": "Detailed image generation prompt for suggestion 2" },
-    { "title": "Short title for suggestion 3", "prompt": "Detailed image generation prompt for suggestion 3" },
-    { "title": "Short title for suggestion 4", "prompt": "Detailed image generation prompt for suggestion 4" }
+    { "title": "Short title for suggestion 1", "aspectRatio": "1:1", "prompt": "Detailed image generation prompt for suggestion 1" },
+    { "title": "Short title for suggestion 2", "aspectRatio": "1:1", "prompt": "Detailed image generation prompt for suggestion 2" },
+    { "title": "Short title for suggestion 3", "aspectRatio": "1:1", "prompt": "Detailed image generation prompt for suggestion 3" },
+    { "title": "Short title for suggestion 4", "aspectRatio": "1:1", "prompt": "Detailed image generation prompt for suggestion 4" }
   ]
 }
 Note: "suggestions" can be an empty array [] if no suggestions are appropriate.
+Note: "aspectRatio" must be one of the supported aspect ratios listed above.
 `;
 
     // Convert previous agent_image parts to text in history
@@ -58,7 +85,7 @@ Note: "suggestions" can be an empty array [] if no suggestions are appropriate.
             if (p.type === "agent_image") {
               return {
                 type: "text" as const,
-                text: `Suggestion: ${p.title}\nPrompt: ${p.prompt}`,
+                text: `Suggestion: ${p.title}\nAspect Ratio: ${p.aspectRatio || "1:1"}\nPrompt: ${p.prompt}`,
               };
             }
             return p;
@@ -179,6 +206,7 @@ Note: "suggestions" can be an empty array [] if no suggestions are appropriate.
                   part: {
                     type: "agent_image",
                     title: s.title,
+                    aspectRatio: s.aspectRatio || "1:1",
                     prompt: s.prompt,
                     status: "loading",
                   },
@@ -199,6 +227,7 @@ Note: "suggestions" can be an empty array [] if no suggestions are appropriate.
             ({
               type: "agent_image",
               title: s.title,
+              aspectRatio: s.aspectRatio || "1:1",
               prompt: s.prompt,
               status: "loading",
             }) as MessageContentPart
@@ -235,6 +264,13 @@ Note: "suggestions" can be an empty array [] if no suggestions are appropriate.
             apiKey: process.env.GOOGLE_API_KEY,
           });
 
+          // Validate and use aspect ratio (default to 1:1 if invalid)
+          const aspectRatio: AspectRatio = SUPPORTED_ASPECT_RATIOS.includes(
+            suggestion.aspectRatio as AspectRatio
+          )
+            ? (suggestion.aspectRatio as AspectRatio)
+            : "1:1";
+
           if (userImageId) {
             // Image editing with Gemini (text-and-image-to-image)
             if (!userImageBase64) throw new Error("Failed to download user image");
@@ -251,6 +287,11 @@ Note: "suggestions" can be an empty array [] if no suggestions are appropriate.
             const response = await ai.models.generateContent({
               model: "gemini-2.5-flash-image",
               contents: prompt,
+              config: {
+                imageConfig: {
+                  aspectRatio: aspectRatio,
+                },
+              },
             });
 
             let generatedImageData: string | undefined;
@@ -279,6 +320,11 @@ Note: "suggestions" can be an empty array [] if no suggestions are appropriate.
             const response = await ai.models.generateContent({
               model: "gemini-2.5-flash-image",
               contents: suggestion.prompt,
+              config: {
+                imageConfig: {
+                  aspectRatio: aspectRatio,
+                },
+              },
             });
 
             let generatedImageData: string | undefined;
@@ -308,6 +354,7 @@ Note: "suggestions" can be an empty array [] if no suggestions are appropriate.
             type: "agent_image",
             imageId: finalImageId,
             title: suggestion.title,
+            aspectRatio: aspectRatio,
             prompt: suggestion.prompt,
             status: "generated",
           };
@@ -328,9 +375,16 @@ Note: "suggestions" can be an empty array [] if no suggestions are appropriate.
           finalContent[index + 1] = part;
         } catch (e) {
           console.error(e);
+          // Validate aspect ratio for error case too
+          const aspectRatio: AspectRatio = SUPPORTED_ASPECT_RATIOS.includes(
+            suggestion.aspectRatio as AspectRatio
+          )
+            ? (suggestion.aspectRatio as AspectRatio)
+            : "1:1";
           const part: MessageContentPart = {
             type: "agent_image",
             title: suggestion.title,
+            aspectRatio: aspectRatio,
             prompt: suggestion.prompt,
             status: "error",
           };

@@ -9,6 +9,7 @@ export type MessageContentPart =
       imageId?: string;
       imageUrl?: string; // For display before S3 upload or if using external URL
       title: string;
+      aspectRatio?: string;
       prompt: string;
       status: "loading" | "generated" | "error";
       isSelected?: boolean;
