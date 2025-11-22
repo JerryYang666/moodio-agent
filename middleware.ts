@@ -178,6 +178,28 @@ export async function middleware(request: NextRequest) {
 
   // 3. Allow other public paths
   if (isPublicPath(pathname)) {
+    // Special case: /api/auth/me - attempt token refresh if refresh token exists
+    // This handles the common scenario where /me is the first endpoint called
+    // after the access token expires
+    if (pathname === "/api/auth/me" && !isValidAccessToken) {
+      const refreshToken = getRefreshToken(request);
+      
+      // Only attempt refresh if we have a refresh token and it's not a prefetch
+      if (refreshToken && !isPrefetch(request)) {
+        const { setCookie, newAccessToken } = await refreshSession(request);
+        
+        if (setCookie && newAccessToken) {
+          // Refresh succeeded - update request cookies and set response header
+          request.cookies.set(siteConfig.auth.accessToken.cookieName, newAccessToken);
+          const response = NextResponse.next();
+          response.headers.set("set-cookie", setCookie);
+          return response;
+        }
+        
+        // Refresh failed - continue anyway since this is a public path
+      }
+    }
+    
     return NextResponse.next();
   }
 
