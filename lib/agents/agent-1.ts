@@ -3,10 +3,12 @@ import { Message, MessageContentPart } from "@/lib/llm/types";
 import { downloadImage, uploadImage } from "@/lib/storage/s3";
 import OpenAI from "openai";
 import { GoogleGenAI } from "@google/genai";
-import { v4 as uuidv4 } from "uuid";
 
 // Maximum number of retries for failed operations
 const MAX_RETRY = 2;
+
+// Maximum number of user messages to send to AI (excluding the first user message)
+const MAX_USER_MESSAGES = 19;
 
 // Supported aspect ratios for Gemini image generation
 const SUPPORTED_ASPECT_RATIOS = [
@@ -73,6 +75,61 @@ export class Agent1 implements Agent {
     return { stream, completion };
   }
 
+  /**
+   * Filter conversation history to keep only the first user message, first assistant message,
+   * and the last N user messages (and their subsequent messages)
+   * @param history Array of messages to filter
+   * @returns Filtered array of messages
+   */
+  private filterMessagesByUserCount(history: Message[]): Message[] {
+    if (history.length === 0) {
+      return history;
+    }
+
+    // Find indices of all user messages
+    const userMessageIndices: number[] = [];
+    for (let i = 0; i < history.length; i++) {
+      if (history[i].role === "user") {
+        userMessageIndices.push(i);
+      }
+    }
+
+    // If we have fewer user messages than the limit + 1 (first user), return all
+    if (userMessageIndices.length <= MAX_USER_MESSAGES + 1) {
+      return history;
+    }
+
+    // Find the index of the first user message
+    const firstUserIndex = userMessageIndices[0];
+
+    // Find the index of the first assistant message (should be after first user)
+    let firstAssistantIndex = -1;
+    for (let i = firstUserIndex + 1; i < history.length; i++) {
+      if (history[i].role === "assistant") {
+        firstAssistantIndex = i;
+        break;
+      }
+    }
+
+    // If no assistant message found after first user, just return all
+    if (firstAssistantIndex === -1) {
+      return history;
+    }
+
+    // Find the index of the Nth user message from the end (where N = MAX_USER_MESSAGES)
+    // We want to keep the last MAX_USER_MESSAGES user messages, so we find the (MAX_USER_MESSAGES)th from the end
+    const cutoffUserMessageIndex =
+      userMessageIndices[userMessageIndices.length - MAX_USER_MESSAGES];
+
+    // Keep: [0...firstAssistantIndex] + [cutoffUserMessageIndex...end]
+    const filteredHistory = [
+      ...history.slice(0, firstAssistantIndex + 1),
+      ...history.slice(cutoffUserMessageIndex),
+    ];
+
+    return filteredHistory;
+  }
+
   private async prepareMessages(
     history: Message[],
     userMessage: Message,
@@ -134,6 +191,15 @@ Example without suggestions:
       return m;
     });
 
+    // Filter history to keep only the first user message, first assistant message, and last N user messages
+    const filteredHistory = this.filterMessagesByUserCount(cleanHistory);
+
+    if (cleanHistory.length !== filteredHistory.length) {
+      console.log(
+        `[Agent-1] Conversation history filtered: ${cleanHistory.length} → ${filteredHistory.length} messages (keeping first user + first assistant + last ${MAX_USER_MESSAGES} user messages)`
+      );
+    }
+
     // Check for user image - search through history and current message for last user image
     let userImageId: string | undefined;
     const allMessages = [...history, userMessage];
@@ -177,7 +243,7 @@ Example without suggestions:
 
     const messages = [
       { role: "system", content: systemPrompt },
-      ...cleanHistory.map((m) => {
+      ...filteredHistory.map((m) => {
         if (Array.isArray(m.content)) {
           return {
             role: m.role,
