@@ -209,6 +209,98 @@ Example without suggestions:
     prepared: PreparedMessages,
     startTime: number
   ): Promise<AgentResponse> {
+    const encoder = new TextEncoder();
+    let resolveCompletion: (value: Message) => void;
+    let rejectCompletion: (error: Error) => void;
+    const completion = new Promise<Message>((resolve, reject) => {
+      resolveCompletion = resolve;
+      rejectCompletion = reject;
+    });
+
+    let currentAttempt = 0;
+    const self = this;
+
+    // Create a wrapper stream that handles retries
+    const stream = new ReadableStream({
+      async start(controller) {
+        const send = (data: any) => {
+          try {
+            controller.enqueue(encoder.encode(JSON.stringify(data) + "\n"));
+          } catch (e) {
+            // Controller might be closed
+          }
+        };
+
+        let lastError: Error | undefined;
+
+        for (let attempt = 0; attempt <= MAX_RETRY; attempt++) {
+          try {
+            if (attempt > 0) {
+              console.log(
+                `[Agent-1] Retrying LLM call and parse, attempt ${attempt + 1}/${MAX_RETRY + 1}`
+              );
+
+              // Send invalidation signal to frontend before retry
+              send({ type: "invalidate", reason: "retry" });
+
+              // Wait before retry
+              const waitTime = Math.pow(2, attempt - 1) * 1000; // Exponential backoff: 1s, 2s
+              console.log(`[Agent-1] Waiting ${waitTime}ms before LLM retry`);
+              await new Promise((resolve) => setTimeout(resolve, waitTime));
+            }
+
+            const result = await self.callLLMAndParseCore(
+              prepared,
+              startTime,
+              send
+            );
+
+            if (attempt > 0) {
+              console.log(
+                `[Agent-1] LLM call and parse succeeded on retry attempt ${attempt + 1}`
+              );
+            }
+
+            // Success - resolve completion and close controller
+            resolveCompletion(result);
+            controller.close();
+            return;
+          } catch (error) {
+            lastError = error as Error;
+            console.error(
+              `[Agent-1] LLM call and parse attempt ${attempt + 1}/${MAX_RETRY + 1} failed:`,
+              error
+            );
+          }
+        }
+
+        // All retries exhausted - send failure signal to frontend
+        console.error(
+          `[Agent-1] LLM call and parse failed after ${MAX_RETRY + 1} attempts`
+        );
+
+        // Send retry exhausted signal so frontend can restore user input
+        send({
+          type: "retry_exhausted",
+          reason: "All retry attempts failed",
+          error: lastError?.message || "Unknown error",
+        });
+
+        rejectCompletion(lastError || new Error("LLM call and parse failed"));
+        try {
+          controller.close();
+        } catch (e) {}
+      },
+    });
+
+    return { stream, completion };
+  }
+
+  private async callLLMAndParseCore(
+    prepared: PreparedMessages,
+    startTime: number,
+    send: (data: any) => void
+  ): Promise<Message> {
     const client = new OpenAI({
       apiKey: process.env.LLM_API_KEY,
     });
@@ -224,189 +316,217 @@ Example without suggestions:
       `[${Date.now() - startTime}ms]`
     );
 
-    const encoder = new TextEncoder();
-    let resolveCompletion: (value: Message) => void;
-    const completion = new Promise<Message>((resolve) => {
-      resolveCompletion = resolve;
-    });
-
     // Track final content for completion
     const finalContent: MessageContentPart[] = [];
     const self = this;
 
-    const stream = new ReadableStream({
-      async start(controller) {
-        console.log(
-          "[Perf] Agent output stream start",
-          `[${Date.now() - startTime}ms]`
-        );
-        let buffer = "";
-        let fullLlmResponse = ""; // Track complete LLM response
-        let questionSent = false;
-        let suggestionIndex = 0;
-        const imageTasks: Promise<void>[] = [];
+    console.log(
+      "[Perf] Agent output stream start",
+      `[${Date.now() - startTime}ms]`
+    );
+    let buffer = "";
+    let fullLlmResponse = ""; // Track complete LLM response
+    let questionSent = false;
+    let suggestionIndex = 0;
+    const imageTasks: Promise<void>[] = [];
 
-        const send = (data: any) => {
-          try {
-            controller.enqueue(encoder.encode(JSON.stringify(data) + "\n"));
-          } catch (e) {
-            // Controller might be closed
-          }
-        };
+    try {
+      for await (const chunk of llmStream) {
+        const delta = chunk.choices[0]?.delta?.content || "";
+        buffer += delta;
+        fullLlmResponse += delta; // Accumulate full response
 
-        try {
-          for await (const chunk of llmStream) {
-            const delta = chunk.choices[0]?.delta?.content || "";
-            buffer += delta;
-            fullLlmResponse += delta; // Accumulate full response
+        // Check for invalid text outside tags
+        // Valid text should only be inside <TEXT>...</TEXT> or <JSON>...</JSON>
+        // Whitespace outside is OK
+        let checkBuffer = buffer;
+        let inAngleBrackets = false;
+        let inTextTag = false;
+        let inJsonTag = false;
+        let i = 0;
 
-            // 1. Parse Question
-            if (!questionSent) {
-              const qStart = buffer.indexOf("<TEXT>");
-              const qEnd = buffer.indexOf("</TEXT>");
+        while (i < checkBuffer.length) {
+          const char = checkBuffer[i];
+          const remaining = checkBuffer.substring(i);
 
-              if (qStart !== -1 && qEnd !== -1) {
-                const questionText = buffer.substring(qStart + 6, qEnd).trim();
-                send({ type: "text", content: questionText });
-                console.log(
-                  "[Perf] Agent question sent",
-                  `[${Date.now() - startTime}ms]`
-                );
-                finalContent.push({ type: "text", text: questionText });
-                questionSent = true;
-                buffer = buffer.substring(qEnd + 7);
-              }
-            }
-
-            // 2. Parse Suggestions (max 8)
-            while (buffer.includes("</JSON>")) {
-              const sStart = buffer.indexOf("<JSON>");
-              const sEnd = buffer.indexOf("</JSON>");
-
-              if (sStart !== -1 && sEnd !== -1) {
-                if (sStart < sEnd) {
-                  const jsonStr = buffer.substring(sStart + 6, sEnd);
-                  try {
-                    const suggestion = JSON.parse(jsonStr);
-                    
-                    // Hard limit: only start up to 8 image generation tasks
-                    if (suggestionIndex < 8) {
-                      const currentIndex = suggestionIndex;
-                      suggestionIndex++;
-
-                      // Start image generation
-                      const task = (async () => {
-                      try {
-                        // Send placeholder when image generation starts
-                        const placeholder: MessageContentPart = {
-                          type: "agent_image",
-                          title: "Loading...",
-                          aspectRatio: suggestion.aspectRatio as AspectRatio,
-                          prompt: suggestion.prompt,
-                          status: "loading",
-                        };
-                        send({ type: "part", part: placeholder });
-                        finalContent.push(placeholder);
-
-                        console.log(
-                          "[Perf] Agent image generation start",
-                          `[${Date.now() - startTime}ms]`
-                        );
-                        const part = await self.generateImage(
-                          suggestion,
-                          prepared.userImageId,
-                          prepared.userImageBase64Promise,
-                          currentIndex,
-                          startTime
-                        );
-
-                        // Send update
-                        send({
-                          type: "part_update",
-                          index: currentIndex,
-                          part: part,
-                        });
-
-                        // Update final content (index + 1 because of text part)
-                        finalContent[currentIndex + 1] = part;
-                      } catch (err) {
-                        console.error(
-                          `Image gen error for index ${currentIndex}`,
-                          err
-                        );
-                        const errorPart: MessageContentPart = {
-                          type: "agent_image",
-                          title: suggestion.title || "Error",
-                          aspectRatio: "1:1",
-                          prompt: suggestion.prompt || "",
-                          status: "error",
-                        };
-                        send({
-                          type: "part_update",
-                          index: currentIndex,
-                          part: errorPart,
-                        });
-                        finalContent[currentIndex + 1] = errorPart;
-                      }
-                      })();
-
-                      imageTasks.push(task);
-                    } else {
-                      console.log(
-                        `[Agent-1] Skipping suggestion beyond limit of 8. Title: ${suggestion.title}`
-                      );
-                    }
-                  } catch (e) {
-                    console.error("Failed to parse suggestion JSON", e);
-                  }
-                }
-                // Remove processed part
-                buffer = buffer.substring(sEnd + 7);
-              } else {
-                break;
-              }
-            }
+          // Check for opening tags
+          if (remaining.startsWith("<TEXT>")) {
+            inTextTag = true;
+            i += 6;
+            continue;
+          } else if (remaining.startsWith("</TEXT>")) {
+            inTextTag = false;
+            i += 7;
+            continue;
+          } else if (remaining.startsWith("<JSON>")) {
+            inJsonTag = true;
+            i += 6;
+            continue;
+          } else if (remaining.startsWith("</JSON>")) {
+            inJsonTag = false;
+            i += 7;
+            continue;
           }
 
-          // Stream ended
-          await Promise.all(imageTasks);
-
-          // Log final LLM response
-          console.log("=== FINAL AI LLM RESPONSE ===");
-          console.log(fullLlmResponse);
-          console.log("=== END FINAL AI LLM RESPONSE ===");
-
-          // If no question found (fallback)
-          if (finalContent.length === 0) {
-            // Maybe buffer has text?
-            const text = buffer.replace(/<[^>]*>/g, "").trim();
-            if (text) {
-              send({ type: "text", content: text });
-              finalContent.push({ type: "text", text });
-            }
+          // Track if we're in angle brackets (for any other tags)
+          if (char === "<") {
+            inAngleBrackets = true;
+          } else if (char === ">") {
+            inAngleBrackets = false;
+          } else if (
+            !inTextTag &&
+            !inJsonTag &&
+            !inAngleBrackets &&
+            char.trim() !== ""
+          ) {
+            // Found non-whitespace text outside of valid tag content
+            console.error(
+              `[Agent-1] Invalid text outside tags detected: "${checkBuffer.substring(Math.max(0, i - 20), Math.min(checkBuffer.length, i + 20))}"`
+            );
+            throw new Error(
+              `Invalid LLM response: text outside tags at position ${i}`
+            );
           }
 
-          resolveCompletion({
-            role: "assistant",
-            content: finalContent,
-            agentId: "agent-1",
-          });
-          controller.close();
-        } catch (err) {
-          console.error("Stream processing error", err);
-          resolveCompletion({
-            role: "assistant",
-            content: [{ type: "text", text: "Error processing request." }],
-            agentId: "agent-1",
-          });
-          try {
-            controller.close();
-          } catch (e) {}
+          i++;
         }
-      },
-    });
 
-    return { stream, completion };
+        // 1. Parse Question
+        if (!questionSent) {
+          const qStart = buffer.indexOf("<TEXT>");
+          const qEnd = buffer.indexOf("</TEXT>");
+
+          if (qStart !== -1 && qEnd !== -1) {
+            const questionText = buffer.substring(qStart + 6, qEnd).trim();
+            send({ type: "text", content: questionText });
+            console.log(
+              "[Perf] Agent question sent",
+              `[${Date.now() - startTime}ms]`
+            );
+            finalContent.push({ type: "text", text: questionText });
+            questionSent = true;
+            buffer = buffer.substring(qEnd + 7);
+          }
+        }
+
+        // 2. Parse Suggestions (max 8)
+        while (buffer.includes("</JSON>")) {
+          const sStart = buffer.indexOf("<JSON>");
+          const sEnd = buffer.indexOf("</JSON>");
+
+          if (sStart !== -1 && sEnd !== -1) {
+            if (sStart < sEnd) {
+              const jsonStr = buffer.substring(sStart + 6, sEnd);
+              try {
+                const suggestion = JSON.parse(jsonStr);
+
+                // Hard limit: only start up to 8 image generation tasks
+                if (suggestionIndex < 8) {
+                  const currentIndex = suggestionIndex;
+                  suggestionIndex++;
+
+                  // Start image generation
+                  const task = (async () => {
+                    try {
+                      // Send placeholder when image generation starts
+                      const placeholder: MessageContentPart = {
+                        type: "agent_image",
+                        title: "Loading...",
+                        aspectRatio: suggestion.aspectRatio as AspectRatio,
+                        prompt: suggestion.prompt,
+                        status: "loading",
+                      };
+                      send({ type: "part", part: placeholder });
+                      finalContent.push(placeholder);
+
+                      console.log(
+                        "[Perf] Agent image generation start",
+                        `[${Date.now() - startTime}ms]`
+                      );
+                      const part = await self.generateImage(
+                        suggestion,
+                        prepared.userImageId,
+                        prepared.userImageBase64Promise,
+                        currentIndex,
+                        startTime
+                      );
+
+                      // Send update
+                      send({
+                        type: "part_update",
+                        index: currentIndex,
+                        part: part,
+                      });
+
+                      // Update final content (index + 1 because of text part)
+                      finalContent[currentIndex + 1] = part;
+                    } catch (err) {
+                      console.error(
+                        `Image gen error for index ${currentIndex}`,
+                        err
+                      );
+                      const errorPart: MessageContentPart = {
+                        type: "agent_image",
+                        title: suggestion.title || "Error",
+                        aspectRatio: "1:1",
+                        prompt: suggestion.prompt || "",
+                        status: "error",
+                      };
+                      send({
+                        type: "part_update",
+                        index: currentIndex,
+                        part: errorPart,
+                      });
+                      finalContent[currentIndex + 1] = errorPart;
+                    }
+                  })();
+
+                  imageTasks.push(task);
+                } else {
+                  console.log(
+                    `[Agent-1] Skipping suggestion beyond limit of 8. Title: ${suggestion.title}`
+                  );
+                }
+              } catch (e) {
+                console.error("Failed to parse suggestion JSON", e);
+                throw new Error(`JSON parsing failed: ${e}`);
+              }
+            }
+            // Remove processed part
+            buffer = buffer.substring(sEnd + 7);
+          } else {
+            break;
+          }
+        }
+      }
+
+      // Stream ended
+      await Promise.all(imageTasks);
+
+      // Log final LLM response
+      console.log("=== FINAL AI LLM RESPONSE ===");
+      console.log(fullLlmResponse);
+      console.log("=== END FINAL AI LLM RESPONSE ===");
+
+      // If no question found (fallback)
+      if (finalContent.length === 0) {
+        // Maybe buffer has text?
+        const text = buffer.replace(/<[^>]*>/g, "").trim();
+        if (text) {
+          send({ type: "text", content: text });
+          finalContent.push({ type: "text", text });
+        }
+      }
+
+      return {
+        role: "assistant",
+        content: finalContent,
+        agentId: "agent-1",
+      };
+    } catch (err) {
+      console.error("Stream processing error", err);
+      throw err;
+    }
   }
 
   private async generateImage(
@@ -422,7 +542,7 @@ Example without suggestions:
     );
 
     let lastError: Error | undefined;
-    
+
     for (let attempt = 0; attempt <= MAX_RETRY; attempt++) {
       try {
         if (attempt > 0) {
@@ -452,7 +572,7 @@ Example without suggestions:
           `[Agent-1] Image generation attempt ${attempt + 1}/${MAX_RETRY + 1} failed for index=${index}:`,
           error
         );
-        
+
         // Don't wait after the last attempt
         if (attempt < MAX_RETRY) {
           const waitTime = Math.pow(2, attempt) * 1000; // Exponential backoff: 1s, 2s

@@ -9,6 +9,7 @@ import { Spinner } from "@heroui/spinner";
 import { useDisclosure } from "@heroui/modal";
 import { Avatar } from "@heroui/avatar";
 import { Popover, PopoverTrigger, PopoverContent } from "@heroui/popover";
+import { addToast } from "@heroui/toast";
 import { siteConfig } from "@/config/site";
 import {
   Send,
@@ -23,7 +24,10 @@ import clsx from "clsx";
 import ReactMarkdown from "react-markdown";
 import { useRouter } from "next/navigation";
 import { useChat } from "@/hooks/use-chat";
-import { NotificationPermissionModal, NotificationPermissionModalRef } from "@/components/notification-permission-modal";
+import {
+  NotificationPermissionModal,
+  NotificationPermissionModalRef,
+} from "@/components/notification-permission-modal";
 import { Message, MessageContentPart } from "@/lib/llm/types";
 import ImageDetailModal from "./image-detail-modal";
 import ImageWithMenu from "@/components/collection/image-with-menu";
@@ -57,7 +61,7 @@ const getSupportedMimeType = (): string | null => {
       return type;
     }
   }
-  
+
   console.warn("No supported audio format found");
   return null;
 };
@@ -109,7 +113,7 @@ export default function ChatInterface({
     prompt: string;
     status?: "loading" | "generated" | "error";
   } | null>(null);
-  
+
   // State for selected agent image (for sending in next message)
   const [selectedAgentPart, setSelectedAgentPart] = useState<{
     url: string;
@@ -126,6 +130,7 @@ export default function ChatInterface({
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const notificationModalRef = useRef<NotificationPermissionModalRef>(null);
+  const lastUserInputRef = useRef<string>("");
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -203,7 +208,9 @@ export default function ChatInterface({
     try {
       // Check if MediaRecorder is supported
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        alert("Audio recording is not supported on this browser. Please use HTTPS or a supported browser.");
+        alert(
+          "Audio recording is not supported on this browser. Please use HTTPS or a supported browser."
+        );
         return;
       }
 
@@ -215,7 +222,9 @@ export default function ChatInterface({
       // Detect supported MIME type for iOS Safari compatibility
       const mimeType = getSupportedMimeType();
       if (!mimeType) {
-        alert("Audio recording format is not supported on this device. Please try a different browser.");
+        alert(
+          "Audio recording format is not supported on this device. Please try a different browser."
+        );
         return;
       }
 
@@ -243,7 +252,7 @@ export default function ChatInterface({
       mediaRecorder.start();
       setIsRecording(true);
       setRecordingTime(0);
-      
+
       if (timerRef.current) clearInterval(timerRef.current);
       timerRef.current = setInterval(() => {
         setRecordingTime((prev) => prev + 1);
@@ -251,17 +260,32 @@ export default function ChatInterface({
     } catch (error) {
       console.error("Error accessing microphone:", error);
       if (error instanceof Error) {
-        if (error.name === "NotAllowedError" || error.name === "PermissionDeniedError") {
-          alert("Microphone permission denied. Please allow microphone access in your browser settings.");
-        } else if (error.name === "NotFoundError" || error.name === "DevicesNotFoundError") {
-          alert("No microphone found. Please connect a microphone and try again.");
-        } else if (error.name === "NotReadableError" || error.name === "TrackStartError") {
+        if (
+          error.name === "NotAllowedError" ||
+          error.name === "PermissionDeniedError"
+        ) {
+          alert(
+            "Microphone permission denied. Please allow microphone access in your browser settings."
+          );
+        } else if (
+          error.name === "NotFoundError" ||
+          error.name === "DevicesNotFoundError"
+        ) {
+          alert(
+            "No microphone found. Please connect a microphone and try again."
+          );
+        } else if (
+          error.name === "NotReadableError" ||
+          error.name === "TrackStartError"
+        ) {
           alert("Microphone is already in use by another application.");
         } else {
           alert(`Unable to access microphone: ${error.message}`);
         }
       } else {
-        alert("Unable to access microphone. Please check permissions and try again.");
+        alert(
+          "Unable to access microphone. Please check permissions and try again."
+        );
       }
     }
   };
@@ -326,6 +350,9 @@ export default function ChatInterface({
       currentInput = currentInput ? `${prefix}\n\n${currentInput}` : prefix;
     }
 
+    // Save the original input for potential retry exhausted scenario
+    lastUserInputRef.current = input;
+
     const currentFile = selectedFile;
     const currentPreviewUrl = previewUrl;
 
@@ -352,7 +379,10 @@ export default function ChatInterface({
           if (Array.isArray(msg.content)) {
             const newContent = [...msg.content];
             const partIndex = selectedAgentPart.partIndex;
-            if (newContent[partIndex] && newContent[partIndex].type === "agent_image") {
+            if (
+              newContent[partIndex] &&
+              newContent[partIndex].type === "agent_image"
+            ) {
               newContent[partIndex] = {
                 ...newContent[partIndex],
                 isSelected: true,
@@ -406,10 +436,13 @@ export default function ChatInterface({
         formData.append("message", currentInput);
         formData.append("file", currentFile);
         if (selectedAgentPart) {
-          formData.append("selection", JSON.stringify({
-            messageIndex: selectedAgentPart.messageIndex,
-            partIndex: selectedAgentPart.partIndex
-          }));
+          formData.append(
+            "selection",
+            JSON.stringify({
+              messageIndex: selectedAgentPart.messageIndex,
+              partIndex: selectedAgentPart.partIndex,
+            })
+          );
         }
         body = formData;
       } else {
@@ -417,7 +450,7 @@ export default function ChatInterface({
         if (selectedAgentPart) {
           payload.selection = {
             messageIndex: selectedAgentPart.messageIndex,
-            partIndex: selectedAgentPart.partIndex
+            partIndex: selectedAgentPart.partIndex,
           };
         }
         body = JSON.stringify(payload);
@@ -454,6 +487,96 @@ export default function ChatInterface({
           if (!line.trim()) continue;
           try {
             const event = JSON.parse(line);
+
+            if (event.type === "invalidate") {
+              // LLM is being retried - clear current content and reset state
+              console.log(
+                "[Chat] Received invalidate signal - clearing assistant message for retry"
+              );
+
+              // Show a cute toast notification
+              const cuteMessages = [
+                "Oops! Let me think about that again... 🤔",
+                "Hmm, let me rephrase that better! 💭",
+                "One sec, organizing my thoughts... ✨",
+                "Wait, I can do better! 🎨",
+                "Let me try that again with more sparkle! ⭐",
+              ];
+              const randomMessage =
+                cuteMessages[Math.floor(Math.random() * cuteMessages.length)];
+
+              addToast({
+                title: randomMessage,
+                color: "primary",
+              });
+
+              currentContent = [];
+              isFirstChunk = true;
+
+              // Remove the assistant message from UI
+              setMessages((prev) => {
+                const newMessages = [...prev];
+                if (
+                  newMessages.length > 0 &&
+                  newMessages[newMessages.length - 1].role === "assistant"
+                ) {
+                  return newMessages.slice(0, -1);
+                }
+                return newMessages;
+              });
+              continue;
+            }
+
+            if (event.type === "retry_exhausted") {
+              // All retries failed - restore user input and remove messages
+              console.log(
+                "[Chat] Received retry_exhausted signal - restoring user input"
+              );
+
+              // Show a cute error toast
+              const cuteErrorMessages = [
+                "Oops! Our agent got a bit overwhelmed... 🥺 Mind trying again?",
+                "So sorry! Our agent is taking a coffee break ☕ Please try again!",
+                "Uh oh! Our agent tripped over their thoughts 🤭 Give it another go?",
+                "Our agent's having a moment... 😅 Could you try once more?",
+                "Whoopsie! The agent's brain did a somersault 🤸 Try again?",
+              ];
+              const randomErrorMessage =
+                cuteErrorMessages[
+                  Math.floor(Math.random() * cuteErrorMessages.length)
+                ];
+
+              addToast({
+                title: randomErrorMessage,
+                color: "danger",
+              });
+
+              // Restore the user's original input
+              setInput(lastUserInputRef.current);
+
+              // Remove both the assistant message (if present) and the user message
+              setMessages((prev) => {
+                const newMessages = [...prev];
+                // Remove assistant message if present
+                if (
+                  newMessages.length > 0 &&
+                  newMessages[newMessages.length - 1].role === "assistant"
+                ) {
+                  newMessages.pop();
+                }
+                // Remove user message
+                if (
+                  newMessages.length > 0 &&
+                  newMessages[newMessages.length - 1].role === "user"
+                ) {
+                  newMessages.pop();
+                }
+                return newMessages;
+              });
+
+              // Break out of the read loop since we're done
+              break;
+            }
 
             if (isFirstChunk) {
               setMessages((prev) => [
@@ -568,13 +691,18 @@ export default function ChatInterface({
     });
   };
 
-  const renderContent = (content: string | MessageContentPart[], messageIndex?: number, messageTimestamp?: number) => {
+  const renderContent = (
+    content: string | MessageContentPart[],
+    messageIndex?: number,
+    messageTimestamp?: number
+  ) => {
     if (typeof content === "string") {
       return <ReactMarkdown>{content}</ReactMarkdown>;
     }
 
     // Check if message is more than 10 minutes old (10 * 60 * 1000 ms)
-    const isStaleMessage = messageTimestamp && (Date.now() - messageTimestamp > 10 * 60 * 1000);
+    const isStaleMessage =
+      messageTimestamp && Date.now() - messageTimestamp > 10 * 60 * 1000;
 
     // Group agent images to render them in a grid
     const textParts = content.filter((p) => p.type === "text");
@@ -596,8 +724,8 @@ export default function ChatInterface({
                 key={`img-${i}`}
                 src={
                   part.type === "image"
-                  ? getImageUrl(part.imageId)
-                  : part.image_url.url
+                    ? getImageUrl(part.imageId)
+                    : part.image_url.url
                 }
                 alt="User upload"
                 className="max-w-full rounded-lg"
@@ -623,7 +751,10 @@ export default function ChatInterface({
               );
 
               // Show error if image is loading but message is more than 10 minutes old
-              const effectiveStatus = (part.status === "loading" && isStaleMessage) ? "error" : part.status;
+              const effectiveStatus =
+                part.status === "loading" && isStaleMessage
+                  ? "error"
+                  : part.status;
 
               return (
                 <ImageWithMenu
@@ -673,7 +804,8 @@ export default function ChatInterface({
                           className="w-full h-full object-contain bg-default-100 dark:bg-black"
                         />
                       )}
-                      {(effectiveStatus === "generated" || effectiveStatus === "error") && (
+                      {(effectiveStatus === "generated" ||
+                        effectiveStatus === "error") && (
                         <div className="absolute bottom-0 left-0 right-0 bg-white/90 dark:bg-black/60 text-black dark:text-white p-2 text-xs truncate opacity-0 group-hover/image:opacity-100 transition-opacity">
                           {part.title}
                         </div>
@@ -855,8 +987,12 @@ export default function ChatInterface({
               </>
             )}
 
-            <Popover 
-              isOpen={isRecording && (siteConfig.audioRecording.maxDuration - recordingTime <= siteConfig.audioRecording.countdownThreshold)} 
+            <Popover
+              isOpen={
+                isRecording &&
+                siteConfig.audioRecording.maxDuration - recordingTime <=
+                  siteConfig.audioRecording.countdownThreshold
+              }
               placement="top"
             >
               <PopoverTrigger>
@@ -881,7 +1017,11 @@ export default function ChatInterface({
               <PopoverContent className="bg-danger text-danger-foreground">
                 <div className="px-1 py-1">
                   <div className="text-small font-bold">
-                    {Math.max(0, siteConfig.audioRecording.maxDuration - recordingTime)}s remaining
+                    {Math.max(
+                      0,
+                      siteConfig.audioRecording.maxDuration - recordingTime
+                    )}
+                    s remaining
                   </div>
                 </div>
               </PopoverContent>
