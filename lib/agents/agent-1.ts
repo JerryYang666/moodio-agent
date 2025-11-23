@@ -32,6 +32,12 @@ interface AgentOutput {
   suggestions: Suggestion[];
 }
 
+interface PreparedMessages {
+  messages: any[];
+  userImageId: string | undefined;
+  userImageBase64Promise: Promise<string | undefined>;
+}
+
 export class Agent1 implements Agent {
   id = "agent-1";
   name = "Creative Assistant (Gemini)";
@@ -47,11 +53,28 @@ export class Agent1 implements Agent {
       "[Perf] Agent processRequest start",
       `[${Date.now() - startTime}ms]`
     );
-    const client = new OpenAI({
-      apiKey: process.env.LLM_API_KEY,
-    });
 
-    // 1. Prepare messages
+    // Step 1: Prepare messages
+    const prepared = await this.prepareMessages(
+      history,
+      userMessage,
+      startTime
+    );
+
+    // Step 2: Call LLM and parse response
+    const { stream, completion } = await this.callLLMAndParse(
+      prepared,
+      startTime
+    );
+
+    return { stream, completion };
+  }
+
+  private async prepareMessages(
+    history: Message[],
+    userMessage: Message,
+    startTime: number
+  ): Promise<PreparedMessages> {
     const systemPrompt = `You are a creative assistant.
 Based on the user's input, generate a question that will help trigger the creativity of the user, and four suggestions based on the question. You must give exactly four suggestions unless the user explicitly asks for fewer or more.
 The absolute maximum number of suggestions you can give is eight (8). If the user asks for more than eight, you should give eight suggestions.
@@ -176,10 +199,21 @@ Example without suggestions:
       `[${Date.now() - startTime}ms]`
     );
 
-    // 2. Call LLM with stream
+    return { messages, userImageId, userImageBase64Promise };
+  }
+
+  private async callLLMAndParse(
+    prepared: PreparedMessages,
+    startTime: number
+  ): Promise<AgentResponse> {
+    const client = new OpenAI({
+      apiKey: process.env.LLM_API_KEY,
+    });
+
+    // Call LLM with stream
     const llmStream = await client.chat.completions.create({
       model: "gpt-4.1",
-      messages: messages as any,
+      messages: prepared.messages as any,
       stream: true,
     });
     console.log(
@@ -277,8 +311,8 @@ Example without suggestions:
                         );
                         const part = await self.generateImage(
                           suggestion,
-                          userImageId,
-                          userImageBase64Promise,
+                          prepared.userImageId,
+                          prepared.userImageBase64Promise,
                           currentIndex,
                           startTime
                         );
