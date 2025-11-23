@@ -5,6 +5,9 @@ import OpenAI from "openai";
 import { GoogleGenAI } from "@google/genai";
 import { v4 as uuidv4 } from "uuid";
 
+// Maximum number of retries for failed operations
+const MAX_RETRY = 2;
+
 // Supported aspect ratios for Gemini image generation
 const SUPPORTED_ASPECT_RATIOS = [
   "1:1",
@@ -417,6 +420,64 @@ Example without suggestions:
       `[Perf] Image generation start index=${index}`,
       `[${Date.now() - startTime}ms]`
     );
+
+    let lastError: Error | undefined;
+    
+    for (let attempt = 0; attempt <= MAX_RETRY; attempt++) {
+      try {
+        if (attempt > 0) {
+          console.log(
+            `[Agent-1] Retrying image generation for index=${index}, attempt ${attempt + 1}/${MAX_RETRY + 1}`
+          );
+        }
+
+        const result = await this.generateImageCore(
+          suggestion,
+          userImageId,
+          userImageBase64Promise,
+          index,
+          startTime
+        );
+
+        if (attempt > 0) {
+          console.log(
+            `[Agent-1] Image generation succeeded on retry attempt ${attempt + 1} for index=${index}`
+          );
+        }
+
+        return result;
+      } catch (error) {
+        lastError = error as Error;
+        console.error(
+          `[Agent-1] Image generation attempt ${attempt + 1}/${MAX_RETRY + 1} failed for index=${index}:`,
+          error
+        );
+        
+        // Don't wait after the last attempt
+        if (attempt < MAX_RETRY) {
+          const waitTime = Math.pow(2, attempt) * 1000; // Exponential backoff: 1s, 2s
+          console.log(
+            `[Agent-1] Waiting ${waitTime}ms before retry for index=${index}`
+          );
+          await new Promise((resolve) => setTimeout(resolve, waitTime));
+        }
+      }
+    }
+
+    // All retries exhausted
+    console.error(
+      `[Agent-1] Image generation failed after ${MAX_RETRY + 1} attempts for index=${index}`
+    );
+    throw lastError || new Error("Image generation failed");
+  }
+
+  private async generateImageCore(
+    suggestion: Suggestion,
+    userImageId: string | undefined,
+    userImageBase64Promise: Promise<string | undefined>,
+    index: number,
+    startTime: number
+  ): Promise<MessageContentPart> {
     const ai = new GoogleGenAI({
       apiKey: process.env.GOOGLE_API_KEY,
     });
