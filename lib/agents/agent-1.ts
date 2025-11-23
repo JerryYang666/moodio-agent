@@ -8,7 +8,7 @@ import { GoogleGenAI } from "@google/genai";
 const MAX_RETRY = 2;
 
 // Maximum number of user messages to send to AI (excluding the first user message)
-const MAX_USER_MESSAGES = 19;
+const MAX_USER_MESSAGES = 15;
 
 // Supported aspect ratios for Gemini image generation
 const SUPPORTED_ASPECT_RATIOS = [
@@ -309,10 +309,20 @@ Example without suggestions:
               // Send invalidation signal to frontend before retry
               send({ type: "invalidate", reason: "retry" });
 
-              // Wait before retry
-              const waitTime = Math.pow(2, attempt - 1) * 1000; // Exponential backoff: 1s, 2s
-              console.log(`[Agent-1] Waiting ${waitTime}ms before LLM retry`);
-              await new Promise((resolve) => setTimeout(resolve, waitTime));
+              // Append format reminder to the last user message on retry
+              const lastMessage = prepared.messages[prepared.messages.length - 1];
+              if (lastMessage && lastMessage.role === "user") {
+                if (Array.isArray(lastMessage.content)) {
+                  // Add reminder as text part
+                  lastMessage.content.push({
+                    type: "text",
+                    text: "\n\nPlease remember to follow the required format with <TEXT> and <JSON> tags as specified in the system prompt.",
+                  });
+                } else if (typeof lastMessage.content === "string") {
+                  // Append to string content
+                  lastMessage.content += "\n\nPlease remember to follow the required format with <TEXT> and <JSON> tags as specified in the system prompt.";
+                }
+              }
             }
 
             const result = await self.callLLMAndParseCore(
@@ -638,15 +648,6 @@ Example without suggestions:
           `[Agent-1] Image generation attempt ${attempt + 1}/${MAX_RETRY + 1} failed for index=${index}:`,
           error
         );
-
-        // Don't wait after the last attempt
-        if (attempt < MAX_RETRY) {
-          const waitTime = Math.pow(2, attempt) * 1000; // Exponential backoff: 1s, 2s
-          console.log(
-            `[Agent-1] Waiting ${waitTime}ms before retry for index=${index}`
-          );
-          await new Promise((resolve) => setTimeout(resolve, waitTime));
-        }
       }
     }
 
