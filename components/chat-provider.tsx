@@ -17,6 +17,7 @@ interface ChatContextType {
   error: string;
   refreshChats: () => Promise<void>;
   monitorChat: (chatId: string, startCount: number) => void;
+  cancelMonitorChat: (chatId: string) => void;
   renameChat: (chatId: string, name: string) => Promise<void>;
   isChatMonitored: (chatId: string) => boolean;
 }
@@ -122,6 +123,14 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     }));
   }, []);
 
+  const cancelMonitorChat = useCallback((chatId: string) => {
+    setMonitoredChats(prev => {
+      const newState = { ...prev };
+      delete newState[chatId];
+      return newState;
+    });
+  }, []);
+
   const isChatMonitored = useCallback((chatId: string) => {
     return !!monitoredChats[chatId];
   }, [monitoredChats]);
@@ -216,6 +225,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         error,
         refreshChats: fetchChats,
         monitorChat,
+        cancelMonitorChat,
         renameChat,
         isChatMonitored,
       }}

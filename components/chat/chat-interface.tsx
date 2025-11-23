@@ -91,7 +91,7 @@ export default function ChatInterface({
   initialMessages = [],
 }: ChatInterfaceProps) {
   const { user } = useAuth();
-  const { monitorChat } = useChat();
+  const { monitorChat, cancelMonitorChat } = useChat();
   const router = useRouter();
   const [chatId, setChatId] = useState<string | undefined>(initialChatId);
   const [messages, setMessages] = useState<Message[]>(initialMessages);
@@ -532,6 +532,11 @@ export default function ChatInterface({
               console.log(
                 "[Chat] Received retry_exhausted signal - restoring user input"
               );
+
+              // Cancel chat monitoring since the request failed
+              if (currentChatId) {
+                cancelMonitorChat(currentChatId);
+              }
 
               // Show a cute error toast
               const cuteErrorMessages = [
