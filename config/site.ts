@@ -3,6 +3,7 @@ export type SiteConfig = typeof siteConfig;
 export const siteConfig = {
   name: "moodio agent",
   description: "moodio agent",
+  chatInputPrefix: "moodio_chat_draft_",
   navItems: [
     {
       label: "Home",

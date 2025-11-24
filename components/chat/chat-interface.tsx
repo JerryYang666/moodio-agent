@@ -17,6 +17,7 @@ import { Message, MessageContentPart } from "@/lib/llm/types";
 import ImageDetailModal from "./image-detail-modal";
 import ChatMessage from "./chat-message";
 import ChatInput from "./chat-input";
+import { siteConfig } from "@/config/site";
 import { useVoiceRecorder } from "./use-voice-recorder";
 import { getImageUrl } from "./utils";
 
@@ -48,6 +49,37 @@ export default function ChatInterface({
   const [isSending, setIsSending] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+  // Draft saving logic
+  const [prevChatId, setPrevChatId] = useState(chatId);
+  const [isDraftLoaded, setIsDraftLoaded] = useState(false);
+
+  if (chatId !== prevChatId) {
+    setPrevChatId(chatId);
+    setIsDraftLoaded(false);
+  }
+
+  useEffect(() => {
+    const key = `${siteConfig.chatInputPrefix}${chatId || "new-chat"}`;
+    const saved = localStorage.getItem(key);
+    if (saved) {
+      setInput(saved);
+    } else {
+      setInput("");
+    }
+    setIsDraftLoaded(true);
+  }, [chatId]);
+
+  useEffect(() => {
+    if (isDraftLoaded) {
+      const key = `${siteConfig.chatInputPrefix}${chatId || "new-chat"}`;
+      if (input) {
+        localStorage.setItem(key, input);
+      } else {
+        localStorage.removeItem(key);
+      }
+    }
+  }, [input, chatId, isDraftLoaded]);
 
   // Modal state for agent images
   const { isOpen, onOpen, onOpenChange, onClose } = useDisclosure();
