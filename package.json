@@ -6,6 +6,7 @@
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
+    "db:studio": "drizzle-kit studio",
     "lint": "eslint --fix",
     "db:create": "node scripts/create-database.js",
     "db:generate": "drizzle-kit generate",
