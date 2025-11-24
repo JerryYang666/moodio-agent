@@ -189,7 +189,7 @@ export default function ImageWithMenu({
       <div ref={imageRef} className="relative group">
         {children}
         
-        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+        <div className="absolute top-2 right-2 md:opacity-0 md:group-hover:opacity-100 transition-opacity z-10">
           <Dropdown
             isOpen={isMenuOpen}
             onOpenChange={setIsMenuOpen}

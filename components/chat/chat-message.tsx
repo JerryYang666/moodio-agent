@@ -171,7 +171,7 @@ export default function ChatMessage({
                       )}
                       {(effectiveStatus === "generated" ||
                         effectiveStatus === "error") && (
-                        <div className="absolute bottom-0 left-0 right-0 bg-white/90 dark:bg-black/60 text-black dark:text-white p-2 text-xs truncate opacity-0 group-hover/image:opacity-100 transition-opacity">
+                        <div className="absolute bottom-0 left-0 right-0 bg-white/90 dark:bg-black/60 text-black dark:text-white p-2 text-xs truncate md:opacity-0 md:group-hover/image:opacity-100 transition-opacity">
                           {part.title}
                         </div>
                       )}
@@ -243,7 +243,7 @@ export default function ChatMessage({
               >
                 <PopoverTrigger>
                   <button
-                    className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-default-100 rounded-full text-default-400 hover:text-default-600"
+                    className="md:opacity-0 md:group-hover:opacity-100 transition-opacity p-1 hover:bg-default-100 rounded-full text-default-400 hover:text-default-600"
                     aria-label="Edit message"
                   >
                     <Pencil size={12} />
