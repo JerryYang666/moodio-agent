@@ -83,6 +83,7 @@
     "react-dom": "19.2.0",
     "react-markdown": "^10.1.0",
     "react-simple-code-editor": "^0.14.1",
+    "react-zoom-pan-pinch": "^3.7.0",
     "uuid": "^13.0.0"
   },
   "devDependencies": {

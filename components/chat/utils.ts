@@ -1,6 +1,7 @@
 // Helper constants and functions for chat components
 
-export const AWS_S3_PUBLIC_URL = process.env.NEXT_PUBLIC_AWS_S3_PUBLIC_URL || "";
+export const AWS_S3_PUBLIC_URL =
+  process.env.NEXT_PUBLIC_AWS_S3_PUBLIC_URL || "";
 
 // Helper to get image URL from S3
 export const getImageUrl = (imageId: string) => {
@@ -60,3 +61,30 @@ export const formatTime = (timestamp?: number) => {
   });
 };
 
+// Helper to trigger image download via backend API
+// Uses the backend endpoint which sets Content-Disposition header to force download
+export const downloadImage = (imageId: string | undefined, title: string) => {
+  if (!imageId) {
+    console.error("No imageId provided for download");
+    return;
+  }
+
+  // Sanitize filename for URL
+  const safeFilename = encodeURIComponent(
+    title
+      .replace(/[^a-z0-9\s-]/gi, "")
+      .replace(/\s+/g, "_")
+      .substring(0, 100) || "image"
+  );
+
+  // Use the backend download endpoint which sets Content-Disposition header
+  const downloadUrl = `/api/image/${imageId}/download?filename=${safeFilename}`;
+
+  // Create a hidden link and click it to trigger download
+  const link = document.createElement("a");
+  link.href = downloadUrl;
+  link.download = ""; // Browser will use Content-Disposition filename
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};

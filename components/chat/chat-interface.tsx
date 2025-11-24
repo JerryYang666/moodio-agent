@@ -87,6 +87,7 @@ export default function ChatInterface({
     url: string;
     title: string;
     prompt: string;
+    imageId?: string;
     status?: "loading" | "generated" | "error";
   } | null>(null);
 
@@ -483,6 +484,7 @@ export default function ChatInterface({
         url: part.imageUrl || (part.imageId ? getImageUrl(part.imageId) : ""),
         title: part.title,
         prompt: part.prompt,
+        imageId: part.imageId,
         status: part.status,
       });
       onOpen();
