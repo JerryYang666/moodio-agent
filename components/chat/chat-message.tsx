@@ -3,12 +3,15 @@
 import { Card, CardBody } from "@heroui/card";
 import { Spinner } from "@heroui/spinner";
 import { Avatar } from "@heroui/avatar";
-import { Bot, X } from "lucide-react";
+import { Bot, X, Pencil } from "lucide-react";
 import clsx from "clsx";
 import ReactMarkdown from "react-markdown";
 import { Message, MessageContentPart } from "@/lib/llm/types";
 import ImageWithMenu from "@/components/collection/image-with-menu";
 import { getImageUrl, formatTime } from "./utils";
+import { Button } from "@heroui/button";
+import { Popover, PopoverTrigger, PopoverContent } from "@heroui/popover";
+import { useState } from "react";
 
 interface SelectedAgentPart {
   url: string;
@@ -32,6 +35,7 @@ interface ChatMessageProps {
     partIndex: number
   ) => void;
   onAgentTitleClick: (part: any) => void;
+  onForkChat?: (messageIndex: number) => void;
 }
 
 export default function ChatMessage({
@@ -42,8 +46,10 @@ export default function ChatMessage({
   selectedAgentPart,
   onAgentImageSelect,
   onAgentTitleClick,
+  onForkChat,
 }: ChatMessageProps) {
   const isUser = message.role === "user";
+  const [isForkPopoverOpen, setIsForkPopoverOpen] = useState(false);
 
   const renderContent = (
     content: string | MessageContentPart[],
@@ -174,7 +180,7 @@ export default function ChatMessage({
   return (
     <div
       className={clsx(
-        "flex gap-3 max-w-3xl mx-auto",
+        "flex gap-3 max-w-3xl mx-auto group",
         isUser ? "justify-end" : "justify-start"
       )}
     >
@@ -211,14 +217,62 @@ export default function ChatMessage({
           </CardBody>
         </Card>
         {message.createdAt && (
-          <span
+          <div
             className={clsx(
-              "text-xs text-default-400 px-1",
-              isUser ? "text-right" : "text-left"
+              "flex items-center gap-2",
+              isUser ? "justify-end" : "justify-start"
             )}
           >
-            {formatTime(message.createdAt)}
-          </span>
+            <span className="text-xs text-default-400 px-1">
+              {formatTime(message.createdAt)}
+            </span>
+            {isUser && messageIndex > 0 && onForkChat && (
+              <Popover
+                isOpen={isForkPopoverOpen}
+                onOpenChange={setIsForkPopoverOpen}
+                placement="bottom-end"
+              >
+                <PopoverTrigger>
+                  <button
+                    className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-default-100 rounded-full text-default-400 hover:text-default-600"
+                    aria-label="Edit message"
+                  >
+                    <Pencil size={12} />
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent>
+                  <div className="px-1 py-2 w-60">
+                    <div className="text-small font-bold mb-1">
+                      Edit in new chat?
+                    </div>
+                    <div className="text-tiny text-default-500 mb-2">
+                      This will create a new chat starting from here, preserving
+                      the conversation history up to this point.
+                    </div>
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        size="sm"
+                        variant="light"
+                        onPress={() => setIsForkPopoverOpen(false)}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        size="sm"
+                        color="primary"
+                        onPress={() => {
+                          setIsForkPopoverOpen(false);
+                          onForkChat(messageIndex);
+                        }}
+                      >
+                        Edit & Fork
+                      </Button>
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            )}
+          </div>
         )}
       </div>
 
@@ -237,4 +291,3 @@ export default function ChatMessage({
     </div>
   );
 }
-

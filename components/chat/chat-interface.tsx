@@ -512,6 +512,54 @@ export default function ChatInterface({
     }
   };
 
+  const handleForkChat = async (messageIndex: number) => {
+    if (!chatId) return;
+
+    try {
+      const res = await fetch(`/api/chat/${chatId}/fork`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ messageIndex }),
+      });
+
+      if (!res.ok) {
+        throw new Error("Failed to fork chat");
+      }
+
+      const data = await res.json();
+      const newChatId = data.chatId;
+      const originalMessage = data.originalMessage;
+
+      // Save draft for new chat
+      const draftKey = `${siteConfig.chatInputPrefix}${newChatId}`;
+      let content = "";
+      if (typeof originalMessage.content === "string") {
+        content = originalMessage.content;
+      } else if (Array.isArray(originalMessage.content)) {
+        // Extract text parts
+        content = originalMessage.content
+          .filter((p: any) => p.type === "text")
+          .map((p: any) => p.text)
+          .join("\n");
+      }
+      localStorage.setItem(draftKey, content);
+
+      // Trigger chat refresh
+      window.dispatchEvent(new Event("refresh-chats"));
+
+      // Redirect to new chat
+      router.push(`/chat/${newChatId}`);
+    } catch (error) {
+      console.error("Error forking chat:", error);
+      addToast({
+        title: "Failed to fork chat",
+        color: "danger",
+      });
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-full min-h-[50vh]">
@@ -540,6 +588,7 @@ export default function ChatInterface({
             selectedAgentPart={selectedAgentPart}
             onAgentImageSelect={handleAgentImageSelect}
             onAgentTitleClick={handleAgentTitleClick}
+            onForkChat={handleForkChat}
           />
         ))}
 
