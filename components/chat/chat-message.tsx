@@ -142,6 +142,15 @@ export default function ChatMessage({
                         msgIndex !== undefined &&
                         onAgentImageSelect(part, msgIndex, realPartIndex)
                       }
+                      onDoubleClick={(e) => {
+                        e.preventDefault();
+                        if (
+                          effectiveStatus === "generated" ||
+                          effectiveStatus === "error"
+                        ) {
+                          onAgentTitleClick(part);
+                        }
+                      }}
                     >
                       {effectiveStatus === "loading" && (
                         <div className="w-full h-full flex items-center justify-center bg-default-100">
