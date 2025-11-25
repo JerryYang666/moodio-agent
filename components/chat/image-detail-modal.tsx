@@ -9,7 +9,7 @@ import {
   Minimize2,
   ZoomIn,
   ZoomOut,
-  Scan,
+  Undo2,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
@@ -113,7 +113,7 @@ export default function ImageDetailModal({
                                 className="bg-black/50 text-white"
                                 onPress={() => resetTransform()}
                               >
-                                <Scan size={20} />
+                                <Undo2 size={20} />
                               </Button>
                               <Button
                                 isIconOnly
