@@ -80,25 +80,30 @@ export const downloadImage = async (
       .replace(/\s+/g, "_")
       .substring(0, 100) || "image";
 
-  // Try fetching blob first if url is provided
+  // Helper to trigger download from blob
+  const downloadBlob = (blob: Blob, name: string) => {
+    const blobUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = blobUrl;
+    link.download = name;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(blobUrl);
+  };
+
+  // 1. Try fetching from direct URL (if provided)
   if (url) {
     try {
       const response = await fetch(url);
       if (response.ok) {
         const blob = await response.blob();
-        const blobUrl = window.URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = blobUrl;
-        link.download = filename;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(blobUrl);
+        downloadBlob(blob, filename);
         return;
       }
     } catch (error) {
       console.warn(
-        "Failed to download via blob, falling back to server",
+        "Direct download failed (likely CORS), trying backend proxy...",
         error
       );
     }
@@ -107,10 +112,26 @@ export const downloadImage = async (
   // Sanitize filename for URL
   const safeFilename = encodeURIComponent(filename);
 
-  // Use the backend download endpoint which sets Content-Disposition header
+  // Use the backend download endpoint
   const downloadUrl = `/api/image/${imageId}/download?filename=${safeFilename}`;
 
-  // Create a hidden link and click it to trigger download
+  // 2. Try fetching from backend proxy (avoids Vercel security checkpoint on navigation)
+  try {
+    const response = await fetch(downloadUrl);
+    if (response.ok) {
+      const contentType = response.headers.get("content-type");
+      // Ensure we actually got an image and not an HTML error page
+      if (contentType && contentType.startsWith("image/")) {
+        const blob = await response.blob();
+        downloadBlob(blob, filename);
+        return;
+      }
+    }
+  } catch (error) {
+    console.warn("Backend proxy fetch failed, falling back to direct link", error);
+  }
+
+  // 3. Fallback: Create a hidden link and click it (Standard browser download)
   const link = document.createElement("a");
   link.href = downloadUrl;
   link.download = ""; // Browser will use Content-Disposition filename
