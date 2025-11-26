@@ -43,6 +43,13 @@
       "when": 1763751002944,
       "tag": "0005_married_annihilus",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1764132755848,
+      "tag": "0006_petite_master_mold",
+      "breakpoints": true
     }
   ]
 }

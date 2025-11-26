@@ -6,10 +6,10 @@ import NextLink from "next/link";
 import clsx from "clsx";
 import { siteConfig } from "@/config/site";
 import { ThemeSwitch } from "@/components/theme-switch";
-import { 
-  BotMessageSquare, 
-  PanelRightClose, 
-  PanelRightOpen, 
+import {
+  BotMessageSquare,
+  PanelRightClose,
+  PanelRightOpen,
   Home,
   LayoutDashboard,
   Settings,
@@ -23,12 +23,19 @@ import {
   MoreHorizontal,
   Folder,
   ChevronDown,
-  ChevronRight
+  ChevronRight,
 } from "lucide-react";
+import { Tooltip } from "@heroui/tooltip";
+import { Image } from "@heroui/image";
 import { User } from "@heroui/user";
 import { Card, CardBody } from "@heroui/card";
 import { Popover, PopoverTrigger, PopoverContent } from "@heroui/popover";
-import { Dropdown, DropdownTrigger, DropdownMenu, DropdownItem } from "@heroui/dropdown";
+import {
+  Dropdown,
+  DropdownTrigger,
+  DropdownMenu,
+  DropdownItem,
+} from "@heroui/dropdown";
 import { Spinner } from "@heroui/spinner";
 import { useAuth } from "@/hooks/use-auth";
 import { useChat } from "@/hooks/use-chat";
@@ -44,6 +51,8 @@ interface ChatItemProps {
   isActive: boolean;
   isCollapsed: boolean;
 }
+
+const AWS_S3_PUBLIC_URL = process.env.NEXT_PUBLIC_AWS_S3_PUBLIC_URL || "";
 
 const ChatItem = ({ chat, isActive, isCollapsed }: ChatItemProps) => {
   const { renameChat, isChatMonitored } = useChat();
@@ -66,6 +75,93 @@ const ChatItem = ({ chat, isActive, isCollapsed }: ChatItemProps) => {
 
   const chatName = chat.name || "New Chat";
   const isMonitored = isChatMonitored(chat.id);
+  const thumbnailUrl = chat.thumbnailImageId
+    ? `${AWS_S3_PUBLIC_URL}/${chat.thumbnailImageId}`
+    : null;
+
+  const LinkComponent = (
+    <NextLink
+      href={`/chat/${chat.id}`}
+      className={clsx(
+        "flex items-center gap-2 px-3 py-2 rounded-xl transition-colors whitespace-nowrap text-sm relative",
+        isActive
+          ? "bg-primary/10 text-primary font-medium"
+          : "text-default-500 hover:bg-default-100 hover:text-default-900",
+        isCollapsed && "justify-center pr-3"
+      )}
+    >
+      <span className="shrink-0 flex items-center justify-center w-4 h-4">
+        {isMonitored ? (
+          <Spinner
+            size="sm"
+            color="current"
+            classNames={{
+              wrapper: "w-4 h-4",
+              circle1: "border-b-current",
+              circle2: "border-b-current",
+            }}
+          />
+        ) : (
+          <MessageSquare size={16} />
+        )}
+      </span>
+      <AnimatePresence>
+        {!isCollapsed && (
+          <motion.span
+            initial={{ opacity: 0, width: 0 }}
+            animate={{ opacity: 1, width: "auto" }}
+            exit={{ opacity: 0, width: 0 }}
+            className="overflow-hidden truncate"
+          >
+            {chatName}
+          </motion.span>
+        )}
+      </AnimatePresence>
+
+      {!isCollapsed && (
+        <div
+          className={clsx(
+            "absolute right-2 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg",
+            isActive
+              ? "bg-primary/20 backdrop-blur-md"
+              : "bg-default-100/80 backdrop-blur-md"
+          )}
+        >
+          <Dropdown>
+            <DropdownTrigger>
+              <Button
+                isIconOnly
+                size="sm"
+                variant="light"
+                className="min-w-6 w-6 h-6 p-0 text-default-500"
+                onPress={(e) => {
+                  // Prevent navigation
+                  // Note: NextLink might still capture click if we are not careful,
+                  // but Button inside usually handles its own events.
+                  // We might need to use e.continuePropagation() equivalent or just rely on button behavior.
+                }}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }}
+              >
+                <MoreHorizontal size={16} />
+              </Button>
+            </DropdownTrigger>
+            <DropdownMenu aria-label="Chat Actions">
+              <DropdownItem
+                key="rename"
+                startContent={<Pencil size={16} />}
+                onPress={() => setIsRenameOpen(true)}
+              >
+                Rename
+              </DropdownItem>
+            </DropdownMenu>
+          </Dropdown>
+        </div>
+      )}
+    </NextLink>
+  );
 
   return (
     <div className="relative group">
@@ -78,12 +174,14 @@ const ChatItem = ({ chat, isActive, isCollapsed }: ChatItemProps) => {
         placement="right"
       >
         <PopoverTrigger>
-           {/* Anchor for the popover - positioned at the end of the item */}
-           <div className="absolute right-2 top-1/2 w-1 h-1 opacity-0 pointer-events-none" />
+          {/* Anchor for the popover - positioned at the end of the item */}
+          <div className="absolute right-2 top-1/2 w-1 h-1 opacity-0 pointer-events-none" />
         </PopoverTrigger>
         <PopoverContent>
           <div className="px-1 py-2 w-64">
-            <p className="text-small font-bold text-foreground mb-2">Rename Chat</p>
+            <p className="text-small font-bold text-foreground mb-2">
+              Rename Chat
+            </p>
             <div className="flex gap-2">
               <Input
                 size="sm"
@@ -108,75 +206,26 @@ const ChatItem = ({ chat, isActive, isCollapsed }: ChatItemProps) => {
         </PopoverContent>
       </Popover>
 
-      <NextLink
-        href={`/chat/${chat.id}`}
-        className={clsx(
-          "flex items-center gap-2 px-3 py-2 rounded-xl transition-colors whitespace-nowrap text-sm relative",
-          isActive
-            ? "bg-primary/10 text-primary font-medium"
-            : "text-default-500 hover:bg-default-100 hover:text-default-900",
-          isCollapsed && "justify-center pr-3"
-        )}
-      >
-        <span className="shrink-0 flex items-center justify-center w-4 h-4">
-          {isMonitored ? (
-            <Spinner size="sm" color="current" classNames={{ wrapper: "w-4 h-4", circle1: "border-b-current", circle2: "border-b-current" }} />
-          ) : (
-            <MessageSquare size={16} />
-          )}
-        </span>
-        <AnimatePresence>
-          {!isCollapsed && (
-            <motion.span
-              initial={{ opacity: 0, width: 0 }}
-              animate={{ opacity: 1, width: "auto" }}
-              exit={{ opacity: 0, width: 0 }}
-              className="overflow-hidden truncate"
-            >
-              {chatName}
-            </motion.span>
-          )}
-        </AnimatePresence>
-
-        {!isCollapsed && (
-          <div className={clsx(
-            "absolute right-2 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg",
-            isActive ? "bg-primary/20 backdrop-blur-md" : "bg-default-100/80 backdrop-blur-md"
-          )}>
-             <Dropdown>
-               <DropdownTrigger>
-                 <Button
-                   isIconOnly
-                   size="sm"
-                   variant="light"
-                   className="min-w-6 w-6 h-6 p-0 text-default-500"
-                   onPress={(e) => {
-                     // Prevent navigation
-                     // Note: NextLink might still capture click if we are not careful, 
-                     // but Button inside usually handles its own events.
-                     // We might need to use e.continuePropagation() equivalent or just rely on button behavior.
-                   }}
-                   onClick={(e) => {
-                     e.preventDefault();
-                     e.stopPropagation();
-                   }}
-                 >
-                   <MoreHorizontal size={16} />
-                 </Button>
-               </DropdownTrigger>
-               <DropdownMenu aria-label="Chat Actions">
-                 <DropdownItem 
-                   key="rename" 
-                   startContent={<Pencil size={16} />}
-                   onPress={() => setIsRenameOpen(true)}
-                 >
-                   Rename
-                 </DropdownItem>
-               </DropdownMenu>
-             </Dropdown>
-          </div>
-        )}
-      </NextLink>
+      {thumbnailUrl ? (
+        <Tooltip
+          content={
+            <Image
+              src={thumbnailUrl}
+              alt="Chat Thumbnail"
+              width={200}
+              className="object-contain rounded-lg"
+            />
+          }
+          placement="right"
+          showArrow={true}
+          delay={200}
+          className="p-0.5"
+        >
+          <div className="w-full">{LinkComponent}</div>
+        </Tooltip>
+      ) : (
+        LinkComponent
+      )}
     </div>
   );
 };
@@ -196,19 +245,19 @@ export const Sidebar = () => {
     const handleRefreshChats = () => {
       refreshChats();
     };
-    
+
     window.addEventListener("refresh-chats", handleRefreshChats);
     return () => {
       window.removeEventListener("refresh-chats", handleRefreshChats);
     };
-  }, [refreshChats]); 
+  }, [refreshChats]);
 
   const handleNewChat = () => {
     router.push("/chat");
   };
 
   const displayName = user
-    ? (user.firstName && user.lastName)
+    ? user.firstName && user.lastName
       ? `${user.firstName} ${user.lastName}`
       : user.firstName || user.email
     : "";
@@ -232,18 +281,31 @@ export const Sidebar = () => {
   };
 
   // Filter out "Home" from navItems as we have "New Chat"
-  const navItems = siteConfig.navItems.filter(item => item.label !== "Home");
+  const navItems = siteConfig.navItems.filter((item) => item.label !== "Home");
 
   return (
-    <motion.aside 
+    <motion.aside
       initial={{ width: 256 }}
       animate={{ width: isCollapsed ? 80 : 256 }}
-      transition={{ duration: 0.3, type: "spring", stiffness: 200, damping: 25 }}
+      transition={{
+        duration: 0.3,
+        type: "spring",
+        stiffness: 200,
+        damping: 25,
+      }}
       className="hidden md:flex flex-col h-screen sticky top-0 border-r border-divider bg-background z-40 overflow-hidden"
     >
-      <div className={clsx("p-4 flex items-center", isCollapsed ? "justify-center" : "justify-between")}>
-        <div 
-          className={clsx("flex items-center gap-2", isCollapsed && "cursor-pointer")}
+      <div
+        className={clsx(
+          "p-4 flex items-center",
+          isCollapsed ? "justify-center" : "justify-between"
+        )}
+      >
+        <div
+          className={clsx(
+            "flex items-center gap-2",
+            isCollapsed && "cursor-pointer"
+          )}
           onMouseEnter={() => isCollapsed && setIsLogoHovered(true)}
           onMouseLeave={() => isCollapsed && setIsLogoHovered(false)}
           onClick={() => isCollapsed && setIsCollapsed(false)}
@@ -255,7 +317,7 @@ export const Sidebar = () => {
           )}
           <AnimatePresence>
             {!isCollapsed && (
-              <motion.p 
+              <motion.p
                 initial={{ opacity: 0, width: 0 }}
                 animate={{ opacity: 1, width: "auto" }}
                 exit={{ opacity: 0, width: 0 }}
@@ -279,7 +341,12 @@ export const Sidebar = () => {
         )}
       </div>
 
-      <div className={clsx("flex flex-col gap-1 py-2 grow overflow-y-auto overflow-x-hidden sidebar-scrollbar", isCollapsed ? "px-2" : "pl-3 pr-2")}>
+      <div
+        className={clsx(
+          "flex flex-col gap-1 py-2 grow overflow-y-auto overflow-x-hidden sidebar-scrollbar",
+          isCollapsed ? "px-2" : "pl-3 pr-2"
+        )}
+      >
         {/* New Chat Button */}
         <button
           onClick={handleNewChat}
@@ -288,7 +355,9 @@ export const Sidebar = () => {
             isCollapsed && "justify-center"
           )}
         >
-          <span className="shrink-0"><SquarePen size={20} /></span>
+          <span className="shrink-0">
+            <SquarePen size={20} />
+          </span>
           <AnimatePresence>
             {!isCollapsed && (
               <motion.span
@@ -336,7 +405,9 @@ export const Sidebar = () => {
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    onClick={() => setIsCollectionsExpanded(!isCollectionsExpanded)}
+                    onClick={() =>
+                      setIsCollectionsExpanded(!isCollectionsExpanded)
+                    }
                     className="shrink-0"
                   >
                     {isCollectionsExpanded ? (
@@ -391,8 +462,8 @@ export const Sidebar = () => {
               href={item.href}
               className={clsx(
                 "flex items-center gap-2 px-3 py-2 rounded-xl transition-colors whitespace-nowrap",
-                isActive 
-                  ? "bg-primary/10 text-primary font-medium" 
+                isActive
+                  ? "bg-primary/10 text-primary font-medium"
                   : "text-default-500 hover:bg-default-100 hover:text-default-900",
                 isCollapsed && "justify-center"
               )}
@@ -421,12 +492,14 @@ export const Sidebar = () => {
             className={clsx(
               "flex items-center gap-2 px-3 py-2 rounded-xl transition-colors whitespace-nowrap",
               pathname?.startsWith("/admin")
-                ? "bg-primary/10 text-primary font-medium" 
+                ? "bg-primary/10 text-primary font-medium"
                 : "text-default-500 hover:bg-default-100 hover:text-default-900",
               isCollapsed && "justify-center"
             )}
           >
-            <span className="shrink-0"><Shield size={20} /></span>
+            <span className="shrink-0">
+              <Shield size={20} />
+            </span>
             <AnimatePresence>
               {!isCollapsed && (
                 <motion.span
@@ -441,23 +514,23 @@ export const Sidebar = () => {
             </AnimatePresence>
           </NextLink>
         )}
-        
+
         {!isCollapsed && (
           <>
             <Divider className="my-2" />
-            
+
             {/* Recent Chats */}
             <div className="space-y-1">
               {chats.map((chat) => {
-                 const isActive = pathname === `/chat/${chat.id}`;
-                 return (
-                   <ChatItem 
-                     key={chat.id} 
-                     chat={chat} 
-                     isActive={isActive} 
-                     isCollapsed={isCollapsed} 
-                   />
-                 );
+                const isActive = pathname === `/chat/${chat.id}`;
+                return (
+                  <ChatItem
+                    key={chat.id}
+                    chat={chat}
+                    isActive={isActive}
+                    isCollapsed={isCollapsed}
+                  />
+                );
               })}
             </div>
           </>
@@ -468,27 +541,37 @@ export const Sidebar = () => {
         {user && (
           <Popover placement="top">
             <PopoverTrigger>
-              <Card 
-                isPressable 
-                shadow="sm" 
-                className={clsx("bg-default-50 dark:bg-default-100/50 cursor-pointer hover:bg-default-100 transition-colors w-full", isCollapsed ? "p-1" : "")}
+              <Card
+                isPressable
+                shadow="sm"
+                className={clsx(
+                  "bg-default-50 dark:bg-default-100/50 cursor-pointer hover:bg-default-100 transition-colors w-full",
+                  isCollapsed ? "p-1" : ""
+                )}
               >
-                <CardBody className={clsx("p-2 overflow-hidden", isCollapsed && "flex justify-center items-center")}>
+                <CardBody
+                  className={clsx(
+                    "p-2 overflow-hidden",
+                    isCollapsed && "flex justify-center items-center"
+                  )}
+                >
                   <User
                     name={!isCollapsed ? displayName : ""}
                     description={!isCollapsed ? user.email : ""}
                     avatarProps={{
                       src: undefined,
-                      name: user.firstName?.charAt(0) || user.email.charAt(0).toUpperCase(),
+                      name:
+                        user.firstName?.charAt(0) ||
+                        user.email.charAt(0).toUpperCase(),
                       isBordered: true,
                       color: "primary",
                       size: "sm",
-                      className: "shrink-0 mr-2"
+                      className: "shrink-0 mr-2",
                     }}
                     classNames={{
                       name: "text-sm font-semibold truncate",
                       description: "text-xs text-default-500 truncate",
-                      base: isCollapsed ? "gap-0" : ""
+                      base: isCollapsed ? "gap-0" : "",
                     }}
                   />
                 </CardBody>

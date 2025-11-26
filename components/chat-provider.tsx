@@ -8,6 +8,7 @@ import { addToast } from "@heroui/toast";
 export interface Chat {
   id: string;
   name: string | null;
+  thumbnailImageId: string | null;
   updatedAt: string;
 }
 
@@ -22,7 +23,9 @@ interface ChatContextType {
   isChatMonitored: (chatId: string) => boolean;
 }
 
-export const ChatContext = createContext<ChatContextType | undefined>(undefined);
+export const ChatContext = createContext<ChatContextType | undefined>(
+  undefined
+);
 
 export function ChatProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
@@ -31,9 +34,11 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   const [chats, setChats] = useState<Chat[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  
+
   // Map of chatId -> initial message count
-  const [monitoredChats, setMonitoredChats] = useState<Record<string, number>>({});
+  const [monitoredChats, setMonitoredChats] = useState<Record<string, number>>(
+    {}
+  );
   const monitoredChatsRef = useRef<Record<string, number>>({});
 
   // Update ref when state changes to avoid stale closures in interval
@@ -46,7 +51,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       setChats([]);
       return;
     }
-    
+
     try {
       setLoading(true);
       const res = await fetch("/api/chat");
@@ -111,29 +116,33 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   const monitorChat = useCallback((chatId: string, startCount: number) => {
     // Only monitor if we have permission or might get it (don't spam if denied)
     try {
-      if ("Notification" in window && Notification.permission === "denied") return;
+      if ("Notification" in window && Notification.permission === "denied")
+        return;
     } catch (e) {
       // Ignore potential errors accessing Notification API
       console.warn("Error checking notification permission:", e);
     }
 
-    setMonitoredChats(prev => ({
+    setMonitoredChats((prev) => ({
       ...prev,
-      [chatId]: startCount
+      [chatId]: startCount,
     }));
   }, []);
 
   const cancelMonitorChat = useCallback((chatId: string) => {
-    setMonitoredChats(prev => {
+    setMonitoredChats((prev) => {
       const newState = { ...prev };
       delete newState[chatId];
       return newState;
     });
   }, []);
 
-  const isChatMonitored = useCallback((chatId: string) => {
-    return !!monitoredChats[chatId];
-  }, [monitoredChats]);
+  const isChatMonitored = useCallback(
+    (chatId: string) => {
+      return !!monitoredChats[chatId];
+    },
+    [monitoredChats]
+  );
 
   // Polling for monitored chats
   useEffect(() => {
@@ -147,14 +156,14 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         try {
           const startCount = currentMonitored[chatId];
           const res = await fetch(`/api/chat/${chatId}`);
-          
+
           if (res.ok) {
             const data = await res.json();
             const currentCount = data.messages.length;
 
             if (currentCount > startCount) {
               // Generation finished!
-              
+
               // Determine if we should notify
               const isChatOpen = pathname === `/chat/${chatId}`;
               const isHidden = document.hidden;
@@ -162,13 +171,16 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
               // Notify if: Tab is hidden OR User is not on the specific chat page
               if (isHidden || !isChatOpen) {
                 try {
-                  if ("Notification" in window && Notification.permission === "granted") {
+                  if (
+                    "Notification" in window &&
+                    Notification.permission === "granted"
+                  ) {
                     const notification = new Notification("Moodio Agent", {
                       body: "Your image generation is complete!",
                       icon: "/favicon.ico",
-                      tag: chatId // Tag allows replacing old notifications if needed
+                      tag: chatId, // Tag allows replacing old notifications if needed
                     });
-                    
+
                     notification.onclick = () => {
                       window.focus();
                       router.push(`/chat/${chatId}`);
@@ -178,7 +190,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                 } catch (e) {
                   console.error("Error showing notification:", e);
                 }
-                
+
                 // Also show toast if user is active in app but on different page
                 if (!isHidden && !isChatOpen) {
                   addToast({
@@ -186,24 +198,24 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                     description: "Your image generation is complete!",
                     color: "success",
                     endContent: (
-                      <button 
+                      <button
                         onClick={() => router.push(`/chat/${chatId}`)}
                         className="text-xs font-medium underline hover:opacity-80 text-current px-2 py-1 rounded"
                       >
                         View
                       </button>
-                    )
+                    ),
                   });
                 }
               }
 
               // Stop monitoring this chat
-              setMonitoredChats(prev => {
+              setMonitoredChats((prev) => {
                 const newState = { ...prev };
                 delete newState[chatId];
                 return newState;
               });
-              
+
               // Refresh chat list as well since something changed
               fetchChats();
             }

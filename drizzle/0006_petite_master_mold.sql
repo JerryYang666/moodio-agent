@@ -1,0 +1,1 @@
+ALTER TABLE "chats" ADD COLUMN "thumbnail_image_id" varchar(255);

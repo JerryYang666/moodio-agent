@@ -220,6 +220,59 @@ export async function POST(
           const updatedHistory = [...history, userMessage, messageToSave];
           await saveChatHistory(chatId, updatedHistory);
 
+          // Calculate thumbnail image ID
+          let thumbnailImageId: string | null = null;
+
+          // 1. Check current user upload
+          if (Array.isArray(userMessage.content)) {
+            const userImage = userMessage.content.find(
+              (c) => c.type === "image"
+            );
+            if (userImage && "imageId" in userImage) {
+              thumbnailImageId = userImage.imageId;
+            }
+          }
+
+          // 2. Check current selection
+          if (!thumbnailImageId && selection) {
+            const selectedMsg = history[selection.messageIndex];
+            if (selectedMsg && Array.isArray(selectedMsg.content)) {
+              const part = selectedMsg.content[selection.partIndex];
+              if (part) {
+                if (part.type === "image") {
+                  thumbnailImageId = part.imageId;
+                } else if (part.type === "agent_image" && part.imageId) {
+                  thumbnailImageId = part.imageId;
+                }
+              }
+            }
+          }
+
+          // 3. Fallback: Traverse backwards to find the latest selected image
+          if (!thumbnailImageId) {
+            for (let i = updatedHistory.length - 1; i >= 0; i--) {
+              const msg = updatedHistory[i];
+              if (Array.isArray(msg.content)) {
+                for (let j = msg.content.length - 1; j >= 0; j--) {
+                  const part = msg.content[j];
+                  if (part.type === "image") {
+                    thumbnailImageId = part.imageId;
+                    break;
+                  }
+                  if (
+                    part.type === "agent_image" &&
+                    part.isSelected &&
+                    part.imageId
+                  ) {
+                    thumbnailImageId = part.imageId;
+                    break;
+                  }
+                }
+              }
+              if (thumbnailImageId) break;
+            }
+          }
+
           // Generate chat name if needed
           if (history.length === 0 && updatedHistory.length === 2) {
             const llmClient = createLLMClient({
@@ -282,6 +335,7 @@ export async function POST(
                 .set({
                   updatedAt: new Date(),
                   name: newChatName,
+                  thumbnailImageId,
                 })
                 .where(eq(chats.id, chatId));
             } catch (err) {
@@ -292,6 +346,7 @@ export async function POST(
               .update(chats)
               .set({
                 updatedAt: new Date(),
+                thumbnailImageId,
               })
               .where(eq(chats.id, chatId));
           }

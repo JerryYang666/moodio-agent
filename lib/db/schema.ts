@@ -82,6 +82,7 @@ export const chats = pgTable("chats", {
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
   name: varchar("name", { length: 255 }), // Can be null/empty initially
+  thumbnailImageId: varchar("thumbnail_image_id", { length: 255 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -144,7 +145,9 @@ export const passkeys = pgTable("passkeys", {
   publicKey: text("public_key").notNull(),
   counter: bigint("counter", { mode: "number" }).notNull().default(0),
   transports: text("transports"), // JSON string of transports array
-  deviceType: varchar("device_type", { length: 32 }).notNull().default("singleDevice"),
+  deviceType: varchar("device_type", { length: 32 })
+    .notNull()
+    .default("singleDevice"),
   backedUp: boolean("backed_up").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   lastUsedAt: timestamp("last_used_at").defaultNow().notNull(),
