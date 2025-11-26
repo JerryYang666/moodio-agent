@@ -63,19 +63,49 @@ export const formatTime = (timestamp?: number) => {
 
 // Helper to trigger image download via backend API
 // Uses the backend endpoint which sets Content-Disposition header to force download
-export const downloadImage = (imageId: string | undefined, title: string) => {
+export const downloadImage = async (
+  imageId: string | undefined,
+  title: string,
+  url?: string
+) => {
   if (!imageId) {
     console.error("No imageId provided for download");
     return;
   }
 
-  // Sanitize filename for URL
-  const safeFilename = encodeURIComponent(
+  // Sanitize filename
+  const filename =
     title
       .replace(/[^a-z0-9\s-]/gi, "")
       .replace(/\s+/g, "_")
-      .substring(0, 100) || "image"
-  );
+      .substring(0, 100) || "image";
+
+  // Try fetching blob first if url is provided
+  if (url) {
+    try {
+      const response = await fetch(url);
+      if (response.ok) {
+        const blob = await response.blob();
+        const blobUrl = window.URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = blobUrl;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(blobUrl);
+        return;
+      }
+    } catch (error) {
+      console.warn(
+        "Failed to download via blob, falling back to server",
+        error
+      );
+    }
+  }
+
+  // Sanitize filename for URL
+  const safeFilename = encodeURIComponent(filename);
 
   // Use the backend download endpoint which sets Content-Disposition header
   const downloadUrl = `/api/image/${imageId}/download?filename=${safeFilename}`;

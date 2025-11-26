@@ -122,7 +122,8 @@ export default function ImageDetailModal({
                                 onPress={() =>
                                   downloadImage(
                                     selectedImage.imageId,
-                                    selectedImage.title
+                                    selectedImage.title,
+                                    selectedImage.url
                                   )
                                 }
                               >
@@ -189,7 +190,8 @@ export default function ImageDetailModal({
                                 onPress={() =>
                                   downloadImage(
                                     selectedImage.imageId,
-                                    selectedImage.title
+                                    selectedImage.title,
+                                    selectedImage.url
                                   )
                                 }
                               >

@@ -130,6 +130,7 @@ export default function CollectionPage({
     url: string;
     title: string;
     prompt: string;
+    imageId?: string;
     status?: "loading" | "generated" | "error";
   } | null>(null);
   const [imageToRemoveId, setImageToRemoveId] = useState<string | null>(null);
@@ -312,6 +313,7 @@ export default function CollectionPage({
       title: image.generationDetails.title,
       prompt: image.generationDetails.prompt,
       status: image.generationDetails.status,
+      imageId: image.imageId,
     });
     onImageDetailOpen();
   };
