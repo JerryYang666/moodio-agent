@@ -248,17 +248,27 @@ export async function POST(
             }
           }
 
-          // 3. Fallback: Traverse backwards to find the latest selected image
+          // 3. Fallback: Traverse backwards to find the latest image
+          // Priority:
+          // 1. User uploaded image (type: "image")
+          // 2. Selected agent image (type: "agent_image", isSelected: true)
+          // 3. Latest generated image (type: "agent_image", status: "generated")
           if (!thumbnailImageId) {
+            let latestGeneratedImageId: string | null = null;
+
             for (let i = updatedHistory.length - 1; i >= 0; i--) {
               const msg = updatedHistory[i];
               if (Array.isArray(msg.content)) {
                 for (let j = msg.content.length - 1; j >= 0; j--) {
                   const part = msg.content[j];
+
+                  // User uploaded image - High priority (most recent)
                   if (part.type === "image") {
                     thumbnailImageId = part.imageId;
                     break;
                   }
+
+                  // Selected agent image - High priority
                   if (
                     part.type === "agent_image" &&
                     part.isSelected &&
@@ -267,9 +277,24 @@ export async function POST(
                     thumbnailImageId = part.imageId;
                     break;
                   }
+
+                  // Generated agent image - Fallback candidate
+                  if (
+                    part.type === "agent_image" &&
+                    part.imageId &&
+                    part.status === "generated" &&
+                    !latestGeneratedImageId
+                  ) {
+                    latestGeneratedImageId = part.imageId;
+                  }
                 }
               }
               if (thumbnailImageId) break;
+            }
+
+            // If no user upload or selected image found, use the latest generated one
+            if (!thumbnailImageId && latestGeneratedImageId) {
+              thumbnailImageId = latestGeneratedImageId;
             }
           }
 
