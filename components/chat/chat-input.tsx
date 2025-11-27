@@ -4,14 +4,17 @@ import { useRef } from "react";
 import { Button } from "@heroui/button";
 import { Textarea } from "@heroui/input";
 import { Popover, PopoverTrigger, PopoverContent } from "@heroui/popover";
+import { Switch } from "@heroui/switch";
+import { Tooltip } from "@heroui/tooltip";
 import { siteConfig } from "@/config/site";
-import { Send, X, ImagePlus, Mic, Square } from "lucide-react";
+import { Send, X, ImagePlus, Mic, Square, Info } from "lucide-react";
 
 interface SelectedAgentPart {
   url: string;
   title: string;
   messageIndex: number;
   partIndex: number;
+  imageId?: string;
 }
 
 interface ChatInputProps {
@@ -30,6 +33,8 @@ interface ChatInputProps {
   selectedAgentPart: SelectedAgentPart | null;
   onClearSelectedAgentPart: () => void;
   showFileUpload: boolean;
+  precisionEditing: boolean;
+  onPrecisionEditingChange: (value: boolean) => void;
 }
 
 export default function ChatInput({
@@ -48,6 +53,8 @@ export default function ChatInput({
   selectedAgentPart,
   onClearSelectedAgentPart,
   showFileUpload,
+  precisionEditing,
+  onPrecisionEditingChange,
 }: ChatInputProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -98,6 +105,22 @@ export default function ChatInput({
               >
                 <X size={14} />
               </button>
+            </div>
+          )}
+          
+          {(previewUrl || selectedAgentPart) && (
+            <div className="flex items-center h-20 ml-2 gap-1">
+               <Switch
+                size="sm"
+                color="secondary"
+                isSelected={precisionEditing}
+                onValueChange={onPrecisionEditingChange}
+              >
+                <span className="text-xs font-medium">Precision Editing</span>
+              </Switch>
+              <Tooltip content="When enabled, Agent will try its best to only edit the part of the image that you want to change and keeping everything else the same.">
+                <Info size={14} className="text-default-400 cursor-help" />
+              </Tooltip>
             </div>
           )}
         </div>

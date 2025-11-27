@@ -26,6 +26,7 @@ interface SelectedAgentPart {
   title: string;
   messageIndex: number;
   partIndex: number;
+  imageId?: string;
 }
 
 interface ChatInterfaceProps {
@@ -49,6 +50,7 @@ export default function ChatInterface({
   const [isSending, setIsSending] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [precisionEditing, setPrecisionEditing] = useState(false);
 
   // Draft saving logic
   const [prevChatId, setPrevChatId] = useState(chatId);
@@ -237,6 +239,7 @@ export default function ChatInterface({
     setSelectedFile(null);
     setPreviewUrl(null);
     setSelectedAgentPart(null);
+    setPrecisionEditing(false);
     if (fileInputRef.current) fileInputRef.current.value = "";
 
     setIsSending(true);
@@ -278,6 +281,12 @@ export default function ChatInterface({
             })
           );
         }
+        if (precisionEditing) {
+          formData.append("precisionEditing", "true");
+          if (selectedAgentPart?.imageId) {
+            formData.append("precisionEditImageId", selectedAgentPart.imageId);
+          }
+        }
         body = formData;
       } else {
         const payload: any = { content: currentInput };
@@ -286,6 +295,12 @@ export default function ChatInterface({
             messageIndex: selectedAgentPart.messageIndex,
             partIndex: selectedAgentPart.partIndex,
           };
+        }
+        if (precisionEditing) {
+          payload.precisionEditing = true;
+          if (selectedAgentPart?.imageId) {
+            payload.precisionEditImageId = selectedAgentPart.imageId;
+          }
         }
         body = JSON.stringify(payload);
         headers = { "Content-Type": "application/json" };
@@ -509,6 +524,7 @@ export default function ChatInterface({
           title: part.title,
           messageIndex,
           partIndex,
+          imageId: part.imageId,
         });
       }
     }
@@ -625,6 +641,8 @@ export default function ChatInterface({
         selectedAgentPart={selectedAgentPart}
         onClearSelectedAgentPart={() => setSelectedAgentPart(null)}
         showFileUpload={messages.length === 0}
+        precisionEditing={precisionEditing}
+        onPrecisionEditingChange={setPrecisionEditing}
       />
 
       <ImageDetailModal

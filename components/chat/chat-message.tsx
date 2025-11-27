@@ -18,6 +18,7 @@ interface SelectedAgentPart {
   title: string;
   messageIndex: number;
   partIndex: number;
+  imageId?: string;
 }
 
 interface ChatMessageProps {

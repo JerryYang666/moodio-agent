@@ -22,7 +22,9 @@ export class Agent0 implements Agent {
     history: Message[],
     userMessage: Message,
     userId: string,
-    requestStartTime?: number
+    requestStartTime?: number,
+    precisionEditing?: boolean,
+    precisionEditImageId?: string
   ): Promise<AgentResponse> {
     const startTime = requestStartTime || Date.now();
     console.log(

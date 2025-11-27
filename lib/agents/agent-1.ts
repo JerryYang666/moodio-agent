@@ -41,6 +41,9 @@ interface PreparedMessages {
   messages: any[];
   userImageId: string | undefined;
   userImageBase64Promise: Promise<string | undefined>;
+  precisionEditing?: boolean;
+  precisionEditImageId?: string;
+  precisionEditImageBase64Promise?: Promise<string | undefined>;
 }
 
 export class Agent1 implements Agent {
@@ -51,7 +54,9 @@ export class Agent1 implements Agent {
     history: Message[],
     userMessage: Message,
     userId: string,
-    requestStartTime?: number
+    requestStartTime?: number,
+    precisionEditing?: boolean,
+    precisionEditImageId?: string
   ): Promise<AgentResponse> {
     const startTime = requestStartTime || Date.now();
     console.log(
@@ -63,7 +68,9 @@ export class Agent1 implements Agent {
     const prepared = await this.prepareMessages(
       history,
       userMessage,
-      startTime
+      startTime,
+      precisionEditing,
+      precisionEditImageId
     );
 
     // Step 2: Call LLM and parse response
@@ -133,7 +140,9 @@ export class Agent1 implements Agent {
   private async prepareMessages(
     history: Message[],
     userMessage: Message,
-    startTime: number
+    startTime: number,
+    precisionEditing?: boolean,
+    precisionEditImageId?: string
   ): Promise<PreparedMessages> {
     const systemPrompt = `You are a creative assistant.
 Based on the user's input, generate a question that will help trigger the creativity of the user, and four suggestions based on the question. You must give exactly four suggestions unless the user explicitly asks for fewer or more.
@@ -219,8 +228,15 @@ Example without suggestions:
       ? downloadImage(userImageId).then((buf) => buf?.toString("base64"))
       : Promise.resolve(undefined);
 
+    // Pre-fetch precision edit image base64 if needed
+    const precisionEditImageBase64Promise = precisionEditImageId
+      ? downloadImage(precisionEditImageId).then((buf) =>
+          buf?.toString("base64")
+        )
+      : Promise.resolve(undefined);
+
     console.log(
-      "[Perf] User image base64 prepared",
+      "[Perf] User/Precision image base64 prepared",
       `[${Date.now() - startTime}ms]`
     );
 
@@ -238,8 +254,31 @@ Example without suggestions:
             }
             return p;
           })
-        : userMessage.content,
+        : [
+            // If userMessage.content is string, convert to array format for consistency
+            { type: "text", text: userMessage.content as string },
+          ],
     };
+
+    // Add precision editing prompt and image if applicable
+    if (precisionEditing) {
+      if (Array.isArray(formattedUserMessage.content)) {
+        formattedUserMessage.content.push({
+          type: "text",
+          text: "\nPrecision Editing on. Make sure that your prompt is describing an edit to the picture.",
+        });
+
+        if (precisionEditImageId) {
+          // Prepend the precision edit image so it appears first/with context
+          formattedUserMessage.content.unshift({
+            type: "image_url",
+            image_url: {
+              url: `${process.env.NEXT_PUBLIC_AWS_S3_PUBLIC_URL}/${precisionEditImageId}`,
+            },
+          });
+        }
+      }
+    }
 
     const messages = [
       { role: "system", content: systemPrompt },
@@ -268,7 +307,14 @@ Example without suggestions:
       `[${Date.now() - startTime}ms]`
     );
 
-    return { messages, userImageId, userImageBase64Promise };
+    return {
+      messages,
+      userImageId,
+      userImageBase64Promise,
+      precisionEditing,
+      precisionEditImageId,
+      precisionEditImageBase64Promise,
+    };
   }
 
   private async callLLMAndParse(
@@ -521,8 +567,7 @@ Example without suggestions:
                       );
                       const part = await self.generateImage(
                         suggestion,
-                        prepared.userImageId,
-                        prepared.userImageBase64Promise,
+                        prepared,
                         currentIndex,
                         startTime
                       );
@@ -607,8 +652,7 @@ Example without suggestions:
 
   private async generateImage(
     suggestion: Suggestion,
-    userImageId: string | undefined,
-    userImageBase64Promise: Promise<string | undefined>,
+    prepared: PreparedMessages,
     index: number,
     startTime: number
   ): Promise<MessageContentPart> {
@@ -629,8 +673,7 @@ Example without suggestions:
 
         const result = await this.generateImageCore(
           suggestion,
-          userImageId,
-          userImageBase64Promise,
+          prepared,
           index,
           startTime
         );
@@ -660,8 +703,7 @@ Example without suggestions:
 
   private async generateImageCore(
     suggestion: Suggestion,
-    userImageId: string | undefined,
-    userImageBase64Promise: Promise<string | undefined>,
+    prepared: PreparedMessages,
     index: number,
     startTime: number
   ): Promise<MessageContentPart> {
@@ -676,19 +718,40 @@ Example without suggestions:
       : "1:1";
 
     let finalImageId: string;
-    const userImageBase64 = await userImageBase64Promise;
+    const userImageBase64 = await prepared.userImageBase64Promise;
+    const precisionEditImageBase64 = prepared.precisionEditImageBase64Promise
+      ? await prepared.precisionEditImageBase64Promise
+      : undefined;
 
-    if (userImageId && userImageBase64) {
+    // Determine if we should use image editing
+    const useImageEditing =
+      (prepared.precisionEditing &&
+        (precisionEditImageBase64 || userImageBase64)) ||
+      (prepared.userImageId && userImageBase64);
+
+    if (useImageEditing) {
       // Image editing
-      const prompt = [
-        { text: suggestion.prompt },
-        {
+      const prompt: any[] = [{ text: suggestion.prompt }];
+
+      // Include precision edit image if available
+      if (precisionEditImageBase64) {
+        prompt.push({
+          inlineData: {
+            mimeType: "image/png",
+            data: precisionEditImageBase64,
+          },
+        });
+      }
+
+      // Include user uploaded image if available (and distinct from precision image if needed, but we just push both)
+      if (userImageBase64) {
+        prompt.push({
           inlineData: {
             mimeType: "image/png",
             data: userImageBase64,
           },
-        },
-      ];
+        });
+      }
 
       const response = await ai.models.generateContent({
         model: "gemini-2.5-flash-image",

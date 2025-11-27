@@ -57,6 +57,8 @@ export async function POST(
     let content = "";
     let file: File | null = null;
     let selection: { messageIndex: number; partIndex: number } | null = null;
+    let precisionEditing = false;
+    let precisionEditImageId: string | undefined;
 
     const contentType = request.headers.get("content-type") || "";
     if (contentType.includes("multipart/form-data")) {
@@ -71,10 +73,21 @@ export async function POST(
           console.error("Failed to parse selection from FormData", e);
         }
       }
+      if (formData.get("precisionEditing") === "true") {
+        precisionEditing = true;
+      }
+      const pId = formData.get("precisionEditImageId") as string;
+      if (pId) precisionEditImageId = pId;
     } else {
       const json = await request.json();
       content = json.content;
       selection = json.selection;
+      if (json.precisionEditing) {
+        precisionEditing = true;
+      }
+      if (json.precisionEditImageId) {
+        precisionEditImageId = json.precisionEditImageId;
+      }
     }
 
     if (!content && !file) {
@@ -204,7 +217,9 @@ export async function POST(
       history,
       userMessage,
       payload.userId,
-      requestStartTime
+      requestStartTime,
+      precisionEditing,
+      precisionEditImageId
     );
 
     // Handle background completion (saving history)

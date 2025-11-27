@@ -12,6 +12,8 @@ export interface Agent {
     history: Message[],
     userMessage: Message,
     userId: string,
-    requestStartTime?: number
+    requestStartTime?: number,
+    precisionEditing?: boolean,
+    precisionEditImageId?: string
   ): Promise<AgentResponse>;
 }
