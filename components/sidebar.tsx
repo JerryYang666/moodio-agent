@@ -368,7 +368,7 @@ export const Sidebar = () => {
           </button>
 
           {/* Divider with Switch */}
-          {!isCollapsed ? (
+          {!isCollapsed && (
             <div className="relative py-2 flex items-center justify-center my-0">
               <div className="absolute inset-0 flex items-center">
                 <Divider />
@@ -396,8 +396,6 @@ export const Sidebar = () => {
                 </button>
               </div>
             </div>
-          ) : (
-            <Divider className="my-2" />
           )}
         </div>
       </div>
@@ -409,30 +407,32 @@ export const Sidebar = () => {
         )}
       >
         {/* Recent Chats */}
-        <motion.div
-          layout
-          className={clsx(
-            "space-y-1",
-            viewMode === "grid" && !isCollapsed
-              ? "grid grid-cols-1 gap-0 space-y-0"
-              : ""
-          )}
-        >
-          <AnimatePresence mode="popLayout">
-            {chats.map((chat) => {
-              const isActive = pathname === `/chat/${chat.id}`;
-              return (
-                <ChatItem
-                  key={chat.id}
-                  chat={chat}
-                  isActive={isActive}
-                  isCollapsed={isCollapsed}
-                  viewMode={viewMode}
-                />
-              );
-            })}
-          </AnimatePresence>
-        </motion.div>
+        {!isCollapsed && (
+          <motion.div
+            layout
+            className={clsx(
+              "space-y-1",
+              viewMode === "grid" && !isCollapsed
+                ? "grid grid-cols-1 gap-0 space-y-0"
+                : ""
+            )}
+          >
+            <AnimatePresence mode="popLayout">
+              {chats.map((chat) => {
+                const isActive = pathname === `/chat/${chat.id}`;
+                return (
+                  <ChatItem
+                    key={chat.id}
+                    chat={chat}
+                    isActive={isActive}
+                    isCollapsed={isCollapsed}
+                    viewMode={viewMode}
+                  />
+                );
+              })}
+            </AnimatePresence>
+          </motion.div>
+        )}
       </div>
     </motion.aside>
   );
