@@ -12,6 +12,8 @@ import {
   Pencil,
   Check,
   MoreHorizontal,
+  List,
+  LayoutGrid,
 } from "lucide-react";
 import { Tooltip } from "@heroui/tooltip";
 import { Image } from "@heroui/image";
@@ -34,11 +36,12 @@ interface ChatItemProps {
   chat: Chat;
   isActive: boolean;
   isCollapsed: boolean;
+  viewMode: "list" | "grid";
 }
 
 const AWS_S3_PUBLIC_URL = process.env.NEXT_PUBLIC_AWS_S3_PUBLIC_URL || "";
 
-const ChatItem = ({ chat, isActive, isCollapsed }: ChatItemProps) => {
+const ChatItem = ({ chat, isActive, isCollapsed, viewMode }: ChatItemProps) => {
   const { renameChat, isChatMonitored } = useChat();
   const [isRenameOpen, setIsRenameOpen] = useState(false);
   const [newName, setNewName] = useState(chat.name || "");
@@ -67,15 +70,62 @@ const ChatItem = ({ chat, isActive, isCollapsed }: ChatItemProps) => {
     <NextLink
       href={`/chat/${chat.id}`}
       className={clsx(
-        "flex items-center gap-2 px-3 py-2 rounded-xl transition-colors whitespace-nowrap text-sm relative",
+        "transition-colors relative group/item",
+        viewMode === "list" || isCollapsed
+          ? "flex items-center gap-2 px-3 py-2 rounded-xl whitespace-nowrap text-sm"
+          : "flex flex-col p-2 rounded-xl gap-2 h-auto",
         isActive
           ? "bg-primary/10 text-primary font-medium"
           : "text-default-500 hover:bg-default-100 hover:text-default-900",
         isCollapsed && "justify-center pr-3"
       )}
     >
-      <span className="shrink-0 flex items-center justify-center w-4 h-4">
-        {isMonitored ? (
+      {/* Grid View: Thumbnail */}
+      {viewMode === "grid" && !isCollapsed && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.9 }}
+          className={clsx(
+            "w-full rounded-lg overflow-hidden bg-default-100 relative border border-default-200",
+            !thumbnailUrl && "aspect-square" // Only force square aspect ratio if no image
+          )}
+        >
+          {thumbnailUrl ? (
+            <Image
+              src={thumbnailUrl}
+              alt={chatName}
+              width={300}
+              radius="none"
+              classNames={{
+                wrapper: "w-full !max-w-full",
+                img: "w-full h-auto",
+              }}
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-default-300">
+              <MessageSquare size={24} />
+            </div>
+          )}
+          {isMonitored && (
+            <div className="absolute top-2 right-2 z-10">
+              <Spinner
+                size="sm"
+                color="current"
+                classNames={{
+                  wrapper: "w-4 h-4",
+                  circle1: "border-b-current",
+                  circle2: "border-b-current",
+                }}
+              />
+            </div>
+          )}
+        </motion.div>
+      )}
+
+      {/* List View: Spinner only (no icon) */}
+      {(viewMode === "list" || isCollapsed) && isMonitored && (
+        <span className="shrink-0 flex items-center justify-center w-4 h-4">
           <Spinner
             size="sm"
             color="current"
@@ -85,17 +135,20 @@ const ChatItem = ({ chat, isActive, isCollapsed }: ChatItemProps) => {
               circle2: "border-b-current",
             }}
           />
-        ) : (
-          <MessageSquare size={16} />
-        )}
-      </span>
-      <AnimatePresence>
+        </span>
+      )}
+
+      <AnimatePresence mode="wait">
         {!isCollapsed && (
           <motion.span
-            initial={{ opacity: 0, width: 0 }}
-            animate={{ opacity: 1, width: "auto" }}
-            exit={{ opacity: 0, width: 0 }}
-            className="overflow-hidden truncate"
+            key={viewMode} // Triggers animation on view change
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className={clsx(
+              "overflow-hidden truncate text-sm",
+              viewMode === "grid" ? "w-full text-center font-medium" : "flex-1"
+            )}
           >
             {chatName}
           </motion.span>
@@ -105,7 +158,10 @@ const ChatItem = ({ chat, isActive, isCollapsed }: ChatItemProps) => {
       {!isCollapsed && (
         <div
           className={clsx(
-            "absolute right-2 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg",
+            "absolute opacity-0 group-hover/item:opacity-100 transition-opacity rounded-lg z-20",
+            viewMode === "list"
+              ? "right-2 top-1/2 -translate-y-1/2"
+              : "top-2 right-2",
             isActive
               ? "bg-primary/20 backdrop-blur-md"
               : "bg-default-100/80 backdrop-blur-md"
@@ -145,7 +201,7 @@ const ChatItem = ({ chat, isActive, isCollapsed }: ChatItemProps) => {
   );
 
   return (
-    <div className="relative group">
+    <motion.div layout className="relative group">
       <Popover
         isOpen={isRenameOpen}
         onOpenChange={(open) => {
@@ -155,7 +211,6 @@ const ChatItem = ({ chat, isActive, isCollapsed }: ChatItemProps) => {
         placement="right"
       >
         <PopoverTrigger>
-          {/* Anchor for the popover - positioned at the end of the item */}
           <div className="absolute right-2 top-1/2 w-1 h-1 opacity-0 pointer-events-none" />
         </PopoverTrigger>
         <PopoverContent>
@@ -187,7 +242,8 @@ const ChatItem = ({ chat, isActive, isCollapsed }: ChatItemProps) => {
         </PopoverContent>
       </Popover>
 
-      {thumbnailUrl ? (
+      {/* Always show tooltip in List view if it has thumbnail, OR if collapsed */}
+      {(viewMode === "list" || isCollapsed) && thumbnailUrl ? (
         <Tooltip
           content={
             <Image
@@ -207,7 +263,7 @@ const ChatItem = ({ chat, isActive, isCollapsed }: ChatItemProps) => {
       ) : (
         LinkComponent
       )}
-    </div>
+    </motion.div>
   );
 };
 
@@ -216,9 +272,9 @@ export const Sidebar = () => {
   const router = useRouter();
   const { chats, refreshChats } = useChat();
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [viewMode, setViewMode] = useState<"list" | "grid">("list");
 
   useEffect(() => {
-    // Listen for custom event to refresh chats
     const handleRefreshChats = () => {
       refreshChats();
     };
@@ -245,38 +301,105 @@ export const Sidebar = () => {
       }}
       className="hidden md:flex flex-col h-full border-r border-divider bg-background z-40 overflow-hidden"
     >
-      <div
-        className={clsx(
-          "p-4 flex items-center",
-          isCollapsed ? "justify-center" : "justify-between"
-        )}
-      >
-        <AnimatePresence>
-          {!isCollapsed && (
-            <motion.p
-              initial={{ opacity: 0, width: 0 }}
-              animate={{ opacity: 1, width: "auto" }}
-              exit={{ opacity: 0, width: 0 }}
-              className="font-bold text-lg whitespace-nowrap overflow-hidden"
-            >
-              Chats
-            </motion.p>
+      <div className="shrink-0">
+        <div
+          className={clsx(
+            "p-4 flex items-center",
+            isCollapsed ? "justify-center" : "justify-between"
           )}
-        </AnimatePresence>
-
-        <Button
-          isIconOnly
-          variant="light"
-          size="sm"
-          onPress={() => setIsCollapsed(!isCollapsed)}
-          className="text-default-500 shrink-0"
         >
-          {isCollapsed ? (
-            <PanelRightClose size={20} />
-          ) : (
-            <PanelRightOpen size={20} />
+          <AnimatePresence>
+            {!isCollapsed && (
+              <motion.p
+                initial={{ opacity: 0, width: 0 }}
+                animate={{ opacity: 1, width: "auto" }}
+                exit={{ opacity: 0, width: 0 }}
+                className="font-bold text-lg whitespace-nowrap overflow-hidden"
+              >
+                Chats
+              </motion.p>
+            )}
+          </AnimatePresence>
+
+          <Button
+            isIconOnly
+            variant="light"
+            size="sm"
+            onPress={() => setIsCollapsed(!isCollapsed)}
+            className="text-default-500 shrink-0"
+          >
+            {isCollapsed ? (
+              <PanelRightClose size={20} />
+            ) : (
+              <PanelRightOpen size={20} />
+            )}
+          </Button>
+        </div>
+
+        <div
+          className={clsx(
+            "flex flex-col gap-0 pb-0",
+            isCollapsed ? "px-2" : "pl-3 pr-2"
           )}
-        </Button>
+        >
+          {/* New Chat Button */}
+          <button
+            onClick={handleNewChat}
+            className={clsx(
+              "flex items-center gap-2 px-3 py-2 rounded-xl transition-colors whitespace-nowrap text-default-500 hover:bg-default-100 hover:text-default-900",
+              isCollapsed && "justify-center"
+            )}
+          >
+            <span className="shrink-0">
+              <SquarePen size={20} />
+            </span>
+            <AnimatePresence>
+              {!isCollapsed && (
+                <motion.span
+                  initial={{ opacity: 0, width: 0 }}
+                  animate={{ opacity: 1, width: "auto" }}
+                  exit={{ opacity: 0, width: 0 }}
+                  className="overflow-hidden text-sm"
+                >
+                  New Chat
+                </motion.span>
+              )}
+            </AnimatePresence>
+          </button>
+
+          {/* Divider with Switch */}
+          {!isCollapsed ? (
+            <div className="relative py-2 flex items-center justify-center my-0">
+              <div className="absolute inset-0 flex items-center">
+                <Divider />
+              </div>
+              <div className="relative bg-background px-2 flex gap-1">
+                <button
+                  onClick={() => setViewMode("list")}
+                  className={clsx(
+                    "p-1 rounded hover:bg-default-100 transition-colors",
+                    viewMode === "list" ? "text-primary" : "text-default-400"
+                  )}
+                  title="List View"
+                >
+                  <List size={16} />
+                </button>
+                <button
+                  onClick={() => setViewMode("grid")}
+                  className={clsx(
+                    "p-1 rounded hover:bg-default-100 transition-colors",
+                    viewMode === "grid" ? "text-primary" : "text-default-400"
+                  )}
+                  title="Grid View"
+                >
+                  <LayoutGrid size={16} />
+                </button>
+              </div>
+            </div>
+          ) : (
+            <Divider className="my-2" />
+          )}
+        </div>
       </div>
 
       <div
@@ -285,47 +408,31 @@ export const Sidebar = () => {
           isCollapsed ? "px-2" : "pl-3 pr-2"
         )}
       >
-        {/* New Chat Button */}
-        <button
-          onClick={handleNewChat}
+        {/* Recent Chats */}
+        <motion.div
+          layout
           className={clsx(
-            "flex items-center gap-2 px-3 py-2 rounded-xl transition-colors whitespace-nowrap text-default-500 hover:bg-default-100 hover:text-default-900",
-            isCollapsed && "justify-center"
+            "space-y-1",
+            viewMode === "grid" && !isCollapsed
+              ? "grid grid-cols-1 gap-2 space-y-0"
+              : ""
           )}
         >
-          <span className="shrink-0">
-            <SquarePen size={20} />
-          </span>
-          <AnimatePresence>
-            {!isCollapsed && (
-              <motion.span
-                initial={{ opacity: 0, width: 0 }}
-                animate={{ opacity: 1, width: "auto" }}
-                exit={{ opacity: 0, width: 0 }}
-                className="overflow-hidden text-sm"
-              >
-                New Chat
-              </motion.span>
-            )}
+          <AnimatePresence mode="popLayout">
+            {chats.map((chat) => {
+              const isActive = pathname === `/chat/${chat.id}`;
+              return (
+                <ChatItem
+                  key={chat.id}
+                  chat={chat}
+                  isActive={isActive}
+                  isCollapsed={isCollapsed}
+                  viewMode={viewMode}
+                />
+              );
+            })}
           </AnimatePresence>
-        </button>
-
-        <Divider className="my-2" />
-
-        {/* Recent Chats */}
-        <div className="space-y-1">
-          {chats.map((chat) => {
-            const isActive = pathname === `/chat/${chat.id}`;
-            return (
-              <ChatItem
-                key={chat.id}
-                chat={chat}
-                isActive={isActive}
-                isCollapsed={isCollapsed}
-              />
-            );
-          })}
-        </div>
+        </motion.div>
       </div>
     </motion.aside>
   );
