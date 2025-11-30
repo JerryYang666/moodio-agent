@@ -468,8 +468,11 @@ export default function ChatInterface({
               currentContent.push(event.part);
             } else if (event.type === "part_update") {
               // Update existing part
-              // For admins, use offset +2; for others, use +1 (internal_think not streamed)
-              const offset = (event.isAdmin ? 2 : 1);
+              // For admins (internal_think present), use offset +2; for others, use +1
+              const hasThink = currentContent.some(
+                (p) => p.type === "internal_think"
+              );
+              const offset = hasThink ? 2 : 1;
               if (currentContent[event.index + offset]) {
                 currentContent[event.index + offset] = event.part;
               }
