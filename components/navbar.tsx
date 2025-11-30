@@ -9,7 +9,6 @@ import {
   NavbarMenuToggle,
   NavbarBrand,
   NavbarItem,
-  NavbarMenuItem,
 } from "@heroui/navbar";
 import { Link } from "@heroui/link";
 import { link as linkStyles } from "@heroui/theme";
@@ -29,14 +28,238 @@ import {
   MessageSquare,
   Folder,
   LogOut,
+  Globe,
+  Clapperboard,
+  List,
+  GalleryThumbnails,
+  MoreHorizontal,
+  Pencil,
+  Check,
 } from "lucide-react";
 import { User } from "@heroui/user";
+import { Avatar } from "@heroui/avatar";
 import { Card, CardBody } from "@heroui/card";
 import { Popover, PopoverTrigger, PopoverContent } from "@heroui/popover";
 import { Button } from "@heroui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { useChat } from "@/hooks/use-chat";
 import { Divider } from "@heroui/divider";
+import { Chat } from "@/components/chat-provider";
+import { motion, AnimatePresence } from "framer-motion";
+import { Spinner } from "@heroui/spinner";
+import { Image } from "@heroui/image";
+import { Input } from "@heroui/input";
+import {
+  Dropdown,
+  DropdownTrigger,
+  DropdownMenu,
+  DropdownItem,
+} from "@heroui/dropdown";
+
+const AWS_S3_PUBLIC_URL = process.env.NEXT_PUBLIC_AWS_S3_PUBLIC_URL || "";
+
+interface ChatItemProps {
+  chat: Chat;
+  isActive: boolean;
+  viewMode: "list" | "grid";
+}
+
+// Re-implementation of ChatItem for Mobile Navbar to handle interactions properly in mobile context
+const MobileChatItem = ({ chat, isActive, viewMode }: ChatItemProps) => {
+  const { renameChat, isChatMonitored } = useChat();
+  const [isRenameOpen, setIsRenameOpen] = useState(false);
+  const [newName, setNewName] = useState(chat.name || "");
+  const [isRenaming, setIsRenaming] = useState(false);
+
+  const handleRename = async () => {
+    if (!newName.trim()) return;
+    setIsRenaming(true);
+    try {
+      await renameChat(chat.id, newName);
+      setIsRenameOpen(false);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsRenaming(false);
+    }
+  };
+
+  const chatName = chat.name || "New Chat";
+  const isMonitored = isChatMonitored(chat.id);
+  const thumbnailUrl = chat.thumbnailImageId
+    ? `${AWS_S3_PUBLIC_URL}/${chat.thumbnailImageId}`
+    : null;
+
+  return (
+    <div className="relative group">
+      <Popover
+        isOpen={isRenameOpen}
+        onOpenChange={(open) => {
+          setIsRenameOpen(open);
+          if (!open) setNewName(chat.name || "");
+        }}
+        placement="bottom"
+      >
+        <PopoverTrigger>
+          <div className="absolute right-2 top-1/2 w-1 h-1 opacity-0 pointer-events-none" />
+        </PopoverTrigger>
+        <PopoverContent>
+          <div className="px-1 py-2 w-64">
+            <p className="text-small font-bold text-foreground mb-2">
+              Rename Chat
+            </p>
+            <div className="flex gap-2">
+              <Input
+                size="sm"
+                value={newName}
+                onValueChange={setNewName}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleRename();
+                }}
+                autoFocus
+              />
+              <Button
+                size="sm"
+                color="primary"
+                isIconOnly
+                isLoading={isRenaming}
+                onPress={handleRename}
+              >
+                <Check size={16} />
+              </Button>
+            </div>
+          </div>
+        </PopoverContent>
+      </Popover>
+
+      <NextLink
+        href={`/chat/${chat.id}`}
+        className={clsx(
+          "transition-colors relative group/item w-full",
+          viewMode === "list"
+            ? "flex items-center gap-2 px-3 py-2 rounded-xl whitespace-nowrap text-sm"
+            : "flex flex-col p-2 rounded-xl gap-2 h-auto",
+          isActive
+            ? "bg-primary/10 text-primary font-medium"
+            : "text-default-500 hover:bg-default-100 hover:text-default-900"
+        )}
+      >
+        {/* Grid View: Thumbnail */}
+        {viewMode === "grid" && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            className={clsx(
+              "w-full rounded-lg overflow-hidden bg-default-100 relative border border-default-200",
+              !thumbnailUrl && "aspect-square"
+            )}
+          >
+            {thumbnailUrl ? (
+              <Image
+                src={thumbnailUrl}
+                alt={chatName}
+                width={300}
+                radius="none"
+                classNames={{
+                  wrapper: "w-full !max-w-full",
+                  img: "w-full h-auto",
+                }}
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-default-300">
+                <MessageSquare size={24} />
+              </div>
+            )}
+            {isMonitored && (
+              <div className="absolute top-2 right-2 z-10">
+                <Spinner
+                  size="sm"
+                  color="current"
+                  classNames={{
+                    wrapper: "w-4 h-4",
+                    circle1: "border-b-current",
+                    circle2: "border-b-current",
+                  }}
+                />
+              </div>
+            )}
+          </motion.div>
+        )}
+
+        {/* List View: Spinner */}
+        {viewMode === "list" && isMonitored && (
+          <span className="shrink-0 flex items-center justify-center w-4 h-4">
+            <Spinner
+              size="sm"
+              color="current"
+              classNames={{
+                wrapper: "w-4 h-4",
+                circle1: "border-b-current",
+                circle2: "border-b-current",
+              }}
+            />
+          </span>
+        )}
+
+        <span
+          className={clsx(
+            "overflow-hidden truncate text-sm",
+            viewMode === "grid" ? "w-full text-center font-medium" : "flex-1"
+          )}
+        >
+          {chatName}
+        </span>
+
+        <div
+          className={clsx(
+            "absolute opacity-100 md:opacity-0 md:group-hover/item:opacity-100 transition-opacity rounded-lg z-20",
+            viewMode === "list"
+              ? "right-2 top-1/2 -translate-y-1/2"
+              : "top-2 right-2",
+            isActive || viewMode === "grid" // Always visible on mobile/active/grid for better UX
+              ? "visible"
+              : "hidden"
+          )}
+        >
+          <Dropdown>
+            <DropdownTrigger>
+              <Button
+                isIconOnly
+                size="sm"
+                variant="light"
+                className={clsx(
+                  "min-w-6 w-6 h-6 p-0",
+                  viewMode === "grid"
+                    ? "bg-background/50 backdrop-blur-sm text-foreground"
+                    : "text-default-500"
+                )}
+                onPress={(e) => {
+                  // Prevent navigation
+                }}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }}
+              >
+                <MoreHorizontal size={16} />
+              </Button>
+            </DropdownTrigger>
+            <DropdownMenu aria-label="Chat Actions">
+              <DropdownItem
+                key="rename"
+                startContent={<Pencil size={16} />}
+                onPress={() => setIsRenameOpen(true)}
+              >
+                Rename
+              </DropdownItem>
+            </DropdownMenu>
+          </Dropdown>
+        </div>
+      </NextLink>
+    </div>
+  );
+};
 
 export const Navbar = () => {
   const pathname = usePathname();
@@ -44,6 +267,19 @@ export const Navbar = () => {
   const { user, logout } = useAuth();
   const { chats, refreshChats } = useChat();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [activeSection, setActiveSection] = useState<
+    "browse" | "agent" | "collections" | "storyboard"
+  >("agent");
+  const [viewMode, setViewMode] = useState<"list" | "grid">("list");
+
+  useEffect(() => {
+    if (pathname?.startsWith("/browse")) setActiveSection("browse");
+    else if (pathname?.startsWith("/collection"))
+      setActiveSection("collections");
+    else if (pathname?.startsWith("/storyboard"))
+      setActiveSection("storyboard");
+    else setActiveSection("agent");
+  }, [pathname]);
 
   useEffect(() => {
     // Listen for custom event to refresh chats
@@ -62,32 +298,32 @@ export const Navbar = () => {
     setIsMenuOpen(false);
   };
 
-  const displayName = user
-    ? user.firstName && user.lastName
-      ? `${user.firstName} ${user.lastName}`
-      : user.firstName || user.email
-    : "";
-
-  // Helper to get icon based on label
-  const getIcon = (label: string) => {
-    switch (label.toLowerCase()) {
-      case "home":
-        return <Home size={20} />;
-      case "dashboard":
-        return <LayoutDashboard size={20} />;
-      case "settings":
-        return <Settings size={20} />;
-      case "profile":
-        return <UserIcon size={20} />;
-      case "admin":
-        return <Shield size={20} />;
-      default:
-        return <BotMessageSquare size={20} />;
-    }
-  };
-
-  // Filter out "Home" from navItems as we have "New Chat"
-  const navItems = siteConfig.navItems.filter((item) => item.label !== "Home");
+  const navTabs = [
+    {
+      id: "browse",
+      label: "Browse",
+      icon: <Globe size={20} />,
+      href: "/browse",
+    },
+    {
+      id: "agent",
+      label: "Agent",
+      icon: <BotMessageSquare size={20} />,
+      href: "/chat",
+    },
+    {
+      id: "collections",
+      label: "Collect.",
+      icon: <Folder size={20} />,
+      href: "/collection",
+    },
+    {
+      id: "storyboard",
+      label: "Story.",
+      icon: <Clapperboard size={20} />,
+      href: "/storyboard",
+    },
+  ];
 
   return (
     <HeroUINavbar
@@ -109,22 +345,6 @@ export const Navbar = () => {
             </p>
           </NextLink>
         </NavbarBrand>
-        <ul className="hidden lg:flex gap-4 justify-start ml-2">
-          {siteConfig.navItems.map((item) => (
-            <NavbarItem key={item.href}>
-              <NextLink
-                className={clsx(
-                  linkStyles({ color: "foreground" }),
-                  "data-[active=true]:text-primary data-[active=true]:font-medium"
-                )}
-                color="foreground"
-                href={item.href}
-              >
-                {item.label}
-              </NextLink>
-            </NavbarItem>
-          ))}
-        </ul>
       </NavbarContent>
 
       <NavbarContent className="hidden" justify="end">
@@ -137,182 +357,221 @@ export const Navbar = () => {
         <NavbarMenuToggle className="md:w-auto md:h-auto w-8 h-8" />
       </NavbarContent>
 
-      <NavbarMenu className="pt-0 mt-0 top-12 md:top-auto">
-        <div className="flex flex-col h-full pt-4">
-          {/* Pinned User Card - Moved to Top */}
-          {user && (
-            <div className="px-4 pb-0">
-              <Popover
-                placement="bottom"
-                offset={10}
-                className="w-[calc(100vw-48px)] max-w-[380px]"
-              >
-                <PopoverTrigger>
-                  <Card
-                    isPressable
-                    shadow="sm"
-                    className="bg-default-50 dark:bg-default-100/50 w-full"
-                  >
-                    <CardBody className="p-2 flex-row items-center gap-3">
-                      <User
-                        name={displayName}
-                        description={user.email}
-                        avatarProps={{
-                          src: undefined,
-                          name:
-                            user.firstName?.charAt(0) ||
-                            user.email.charAt(0).toUpperCase(),
-                          isBordered: true,
-                          color: "primary",
-                          size: "sm",
-                          className: "mx-2",
-                        }}
-                        classNames={{
-                          name: "text-sm font-semibold truncate",
-                          description: "text-xs text-default-500 truncate",
-                        }}
-                      />
-                    </CardBody>
-                  </Card>
-                </PopoverTrigger>
-                <PopoverContent className="w-full p-2">
-                  <div className="flex flex-col gap-8 w-full min-w-[200px] p-2">
-                    <NextLink
-                      href="/profile"
-                      onClick={() => setIsMenuOpen(false)}
-                      className="w-full"
-                    >
-                      <Button
-                        size="md"
-                        variant="flat"
-                        className="w-full justify-start h-12 text-base"
-                        startContent={<UserIcon size={20} />}
-                      >
-                        Profile
-                      </Button>
-                    </NextLink>
-                    <div className="flex items-center justify-between gap-24">
-                      <Button
-                        size="md"
-                        variant="flat"
-                        color="danger"
-                        startContent={<LogOut size={20} />}
-                        onPress={() => {
-                          logout();
-                          setIsMenuOpen(false);
-                        }}
-                        className="flex-1 h-12 text-base"
-                      >
-                        Logout
-                      </Button>
-                      <div className="p-2">
-                        <ThemeSwitch />
-                      </div>
-                    </div>
-                  </div>
-                </PopoverContent>
-              </Popover>
-            </div>
-          )}
-
-          <div className="flex-1 overflow-y-auto px-4 flex flex-col gap-3 mt-4">
-            {/* New Chat Button */}
-            <button
-              onClick={handleNewChat}
-              className="flex items-center gap-2 px-3 py-2 rounded-xl transition-colors text-default-500 hover:bg-default-100 hover:text-default-900 shrink-0"
-            >
-              <SquarePen size={20} />
-              <span className="text-sm">New Chat</span>
-            </button>
-
-            {/* Collections Button */}
-            <NextLink
-              href="/collection"
-              onClick={() => setIsMenuOpen(false)}
-              className={clsx(
-                "flex items-center gap-2 px-3 py-2 rounded-xl transition-colors shrink-0",
-                pathname?.startsWith("/collection")
-                  ? "bg-primary/10 text-primary font-medium"
-                  : "text-default-500 hover:bg-default-100 hover:text-default-900"
-              )}
-            >
-              <Folder size={20} />
-              <span className="text-sm">Collections</span>
-            </NextLink>
-
-            {/* Navigation Items */}
-            {navItems.map((item) => {
-              const isActive = pathname === item.href;
-              return (
-                <NextLink
-                  key={item.href}
-                  href={item.href}
-                  onClick={() => setIsMenuOpen(false)}
-                  className={clsx(
-                    "flex items-center gap-2 px-3 py-2 rounded-xl transition-colors shrink-0",
-                    isActive
-                      ? "bg-primary/10 text-primary font-medium"
-                      : "text-default-500 hover:bg-default-100 hover:text-default-900"
-                  )}
-                >
-                  {getIcon(item.label)}
-                  <span className="text-sm">{item.label}</span>
-                </NextLink>
-              );
-            })}
-
-            {/* Admin Link */}
-            {user && user.roles.includes("admin") && (
-              <NextLink
-                href="/admin"
-                onClick={() => setIsMenuOpen(false)}
+      <NavbarMenu className="pt-0 mt-0 top-12 bottom-0 pb-0 h-[calc(100dvh-3rem)] overflow-hidden flex flex-col">
+        <div className="flex flex-col h-full pt-2 pb-4">
+          {/* Top Tabs */}
+          <div className="grid grid-cols-4 gap-1 px-2 mb-4 shrink-0">
+            {navTabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => {
+                  setActiveSection(tab.id as any);
+                  router.push(tab.href);
+                  // Don't close menu immediately to allow interaction with sub-nav if needed
+                  // But usually navigating changes page.
+                  // For "Agent", we might want to stay open to pick a chat?
+                  // Let's follow typical behavior: navigating usually closes, but here we are building navigation INSIDE the menu.
+                  // If it's just a tab switch, we don't route yet? Or do we?
+                  // The prompt says "switch between these sort of pages".
+                  // If I click "Agent", I expect to see the chat list.
+                }}
                 className={clsx(
-                  "flex items-center gap-2 px-3 py-2 rounded-xl transition-colors shrink-0",
-                  pathname?.startsWith("/admin")
-                    ? "bg-primary/10 text-primary font-medium"
-                    : "text-default-500 hover:bg-default-100 hover:text-default-900"
+                  "flex flex-col items-center justify-center p-2 rounded-xl transition-colors gap-1",
+                  activeSection === tab.id
+                    ? "bg-primary/10 text-primary"
+                    : "text-default-500 hover:bg-default-100"
                 )}
               >
-                <Shield size={20} />
-                <span className="text-sm">Admin</span>
-              </NextLink>
+                {tab.icon}
+                <span className="text-[10px] font-medium">{tab.label}</span>
+              </button>
+            ))}
+          </div>
+
+          {/* Dynamic Content Area based on activeSection */}
+          <div className="flex-1 overflow-y-auto px-4 flex flex-col gap-2 min-h-0">
+            {activeSection === "agent" && (
+              <>
+                <div className="flex flex-col gap-0 pb-0 shrink-0 sticky top-0 bg-background z-10">
+                  <button
+                    onClick={handleNewChat}
+                    className="flex items-center gap-2 px-3 py-2 rounded-xl transition-colors text-default-500 hover:bg-default-100 hover:text-default-900 w-full justify-center bg-default-50 mb-2"
+                  >
+                    <SquarePen size={20} />
+                    <span className="text-sm">New Chat</span>
+                  </button>
+
+                  <div className="relative py-2 flex items-center justify-center my-0">
+                    <div className="absolute inset-0 flex items-center">
+                      <Divider />
+                    </div>
+                    <div className="relative bg-background px-2 flex gap-1">
+                      <button
+                        onClick={() => setViewMode("list")}
+                        className={clsx(
+                          "p-1 rounded hover:bg-default-100 transition-colors",
+                          viewMode === "list"
+                            ? "text-primary"
+                            : "text-default-400"
+                        )}
+                        title="List View"
+                      >
+                        <List size={16} />
+                      </button>
+                      <button
+                        onClick={() => setViewMode("grid")}
+                        className={clsx(
+                          "p-1 rounded hover:bg-default-100 transition-colors",
+                          viewMode === "grid"
+                            ? "text-primary"
+                            : "text-default-400"
+                        )}
+                        title="Grid View"
+                      >
+                        <GalleryThumbnails size={16} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div
+                  className={clsx(
+                    "pb-4",
+                    viewMode === "grid"
+                      ? "grid grid-cols-1 gap-2"
+                      : "flex flex-col gap-1"
+                  )}
+                >
+                  {chats.length > 0 ? (
+                    chats.map((chat) => (
+                      <div key={chat.id} onClick={() => setIsMenuOpen(false)}>
+                        <MobileChatItem
+                          chat={chat}
+                          isActive={pathname === `/chat/${chat.id}`}
+                          viewMode={viewMode}
+                        />
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-center text-default-400 py-4 text-sm">
+                      No chats yet
+                    </p>
+                  )}
+                </div>
+              </>
             )}
 
-            <Divider className="my-2" />
+            {activeSection === "collections" && (
+              <div className="flex flex-col items-center justify-center h-full text-default-500">
+                <Folder size={48} className="mb-2 opacity-50" />
+                <p>Manage your collections here</p>
+                <Button
+                  className="mt-4"
+                  color="primary"
+                  variant="flat"
+                  onPress={() => {
+                    router.push("/collection");
+                    setIsMenuOpen(false);
+                  }}
+                >
+                  Go to Collections
+                </Button>
+              </div>
+            )}
 
-            {/* Recent Chats */}
-            <div className="space-y-1">
-              <p className="px-3 text-xs text-default-400 font-semibold uppercase">
-                Recent Chats
-              </p>
-              {chats.length > 0 ? (
-                chats.map((chat) => {
-                  const isActive = pathname === `/chat/${chat.id}`;
-                  const chatName = chat.name || "New Chat";
+            {activeSection === "browse" && (
+              <div className="flex flex-col items-center justify-center h-full text-default-500">
+                <Globe size={48} className="mb-2 opacity-50" />
+                <p>Browse content</p>
+                <Button
+                  className="mt-4"
+                  color="primary"
+                  variant="flat"
+                  onPress={() => {
+                    router.push("/browse");
+                    setIsMenuOpen(false);
+                  }}
+                >
+                  Go to Browse
+                </Button>
+              </div>
+            )}
 
-                  return (
-                    <NextLink
-                      key={chat.id}
-                      href={`/chat/${chat.id}`}
-                      onClick={() => setIsMenuOpen(false)}
-                      className={clsx(
-                        "flex items-center gap-2 px-3 py-2 rounded-xl transition-colors text-sm",
-                        isActive
-                          ? "bg-primary/10 text-primary font-medium"
-                          : "text-default-500 hover:bg-default-100 hover:text-default-900"
-                      )}
+            {activeSection === "storyboard" && (
+              <div className="flex flex-col items-center justify-center h-full text-default-500">
+                <Clapperboard size={48} className="mb-2 opacity-50" />
+                <p>Storyboard your ideas</p>
+                <Button
+                  className="mt-4"
+                  color="primary"
+                  variant="flat"
+                  onPress={() => {
+                    router.push("/storyboard");
+                    setIsMenuOpen(false);
+                  }}
+                >
+                  Go to Storyboard
+                </Button>
+              </div>
+            )}
+          </div>
+
+          {/* User & Admin Section at Bottom */}
+          <div className="mt-auto pt-2 px-4 pb-4 shrink-0 border-t border-divider">
+            {user && (
+              <div className="flex flex-col gap-2">
+                {user.roles.includes("admin") && (
+                  <NextLink
+                    href="/admin"
+                    onClick={() => setIsMenuOpen(false)}
+                    className="flex items-center gap-2 px-3 py-2 rounded-xl transition-colors text-default-500 hover:bg-default-100"
+                  >
+                    <Shield size={20} />
+                    <span>Admin Dashboard</span>
+                  </NextLink>
+                )}
+
+                <div className="flex items-center justify-between gap-2 bg-default-50 p-2 rounded-xl">
+                  <div className="flex items-center gap-2 overflow-hidden">
+                    <Avatar
+                      src={undefined}
+                      name={
+                        user.firstName?.charAt(0) ||
+                        user.email.charAt(0).toUpperCase()
+                      }
+                      size="sm"
+                      isBordered
+                      color="primary"
+                    />
+                    <div className="flex flex-col overflow-hidden">
+                      <span className="text-sm font-medium truncate">
+                        {user.firstName
+                          ? `${user.firstName} ${user.lastName || ""}`
+                          : user.email}
+                      </span>
+                      <span className="text-xs text-default-400 truncate">
+                        {user.email}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <ThemeSwitch />
+                    <Button
+                      isIconOnly
+                      size="sm"
+                      variant="light"
+                      color="danger"
+                      onPress={() => {
+                        logout();
+                        setIsMenuOpen(false);
+                      }}
                     >
-                      <MessageSquare size={16} />
-                      <span className="truncate">{chatName}</span>
-                    </NextLink>
-                  );
-                })
-              ) : (
-                <p className="px-3 py-2 text-sm text-default-400">
-                  No recent chats
-                </p>
-              )}
-            </div>
+                      <LogOut size={18} />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </NavbarMenu>
