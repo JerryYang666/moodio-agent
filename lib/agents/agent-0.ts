@@ -2,7 +2,7 @@ import { Agent, AgentResponse } from "./types";
 import { Message, MessageContentPart } from "@/lib/llm/types";
 import { downloadImage, uploadImage } from "@/lib/storage/s3";
 import OpenAI, { toFile } from "openai";
-import { v4 as uuidv4 } from "uuid";
+import { getSystemPrompt } from "./system-prompts";
 
 interface Suggestion {
   title: string;
@@ -37,25 +37,7 @@ export class Agent0 implements Agent {
     });
 
     // 1. Prepare messages for the LLM to generate JSON
-    const systemPrompt = `You are a creative assistant.
-Based on the user's input, generate a question that will help trigger the creativity of the user, and four suggestions based on the question.
-For example, if the user said "I want to create an image of two couples kissing", you can ask "Where are these two couples kissing?" and provide suggestions like "In a classroom", "In a playground", etc.
-
-If the user's input is too short or not conducive to suggestions (e.g., just "Hi"), you can choose not to provide any suggestions.
-If the user's input includes an image, you should make sure your prompts are editing prompts that are referring to an edit of the image. For example, "Change the man in the image's shirt to red...".
-
-You must output a JSON object with the following structure:
-{
-  "question": "The question you ask the user, or just a response if no suggestions",
-  "suggestions": [
-    { "title": "Short title for suggestion 1", "prompt": "Detailed image generation prompt for suggestion 1" },
-    { "title": "Short title for suggestion 2", "prompt": "Detailed image generation prompt for suggestion 2" },
-    { "title": "Short title for suggestion 3", "prompt": "Detailed image generation prompt for suggestion 3" },
-    { "title": "Short title for suggestion 4", "prompt": "Detailed image generation prompt for suggestion 4" }
-  ]
-}
-Note: "suggestions" can be an empty array [] if no suggestions are appropriate.
-`;
+    const systemPrompt = getSystemPrompt(this.id);
 
     // Convert previous agent_image parts to text in history
     const cleanHistory = history.map((m) => {
@@ -168,10 +150,7 @@ Note: "suggestions" can be an empty array [] if no suggestions are appropriate.
       };
     }
 
-    console.log(
-      "[Perf] Agent JSON parsed",
-      `[${Date.now() - startTime}ms]`
-    );
+    console.log("[Perf] Agent JSON parsed", `[${Date.now() - startTime}ms]`);
 
     const { stream, completion } = this.createStreamAndCompletion(
       parsed,
@@ -210,7 +189,10 @@ Note: "suggestions" can be an empty array [] if no suggestions are appropriate.
         );
 
         // Send placeholders
-        if (Array.isArray(parsed.suggestions) && parsed.suggestions.length > 0) {
+        if (
+          Array.isArray(parsed.suggestions) &&
+          parsed.suggestions.length > 0
+        ) {
           parsed.suggestions.forEach((s) => {
             c.enqueue(
               encoder.encode(
@@ -282,7 +264,8 @@ Note: "suggestions" can be an empty array [] if no suggestions are appropriate.
           let finalImageId: string;
 
           if (userImageId) {
-            if (!userImageBuffer) throw new Error("Failed to download user image");
+            if (!userImageBuffer)
+              throw new Error("Failed to download user image");
             const file = await toFile(userImageBuffer, "image.png", {
               type: "image/png",
             });
