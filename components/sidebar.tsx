@@ -13,7 +13,7 @@ import {
   Check,
   MoreHorizontal,
   List,
-  LayoutGrid,
+  GalleryThumbnails,
 } from "lucide-react";
 import { Tooltip } from "@heroui/tooltip";
 import { Image } from "@heroui/image";
@@ -392,7 +392,7 @@ export const Sidebar = () => {
                   )}
                   title="Grid View"
                 >
-                  <LayoutGrid size={16} />
+                  <GalleryThumbnails size={16} />
                 </button>
               </div>
             </div>
