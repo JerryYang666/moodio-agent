@@ -79,7 +79,7 @@ export function TestKit() {
             <div className="flex justify-between items-center">
               <h3 className="text-lg font-bold">TestKit - System Prompt Override</h3>
                <Switch isSelected={isEnabled} onValueChange={handleToggle}>
-                Override Active
+                {isEnabled ? "Override Active" : "Override Inactive"}
               </Switch>
             </div>
             
