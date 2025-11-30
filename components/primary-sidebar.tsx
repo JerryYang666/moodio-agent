@@ -8,10 +8,10 @@ import {
   BotMessageSquare,
   Folder,
   Shield,
-  Globe,
   Clapperboard,
   LogOut,
   User as UserIcon,
+  BookOpen,
 } from "lucide-react";
 import { User } from "@heroui/user";
 import { Avatar } from "@heroui/avatar";
@@ -34,7 +34,7 @@ export const PrimarySidebar = () => {
     {
       label: "Browse",
       href: "/browse",
-      icon: <Globe size={20} />,
+      icon: <BookOpen size={20} />,
     },
     {
       label: "Agent",
