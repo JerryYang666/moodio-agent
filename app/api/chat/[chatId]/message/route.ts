@@ -59,6 +59,7 @@ export async function POST(
     let selection: { messageIndex: number; partIndex: number } | null = null;
     let precisionEditing = false;
     let precisionEditImageId: string | undefined;
+    let systemPromptOverride: string | undefined;
 
     const contentType = request.headers.get("content-type") || "";
     if (contentType.includes("multipart/form-data")) {
@@ -78,6 +79,8 @@ export async function POST(
       }
       const pId = formData.get("precisionEditImageId") as string;
       if (pId) precisionEditImageId = pId;
+      const spo = formData.get("systemPromptOverride") as string;
+      if (spo) systemPromptOverride = spo;
     } else {
       const json = await request.json();
       content = json.content;
@@ -87,6 +90,9 @@ export async function POST(
       }
       if (json.precisionEditImageId) {
         precisionEditImageId = json.precisionEditImageId;
+      }
+      if (json.systemPromptOverride) {
+        systemPromptOverride = json.systemPromptOverride;
       }
     }
 
@@ -220,7 +226,8 @@ export async function POST(
       isAdmin ?? false,
       requestStartTime,
       precisionEditing,
-      precisionEditImageId
+      precisionEditImageId,
+      isAdmin ? systemPromptOverride : undefined
     );
 
     // Handle background completion (saving history)

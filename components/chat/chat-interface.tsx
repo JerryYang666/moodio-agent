@@ -20,6 +20,7 @@ import ChatInput from "./chat-input";
 import { siteConfig } from "@/config/site";
 import { useVoiceRecorder } from "./use-voice-recorder";
 import { getImageUrl } from "./utils";
+import { SYSTEM_PROMPT_STORAGE_KEY } from "@/components/test-kit";
 
 interface SelectedAgentPart {
   url: string;
@@ -287,6 +288,19 @@ export default function ChatInterface({
             formData.append("precisionEditImageId", selectedAgentPart.imageId);
           }
         }
+
+        const overrideEnabled =
+          localStorage.getItem(SYSTEM_PROMPT_STORAGE_KEY + "_enabled") ===
+          "true";
+        if (overrideEnabled) {
+          const overridePrompt = localStorage.getItem(
+            SYSTEM_PROMPT_STORAGE_KEY
+          );
+          if (overridePrompt) {
+            formData.append("systemPromptOverride", overridePrompt);
+          }
+        }
+
         body = formData;
       } else {
         const payload: any = { content: currentInput };
@@ -302,6 +316,19 @@ export default function ChatInterface({
             payload.precisionEditImageId = selectedAgentPart.imageId;
           }
         }
+
+        const overrideEnabled =
+          localStorage.getItem(SYSTEM_PROMPT_STORAGE_KEY + "_enabled") ===
+          "true";
+        if (overrideEnabled) {
+          const overridePrompt = localStorage.getItem(
+            SYSTEM_PROMPT_STORAGE_KEY
+          );
+          if (overridePrompt) {
+            payload.systemPromptOverride = overridePrompt;
+          }
+        }
+
         body = JSON.stringify(payload);
         headers = { "Content-Type": "application/json" };
       }

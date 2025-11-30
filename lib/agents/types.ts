@@ -15,6 +15,7 @@ export interface Agent {
     isAdmin: boolean,
     requestStartTime?: number,
     precisionEditing?: boolean,
-    precisionEditImageId?: string
+    precisionEditImageId?: string,
+    systemPromptOverride?: string
   ): Promise<AgentResponse>;
 }

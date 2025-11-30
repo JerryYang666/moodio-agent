@@ -25,7 +25,8 @@ export class Agent0 implements Agent {
     isAdmin: boolean,
     requestStartTime?: number,
     precisionEditing?: boolean,
-    precisionEditImageId?: string
+    precisionEditImageId?: string,
+    systemPromptOverride?: string
   ): Promise<AgentResponse> {
     const startTime = requestStartTime || Date.now();
     console.log(
@@ -37,7 +38,7 @@ export class Agent0 implements Agent {
     });
 
     // 1. Prepare messages for the LLM to generate JSON
-    const systemPrompt = getSystemPrompt(this.id);
+    const systemPrompt = systemPromptOverride || getSystemPrompt(this.id);
 
     // Convert previous agent_image parts to text in history
     const cleanHistory = history.map((m) => {

@@ -1,6 +1,7 @@
 import { PrimarySidebar } from "@/components/primary-sidebar";
 import { Navbar } from "@/components/navbar";
 import { OnboardingModal } from "@/components/onboarding-modal";
+import { TestKit } from "@/components/test-kit";
 
 export default function DashboardLayout({
   children,
@@ -20,6 +21,7 @@ export default function DashboardLayout({
         </main>
       </div>
       <OnboardingModal />
+      <TestKit />
     </div>
   );
 }

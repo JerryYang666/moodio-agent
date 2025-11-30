@@ -58,7 +58,8 @@ export class Agent1 implements Agent {
     isAdmin: boolean,
     requestStartTime?: number,
     precisionEditing?: boolean,
-    precisionEditImageId?: string
+    precisionEditImageId?: string,
+    systemPromptOverride?: string
   ): Promise<AgentResponse> {
     const startTime = requestStartTime || Date.now();
     console.log(
@@ -72,7 +73,8 @@ export class Agent1 implements Agent {
       userMessage,
       startTime,
       precisionEditing,
-      precisionEditImageId
+      precisionEditImageId,
+      systemPromptOverride
     );
 
     // Step 2: Call LLM and parse response
@@ -145,9 +147,10 @@ export class Agent1 implements Agent {
     userMessage: Message,
     startTime: number,
     precisionEditing?: boolean,
-    precisionEditImageId?: string
+    precisionEditImageId?: string,
+    systemPromptOverride?: string
   ): Promise<PreparedMessages> {
-    const rawSystemPrompt = getSystemPrompt(this.id);
+    const rawSystemPrompt = systemPromptOverride || getSystemPrompt(this.id);
     const systemPrompt = rawSystemPrompt.replace(
       "{{SUPPORTED_ASPECT_RATIOS}}",
       SUPPORTED_ASPECT_RATIOS.join(", ")
