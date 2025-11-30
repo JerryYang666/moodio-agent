@@ -3,7 +3,7 @@
 import { Card, CardBody } from "@heroui/card";
 import { Spinner } from "@heroui/spinner";
 import { Avatar } from "@heroui/avatar";
-import { Bot, X, Pencil } from "lucide-react";
+import { Bot, X, Pencil, ChevronDown, ChevronRight, Brain } from "lucide-react";
 import clsx from "clsx";
 import ReactMarkdown from "react-markdown";
 import { Message, MessageContentPart } from "@/lib/llm/types";
@@ -12,6 +12,7 @@ import { getImageUrl, formatTime } from "./utils";
 import { Button } from "@heroui/button";
 import { Popover, PopoverTrigger, PopoverContent } from "@heroui/popover";
 import { useState } from "react";
+import { useAuth } from "@/hooks/use-auth";
 
 interface SelectedAgentPart {
   url: string;
@@ -51,6 +52,9 @@ export default function ChatMessage({
 }: ChatMessageProps) {
   const isUser = message.role === "user";
   const [isForkPopoverOpen, setIsForkPopoverOpen] = useState(false);
+  const [isThinkingOpen, setIsThinkingOpen] = useState(false);
+  const { user: currentUser } = useAuth();
+  const isAdmin = currentUser?.roles?.includes("admin");
 
   const renderContent = (
     content: string | MessageContentPart[],
@@ -71,9 +75,34 @@ export default function ChatMessage({
       (p) => p.type === "image" || p.type === "image_url"
     );
     const agentParts = content.filter((p) => p.type === "agent_image");
+    const thinkParts = content.filter((p) => p.type === "internal_think");
 
     return (
       <div className="space-y-4">
+        {isAdmin && thinkParts.length > 0 && (
+          <div className="mb-4">
+            <button
+              onClick={() => setIsThinkingOpen(!isThinkingOpen)}
+              className="flex items-center gap-2 text-xs text-default-400 hover:text-default-600 transition-colors w-full"
+            >
+              {isThinkingOpen ? (
+                <ChevronDown size={14} />
+              ) : (
+                <ChevronRight size={14} />
+              )}
+              <Brain size={14} />
+              <span>Thinking Process</span>
+            </button>
+            {isThinkingOpen && (
+              <div className="mt-2 p-3 bg-default-100 rounded-lg text-xs font-mono text-default-600 whitespace-pre-wrap border border-default-200">
+                {thinkParts.map((part: any, i) => (
+                  <div key={`think-${i}`}>{part.text}</div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {textParts.map((part: any, i) => (
           <ReactMarkdown key={`text-${i}`}>{part.text}</ReactMarkdown>
         ))}

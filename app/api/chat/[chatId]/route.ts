@@ -44,7 +44,18 @@ export async function GET(
 
     const messages = await getChatHistory(chatId);
 
-    return NextResponse.json({ chat, messages });
+    // Filter out internal_* for non-admins
+    const filteredMessages = isAdmin
+      ? messages
+      : messages.map((msg) => {
+          if (typeof msg.content === "string") return msg;
+          return {
+            ...msg,
+            content: msg.content.filter((part) => !part.type.startsWith("internal_")),
+          };
+        });
+
+    return NextResponse.json({ chat, messages: filteredMessages });
   } catch (error) {
     console.error("Error fetching chat:", error);
     return NextResponse.json(

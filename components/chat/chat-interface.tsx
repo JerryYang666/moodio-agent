@@ -444,7 +444,13 @@ export default function ChatInterface({
               isFirstChunk = false;
             }
 
-            if (event.type === "text") {
+            if (event.type === "internal_think") {
+              // Add internal_think part
+              currentContent.push({
+                type: "internal_think",
+                text: event.content,
+              });
+            } else if (event.type === "text") {
               // Append text to the first part if it's text, or create new
               if (
                 currentContent.length === 0 ||
@@ -462,8 +468,10 @@ export default function ChatInterface({
               currentContent.push(event.part);
             } else if (event.type === "part_update") {
               // Update existing part
-              if (currentContent[event.index + 1]) {
-                currentContent[event.index + 1] = event.part;
+              // For admins, use offset +2; for others, use +1 (internal_think not streamed)
+              const offset = (event.isAdmin ? 2 : 1);
+              if (currentContent[event.index + offset]) {
+                currentContent[event.index + offset] = event.part;
               }
             }
 

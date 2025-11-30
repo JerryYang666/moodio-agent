@@ -12,6 +12,7 @@ export interface Agent {
     history: Message[],
     userMessage: Message,
     userId: string,
+    isAdmin: boolean,
     requestStartTime?: number,
     precisionEditing?: boolean,
     precisionEditImageId?: string

@@ -22,6 +22,7 @@ export class Agent0 implements Agent {
     history: Message[],
     userMessage: Message,
     userId: string,
+    isAdmin: boolean,
     requestStartTime?: number,
     precisionEditing?: boolean,
     precisionEditImageId?: string

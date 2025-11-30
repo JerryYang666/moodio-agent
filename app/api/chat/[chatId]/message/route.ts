@@ -217,6 +217,7 @@ export async function POST(
       history,
       userMessage,
       payload.userId,
+      isAdmin ?? false,
       requestStartTime,
       precisionEditing,
       precisionEditImageId

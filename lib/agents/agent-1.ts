@@ -54,6 +54,7 @@ export class Agent1 implements Agent {
     history: Message[],
     userMessage: Message,
     userId: string,
+    isAdmin: boolean,
     requestStartTime?: number,
     precisionEditing?: boolean,
     precisionEditImageId?: string
@@ -76,7 +77,8 @@ export class Agent1 implements Agent {
     // Step 2: Call LLM and parse response
     const { stream, completion } = await this.callLLMAndParse(
       prepared,
-      startTime
+      startTime,
+      isAdmin
     );
 
     return { stream, completion };
@@ -145,9 +147,20 @@ export class Agent1 implements Agent {
     precisionEditImageId?: string
   ): Promise<PreparedMessages> {
     const systemPrompt = `You are a creative assistant.
-Based on the user's input, generate a question that will help trigger the creativity of the user, and four suggestions based on the question. You must give exactly four suggestions unless the user explicitly asks for fewer or more.
+Based on the user's input, first engage in a thinking process to evaluate the user's needs, intentions, and preferences. Then, generate a question that will help trigger the creativity of the user, and four suggestions based on the question.
+
+Thinking Process:
+Before responding, you MUST provide a thinking block wrapped in <think>...</think> tags. This block should contain the following sections:
+1. belief_prompt: Your internal estimate of what the user currently wants, summarized from the most recent user click (or no-click) and message.
+2. user_intention (immediate goal): Your analysis and prediction of what the user would like in the next round.
+3. user_preference (short-term goal): A list of textual statements describing the user’s preferences or dislikes within this session.
+4. user_persona (long-term goal): High-level, persistent user preferences collected across previous rounds.
+
+Response Generation:
+After the thinking process, generate your response.
+You must give exactly four suggestions unless the user explicitly asks for fewer or more.
 The absolute maximum number of suggestions you can give is eight (8). If the user asks for more than eight, you should give eight suggestions.
-The absolute maximum number of suggestions you can give is eight (8). If the user asks for more than eight, you should give eight suggestions.
+
 For example, if the user said "I want to create an image of two couples kissing", you can ask "Where are these two couples kissing?" and provide suggestions like "In a classroom", "In a playground", etc.
 
 If the user's input is too short or not conducive to suggestions (e.g., just "Hi"), you can choose not to provide any suggestions.
@@ -164,13 +177,20 @@ Supported aspect ratios: ${SUPPORTED_ASPECT_RATIOS.join(", ")}
 Choose the most appropriate ratio based on the subject matter and composition.
 
 Output Format:
-1. Wrap your question/response in <TEXT>...</TEXT> tags.
-2. If you are providing suggestions, output them one by one.
-3. Wrap each suggestion in <JSON>...</JSON> tags.
-4. Inside <JSON>, provide a JSON object with "title", "aspectRatio", and "prompt".
-5. Do NOT output markdown code blocks. Just the raw tags.
+1. Start with <think>...</think> containing your internal analysis.
+2. Wrap your question/response in <TEXT>...</TEXT> tags.
+3. If you are providing suggestions, output them one by one.
+4. Wrap each suggestion in <JSON>...</JSON> tags.
+5. Inside <JSON>, provide a JSON object with "title", "aspectRatio", and "prompt".
+6. Do NOT output markdown code blocks. Just the raw tags.
 
 Example with suggestions:
+<think>
+belief_prompt: User wants to create a romantic scene...
+user_intention: User likely wants to refine the setting...
+user_preference: - Likes realistic style...
+user_persona: Romantic, detail-oriented...
+</think>
 <TEXT>The question you ask the user, or just a response if no suggestions</TEXT>
 <JSON>{"title": "Short title for suggestion 1", "aspectRatio": "1:1", "prompt": "Detailed image generation prompt for suggestion 1"}</JSON>
 <JSON>{"title": "Short title for suggestion 2", "aspectRatio": "1:1", "prompt": "Detailed image generation prompt for suggestion 2"}</JSON>
@@ -178,6 +198,12 @@ Example with suggestions:
 <JSON>{"title": "Short title for suggestion 4", "aspectRatio": "1:1", "prompt": "Detailed image generation prompt for suggestion 4"}</JSON>
 
 Example without suggestions:
+<think>
+belief_prompt: User is greeting...
+user_intention: User wants to start a conversation...
+user_preference: None yet...
+user_persona: Friendly...
+</think>
 <TEXT>Hello! How can I help you today?</TEXT>
 `;
 
@@ -280,22 +306,58 @@ Example without suggestions:
       }
     }
 
+    // Find last think part location in filteredHistory
+    let lastThinkMessageIndex = -1;
+    let lastThinkPartIndex = -1;
+
+    for (let i = 0; i < filteredHistory.length; i++) {
+      const msg = filteredHistory[i];
+      if (Array.isArray(msg.content)) {
+        for (let j = 0; j < msg.content.length; j++) {
+          if (msg.content[j].type === "internal_think") {
+            lastThinkMessageIndex = i;
+            lastThinkPartIndex = j;
+          }
+        }
+      }
+    }
+
     const messages = [
       { role: "system", content: systemPrompt },
-      ...filteredHistory.map((m) => {
+      ...filteredHistory.map((m, mIdx) => {
         if (Array.isArray(m.content)) {
-          return {
-            role: m.role,
-            content: m.content.map((c) => {
-              if (c.type === "image")
+          // Filter and transform content parts
+          const newContent = m.content
+            .map((c, pIdx) => {
+              if (c.type === "image") {
                 return {
                   type: "image_url",
                   image_url: {
                     url: `${process.env.NEXT_PUBLIC_AWS_S3_PUBLIC_URL}/${c.imageId}`,
                   },
                 };
+              }
+              if (c.type === "internal_think") {
+                // Only keep the latest think part and convert it to text
+                if (
+                  mIdx === lastThinkMessageIndex &&
+                  pIdx === lastThinkPartIndex
+                ) {
+                  return {
+                    type: "text",
+                    text: `(agent thinking process)\n${c.text}`,
+                  };
+                }
+                // Filter out other think parts
+                return null;
+              }
               return c;
-            }),
+            })
+            .filter((c) => c !== null); // Remove nulls
+
+          return {
+            role: m.role,
+            content: newContent,
           };
         }
         return m;
@@ -319,7 +381,8 @@ Example without suggestions:
 
   private async callLLMAndParse(
     prepared: PreparedMessages,
-    startTime: number
+    startTime: number,
+    isAdmin: boolean
   ): Promise<AgentResponse> {
     const encoder = new TextEncoder();
     let resolveCompletion: (value: Message) => void;
@@ -337,6 +400,10 @@ Example without suggestions:
       async start(controller) {
         const send = (data: any) => {
           try {
+            // Only stream internal_* to admins
+            if (data.type?.startsWith("internal_") && !isAdmin) {
+              return;
+            }
             controller.enqueue(encoder.encode(JSON.stringify(data) + "\n"));
           } catch (e) {
             // Controller might be closed
@@ -356,7 +423,8 @@ Example without suggestions:
               send({ type: "invalidate", reason: "retry" });
 
               // Append format reminder to the last user message on retry
-              const lastMessage = prepared.messages[prepared.messages.length - 1];
+              const lastMessage =
+                prepared.messages[prepared.messages.length - 1];
               if (lastMessage && lastMessage.role === "user") {
                 if (Array.isArray(lastMessage.content)) {
                   // Add reminder as text part
@@ -366,7 +434,8 @@ Example without suggestions:
                   });
                 } else if (typeof lastMessage.content === "string") {
                   // Append to string content
-                  lastMessage.content += "\n\nPlease remember to follow the required format with <TEXT> and <JSON> tags as specified in the system prompt.";
+                  lastMessage.content +=
+                    "\n\nPlease remember to follow the required format with <TEXT> and <JSON> tags as specified in the system prompt.";
                 }
               }
             }
@@ -448,6 +517,7 @@ Example without suggestions:
     );
     let buffer = "";
     let fullLlmResponse = ""; // Track complete LLM response
+    let thoughtSent = false;
     let questionSent = false;
     let suggestionIndex = 0;
     const imageTasks: Promise<void>[] = [];
@@ -459,12 +529,13 @@ Example without suggestions:
         fullLlmResponse += delta; // Accumulate full response
 
         // Check for invalid text outside tags
-        // Valid text should only be inside <TEXT>...</TEXT> or <JSON>...</JSON>
+        // Valid text should only be inside <TEXT>...</TEXT> or <JSON>...</JSON> or <think>...</think>
         // Whitespace outside is OK
         let checkBuffer = buffer;
         let inAngleBrackets = false;
         let inTextTag = false;
         let inJsonTag = false;
+        let inThinkTag = false;
         let i = 0;
 
         while (i < checkBuffer.length) {
@@ -488,6 +559,14 @@ Example without suggestions:
             inJsonTag = false;
             i += 7;
             continue;
+          } else if (remaining.startsWith("<think>")) {
+            inThinkTag = true;
+            i += 7;
+            continue;
+          } else if (remaining.startsWith("</think>")) {
+            inThinkTag = false;
+            i += 8;
+            continue;
           }
 
           // Track if we're in angle brackets (for any other tags)
@@ -498,6 +577,7 @@ Example without suggestions:
           } else if (
             !inTextTag &&
             !inJsonTag &&
+            !inThinkTag &&
             !inAngleBrackets &&
             char.trim() !== ""
           ) {
@@ -513,7 +593,25 @@ Example without suggestions:
           i++;
         }
 
-        // 1. Parse Question
+        // 1. Parse Thought
+        if (!thoughtSent) {
+          const tStart = buffer.indexOf("<think>");
+          const tEnd = buffer.indexOf("</think>");
+
+          if (tStart !== -1 && tEnd !== -1) {
+            const thoughtText = buffer.substring(tStart + 7, tEnd).trim();
+            send({ type: "internal_think", content: thoughtText });
+            console.log(
+              "[Perf] Agent thought sent",
+              `[${Date.now() - startTime}ms]`
+            );
+            finalContent.push({ type: "internal_think", text: thoughtText });
+            thoughtSent = true;
+            buffer = buffer.substring(tEnd + 8);
+          }
+        }
+
+        // 2. Parse Question
         if (!questionSent) {
           const qStart = buffer.indexOf("<TEXT>");
           const qEnd = buffer.indexOf("</TEXT>");
@@ -579,8 +677,8 @@ Example without suggestions:
                         part: part,
                       });
 
-                      // Update final content (index + 1 because of text part)
-                      finalContent[currentIndex + 1] = part;
+                      // Update final content (index + 2 because of text part and internal_think part)
+                      finalContent[currentIndex + 2] = part;
                     } catch (err) {
                       console.error(
                         `Image gen error for index ${currentIndex}`,
@@ -598,7 +696,7 @@ Example without suggestions:
                         index: currentIndex,
                         part: errorPart,
                       });
-                      finalContent[currentIndex + 1] = errorPart;
+                      finalContent[currentIndex + 2] = errorPart;
                     }
                   })();
 

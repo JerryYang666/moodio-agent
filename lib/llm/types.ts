@@ -2,6 +2,7 @@
 
 export type MessageContentPart =
   | { type: "text"; text: string }
+  | { type: "internal_think"; text: string }
   | { type: "image_url"; image_url: { url: string } }
   | { type: "image"; imageId: string }
   | {
