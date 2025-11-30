@@ -414,7 +414,7 @@ export const Sidebar = () => {
           className={clsx(
             "space-y-1",
             viewMode === "grid" && !isCollapsed
-              ? "grid grid-cols-1 gap-2 space-y-0"
+              ? "grid grid-cols-1 gap-0 space-y-0"
               : ""
           )}
         >
