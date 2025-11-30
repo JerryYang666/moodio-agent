@@ -84,9 +84,9 @@ export const PrimarySidebar = () => {
               <NextLink
                 href={item.href}
                 className={clsx(
-                  "p-2 rounded-xl transition-all duration-300 group relative",
+                  "p-2 rounded-xl transition-all duration-300 group relative z-0 flex items-center justify-center",
                   isActive
-                    ? "bg-primary/10 text-primary shadow-sm"
+                    ? "text-primary"
                     : "text-default-500 hover:bg-default-100 hover:text-default-900"
                 )}
               >
@@ -94,7 +94,7 @@ export const PrimarySidebar = () => {
                 {isActive && (
                   <motion.div
                     layoutId="active-indicator"
-                    className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-6 bg-primary rounded-r-full"
+                    className="absolute inset-0 bg-primary/10 rounded-xl -z-10 shadow-sm"
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
@@ -111,13 +111,22 @@ export const PrimarySidebar = () => {
             <NextLink
               href="/admin"
               className={clsx(
-                "p-2 rounded-xl transition-all duration-300 group relative mt-auto",
+                "p-2 rounded-xl transition-all duration-300 group relative mt-auto z-0 flex items-center justify-center",
                 pathname?.startsWith("/admin")
-                  ? "bg-primary/10 text-primary shadow-sm"
+                  ? "text-primary"
                   : "text-default-500 hover:bg-default-100 hover:text-default-900"
               )}
             >
               <Shield size={20} />
+               {pathname?.startsWith("/admin") && (
+                  <motion.div
+                    layoutId="active-indicator"
+                    className="absolute inset-0 bg-primary/10 rounded-xl -z-10 shadow-sm"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                  />
+                )}
             </NextLink>
           </Tooltip>
         )}
