@@ -496,6 +496,8 @@ user_persona: Friendly...
       apiKey: process.env.LLM_API_KEY,
     });
 
+    console.log("prepared.messages", JSON.stringify(prepared.messages, null, 2));
+
     // Call LLM with stream
     const llmStream = await client.chat.completions.create({
       model: "gpt-4.1",
