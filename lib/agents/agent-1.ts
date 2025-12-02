@@ -794,9 +794,9 @@ export class Agent1 implements Agent {
           },
         });
       }
-
-      // Include user uploaded image if available (and distinct from precision image if needed, but we just push both)
-      if (userImageBase64) {
+      // Include user uploaded image ONLY if precision edit image is NOT provided
+      // If precision editing is on but no specific image ID was passed, we edit the last user image
+      else if (userImageBase64) {
         prompt.push({
           inlineData: {
             mimeType: "image/png",
