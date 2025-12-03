@@ -64,6 +64,7 @@ export default function ChatInterface({
       setPreviewUrl(null);
       setSelectedAgentPart(null);
       setPrecisionEditing(false);
+      setIsSending(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
       
       // Ensure we clean up any draft that might be lingering
