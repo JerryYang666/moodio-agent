@@ -56,7 +56,7 @@ export async function POST(
     // Handle FormData or JSON
     let content = "";
     let file: File | null = null;
-    let selection: { messageIndex: number; partIndex: number } | null = null;
+    let selection: { messageIndex: number; partIndex: number; imageId?: string } | null = null;
     let precisionEditing = false;
     let precisionEditImageId: string | undefined;
     let systemPromptOverride: string | undefined;
@@ -133,21 +133,35 @@ export async function POST(
 
     // Update history if selection is present
     if (selection) {
-      const { messageIndex, partIndex } = selection;
-      if (
-        history[messageIndex] &&
-        Array.isArray(history[messageIndex].content) &&
-        history[messageIndex].content[partIndex]
-      ) {
-        const part = history[messageIndex].content[partIndex];
-        if (part.type === "agent_image") {
+      const { messageIndex, imageId } = selection;
+      if (history[messageIndex] && Array.isArray(history[messageIndex].content)) {
+        const content = history[messageIndex].content as MessageContentPart[];
+        
+        // Find the part by imageId (more reliable than partIndex)
+        let targetPartIndex = -1;
+        if (imageId) {
+          targetPartIndex = content.findIndex(
+            (p) => p.type === "agent_image" && p.imageId === imageId
+          );
+        }
+        
+        // Fallback to partIndex if imageId not found (backward compatibility)
+        if (targetPartIndex === -1 && selection.partIndex !== undefined) {
+          targetPartIndex = selection.partIndex;
+        }
+
+        if (
+          targetPartIndex >= 0 &&
+          content[targetPartIndex] &&
+          content[targetPartIndex].type === "agent_image"
+        ) {
           // Create a deep copy of history to modify
           history = history.map((msg, mIdx) => {
             if (mIdx !== messageIndex) return msg;
 
             const newContent = [...(msg.content as MessageContentPart[])];
-            newContent[partIndex] = {
-              ...newContent[partIndex],
+            newContent[targetPartIndex] = {
+              ...newContent[targetPartIndex],
               // @ts-ignore - isSelected is optional
               isSelected: true,
             };

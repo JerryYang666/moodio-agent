@@ -301,6 +301,7 @@ export default function ChatInterface({
             JSON.stringify({
               messageIndex: selectedAgentPart.messageIndex,
               partIndex: selectedAgentPart.partIndex,
+              imageId: selectedAgentPart.imageId,
             })
           );
         }
@@ -330,6 +331,7 @@ export default function ChatInterface({
           payload.selection = {
             messageIndex: selectedAgentPart.messageIndex,
             partIndex: selectedAgentPart.partIndex,
+            imageId: selectedAgentPart.imageId,
           };
         }
         if (precisionEditing) {
