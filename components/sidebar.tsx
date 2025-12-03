@@ -286,6 +286,7 @@ export const Sidebar = () => {
   }, [refreshChats]);
 
   const handleNewChat = () => {
+    window.dispatchEvent(new Event("reset-chat"));
     router.push("/chat");
   };
 

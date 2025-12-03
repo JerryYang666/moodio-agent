@@ -53,6 +53,27 @@ export default function ChatInterface({
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [precisionEditing, setPrecisionEditing] = useState(false);
 
+  // Listen for reset-chat event (triggered when clicking New Chat button while technically already on /chat)
+  useEffect(() => {
+    const handleReset = () => {
+      setChatId(undefined);
+      setMessages([]);
+      setInput("");
+      setSelectedFile(null);
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      setPreviewUrl(null);
+      setSelectedAgentPart(null);
+      setPrecisionEditing(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      
+      // Ensure we clean up any draft that might be lingering
+      localStorage.removeItem(`${siteConfig.chatInputPrefix}new-chat`);
+    };
+
+    window.addEventListener("reset-chat", handleReset);
+    return () => window.removeEventListener("reset-chat", handleReset);
+  }, [previewUrl]);
+
   // Draft saving logic
   const [prevChatId, setPrevChatId] = useState(chatId);
   const [isDraftLoaded, setIsDraftLoaded] = useState(false);
@@ -508,7 +529,7 @@ export default function ChatInterface({
             setMessages((prev) => {
               const newMessages = [...prev];
               const lastMsg = newMessages[newMessages.length - 1];
-              if (lastMsg.role === "assistant") {
+              if (lastMsg && lastMsg.role === "assistant") {
                 lastMsg.content = [...currentContent];
               }
               return newMessages;
