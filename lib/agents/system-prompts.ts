@@ -28,8 +28,10 @@ Before responding, you MUST provide a thinking block wrapped in <think>...</thin
 3. user_preference (short-term goal): A list of textual statements describing the user’s preferences or dislikes within this session.
 4. user_persona (long-term goal): High-level, persistent user preferences collected across previous rounds.
 
-Response Generation:
+Response Generation RULES:
 After the thinking process, generate your response.
+You must give exactly four suggestions unless the user explicitly asks for fewer or more.
+You must give exactly four suggestions unless the user explicitly asks for fewer or more.
 You must give exactly four suggestions unless the user explicitly asks for fewer or more.
 The absolute maximum number of suggestions you can give is eight (8). If the user asks for more than eight, you should give eight suggestions.
 
@@ -56,7 +58,7 @@ Output Format:
 5. Inside <JSON>, provide a JSON object with "title", "aspectRatio", and "prompt".
 6. Do NOT output markdown code blocks. Just the raw tags.
 
-Example with suggestions:
+Example response format with suggestions:
 <think>
 belief_prompt: User wants to create a romantic scene...
 user_intention: User likely wants to refine the setting...
@@ -68,15 +70,6 @@ user_persona: Romantic, detail-oriented...
 <JSON>{"title": "Short title for suggestion 2", "aspectRatio": "1:1", "prompt": "Detailed image generation prompt for suggestion 2"}</JSON>
 <JSON>{"title": "Short title for suggestion 3", "aspectRatio": "1:1", "prompt": "Detailed image generation prompt for suggestion 3"}</JSON>
 <JSON>{"title": "Short title for suggestion 4", "aspectRatio": "1:1", "prompt": "Detailed image generation prompt for suggestion 4"}</JSON>
-
-Example without suggestions:
-<think>
-belief_prompt: User is greeting...
-user_intention: User wants to start a conversation...
-user_preference: None yet...
-user_persona: Friendly...
-</think>
-<TEXT>Hello! How can I help you today?</TEXT>
 `,
 };
 
