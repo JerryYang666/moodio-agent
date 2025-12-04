@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@heroui/button";
 import { Card } from "@heroui/card";
 import { Spinner } from "@heroui/spinner";
@@ -8,6 +9,7 @@ import { Chip } from "@heroui/chip";
 import { useAuth } from "@/hooks/use-auth";
 
 export default function Home() {
+  const router = useRouter();
   const { user, loading, error, logout, loggingOut } = useAuth();
   const [testResult, setTestResult] = useState<any>(null);
   const [testLoading, setTestLoading] = useState(false);
@@ -135,7 +137,7 @@ export default function Home() {
           </div>
 
           <div className="space-y-4">
-            <div className="flex justify-center pt-4">
+            <div className="flex justify-center gap-4 pt-4">
               <Button
                 color="primary"
                 variant="flat"
@@ -144,6 +146,14 @@ export default function Home() {
                 isLoading={testLoading}
               >
                 Test Protected API
+              </Button>
+              <Button
+                color="secondary"
+                variant="flat"
+                size="lg"
+                onPress={() => router.push("/chat")}
+              >
+                Go to agent
               </Button>
             </div>
 
