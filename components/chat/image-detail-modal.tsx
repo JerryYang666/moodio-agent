@@ -147,18 +147,25 @@ export default function ImageDetailModal({
                               </Button>
                             </div>
                             <TransformComponent
-                              wrapperClass="w-full h-full"
-                              contentClass="w-full h-full flex items-center justify-center"
+                              wrapperStyle={{
+                                width: "100%",
+                                height: "100%",
+                              }}
+                              contentStyle={{
+                                width: "100%",
+                                height: "100%",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                              }}
                             >
                               <img
                                 src={selectedImage.url}
                                 alt={selectedImage.title}
-                                className="max-w-none max-h-none object-contain"
+                                className="object-contain"
                                 style={{
-                                  width: "auto",
-                                  height: "auto",
-                                  maxWidth: "100%",
-                                  maxHeight: "100%",
+                                  maxWidth: "100vw",
+                                  maxHeight: "100dvh",
                                 }}
                               />
                             </TransformComponent>
