@@ -389,13 +389,13 @@ export const Navbar = () => {
           </div>
 
           {/* Dynamic Content Area based on activeSection */}
-          <div className="flex-1 overflow-y-auto px-4 flex flex-col gap-2 min-h-0">
+          <div className="flex-1 overflow-y-auto overflow-x-hidden px-4 flex flex-col gap-2 min-h-0">
             {activeSection === "agent" && (
               <>
-                <div className="flex flex-col gap-0 pb-0 shrink-0 sticky top-0 bg-background z-10">
+                <div className="flex flex-col gap-0 pb-2 shrink-0 sticky top-0 z-10 bg-background/70 backdrop-blur-md -mx-4 px-4 pt-1">
                   <button
                     onClick={handleNewChat}
-                    className="flex items-center gap-2 px-3 py-2 rounded-xl transition-colors text-default-500 hover:bg-default-100 hover:text-default-900 w-full justify-center bg-default-50 mb-2"
+                    className="flex items-center gap-2 px-3 py-2 rounded-xl transition-colors text-default-500 hover:bg-default-100/80 hover:text-default-900 w-full justify-center bg-default-100/50 mb-2"
                   >
                     <SquarePen size={20} />
                     <span className="text-sm">New Chat</span>
@@ -403,9 +403,9 @@ export const Navbar = () => {
 
                   <div className="relative py-2 flex items-center justify-center my-0">
                     <div className="absolute inset-0 flex items-center">
-                      <Divider />
+                      <Divider className="bg-divider/50" />
                     </div>
-                    <div className="relative bg-background px-2 flex gap-1">
+                    <div className="relative bg-transparent px-2 flex gap-1">
                       <button
                         onClick={() => setViewMode("list")}
                         className={clsx(
@@ -517,7 +517,7 @@ export const Navbar = () => {
           </div>
 
           {/* User & Admin Section at Bottom */}
-          <div className="mt-auto pt-2 px-4 pb-4 shrink-0 border-t border-divider">
+          <div className="mt-auto pt-2 px-4 pb-16 shrink-0 border-t border-divider/50">
             {user && (
               <div className="flex flex-col gap-2">
                 {user.roles.includes("admin") && (
@@ -531,18 +531,19 @@ export const Navbar = () => {
                   </NextLink>
                 )}
 
-                <div className="flex items-center justify-between gap-2 bg-default-50 p-2 rounded-xl">
-                  <div className="flex items-center gap-2 overflow-hidden">
-                    <Avatar
-                      src={undefined}
-                      name={
-                        user.firstName?.charAt(0) ||
-                        user.email.charAt(0).toUpperCase()
-                      }
-                      size="sm"
-                      isBordered
-                      color="primary"
-                    />
+                <div className="flex items-center justify-between gap-2 bg-default-100/50 p-2 rounded-xl">
+                  <div className="flex items-center gap-2 overflow-hidden min-w-0">
+                    <div className="shrink-0">
+                      <Avatar
+                        src={undefined}
+                        name={
+                          user.firstName?.charAt(0) ||
+                          user.email.charAt(0).toUpperCase()
+                        }
+                        size="sm"
+                        color="primary"
+                      />
+                    </div>
                     <div className="flex flex-col overflow-hidden">
                       <span className="text-sm font-medium truncate">
                         {user.firstName
@@ -554,21 +555,35 @@ export const Navbar = () => {
                       </span>
                     </div>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <ThemeSwitch />
-                    <Button
-                      isIconOnly
-                      size="sm"
-                      variant="light"
-                      color="danger"
-                      onPress={() => {
-                        logout();
-                        setIsMenuOpen(false);
-                      }}
-                    >
-                      <LogOut size={18} />
-                    </Button>
-                  </div>
+                  <Popover placement="top">
+                    <PopoverTrigger>
+                      <Button
+                        isIconOnly
+                        size="sm"
+                        variant="light"
+                        className="text-default-500"
+                      >
+                        <MoreHorizontal size={18} />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent>
+                      <div className="flex items-center gap-20 p-2">
+                        <Button
+                          size="sm"
+                          variant="flat"
+                          color="danger"
+                          startContent={<LogOut size={16} />}
+                          onPress={() => {
+                            logout();
+                            setIsMenuOpen(false);
+                          }}
+                        >
+                          Logout
+                        </Button>
+                        <ThemeSwitch />
+                      </div>
+                    </PopoverContent>
+                  </Popover>
                 </div>
               </div>
             )}
