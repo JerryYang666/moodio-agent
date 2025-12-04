@@ -213,13 +213,10 @@ const MobileChatItem = ({ chat, isActive, viewMode }: ChatItemProps) => {
 
         <div
           className={clsx(
-            "absolute opacity-100 md:opacity-0 md:group-hover/item:opacity-100 transition-opacity rounded-lg z-20",
+            "absolute opacity-100 transition-opacity rounded-lg z-20",
             viewMode === "list"
               ? "right-2 top-1/2 -translate-y-1/2"
-              : "top-2 right-2",
-            isActive || viewMode === "grid" // Always visible on mobile/active/grid for better UX
-              ? "visible"
-              : "hidden"
+              : "top-2 right-2"
           )}
         >
           <Dropdown>
@@ -360,7 +357,7 @@ export const Navbar = () => {
       <NavbarMenu className="pt-0 mt-0 top-12 bottom-0 pb-0 h-[calc(100dvh-3rem)] overflow-hidden flex flex-col">
         <div className="flex flex-col h-full pt-2 pb-4">
           {/* Top Tabs */}
-          <div className="grid grid-cols-4 gap-1 px-2 mb-4 shrink-0">
+          <div className="grid grid-cols-4 gap-1 px-2 mb-1 shrink-0">
             {navTabs.map((tab) => (
               <button
                 key={tab.id}
@@ -392,7 +389,7 @@ export const Navbar = () => {
           <div className="flex-1 overflow-y-auto overflow-x-hidden px-4 flex flex-col gap-2 min-h-0">
             {activeSection === "agent" && (
               <>
-                <div className="flex flex-col gap-0 pb-2 shrink-0 sticky top-0 z-10 bg-background/70 backdrop-blur-md -mx-4 px-4 pt-1">
+                <div className="flex flex-col gap-0 pb-2 shrink-0 sticky top-0 z-30 bg-background/60 backdrop-blur-xl -mx-4 px-4 pt-2 rounded-2xl mt-1">
                   <button
                     onClick={handleNewChat}
                     className="flex items-center gap-2 px-3 py-2 rounded-xl transition-colors text-default-500 hover:bg-default-100/80 hover:text-default-900 w-full justify-center bg-default-100/50 mb-2"
@@ -401,11 +398,8 @@ export const Navbar = () => {
                     <span className="text-sm">New Chat</span>
                   </button>
 
-                  <div className="relative py-2 flex items-center justify-center my-0">
-                    <div className="absolute inset-0 flex items-center">
-                      <Divider className="bg-divider/50" />
-                    </div>
-                    <div className="relative bg-transparent px-2 flex gap-1">
+                  <div className="relative py-0 flex items-center justify-center my-0">
+                    <div className="relative px-2 flex gap-1">
                       <button
                         onClick={() => setViewMode("list")}
                         className={clsx(
