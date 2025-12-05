@@ -18,12 +18,57 @@ async function createDatabase() {
     process.exit(1);
   }
 
-  // Extract database name from URL
-  const urlMatch = dbUrl.match(/\/([^/?]+)(\?|$)/);
-  const dbName = urlMatch ? urlMatch[1] : "moodio-dev";
+  // Auto-encode password with special characters
+  // Match: protocol://user:password@host:port/db
+  // Find the last @ that precedes a hostname (contains dots and no special chars)
+  const protocolMatch = dbUrl.match(/^(postgresql?:\/\/)/);
+  if (!protocolMatch) {
+    console.error("❌ DATABASE_URL must start with postgresql:// or postgres://");
+    process.exit(1);
+  }
+
+  const protocol = protocolMatch[1];
+  const rest = dbUrl.slice(protocol.length);
+
+  // Find user (everything before first :)
+  const colonIndex = rest.indexOf(":");
+  if (colonIndex === -1) {
+    console.error("❌ DATABASE_URL missing password separator (:)");
+    process.exit(1);
+  }
+  const user = rest.slice(0, colonIndex);
+  const afterUser = rest.slice(colonIndex + 1);
+
+  // Find the @ that separates password from host
+  // Look for @<hostname> pattern (hostname has dots and alphanumeric chars)
+  const hostMatch = afterUser.match(/@([a-zA-Z0-9][-a-zA-Z0-9]*(\.[a-zA-Z0-9][-a-zA-Z0-9]*)+[:\/?])/);
+  if (!hostMatch) {
+    console.error("❌ Could not find host in DATABASE_URL");
+    process.exit(1);
+  }
+
+  const atHostIndex = afterUser.indexOf(hostMatch[0]);
+  const password = afterUser.slice(0, atHostIndex);
+  const hostAndRest = afterUser.slice(atHostIndex + 1); // skip the @
+
+  // Rebuild URL with encoded password
+  const encodedPassword = encodeURIComponent(password);
+  const fixedUrl = `${protocol}${user}:${encodedPassword}@${hostAndRest}`;
+
+  let parsedUrl;
+  try {
+    parsedUrl = new URL(fixedUrl);
+  } catch (e) {
+    console.error("❌ Could not parse DATABASE_URL:", e.message);
+    process.exit(1);
+  }
+
+  // Extract database name from pathname
+  const dbName = parsedUrl.pathname.slice(1) || "moodio-dev";
 
   // Create connection to postgres database (default)
-  const postgresUrl = dbUrl.replace(`/${dbName}`, "/postgres");
+  parsedUrl.pathname = "/postgres";
+  const postgresUrl = parsedUrl.toString();
 
   const client = new Client({
     connectionString: postgresUrl,
