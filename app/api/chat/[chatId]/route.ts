@@ -4,7 +4,8 @@ import { verifyAccessToken } from "@/lib/auth/jwt";
 import { db } from "@/lib/db";
 import { chats } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
-import { getChatHistory } from "@/lib/storage/s3";
+import { getChatHistory, getSignedImageUrl } from "@/lib/storage/s3";
+import { Message, MessageContentPart } from "@/lib/llm/types";
 
 export async function GET(
   request: NextRequest,
@@ -44,18 +45,37 @@ export async function GET(
 
     const messages = await getChatHistory(chatId);
 
-    // Filter out internal_* for non-admins
-    const filteredMessages = isAdmin
-      ? messages
-      : messages.map((msg) => {
-          if (typeof msg.content === "string") return msg;
-          return {
-            ...msg,
-            content: msg.content.filter((part) => !part.type.startsWith("internal_")),
-          };
+    // Filter out internal_* for non-admins and add signed URLs for images
+    const processedMessages = messages.map((msg) => {
+      if (typeof msg.content === "string") return msg;
+
+      const processedContent = msg.content
+        .filter((part) => isAdmin || !part.type.startsWith("internal_"))
+        .map((part) => {
+          // Add signed URL for agent_image parts
+          if (part.type === "agent_image" && part.imageId && !part.imageUrl) {
+            return {
+              ...part,
+              imageUrl: getSignedImageUrl(part.imageId),
+            };
+          }
+          // Add signed URL for image parts (user uploaded images)
+          if (part.type === "image" && part.imageId) {
+            return {
+              ...part,
+              imageUrl: getSignedImageUrl(part.imageId),
+            };
+          }
+          return part;
         });
 
-    return NextResponse.json({ chat, messages: filteredMessages });
+      return {
+        ...msg,
+        content: processedContent,
+      };
+    });
+
+    return NextResponse.json({ chat, messages: processedMessages });
   } catch (error) {
     console.error("Error fetching chat:", error);
     return NextResponse.json(

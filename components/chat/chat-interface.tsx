@@ -19,7 +19,6 @@ import ChatMessage from "./chat-message";
 import ChatInput from "./chat-input";
 import { siteConfig } from "@/config/site";
 import { useVoiceRecorder } from "./use-voice-recorder";
-import { getImageUrl } from "./utils";
 import { SYSTEM_PROMPT_STORAGE_KEY } from "@/components/test-kit";
 
 interface SelectedAgentPart {
@@ -558,7 +557,7 @@ export default function ChatInterface({
   const handleAgentTitleClick = (part: any) => {
     if (part.status === "generated" || part.status === "error") {
       setSelectedImage({
-        url: part.imageUrl || (part.imageId ? getImageUrl(part.imageId) : ""),
+        url: part.imageUrl || "", // Use signed CloudFront URL from API
         title: part.title,
         prompt: part.prompt,
         imageId: part.imageId,
@@ -574,7 +573,7 @@ export default function ChatInterface({
     partIndex: number
   ) => {
     if (part.status === "generated") {
-      const url = part.imageUrl || getImageUrl(part.imageId);
+      const url = part.imageUrl || ""; // Use signed CloudFront URL from API
       if (
         selectedAgentPart?.url === url &&
         selectedAgentPart?.messageIndex === messageIndex

@@ -1,6 +1,6 @@
 import { Agent, AgentResponse } from "./types";
 import { Message, MessageContentPart } from "@/lib/llm/types";
-import { downloadImage, uploadImage } from "@/lib/storage/s3";
+import { downloadImage, uploadImage, getSignedImageUrl } from "@/lib/storage/s3";
 import OpenAI from "openai";
 import { GoogleGenAI } from "@google/genai";
 import { getSystemPrompt } from "./system-prompts";
@@ -223,7 +223,7 @@ export class Agent1 implements Agent {
               return {
                 type: "image_url",
                 image_url: {
-                  url: `${process.env.NEXT_PUBLIC_AWS_S3_PUBLIC_URL}/${p.imageId}`,
+                  url: getSignedImageUrl(p.imageId),
                 },
               };
             }
@@ -248,7 +248,7 @@ export class Agent1 implements Agent {
           formattedUserMessage.content.unshift({
             type: "image_url",
             image_url: {
-              url: `${process.env.NEXT_PUBLIC_AWS_S3_PUBLIC_URL}/${precisionEditImageId}`,
+              url: getSignedImageUrl(precisionEditImageId),
             },
           });
         }
@@ -282,7 +282,7 @@ export class Agent1 implements Agent {
                 return {
                   type: "image_url",
                   image_url: {
-                    url: `${process.env.NEXT_PUBLIC_AWS_S3_PUBLIC_URL}/${c.imageId}`,
+                    url: getSignedImageUrl(c.imageId),
                   },
                 };
               }
@@ -878,6 +878,7 @@ export class Agent1 implements Agent {
     const result: MessageContentPart = {
       type: "agent_image",
       imageId: finalImageId,
+      imageUrl: getSignedImageUrl(finalImageId),
       title: suggestion.title,
       aspectRatio: aspectRatio,
       prompt: suggestion.prompt,

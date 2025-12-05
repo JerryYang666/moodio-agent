@@ -57,4 +57,9 @@ export const siteConfig = {
     maxDuration: 120, // 2 minutes in seconds
     countdownThreshold: 15, // Show countdown 15 seconds before max duration
   },
+
+  // CloudFront Configuration
+  cloudfront: {
+    signedUrlExpirationSeconds: 30 * 60, // 30 minutes default expiration for signed URLs
+  },
 };

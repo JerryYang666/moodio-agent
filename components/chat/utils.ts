@@ -3,8 +3,14 @@
 export const AWS_S3_PUBLIC_URL =
   process.env.NEXT_PUBLIC_AWS_S3_PUBLIC_URL || "";
 
-// Helper to get image URL from S3
+/**
+ * @deprecated Use imageUrl from API response instead of constructing URLs client-side.
+ * Images are now served via signed CloudFront URLs provided by the backend.
+ */
 export const getImageUrl = (imageId: string) => {
+  console.warn(
+    "[Deprecated] getImageUrl is deprecated. Use imageUrl from API response instead."
+  );
   return `${AWS_S3_PUBLIC_URL}/${imageId}`;
 };
 

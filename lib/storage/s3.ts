@@ -3,8 +3,10 @@ import {
   PutObjectCommand,
   GetObjectCommand,
 } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/cloudfront-signer";
 import { Message } from "@/lib/llm/types";
 import { randomUUID } from "crypto";
+import { siteConfig } from "@/config/site";
 
 const s3Client = new S3Client({
   region: process.env.AWS_REGION!,
@@ -15,6 +17,13 @@ const s3Client = new S3Client({
 });
 
 const BUCKET_NAME = process.env.AWS_S3_BUCKET_NAME!;
+const CLOUDFRONT_DOMAIN = process.env.CLOUDFRONT_DOMAIN;
+const CLOUDFRONT_KEY_PAIR_ID = process.env.CLOUDFRONT_KEY_PAIR_ID;
+// Process private key once at module load - handle escaped newlines from env var
+const CLOUDFRONT_PRIVATE_KEY = process.env.CLOUDFRONT_PRIVATE_KEY?.replace(
+  /\\n/g,
+  "\n"
+);
 
 export interface ChatHistory {
   messages: Message[];
@@ -40,7 +49,6 @@ export async function uploadImage(
       Key: key,
       Body: body,
       ContentType: contentType,
-      ACL: "public-read",
     })
   );
 
@@ -104,4 +112,35 @@ export async function downloadImage(imageId: string): Promise<Buffer | null> {
     console.error("Error downloading image:", error);
     return null;
   }
+}
+
+/**
+ * Generate a signed CloudFront URL for an image
+ * @param imageId The image ID (stored in S3 as images/{imageId})
+ * @param expirationSeconds Optional expiration time in seconds (defaults to siteConfig)
+ * @returns Signed CloudFront URL
+ */
+export function getSignedImageUrl(
+  imageId: string,
+  expirationSeconds?: number
+): string {
+  if (!CLOUDFRONT_DOMAIN || !CLOUDFRONT_KEY_PAIR_ID || !CLOUDFRONT_PRIVATE_KEY) {
+    console.warn(
+      "[CloudFront] Missing CloudFront configuration, falling back to unsigned URL"
+    );
+    // Fallback to direct S3 URL if CloudFront is not configured
+    return `https://${CLOUDFRONT_DOMAIN || "s3-fallback"}/images/${imageId}`;
+  }
+
+  const url = `https://${CLOUDFRONT_DOMAIN}/images/${imageId}`;
+  const expiration =
+    expirationSeconds || siteConfig.cloudfront.signedUrlExpirationSeconds;
+  const dateLessThan = new Date(Date.now() + expiration * 1000);
+
+  return getSignedUrl({
+    url,
+    keyPairId: CLOUDFRONT_KEY_PAIR_ID,
+    dateLessThan: dateLessThan.toISOString(),
+    privateKey: CLOUDFRONT_PRIVATE_KEY,
+  });
 }

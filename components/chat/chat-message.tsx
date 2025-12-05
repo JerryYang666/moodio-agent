@@ -8,7 +8,7 @@ import clsx from "clsx";
 import ReactMarkdown from "react-markdown";
 import { Message, MessageContentPart } from "@/lib/llm/types";
 import ImageWithMenu from "@/components/collection/image-with-menu";
-import { getImageUrl, formatTime } from "./utils";
+import { formatTime } from "./utils";
 import { Button } from "@heroui/button";
 import { Popover, PopoverTrigger, PopoverContent } from "@heroui/popover";
 import { useState } from "react";
@@ -114,7 +114,7 @@ export default function ChatMessage({
                 key={`img-${i}`}
                 src={
                   part.type === "image"
-                    ? getImageUrl(part.imageId)
+                    ? part.imageUrl || "" // Use signed CloudFront URL from API
                     : part.image_url.url
                 }
                 alt="User upload"
@@ -128,9 +128,8 @@ export default function ChatMessage({
         {agentParts.length > 0 && (
           <div className="grid grid-cols-2 gap-3 mt-2">
             {agentParts.map((part: any, i) => {
-              const url =
-                part.imageUrl ||
-                (part.imageId ? getImageUrl(part.imageId) : "");
+              // Use imageUrl from API response (CloudFront signed URL)
+              const url = part.imageUrl || "";
               const isSelected =
                 (selectedAgentPart?.url === url &&
                   selectedAgentPart?.messageIndex === msgIndex) ||

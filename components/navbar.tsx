@@ -56,8 +56,6 @@ import {
   DropdownItem,
 } from "@heroui/dropdown";
 
-const AWS_S3_PUBLIC_URL = process.env.NEXT_PUBLIC_AWS_S3_PUBLIC_URL || "";
-
 interface ChatItemProps {
   chat: Chat;
   isActive: boolean;
@@ -86,9 +84,8 @@ const MobileChatItem = ({ chat, isActive, viewMode }: ChatItemProps) => {
 
   const chatName = chat.name || "New Chat";
   const isMonitored = isChatMonitored(chat.id);
-  const thumbnailUrl = chat.thumbnailImageId
-    ? `${AWS_S3_PUBLIC_URL}/${chat.thumbnailImageId}`
-    : null;
+  // Use signed CloudFront URL from API response
+  const thumbnailUrl = chat.thumbnailImageUrl || null;
 
   return (
     <div className="relative group">

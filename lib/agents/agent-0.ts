@@ -1,6 +1,6 @@
 import { Agent, AgentResponse } from "./types";
 import { Message, MessageContentPart } from "@/lib/llm/types";
-import { downloadImage, uploadImage } from "@/lib/storage/s3";
+import { downloadImage, uploadImage, getSignedImageUrl } from "@/lib/storage/s3";
 import OpenAI, { toFile } from "openai";
 import { getSystemPrompt } from "./system-prompts";
 
@@ -86,7 +86,7 @@ export class Agent0 implements Agent {
               return {
                 type: "image_url",
                 image_url: {
-                  url: `${process.env.NEXT_PUBLIC_AWS_S3_PUBLIC_URL}/${p.imageId}`,
+                  url: getSignedImageUrl(p.imageId),
                 },
               };
             }
@@ -106,7 +106,7 @@ export class Agent0 implements Agent {
                 return {
                   type: "image_url",
                   image_url: {
-                    url: `${process.env.NEXT_PUBLIC_AWS_S3_PUBLIC_URL}/${c.imageId}`,
+                    url: getSignedImageUrl(c.imageId),
                   },
                 };
               return c;
@@ -318,6 +318,7 @@ export class Agent0 implements Agent {
           const part: MessageContentPart = {
             type: "agent_image",
             imageId: finalImageId,
+            imageUrl: getSignedImageUrl(finalImageId),
             title: suggestion.title,
             prompt: suggestion.prompt,
             status: "generated",

@@ -39,8 +39,6 @@ interface ChatItemProps {
   viewMode: "list" | "grid";
 }
 
-const AWS_S3_PUBLIC_URL = process.env.NEXT_PUBLIC_AWS_S3_PUBLIC_URL || "";
-
 const ChatItem = ({ chat, isActive, isCollapsed, viewMode }: ChatItemProps) => {
   const { renameChat, isChatMonitored } = useChat();
   const [isRenameOpen, setIsRenameOpen] = useState(false);
@@ -62,9 +60,8 @@ const ChatItem = ({ chat, isActive, isCollapsed, viewMode }: ChatItemProps) => {
 
   const chatName = chat.name || "New Chat";
   const isMonitored = isChatMonitored(chat.id);
-  const thumbnailUrl = chat.thumbnailImageId
-    ? `${AWS_S3_PUBLIC_URL}/${chat.thumbnailImageId}`
-    : null;
+  // Use signed CloudFront URL from API response
+  const thumbnailUrl = chat.thumbnailImageUrl || null;
 
   const LinkComponent = (
     <NextLink

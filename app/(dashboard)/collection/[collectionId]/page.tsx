@@ -36,12 +36,6 @@ import {
   DropdownItem,
 } from "@heroui/dropdown";
 
-const AWS_S3_PUBLIC_URL = process.env.NEXT_PUBLIC_AWS_S3_PUBLIC_URL || "";
-
-const getImageUrl = (imageId: string) => {
-  return `${AWS_S3_PUBLIC_URL}/${imageId}`;
-};
-
 interface CollectionData {
   collection: {
     id: string;
@@ -56,6 +50,7 @@ interface CollectionData {
     id: string;
     collectionId: string;
     imageId: string;
+    imageUrl: string; // Signed CloudFront URL from API
     chatId: string | null;
     generationDetails: {
       title: string;
@@ -309,7 +304,7 @@ export default function CollectionPage({
 
   const handleImageClick = (image: CollectionData["images"][0]) => {
     setSelectedImage({
-      url: image.generationDetails.imageUrl || getImageUrl(image.imageId),
+      url: image.imageUrl, // Use signed CloudFront URL from API
       title: image.generationDetails.title,
       prompt: image.generationDetails.prompt,
       status: image.generationDetails.status,
@@ -413,10 +408,7 @@ export default function CollectionPage({
             <Card key={image.id} className="group relative">
               <CardBody className="p-0 overflow-hidden aspect-square relative rounded-lg">
                 <img
-                  src={
-                    image.generationDetails.imageUrl ||
-                    getImageUrl(image.imageId)
-                  }
+                  src={image.imageUrl} // Use signed CloudFront URL from API
                   alt={image.generationDetails.title}
                   className="w-full h-full object-cover cursor-pointer"
                   onClick={() => handleImageClick(image)}

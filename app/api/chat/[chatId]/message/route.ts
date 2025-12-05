@@ -4,13 +4,11 @@ import { verifyAccessToken } from "@/lib/auth/jwt";
 import { db } from "@/lib/db";
 import { chats } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
-import { getChatHistory, saveChatHistory, uploadImage } from "@/lib/storage/s3";
+import { getChatHistory, saveChatHistory, uploadImage, getSignedImageUrl } from "@/lib/storage/s3";
 import { createLLMClient } from "@/lib/llm/client";
 import { Message, MessageContentPart } from "@/lib/llm/types";
 import { agent1 } from "@/lib/agents/agent-1";
 import { waitUntil } from "@vercel/functions";
-
-const AWS_S3_PUBLIC_URL = process.env.NEXT_PUBLIC_AWS_S3_PUBLIC_URL || "";
 
 function convertToLLMFormat(message: Message): Message {
   if (typeof message.content === "string") {
@@ -22,7 +20,7 @@ function convertToLLMFormat(message: Message): Message {
       return {
         type: "image_url",
         image_url: {
-          url: `${AWS_S3_PUBLIC_URL}/${part.imageId}`,
+          url: getSignedImageUrl(part.imageId),
         },
       };
     }

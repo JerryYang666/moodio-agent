@@ -4,11 +4,11 @@ export type MessageContentPart =
   | { type: "text"; text: string }
   | { type: "internal_think"; text: string }
   | { type: "image_url"; image_url: { url: string } }
-  | { type: "image"; imageId: string }
+  | { type: "image"; imageId: string; imageUrl?: string } // imageUrl is signed CloudFront URL from API
   | {
       type: "agent_image";
       imageId?: string;
-      imageUrl?: string; // For display before S3 upload or if using external URL
+      imageUrl?: string; // Signed CloudFront URL for display
       title: string;
       aspectRatio?: string;
       prompt: string;

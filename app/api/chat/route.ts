@@ -4,6 +4,7 @@ import { verifyAccessToken } from "@/lib/auth/jwt";
 import { db } from "@/lib/db";
 import { chats } from "@/lib/db/schema";
 import { eq, desc } from "drizzle-orm";
+import { getSignedImageUrl } from "@/lib/storage/s3";
 
 // Create a new chat
 export async function POST(request: NextRequest) {
@@ -55,7 +56,15 @@ export async function GET(request: NextRequest) {
       .where(eq(chats.userId, payload.userId))
       .orderBy(desc(chats.updatedAt));
 
-    return NextResponse.json({ chats: userChats });
+    // Add signed CloudFront URLs for thumbnails
+    const chatsWithUrls = userChats.map((chat) => ({
+      ...chat,
+      thumbnailImageUrl: chat.thumbnailImageId
+        ? getSignedImageUrl(chat.thumbnailImageId)
+        : null,
+    }));
+
+    return NextResponse.json({ chats: chatsWithUrls });
   } catch (error) {
     console.error("Error listing chats:", error);
     return NextResponse.json(
