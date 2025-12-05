@@ -148,6 +148,14 @@ async function refreshSession(request: NextRequest): Promise<{ setCookie: string
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  // Check for maintenance mode
+  const isMaintenanceMode = process.env.MAINTENANCE_MODE === "true";
+  if (isMaintenanceMode && pathname !== "/maintenance") {
+    return NextResponse.redirect(new URL("/maintenance", request.url));
+  } else if (isMaintenanceMode && pathname === "/maintenance") {
+    return NextResponse.next();
+  }
+
   // 1. Verify existing access token
   const accessToken = getAccessToken(request);
   const isValidAccessToken = accessToken ? await verifyAccessToken(accessToken) : null;
