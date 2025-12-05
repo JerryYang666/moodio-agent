@@ -5,6 +5,7 @@
  * Run with: node scripts/create-database.js
  */
 
+require("dotenv").config();
 const { Client } = require("pg");
 
 async function createDatabase() {
