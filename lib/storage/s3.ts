@@ -55,9 +55,40 @@ export async function uploadImage(
   return imageId;
 }
 
+/**
+ * Strip imageUrl from message content parts before saving
+ * imageUrl contains signed URLs which are temporary and should not be persisted
+ */
+function stripImageUrls(messages: Message[]): Message[] {
+  return messages.map((message) => {
+    if (typeof message.content === "string") {
+      return message;
+    }
+
+    const strippedContent = message.content.map((part) => {
+      if (part.type === "image" && "imageUrl" in part) {
+        const { imageUrl, ...rest } = part;
+        return rest;
+      }
+      if (part.type === "agent_image" && "imageUrl" in part) {
+        const { imageUrl, ...rest } = part;
+        return rest;
+      }
+      return part;
+    });
+
+    return {
+      ...message,
+      content: strippedContent,
+    };
+  });
+}
+
 export async function saveChatHistory(chatId: string, messages: Message[]) {
   const key = `chats/${chatId}.json`;
-  const content = JSON.stringify({ messages });
+  // Strip imageUrl from all messages before saving - signed URLs should not be persisted
+  const cleanedMessages = stripImageUrls(messages);
+  const content = JSON.stringify({ messages: cleanedMessages });
 
   await s3Client.send(
     new PutObjectCommand({
@@ -67,6 +98,39 @@ export async function saveChatHistory(chatId: string, messages: Message[]) {
       ContentType: "application/json",
     })
   );
+}
+
+/**
+ * Add signed imageUrl to message content parts on retrieval
+ * Generates fresh signed URLs for all image references
+ */
+function addImageUrls(messages: Message[]): Message[] {
+  return messages.map((message) => {
+    if (typeof message.content === "string") {
+      return message;
+    }
+
+    const enrichedContent = message.content.map((part) => {
+      if (part.type === "image" && "imageId" in part) {
+        return {
+          ...part,
+          imageUrl: getSignedImageUrl(part.imageId),
+        };
+      }
+      if (part.type === "agent_image" && part.imageId) {
+        return {
+          ...part,
+          imageUrl: getSignedImageUrl(part.imageId),
+        };
+      }
+      return part;
+    });
+
+    return {
+      ...message,
+      content: enrichedContent,
+    };
+  });
 }
 
 export async function getChatHistory(chatId: string): Promise<Message[]> {
@@ -86,7 +150,8 @@ export async function getChatHistory(chatId: string): Promise<Message[]> {
 
     const str = await response.Body.transformToString();
     const data = JSON.parse(str) as ChatHistory;
-    return data.messages;
+    // Generate fresh signed URLs for all images on retrieval
+    return addImageUrls(data.messages);
   } catch (error: any) {
     if (error.name === "NoSuchKey") {
       return [];
