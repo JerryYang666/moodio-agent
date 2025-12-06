@@ -2,6 +2,7 @@
 
 import { Modal, ModalContent, ModalHeader, ModalBody } from "@heroui/modal";
 import { Button } from "@heroui/button";
+import { Image } from "@heroui/image";
 import {
   X,
   Download,
@@ -182,10 +183,13 @@ export default function ImageDetailModal({
                           </div>
                         ) : (
                           <div className="relative w-full h-full flex items-center justify-center">
-                            <img
+                            <Image
                               src={selectedImage.url}
                               alt={selectedImage.title}
-                              className="max-w-full max-h-[40vh] md:max-h-[60vh] object-contain rounded-lg cursor-zoom-in"
+                              classNames={{
+                                wrapper: "cursor-zoom-in",
+                                img: "max-w-full max-h-[40vh] md:max-h-[60vh] object-contain rounded-lg",
+                              }}
                               onClick={() => setIsFullscreen(true)}
                               onDoubleClick={() => setIsFullscreen(true)}
                             />

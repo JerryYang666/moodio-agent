@@ -7,6 +7,7 @@ import { Button } from "@heroui/button";
 import { Input } from "@heroui/input";
 import { Spinner } from "@heroui/spinner";
 import { Chip } from "@heroui/chip";
+import { Image } from "@heroui/image";
 import { Select, SelectItem } from "@heroui/select";
 import { Autocomplete, AutocompleteItem } from "@heroui/autocomplete";
 import {
@@ -407,10 +408,14 @@ export default function CollectionPage({
           {images.map((image) => (
             <Card key={image.id} className="group relative">
               <CardBody className="p-0 overflow-hidden aspect-square relative rounded-lg">
-                <img
+                <Image
                   src={image.imageUrl} // Use signed CloudFront URL from API
                   alt={image.generationDetails.title}
-                  className="w-full h-full object-cover cursor-pointer"
+                  radius="none"
+                  classNames={{
+                    wrapper: "w-full h-full !max-w-full cursor-pointer",
+                    img: "w-full h-full object-cover",
+                  }}
                   onClick={() => handleImageClick(image)}
                 />
                 <div className="absolute bottom-0 left-0 right-0 bg-white/90 dark:bg-black/60 text-black dark:text-white p-2 text-xs truncate opacity-0 group-hover:opacity-100 transition-opacity">

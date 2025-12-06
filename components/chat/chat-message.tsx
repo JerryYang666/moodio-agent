@@ -3,6 +3,7 @@
 import { Card, CardBody } from "@heroui/card";
 import { Spinner } from "@heroui/spinner";
 import { Avatar } from "@heroui/avatar";
+import { Image } from "@heroui/image";
 import { Bot, X, Pencil, ChevronDown, ChevronRight, Brain } from "lucide-react";
 import clsx from "clsx";
 import ReactMarkdown from "react-markdown";
@@ -110,7 +111,7 @@ export default function ChatMessage({
         {imageParts.length > 0 && (
           <div className="space-y-2">
             {imageParts.map((part: any, i) => (
-              <img
+              <Image
                 key={`img-${i}`}
                 src={
                   part.type === "image"
@@ -118,8 +119,10 @@ export default function ChatMessage({
                     : part.image_url.url
                 }
                 alt="User upload"
-                className="max-w-full rounded-lg"
-                style={{ maxHeight: "300px", objectFit: "contain" }}
+                classNames={{
+                  wrapper: "max-w-full",
+                  img: "max-w-full max-h-[300px] object-contain rounded-lg",
+                }}
               />
             ))}
           </div>
@@ -192,10 +195,14 @@ export default function ChatMessage({
                         </div>
                       )}
                       {effectiveStatus === "generated" && (
-                        <img
+                        <Image
                           src={url}
                           alt={part.title}
-                          className="w-full h-full object-contain bg-default-100 dark:bg-black"
+                          radius="none"
+                          classNames={{
+                            wrapper: "w-full h-full !max-w-full",
+                            img: "w-full h-full object-contain bg-default-100 dark:bg-black",
+                          }}
                         />
                       )}
                       {(effectiveStatus === "generated" ||
