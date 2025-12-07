@@ -10,6 +10,7 @@ import { ToastProvider } from "@heroui/toast";
 import { AuthProvider } from "@/components/auth-provider";
 import { ChatProvider } from "@/components/chat-provider";
 import { CollectionsProvider } from "@/components/collections-provider";
+import { IOSInstallPrompt } from "@/components/ios-install-prompt";
 
 export interface ProvidersProps {
   children: React.ReactNode;
@@ -34,6 +35,7 @@ export function Providers({ children, themeProps }: ProvidersProps) {
           <ChatProvider>
             <CollectionsProvider>
               <ToastProvider />
+              <IOSInstallPrompt />
               {children}
             </CollectionsProvider>
           </ChatProvider>
