@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { siteConfig } from "@/config/site";
 
 // Check if running in standalone mode (already installed)
 function isInStandaloneMode(): boolean {
@@ -40,6 +41,11 @@ export function IOSInstallPrompt() {
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
+    // Don't show if disabled in config
+    if (!siteConfig.pwa.enableInstallPrompt) {
+      return;
+    }
+
     // Don't show if not iOS Safari or already in standalone mode
     if (!isIOSSafari() || isInStandaloneMode()) {
       return;
@@ -86,7 +92,7 @@ export function IOSInstallPrompt() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100]"
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-100"
             onClick={handleDismiss}
           />
           
@@ -96,7 +102,7 @@ export function IOSInstallPrompt() {
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
             transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            className="fixed bottom-0 left-0 right-0 z-[101] bg-zinc-900 rounded-t-3xl p-6 pb-10 safe-area-bottom"
+            className="fixed bottom-0 left-0 right-0 z-101 bg-zinc-900 rounded-t-3xl p-6 pb-10 safe-area-bottom"
           >
             {/* Handle bar */}
             <div className="absolute top-3 left-1/2 -translate-x-1/2 w-10 h-1 bg-zinc-600 rounded-full" />
@@ -104,7 +110,7 @@ export function IOSInstallPrompt() {
             {/* Content */}
             <div className="mt-4 text-center">
               {/* App Icon */}
-              <div className="mx-auto w-16 h-16 rounded-2xl bg-gradient-to-br from-violet-500 to-fuchsia-600 flex items-center justify-center mb-4 shadow-lg shadow-violet-500/30">
+              <div className="mx-auto w-16 h-16 rounded-2xl bg-linear-to-br from-violet-500 to-fuchsia-600 flex items-center justify-center mb-4 shadow-lg shadow-violet-500/30">
                 <svg 
                   className="w-9 h-9 text-white" 
                   fill="none" 
@@ -130,7 +136,7 @@ export function IOSInstallPrompt() {
               {/* Instructions */}
               <div className="bg-zinc-800/50 rounded-2xl p-4 mb-6 text-left">
                 <div className="flex items-start gap-3 mb-4">
-                  <div className="flex-shrink-0 w-7 h-7 rounded-full bg-blue-500/20 flex items-center justify-center">
+                  <div className="shrink-0 w-7 h-7 rounded-full bg-blue-500/20 flex items-center justify-center">
                     <span className="text-blue-400 text-sm font-medium">1</span>
                   </div>
                   <div className="flex-1">
@@ -145,7 +151,7 @@ export function IOSInstallPrompt() {
                 </div>
                 
                 <div className="flex items-start gap-3">
-                  <div className="flex-shrink-0 w-7 h-7 rounded-full bg-blue-500/20 flex items-center justify-center">
+                  <div className="shrink-0 w-7 h-7 rounded-full bg-blue-500/20 flex items-center justify-center">
                     <span className="text-blue-400 text-sm font-medium">2</span>
                   </div>
                   <div className="flex-1">

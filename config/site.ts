@@ -62,4 +62,9 @@ export const siteConfig = {
   cloudfront: {
     signedUrlExpirationSeconds: 30 * 60, // 30 minutes default expiration for signed URLs
   },
+
+  // PWA Configuration
+  pwa: {
+    enableInstallPrompt: false, // Set to true when icons are ready in /public/icons/
+  },
 };
