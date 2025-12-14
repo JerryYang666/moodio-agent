@@ -207,7 +207,7 @@ export default function ChatMessage({
                       )}
                       {(effectiveStatus === "generated" ||
                         effectiveStatus === "error") && (
-                        <div className="absolute bottom-0 left-0 right-0 bg-white/90 dark:bg-black/60 text-black dark:text-white p-2 text-xs truncate md:opacity-0 md:group-hover/image:opacity-100 transition-opacity">
+                        <div className="absolute bottom-0 left-0 right-0 bg-white/90 dark:bg-black/60 text-black dark:text-white p-2 text-xs truncate md:opacity-0 md:group-hover/image:opacity-100 transition-opacity z-10 pointer-events-none">
                           {part.title}
                         </div>
                       )}
