@@ -314,7 +314,7 @@ export default function MenuConfiguration({
 
   return (
     <div className="overflow-x-auto scrollbar-hide -mx-2 px-2">
-      <div className="flex gap-2 items-center p-2 bg-content2/50 rounded-lg backdrop-blur-sm min-w-max">
+      <div className="flex gap-2 items-center p-2 bg-transparent rounded-lg min-w-max">
         {renderModeDropdown()}
         <div className="w-px h-6 bg-divider mx-1 shrink-0" />
         {renderDropdown("model")}
