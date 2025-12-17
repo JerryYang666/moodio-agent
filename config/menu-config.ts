@@ -52,7 +52,8 @@ export const MENU_CONFIG = {
       options: {
         smart: {
           label: "Smart",
-          description: "Let the model choose the best aspect ratio for your content",
+          description:
+            "Let the model choose the best aspect ratio for your content",
           icon: "Sparkles",
         },
         "21:9": { label: "21:9" },
@@ -85,7 +86,17 @@ export const MENU_CONFIG = {
         },
         aspectRatio: {
           enabled: true,
-          allowed: ["smart", "21:9", "16:9", "3:2", "4:3", "1:1", "3:4", "2:3", "9:16"],
+          allowed: [
+            "smart",
+            "21:9",
+            "16:9",
+            "3:2",
+            "4:3",
+            "1:1",
+            "3:4",
+            "2:3",
+            "9:16",
+          ],
         },
       },
     },
@@ -103,7 +114,17 @@ export const MENU_CONFIG = {
         },
         aspectRatio: {
           enabled: true,
-          allowed: ["smart", "21:9", "16:9", "3:2", "4:3", "1:1", "3:4", "2:3", "9:16"],
+          allowed: [
+            "smart",
+            "21:9",
+            "16:9",
+            "3:2",
+            "4:3",
+            "1:1",
+            "3:4",
+            "2:3",
+            "9:16",
+          ],
         },
       },
     },

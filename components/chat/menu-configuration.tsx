@@ -169,7 +169,9 @@ export default function MenuConfiguration({
         const Icon = ICON_MAP[option.icon];
         return <Icon size={size} className="text-default-500" />;
       }
-      return <AspectRatioIcon ratio={key} size={size} className="text-default-500" />;
+      return (
+        <AspectRatioIcon ratio={key} size={size} className="text-default-500" />
+      );
     };
 
     return (
@@ -179,7 +181,9 @@ export default function MenuConfiguration({
             className="capitalize"
             variant="bordered"
             size="sm"
-            startContent={isAspectRatio ? getAspectRatioIcon(selectedKey, 16) : undefined}
+            startContent={
+              isAspectRatio ? getAspectRatioIcon(selectedKey, 16) : undefined
+            }
           >
             <span className="text-default-500">{categoryDef.label}:</span>
             {selectedLabel}
@@ -201,7 +205,9 @@ export default function MenuConfiguration({
               <DropdownItem
                 key={key}
                 description={hasDescription ? option.description : undefined}
-                startContent={isAspectRatio ? getAspectRatioIcon(key, 20) : undefined}
+                startContent={
+                  isAspectRatio ? getAspectRatioIcon(key, 20) : undefined
+                }
               >
                 {option?.label || key}
               </DropdownItem>
