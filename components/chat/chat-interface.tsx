@@ -20,6 +20,7 @@ import ChatInput from "./chat-input";
 import { siteConfig } from "@/config/site";
 import { useVoiceRecorder } from "./use-voice-recorder";
 import { SYSTEM_PROMPT_STORAGE_KEY } from "@/components/test-kit";
+import { MenuState, INITIAL_MENU_STATE } from "./menu-configuration";
 
 interface SelectedAgentPart {
   url: string;
@@ -51,6 +52,7 @@ export default function ChatInterface({
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [precisionEditing, setPrecisionEditing] = useState(false);
+  const [menuState, setMenuState] = useState<MenuState>(INITIAL_MENU_STATE);
 
   // Listen for reset-chat event (triggered when clicking New Chat button while technically already on /chat)
   useEffect(() => {
@@ -65,7 +67,7 @@ export default function ChatInterface({
       setPrecisionEditing(false);
       setIsSending(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
-      
+
       // Ensure we clean up any draft that might be lingering
       localStorage.removeItem(`${siteConfig.chatInputPrefix}new-chat`);
     };
@@ -649,7 +651,7 @@ export default function ChatInterface({
 
   return (
     <div className="flex flex-col h-full relative">
-      <div className="flex-1 overflow-y-auto space-y-6 pb-4 pr-2 scrollbar-hide">
+      <div className="flex-1 overflow-y-auto space-y-6 pb-24 pr-2 scrollbar-hide">
         {messages.length === 0 && (
           <div className="text-center text-default-500 mt-60">
             <Bot size={48} className="mx-auto mb-4 opacity-20" />
@@ -704,6 +706,8 @@ export default function ChatInterface({
         showFileUpload={messages.length === 0}
         precisionEditing={precisionEditing}
         onPrecisionEditingChange={setPrecisionEditing}
+        menuState={menuState}
+        onMenuStateChange={setMenuState}
       />
 
       <ImageDetailModal
