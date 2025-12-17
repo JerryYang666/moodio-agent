@@ -16,6 +16,7 @@ import {
   MessageSquare,
   Sparkles,
   Info,
+  ChevronUp,
 } from "lucide-react";
 import { AspectRatioIcon } from "./aspect-ratio-icon";
 
@@ -181,55 +182,62 @@ export default function MenuConfiguration({
     };
 
     return (
-      <Dropdown key={categoryKey}>
-        <DropdownTrigger>
-          <Button
-            className="capitalize"
-            variant="bordered"
-            size="sm"
-            startContent={
-              isAspectRatio ? getAspectRatioIcon(selectedKey, 16) : undefined
+      <div key={categoryKey} className="flex flex-col gap-0.5">
+        <span className="text-[10px] text-default-400 uppercase tracking-wide pl-1">
+          {categoryDef.label}
+        </span>
+        <Dropdown>
+          <DropdownTrigger>
+            <Button
+              className="capitalize"
+              variant="bordered"
+              size="sm"
+              startContent={
+                isAspectRatio ? getAspectRatioIcon(selectedKey, 16) : undefined
+              }
+              endContent={<ChevronUp size={14} className="text-default-400" />}
+            >
+              {selectedLabel}
+            </Button>
+          </DropdownTrigger>
+          <DropdownMenu
+            disallowEmptySelection
+            aria-label={`Select ${categoryDef.label}`}
+            selectedKeys={new Set([selectedKey])}
+            selectionMode="single"
+            variant="flat"
+            onSelectionChange={(keys) =>
+              handleCategoryChange(categoryKey, keys)
             }
           >
-            <span className="text-default-500">{categoryDef.label}:</span>
-            {selectedLabel}
-          </Button>
-        </DropdownTrigger>
-        <DropdownMenu
-          disallowEmptySelection
-          aria-label={`Select ${categoryDef.label}`}
-          selectedKeys={new Set([selectedKey])}
-          selectionMode="single"
-          variant="flat"
-          onSelectionChange={(keys) => handleCategoryChange(categoryKey, keys)}
-        >
-          {allowedKeys.map((key) => {
-            const option = (options as any)[key];
-            const hasDescription = option?.description;
+            {allowedKeys.map((key) => {
+              const option = (options as any)[key];
+              const hasDescription = option?.description;
 
-            return (
-              <DropdownItem
-                key={key}
-                startContent={
-                  isAspectRatio ? getAspectRatioIcon(key, 20) : undefined
-                }
-                endContent={
-                  hasDescription ? (
-                    <Tooltip content={option.description} placement="right">
-                      <Info
-                        size={14}
-                        className="text-default-400 hover:text-default-600 cursor-help"
-                      />
-                    </Tooltip>
-                  ) : undefined
-                }
-              >
-                {option?.label || key}
-              </DropdownItem>
-            );
-          })}
-        </DropdownMenu>
-      </Dropdown>
+              return (
+                <DropdownItem
+                  key={key}
+                  startContent={
+                    isAspectRatio ? getAspectRatioIcon(key, 20) : undefined
+                  }
+                  endContent={
+                    hasDescription ? (
+                      <Tooltip content={option.description} placement="right">
+                        <Info
+                          size={14}
+                          className="text-default-400 hover:text-default-600 cursor-help"
+                        />
+                      </Tooltip>
+                    ) : undefined
+                  }
+                >
+                  {option?.label || key}
+                </DropdownItem>
+              );
+            })}
+          </DropdownMenu>
+        </Dropdown>
+      </div>
     );
   };
 
@@ -256,67 +264,75 @@ export default function MenuConfiguration({
     const buttonColor = modeColors[selectedKey] || "primary";
 
     return (
-      <Dropdown>
-        <DropdownTrigger>
-          <Button
-            className="capitalize font-medium"
+      <div className="flex flex-col gap-0.5">
+        <span className="text-[10px] text-default-400 uppercase tracking-wide pl-1">
+          Mode
+        </span>
+        <Dropdown>
+          <DropdownTrigger>
+            <Button
+              className="capitalize font-medium"
+              variant="flat"
+              color={buttonColor}
+              size="sm"
+              startContent={
+                SelectedIcon ? <SelectedIcon size={16} /> : undefined
+              }
+              endContent={<ChevronUp size={14} />}
+            >
+              {selectedLabel}
+            </Button>
+          </DropdownTrigger>
+          <DropdownMenu
+            disallowEmptySelection
+            aria-label="Select Mode"
+            selectedKeys={new Set([selectedKey])}
+            selectionMode="single"
             variant="flat"
-            color={buttonColor}
-            size="sm"
-            startContent={SelectedIcon ? <SelectedIcon size={16} /> : undefined}
+            onSelectionChange={handleModeChange}
           >
-            {selectedLabel}
-          </Button>
-        </DropdownTrigger>
-        <DropdownMenu
-          disallowEmptySelection
-          aria-label="Select Mode"
-          selectedKeys={new Set([selectedKey])}
-          selectionMode="single"
-          variant="flat"
-          onSelectionChange={handleModeChange}
-        >
-          {Object.entries(categoryDef.options).map(([key, value]) => {
-            const Icon = (value as any).icon
-              ? ICON_MAP[(value as any).icon]
-              : null;
-            const hasDescription = (value as any).description;
-            return (
-              <DropdownItem
-                key={key}
-                startContent={
-                  Icon ? (
-                    <Icon size={20} className="text-default-500" />
-                  ) : undefined
-                }
-                endContent={
-                  hasDescription ? (
-                    <Tooltip
-                      content={(value as any).description}
-                      placement="right"
-                    >
-                      <Info
-                        size={14}
-                        className="text-default-400 hover:text-default-600 cursor-help"
-                      />
-                    </Tooltip>
-                  ) : undefined
-                }
-              >
-                {value.label}
-              </DropdownItem>
-            );
-          })}
-        </DropdownMenu>
-      </Dropdown>
+            {Object.entries(categoryDef.options).map(([key, value]) => {
+              const Icon = (value as any).icon
+                ? ICON_MAP[(value as any).icon]
+                : null;
+              const hasDescription = (value as any).description;
+              return (
+                <DropdownItem
+                  key={key}
+                  startContent={
+                    Icon ? (
+                      <Icon size={20} className="text-default-500" />
+                    ) : undefined
+                  }
+                  endContent={
+                    hasDescription ? (
+                      <Tooltip
+                        content={(value as any).description}
+                        placement="right"
+                      >
+                        <Info
+                          size={14}
+                          className="text-default-400 hover:text-default-600 cursor-help"
+                        />
+                      </Tooltip>
+                    ) : undefined
+                  }
+                >
+                  {value.label}
+                </DropdownItem>
+              );
+            })}
+          </DropdownMenu>
+        </Dropdown>
+      </div>
     );
   };
 
   return (
     <div className="overflow-x-auto scrollbar-hide -mx-2 px-2">
-      <div className="flex gap-2 items-center p-2 bg-transparent rounded-lg min-w-max">
+      <div className="flex gap-2 items-center p-2 bg-transparent pt-0 rounded-lg min-w-max">
         {renderModeDropdown()}
-        <div className="w-px h-6 bg-divider mx-1 shrink-0" />
+        <span className="text-default-400 text-sm mx-1 mt-4">with</span>
         {renderDropdown("model")}
         {renderDropdown("expertise")}
         {renderDropdown("aspectRatio")}
