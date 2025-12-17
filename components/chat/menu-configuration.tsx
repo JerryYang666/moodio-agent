@@ -10,7 +10,13 @@ import {
 import { Button } from "@heroui/button";
 import { Tooltip } from "@heroui/tooltip";
 import { MENU_CONFIG } from "@/config/menu-config";
-import { WandSparkles, Pencil, MessageSquare, Sparkles } from "lucide-react";
+import {
+  WandSparkles,
+  Pencil,
+  MessageSquare,
+  Sparkles,
+  Info,
+} from "lucide-react";
 import { AspectRatioIcon } from "./aspect-ratio-icon";
 
 const ICON_MAP: Record<string, React.ElementType> = {
@@ -204,9 +210,18 @@ export default function MenuConfiguration({
             return (
               <DropdownItem
                 key={key}
-                description={hasDescription ? option.description : undefined}
                 startContent={
                   isAspectRatio ? getAspectRatioIcon(key, 20) : undefined
+                }
+                endContent={
+                  hasDescription ? (
+                    <Tooltip content={option.description} placement="right">
+                      <Info
+                        size={14}
+                        className="text-default-400 hover:text-default-600 cursor-help"
+                      />
+                    </Tooltip>
+                  ) : undefined
                 }
               >
                 {option?.label || key}
@@ -265,13 +280,26 @@ export default function MenuConfiguration({
             const Icon = (value as any).icon
               ? ICON_MAP[(value as any).icon]
               : null;
+            const hasDescription = (value as any).description;
             return (
               <DropdownItem
                 key={key}
-                description={(value as any).description}
                 startContent={
                   Icon ? (
                     <Icon size={20} className="text-default-500" />
+                  ) : undefined
+                }
+                endContent={
+                  hasDescription ? (
+                    <Tooltip
+                      content={(value as any).description}
+                      placement="right"
+                    >
+                      <Info
+                        size={14}
+                        className="text-default-400 hover:text-default-600 cursor-help"
+                      />
+                    </Tooltip>
                   ) : undefined
                 }
               >
