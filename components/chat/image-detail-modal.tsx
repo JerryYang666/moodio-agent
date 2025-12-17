@@ -11,21 +11,28 @@ import {
   ZoomIn,
   ZoomOut,
   Undo2,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 import { downloadImage } from "./utils";
+
+export interface ImageInfo {
+  url: string;
+  title: string;
+  prompt: string;
+  imageId?: string;
+  status?: "loading" | "generated" | "error";
+}
 
 interface ImageDetailModalProps {
   isOpen: boolean;
   onOpenChange: () => void;
-  selectedImage: {
-    url: string;
-    title: string;
-    prompt: string;
-    imageId?: string;
-    status?: "loading" | "generated" | "error";
-  } | null;
+  selectedImage: ImageInfo | null;
+  allImages: ImageInfo[];
+  currentIndex: number;
+  onNavigate: (index: number) => void;
   onClose: () => void;
 }
 
@@ -33,9 +40,45 @@ export default function ImageDetailModal({
   isOpen,
   onOpenChange,
   selectedImage,
+  allImages,
+  currentIndex,
+  onNavigate,
   onClose,
 }: ImageDetailModalProps) {
   const [isFullscreen, setIsFullscreen] = useState(false);
+
+  const canNavigatePrev = currentIndex > 0;
+  const canNavigateNext = currentIndex < allImages.length - 1;
+
+  const handlePrevious = useCallback(() => {
+    if (canNavigatePrev) {
+      onNavigate(currentIndex - 1);
+    }
+  }, [canNavigatePrev, currentIndex, onNavigate]);
+
+  const handleNext = useCallback(() => {
+    if (canNavigateNext) {
+      onNavigate(currentIndex + 1);
+    }
+  }, [canNavigateNext, currentIndex, onNavigate]);
+
+  // Keyboard navigation
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        handlePrevious();
+      } else if (e.key === "ArrowRight") {
+        e.preventDefault();
+        handleNext();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, handlePrevious, handleNext]);
 
   // Reset fullscreen when modal closes
   useEffect(() => {
@@ -88,6 +131,7 @@ export default function ImageDetailModal({
                         minScale={0.5}
                         maxScale={4}
                         centerOnInit
+                        key={selectedImage.url}
                       >
                         {({ zoomIn, zoomOut, resetTransform }) => (
                           <>
@@ -147,6 +191,36 @@ export default function ImageDetailModal({
                                 <X size={20} />
                               </Button>
                             </div>
+
+                            {/* Navigation arrows in fullscreen */}
+                            {canNavigatePrev && (
+                              <Button
+                                isIconOnly
+                                variant="flat"
+                                className="absolute left-4 top-1/2 -translate-y-1/2 z-50 bg-black/50 text-white w-12 h-12"
+                                onPress={handlePrevious}
+                              >
+                                <ChevronLeft size={28} />
+                              </Button>
+                            )}
+                            {canNavigateNext && (
+                              <Button
+                                isIconOnly
+                                variant="flat"
+                                className="absolute right-4 top-1/2 -translate-y-1/2 z-50 bg-black/50 text-white w-12 h-12"
+                                onPress={handleNext}
+                              >
+                                <ChevronRight size={28} />
+                              </Button>
+                            )}
+
+                            {/* Image counter */}
+                            {allImages.length > 1 && (
+                              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-50 bg-black/50 text-white px-3 py-1 rounded-full text-sm">
+                                {currentIndex + 1} / {allImages.length}
+                              </div>
+                            )}
+
                             <TransformComponent
                               wrapperStyle={{
                                 width: "100%",
@@ -177,6 +251,35 @@ export default function ImageDetailModal({
                   ) : (
                     <>
                       <div className="w-full md:w-1/2 flex items-center justify-center bg-black/5 rounded-lg min-h-[200px] md:min-h-[400px] relative group">
+                        {/* Navigation arrows */}
+                        {canNavigatePrev && (
+                          <Button
+                            isIconOnly
+                            variant="flat"
+                            className="absolute left-2 top-1/2 -translate-y-1/2 z-20 bg-black/50 text-white md:opacity-0 md:group-hover:opacity-100 transition-opacity"
+                            onPress={handlePrevious}
+                          >
+                            <ChevronLeft size={24} />
+                          </Button>
+                        )}
+                        {canNavigateNext && (
+                          <Button
+                            isIconOnly
+                            variant="flat"
+                            className="absolute right-2 top-1/2 -translate-y-1/2 z-20 bg-black/50 text-white md:opacity-0 md:group-hover:opacity-100 transition-opacity"
+                            onPress={handleNext}
+                          >
+                            <ChevronRight size={24} />
+                          </Button>
+                        )}
+
+                        {/* Image counter */}
+                        {allImages.length > 1 && (
+                          <div className="absolute bottom-2 left-1/2 -translate-x-1/2 z-20 bg-black/50 text-white px-2 py-0.5 rounded-full text-xs">
+                            {currentIndex + 1} / {allImages.length}
+                          </div>
+                        )}
+
                         {selectedImage.status === "error" ? (
                           <div className="w-full h-full flex items-center justify-center bg-danger-50 text-danger rounded-lg min-h-[200px]">
                             <X size={48} />

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, use } from "react";
+import { useState, useEffect, use, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardBody } from "@heroui/card";
 import { Button } from "@heroui/button";
@@ -29,7 +29,9 @@ import {
   MessageSquare,
 } from "lucide-react";
 import { useCollections } from "@/hooks/use-collections";
-import ImageDetailModal from "@/components/chat/image-detail-modal";
+import ImageDetailModal, {
+  ImageInfo,
+} from "@/components/chat/image-detail-modal";
 import {
   Dropdown,
   DropdownTrigger,
@@ -122,13 +124,9 @@ export default function CollectionPage({
     onOpenChange: onRemoveImageOpenChange,
   } = useDisclosure();
 
-  const [selectedImage, setSelectedImage] = useState<{
-    url: string;
-    title: string;
-    prompt: string;
-    imageId?: string;
-    status?: "loading" | "generated" | "error";
-  } | null>(null);
+  const [selectedImage, setSelectedImage] = useState<ImageInfo | null>(null);
+  const [allImages, setAllImages] = useState<ImageInfo[]>([]);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [imageToRemoveId, setImageToRemoveId] = useState<string | null>(null);
 
   const [searchEmail, setSearchEmail] = useState("");
@@ -304,6 +302,23 @@ export default function CollectionPage({
   };
 
   const handleImageClick = (image: CollectionData["images"][0]) => {
+    // Build allImages array from collection images
+    const imagesForNav: ImageInfo[] = (collectionData?.images || []).map(
+      (img) => ({
+        url: img.imageUrl,
+        title: img.generationDetails.title,
+        prompt: img.generationDetails.prompt,
+        status: img.generationDetails.status,
+        imageId: img.imageId,
+      })
+    );
+
+    const clickedIndex = imagesForNav.findIndex(
+      (img) => img.imageId === image.imageId
+    );
+
+    setAllImages(imagesForNav);
+    setCurrentImageIndex(clickedIndex >= 0 ? clickedIndex : 0);
     setSelectedImage({
       url: image.imageUrl, // Use signed CloudFront URL from API
       title: image.generationDetails.title,
@@ -313,6 +328,16 @@ export default function CollectionPage({
     });
     onImageDetailOpen();
   };
+
+  const handleImageNavigate = useCallback(
+    (index: number) => {
+      if (index >= 0 && index < allImages.length) {
+        setCurrentImageIndex(index);
+        setSelectedImage(allImages[index]);
+      }
+    },
+    [allImages]
+  );
 
   if (loading) {
     return (
@@ -702,6 +727,9 @@ export default function CollectionPage({
         isOpen={isImageDetailOpen}
         onOpenChange={onImageDetailOpenChange}
         selectedImage={selectedImage}
+        allImages={allImages}
+        currentIndex={currentImageIndex}
+        onNavigate={handleImageNavigate}
         onClose={onImageDetailClose}
       />
     </div>

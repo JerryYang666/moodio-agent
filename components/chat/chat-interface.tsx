@@ -14,7 +14,7 @@ import {
   NotificationPermissionModalRef,
 } from "@/components/notification-permission-modal";
 import { Message, MessageContentPart } from "@/lib/llm/types";
-import ImageDetailModal from "./image-detail-modal";
+import ImageDetailModal, { ImageInfo } from "./image-detail-modal";
 import ChatMessage from "./chat-message";
 import ChatInput from "./chat-input";
 import { siteConfig } from "@/config/site";
@@ -109,13 +109,33 @@ export default function ChatInterface({
 
   // Modal state for agent images
   const { isOpen, onOpen, onOpenChange, onClose } = useDisclosure();
-  const [selectedImage, setSelectedImage] = useState<{
-    url: string;
-    title: string;
-    prompt: string;
-    imageId?: string;
-    status?: "loading" | "generated" | "error";
-  } | null>(null);
+  const [selectedImage, setSelectedImage] = useState<ImageInfo | null>(null);
+  const [allImages, setAllImages] = useState<ImageInfo[]>([]);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+
+  // Collect all images from messages
+  const collectAllImages = useCallback((): ImageInfo[] => {
+    const images: ImageInfo[] = [];
+    for (const message of messages) {
+      if (message.role === "assistant" && Array.isArray(message.content)) {
+        for (const part of message.content) {
+          if (
+            part.type === "agent_image" &&
+            (part.status === "generated" || part.status === "error")
+          ) {
+            images.push({
+              url: part.imageUrl || "",
+              title: part.title,
+              prompt: part.prompt,
+              imageId: part.imageId,
+              status: part.status,
+            });
+          }
+        }
+      }
+    }
+    return images;
+  }, [messages]);
 
   // State for selected agent image (for sending in next message)
   const [selectedAgentPart, setSelectedAgentPart] =
@@ -558,8 +578,14 @@ export default function ChatInterface({
 
   const handleAgentTitleClick = (part: any) => {
     if (part.status === "generated" || part.status === "error") {
+      const images = collectAllImages();
+      const url = part.imageUrl || "";
+      const index = images.findIndex((img) => img.url === url);
+
+      setAllImages(images);
+      setCurrentImageIndex(index >= 0 ? index : 0);
       setSelectedImage({
-        url: part.imageUrl || "", // Use signed CloudFront URL from API
+        url, // Use signed CloudFront URL from API
         title: part.title,
         prompt: part.prompt,
         imageId: part.imageId,
@@ -568,6 +594,16 @@ export default function ChatInterface({
       onOpen();
     }
   };
+
+  const handleImageNavigate = useCallback(
+    (index: number) => {
+      if (index >= 0 && index < allImages.length) {
+        setCurrentImageIndex(index);
+        setSelectedImage(allImages[index]);
+      }
+    },
+    [allImages]
+  );
 
   const handleAgentImageSelect = (
     part: any,
@@ -714,6 +750,9 @@ export default function ChatInterface({
         isOpen={isOpen}
         onOpenChange={onOpenChange}
         selectedImage={selectedImage}
+        allImages={allImages}
+        currentIndex={currentImageIndex}
+        onNavigate={handleImageNavigate}
         onClose={onClose}
       />
       <NotificationPermissionModal ref={notificationModalRef} />
