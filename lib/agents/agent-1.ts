@@ -1,6 +1,10 @@
 import { Agent, AgentResponse } from "./types";
 import { Message, MessageContentPart } from "@/lib/llm/types";
-import { downloadImage, uploadImage, getSignedImageUrl } from "@/lib/storage/s3";
+import {
+  downloadImage,
+  uploadImage,
+  getSignedImageUrl,
+} from "@/lib/storage/s3";
 import OpenAI from "openai";
 import { GoogleGenAI } from "@google/genai";
 import { getSystemPrompt } from "./system-prompts";
@@ -806,12 +810,15 @@ export class Agent1 implements Agent {
       }
 
       const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash-image",
+        model: "gemini-3-pro-image-preview",
         contents: prompt,
         config: {
+          responseModalities: ["TEXT", "IMAGE"],
           imageConfig: {
             aspectRatio: aspectRatio,
+            imageSize: "2K",
           },
+          tools: [{ googleSearch: {} }],
         },
       });
 
@@ -841,12 +848,15 @@ export class Agent1 implements Agent {
     } else {
       // Text to image
       const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash-image",
+        model: "gemini-3-pro-image-preview",
         contents: suggestion.prompt,
         config: {
+          responseModalities: ["TEXT", "IMAGE"],
           imageConfig: {
             aspectRatio: aspectRatio,
+            imageSize: "2K",
           },
+          tools: [{ googleSearch: {} }],
         },
       });
 
