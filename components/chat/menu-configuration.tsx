@@ -220,13 +220,21 @@ export default function MenuConfiguration({
     ).icon;
     const SelectedIcon = selectedIconName ? ICON_MAP[selectedIconName] : null;
 
+    // Different colors for different modes
+    const modeColors: Record<string, "primary" | "secondary" | "success"> = {
+      create: "primary",
+      edit: "secondary",
+      chat: "success",
+    };
+    const buttonColor = modeColors[selectedKey] || "primary";
+
     return (
       <Dropdown>
         <DropdownTrigger>
           <Button
             className="capitalize font-medium"
             variant="flat"
-            color="primary"
+            color={buttonColor}
             size="sm"
             startContent={SelectedIcon ? <SelectedIcon size={16} /> : undefined}
           >
