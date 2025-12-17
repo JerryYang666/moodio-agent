@@ -48,8 +48,13 @@ export const MENU_CONFIG = {
 
     aspectRatio: {
       label: "Aspect Ratio",
-      default: "21:9",
+      default: "smart",
       options: {
+        smart: {
+          label: "Smart",
+          description: "Let the model choose the best aspect ratio for your content",
+          icon: "Sparkles",
+        },
         "21:9": { label: "21:9" },
         "16:9": { label: "16:9" },
         "3:2": { label: "3:2" },
@@ -67,12 +72,12 @@ export const MENU_CONFIG = {
       defaults: {
         model: "nano-banana-pro",
         expertise: "commercial",
-        aspectRatio: "21:9",
+        aspectRatio: "smart",
       },
       availability: {
         model: {
           enabled: true,
-          allowed: ["nano-banana-pro", "midjourney", "gpt-5.2", "gemini-3"],
+          allowed: ["nano-banana-pro"],
         },
         expertise: {
           enabled: true,
@@ -80,7 +85,7 @@ export const MENU_CONFIG = {
         },
         aspectRatio: {
           enabled: true,
-          allowed: ["21:9", "16:9", "3:2", "4:3", "1:1", "3:4", "2:3", "9:16"],
+          allowed: ["smart", "21:9", "16:9", "3:2", "4:3", "1:1", "3:4", "2:3", "9:16"],
         },
       },
     },
@@ -88,7 +93,7 @@ export const MENU_CONFIG = {
     edit: {
       defaults: {
         model: "nano-banana-pro",
-        aspectRatio: "21:9",
+        aspectRatio: "smart",
       },
       availability: {
         model: { enabled: true, allowed: ["nano-banana-pro"] },
@@ -96,7 +101,10 @@ export const MENU_CONFIG = {
           enabled: false,
           reason: "Expertise is not available in Edit selected images mode.",
         },
-        aspectRatio: { enabled: true, allowed: ["21:9", "16:9", "1:1"] },
+        aspectRatio: {
+          enabled: true,
+          allowed: ["smart", "21:9", "16:9", "3:2", "4:3", "1:1", "3:4", "2:3", "9:16"],
+        },
       },
     },
 

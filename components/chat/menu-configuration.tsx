@@ -10,13 +10,14 @@ import {
 import { Button } from "@heroui/button";
 import { Tooltip } from "@heroui/tooltip";
 import { MENU_CONFIG } from "@/config/menu-config";
-import { WandSparkles, Pencil, MessageSquare } from "lucide-react";
+import { WandSparkles, Pencil, MessageSquare, Sparkles } from "lucide-react";
 import { AspectRatioIcon } from "./aspect-ratio-icon";
 
 const ICON_MAP: Record<string, React.ElementType> = {
   WandSparkles,
   Pencil,
   MessageSquare,
+  Sparkles,
 };
 
 export type MenuState = {
@@ -157,8 +158,19 @@ export default function MenuConfiguration({
     const allowedKeys = availability.allowed;
 
     const selectedKey = state[categoryKey];
-    const selectedLabel = (options as any)[selectedKey]?.label || selectedKey;
+    const selectedOption = (options as any)[selectedKey];
+    const selectedLabel = selectedOption?.label || selectedKey;
     const isAspectRatio = categoryKey === "aspectRatio";
+
+    // Get icon for aspect ratio options (if defined in config)
+    const getAspectRatioIcon = (key: string, size: number) => {
+      const option = (options as any)[key];
+      if (option?.icon && ICON_MAP[option.icon]) {
+        const Icon = ICON_MAP[option.icon];
+        return <Icon size={size} className="text-default-500" />;
+      }
+      return <AspectRatioIcon ratio={key} size={size} className="text-default-500" />;
+    };
 
     return (
       <Dropdown key={categoryKey}>
@@ -167,11 +179,7 @@ export default function MenuConfiguration({
             className="capitalize"
             variant="bordered"
             size="sm"
-            startContent={
-              isAspectRatio ? (
-                <AspectRatioIcon ratio={selectedKey} size={16} />
-              ) : undefined
-            }
+            startContent={isAspectRatio ? getAspectRatioIcon(selectedKey, 16) : undefined}
           >
             <span className="text-default-500">{categoryDef.label}:</span>
             {selectedLabel}
@@ -185,22 +193,20 @@ export default function MenuConfiguration({
           variant="flat"
           onSelectionChange={(keys) => handleCategoryChange(categoryKey, keys)}
         >
-          {allowedKeys.map((key) => (
-            <DropdownItem
-              key={key}
-              startContent={
-                isAspectRatio ? (
-                  <AspectRatioIcon
-                    ratio={key}
-                    size={20}
-                    className="text-default-500"
-                  />
-                ) : undefined
-              }
-            >
-              {(options as any)[key]?.label || key}
-            </DropdownItem>
-          ))}
+          {allowedKeys.map((key) => {
+            const option = (options as any)[key];
+            const hasDescription = option?.description;
+
+            return (
+              <DropdownItem
+                key={key}
+                description={hasDescription ? option.description : undefined}
+                startContent={isAspectRatio ? getAspectRatioIcon(key, 20) : undefined}
+              >
+                {option?.label || key}
+              </DropdownItem>
+            );
+          })}
         </DropdownMenu>
       </Dropdown>
     );
