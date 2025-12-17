@@ -198,7 +198,7 @@ export default function ChatInput({
           <div className={clsx("flex items-center p-2", isExpanded && "gap-2")}>
             <div
               className={clsx(
-                "flex gap-1 items-center overflow-hidden transition-all duration-300",
+                "flex gap-1 items-center overflow-hidden transition-all duration-300 shrink-0",
                 isExpanded ? "w-auto opacity-100" : "w-0 opacity-0"
               )}
             >
@@ -268,7 +268,7 @@ export default function ChatInput({
               onValueChange={onInputChange}
               onKeyDown={handleKeyDown}
               onFocus={() => setIsExpanded(true)}
-              className="flex-1 min-w-[200px]"
+              className="flex-1 min-w-0"
               classNames={{
                 input: "text-base",
                 inputWrapper:
