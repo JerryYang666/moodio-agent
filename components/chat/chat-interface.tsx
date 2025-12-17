@@ -20,7 +20,7 @@ import ChatInput from "./chat-input";
 import { siteConfig } from "@/config/site";
 import { useVoiceRecorder } from "./use-voice-recorder";
 import { SYSTEM_PROMPT_STORAGE_KEY } from "@/components/test-kit";
-import { MenuState, INITIAL_MENU_STATE } from "./menu-configuration";
+import { MenuState, INITIAL_MENU_STATE, resolveMenuState } from "./menu-configuration";
 
 interface SelectedAgentPart {
   url: string;
@@ -576,6 +576,16 @@ export default function ChatInterface({
     }
   };
 
+  // Handle precision editing toggle - auto-switch mode to "edit" when enabled
+  const handlePrecisionEditingChange = useCallback((value: boolean) => {
+    setPrecisionEditing(value);
+    // When precision editing is turned ON and mode is "create", switch to "edit"
+    if (value && menuState.mode === "create") {
+      const newState = resolveMenuState(menuState, "edit");
+      setMenuState(newState);
+    }
+  }, [menuState]);
+
   const handleAgentTitleClick = (part: any) => {
     if (part.status === "generated" || part.status === "error") {
       const images = collectAllImages();
@@ -741,7 +751,7 @@ export default function ChatInterface({
         onClearSelectedAgentPart={() => setSelectedAgentPart(null)}
         showFileUpload={messages.length === 0}
         precisionEditing={precisionEditing}
-        onPrecisionEditingChange={setPrecisionEditing}
+        onPrecisionEditingChange={handlePrecisionEditingChange}
         menuState={menuState}
         onMenuStateChange={setMenuState}
       />
