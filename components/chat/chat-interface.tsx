@@ -687,7 +687,7 @@ export default function ChatInterface({
 
   return (
     <div className="flex flex-col h-full relative">
-      <div className="flex-1 overflow-y-auto space-y-6 pb-24 pr-2 scrollbar-hide">
+      <div className="flex-1 overflow-y-auto space-y-6 pb-24 pr-2 pt-4 scrollbar-hide">
         {messages.length === 0 && (
           <div className="text-center text-default-500 mt-60">
             <Bot size={48} className="mx-auto mb-4 opacity-20" />
