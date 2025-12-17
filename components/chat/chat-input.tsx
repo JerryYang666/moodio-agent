@@ -92,6 +92,11 @@ export default function ChatInput({
           return;
         }
 
+        // Don't collapse if audio recording or transcription is in progress
+        if (isRecording || isTranscribing) {
+          return;
+        }
+
         setIsExpanded(false);
       }
     };
@@ -100,7 +105,7 @@ export default function ChatInput({
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
-  }, []);
+  }, [isRecording, isTranscribing]);
 
   // Auto-expand if there are attachments or recording
   useEffect(() => {
