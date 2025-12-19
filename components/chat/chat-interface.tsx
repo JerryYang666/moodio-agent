@@ -338,6 +338,10 @@ export default function ChatInterface({
             formData.append("precisionEditImageId", selectedAgentPart.imageId);
           }
         }
+        // Pass aspect ratio if not "smart" (let agent decide)
+        if (menuState.aspectRatio && menuState.aspectRatio !== "smart") {
+          formData.append("aspectRatio", menuState.aspectRatio);
+        }
 
         const overrideEnabled =
           localStorage.getItem(SYSTEM_PROMPT_STORAGE_KEY + "_enabled") ===
@@ -366,6 +370,10 @@ export default function ChatInterface({
           if (selectedAgentPart?.imageId) {
             payload.precisionEditImageId = selectedAgentPart.imageId;
           }
+        }
+        // Pass aspect ratio if not "smart" (let agent decide)
+        if (menuState.aspectRatio && menuState.aspectRatio !== "smart") {
+          payload.aspectRatio = menuState.aspectRatio;
         }
 
         const overrideEnabled =

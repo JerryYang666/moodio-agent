@@ -58,6 +58,7 @@ export async function POST(
     let precisionEditing = false;
     let precisionEditImageId: string | undefined;
     let systemPromptOverride: string | undefined;
+    let aspectRatioOverride: string | undefined;
 
     const contentType = request.headers.get("content-type") || "";
     if (contentType.includes("multipart/form-data")) {
@@ -79,6 +80,8 @@ export async function POST(
       if (pId) precisionEditImageId = pId;
       const spo = formData.get("systemPromptOverride") as string;
       if (spo) systemPromptOverride = spo;
+      const ar = formData.get("aspectRatio") as string;
+      if (ar) aspectRatioOverride = ar;
     } else {
       const json = await request.json();
       content = json.content;
@@ -91,6 +94,9 @@ export async function POST(
       }
       if (json.systemPromptOverride) {
         systemPromptOverride = json.systemPromptOverride;
+      }
+      if (json.aspectRatio) {
+        aspectRatioOverride = json.aspectRatio;
       }
     }
 
@@ -239,7 +245,8 @@ export async function POST(
       requestStartTime,
       precisionEditing,
       precisionEditImageId,
-      isAdmin ? systemPromptOverride : undefined
+      isAdmin ? systemPromptOverride : undefined,
+      aspectRatioOverride
     );
 
     // Handle background completion (saving history)

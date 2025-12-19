@@ -49,6 +49,7 @@ interface PreparedMessages {
   precisionEditing?: boolean;
   precisionEditImageId?: string;
   precisionEditImageBase64Promise?: Promise<string | undefined>;
+  aspectRatioOverride?: AspectRatio;
 }
 
 export class Agent1 implements Agent {
@@ -63,13 +64,27 @@ export class Agent1 implements Agent {
     requestStartTime?: number,
     precisionEditing?: boolean,
     precisionEditImageId?: string,
-    systemPromptOverride?: string
+    systemPromptOverride?: string,
+    aspectRatioOverride?: string
   ): Promise<AgentResponse> {
     const startTime = requestStartTime || Date.now();
     console.log(
       "[Perf] Agent processRequest start",
       `[${Date.now() - startTime}ms]`
     );
+
+    // Validate aspect ratio override - if invalid, fall back to smart mode (undefined)
+    let validatedAspectRatio: AspectRatio | undefined;
+    if (aspectRatioOverride) {
+      if (SUPPORTED_ASPECT_RATIOS.includes(aspectRatioOverride as AspectRatio)) {
+        validatedAspectRatio = aspectRatioOverride as AspectRatio;
+        console.log(`[Agent-1] User selected aspect ratio: ${validatedAspectRatio}`);
+      } else {
+        console.log(
+          `[Agent-1] Invalid aspect ratio "${aspectRatioOverride}" provided, falling back to smart mode`
+        );
+      }
+    }
 
     // Step 1: Prepare messages
     const prepared = await this.prepareMessages(
@@ -78,7 +93,8 @@ export class Agent1 implements Agent {
       startTime,
       precisionEditing,
       precisionEditImageId,
-      systemPromptOverride
+      systemPromptOverride,
+      validatedAspectRatio
     );
 
     // Step 2: Call LLM and parse response
@@ -152,7 +168,8 @@ export class Agent1 implements Agent {
     startTime: number,
     precisionEditing?: boolean,
     precisionEditImageId?: string,
-    systemPromptOverride?: string
+    systemPromptOverride?: string,
+    aspectRatioOverride?: AspectRatio
   ): Promise<PreparedMessages> {
     const rawSystemPrompt = systemPromptOverride || getSystemPrompt(this.id);
     const systemPrompt = rawSystemPrompt.replace(
@@ -329,6 +346,7 @@ export class Agent1 implements Agent {
       precisionEditing,
       precisionEditImageId,
       precisionEditImageBase64Promise,
+      aspectRatioOverride,
     };
   }
 
@@ -767,11 +785,17 @@ export class Agent1 implements Agent {
       apiKey: process.env.GOOGLE_API_KEY,
     });
 
-    const aspectRatio: AspectRatio = SUPPORTED_ASPECT_RATIOS.includes(
-      suggestion.aspectRatio as AspectRatio
-    )
-      ? (suggestion.aspectRatio as AspectRatio)
-      : "1:1";
+    // Use user-selected aspect ratio if provided, otherwise use agent's suggestion
+    // If agent's suggestion is also invalid, fall back to "1:1"
+    let aspectRatio: AspectRatio;
+    if (prepared.aspectRatioOverride) {
+      aspectRatio = prepared.aspectRatioOverride;
+      console.log(`[Agent-1] Using user-selected aspect ratio: ${aspectRatio} for image ${index}`);
+    } else if (SUPPORTED_ASPECT_RATIOS.includes(suggestion.aspectRatio as AspectRatio)) {
+      aspectRatio = suggestion.aspectRatio as AspectRatio;
+    } else {
+      aspectRatio = "1:1";
+    }
 
     let finalImageId: string;
     const userImageBase64 = await prepared.userImageBase64Promise;
