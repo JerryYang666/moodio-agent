@@ -165,6 +165,19 @@ export const authChallenges = pgTable("auth_challenges", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+/**
+ * Events table
+ * Stores telemetry data
+ */
+export const events = pgTable("events", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  eventType: varchar("event_type", { length: 50 }).notNull(),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+  timestamp: timestamp("timestamp").defaultNow().notNull(),
+  ipAddress: varchar("ip_address", { length: 255 }),
+  metadata: jsonb("metadata").notNull(),
+});
+
 // Export types for TypeScript
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
@@ -195,3 +208,6 @@ export type NewPasskey = typeof passkeys.$inferInsert;
 
 export type AuthChallenge = typeof authChallenges.$inferSelect;
 export type NewAuthChallenge = typeof authChallenges.$inferInsert;
+
+export type Event = typeof events.$inferSelect;
+export type NewEvent = typeof events.$inferInsert;

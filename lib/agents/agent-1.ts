@@ -8,6 +8,7 @@ import {
 import OpenAI from "openai";
 import { GoogleGenAI } from "@google/genai";
 import { getSystemPrompt } from "./system-prompts";
+import { recordEvent, sanitizeGeminiResponse } from "@/lib/telemetry";
 
 // Maximum number of retries for failed operations
 const MAX_RETRY = 2;
@@ -76,9 +77,13 @@ export class Agent1 implements Agent {
     // Validate aspect ratio override - if invalid, fall back to smart mode (undefined)
     let validatedAspectRatio: AspectRatio | undefined;
     if (aspectRatioOverride) {
-      if (SUPPORTED_ASPECT_RATIOS.includes(aspectRatioOverride as AspectRatio)) {
+      if (
+        SUPPORTED_ASPECT_RATIOS.includes(aspectRatioOverride as AspectRatio)
+      ) {
         validatedAspectRatio = aspectRatioOverride as AspectRatio;
-        console.log(`[Agent-1] User selected aspect ratio: ${validatedAspectRatio}`);
+        console.log(
+          `[Agent-1] User selected aspect ratio: ${validatedAspectRatio}`
+        );
       } else {
         console.log(
           `[Agent-1] Invalid aspect ratio "${aspectRatioOverride}" provided, falling back to smart mode`
@@ -101,7 +106,8 @@ export class Agent1 implements Agent {
     const { stream, completion } = await this.callLLMAndParse(
       prepared,
       startTime,
-      isAdmin
+      isAdmin,
+      userId
     );
 
     return { stream, completion };
@@ -186,7 +192,9 @@ export class Agent1 implements Agent {
             if (p.type === "agent_image") {
               return {
                 type: "text" as const,
-                text: `Suggestion: ${p.title}\nAspect Ratio: ${p.aspectRatio || "1:1"}\nPrompt: ${p.prompt}`,
+                text: `Suggestion: ${p.title}\nAspect Ratio: ${
+                  p.aspectRatio || "1:1"
+                }\nPrompt: ${p.prompt}`,
               };
             }
             return p;
@@ -353,7 +361,8 @@ export class Agent1 implements Agent {
   private async callLLMAndParse(
     prepared: PreparedMessages,
     startTime: number,
-    isAdmin: boolean
+    isAdmin: boolean,
+    userId: string
   ): Promise<AgentResponse> {
     const encoder = new TextEncoder();
     let resolveCompletion: (value: Message) => void;
@@ -387,7 +396,9 @@ export class Agent1 implements Agent {
           try {
             if (attempt > 0) {
               console.log(
-                `[Agent-1] Retrying LLM call and parse, attempt ${attempt + 1}/${MAX_RETRY + 1}`
+                `[Agent-1] Retrying LLM call and parse, attempt ${
+                  attempt + 1
+                }/${MAX_RETRY + 1}`
               );
 
               // Send invalidation signal to frontend before retry
@@ -414,12 +425,15 @@ export class Agent1 implements Agent {
             const result = await self.callLLMAndParseCore(
               prepared,
               startTime,
-              send
+              send,
+              userId
             );
 
             if (attempt > 0) {
               console.log(
-                `[Agent-1] LLM call and parse succeeded on retry attempt ${attempt + 1}`
+                `[Agent-1] LLM call and parse succeeded on retry attempt ${
+                  attempt + 1
+                }`
               );
             }
 
@@ -430,7 +444,9 @@ export class Agent1 implements Agent {
           } catch (error) {
             lastError = error as Error;
             console.error(
-              `[Agent-1] LLM call and parse attempt ${attempt + 1}/${MAX_RETRY + 1} failed:`,
+              `[Agent-1] LLM call and parse attempt ${attempt + 1}/${
+                MAX_RETRY + 1
+              } failed:`,
               error
             );
           }
@@ -461,7 +477,8 @@ export class Agent1 implements Agent {
   private async callLLMAndParseCore(
     prepared: PreparedMessages,
     startTime: number,
-    send: (data: any) => void
+    send: (data: any) => void,
+    userId: string
   ): Promise<Message> {
     const client = new OpenAI({
       apiKey: process.env.LLM_API_KEY,
@@ -559,7 +576,10 @@ export class Agent1 implements Agent {
           ) {
             // Found non-whitespace text outside of valid tag content
             console.error(
-              `[Agent-1] Invalid text outside tags detected: "${checkBuffer.substring(Math.max(0, i - 20), Math.min(checkBuffer.length, i + 20))}"`
+              `[Agent-1] Invalid text outside tags detected: "${checkBuffer.substring(
+                Math.max(0, i - 20),
+                Math.min(checkBuffer.length, i + 20)
+              )}"`
             );
             throw new Error(
               `Invalid LLM response: text outside tags at position ${i}`
@@ -643,7 +663,8 @@ export class Agent1 implements Agent {
                         suggestion,
                         prepared,
                         currentIndex,
-                        startTime
+                        startTime,
+                        userId
                       );
 
                       // Send update
@@ -728,7 +749,8 @@ export class Agent1 implements Agent {
     suggestion: Suggestion,
     prepared: PreparedMessages,
     index: number,
-    startTime: number
+    startTime: number,
+    userId: string
   ): Promise<MessageContentPart> {
     console.log(
       `[Perf] Image generation start index=${index}`,
@@ -741,7 +763,9 @@ export class Agent1 implements Agent {
       try {
         if (attempt > 0) {
           console.log(
-            `[Agent-1] Retrying image generation for index=${index}, attempt ${attempt + 1}/${MAX_RETRY + 1}`
+            `[Agent-1] Retrying image generation for index=${index}, attempt ${
+              attempt + 1
+            }/${MAX_RETRY + 1}`
           );
         }
 
@@ -749,12 +773,15 @@ export class Agent1 implements Agent {
           suggestion,
           prepared,
           index,
-          startTime
+          startTime,
+          userId
         );
 
         if (attempt > 0) {
           console.log(
-            `[Agent-1] Image generation succeeded on retry attempt ${attempt + 1} for index=${index}`
+            `[Agent-1] Image generation succeeded on retry attempt ${
+              attempt + 1
+            } for index=${index}`
           );
         }
 
@@ -762,7 +789,9 @@ export class Agent1 implements Agent {
       } catch (error) {
         lastError = error as Error;
         console.error(
-          `[Agent-1] Image generation attempt ${attempt + 1}/${MAX_RETRY + 1} failed for index=${index}:`,
+          `[Agent-1] Image generation attempt ${attempt + 1}/${
+            MAX_RETRY + 1
+          } failed for index=${index}:`,
           error
         );
       }
@@ -770,8 +799,29 @@ export class Agent1 implements Agent {
 
     // All retries exhausted
     console.error(
-      `[Agent-1] Image generation failed after ${MAX_RETRY + 1} attempts for index=${index}`
+      `[Agent-1] Image generation failed after ${
+        MAX_RETRY + 1
+      } attempts for index=${index}`
     );
+
+    // Record failure event
+    const failureMetadata: any = {
+      status: "failed",
+      provider: "google",
+      error: lastError?.message || "Image generation failed",
+      prompt: suggestion.prompt,
+      aspectRatio: suggestion.aspectRatio,
+    };
+
+    // Attach response if available (sent from generateImageCore via error property)
+    if (lastError && "response" in lastError) {
+      failureMetadata.response = sanitizeGeminiResponse(
+        (lastError as any).response
+      );
+    }
+
+    await recordEvent("image_generation", userId, failureMetadata);
+
     throw lastError || new Error("Image generation failed");
   }
 
@@ -779,7 +829,8 @@ export class Agent1 implements Agent {
     suggestion: Suggestion,
     prepared: PreparedMessages,
     index: number,
-    startTime: number
+    startTime: number,
+    userId: string
   ): Promise<MessageContentPart> {
     const ai = new GoogleGenAI({
       apiKey: process.env.GOOGLE_API_KEY,
@@ -790,8 +841,12 @@ export class Agent1 implements Agent {
     let aspectRatio: AspectRatio;
     if (prepared.aspectRatioOverride) {
       aspectRatio = prepared.aspectRatioOverride;
-      console.log(`[Agent-1] Using user-selected aspect ratio: ${aspectRatio} for image ${index}`);
-    } else if (SUPPORTED_ASPECT_RATIOS.includes(suggestion.aspectRatio as AspectRatio)) {
+      console.log(
+        `[Agent-1] Using user-selected aspect ratio: ${aspectRatio} for image ${index}`
+      );
+    } else if (
+      SUPPORTED_ASPECT_RATIOS.includes(suggestion.aspectRatio as AspectRatio)
+    ) {
       aspectRatio = suggestion.aspectRatio as AspectRatio;
     } else {
       aspectRatio = "1:1";
@@ -809,42 +864,60 @@ export class Agent1 implements Agent {
         (precisionEditImageBase64 || userImageBase64)) ||
       (prepared.userImageId && userImageBase64);
 
-    if (useImageEditing) {
-      // Image editing
-      const prompt: any[] = [{ text: suggestion.prompt }];
+    let response: any;
 
-      // Include precision edit image if available
-      if (precisionEditImageBase64) {
-        prompt.push({
-          inlineData: {
-            mimeType: "image/png",
-            data: precisionEditImageBase64,
+    try {
+      if (useImageEditing) {
+        // Image editing
+        const prompt: any[] = [{ text: suggestion.prompt }];
+
+        // Include precision edit image if available
+        if (precisionEditImageBase64) {
+          prompt.push({
+            inlineData: {
+              mimeType: "image/png",
+              data: precisionEditImageBase64,
+            },
+          });
+        }
+        // Include user uploaded image ONLY if precision edit image is NOT provided
+        // If precision editing is on but no specific image ID was passed, we edit the last user image
+        else if (userImageBase64) {
+          prompt.push({
+            inlineData: {
+              mimeType: "image/png",
+              data: userImageBase64,
+            },
+          });
+        }
+
+        response = await ai.models.generateContent({
+          model: "gemini-3-pro-image-preview",
+          contents: prompt,
+          config: {
+            responseModalities: ["TEXT", "IMAGE"],
+            imageConfig: {
+              aspectRatio: aspectRatio,
+              imageSize: "2K",
+            },
+            tools: [{ googleSearch: {} }],
+          },
+        });
+      } else {
+        // Text to image
+        response = await ai.models.generateContent({
+          model: "gemini-3-pro-image-preview",
+          contents: suggestion.prompt,
+          config: {
+            responseModalities: ["TEXT", "IMAGE"],
+            imageConfig: {
+              aspectRatio: aspectRatio,
+              imageSize: "2K",
+            },
+            tools: [{ googleSearch: {} }],
           },
         });
       }
-      // Include user uploaded image ONLY if precision edit image is NOT provided
-      // If precision editing is on but no specific image ID was passed, we edit the last user image
-      else if (userImageBase64) {
-        prompt.push({
-          inlineData: {
-            mimeType: "image/png",
-            data: userImageBase64,
-          },
-        });
-      }
-
-      const response = await ai.models.generateContent({
-        model: "gemini-3-pro-image-preview",
-        contents: prompt,
-        config: {
-          responseModalities: ["TEXT", "IMAGE"],
-          imageConfig: {
-            aspectRatio: aspectRatio,
-            imageSize: "2K",
-          },
-          tools: [{ googleSearch: {} }],
-        },
-      });
 
       const candidates = (response as any).candidates;
       let generatedImageData: string | undefined;
@@ -862,52 +935,30 @@ export class Agent1 implements Agent {
 
       if (!generatedImageData) {
         console.log(
-          "[Agent-1] No image data in Gemini response (image editing). Full response:",
+          "[Agent-1] No image data in Gemini response. Full response:",
           JSON.stringify(response, null, 2)
         );
-        throw new Error("No image data in Gemini response");
+        const error = new Error("No image data in Gemini response");
+        // Attach response to error object so we can log it upstream
+        (error as any).response = response;
+        throw error;
       }
       const buf = Buffer.from(generatedImageData, "base64");
       finalImageId = await uploadImage(buf, "image/png");
-    } else {
-      // Text to image
-      const response = await ai.models.generateContent({
-        model: "gemini-3-pro-image-preview",
-        contents: suggestion.prompt,
-        config: {
-          responseModalities: ["TEXT", "IMAGE"],
-          imageConfig: {
-            aspectRatio: aspectRatio,
-            imageSize: "2K",
-          },
-          tools: [{ googleSearch: {} }],
-        },
-      });
-
-      const candidates = (response as any).candidates;
-      let generatedImageData: string | undefined;
-      if (candidates && candidates.length > 0) {
-        const parts = candidates[0].content?.parts;
-        if (parts) {
-          for (const part of parts) {
-            if (part.inlineData) {
-              generatedImageData = part.inlineData.data;
-              break;
-            }
-          }
-        }
-      }
-
-      if (!generatedImageData) {
-        console.log(
-          "[Agent-1] No image data in Gemini response (text-to-image). Full response:",
-          JSON.stringify(response, null, 2)
-        );
-        throw new Error("No image data in Gemini response");
-      }
-      const buf = Buffer.from(generatedImageData, "base64");
-      finalImageId = await uploadImage(buf, "image/png");
+    } catch (error) {
+      // If we have a response in the error (from our manual throw above), or if it's a GoogleGenerativeAIError that contains response data
+      // we want to ensure it propagates up
+      throw error;
     }
+
+    // Record success event
+    await recordEvent("image_generation", userId, {
+      status: "success",
+      provider: "google",
+      prompt: suggestion.prompt,
+      aspectRatio: aspectRatio,
+      response: sanitizeGeminiResponse(response),
+    });
 
     const result: MessageContentPart = {
       type: "agent_image",

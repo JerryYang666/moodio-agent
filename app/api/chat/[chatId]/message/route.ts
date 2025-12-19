@@ -4,11 +4,17 @@ import { verifyAccessToken } from "@/lib/auth/jwt";
 import { db } from "@/lib/db";
 import { chats } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
-import { getChatHistory, saveChatHistory, uploadImage, getSignedImageUrl } from "@/lib/storage/s3";
+import {
+  getChatHistory,
+  saveChatHistory,
+  uploadImage,
+  getSignedImageUrl,
+} from "@/lib/storage/s3";
 import { createLLMClient } from "@/lib/llm/client";
 import { Message, MessageContentPart } from "@/lib/llm/types";
 import { agent1 } from "@/lib/agents/agent-1";
 import { waitUntil } from "@vercel/functions";
+import { recordEvent } from "@/lib/telemetry";
 
 function convertToLLMFormat(message: Message): Message {
   if (typeof message.content === "string") {
@@ -51,10 +57,19 @@ export async function POST(
       return NextResponse.json({ error: "Invalid token" }, { status: 401 });
     }
 
+    const ipAddress =
+      request.headers.get("x-forwarded-for") ||
+      request.headers.get("x-real-ip") ||
+      undefined;
+
     // Handle FormData or JSON
     let content = "";
     let file: File | null = null;
-    let selection: { messageIndex: number; partIndex: number; imageId?: string } | null = null;
+    let selection: {
+      messageIndex: number;
+      partIndex: number;
+      imageId?: string;
+    } | null = null;
     let precisionEditing = false;
     let precisionEditImageId: string | undefined;
     let systemPromptOverride: string | undefined;
@@ -107,6 +122,24 @@ export async function POST(
       );
     }
 
+    // Record user sent message event
+    await recordEvent(
+      "user_sent_message",
+      payload.userId,
+      {
+        chatId,
+        content,
+        hasImage: !!file,
+        imageSize: file ? file.size : undefined,
+        imageType: file ? file.type : undefined,
+        selection,
+        precisionEditing,
+        systemPromptOverride,
+        aspectRatioOverride,
+      },
+      ipAddress
+    );
+
     // Verify ownership or admin status
     const isAdmin = payload.roles?.includes("admin");
     let chat;
@@ -138,9 +171,12 @@ export async function POST(
     // Update history if selection is present
     if (selection) {
       const { messageIndex, imageId } = selection;
-      if (history[messageIndex] && Array.isArray(history[messageIndex].content)) {
+      if (
+        history[messageIndex] &&
+        Array.isArray(history[messageIndex].content)
+      ) {
         const content = history[messageIndex].content as MessageContentPart[];
-        
+
         // Find the part by imageId (more reliable than partIndex)
         let targetPartIndex = -1;
         if (imageId) {
@@ -148,7 +184,7 @@ export async function POST(
             (p) => p.type === "agent_image" && p.imageId === imageId
           );
         }
-        
+
         // Fallback to partIndex if imageId not found (backward compatibility)
         if (targetPartIndex === -1 && selection.partIndex !== undefined) {
           targetPartIndex = selection.partIndex;

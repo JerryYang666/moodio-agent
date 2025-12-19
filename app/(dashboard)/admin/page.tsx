@@ -5,7 +5,7 @@ import { Card, CardBody, CardFooter, CardHeader } from "@heroui/card";
 import { Button } from "@heroui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { Spinner } from "@heroui/spinner";
-import { Users, MessageSquare, Settings } from "lucide-react";
+import { Users, MessageSquare, Settings, Activity } from "lucide-react";
 
 export default function AdminPage() {
   const { user, loading: authLoading } = useAuth();
@@ -58,6 +58,25 @@ export default function AdminPage() {
           <CardFooter>
             <Button color="primary" variant="flat" onPress={() => router.push("/admin/chat-management")}>
               Go to Chat Management
+            </Button>
+          </CardFooter>
+        </Card>
+
+        {/* Telemetry/Events Card */}
+        <Card className="py-4 cursor-pointer hover:scale-[1.02] transition-transform" onPress={() => router.push("/admin/events")}>
+          <CardHeader className="pb-0 pt-2 px-4 flex-row gap-2 items-center">
+            <Activity className="w-6 h-6 text-primary" />
+            <div className="flex flex-col">
+               <p className="text-tiny uppercase font-bold">Telemetry</p>
+               <h4 className="font-bold text-large">Events</h4>
+            </div>
+          </CardHeader>
+          <CardBody className="overflow-visible py-2">
+             <p className="text-default-500">View system events, user actions, and errors.</p>
+          </CardBody>
+          <CardFooter>
+            <Button color="primary" variant="flat" onPress={() => router.push("/admin/events")}>
+              Go to Events
             </Button>
           </CardFooter>
         </Card>

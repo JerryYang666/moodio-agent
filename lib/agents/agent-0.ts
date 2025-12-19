@@ -1,8 +1,13 @@
 import { Agent, AgentResponse } from "./types";
 import { Message, MessageContentPart } from "@/lib/llm/types";
-import { downloadImage, uploadImage, getSignedImageUrl } from "@/lib/storage/s3";
+import {
+  downloadImage,
+  uploadImage,
+  getSignedImageUrl,
+} from "@/lib/storage/s3";
 import OpenAI, { toFile } from "openai";
 import { getSystemPrompt } from "./system-prompts";
+import { recordEvent, sanitizeOpenAIResponse } from "@/lib/telemetry";
 
 interface Suggestion {
   title: string;
@@ -26,7 +31,8 @@ export class Agent0 implements Agent {
     requestStartTime?: number,
     precisionEditing?: boolean,
     precisionEditImageId?: string,
-    systemPromptOverride?: string
+    systemPromptOverride?: string,
+    aspectRatioOverride?: string
   ): Promise<AgentResponse> {
     const startTime = requestStartTime || Date.now();
     console.log(
@@ -157,7 +163,8 @@ export class Agent0 implements Agent {
       parsed,
       userImageId,
       client,
-      startTime
+      startTime,
+      userId
     );
     return { stream, completion };
   }
@@ -166,7 +173,8 @@ export class Agent0 implements Agent {
     parsed: AgentOutput,
     userImageId: string | undefined,
     client: OpenAI,
-    startTime: number
+    startTime: number,
+    userId: string
   ) {
     const encoder = new TextEncoder();
     let controller: any = null;
@@ -263,6 +271,7 @@ export class Agent0 implements Agent {
             `[${Date.now() - startTime}ms]`
           );
           let finalImageId: string;
+          let response: any;
 
           if (userImageId) {
             if (!userImageBuffer)
@@ -271,7 +280,7 @@ export class Agent0 implements Agent {
               type: "image/png",
             });
             console.log("editing image");
-            const response = await client.images.edit({
+            response = await client.images.edit({
               model: "gpt-image-1",
               image: file,
               prompt: suggestion.prompt,
@@ -296,7 +305,7 @@ export class Agent0 implements Agent {
               throw new Error("No image data in response");
             }
           } else {
-            const response = await client.images.generate({
+            response = await client.images.generate({
               model: "gpt-image-1",
               prompt: suggestion.prompt,
               n: 1,
@@ -309,6 +318,14 @@ export class Agent0 implements Agent {
             const buf = Buffer.from(data.b64_json, "base64");
             finalImageId = await uploadImage(buf, "image/png");
           }
+
+          // Record success event
+          await recordEvent("image_generation", userId, {
+            status: "success",
+            provider: "openai",
+            prompt: suggestion.prompt,
+            response: sanitizeOpenAIResponse(response),
+          });
 
           console.log(
             `[Perf] Image generation end index=${index}`,
@@ -340,6 +357,15 @@ export class Agent0 implements Agent {
           finalContent[index + 1] = part;
         } catch (e) {
           console.error(e);
+
+          // Record failure event
+          await recordEvent("image_generation", userId, {
+            status: "failed",
+            provider: "openai",
+            error: (e as Error).message || "Image generation failed",
+            prompt: suggestion.prompt,
+          });
+
           const part: MessageContentPart = {
             type: "agent_image",
             title: suggestion.title,

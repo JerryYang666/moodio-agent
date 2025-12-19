@@ -16,6 +16,7 @@ export interface Agent {
     requestStartTime?: number,
     precisionEditing?: boolean,
     precisionEditImageId?: string,
-    systemPromptOverride?: string
+    systemPromptOverride?: string,
+    aspectRatioOverride?: string
   ): Promise<AgentResponse>;
 }
