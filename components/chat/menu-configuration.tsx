@@ -122,11 +122,13 @@ export const resolveMenuState = (
 interface MenuConfigurationProps {
   state: MenuState;
   onStateChange: (newState: MenuState) => void;
+  hasSelectedImages?: boolean;
 }
 
 export default function MenuConfiguration({
   state,
   onStateChange,
+  hasSelectedImages = false,
 }: MenuConfigurationProps) {
   // Handlers for changes
   const handleModeChange = (keys: any) => {
@@ -290,12 +292,18 @@ export default function MenuConfiguration({
             selectionMode="single"
             variant="flat"
             onSelectionChange={handleModeChange}
+            disabledKeys={!hasSelectedImages ? ["edit"] : []}
           >
             {Object.entries(categoryDef.options).map(([key, value]) => {
               const Icon = (value as any).icon
                 ? ICON_MAP[(value as any).icon]
                 : null;
               const hasDescription = (value as any).description;
+              const isEditDisabled = key === "edit" && !hasSelectedImages;
+              const tooltipContent = isEditDisabled
+                ? "Select or upload an image first to use Edit mode"
+                : (value as any).description;
+              const showTooltip = hasDescription || isEditDisabled;
               return (
                 <DropdownItem
                   key={key}
@@ -305,9 +313,9 @@ export default function MenuConfiguration({
                     ) : undefined
                   }
                   endContent={
-                    hasDescription ? (
+                    showTooltip ? (
                       <Tooltip
-                        content={(value as any).description}
+                        content={tooltipContent}
                         placement="right"
                       >
                         <Info

@@ -210,12 +210,18 @@ export default function ChatInterface({
     }
   };
 
-  const clearFile = () => {
+  const clearFile = useCallback(() => {
     setSelectedFile(null);
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     setPreviewUrl(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
-  };
+    
+    // If in "edit" mode and no other images remain, switch to "create" mode
+    if (menuState.mode === "edit" && !selectedAgentPart) {
+      const newState = resolveMenuState(menuState, "create");
+      setMenuState(newState);
+    }
+  }, [previewUrl, menuState, selectedAgentPart]);
 
   const handleSend = async () => {
     if (
@@ -748,7 +754,14 @@ export default function ChatInterface({
         onFileSelect={handleFileSelect}
         onClearFile={clearFile}
         selectedAgentPart={selectedAgentPart}
-        onClearSelectedAgentPart={() => setSelectedAgentPart(null)}
+        onClearSelectedAgentPart={() => {
+          setSelectedAgentPart(null);
+          // If in "edit" mode and no other images remain, switch to "create" mode
+          if (menuState.mode === "edit" && !previewUrl) {
+            const newState = resolveMenuState(menuState, "create");
+            setMenuState(newState);
+          }
+        }}
         showFileUpload={messages.length === 0}
         precisionEditing={precisionEditing}
         onPrecisionEditingChange={handlePrecisionEditingChange}

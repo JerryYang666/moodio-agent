@@ -309,6 +309,7 @@ export default function ChatInput({
                   <MenuConfiguration
                     state={menuState}
                     onStateChange={onMenuStateChange}
+                    hasSelectedImages={!!(previewUrl || selectedAgentPart)}
                   />
                 </div>
               </motion.div>
