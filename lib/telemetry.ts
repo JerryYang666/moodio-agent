@@ -34,6 +34,9 @@ export function sanitizeGeminiResponse(response: any): any {
             if (part.inlineData && part.inlineData.data) {
               part.inlineData.data = "<REDACTED_IMAGE_DATA>";
             }
+            if (part.thoughtSignature) {
+              part.thoughtSignature = "<REDACTED_THOUGHT_SIGNATURE>";
+            }
           }
         }
       }
