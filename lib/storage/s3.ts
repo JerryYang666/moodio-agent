@@ -29,11 +29,19 @@ export interface ChatHistory {
   messages: Message[];
 }
 
+/**
+ * Upload an image to S3
+ * @param file The image data as Buffer or Blob
+ * @param contentType The MIME type of the image
+ * @param preGeneratedId Optional pre-generated imageId (for parallel tracking)
+ * @returns The imageId used for storage
+ */
 export async function uploadImage(
   file: Buffer | Blob,
-  contentType: string
+  contentType: string,
+  preGeneratedId?: string
 ): Promise<string> {
-  const imageId = randomUUID();
+  const imageId = preGeneratedId || randomUUID();
   const key = `images/${imageId}`;
 
   let body;
@@ -53,6 +61,15 @@ export async function uploadImage(
   );
 
   return imageId;
+}
+
+/**
+ * Generate a unique image ID for tracking purposes
+ * Use this to pre-generate an ID before starting image generation
+ * Then pass it to uploadImage() when the image is ready
+ */
+export function generateImageId(): string {
+  return randomUUID();
 }
 
 /**
@@ -189,7 +206,11 @@ export function getSignedImageUrl(
   imageId: string,
   expirationSeconds?: number
 ): string {
-  if (!CLOUDFRONT_DOMAIN || !CLOUDFRONT_KEY_PAIR_ID || !CLOUDFRONT_PRIVATE_KEY) {
+  if (
+    !CLOUDFRONT_DOMAIN ||
+    !CLOUDFRONT_KEY_PAIR_ID ||
+    !CLOUDFRONT_PRIVATE_KEY
+  ) {
     console.warn(
       "[CloudFront] Missing CloudFront configuration, falling back to unsigned URL"
     );

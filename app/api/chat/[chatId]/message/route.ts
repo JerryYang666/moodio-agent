@@ -11,7 +11,11 @@ import {
   getSignedImageUrl,
 } from "@/lib/storage/s3";
 import { createLLMClient } from "@/lib/llm/client";
-import { Message, MessageContentPart } from "@/lib/llm/types";
+import {
+  Message,
+  MessageContentPart,
+  PARALLEL_VARIANT_COUNT,
+} from "@/lib/llm/types";
 import { agent1 } from "@/lib/agents/agent-1";
 import { waitUntil } from "@vercel/functions";
 import { recordEvent } from "@/lib/telemetry";
@@ -69,6 +73,7 @@ export async function POST(
       messageIndex: number;
       partIndex: number;
       imageId?: string;
+      variantId?: string;
     } | null = null;
     let precisionEditing = false;
     let precisionEditImageId: string | undefined;
@@ -170,12 +175,29 @@ export async function POST(
 
     // Update history if selection is present
     if (selection) {
-      const { messageIndex, imageId } = selection;
+      const { messageIndex, imageId, variantId } = selection;
+
+      // Find the actual message index in the flat history array
+      // With variants, messageIndex from frontend is the group's originalIndex
+      // We need to use variantId to find the correct message
+      let actualMessageIndex = messageIndex;
+
+      if (variantId) {
+        // Find message by variantId (for parallel variants)
+        const variantMsgIndex = history.findIndex(
+          (msg) => msg.variantId === variantId
+        );
+        if (variantMsgIndex !== -1) {
+          actualMessageIndex = variantMsgIndex;
+        }
+      }
+
       if (
-        history[messageIndex] &&
-        Array.isArray(history[messageIndex].content)
+        history[actualMessageIndex] &&
+        Array.isArray(history[actualMessageIndex].content)
       ) {
-        const content = history[messageIndex].content as MessageContentPart[];
+        const content = history[actualMessageIndex]
+          .content as MessageContentPart[];
 
         // Find the part by imageId (more reliable than partIndex)
         let targetPartIndex = -1;
@@ -197,7 +219,7 @@ export async function POST(
         ) {
           // Create a deep copy of history to modify
           history = history.map((msg, mIdx) => {
-            if (mIdx !== messageIndex) return msg;
+            if (mIdx !== actualMessageIndex) return msg;
 
             const newContent = [...(msg.content as MessageContentPart[])];
             newContent[targetPartIndex] = {
@@ -272,31 +294,40 @@ export async function POST(
     // Let's proceed with creating the Agent stream.
     console.log("[Perf] Calling agent", `[${Date.now() - requestStartTime}ms]`);
 
-    // Use Agent 1
-    const { stream: agentStream, completion } = await agent1.processRequest(
-      history,
-      userMessage,
-      payload.userId,
-      isAdmin ?? false,
-      requestStartTime,
-      precisionEditing,
-      precisionEditImageId,
-      isAdmin ? systemPromptOverride : undefined,
-      aspectRatioOverride
-    );
+    // Use Agent 1 with parallel variants
+    const { stream: agentStream, completions } =
+      await agent1.processRequestParallel(
+        history,
+        userMessage,
+        payload.userId,
+        isAdmin ?? false,
+        PARALLEL_VARIANT_COUNT,
+        requestStartTime,
+        precisionEditing,
+        precisionEditImageId,
+        isAdmin ? systemPromptOverride : undefined,
+        aspectRatioOverride
+      );
 
     // Handle background completion (saving history)
     waitUntil(
-      completion
-        .then(async (finalMessage) => {
-          // Add timestamp to the final message from agent if not present (agent might not add it)
-          const messageToSave = {
-            ...finalMessage,
-            createdAt: finalMessage.createdAt || Date.now(),
-          };
+      completions
+        .then(async (finalMessages) => {
+          // Create a combined message with variants for storage
+          // The first variant becomes the main message, others are stored in variants array
+          const timestamp = Date.now();
+          const messagesToSave: Message[] = finalMessages.map((msg, idx) => ({
+            ...msg,
+            createdAt: msg.createdAt || timestamp,
+          }));
 
-          const updatedHistory = [...history, userMessage, messageToSave];
+          // For backward compatibility, store as array of messages with variantId
+          // Frontend will group messages with the same timestamp but different variantIds
+          const updatedHistory = [...history, userMessage, ...messagesToSave];
           await saveChatHistory(chatId, updatedHistory);
+
+          // Use the first variant for thumbnail calculation
+          const primaryMessage = messagesToSave[0];
 
           // Calculate thumbnail image ID
           let thumbnailImageId: string | null = null;
@@ -326,7 +357,21 @@ export async function POST(
             }
           }
 
-          // 3. Fallback: Traverse backwards to find the latest image
+          // 3. Fallback: Check the primary message for generated images
+          if (!thumbnailImageId && Array.isArray(primaryMessage.content)) {
+            for (const part of primaryMessage.content) {
+              if (
+                part.type === "agent_image" &&
+                part.imageId &&
+                part.status === "generated"
+              ) {
+                thumbnailImageId = part.imageId;
+                break;
+              }
+            }
+          }
+
+          // 4. Fallback: Traverse backwards to find the latest image
           // Priority:
           // 1. User uploaded image (type: "image")
           // 2. Selected agent image (type: "agent_image", isSelected: true)
@@ -376,8 +421,11 @@ export async function POST(
             }
           }
 
-          // Generate chat name if needed
-          if (history.length === 0 && updatedHistory.length === 2) {
+          // Generate chat name if needed (check for 1 user message + N variants)
+          const isFirstInteraction =
+            history.length === 0 &&
+            updatedHistory.length === 1 + PARALLEL_VARIANT_COUNT;
+          if (isFirstInteraction) {
             const llmClient = createLLMClient({
               apiKey: process.env.LLM_API_KEY,
               provider: "openai",
@@ -385,6 +433,8 @@ export async function POST(
             });
 
             try {
+              // Use only the user message and primary variant for name generation
+              const messagesForNaming = [userMessage, primaryMessage];
               const namePrompt: Message[] = [
                 {
                   role: "system",
@@ -395,7 +445,7 @@ export async function POST(
                     "Give the name in the same language as the messages. " +
                     'Output JSON only. Format: {"chat_name": "Your Chat Name"}',
                 },
-                ...updatedHistory.map((msg) => {
+                ...messagesForNaming.map((msg) => {
                   if (typeof msg.content === "string") {
                     return msg;
                   }

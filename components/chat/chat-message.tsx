@@ -21,6 +21,7 @@ interface SelectedAgentPart {
   messageIndex: number;
   partIndex: number;
   imageId?: string;
+  variantId?: string;
 }
 
 interface ChatMessageProps {
@@ -35,10 +36,12 @@ interface ChatMessageProps {
   onAgentImageSelect: (
     part: any,
     messageIndex: number,
-    partIndex: number
+    partIndex: number,
+    variantId?: string
   ) => void;
   onAgentTitleClick: (part: any) => void;
   onForkChat?: (messageIndex: number) => void;
+  hideAvatar?: boolean;
 }
 
 export default function ChatMessage({
@@ -50,6 +53,7 @@ export default function ChatMessage({
   onAgentImageSelect,
   onAgentTitleClick,
   onForkChat,
+  hideAvatar = false,
 }: ChatMessageProps) {
   const isUser = message.role === "user";
   const [isForkPopoverOpen, setIsForkPopoverOpen] = useState(false);
@@ -135,7 +139,9 @@ export default function ChatMessage({
               const url = part.imageUrl || "";
               const isSelected =
                 (selectedAgentPart?.url === url &&
-                  selectedAgentPart?.messageIndex === msgIndex) ||
+                  selectedAgentPart?.messageIndex === msgIndex &&
+                  (selectedAgentPart?.variantId === message.variantId ||
+                    !message.variantId)) ||
                 part.isSelected;
 
               const realPartIndex = (content as MessageContentPart[]).indexOf(
@@ -172,7 +178,12 @@ export default function ChatMessage({
                       onClick={() =>
                         effectiveStatus === "generated" &&
                         msgIndex !== undefined &&
-                        onAgentImageSelect(part, msgIndex, realPartIndex)
+                        onAgentImageSelect(
+                          part,
+                          msgIndex,
+                          realPartIndex,
+                          message.variantId
+                        )
                       }
                       onDoubleClick={(e) => {
                         e.preventDefault();
@@ -229,7 +240,7 @@ export default function ChatMessage({
         isUser ? "justify-end" : "justify-start"
       )}
     >
-      {!isUser && (
+      {!isUser && !hideAvatar && (
         <div className="hidden md:flex w-8 h-8 rounded-full bg-primary/10 items-center justify-center shrink-0 mt-1">
           <Bot size={16} className="text-primary" />
         </div>
@@ -238,7 +249,7 @@ export default function ChatMessage({
       <div
         className={clsx(
           "flex flex-col gap-1",
-          isUser ? "max-w-[80%]" : "max-w-full md:max-w-[80%]"
+          isUser ? "max-w-[80%]" : "max-w-full"
         )}
       >
         <Card

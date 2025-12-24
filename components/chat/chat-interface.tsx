@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { Spinner } from "@heroui/spinner";
 import { useDisclosure } from "@heroui/modal";
@@ -13,14 +13,23 @@ import {
   NotificationPermissionModal,
   NotificationPermissionModalRef,
 } from "@/components/notification-permission-modal";
-import { Message, MessageContentPart } from "@/lib/llm/types";
+import {
+  Message,
+  MessageContentPart,
+  PARALLEL_VARIANT_COUNT,
+} from "@/lib/llm/types";
 import ImageDetailModal, { ImageInfo } from "./image-detail-modal";
 import ChatMessage from "./chat-message";
 import ChatInput from "./chat-input";
+import ParallelMessage from "./parallel-message";
 import { siteConfig } from "@/config/site";
 import { useVoiceRecorder } from "./use-voice-recorder";
 import { SYSTEM_PROMPT_STORAGE_KEY } from "@/components/test-kit";
-import { MenuState, INITIAL_MENU_STATE, resolveMenuState } from "./menu-configuration";
+import {
+  MenuState,
+  INITIAL_MENU_STATE,
+  resolveMenuState,
+} from "./menu-configuration";
 
 interface SelectedAgentPart {
   url: string;
@@ -28,6 +37,14 @@ interface SelectedAgentPart {
   messageIndex: number;
   partIndex: number;
   imageId?: string;
+  variantId?: string;
+}
+
+// Helper to group consecutive assistant messages with the same timestamp as variants
+interface MessageGroup {
+  type: "user" | "assistant";
+  messages: Message[];
+  originalIndex: number; // Index of the first message in this group
 }
 
 interface ChatInterfaceProps {
@@ -112,6 +129,56 @@ export default function ChatInterface({
   const [selectedImage, setSelectedImage] = useState<ImageInfo | null>(null);
   const [allImages, setAllImages] = useState<ImageInfo[]>([]);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+
+  // Group messages for rendering (group assistant variants together)
+  const groupedMessages = useMemo((): MessageGroup[] => {
+    const groups: MessageGroup[] = [];
+    let i = 0;
+
+    while (i < messages.length) {
+      const msg = messages[i];
+
+      if (msg.role === "user") {
+        groups.push({
+          type: "user",
+          messages: [msg],
+          originalIndex: i,
+        });
+        i++;
+      } else if (msg.role === "assistant") {
+        // Collect all consecutive assistant messages with the same createdAt timestamp
+        // These are parallel variants
+        const variants: Message[] = [msg];
+        const timestamp = msg.createdAt;
+        let j = i + 1;
+
+        while (j < messages.length) {
+          const nextMsg = messages[j];
+          if (
+            nextMsg.role === "assistant" &&
+            nextMsg.createdAt === timestamp &&
+            nextMsg.variantId // Must have variantId to be considered a variant
+          ) {
+            variants.push(nextMsg);
+            j++;
+          } else {
+            break;
+          }
+        }
+
+        groups.push({
+          type: "assistant",
+          messages: variants,
+          originalIndex: i,
+        });
+        i = j;
+      } else {
+        i++;
+      }
+    }
+
+    return groups;
+  }, [messages]);
 
   // Collect all images from messages
   const collectAllImages = useCallback((): ImageInfo[] => {
@@ -215,7 +282,7 @@ export default function ChatInterface({
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     setPreviewUrl(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
-    
+
     // If in "edit" mode and no other images remain, switch to "create" mode
     if (menuState.mode === "edit" && !selectedAgentPart) {
       const newState = resolveMenuState(menuState, "create");
@@ -261,18 +328,39 @@ export default function ChatInterface({
     if (selectedAgentPart) {
       setMessages((prev) => {
         const newMessages = [...prev];
-        const msgIndex = selectedAgentPart.messageIndex;
+        
+        // Find the correct message - use variantId if available, otherwise fall back to messageIndex
+        let msgIndex = selectedAgentPart.messageIndex;
+        if (selectedAgentPart.variantId) {
+          const variantIndex = newMessages.findIndex(
+            (m) => m.variantId === selectedAgentPart.variantId
+          );
+          if (variantIndex !== -1) {
+            msgIndex = variantIndex;
+          }
+        }
+        
         if (newMessages[msgIndex]) {
           const msg = newMessages[msgIndex];
           if (Array.isArray(msg.content)) {
             const newContent = [...msg.content];
-            const partIndex = selectedAgentPart.partIndex;
+            // Find the part by imageId for reliability
+            let partIndex = selectedAgentPart.partIndex;
+            if (selectedAgentPart.imageId) {
+              const imgIndex = newContent.findIndex(
+                (p) => p.type === "agent_image" && p.imageId === selectedAgentPart.imageId
+              );
+              if (imgIndex !== -1) {
+                partIndex = imgIndex;
+              }
+            }
             if (
               newContent[partIndex] &&
               newContent[partIndex].type === "agent_image"
             ) {
+              const agentImagePart = newContent[partIndex] as Extract<MessageContentPart, { type: "agent_image" }>;
               newContent[partIndex] = {
-                ...newContent[partIndex],
+                ...agentImagePart,
                 isSelected: true,
               };
               newMessages[msgIndex] = { ...msg, content: newContent };
@@ -329,6 +417,7 @@ export default function ChatInterface({
               messageIndex: selectedAgentPart.messageIndex,
               partIndex: selectedAgentPart.partIndex,
               imageId: selectedAgentPart.imageId,
+              variantId: selectedAgentPart.variantId,
             })
           );
         }
@@ -363,6 +452,7 @@ export default function ChatInterface({
             messageIndex: selectedAgentPart.messageIndex,
             partIndex: selectedAgentPart.partIndex,
             imageId: selectedAgentPart.imageId,
+            variantId: selectedAgentPart.variantId,
           };
         }
         if (precisionEditing) {
@@ -405,10 +495,12 @@ export default function ChatInterface({
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
-      let isFirstChunk = true;
+      let isFirstChunkByVariant: Record<string, boolean> = {};
+      let hasInitializedVariants = false;
 
-      // Temporary storage for the message content parts
-      let currentContent: MessageContentPart[] = [];
+      // Temporary storage for the message content parts per variant
+      const variantContents: Record<string, MessageContentPart[]> = {};
+      const variantTimestamp = Date.now();
 
       while (true) {
         const { done, value } = await reader.read();
@@ -422,113 +514,129 @@ export default function ChatInterface({
           if (!line.trim()) continue;
           try {
             const event = JSON.parse(line);
+            const variantId = event.variantId || "default";
+
+            // Initialize variant tracking if needed
+            if (!variantContents[variantId]) {
+              variantContents[variantId] = [];
+              isFirstChunkByVariant[variantId] = true;
+            }
 
             if (event.type === "invalidate") {
-              // LLM is being retried - clear current content and reset state
+              // LLM is being retried for this variant - clear its content
               console.log(
-                "[Chat] Received invalidate signal - clearing assistant message for retry"
+                `[Chat] Received invalidate signal for variant ${variantId} - clearing for retry`
               );
 
-              // Show a cute toast notification
-              const cuteMessages = [
-                "Oops! Let me think about that again... 🤔",
-                "Hmm, let me rephrase that better! 💭",
-                "One sec, organizing my thoughts... ✨",
-                "Wait, I can do better! 🎨",
-                "Let me try that again with more sparkle! ⭐",
-              ];
-              const randomMessage =
-                cuteMessages[Math.floor(Math.random() * cuteMessages.length)];
+              // Show a cute toast notification (only once per retry cycle)
+              if (Object.keys(variantContents).length <= 1) {
+                const cuteMessages = [
+                  "Oops! Let me think about that again... 🤔",
+                  "Hmm, let me rephrase that better! 💭",
+                  "One sec, organizing my thoughts... ✨",
+                  "Wait, I can do better! 🎨",
+                  "Let me try that again with more sparkle! ⭐",
+                ];
+                const randomMessage =
+                  cuteMessages[Math.floor(Math.random() * cuteMessages.length)];
 
-              addToast({
-                title: randomMessage,
-                color: "primary",
-              });
+                addToast({
+                  title: randomMessage,
+                  color: "primary",
+                });
+              }
 
-              currentContent = [];
-              isFirstChunk = true;
+              variantContents[variantId] = [];
+              isFirstChunkByVariant[variantId] = true;
 
-              // Remove the assistant message from UI
+              // Update the messages state to clear this variant
               setMessages((prev) => {
                 const newMessages = [...prev];
-                if (
-                  newMessages.length > 0 &&
-                  newMessages[newMessages.length - 1].role === "assistant"
-                ) {
-                  return newMessages.slice(0, -1);
+                // Find and update the variant message
+                for (let i = newMessages.length - 1; i >= 0; i--) {
+                  const msg = newMessages[i];
+                  if (msg.role === "assistant" && msg.variantId === variantId) {
+                    newMessages[i] = { ...msg, content: [] };
+                    break;
+                  }
                 }
                 return newMessages;
               });
               continue;
             }
 
-            if (event.type === "retry_exhausted") {
-              // All retries failed - restore user input and remove messages
+            if (
+              event.type === "retry_exhausted" ||
+              event.type === "variant_failed"
+            ) {
+              // This variant failed - log but continue with other variants
               console.log(
-                "[Chat] Received retry_exhausted signal - restoring user input"
+                `[Chat] Variant ${variantId} failed: ${event.reason}`
               );
 
-              // Cancel chat monitoring since the request failed
-              if (currentChatId) {
-                cancelMonitorChat(currentChatId);
-              }
+              // If all variants failed, handle the error
+              const allFailed = Object.keys(variantContents).every(
+                (v) => variantContents[v].length === 0
+              );
 
-              // Show a cute error toast
-              const cuteErrorMessages = [
-                "Oops! Our agent got a bit overwhelmed... 🥺 Mind trying again?",
-                "So sorry! Our agent is taking a coffee break ☕ Please try again!",
-                "Uh oh! Our agent tripped over their thoughts 🤭 Give it another go?",
-                "Our agent's having a moment... 😅 Could you try once more?",
-                "Whoopsie! The agent's brain did a somersault 🤸 Try again?",
-              ];
-              const randomErrorMessage =
-                cuteErrorMessages[
-                  Math.floor(Math.random() * cuteErrorMessages.length)
+              if (
+                allFailed &&
+                Object.keys(variantContents).length >= PARALLEL_VARIANT_COUNT
+              ) {
+                // Cancel chat monitoring since all requests failed
+                if (currentChatId) {
+                  cancelMonitorChat(currentChatId);
+                }
+
+                // Show error toast
+                const cuteErrorMessages = [
+                  "Oops! Our agent got a bit overwhelmed... 🥺 Mind trying again?",
+                  "So sorry! Our agent is taking a coffee break ☕ Please try again!",
+                  "Uh oh! Our agent tripped over their thoughts 🤭 Give it another go?",
                 ];
+                const randomErrorMessage =
+                  cuteErrorMessages[
+                    Math.floor(Math.random() * cuteErrorMessages.length)
+                  ];
 
-              addToast({
-                title: randomErrorMessage,
-                color: "danger",
-              });
+                addToast({
+                  title: randomErrorMessage,
+                  color: "danger",
+                });
 
-              // Restore the user's original input
-              setInput(lastUserInputRef.current);
+                // Restore the user's original input
+                setInput(lastUserInputRef.current);
 
-              // Remove both the assistant message (if present) and the user message
-              setMessages((prev) => {
-                const newMessages = [...prev];
-                // Remove assistant message if present
-                if (
-                  newMessages.length > 0 &&
-                  newMessages[newMessages.length - 1].role === "assistant"
-                ) {
-                  newMessages.pop();
-                }
-                // Remove user message
-                if (
-                  newMessages.length > 0 &&
-                  newMessages[newMessages.length - 1].role === "user"
-                ) {
-                  newMessages.pop();
-                }
-                return newMessages;
-              });
-
-              // Break out of the read loop since we're done
-              break;
+                // Remove all variant messages and user message
+                setMessages((prev) => {
+                  return prev.filter(
+                    (msg) =>
+                      !(
+                        msg.role === "assistant" &&
+                        msg.createdAt === variantTimestamp
+                      ) && !(msg.role === "user" && msg === userMessage)
+                  );
+                });
+              }
+              continue;
             }
 
-            if (isFirstChunk) {
+            // Initialize variant message if this is the first chunk for this variant
+            if (isFirstChunkByVariant[variantId]) {
               setMessages((prev) => [
                 ...prev,
                 {
                   role: "assistant",
                   content: [],
-                  createdAt: Date.now(),
+                  createdAt: variantTimestamp,
+                  variantId: variantId,
                 },
               ]);
-              isFirstChunk = false;
+              isFirstChunkByVariant[variantId] = false;
+              hasInitializedVariants = true;
             }
+
+            const currentContent = variantContents[variantId];
 
             if (event.type === "internal_think") {
               // Add internal_think part
@@ -542,7 +650,7 @@ export default function ChatInterface({
                 currentContent.length === 0 ||
                 currentContent[0].type !== "text"
               ) {
-                currentContent = [
+                variantContents[variantId] = [
                   { type: "text", text: event.content },
                   ...currentContent,
                 ];
@@ -553,22 +661,40 @@ export default function ChatInterface({
               // Add new part
               currentContent.push(event.part);
             } else if (event.type === "part_update") {
-              // Update existing part
-              // For admins (internal_think present), use offset +2; for others, use +1
-              const hasThink = currentContent.some(
-                (p) => p.type === "internal_think"
-              );
-              const offset = hasThink ? 2 : 1;
-              if (currentContent[event.index + offset]) {
-                currentContent[event.index + offset] = event.part;
+              // Update existing part by imageId (for parallel support)
+              if (event.imageId) {
+                // Find the part with matching imageId
+                const partIdx = currentContent.findIndex(
+                  (p) => p.type === "agent_image" && p.imageId === event.imageId
+                );
+                if (partIdx !== -1) {
+                  currentContent[partIdx] = event.part;
+                }
+              } else if (event.index !== undefined) {
+                // Legacy: Update by index (backward compatibility)
+                const hasThink = currentContent.some(
+                  (p) => p.type === "internal_think"
+                );
+                const offset = hasThink ? 2 : 1;
+                if (currentContent[event.index + offset]) {
+                  currentContent[event.index + offset] = event.part;
+                }
               }
             }
 
+            // Update the specific variant message
             setMessages((prev) => {
               const newMessages = [...prev];
-              const lastMsg = newMessages[newMessages.length - 1];
-              if (lastMsg && lastMsg.role === "assistant") {
-                lastMsg.content = [...currentContent];
+              // Find the variant message to update
+              for (let i = newMessages.length - 1; i >= 0; i--) {
+                const msg = newMessages[i];
+                if (msg.role === "assistant" && msg.variantId === variantId) {
+                  newMessages[i] = {
+                    ...msg,
+                    content: [...variantContents[variantId]],
+                  };
+                  break;
+                }
               }
               return newMessages;
             });
@@ -591,14 +717,17 @@ export default function ChatInterface({
   };
 
   // Handle precision editing toggle - auto-switch mode to "edit" when enabled
-  const handlePrecisionEditingChange = useCallback((value: boolean) => {
-    setPrecisionEditing(value);
-    // When precision editing is turned ON and mode is "create", switch to "edit"
-    if (value && menuState.mode === "create") {
-      const newState = resolveMenuState(menuState, "edit");
-      setMenuState(newState);
-    }
-  }, [menuState]);
+  const handlePrecisionEditingChange = useCallback(
+    (value: boolean) => {
+      setPrecisionEditing(value);
+      // When precision editing is turned ON and mode is "create", switch to "edit"
+      if (value && menuState.mode === "create") {
+        const newState = resolveMenuState(menuState, "edit");
+        setMenuState(newState);
+      }
+    },
+    [menuState]
+  );
 
   const handleAgentTitleClick = (part: any) => {
     if (part.status === "generated" || part.status === "error") {
@@ -632,13 +761,15 @@ export default function ChatInterface({
   const handleAgentImageSelect = (
     part: any,
     messageIndex: number,
-    partIndex: number
+    partIndex: number,
+    variantId?: string
   ) => {
     if (part.status === "generated") {
       const url = part.imageUrl || ""; // Use signed CloudFront URL from API
       if (
         selectedAgentPart?.url === url &&
-        selectedAgentPart?.messageIndex === messageIndex
+        selectedAgentPart?.messageIndex === messageIndex &&
+        selectedAgentPart?.variantId === variantId
       ) {
         setSelectedAgentPart(null);
       } else {
@@ -648,6 +779,7 @@ export default function ChatInterface({
           messageIndex,
           partIndex,
           imageId: part.imageId,
+          variantId,
         });
       }
     }
@@ -719,32 +851,53 @@ export default function ChatInterface({
           </div>
         )}
 
-        {messages.map((msg, idx) => (
-          <ChatMessage
-            key={idx}
-            message={msg}
-            messageIndex={idx}
-            chatId={chatId}
-            user={user}
-            selectedAgentPart={selectedAgentPart}
-            onAgentImageSelect={handleAgentImageSelect}
-            onAgentTitleClick={handleAgentTitleClick}
-            onForkChat={handleForkChat}
-          />
-        ))}
+        {groupedMessages.map((group, groupIdx) => {
+          if (group.type === "user") {
+            return (
+              <ChatMessage
+                key={`user-${group.originalIndex}`}
+                message={group.messages[0]}
+                messageIndex={group.originalIndex}
+                chatId={chatId}
+                user={user}
+                selectedAgentPart={selectedAgentPart}
+                onAgentImageSelect={handleAgentImageSelect}
+                onAgentTitleClick={handleAgentTitleClick}
+                onForkChat={handleForkChat}
+              />
+            );
+          } else {
+            // Assistant message(s) - use ParallelMessage for variants
+            return (
+              <ParallelMessage
+                key={`assistant-${group.originalIndex}`}
+                variants={group.messages}
+                messageIndex={group.originalIndex}
+                chatId={chatId}
+                user={user}
+                selectedAgentPart={selectedAgentPart}
+                onAgentImageSelect={handleAgentImageSelect}
+                onAgentTitleClick={handleAgentTitleClick}
+                onForkChat={handleForkChat}
+              />
+            );
+          }
+        })}
 
-        {isSending && messages[messages.length - 1]?.role === "user" && (
-          <div className="flex gap-3 max-w-3xl mx-auto justify-start items-center">
-            <div className="hidden md:flex w-8 h-8 rounded-full bg-primary/10 items-center justify-center shrink-0">
-              <Bot size={16} className="text-primary" />
+        {isSending &&
+          groupedMessages.length > 0 &&
+          groupedMessages[groupedMessages.length - 1]?.type === "user" && (
+            <div className="flex gap-3 max-w-3xl mx-auto justify-start items-center">
+              <div className="hidden md:flex w-8 h-8 rounded-full bg-primary/10 items-center justify-center shrink-0">
+                <Bot size={16} className="text-primary" />
+              </div>
+              <Card className="max-w-full md:max-w-[80%] shadow-none bg-default-100 dark:bg-default-50/10">
+                <CardBody className="px-4 pt-[2px] pb-1 overflow-hidden flex justify-center">
+                  <Spinner variant="dots" size="md" />
+                </CardBody>
+              </Card>
             </div>
-            <Card className="max-w-full md:max-w-[80%] shadow-none bg-default-100 dark:bg-default-50/10">
-              <CardBody className="px-4 pt-[2px] pb-1 overflow-hidden flex justify-center">
-                <Spinner variant="dots" size="md" />
-              </CardBody>
-            </Card>
-          </div>
-        )}
+          )}
         <div ref={messagesEndRef} />
       </div>
 

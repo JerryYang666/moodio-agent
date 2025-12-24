@@ -7,7 +7,7 @@ export type MessageContentPart =
   | { type: "image"; imageId: string; imageUrl?: string } // imageUrl is signed CloudFront URL from API
   | {
       type: "agent_image";
-      imageId?: string;
+      imageId?: string; // Generated at start of image generation for tracking
       imageUrl?: string; // Signed CloudFront URL for display
       title: string;
       aspectRatio?: string;
@@ -21,7 +21,18 @@ export interface Message {
   content: string | MessageContentPart[];
   agentId?: string;
   createdAt?: number; // Unix timestamp in milliseconds
+  variantId?: string; // Unique identifier for parallel variants
 }
+
+// A message group represents a user message and its assistant response(s)
+// When parallel variants are enabled, variants contains multiple assistant responses
+export interface MessageWithVariants extends Omit<Message, "variantId"> {
+  // For assistant messages with parallel variants
+  variants?: Message[]; // Array of parallel assistant message variants
+}
+
+// Number of parallel LLM calls to make for each user message
+export const PARALLEL_VARIANT_COUNT = 2;
 
 export interface LLMConfig {
   apiKey?: string;

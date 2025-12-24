@@ -1,9 +1,10 @@
-import { Agent, AgentResponse } from "./types";
+import { Agent, AgentResponse, ParallelAgentResponse } from "./types";
 import { Message, MessageContentPart } from "@/lib/llm/types";
 import {
   downloadImage,
   uploadImage,
   getSignedImageUrl,
+  generateImageId,
 } from "@/lib/storage/s3";
 import OpenAI from "openai";
 import { GoogleGenAI } from "@google/genai";
@@ -641,12 +642,16 @@ export class Agent1 implements Agent {
                   const currentIndex = suggestionIndex;
                   suggestionIndex++;
 
+                  // Pre-generate imageId for tracking (enables parallel variant support)
+                  const trackingImageId = generateImageId();
+
                   // Start image generation
                   const task = (async () => {
                     try {
-                      // Send placeholder when image generation starts
+                      // Send placeholder when image generation starts - include trackingImageId
                       const placeholder: MessageContentPart = {
                         type: "agent_image",
+                        imageId: trackingImageId, // Pre-generated ID for tracking
                         title: "Loading...",
                         aspectRatio: suggestion.aspectRatio as AspectRatio,
                         prompt: suggestion.prompt,
@@ -657,32 +662,42 @@ export class Agent1 implements Agent {
 
                       console.log(
                         "[Perf] Agent image generation start",
-                        `[${Date.now() - startTime}ms]`
+                        `[${Date.now() - startTime}ms]`,
+                        `imageId=${trackingImageId}`
                       );
                       const part = await self.generateImage(
                         suggestion,
                         prepared,
                         currentIndex,
                         startTime,
-                        userId
+                        userId,
+                        trackingImageId // Pass pre-generated ID
                       );
 
-                      // Send update
+                      // Send update using imageId instead of index for parallel support
                       send({
                         type: "part_update",
-                        index: currentIndex,
+                        imageId: trackingImageId,
                         part: part,
                       });
 
-                      // Update final content (index + 2 because of text part and internal_think part)
-                      finalContent[currentIndex + 2] = part;
+                      // Update final content by finding the placeholder with matching imageId
+                      const placeholderIndex = finalContent.findIndex(
+                        (p) =>
+                          p.type === "agent_image" &&
+                          p.imageId === trackingImageId
+                      );
+                      if (placeholderIndex !== -1) {
+                        finalContent[placeholderIndex] = part;
+                      }
                     } catch (err) {
                       console.error(
-                        `Image gen error for index ${currentIndex}`,
+                        `Image gen error for imageId ${trackingImageId}`,
                         err
                       );
                       const errorPart: MessageContentPart = {
                         type: "agent_image",
+                        imageId: trackingImageId, // Keep the tracking ID
                         title: suggestion.title || "Error",
                         aspectRatio: "1:1",
                         prompt: suggestion.prompt || "",
@@ -690,10 +705,18 @@ export class Agent1 implements Agent {
                       };
                       send({
                         type: "part_update",
-                        index: currentIndex,
+                        imageId: trackingImageId,
                         part: errorPart,
                       });
-                      finalContent[currentIndex + 2] = errorPart;
+                      // Update final content by finding the placeholder with matching imageId
+                      const placeholderIndex = finalContent.findIndex(
+                        (p) =>
+                          p.type === "agent_image" &&
+                          p.imageId === trackingImageId
+                      );
+                      if (placeholderIndex !== -1) {
+                        finalContent[placeholderIndex] = errorPart;
+                      }
                     }
                   })();
 
@@ -750,11 +773,13 @@ export class Agent1 implements Agent {
     prepared: PreparedMessages,
     index: number,
     startTime: number,
-    userId: string
+    userId: string,
+    preGeneratedImageId?: string
   ): Promise<MessageContentPart> {
     console.log(
       `[Perf] Image generation start index=${index}`,
-      `[${Date.now() - startTime}ms]`
+      `[${Date.now() - startTime}ms]`,
+      preGeneratedImageId ? `imageId=${preGeneratedImageId}` : ""
     );
 
     let lastError: Error | undefined;
@@ -774,7 +799,8 @@ export class Agent1 implements Agent {
           prepared,
           index,
           startTime,
-          userId
+          userId,
+          preGeneratedImageId
         );
 
         if (attempt > 0) {
@@ -830,7 +856,8 @@ export class Agent1 implements Agent {
     prepared: PreparedMessages,
     index: number,
     startTime: number,
-    userId: string
+    userId: string,
+    preGeneratedImageId?: string
   ): Promise<MessageContentPart> {
     const ai = new GoogleGenAI({
       apiKey: process.env.GOOGLE_API_KEY,
@@ -944,7 +971,8 @@ export class Agent1 implements Agent {
         throw error;
       }
       const buf = Buffer.from(generatedImageData, "base64");
-      finalImageId = await uploadImage(buf, "image/png");
+      // Use pre-generated imageId if provided (for parallel tracking), otherwise generate new
+      finalImageId = await uploadImage(buf, "image/png", preGeneratedImageId);
     } catch (error) {
       // If we have a response in the error (from our manual throw above), or if it's a GoogleGenerativeAIError that contains response data
       // we want to ensure it propagates up
@@ -971,9 +999,173 @@ export class Agent1 implements Agent {
     };
     console.log(
       `[Perf] Image generation end index=${index}`,
-      `[${Date.now() - startTime}ms]`
+      `[${Date.now() - startTime}ms]`,
+      `imageId=${finalImageId}`
     );
     return result;
+  }
+
+  /**
+   * Process request with parallel variants - runs N parallel LLM calls
+   * and merges their streams into a single stream with variant IDs
+   */
+  async processRequestParallel(
+    history: Message[],
+    userMessage: Message,
+    userId: string,
+    isAdmin: boolean,
+    variantCount: number,
+    requestStartTime?: number,
+    precisionEditing?: boolean,
+    precisionEditImageId?: string,
+    systemPromptOverride?: string,
+    aspectRatioOverride?: string
+  ): Promise<ParallelAgentResponse> {
+    const startTime = requestStartTime || Date.now();
+    console.log(
+      `[Perf] Agent processRequestParallel start with ${variantCount} variants`,
+      `[${Date.now() - startTime}ms]`
+    );
+
+    // Validate aspect ratio override
+    let validatedAspectRatio: AspectRatio | undefined;
+    if (aspectRatioOverride) {
+      if (
+        SUPPORTED_ASPECT_RATIOS.includes(aspectRatioOverride as AspectRatio)
+      ) {
+        validatedAspectRatio = aspectRatioOverride as AspectRatio;
+      }
+    }
+
+    // Prepare messages once (shared across all variants)
+    const prepared = await this.prepareMessages(
+      history,
+      userMessage,
+      startTime,
+      precisionEditing,
+      precisionEditImageId,
+      systemPromptOverride,
+      validatedAspectRatio
+    );
+
+    const encoder = new TextEncoder();
+    const self = this;
+
+    // Generate unique variant IDs
+    const variantIds = Array.from(
+      { length: variantCount },
+      (_, i) =>
+        `variant-${i}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+    );
+
+    // Track completion for each variant
+    const completionPromises: Promise<Message>[] = [];
+    const variantControllers: {
+      controller: ReadableStreamDefaultController<Uint8Array> | null;
+      done: boolean;
+    }[] = variantIds.map(() => ({ controller: null, done: false }));
+
+    // Create merged stream
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        // Start all parallel variant processing
+        variantIds.forEach((variantId, variantIndex) => {
+          const completionPromise = (async () => {
+            const send = (data: any) => {
+              try {
+                // Only stream internal_* to admins
+                if (data.type?.startsWith("internal_") && !isAdmin) {
+                  return;
+                }
+                // Add variantId to all events
+                const eventWithVariant = { ...data, variantId };
+                controller.enqueue(
+                  encoder.encode(JSON.stringify(eventWithVariant) + "\n")
+                );
+              } catch (e) {
+                // Controller might be closed
+              }
+            };
+
+            let lastError: Error | undefined;
+
+            for (let attempt = 0; attempt <= MAX_RETRY; attempt++) {
+              try {
+                if (attempt > 0) {
+                  console.log(
+                    `[Agent-1] Retrying LLM call for variant ${variantId}, attempt ${attempt + 1}/${MAX_RETRY + 1}`
+                  );
+                  send({ type: "invalidate", reason: "retry" });
+                }
+
+                const result = await self.callLLMAndParseCore(
+                  prepared,
+                  startTime,
+                  send,
+                  userId
+                );
+
+                // Add variantId to the result message
+                const messageWithVariant: Message = {
+                  ...result,
+                  variantId,
+                };
+
+                variantControllers[variantIndex].done = true;
+
+                // Check if all variants are done
+                if (variantControllers.every((v) => v.done)) {
+                  try {
+                    controller.close();
+                  } catch (e) {}
+                }
+
+                return messageWithVariant;
+              } catch (error) {
+                lastError = error as Error;
+                console.error(
+                  `[Agent-1] Variant ${variantId} attempt ${attempt + 1} failed:`,
+                  error
+                );
+              }
+            }
+
+            // All retries exhausted for this variant
+            send({
+              type: "variant_failed",
+              reason: "All retry attempts failed",
+              error: lastError?.message || "Unknown error",
+            });
+
+            variantControllers[variantIndex].done = true;
+
+            // Check if all variants are done
+            if (variantControllers.every((v) => v.done)) {
+              try {
+                controller.close();
+              } catch (e) {}
+            }
+
+            // Return an error message for this variant
+            const errorMessage: Message = {
+              role: "assistant",
+              content: [{ type: "text", text: "Failed to generate response" }],
+              agentId: self.id,
+              variantId,
+            };
+
+            return errorMessage;
+          })();
+
+          completionPromises.push(completionPromise);
+        });
+      },
+    });
+
+    // Combine all completion promises
+    const completions = Promise.all(completionPromises);
+
+    return { stream, completions };
   }
 }
 
