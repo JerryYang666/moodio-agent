@@ -342,11 +342,32 @@ export async function POST(
             }
           }
 
-          // 2. Check current selection
+          // 2. Check current selection (use variantId to find correct message)
           if (!thumbnailImageId && selection) {
-            const selectedMsg = history[selection.messageIndex];
+            let selectedMsg;
+            if (selection.variantId) {
+              // Find message by variantId for parallel variants
+              selectedMsg = history.find(
+                (msg) => msg.variantId === selection.variantId
+              );
+            } else {
+              // Fallback to messageIndex for backward compatibility
+              selectedMsg = history[selection.messageIndex];
+            }
+            
             if (selectedMsg && Array.isArray(selectedMsg.content)) {
-              const part = selectedMsg.content[selection.partIndex];
+              // Find part by imageId for reliability
+              let part;
+              if (selection.imageId) {
+                part = selectedMsg.content.find(
+                  (p) => p.type === "agent_image" && p.imageId === selection.imageId
+                );
+              }
+              // Fallback to partIndex
+              if (!part && selection.partIndex !== undefined) {
+                part = selectedMsg.content[selection.partIndex];
+              }
+              
               if (part) {
                 if (part.type === "image") {
                   thumbnailImageId = part.imageId;
