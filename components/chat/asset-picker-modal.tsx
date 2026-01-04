@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Modal,
   ModalContent,
@@ -13,6 +13,7 @@ import { Spinner } from "@heroui/spinner";
 import { Select, SelectItem } from "@heroui/select";
 import { Input } from "@heroui/input";
 import { Image } from "@heroui/image";
+import { Tab, Tabs } from "@heroui/tabs";
 import { Search } from "lucide-react";
 
 export type AssetSummary = {
@@ -48,10 +49,12 @@ export default function AssetPickerModal({
   isOpen,
   onOpenChange,
   onSelect,
+  onUpload,
 }: {
   isOpen: boolean;
   onOpenChange: () => void;
   onSelect: (asset: AssetSummary) => void;
+  onUpload: (file: File) => void;
 }) {
   const [loading, setLoading] = useState(false);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -60,9 +63,12 @@ export default function AssetPickerModal({
   const [projectId, setProjectId] = useState<string>("recent");
   const [collectionId, setCollectionId] = useState<string>("all");
   const [query, setQuery] = useState("");
+  const [tabKey, setTabKey] = useState<"library" | "upload">("library");
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!isOpen) return;
+    setTabKey("library");
     const load = async () => {
       setLoading(true);
       try {
@@ -127,96 +133,156 @@ export default function AssetPickerModal({
   }, [assets, query]);
 
   return (
-    <Modal isOpen={isOpen} onOpenChange={onOpenChange} size="4xl">
+    <Modal
+      isOpen={isOpen}
+      onOpenChange={onOpenChange}
+      size="4xl"
+      scrollBehavior="inside"
+      classNames={{ base: "max-h-[90dvh]" }}
+    >
       <ModalContent>
         {(onClose) => (
           <>
-            <ModalHeader>Select an image from your assets</ModalHeader>
-            <ModalBody>
-              <div className="flex flex-col gap-4">
-                <div className="flex flex-col md:flex-row gap-3">
-                  <Select
-                    label="Project"
-                    selectedKeys={[projectId]}
+            <ModalHeader className="flex flex-col gap-2">
+              <div>Select an image</div>
+              <Tabs
+                selectedKey={tabKey}
+                onSelectionChange={(k) => setTabKey(k as "library" | "upload")}
+                size="sm"
+                variant="underlined"
+              >
+                <Tab key="library" title="Library" />
+                <Tab key="upload" title="Upload" />
+              </Tabs>
+            </ModalHeader>
+
+            <ModalBody className="overflow-hidden">
+              {tabKey === "upload" ? (
+                <div className="flex flex-col gap-4">
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    className="hidden"
+                    accept="image/png, image/jpeg, image/webp, image/gif"
                     onChange={(e) => {
-                      const next = e.target.value;
-                      setProjectId(next);
-                      setCollectionId("all");
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      onUpload(file);
+                      onClose();
+                      // allow re-selecting the same file later
+                      e.currentTarget.value = "";
                     }}
-                    className="md:w-1/2"
-                  >
-                    <SelectItem key="recent">Recent</SelectItem>
-                    <>
-                      {projects.map((p) => (
-                        <SelectItem key={p.id}>
-                          {p.isDefault ? `${p.name} (Default)` : p.name}
-                        </SelectItem>
-                      ))}
-                    </>
-                  </Select>
+                  />
 
-                  <Select
-                    label="Collection"
-                    selectedKeys={[collectionId]}
-                    onChange={(e) => setCollectionId(e.target.value)}
-                    className="md:w-1/2"
-                  >
-                    <SelectItem key="all">All</SelectItem>
-                    <>
-                      {visibleCollections.map((c) => (
-                        <SelectItem key={c.id}>
-                          {c.isOwner ? c.name : `${c.name} (Shared)`}
-                        </SelectItem>
-                      ))}
-                    </>
-                  </Select>
-                </div>
-
-                <Input
-                  startContent={<Search size={16} className="text-default-400" />}
-                  placeholder="Search by title…"
-                  value={query}
-                  onValueChange={setQuery}
-                />
-
-                {loading ? (
-                  <div className="flex items-center justify-center py-10">
-                    <Spinner />
-                  </div>
-                ) : filteredAssets.length === 0 ? (
-                  <div className="text-center py-10 text-default-500">
-                    No assets found
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                    {filteredAssets.map((a) => (
-                      <button
-                        key={a.id}
-                        className="text-left group"
-                        onClick={() => {
-                          onSelect(a);
-                          onClose();
-                        }}
+                  <div className="rounded-xl border border-divider bg-default-50 p-4">
+                    <div className="font-medium">Upload from device</div>
+                    <div className="text-sm text-default-500 mt-1">
+                      Choose an image file to attach to your next message.
+                    </div>
+                    <div className="mt-4 flex gap-2">
+                      <Button
+                        color="primary"
+                        onPress={() => fileInputRef.current?.click()}
                       >
-                        <div className="rounded-lg overflow-hidden border border-divider bg-default-100 aspect-square">
-                          <Image
-                            src={a.imageUrl}
-                            alt={a.generationDetails?.title || "Asset"}
-                            radius="none"
-                            classNames={{
-                              wrapper: "w-full h-full !max-w-full",
-                              img: "w-full h-full object-cover",
-                            }}
-                          />
-                        </div>
-                        <div className="mt-1 text-xs text-default-600 truncate">
-                          {a.generationDetails?.title || "Untitled"}
-                        </div>
-                      </button>
-                    ))}
+                        Choose file
+                      </Button>
+                      <Button variant="flat" onPress={() => setTabKey("library")}>
+                        Browse library instead
+                      </Button>
+                    </div>
                   </div>
-                )}
-              </div>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-4 min-h-0">
+                  <div className="flex flex-col md:flex-row gap-3 shrink-0">
+                    <Select
+                      label="Project"
+                      selectedKeys={[projectId]}
+                      onChange={(e) => {
+                        const next = e.target.value;
+                        setProjectId(next);
+                        setCollectionId("all");
+                      }}
+                      className="md:w-1/2"
+                    >
+                      <SelectItem key="recent">Recent</SelectItem>
+                      <>
+                        {projects.map((p) => (
+                          <SelectItem key={p.id}>
+                            {p.isDefault ? `${p.name} (Default)` : p.name}
+                          </SelectItem>
+                        ))}
+                      </>
+                    </Select>
+
+                    <Select
+                      label="Collection"
+                      selectedKeys={[collectionId]}
+                      onChange={(e) => setCollectionId(e.target.value)}
+                      className="md:w-1/2"
+                    >
+                      <SelectItem key="all">All</SelectItem>
+                      <>
+                        {visibleCollections.map((c) => (
+                          <SelectItem key={c.id}>
+                            {c.isOwner ? c.name : `${c.name} (Shared)`}
+                          </SelectItem>
+                        ))}
+                      </>
+                    </Select>
+                  </div>
+
+                  <Input
+                    startContent={
+                      <Search size={16} className="text-default-400" />
+                    }
+                    placeholder="Search by title…"
+                    value={query}
+                    onValueChange={setQuery}
+                    className="shrink-0"
+                  />
+
+                  {loading ? (
+                    <div className="flex items-center justify-center py-10">
+                      <Spinner />
+                    </div>
+                  ) : filteredAssets.length === 0 ? (
+                    <div className="text-center py-10 text-default-500">
+                      No assets found
+                    </div>
+                  ) : (
+                    <div className="flex-1 min-h-0 overflow-y-auto pr-1">
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                        {filteredAssets.map((a) => (
+                          <button
+                            key={a.id}
+                            className="text-left group"
+                            onClick={() => {
+                              onSelect(a);
+                              onClose();
+                            }}
+                          >
+                            <div className="rounded-lg overflow-hidden border border-divider bg-default-100 aspect-square">
+                              <Image
+                                src={a.imageUrl}
+                                alt={a.generationDetails?.title || "Asset"}
+                                radius="none"
+                                classNames={{
+                                  wrapper: "w-full h-full !max-w-full",
+                                  img: "w-full h-full object-cover",
+                                }}
+                              />
+                            </div>
+                            <div className="mt-1 text-xs text-default-600 truncate">
+                              {a.generationDetails?.title || "Untitled"}
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </ModalBody>
             <ModalFooter>
               <Button variant="light" onPress={onClose}>

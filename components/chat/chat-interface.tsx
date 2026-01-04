@@ -94,7 +94,6 @@ export default function ChatInterface({
       setSelectedAgentPart(null);
       setPrecisionEditing(false);
       setIsSending(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
 
       // Ensure we clean up any draft that might be lingering
       localStorage.removeItem(`${siteConfig.chatInputPrefix}new-chat`);
@@ -219,7 +218,6 @@ export default function ChatInterface({
   const [selectedAgentPart, setSelectedAgentPart] =
     useState<SelectedAgentPart | null>(null);
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const notificationModalRef = useRef<NotificationPermissionModalRef>(null);
   const lastUserInputRef = useRef<string>("");
@@ -276,25 +274,24 @@ export default function ChatInterface({
     }
   }, [chatId, user]);
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        alert("File size too large. Max 5MB.");
-        return;
-      }
-      // Local upload and asset selection are mutually exclusive
-      setSelectedAsset(null);
-      setSelectedFile(file);
-      setPreviewUrl(URL.createObjectURL(file));
+  const applySelectedFile = useCallback((file: File) => {
+    if (file.size > 5 * 1024 * 1024) {
+      alert("File size too large. Max 5MB.");
+      return;
     }
-  };
+    // Local upload and asset selection are mutually exclusive
+    setSelectedAsset(null);
+    setSelectedFile(file);
+    setPreviewUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return URL.createObjectURL(file);
+    });
+  }, []);
 
   const clearFile = useCallback(() => {
     setSelectedFile(null);
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     setPreviewUrl(null);
-    if (fileInputRef.current) fileInputRef.current.value = "";
 
     // If in "edit" mode and no other images remain, switch to "create" mode
     if (menuState.mode === "edit" && !selectedAgentPart) {
@@ -325,7 +322,6 @@ export default function ChatInterface({
       setSelectedFile(null);
       if (previewUrl) URL.revokeObjectURL(previewUrl);
       setPreviewUrl(null);
-      if (fileInputRef.current) fileInputRef.current.value = "";
       setSelectedAsset(payload);
     },
     [previewUrl, messages.length]
@@ -486,11 +482,11 @@ export default function ChatInterface({
 
     setInput("");
     setSelectedFile(null);
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
     setPreviewUrl(null);
     setSelectedAsset(null);
     setSelectedAgentPart(null);
     setPrecisionEditing(false);
-    if (fileInputRef.current) fileInputRef.current.value = "";
 
     setIsSending(true);
 
@@ -1027,7 +1023,6 @@ export default function ChatInterface({
         onStartRecording={startRecording}
         onStopRecording={stopRecording}
         previewUrl={previewUrl}
-        onFileSelect={handleFileSelect}
         onClearFile={clearFile}
         selectedAgentPart={selectedAgentPart}
         onClearSelectedAgentPart={() => {
@@ -1053,6 +1048,7 @@ export default function ChatInterface({
         isOpen={isAssetPickerOpen}
         onOpenChange={() => setIsAssetPickerOpen((v) => !v)}
         onSelect={handleAssetPicked}
+        onUpload={applySelectedFile}
       />
 
       <ImageDetailModal

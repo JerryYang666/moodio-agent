@@ -7,7 +7,7 @@ import { Popover, PopoverTrigger, PopoverContent } from "@heroui/popover";
 import { Switch } from "@heroui/switch";
 import { Tooltip } from "@heroui/tooltip";
 import { siteConfig } from "@/config/site";
-import { Send, X, ImagePlus, Mic, Square, Info, FolderOpen } from "lucide-react";
+import { Send, X, ImagePlus, Mic, Square, Info } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import MenuConfiguration, { MenuState } from "./menu-configuration";
 import clsx from "clsx";
@@ -38,7 +38,6 @@ interface ChatInputProps {
   onStartRecording: () => void;
   onStopRecording: () => void;
   previewUrl: string | null;
-  onFileSelect: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onClearFile: () => void;
   selectedAgentPart: SelectedAgentPart | null;
   onClearSelectedAgentPart: () => void;
@@ -64,7 +63,6 @@ export default function ChatInput({
   onStartRecording,
   onStopRecording,
   previewUrl,
-  onFileSelect,
   onClearFile,
   selectedAgentPart,
   onClearSelectedAgentPart,
@@ -78,7 +76,6 @@ export default function ChatInput({
   menuState,
   onMenuStateChange,
 }: ChatInputProps) {
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -267,31 +264,14 @@ export default function ChatInput({
                 isExpanded ? "w-auto opacity-100" : "w-0 opacity-0"
               )}
             >
-              <input
-                type="file"
-                ref={fileInputRef}
-                className="hidden"
-                accept="image/png, image/jpeg, image/webp, image/gif"
-                onChange={onFileSelect}
-              />
-              {showFileUpload && (
-                <Button
-                  isIconOnly
-                  variant="flat"
-                  onPress={() => fileInputRef.current?.click()}
-                  aria-label="Upload image"
-                >
-                  <ImagePlus size={24} className="text-default-500" />
-                </Button>
-              )}
               {showFileUpload && (
                 <Button
                   isIconOnly
                   variant="flat"
                   onPress={onOpenAssetPicker}
-                  aria-label="Pick from projects/collections"
+                  aria-label="Add image"
                 >
-                  <FolderOpen size={22} className="text-default-500" />
+                  <ImagePlus size={24} className="text-default-500" />
                 </Button>
               )}
 
