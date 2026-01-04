@@ -262,14 +262,14 @@ export const Navbar = () => {
   const { chats, refreshChats } = useChat();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [activeSection, setActiveSection] = useState<
-    "browse" | "agent" | "collections" | "storyboard"
+    "browse" | "agent" | "projects" | "storyboard"
   >("agent");
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
 
   useEffect(() => {
     if (pathname?.startsWith("/browse")) setActiveSection("browse");
-    else if (pathname?.startsWith("/collection"))
-      setActiveSection("collections");
+    else if (pathname?.startsWith("/projects") || pathname?.startsWith("/collection"))
+      setActiveSection("projects");
     else if (pathname?.startsWith("/storyboard"))
       setActiveSection("storyboard");
     else setActiveSection("agent");
@@ -306,10 +306,10 @@ export const Navbar = () => {
       href: "/chat",
     },
     {
-      id: "collections",
-      label: "Collect.",
+      id: "projects",
+      label: "Projects",
       icon: <Folder size={20} />,
-      href: "/collection",
+      href: "/projects",
     },
     {
       id: "storyboard",
@@ -452,20 +452,20 @@ export const Navbar = () => {
               </>
             )}
 
-            {activeSection === "collections" && (
+            {activeSection === "projects" && (
               <div className="flex flex-col items-center justify-center h-full text-default-500">
                 <Folder size={48} className="mb-2 opacity-50" />
-                <p>Manage your collections here</p>
+                <p>Manage your projects here</p>
                 <Button
                   className="mt-4"
                   color="primary"
                   variant="flat"
                   onPress={() => {
-                    router.push("/collection");
+                    router.push("/projects");
                     setIsMenuOpen(false);
                   }}
                 >
-                  Go to Collections
+                  Go to Projects
                 </Button>
               </div>
             )}

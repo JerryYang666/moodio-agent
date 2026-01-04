@@ -4,6 +4,8 @@ import { collections, collectionShares } from "@/lib/db/schema";
 import { getAccessToken } from "@/lib/auth/cookies";
 import { verifyAccessToken } from "@/lib/auth/jwt";
 import { eq, or, and, desc } from "drizzle-orm";
+import { ensureDefaultProject } from "@/lib/db/projects";
+import { projects } from "@/lib/db/schema";
 
 /**
  * GET /api/collection
@@ -22,6 +24,7 @@ export async function GET(req: NextRequest) {
     }
 
     const userId = payload.userId;
+    await ensureDefaultProject(userId);
 
     // Get collections owned by user
     const ownedCollections = await db
@@ -86,7 +89,7 @@ export async function POST(req: NextRequest) {
 
     const userId = payload.userId;
     const body = await req.json();
-    const { name } = body;
+    const { name, projectId } = body as { name?: unknown; projectId?: unknown };
 
     if (!name || typeof name !== "string" || !name.trim()) {
       return NextResponse.json(
@@ -95,11 +98,31 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const resolvedProjectId =
+      typeof projectId === "string" && projectId.trim()
+        ? projectId.trim()
+        : (await ensureDefaultProject(userId)).id;
+
+    // Projects are not shareable; only allow creating collections in owned projects.
+    const [ownedProject] = await db
+      .select({ id: projects.id })
+      .from(projects)
+      .where(and(eq(projects.id, resolvedProjectId), eq(projects.userId, userId)))
+      .limit(1);
+
+    if (!ownedProject) {
+      return NextResponse.json(
+        { error: "Project not found or access denied" },
+        { status: 404 }
+      );
+    }
+
     // Create collection
     const [newCollection] = await db
       .insert(collections)
       .values({
         userId,
+        projectId: resolvedProjectId,
         name: name.trim(),
       })
       .returning();

@@ -43,10 +43,11 @@ export const PrimarySidebar = () => {
       isActive: (path: string) => path.startsWith("/chat") || path === "/",
     },
     {
-      label: "Collections",
-      href: "/collection",
+      label: "Projects",
+      href: "/projects",
       icon: <Folder size={20} />,
-      isActive: (path: string) => path.startsWith("/collection"),
+      isActive: (path: string) =>
+        path.startsWith("/projects") || path.startsWith("/collection"),
     },
     {
       label: "Storyboard",

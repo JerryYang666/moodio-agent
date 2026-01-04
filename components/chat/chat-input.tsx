@@ -7,7 +7,7 @@ import { Popover, PopoverTrigger, PopoverContent } from "@heroui/popover";
 import { Switch } from "@heroui/switch";
 import { Tooltip } from "@heroui/tooltip";
 import { siteConfig } from "@/config/site";
-import { Send, X, ImagePlus, Mic, Square, Info } from "lucide-react";
+import { Send, X, ImagePlus, Mic, Square, Info, FolderOpen } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import MenuConfiguration, { MenuState } from "./menu-configuration";
 import clsx from "clsx";
@@ -18,6 +18,13 @@ interface SelectedAgentPart {
   messageIndex: number;
   partIndex: number;
   imageId?: string;
+}
+
+interface SelectedAsset {
+  assetId: string;
+  url: string;
+  title: string;
+  imageId: string;
 }
 
 interface ChatInputProps {
@@ -35,6 +42,10 @@ interface ChatInputProps {
   onClearFile: () => void;
   selectedAgentPart: SelectedAgentPart | null;
   onClearSelectedAgentPart: () => void;
+  selectedAsset: SelectedAsset | null;
+  onClearSelectedAsset: () => void;
+  onOpenAssetPicker: () => void;
+  onAssetDrop: (payload: SelectedAsset | { assetId: string }) => void;
   showFileUpload: boolean;
   precisionEditing: boolean;
   onPrecisionEditingChange: (value: boolean) => void;
@@ -57,6 +68,10 @@ export default function ChatInput({
   onClearFile,
   selectedAgentPart,
   onClearSelectedAgentPart,
+  selectedAsset,
+  onClearSelectedAsset,
+  onOpenAssetPicker,
+  onAssetDrop,
   showFileUpload,
   precisionEditing,
   onPrecisionEditingChange,
@@ -66,6 +81,27 @@ export default function ChatInput({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [isExpanded, setIsExpanded] = useState(false);
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    try {
+      const json = e.dataTransfer.getData("application/x-moodio-asset");
+      if (json) {
+        const parsed = JSON.parse(json);
+        if (parsed?.assetId) {
+          onAssetDrop(parsed);
+          return;
+        }
+      }
+      const fallbackId = e.dataTransfer.getData("text/plain");
+      if (fallbackId) {
+        onAssetDrop({ assetId: fallbackId });
+      }
+    } catch (err) {
+      console.error("Failed to parse dropped asset", err);
+    }
+  };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -109,15 +145,17 @@ export default function ChatInput({
 
   // Auto-expand if there are attachments or recording
   useEffect(() => {
-    if (previewUrl || selectedAgentPart || isRecording) {
+    if (previewUrl || selectedAgentPart || selectedAsset || isRecording) {
       setIsExpanded(true);
     }
-  }, [previewUrl, selectedAgentPart, isRecording]);
+  }, [previewUrl, selectedAgentPart, selectedAsset, isRecording]);
 
   return (
     <div className="absolute bottom-4 left-0 right-0 z-50 flex justify-center px-4 pointer-events-none">
       <div
         ref={containerRef}
+        onDragOver={(e) => e.preventDefault()}
+        onDrop={handleDrop}
         style={{
           maxWidth: isExpanded ? "48rem" : "320px",
           width: "100%",
@@ -127,7 +165,7 @@ export default function ChatInput({
         <div className="flex flex-col">
           {/* Previews Area */}
           <AnimatePresence>
-            {isExpanded && (previewUrl || selectedAgentPart) && (
+            {isExpanded && (previewUrl || selectedAgentPart || selectedAsset) && (
               <motion.div
                 initial={{ height: 0, opacity: 0 }}
                 animate={{ height: "auto", opacity: 1 }}
@@ -173,8 +211,30 @@ export default function ChatInput({
                       </button>
                     </div>
                   )}
+                  {selectedAsset && (
+                    <div className="relative w-fit group">
+                      <div className="h-20 w-20 rounded-lg border border-divider overflow-hidden relative">
+                        <img
+                          src={selectedAsset.url}
+                          alt={selectedAsset.title}
+                          className="w-full h-full object-cover"
+                        />
+                        <div className="absolute inset-0 bg-black/50 flex items-center justify-center p-1">
+                          <span className="text-white text-[10px] text-center leading-tight font-medium line-clamp-3">
+                            Asset: {selectedAsset.title}
+                          </span>
+                        </div>
+                      </div>
+                      <button
+                        onClick={onClearSelectedAsset}
+                        className="absolute -top-2 -right-2 bg-default-100 rounded-full p-1 hover:bg-default-200 shadow-sm border border-divider"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  )}
 
-                  {(previewUrl || selectedAgentPart) && (
+                  {(previewUrl || selectedAgentPart || selectedAsset) && (
                     <div className="flex items-center h-20 ml-2 gap-1">
                       <Switch
                         size="sm"
@@ -222,6 +282,16 @@ export default function ChatInput({
                   aria-label="Upload image"
                 >
                   <ImagePlus size={24} className="text-default-500" />
+                </Button>
+              )}
+              {showFileUpload && (
+                <Button
+                  isIconOnly
+                  variant="flat"
+                  onPress={onOpenAssetPicker}
+                  aria-label="Pick from projects/collections"
+                >
+                  <FolderOpen size={22} className="text-default-500" />
                 </Button>
               )}
 

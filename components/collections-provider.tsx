@@ -6,6 +6,7 @@ import { useAuth } from "@/hooks/use-auth";
 export interface Collection {
   id: string;
   userId: string;
+  projectId: string;
   name: string;
   createdAt: Date;
   updatedAt: Date;
@@ -16,7 +17,8 @@ export interface Collection {
 
 export interface CollectionImage {
   id: string;
-  collectionId: string;
+  projectId: string;
+  collectionId: string | null;
   imageId: string;
   chatId: string | null;
   generationDetails: {
@@ -41,7 +43,7 @@ interface CollectionsContextValue {
   loading: boolean;
   error: string;
   refreshCollections: () => Promise<void>;
-  createCollection: (name: string) => Promise<Collection | null>;
+  createCollection: (name: string, projectId?: string) => Promise<Collection | null>;
   renameCollection: (collectionId: string, name: string) => Promise<boolean>;
   deleteCollection: (collectionId: string) => Promise<boolean>;
   addImageToCollection: (
@@ -124,26 +126,31 @@ export function CollectionsProvider({
     refreshCollections();
   }, [refreshCollections]);
 
-  const createCollection = useCallback(async (name: string) => {
-    try {
-      const res = await fetch("/api/collection", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name }),
-      });
+  const createCollection = useCallback(
+    async (name: string, projectId?: string) => {
+      try {
+        const payload: any = { name };
+        if (projectId) payload.projectId = projectId;
+        const res = await fetch("/api/collection", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
 
-      if (!res.ok) {
-        throw new Error("Failed to create collection");
+        if (!res.ok) {
+          throw new Error("Failed to create collection");
+        }
+
+        const data = await res.json();
+        setCollections((prev) => [data.collection, ...prev]);
+        return data.collection;
+      } catch (err) {
+        console.error("Error creating collection:", err);
+        return null;
       }
-
-      const data = await res.json();
-      setCollections((prev) => [data.collection, ...prev]);
-      return data.collection;
-    } catch (err) {
-      console.error("Error creating collection:", err);
-      return null;
-    }
-  }, []);
+    },
+    []
+  );
 
   const renameCollection = useCallback(async (collectionId: string, name: string) => {
     try {

@@ -43,6 +43,7 @@ interface CollectionData {
   collection: {
     id: string;
     userId: string;
+    projectId: string;
     name: string;
     createdAt: Date;
     updatedAt: Date;
@@ -385,6 +386,15 @@ export default function CollectionPage({
               >
                 {collection.permission}
               </Chip>
+              {collection.isOwner && collection.projectId && (
+                <Button
+                  size="sm"
+                  variant="flat"
+                  onPress={() => router.push(`/projects/${collection.projectId}`)}
+                >
+                  Open Project
+                </Button>
+              )}
             </div>
             <p className="text-default-500">
               {images.length} {images.length === 1 ? "image" : "images"}

@@ -22,6 +22,7 @@ import ImageDetailModal, { ImageInfo } from "./image-detail-modal";
 import ChatMessage from "./chat-message";
 import ChatInput from "./chat-input";
 import ParallelMessage from "./parallel-message";
+import AssetPickerModal, { type AssetSummary } from "./asset-picker-modal";
 import { siteConfig } from "@/config/site";
 import { useVoiceRecorder } from "./use-voice-recorder";
 import { SYSTEM_PROMPT_STORAGE_KEY } from "@/components/test-kit";
@@ -30,6 +31,13 @@ import {
   INITIAL_MENU_STATE,
   resolveMenuState,
 } from "./menu-configuration";
+
+interface SelectedAsset {
+  assetId: string;
+  url: string;
+  title: string;
+  imageId: string;
+}
 
 interface SelectedAgentPart {
   url: string;
@@ -68,6 +76,8 @@ export default function ChatInterface({
   const [isSending, setIsSending] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [selectedAsset, setSelectedAsset] = useState<SelectedAsset | null>(null);
+  const [isAssetPickerOpen, setIsAssetPickerOpen] = useState(false);
   const [precisionEditing, setPrecisionEditing] = useState(false);
   const [menuState, setMenuState] = useState<MenuState>(INITIAL_MENU_STATE);
 
@@ -80,6 +90,7 @@ export default function ChatInterface({
       setSelectedFile(null);
       if (previewUrl) URL.revokeObjectURL(previewUrl);
       setPreviewUrl(null);
+      setSelectedAsset(null);
       setSelectedAgentPart(null);
       setPrecisionEditing(false);
       setIsSending(false);
@@ -272,6 +283,8 @@ export default function ChatInterface({
         alert("File size too large. Max 5MB.");
         return;
       }
+      // Local upload and asset selection are mutually exclusive
+      setSelectedAsset(null);
       setSelectedFile(file);
       setPreviewUrl(URL.createObjectURL(file));
     }
@@ -290,9 +303,99 @@ export default function ChatInterface({
     }
   }, [previewUrl, menuState, selectedAgentPart]);
 
+  const clearSelectedAsset = useCallback(() => {
+    setSelectedAsset(null);
+    // If in "edit" mode and no other images remain, switch to "create" mode
+    if (menuState.mode === "edit" && !previewUrl) {
+      const newState = resolveMenuState(menuState, "create");
+      setMenuState(newState);
+    }
+  }, [menuState, previewUrl]);
+
+  const applySelectedAsset = useCallback(
+    (payload: SelectedAsset) => {
+      if (messages.length > 0) {
+        addToast({
+          title: "You can only attach an existing asset in the first message.",
+          color: "warning",
+        });
+        return;
+      }
+      // Asset selection and local upload are mutually exclusive
+      setSelectedFile(null);
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      setPreviewUrl(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      setSelectedAsset(payload);
+    },
+    [previewUrl, messages.length]
+  );
+
+  // Listen for asset selection events from the hover sidebar
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const ce = e as CustomEvent;
+      const d = ce.detail as any;
+      if (!d?.assetId || !d?.url || !d?.imageId) return;
+      applySelectedAsset({
+        assetId: d.assetId,
+        url: d.url,
+        title: d.title || "Selected asset",
+        imageId: d.imageId,
+      });
+    };
+    window.addEventListener("moodio-asset-selected", handler as any);
+    return () => window.removeEventListener("moodio-asset-selected", handler as any);
+  }, [applySelectedAsset]);
+
+  const handleAssetDrop = useCallback(
+    async (payload: any) => {
+      if (payload?.assetId && payload?.url && payload?.imageId) {
+        applySelectedAsset({
+          assetId: payload.assetId,
+          url: payload.url,
+          title: payload.title || "Selected asset",
+          imageId: payload.imageId,
+        });
+        return;
+      }
+
+      if (payload?.assetId && typeof payload.assetId === "string") {
+        try {
+          const res = await fetch(`/api/assets/${payload.assetId}`);
+          if (!res.ok) return;
+          const data = await res.json();
+          const a = data.asset;
+          if (!a?.id || !a?.imageUrl || !a?.imageId) return;
+          applySelectedAsset({
+            assetId: a.id,
+            url: a.imageUrl,
+            title: a.generationDetails?.title || "Selected asset",
+            imageId: a.imageId,
+          });
+        } catch (e) {
+          console.error("Failed to load dropped asset", e);
+        }
+      }
+    },
+    [applySelectedAsset]
+  );
+
+  const handleAssetPicked = useCallback(
+    (asset: AssetSummary) => {
+      applySelectedAsset({
+        assetId: asset.id,
+        url: asset.imageUrl,
+        title: asset.generationDetails?.title || "Selected asset",
+        imageId: asset.imageId,
+      });
+    },
+    [applySelectedAsset]
+  );
+
   const handleSend = async () => {
     if (
-      (!input.trim() && !selectedFile && !selectedAgentPart) ||
+      (!input.trim() && !selectedFile && !selectedAgentPart && !selectedAsset) ||
       isSending ||
       isRecording ||
       isTranscribing
@@ -310,17 +413,25 @@ export default function ChatInterface({
 
     const currentFile = selectedFile;
     const currentPreviewUrl = previewUrl;
+    const currentAsset = selectedAsset;
 
     // Optimistic message with current timestamp
+    const optimisticContent: Message["content"] =
+      (currentFile && currentPreviewUrl) || currentAsset
+        ? (() => {
+            const parts: MessageContentPart[] = [];
+            if (currentInput) {
+              parts.push({ type: "text", text: currentInput });
+            }
+            const imageUrl = currentAsset ? currentAsset.url : currentPreviewUrl!;
+            parts.push({ type: "image_url", image_url: { url: imageUrl } });
+            return parts;
+          })()
+        : currentInput;
+
     const userMessage: Message = {
       role: "user",
-      content:
-        currentFile && currentPreviewUrl
-          ? [
-              { type: "text", text: currentInput },
-              { type: "image_url", image_url: { url: currentPreviewUrl } },
-            ]
-          : currentInput,
+      content: optimisticContent,
       createdAt: Date.now(),
     };
 
@@ -376,6 +487,7 @@ export default function ChatInterface({
     setInput("");
     setSelectedFile(null);
     setPreviewUrl(null);
+    setSelectedAsset(null);
     setSelectedAgentPart(null);
     setPrecisionEditing(false);
     if (fileInputRef.current) fileInputRef.current.value = "";
@@ -447,6 +559,9 @@ export default function ChatInterface({
         body = formData;
       } else {
         const payload: any = { content: currentInput };
+        if (currentAsset) {
+          payload.assetId = currentAsset.assetId;
+        }
         if (selectedAgentPart) {
           payload.selection = {
             messageIndex: selectedAgentPart.messageIndex,
@@ -923,11 +1038,21 @@ export default function ChatInterface({
             setMenuState(newState);
           }
         }}
+        selectedAsset={selectedAsset}
+        onClearSelectedAsset={clearSelectedAsset}
+        onOpenAssetPicker={() => setIsAssetPickerOpen(true)}
+        onAssetDrop={handleAssetDrop}
         showFileUpload={messages.length === 0}
         precisionEditing={precisionEditing}
         onPrecisionEditingChange={handlePrecisionEditingChange}
         menuState={menuState}
         onMenuStateChange={setMenuState}
+      />
+
+      <AssetPickerModal
+        isOpen={isAssetPickerOpen}
+        onOpenChange={() => setIsAssetPickerOpen((v) => !v)}
+        onSelect={handleAssetPicked}
       />
 
       <ImageDetailModal

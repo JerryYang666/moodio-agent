@@ -71,6 +71,20 @@ export async function POST(
       );
     }
 
+    // Resolve projectId for this collection
+    const [collection] = await db
+      .select({ projectId: collections.projectId })
+      .from(collections)
+      .where(eq(collections.id, collectionId))
+      .limit(1);
+
+    if (!collection) {
+      return NextResponse.json(
+        { error: "Collection not found" },
+        { status: 404 }
+      );
+    }
+
     const body = await req.json();
     const { imageId, chatId, generationDetails } = body;
 
@@ -104,6 +118,7 @@ export async function POST(
     const [newImage] = await db
       .insert(collectionImages)
       .values({
+        projectId: collection.projectId,
         collectionId,
         imageId,
         chatId: chatId || null,

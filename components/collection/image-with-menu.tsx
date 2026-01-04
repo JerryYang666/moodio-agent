@@ -18,7 +18,7 @@ import {
   useDisclosure,
 } from "@heroui/modal";
 import { Input } from "@heroui/input";
-import { MoreVertical, Eye, FolderPlus, Plus } from "lucide-react";
+import { MoreVertical, Eye, FolderPlus, Plus, Folder } from "lucide-react";
 import { useCollections } from "@/hooks/use-collections";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -97,6 +97,7 @@ export default function ImageWithMenu({
     getDefaultCollectionName,
   } = useCollections();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isSavingToProject, setIsSavingToProject] = useState(false);
   const [flyingImages, setFlyingImages] = useState<
     Array<{ id: string; startPos: { x: number; y: number } }>
   >([]);
@@ -146,6 +147,29 @@ export default function ImageWithMenu({
 
     if (success) {
       startFlyingAnimation();
+    }
+  };
+
+  const handleSaveToProject = async () => {
+    setIsSavingToProject(true);
+    try {
+      const res = await fetch("/api/assets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          imageId,
+          chatId: chatId || null,
+          generationDetails,
+        }),
+      });
+
+      if (res.ok) {
+        startFlyingAnimation();
+      }
+    } catch (e) {
+      console.error("Failed to save to project", e);
+    } finally {
+      setIsSavingToProject(false);
     }
   };
 
@@ -209,6 +233,8 @@ export default function ImageWithMenu({
               onAction={(key) => {
                 if (key === "view") {
                   onViewDetails();
+                } else if (key === "save-project") {
+                  handleSaveToProject();
                 } else if (key === "create-new") {
                   handleCreateNewCollection();
                 }
@@ -220,6 +246,16 @@ export default function ImageWithMenu({
               >
                 View Details
               </DropdownItem>
+              <DropdownSection title="Save" showDivider>
+                <DropdownItem
+                  key="save-project"
+                  startContent={<Folder size={16} />}
+                  className="font-semibold"
+                  isDisabled={isSavingToProject}
+                >
+                  Save to Project
+                </DropdownItem>
+              </DropdownSection>
               <DropdownSection title="Add to Collection" showDivider>
                 <DropdownItem
                   key="create-new"

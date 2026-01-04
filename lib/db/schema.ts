@@ -88,14 +88,32 @@ export const chats = pgTable("chats", {
 });
 
 /**
+ * Projects table
+ * Top-level container for organizing assets and collections
+ */
+export const projects = pgTable("projects", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 255 }).notNull(),
+  isDefault: boolean("is_default").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+/**
  * Collections table
- * Stores collection metadata for organizing generated images
+ * Second-level container under projects for organizing generated images
  */
 export const collections = pgTable("collections", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id")
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
+  projectId: uuid("project_id")
+    .notNull()
+    .references(() => projects.id, { onDelete: "cascade" }),
   name: varchar("name", { length: 255 }).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -103,13 +121,17 @@ export const collections = pgTable("collections", {
 
 /**
  * Collection Images table
- * Stores images within collections along with their generation details
+ * Stores images within projects, optionally within a collection, along with their generation details
  */
 export const collectionImages = pgTable("collection_images", {
   id: uuid("id").primaryKey().defaultRandom(),
-  collectionId: uuid("collection_id")
+  projectId: uuid("project_id")
     .notNull()
-    .references(() => collections.id, { onDelete: "cascade" }),
+    .references(() => projects.id, { onDelete: "cascade" }),
+  // Nullable: an asset can live at the project root (no collection)
+  collectionId: uuid("collection_id").references(() => collections.id, {
+    onDelete: "cascade",
+  }),
   imageId: varchar("image_id", { length: 255 }).notNull(), // S3 image ID
   chatId: uuid("chat_id").references(() => chats.id, { onDelete: "set null" }), // Which chat this image came from
   generationDetails: jsonb("generation_details").notNull(), // Prompt, title, status, etc.
@@ -193,6 +215,9 @@ export type NewInvitationCode = typeof invitationCodes.$inferInsert;
 
 export type Chat = typeof chats.$inferSelect;
 export type NewChat = typeof chats.$inferInsert;
+
+export type Project = typeof projects.$inferSelect;
+export type NewProject = typeof projects.$inferInsert;
 
 export type Collection = typeof collections.$inferSelect;
 export type NewCollection = typeof collections.$inferInsert;

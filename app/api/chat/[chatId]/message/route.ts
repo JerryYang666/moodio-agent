@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAccessToken } from "@/lib/auth/cookies";
 import { verifyAccessToken } from "@/lib/auth/jwt";
 import { db } from "@/lib/db";
-import { chats } from "@/lib/db/schema";
+import { chats, collectionImages, collectionShares, collections, projects } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import {
   getChatHistory,
@@ -69,6 +69,7 @@ export async function POST(
     // Handle FormData or JSON
     let content = "";
     let file: File | null = null;
+    let assetId: string | undefined;
     let selection: {
       messageIndex: number;
       partIndex: number;
@@ -85,6 +86,8 @@ export async function POST(
       const formData = await request.formData();
       content = (formData.get("message") as string) || "";
       file = formData.get("file") as File | null;
+      const assetIdStr = formData.get("assetId") as string;
+      if (assetIdStr) assetId = assetIdStr;
       const selectionStr = formData.get("selection") as string;
       if (selectionStr) {
         try {
@@ -105,6 +108,7 @@ export async function POST(
     } else {
       const json = await request.json();
       content = json.content;
+      assetId = json.assetId;
       selection = json.selection;
       if (json.precisionEditing) {
         precisionEditing = true;
@@ -120,9 +124,16 @@ export async function POST(
       }
     }
 
-    if (!content && !file) {
+    if (file && assetId) {
       return NextResponse.json(
-        { error: "Content or file is required" },
+        { error: "Provide either file or assetId, not both" },
+        { status: 400 }
+      );
+    }
+
+    if (!content && !file && !assetId) {
+      return NextResponse.json(
+        { error: "Content, file, or assetId is required" },
         { status: 400 }
       );
     }
@@ -134,9 +145,10 @@ export async function POST(
       {
         chatId,
         content,
-        hasImage: !!file,
+        hasImage: !!file || !!assetId,
         imageSize: file ? file.size : undefined,
         imageType: file ? file.type : undefined,
+        assetId: assetId || undefined,
         selection,
         precisionEditing,
         systemPromptOverride,
@@ -247,15 +259,17 @@ export async function POST(
 
     // Handle image upload
     let imageId: string | undefined;
-    if (file) {
+    if (file || assetId) {
       // Check if it's the first message
       if (history.length > 0) {
         return NextResponse.json(
-          { error: "Image upload is only allowed in the first message" },
+          { error: "Image attachment is only allowed in the first message" },
           { status: 400 }
         );
       }
+    }
 
+    if (file) {
       if (file.size > 5 * 1024 * 1024) {
         return NextResponse.json(
           { error: "Image size limit is 5MB" },
@@ -263,6 +277,65 @@ export async function POST(
         );
       }
       imageId = await uploadImage(file, file.type);
+    } else if (assetId) {
+      // Resolve asset to its underlying S3 imageId with access checks.
+      const [asset] = await db
+        .select({
+          id: collectionImages.id,
+          imageId: collectionImages.imageId,
+          projectId: collectionImages.projectId,
+          collectionId: collectionImages.collectionId,
+        })
+        .from(collectionImages)
+        .where(eq(collectionImages.id, assetId))
+        .limit(1);
+
+      if (!asset) {
+        return NextResponse.json({ error: "Asset not found" }, { status: 404 });
+      }
+
+      // Owner access via project ownership (projects are not shareable yet)
+      const [ownedProject] = await db
+        .select({ id: projects.id })
+        .from(projects)
+        .where(and(eq(projects.id, asset.projectId), eq(projects.userId, payload.userId)))
+        .limit(1);
+
+      let canAccess = !!ownedProject;
+
+      // Shared access via collection sharing
+      if (!canAccess && asset.collectionId) {
+        const [ownedCollection] = await db
+          .select({ id: collections.id })
+          .from(collections)
+          .where(and(eq(collections.id, asset.collectionId), eq(collections.userId, payload.userId)))
+          .limit(1);
+
+        if (ownedCollection) {
+          canAccess = true;
+        } else {
+          const [share] = await db
+            .select({ id: collectionShares.id })
+            .from(collectionShares)
+            .where(
+              and(
+                eq(collectionShares.collectionId, asset.collectionId),
+                eq(collectionShares.sharedWithUserId, payload.userId)
+              )
+            )
+            .limit(1);
+          if (share) canAccess = true;
+        }
+      }
+
+      if (!canAccess) {
+        return NextResponse.json(
+          { error: "Asset not found or access denied" },
+          { status: 404 }
+        );
+      }
+
+      imageId = asset.imageId;
     }
 
     console.log(
@@ -273,12 +346,14 @@ export async function POST(
     // Construct new user message
     let userMessage: Message;
     if (imageId) {
+      const parts: MessageContentPart[] = [];
+      if (content) {
+        parts.push({ type: "text", text: content });
+      }
+      parts.push({ type: "image", imageId: imageId });
       userMessage = {
         role: "user",
-        content: [
-          { type: "text", text: content },
-          { type: "image", imageId: imageId },
-        ],
+        content: parts,
         createdAt: Date.now(),
       };
     } else {
