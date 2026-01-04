@@ -160,9 +160,9 @@ export default function AssetsHoverSidebar() {
             onMouseEnter={() => setIsOpen(true)}
           >
             {/* Glowing edge effect */}
-            <div className="absolute right-0 top-0 h-full w-1 bg-gradient-to-l from-primary/40 to-transparent" />
+            <div className="absolute right-0 top-0 h-full w-1 bg-linear-to-l from-primary/40 to-transparent" />
             <motion.div
-              className="absolute right-0 top-0 h-full w-6 bg-gradient-to-l from-primary/20 to-transparent"
+              className="absolute right-0 top-0 h-full w-6 bg-linear-to-l from-primary/20 to-transparent"
               animate={{
                 opacity: [0.3, 0.6, 0.3],
               }}
