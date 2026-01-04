@@ -482,7 +482,8 @@ export default function ChatInterface({
 
     setInput("");
     setSelectedFile(null);
-    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    // NOTE: Do NOT revoke previewUrl here — the blob URL is used in the optimistic
+    // message and must remain valid until the message re-renders with the real URL.
     setPreviewUrl(null);
     setSelectedAsset(null);
     setSelectedAgentPart(null);
