@@ -83,6 +83,7 @@ export const chats = pgTable("chats", {
     .references(() => users.id, { onDelete: "cascade" }),
   name: varchar("name", { length: 255 }), // Can be null/empty initially
   thumbnailImageId: varchar("thumbnail_image_id", { length: 255 }),
+  deletedAt: timestamp("deleted_at"), // Soft delete - null means not deleted
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

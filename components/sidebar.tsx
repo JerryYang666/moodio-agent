@@ -14,6 +14,7 @@ import {
   MoreHorizontal,
   List,
   GalleryThumbnails,
+  Trash2,
 } from "lucide-react";
 import { Tooltip } from "@heroui/tooltip";
 import { Image } from "@heroui/image";
@@ -40,10 +41,14 @@ interface ChatItemProps {
 }
 
 const ChatItem = ({ chat, isActive, isCollapsed, viewMode }: ChatItemProps) => {
-  const { renameChat, isChatMonitored } = useChat();
+  const router = useRouter();
+  const pathname = usePathname();
+  const { renameChat, deleteChat, isChatMonitored } = useChat();
   const [isRenameOpen, setIsRenameOpen] = useState(false);
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [newName, setNewName] = useState(chat.name || "");
   const [isRenaming, setIsRenaming] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const handleRename = async () => {
     if (!newName.trim()) return;
@@ -55,6 +60,22 @@ const ChatItem = ({ chat, isActive, isCollapsed, viewMode }: ChatItemProps) => {
       console.error(error);
     } finally {
       setIsRenaming(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    setIsDeleting(true);
+    try {
+      await deleteChat(chat.id);
+      setIsDeleteOpen(false);
+      // If we're on the deleted chat's page, redirect to /chat
+      if (pathname === `/chat/${chat.id}`) {
+        router.push("/chat");
+      }
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -190,6 +211,15 @@ const ChatItem = ({ chat, isActive, isCollapsed, viewMode }: ChatItemProps) => {
               >
                 Rename
               </DropdownItem>
+              <DropdownItem
+                key="delete"
+                startContent={<Trash2 size={16} />}
+                className="text-danger"
+                color="danger"
+                onPress={() => setIsDeleteOpen(true)}
+              >
+                Delete
+              </DropdownItem>
             </DropdownMenu>
           </Dropdown>
         </div>
@@ -199,6 +229,7 @@ const ChatItem = ({ chat, isActive, isCollapsed, viewMode }: ChatItemProps) => {
 
   return (
     <motion.div layout className="relative group">
+      {/* Rename Popover */}
       <Popover
         isOpen={isRenameOpen}
         onOpenChange={(open) => {
@@ -233,6 +264,45 @@ const ChatItem = ({ chat, isActive, isCollapsed, viewMode }: ChatItemProps) => {
                 onPress={handleRename}
               >
                 <Check size={16} />
+              </Button>
+            </div>
+          </div>
+        </PopoverContent>
+      </Popover>
+
+      {/* Delete Confirmation Popover */}
+      <Popover
+        isOpen={isDeleteOpen}
+        onOpenChange={setIsDeleteOpen}
+        placement="right"
+      >
+        <PopoverTrigger>
+          <div className="absolute right-2 top-1/2 w-1 h-1 opacity-0 pointer-events-none" />
+        </PopoverTrigger>
+        <PopoverContent>
+          <div className="px-1 py-2 w-64">
+            <p className="text-small font-bold text-foreground mb-1">
+              Delete Chat
+            </p>
+            <p className="text-tiny text-default-500 mb-3">
+              Are you sure you want to delete this chat? This action cannot be
+              undone.
+            </p>
+            <div className="flex gap-2 justify-end">
+              <Button
+                size="sm"
+                variant="flat"
+                onPress={() => setIsDeleteOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                color="danger"
+                isLoading={isDeleting}
+                onPress={handleDelete}
+              >
+                Delete
               </Button>
             </div>
           </div>

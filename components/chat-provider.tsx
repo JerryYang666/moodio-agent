@@ -21,6 +21,7 @@ interface ChatContextType {
   monitorChat: (chatId: string, startCount: number) => void;
   cancelMonitorChat: (chatId: string) => void;
   renameChat: (chatId: string, name: string) => Promise<void>;
+  deleteChat: (chatId: string) => Promise<void>;
   isChatMonitored: (chatId: string) => boolean;
 }
 
@@ -95,6 +96,38 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       addToast({
         title: "Error",
         description: "Failed to rename chat",
+        color: "danger",
+      });
+      throw error;
+    }
+  }, []);
+
+  const deleteChat = useCallback(async (chatId: string) => {
+    try {
+      const res = await fetch(`/api/chat/${chatId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ deleted: true }),
+      });
+
+      if (res.ok) {
+        // Remove from local state immediately
+        setChats((prevChats) => prevChats.filter((chat) => chat.id !== chatId));
+        addToast({
+          title: "Chat deleted",
+          description: "The chat has been deleted",
+          color: "success",
+        });
+      } else {
+        throw new Error("Failed to delete chat");
+      }
+    } catch (error) {
+      console.error("Error deleting chat:", error);
+      addToast({
+        title: "Error",
+        description: "Failed to delete chat",
         color: "danger",
       });
       throw error;
@@ -240,6 +273,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         monitorChat,
         cancelMonitorChat,
         renameChat,
+        deleteChat,
         isChatMonitored,
       }}
     >

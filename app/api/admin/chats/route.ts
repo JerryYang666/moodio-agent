@@ -16,12 +16,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
+    // Admin sees all chats, including deleted ones
     const allChats = await db
       .select({
         id: chats.id,
         name: chats.name,
         createdAt: chats.createdAt,
         updatedAt: chats.updatedAt,
+        deletedAt: chats.deletedAt,
         userId: chats.userId,
         userEmail: users.email,
         userFirstName: users.firstName,
@@ -34,7 +36,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ chats: allChats });
   } catch (error) {
     console.error("Error fetching chats:", error);
-    return NextResponse.json({ error: "Failed to fetch chats" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to fetch chats" },
+      { status: 500 }
+    );
   }
 }
-

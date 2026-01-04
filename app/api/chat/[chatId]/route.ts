@@ -28,10 +28,7 @@ export async function GET(
     let chat;
 
     if (isAdmin) {
-      [chat] = await db
-        .select()
-        .from(chats)
-        .where(eq(chats.id, chatId));
+      [chat] = await db.select().from(chats).where(eq(chats.id, chatId));
     } else {
       [chat] = await db
         .select()
@@ -102,11 +99,7 @@ export async function PATCH(
     }
 
     const body = await request.json();
-    const { name } = body;
-
-    if (!name || typeof name !== 'string') {
-      return NextResponse.json({ error: "Invalid name" }, { status: 400 });
-    }
+    const { name, deleted } = body;
 
     // Verify ownership
     const [chat] = await db
@@ -118,12 +111,31 @@ export async function PATCH(
       return NextResponse.json({ error: "Chat not found" }, { status: 404 });
     }
 
-    await db
-      .update(chats)
-      .set({ name, updatedAt: new Date() })
-      .where(eq(chats.id, chatId));
+    // Handle soft delete
+    if (deleted === true) {
+      await db
+        .update(chats)
+        .set({ deletedAt: new Date(), updatedAt: new Date() })
+        .where(eq(chats.id, chatId));
+      return NextResponse.json({ success: true, deleted: true });
+    }
 
-    return NextResponse.json({ success: true });
+    // Handle rename
+    if (name !== undefined) {
+      if (!name || typeof name !== "string") {
+        return NextResponse.json({ error: "Invalid name" }, { status: 400 });
+      }
+      await db
+        .update(chats)
+        .set({ name, updatedAt: new Date() })
+        .where(eq(chats.id, chatId));
+      return NextResponse.json({ success: true });
+    }
+
+    return NextResponse.json(
+      { error: "No valid update provided" },
+      { status: 400 }
+    );
   } catch (error) {
     console.error("Error updating chat:", error);
     return NextResponse.json(

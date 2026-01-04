@@ -24,6 +24,7 @@ interface ChatData {
   name: string | null;
   createdAt: string;
   updatedAt: string;
+  deletedAt: string | null;
   userId: string;
   userEmail: string;
   userFirstName: string | null;
@@ -64,11 +65,14 @@ export default function ChatManagementPage() {
 
     if (filterValue) {
       const lowerFilter = filterValue.toLowerCase();
-      filteredChats = filteredChats.filter((chat) => 
-        (chat.name && chat.name.toLowerCase().includes(lowerFilter)) ||
-        chat.userEmail.toLowerCase().includes(lowerFilter) ||
-        (chat.userFirstName && chat.userFirstName.toLowerCase().includes(lowerFilter)) ||
-        (chat.userLastName && chat.userLastName.toLowerCase().includes(lowerFilter))
+      filteredChats = filteredChats.filter(
+        (chat) =>
+          (chat.name && chat.name.toLowerCase().includes(lowerFilter)) ||
+          chat.userEmail.toLowerCase().includes(lowerFilter) ||
+          (chat.userFirstName &&
+            chat.userFirstName.toLowerCase().includes(lowerFilter)) ||
+          (chat.userLastName &&
+            chat.userLastName.toLowerCase().includes(lowerFilter))
       );
     }
 
@@ -119,7 +123,7 @@ export default function ChatManagementPage() {
         <CardBody>
           <div className="flex flex-col gap-4">
             <div className="flex justify-between gap-3 items-end">
-               <Input
+              <Input
                 isClearable
                 className="w-full sm:max-w-[44%]"
                 placeholder="Search by chat name or user..."
@@ -129,7 +133,7 @@ export default function ChatManagementPage() {
                 onValueChange={onSearchChange}
               />
             </div>
-            <Table 
+            <Table
               aria-label="Chat table"
               selectionMode="single"
               color="primary"
@@ -153,6 +157,7 @@ export default function ChatManagementPage() {
               <TableHeader>
                 <TableColumn>CHAT NAME</TableColumn>
                 <TableColumn>USER</TableColumn>
+                <TableColumn>STATUS</TableColumn>
                 <TableColumn>STARTED</TableColumn>
                 <TableColumn>LAST UPDATED</TableColumn>
               </TableHeader>
@@ -163,7 +168,13 @@ export default function ChatManagementPage() {
                 {(item) => (
                   <TableRow key={item.id} className="cursor-pointer">
                     <TableCell>
-                      {item.name || "Untitled Chat"}
+                      <span
+                        className={
+                          item.deletedAt ? "text-default-400 line-through" : ""
+                        }
+                      >
+                        {item.name || "Untitled Chat"}
+                      </span>
                     </TableCell>
                     <TableCell>
                       <UserAvatar
@@ -182,6 +193,17 @@ export default function ChatManagementPage() {
                           color: "primary",
                         }}
                       />
+                    </TableCell>
+                    <TableCell>
+                      {item.deletedAt ? (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-danger/10 text-danger">
+                          Deleted by user
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-success/10 text-success">
+                          Active
+                        </span>
+                      )}
                     </TableCell>
                     <TableCell>
                       {new Date(item.createdAt).toLocaleString()}
