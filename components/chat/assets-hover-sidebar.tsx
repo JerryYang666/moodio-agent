@@ -6,7 +6,7 @@ import { Button } from "@heroui/button";
 import { Spinner } from "@heroui/spinner";
 import { Chip } from "@heroui/chip";
 import { Image } from "@heroui/image";
-import { Folder, Clock } from "lucide-react";
+import { Folder, Clock, Images, ChevronLeft } from "lucide-react";
 import clsx from "clsx";
 
 type Project = {
@@ -54,7 +54,9 @@ export default function AssetsHoverSidebar() {
   const [collections, setCollections] = useState<Collection[]>([]);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [scope, setScope] = useState<
-    { kind: "recent" } | { kind: "project"; id: string } | { kind: "collection"; id: string }
+    | { kind: "recent" }
+    | { kind: "project"; id: string }
+    | { kind: "collection"; id: string }
   >({ kind: "recent" });
 
   const ownedCollectionsByProject = useMemo(() => {
@@ -146,11 +148,51 @@ export default function AssetsHoverSidebar() {
 
   return (
     <div className="hidden lg:block absolute inset-y-0 right-0 z-50">
-      {/* Hover handle */}
-      <div
-        className="absolute right-0 top-0 h-full w-3 cursor-pointer"
-        onMouseEnter={() => setIsOpen(true)}
-      />
+      {/* Hover handle with glow indicator */}
+      <AnimatePresence>
+        {!isOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.3 }}
+            className="absolute right-0 top-0 h-full w-10 cursor-pointer group"
+            onMouseEnter={() => setIsOpen(true)}
+          >
+            {/* Glowing edge effect */}
+            <div className="absolute right-0 top-0 h-full w-1 bg-gradient-to-l from-primary/40 to-transparent" />
+            <motion.div
+              className="absolute right-0 top-0 h-full w-6 bg-gradient-to-l from-primary/20 to-transparent"
+              animate={{
+                opacity: [0.3, 0.6, 0.3],
+              }}
+              transition={{
+                duration: 2,
+                repeat: Infinity,
+                ease: "easeInOut",
+              }}
+            />
+
+            {/* Icon indicator */}
+            <motion.div
+              className="absolute right-2 top-1/2 -translate-y-1/2 flex flex-col items-center gap-1"
+              animate={{
+                x: [0, -3, 0],
+              }}
+              transition={{
+                duration: 3,
+                repeat: Infinity,
+                ease: "easeInOut",
+              }}
+            >
+              <div className="bg-default-100/60 backdrop-blur-md border border-default-200/50 rounded-lg p-1.5 group-hover:bg-default-200/70 transition-colors">
+                <Images size={16} className="text-default-500" />
+              </div>
+              <ChevronLeft size={12} className="text-default-400" />
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {isOpen && (
@@ -211,7 +253,9 @@ export default function AssetsHoverSidebar() {
                               ? "bg-primary/10 text-primary"
                               : "hover:bg-default-100 text-default-600"
                           )}
-                          onClick={() => setScope({ kind: "collection", id: c.id })}
+                          onClick={() =>
+                            setScope({ kind: "collection", id: c.id })
+                          }
                         >
                           {c.name}
                         </button>
@@ -235,9 +279,12 @@ export default function AssetsHoverSidebar() {
                               ? "bg-primary/10 text-primary"
                               : "hover:bg-default-100 text-default-600"
                           )}
-                          onClick={() => setScope({ kind: "collection", id: c.id })}
+                          onClick={() =>
+                            setScope({ kind: "collection", id: c.id })
+                          }
                         >
-                          {c.name} <span className="opacity-70">({c.permission})</span>
+                          {c.name}{" "}
+                          <span className="opacity-70">({c.permission})</span>
                         </button>
                       ))}
                     </div>
@@ -294,5 +341,3 @@ export default function AssetsHoverSidebar() {
 }
 
 export { DRAG_MIME, SELECT_EVENT };
-
-
