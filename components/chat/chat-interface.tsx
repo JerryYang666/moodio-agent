@@ -311,20 +311,13 @@ export default function ChatInterface({
 
   const applySelectedAsset = useCallback(
     (payload: SelectedAsset) => {
-      if (messages.length > 0) {
-        addToast({
-          title: "You can only attach an existing asset in the first message.",
-          color: "warning",
-        });
-        return;
-      }
       // Asset selection and local upload are mutually exclusive
       setSelectedFile(null);
       if (previewUrl) URL.revokeObjectURL(previewUrl);
       setPreviewUrl(null);
       setSelectedAsset(payload);
     },
-    [previewUrl, messages.length]
+    [previewUrl]
   );
 
   // Listen for asset selection events from the hover sidebar
@@ -1038,7 +1031,7 @@ export default function ChatInterface({
         onClearSelectedAsset={clearSelectedAsset}
         onOpenAssetPicker={() => setIsAssetPickerOpen(true)}
         onAssetDrop={handleAssetDrop}
-        showFileUpload={messages.length === 0}
+        showFileUpload={true}
         precisionEditing={precisionEditing}
         onPrecisionEditingChange={handlePrecisionEditingChange}
         menuState={menuState}

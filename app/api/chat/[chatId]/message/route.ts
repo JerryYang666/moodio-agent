@@ -259,15 +259,6 @@ export async function POST(
 
     // Handle image upload
     let imageId: string | undefined;
-    if (file || assetId) {
-      // Check if it's the first message
-      if (history.length > 0) {
-        return NextResponse.json(
-          { error: "Image attachment is only allowed in the first message" },
-          { status: 400 }
-        );
-      }
-    }
 
     if (file) {
       if (file.size > 5 * 1024 * 1024) {
