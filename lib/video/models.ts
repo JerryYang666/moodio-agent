@@ -150,6 +150,99 @@ const seedanceV15Pro: VideoModelConfig = {
 };
 
 /**
+ * Wan v2.6 Image to Video
+ * High-quality image-to-video generation with support for multi-shot segmentation
+ */
+const wanV26ImageToVideo: VideoModelConfig = {
+  id: "wan/v2.6/image-to-video",
+  name: "Wan v2.6",
+  description:
+    "High-quality image-to-video with up to 15s duration and intelligent multi-shot segmentation",
+  imageParams: {
+    sourceImage: "image_url",
+  },
+  params: [
+    {
+      name: "prompt",
+      label: "Prompt",
+      type: "string",
+      required: true,
+      description:
+        "The text prompt describing the desired video motion. Max 800 characters.",
+    },
+    {
+      name: "image_url",
+      label: "Source Image",
+      type: "string",
+      required: true,
+      description:
+        "URL of the image to use as the first frame. Image dimensions must be between 240 and 7680.",
+    },
+    {
+      name: "resolution",
+      label: "Resolution",
+      type: "enum",
+      required: false,
+      default: "1080p",
+      options: ["720p", "1080p"],
+      description: "Video resolution - 720p for faster generation, 1080p for higher quality",
+    },
+    {
+      name: "duration",
+      label: "Duration (seconds)",
+      type: "enum",
+      required: false,
+      default: "5",
+      options: ["5", "10", "15"],
+      description: "Duration of the generated video in seconds",
+    },
+    {
+      name: "negative_prompt",
+      label: "Negative Prompt",
+      type: "string",
+      required: false,
+      default: "",
+      description:
+        "Negative prompt to describe content to avoid. Max 500 characters.",
+    },
+    {
+      name: "enable_prompt_expansion",
+      label: "Prompt Expansion",
+      type: "boolean",
+      required: false,
+      default: true,
+      description: "Whether to enable prompt rewriting using LLM for better results",
+    },
+    {
+      name: "multi_shots",
+      label: "Multi-Shot Mode",
+      type: "boolean",
+      required: false,
+      default: false,
+      description:
+        "Enable intelligent multi-shot segmentation. Only active when Prompt Expansion is enabled.",
+    },
+    {
+      name: "seed",
+      label: "Seed",
+      type: "number",
+      required: false,
+      description: "Random seed for reproducibility. Leave empty for random.",
+    },
+    {
+      name: "enable_safety_checker",
+      label: "Safety Checker",
+      type: "boolean",
+      required: false,
+      default: false,
+      description:
+        "If enabled, the safety checker will filter inappropriate content",
+      status: "hidden",
+    },
+  ],
+};
+
+/**
  * Kling Video v2.6 Pro - Image to Video
  * Top-tier image-to-video with cinematic visuals, fluid motion, and native audio generation
  */
@@ -228,7 +321,11 @@ const klingV26Pro: VideoModelConfig = {
 /**
  * Registry of all supported video models
  */
-export const VIDEO_MODELS: VideoModelConfig[] = [seedanceV15Pro, klingV26Pro];
+export const VIDEO_MODELS: VideoModelConfig[] = [
+  seedanceV15Pro,
+  wanV26ImageToVideo,
+  klingV26Pro,
+];
 
 /**
  * Default model ID
