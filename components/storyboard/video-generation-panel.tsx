@@ -10,7 +10,9 @@ import { Spinner } from "@heroui/spinner";
 import { Image } from "@heroui/image";
 import { Divider } from "@heroui/divider";
 import { Video, ImageIcon, Sparkles, X, Plus } from "lucide-react";
-import AssetPickerModal, { AssetSummary } from "@/components/chat/asset-picker-modal";
+import AssetPickerModal, {
+  AssetSummary,
+} from "@/components/chat/asset-picker-modal";
 import { useVideo } from "@/components/video-provider";
 
 interface VideoModelParam {
@@ -57,8 +59,12 @@ export default function VideoGenerationPanel({
   const [error, setError] = useState<string | null>(null);
 
   // Form state
-  const [sourceImageId, setSourceImageId] = useState<string | null>(initialImageId || null);
-  const [sourceImageUrl, setSourceImageUrl] = useState<string | null>(initialImageUrl || null);
+  const [sourceImageId, setSourceImageId] = useState<string | null>(
+    initialImageId || null
+  );
+  const [sourceImageUrl, setSourceImageUrl] = useState<string | null>(
+    initialImageUrl || null
+  );
   const [endImageId, setEndImageId] = useState<string | null>(null);
   const [endImageUrl, setEndImageUrl] = useState<string | null>(null);
   const [params, setParams] = useState<Record<string, any>>({});
@@ -68,7 +74,9 @@ export default function VideoGenerationPanel({
   const [pickerTarget, setPickerTarget] = useState<"source" | "end">("source");
 
   // String array input state (for voice_ids etc.)
-  const [arrayInputValues, setArrayInputValues] = useState<Record<string, string>>({});
+  const [arrayInputValues, setArrayInputValues] = useState<
+    Record<string, string>
+  >({});
 
   // Load models
   useEffect(() => {
@@ -137,7 +145,7 @@ export default function VideoGenerationPanel({
     // Upload file and get imageId
     const formData = new FormData();
     formData.append("file", file);
-    
+
     try {
       const res = await fetch("/api/assets", {
         method: "POST",
@@ -145,7 +153,7 @@ export default function VideoGenerationPanel({
       });
       if (!res.ok) throw new Error("Upload failed");
       const data = await res.json();
-      
+
       if (pickerTarget === "source") {
         setSourceImageId(data.imageId);
         setSourceImageUrl(data.imageUrl);
@@ -191,10 +199,10 @@ export default function VideoGenerationPanel({
       }
 
       const data = await res.json();
-      
+
       // Start monitoring for notifications
       monitorGeneration(data.generationId);
-      
+
       onGenerationStarted?.(data.generationId);
 
       // Reset form
@@ -223,17 +231,19 @@ export default function VideoGenerationPanel({
   return (
     <>
       <Card className="h-full flex flex-col">
-        <CardHeader className="flex-col items-start gap-1 pb-2 shrink-0">
+        <CardHeader className="flex-col items-start gap-1 pb-2 shrink-0 px-3 sm:px-4">
           <div className="flex items-center gap-2">
             <Video size={20} className="text-primary" />
-            <h2 className="text-lg font-semibold">Generate Video</h2>
+            <h2 className="text-base sm:text-lg font-semibold">
+              Generate Video
+            </h2>
           </div>
-          <p className="text-sm text-default-500">
+          <p className="text-xs sm:text-sm text-default-500">
             Turn your images into videos using AI
           </p>
         </CardHeader>
 
-        <CardBody className="gap-4 pt-0 overflow-auto flex-1">
+        <CardBody className="gap-3 sm:gap-4 pt-0 overflow-auto flex-1 px-3 sm:px-4">
           {/* Model Selector */}
           <Select
             label="Model"
@@ -300,7 +310,9 @@ export default function VideoGenerationPanel({
           {selectedModel?.imageParams.endImage && (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">End Image (optional)</span>
+                <span className="text-sm font-medium">
+                  End Image (optional)
+                </span>
                 <Button
                   size="sm"
                   variant="flat"
@@ -364,7 +376,9 @@ export default function VideoGenerationPanel({
                     key={param.name}
                     label={param.label}
                     selectedKeys={value ? [String(value)] : []}
-                    onChange={(e) => handleParamChange(param.name, e.target.value)}
+                    onChange={(e) =>
+                      handleParamChange(param.name, e.target.value)
+                    }
                     description={param.description}
                     isRequired={param.required}
                   >
@@ -377,11 +391,16 @@ export default function VideoGenerationPanel({
 
               if (param.type === "boolean") {
                 return (
-                  <div key={param.name} className="flex items-center justify-between">
+                  <div
+                    key={param.name}
+                    className="flex items-center justify-between"
+                  >
                     <div>
                       <span className="text-sm">{param.label}</span>
                       {param.description && (
-                        <p className="text-xs text-default-400">{param.description}</p>
+                        <p className="text-xs text-default-400">
+                          {param.description}
+                        </p>
                       )}
                     </div>
                     <Switch
@@ -411,14 +430,18 @@ export default function VideoGenerationPanel({
               // String array type - tag-style input
               if (param.type === "string_array") {
                 const arrayValue: string[] = Array.isArray(value) ? value : [];
-                const canAddMore = !param.maxItems || arrayValue.length < param.maxItems;
+                const canAddMore =
+                  !param.maxItems || arrayValue.length < param.maxItems;
                 const inputValue = arrayInputValues[param.name] || "";
 
                 const addItem = () => {
                   const trimmed = inputValue.trim();
                   if (trimmed) {
                     handleParamChange(param.name, [...arrayValue, trimmed]);
-                    setArrayInputValues((prev) => ({ ...prev, [param.name]: "" }));
+                    setArrayInputValues((prev) => ({
+                      ...prev,
+                      [param.name]: "",
+                    }));
                   }
                 };
 
@@ -427,7 +450,9 @@ export default function VideoGenerationPanel({
                     <div>
                       <span className="text-sm">{param.label}</span>
                       {param.description && (
-                        <p className="text-xs text-default-400">{param.description}</p>
+                        <p className="text-xs text-default-400">
+                          {param.description}
+                        </p>
                       )}
                     </div>
                     <div className="flex flex-wrap gap-2">
@@ -440,8 +465,13 @@ export default function VideoGenerationPanel({
                           <button
                             type="button"
                             onClick={() => {
-                              const newArray = arrayValue.filter((_, i) => i !== idx);
-                              handleParamChange(param.name, newArray.length > 0 ? newArray : undefined);
+                              const newArray = arrayValue.filter(
+                                (_, i) => i !== idx
+                              );
+                              handleParamChange(
+                                param.name,
+                                newArray.length > 0 ? newArray : undefined
+                              );
                             }}
                             className="text-default-400 hover:text-danger transition-colors"
                           >
@@ -453,9 +483,17 @@ export default function VideoGenerationPanel({
                         <Input
                           size="sm"
                           placeholder={`Add voice ID${param.maxItems ? ` (${arrayValue.length}/${param.maxItems})` : ""}`}
-                          classNames={{ base: "w-48", input: "font-mono text-sm" }}
+                          classNames={{
+                            base: "w-full sm:w-48",
+                            input: "font-mono text-sm",
+                          }}
                           value={inputValue}
-                          onValueChange={(v) => setArrayInputValues((prev) => ({ ...prev, [param.name]: v }))}
+                          onValueChange={(v) =>
+                            setArrayInputValues((prev) => ({
+                              ...prev,
+                              [param.name]: v,
+                            }))
+                          }
                           onKeyDown={(e) => {
                             if (e.key === "Enter") {
                               e.preventDefault();
@@ -508,10 +546,10 @@ export default function VideoGenerationPanel({
         </CardBody>
 
         {/* Fixed Footer with Error and Button */}
-        <div className="p-4 pt-2 border-t border-divider shrink-0 space-y-3">
+        <div className="p-3 sm:p-4 pt-2 border-t border-divider shrink-0 space-y-2 sm:space-y-3 safe-area-bottom">
           {/* Error Message */}
           {error && (
-            <div className="text-sm text-danger bg-danger-50 p-3 rounded-lg">
+            <div className="text-xs sm:text-sm text-danger bg-danger-50 p-2 sm:p-3 rounded-lg">
               {error}
             </div>
           )}
@@ -520,13 +558,13 @@ export default function VideoGenerationPanel({
           <Button
             color="primary"
             size="lg"
-            className="w-full"
+            className="w-full text-sm sm:text-base"
             startContent={!submitting && <Sparkles size={18} />}
             isLoading={submitting}
             isDisabled={!sourceImageId || !params.prompt?.trim()}
             onPress={handleGenerate}
           >
-            {submitting ? "Starting Generation..." : "Generate Video"}
+            {submitting ? "Starting..." : "Generate Video"}
           </Button>
         </div>
       </Card>

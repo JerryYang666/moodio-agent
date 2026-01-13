@@ -5,7 +5,6 @@ import { useSearchParams } from "next/navigation";
 import { Spinner } from "@heroui/spinner";
 import VideoGenerationPanel from "@/components/storyboard/video-generation-panel";
 import VideoList from "@/components/storyboard/video-list";
-import { getSignedImageUrl } from "@/lib/storage/s3";
 
 function StoryboardContent() {
   const searchParams = useSearchParams();
@@ -56,9 +55,9 @@ function StoryboardContent() {
   }
 
   return (
-    <div className="flex flex-col lg:flex-row gap-4 h-full p-4 overflow-hidden">
+    <div className="flex flex-col lg:flex-row gap-4 min-h-full lg:h-full p-3 sm:p-4 lg:overflow-hidden">
       {/* Left Panel - Video Generation */}
-      <div className="lg:w-[400px] shrink-0 overflow-auto">
+      <div className="w-full lg:w-[400px] shrink-0 lg:h-full lg:overflow-auto">
         <VideoGenerationPanel
           initialImageId={initialImageId}
           initialImageUrl={initialImageUrl}
@@ -67,7 +66,7 @@ function StoryboardContent() {
       </div>
 
       {/* Right Panel - Video List */}
-      <div className="flex-1 min-w-0 overflow-hidden">
+      <div className="flex-1 min-w-0 min-h-[400px] lg:min-h-0 lg:overflow-hidden">
         <VideoList refreshTrigger={refreshTrigger} />
       </div>
     </div>
