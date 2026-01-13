@@ -131,9 +131,15 @@ export default function VideoList({ refreshTrigger }: VideoListProps) {
     });
   };
 
-  const handleDownload = async (videoUrl: string, filename: string) => {
+  const handleDownload = async (generationId: string, filename: string) => {
     try {
-      const response = await fetch(videoUrl);
+      // Use our proxy endpoint to avoid CORS issues with S3
+      const response = await fetch(
+        `/api/video/generations/${generationId}/download?filename=${encodeURIComponent(filename)}`
+      );
+      if (!response.ok) {
+        throw new Error(`Download failed: ${response.status}`);
+      }
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -398,8 +404,8 @@ export default function VideoList({ refreshTrigger }: VideoListProps) {
                       startContent={<Download size={16} />}
                       onPress={() =>
                         handleDownload(
-                          selectedVideo.videoUrl!,
-                          `video-${selectedVideo.id}.mp4`
+                          selectedVideo.id,
+                          `video-${selectedVideo.id}`
                         )
                       }
                     >
