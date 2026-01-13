@@ -7,7 +7,20 @@
  * for the "replace and fill" validation strategy.
  */
 
-export type VideoModelParamType = "string" | "number" | "boolean" | "enum" | "string_array";
+export type VideoModelParamType =
+  | "string"
+  | "number"
+  | "boolean"
+  | "enum"
+  | "string_array";
+
+/**
+ * Parameter status controls visibility and behavior:
+ * - "active" (default): Normal parameter, displayed and participates in replace and fill
+ * - "hidden": Not displayed to user, but still participates in replace and fill (always uses default)
+ * - "disabled": Completely ignored - not displayed and not in replace and fill
+ */
+export type VideoModelParamStatus = "active" | "hidden" | "disabled";
 
 export interface VideoModelParam {
   name: string;
@@ -20,6 +33,7 @@ export interface VideoModelParam {
   min?: number; // For number types
   max?: number; // For number types
   maxItems?: number; // For array types - maximum number of items allowed
+  status?: VideoModelParamStatus; // Defaults to "active" if not specified
 }
 
 export interface VideoModelConfig {
@@ -41,7 +55,8 @@ export interface VideoModelConfig {
 const seedanceV15Pro: VideoModelConfig = {
   id: "fal-ai/bytedance/seedance/v1.5/pro/image-to-video",
   name: "Seedance v1.5 Pro",
-  description: "ByteDance's high-quality image-to-video generation model with audio support",
+  description:
+    "ByteDance's high-quality image-to-video generation model with audio support",
   imageParams: {
     sourceImage: "image_url",
     endImage: "end_image_url",
@@ -84,7 +99,8 @@ const seedanceV15Pro: VideoModelConfig = {
       required: false,
       default: "720p",
       options: ["480p", "720p", "1080p"],
-      description: "Video resolution - 480p for faster generation, 720p for balance, 1080p for higher quality",
+      description:
+        "Video resolution - 480p for faster generation, 720p for balance, 1080p for higher quality",
     },
     {
       name: "duration",
@@ -108,7 +124,8 @@ const seedanceV15Pro: VideoModelConfig = {
       label: "Seed",
       type: "number",
       required: false,
-      description: "Random seed to control video generation. Use -1 for random.",
+      description:
+        "Random seed to control video generation. Use -1 for random.",
       min: -1,
     },
     {
@@ -116,8 +133,10 @@ const seedanceV15Pro: VideoModelConfig = {
       label: "Safety Checker",
       type: "boolean",
       required: false,
-      default: true,
-      description: "If enabled, the safety checker will filter inappropriate content",
+      default: false,
+      description:
+        "If enabled, the safety checker will filter inappropriate content",
+      status: "hidden",
     },
     {
       name: "generate_audio",
@@ -137,7 +156,8 @@ const seedanceV15Pro: VideoModelConfig = {
 const klingV26Pro: VideoModelConfig = {
   id: "fal-ai/kling-video/v2.6/pro/image-to-video",
   name: "Kling Video v2.6 Pro",
-  description: "Top-tier image-to-video with cinematic visuals, fluid motion, and native audio generation",
+  description:
+    "Top-tier image-to-video with cinematic visuals, fluid motion, and native audio generation",
   imageParams: {
     sourceImage: "start_image_url",
     endImage: "end_image_url",
@@ -148,7 +168,8 @@ const klingV26Pro: VideoModelConfig = {
       label: "Prompt",
       type: "string",
       required: true,
-      description: "The text prompt used to generate the video. Supports speech in quotes for audio generation.",
+      description:
+        "The text prompt used to generate the video. Supports speech in quotes for audio generation.",
     },
     {
       name: "start_image_url",
@@ -162,7 +183,8 @@ const klingV26Pro: VideoModelConfig = {
       label: "End Image",
       type: "string",
       required: false,
-      description: "URL of the image to be used for the end of the video (optional)",
+      description:
+        "URL of the image to be used for the end of the video (optional)",
     },
     {
       name: "duration",
@@ -187,7 +209,8 @@ const klingV26Pro: VideoModelConfig = {
       type: "boolean",
       required: false,
       default: true,
-      description: "Generate native audio for the video. Supports Chinese and English voice output.",
+      description:
+        "Generate native audio for the video. Supports Chinese and English voice output.",
     },
     {
       name: "voice_ids",
@@ -195,7 +218,9 @@ const klingV26Pro: VideoModelConfig = {
       type: "string_array",
       required: false,
       maxItems: 2,
-      description: "List of voice IDs for voice control. Reference voices in the prompt using <<<voice_1>>>, <<<voice_2>>>. Maximum 2 voices allowed.",
+      description:
+        "List of voice IDs for voice control. Reference voices in the prompt using <<<voice_1>>>, <<<voice_2>>>. Maximum 2 voices allowed.",
+      status: "disabled",
     },
   ],
 };
@@ -208,7 +233,8 @@ export const VIDEO_MODELS: VideoModelConfig[] = [seedanceV15Pro, klingV26Pro];
 /**
  * Default model ID
  */
-export const DEFAULT_VIDEO_MODEL_ID = "fal-ai/bytedance/seedance/v1.5/pro/image-to-video";
+export const DEFAULT_VIDEO_MODEL_ID =
+  "fal-ai/bytedance/seedance/v1.5/pro/image-to-video";
 
 /**
  * Get a video model config by ID
@@ -219,6 +245,7 @@ export function getVideoModel(modelId: string): VideoModelConfig | undefined {
 
 /**
  * Get the default values for a model's parameters
+ * Skips disabled parameters as they don't participate in replace and fill
  */
 export function getModelDefaults(modelId: string): Record<string, any> {
   const model = getVideoModel(modelId);
@@ -226,6 +253,9 @@ export function getModelDefaults(modelId: string): Record<string, any> {
 
   const defaults: Record<string, any> = {};
   for (const param of model.params) {
+    // Skip disabled parameters - they don't participate in replace and fill
+    if (param.status === "disabled") continue;
+
     if (param.default !== undefined) {
       defaults[param.name] = param.default;
     }
@@ -236,6 +266,11 @@ export function getModelDefaults(modelId: string): Record<string, any> {
 /**
  * Validate and merge user input with model defaults (replace and fill strategy)
  * Returns the merged params or throws an error if validation fails
+ *
+ * Status handling:
+ * - "disabled": Parameter is completely skipped (not in output)
+ * - "hidden": User input is ignored, always uses default value
+ * - "active" (default): Normal validation and merge
  */
 export function validateAndMergeParams(
   modelId: string,
@@ -246,15 +281,25 @@ export function validateAndMergeParams(
     throw new Error(`Unknown video model: ${modelId}`);
   }
 
-  // Start with defaults
+  // Start with defaults (already excludes disabled params)
   const merged = getModelDefaults(modelId);
 
   // Validate and merge user params
   for (const param of model.params) {
+    // Skip disabled parameters entirely
+    if (param.status === "disabled") continue;
+
+    // For hidden parameters, ignore user input and always use default
+    if (param.status === "hidden") continue;
+
     const userValue = userParams[param.name];
 
     // Check required params
-    if (param.required && userValue === undefined && merged[param.name] === undefined) {
+    if (
+      param.required &&
+      userValue === undefined &&
+      merged[param.name] === undefined
+    ) {
       throw new Error(`Missing required parameter: ${param.name}`);
     }
 
@@ -270,15 +315,20 @@ export function validateAndMergeParams(
         break;
 
       case "number":
-        const numValue = typeof userValue === "string" ? parseFloat(userValue) : userValue;
+        const numValue =
+          typeof userValue === "string" ? parseFloat(userValue) : userValue;
         if (typeof numValue !== "number" || isNaN(numValue)) {
           throw new Error(`Parameter ${param.name} must be a number`);
         }
         if (param.min !== undefined && numValue < param.min) {
-          throw new Error(`Parameter ${param.name} must be at least ${param.min}`);
+          throw new Error(
+            `Parameter ${param.name} must be at least ${param.min}`
+          );
         }
         if (param.max !== undefined && numValue > param.max) {
-          throw new Error(`Parameter ${param.name} must be at most ${param.max}`);
+          throw new Error(
+            `Parameter ${param.name} must be at most ${param.max}`
+          );
         }
         merged[param.name] = numValue;
         continue;
@@ -307,15 +357,21 @@ export function validateAndMergeParams(
 
       case "string_array":
         if (!Array.isArray(userValue)) {
-          throw new Error(`Parameter ${param.name} must be an array of strings`);
+          throw new Error(
+            `Parameter ${param.name} must be an array of strings`
+          );
         }
         for (const item of userValue) {
           if (typeof item !== "string") {
-            throw new Error(`Parameter ${param.name} must contain only strings`);
+            throw new Error(
+              `Parameter ${param.name} must contain only strings`
+            );
           }
         }
         if (param.maxItems !== undefined && userValue.length > param.maxItems) {
-          throw new Error(`Parameter ${param.name} allows maximum ${param.maxItems} items`);
+          throw new Error(
+            `Parameter ${param.name} allows maximum ${param.maxItems} items`
+          );
         }
         break;
     }
@@ -329,6 +385,7 @@ export function validateAndMergeParams(
 
 /**
  * Get model config for API response (safe for frontend)
+ * Excludes hidden and disabled parameters as they shouldn't be shown to users
  */
 export function getModelConfigForApi(modelId: string) {
   const model = getVideoModel(modelId);
@@ -339,18 +396,21 @@ export function getModelConfigForApi(modelId: string) {
     name: model.name,
     description: model.description,
     imageParams: model.imageParams,
-    params: model.params.map((p) => ({
-      name: p.name,
-      label: p.label || p.name,
-      type: p.type,
-      required: p.required,
-      default: p.default,
-      options: p.options,
-      description: p.description,
-      min: p.min,
-      max: p.max,
-      maxItems: p.maxItems,
-    })),
+    params: model.params
+      // Filter out hidden and disabled params - they shouldn't be exposed to frontend
+      .filter((p) => !p.status || p.status === "active")
+      .map((p) => ({
+        name: p.name,
+        label: p.label || p.name,
+        type: p.type,
+        required: p.required,
+        default: p.default,
+        options: p.options,
+        description: p.description,
+        min: p.min,
+        max: p.max,
+        maxItems: p.maxItems,
+      })),
   };
 }
 
