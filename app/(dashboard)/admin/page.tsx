@@ -99,6 +99,25 @@ export default function AdminPage() {
             </Button>
           </CardFooter>
         </Card>
+
+        {/* Fal Usage Card */}
+        <Card className="py-4 cursor-pointer hover:scale-[1.02] transition-transform" onPress={() => router.push("/admin/fal-usage")}>
+          <CardHeader className="pb-0 pt-2 px-4 flex-row gap-2 items-center">
+            <Activity className="w-6 h-6 text-primary" />
+            <div className="flex flex-col">
+               <p className="text-tiny uppercase font-bold">Cost & Usage</p>
+               <h4 className="font-bold text-large">Fal.ai Usage</h4>
+            </div>
+          </CardHeader>
+          <CardBody className="overflow-visible py-2">
+             <p className="text-default-500">Monitor Fal.ai API usage and estimated costs.</p>
+          </CardBody>
+          <CardFooter>
+            <Button color="primary" variant="flat" onPress={() => router.push("/admin/fal-usage")}>
+              Go to Fal Usage
+            </Button>
+          </CardFooter>
+        </Card>
       </div>
     </div>
   );

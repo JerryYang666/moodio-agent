@@ -66,6 +66,7 @@
     "@types/prismjs": "^1.26.5",
     "@vercel/functions": "^3.3.3",
     "clsx": "2.1.1",
+    "date-fns": "^4.1.0",
     "diff": "^8.0.2",
     "dotenv": "^17.2.3",
     "drizzle-orm": "^0.44.7",
