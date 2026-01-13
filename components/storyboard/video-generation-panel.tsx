@@ -9,20 +9,21 @@ import { Card, CardBody, CardHeader } from "@heroui/card";
 import { Spinner } from "@heroui/spinner";
 import { Image } from "@heroui/image";
 import { Divider } from "@heroui/divider";
-import { Video, ImageIcon, Sparkles, X } from "lucide-react";
+import { Video, ImageIcon, Sparkles, X, Plus } from "lucide-react";
 import AssetPickerModal, { AssetSummary } from "@/components/chat/asset-picker-modal";
 import { useVideo } from "@/components/video-provider";
 
 interface VideoModelParam {
   name: string;
   label: string;
-  type: "string" | "number" | "boolean" | "enum";
+  type: "string" | "number" | "boolean" | "enum" | "string_array";
   required: boolean;
-  default?: string | number | boolean;
+  default?: string | number | boolean | string[];
   options?: string[];
   description?: string;
   min?: number;
   max?: number;
+  maxItems?: number;
 }
 
 interface VideoModelConfig {
@@ -65,6 +66,9 @@ export default function VideoGenerationPanel({
   // Asset picker state
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerTarget, setPickerTarget] = useState<"source" | "end">("source");
+
+  // String array input state (for voice_ids etc.)
+  const [arrayInputValues, setArrayInputValues] = useState<Record<string, string>>({});
 
   // Load models
   useEffect(() => {
@@ -401,6 +405,76 @@ export default function VideoGenerationPanel({
                     min={param.min}
                     max={param.max}
                   />
+                );
+              }
+
+              // String array type - tag-style input
+              if (param.type === "string_array") {
+                const arrayValue: string[] = Array.isArray(value) ? value : [];
+                const canAddMore = !param.maxItems || arrayValue.length < param.maxItems;
+                const inputValue = arrayInputValues[param.name] || "";
+
+                const addItem = () => {
+                  const trimmed = inputValue.trim();
+                  if (trimmed) {
+                    handleParamChange(param.name, [...arrayValue, trimmed]);
+                    setArrayInputValues((prev) => ({ ...prev, [param.name]: "" }));
+                  }
+                };
+
+                return (
+                  <div key={param.name} className="space-y-2">
+                    <div>
+                      <span className="text-sm">{param.label}</span>
+                      {param.description && (
+                        <p className="text-xs text-default-400">{param.description}</p>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {arrayValue.map((item, idx) => (
+                        <div
+                          key={idx}
+                          className="flex items-center gap-1 bg-default-100 px-2 py-1 rounded-md text-sm"
+                        >
+                          <span className="font-mono">{item}</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const newArray = arrayValue.filter((_, i) => i !== idx);
+                              handleParamChange(param.name, newArray.length > 0 ? newArray : undefined);
+                            }}
+                            className="text-default-400 hover:text-danger transition-colors"
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
+                      ))}
+                      {canAddMore && (
+                        <Input
+                          size="sm"
+                          placeholder={`Add voice ID${param.maxItems ? ` (${arrayValue.length}/${param.maxItems})` : ""}`}
+                          classNames={{ base: "w-48", input: "font-mono text-sm" }}
+                          value={inputValue}
+                          onValueChange={(v) => setArrayInputValues((prev) => ({ ...prev, [param.name]: v }))}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              addItem();
+                            }
+                          }}
+                          endContent={
+                            <button
+                              type="button"
+                              className="text-default-400 hover:text-primary transition-colors"
+                              onClick={addItem}
+                            >
+                              <Plus size={16} />
+                            </button>
+                          }
+                        />
+                      )}
+                    </div>
+                  </div>
                 );
               }
 

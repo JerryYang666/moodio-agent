@@ -7,18 +7,19 @@
  * for the "replace and fill" validation strategy.
  */
 
-export type VideoModelParamType = "string" | "number" | "boolean" | "enum";
+export type VideoModelParamType = "string" | "number" | "boolean" | "enum" | "string_array";
 
 export interface VideoModelParam {
   name: string;
   type: VideoModelParamType;
   required: boolean;
-  default?: string | number | boolean;
+  default?: string | number | boolean | string[];
   options?: string[]; // For enum types
   description?: string;
   label?: string; // Human-readable label for UI
   min?: number; // For number types
   max?: number; // For number types
+  maxItems?: number; // For array types - maximum number of items allowed
 }
 
 export interface VideoModelConfig {
@@ -130,9 +131,79 @@ const seedanceV15Pro: VideoModelConfig = {
 };
 
 /**
+ * Kling Video v2.6 Pro - Image to Video
+ * Top-tier image-to-video with cinematic visuals, fluid motion, and native audio generation
+ */
+const klingV26Pro: VideoModelConfig = {
+  id: "fal-ai/kling-video/v2.6/pro/image-to-video",
+  name: "Kling Video v2.6 Pro",
+  description: "Top-tier image-to-video with cinematic visuals, fluid motion, and native audio generation",
+  imageParams: {
+    sourceImage: "start_image_url",
+    endImage: "end_image_url",
+  },
+  params: [
+    {
+      name: "prompt",
+      label: "Prompt",
+      type: "string",
+      required: true,
+      description: "The text prompt used to generate the video. Supports speech in quotes for audio generation.",
+    },
+    {
+      name: "start_image_url",
+      label: "Source Image",
+      type: "string",
+      required: true,
+      description: "URL of the image to be used for the video (first frame)",
+    },
+    {
+      name: "end_image_url",
+      label: "End Image",
+      type: "string",
+      required: false,
+      description: "URL of the image to be used for the end of the video (optional)",
+    },
+    {
+      name: "duration",
+      label: "Duration (seconds)",
+      type: "enum",
+      required: false,
+      default: "5",
+      options: ["5", "10"],
+      description: "The duration of the generated video in seconds",
+    },
+    {
+      name: "negative_prompt",
+      label: "Negative Prompt",
+      type: "string",
+      required: false,
+      default: "blur, distort, and low quality",
+      description: "Text prompt describing what to avoid in the video",
+    },
+    {
+      name: "generate_audio",
+      label: "Generate Audio",
+      type: "boolean",
+      required: false,
+      default: true,
+      description: "Generate native audio for the video. Supports Chinese and English voice output.",
+    },
+    {
+      name: "voice_ids",
+      label: "Voice IDs",
+      type: "string_array",
+      required: false,
+      maxItems: 2,
+      description: "List of voice IDs for voice control. Reference voices in the prompt using <<<voice_1>>>, <<<voice_2>>>. Maximum 2 voices allowed.",
+    },
+  ],
+};
+
+/**
  * Registry of all supported video models
  */
-export const VIDEO_MODELS: VideoModelConfig[] = [seedanceV15Pro];
+export const VIDEO_MODELS: VideoModelConfig[] = [seedanceV15Pro, klingV26Pro];
 
 /**
  * Default model ID
@@ -233,6 +304,20 @@ export function validateAndMergeParams(
           );
         }
         break;
+
+      case "string_array":
+        if (!Array.isArray(userValue)) {
+          throw new Error(`Parameter ${param.name} must be an array of strings`);
+        }
+        for (const item of userValue) {
+          if (typeof item !== "string") {
+            throw new Error(`Parameter ${param.name} must contain only strings`);
+          }
+        }
+        if (param.maxItems !== undefined && userValue.length > param.maxItems) {
+          throw new Error(`Parameter ${param.name} allows maximum ${param.maxItems} items`);
+        }
+        break;
     }
 
     // Override default with user value
@@ -264,6 +349,7 @@ export function getModelConfigForApi(modelId: string) {
       description: p.description,
       min: p.min,
       max: p.max,
+      maxItems: p.maxItems,
     })),
   };
 }
