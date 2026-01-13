@@ -18,9 +18,10 @@ import {
   useDisclosure,
 } from "@heroui/modal";
 import { Input } from "@heroui/input";
-import { MoreVertical, Eye, FolderPlus, Plus, Folder } from "lucide-react";
+import { MoreVertical, Eye, FolderPlus, Plus, Folder, Video } from "lucide-react";
 import { useCollections } from "@/hooks/use-collections";
 import { motion, AnimatePresence } from "framer-motion";
+import { useRouter } from "next/navigation";
 
 interface ImageWithMenuProps {
   imageId: string;
@@ -90,6 +91,7 @@ export default function ImageWithMenu({
   onViewDetails,
   children,
 }: ImageWithMenuProps) {
+  const router = useRouter();
   const {
     collections,
     createCollection,
@@ -233,6 +235,8 @@ export default function ImageWithMenu({
               onAction={(key) => {
                 if (key === "view") {
                   onViewDetails();
+                } else if (key === "generate-video") {
+                  router.push(`/storyboard?imageId=${imageId}`);
                 } else if (key === "save-project") {
                   handleSaveToProject();
                 } else if (key === "create-new") {
@@ -245,6 +249,13 @@ export default function ImageWithMenu({
                 startContent={<Eye size={16} />}
               >
                 View Details
+              </DropdownItem>
+              <DropdownItem
+                key="generate-video"
+                startContent={<Video size={16} />}
+                className="text-primary"
+              >
+                Generate Video
               </DropdownItem>
               <DropdownSection title="Save" showDivider>
                 <DropdownItem

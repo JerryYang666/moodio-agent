@@ -10,6 +10,7 @@ import { ToastProvider } from "@heroui/toast";
 import { AuthProvider } from "@/components/auth-provider";
 import { ChatProvider } from "@/components/chat-provider";
 import { CollectionsProvider } from "@/components/collections-provider";
+import { VideoProvider } from "@/components/video-provider";
 import { IOSInstallPrompt } from "@/components/ios-install-prompt";
 
 export interface ProvidersProps {
@@ -34,9 +35,11 @@ export function Providers({ children, themeProps }: ProvidersProps) {
         <AuthProvider>
           <ChatProvider>
             <CollectionsProvider>
-              <ToastProvider />
-              <IOSInstallPrompt />
-              {children}
+              <VideoProvider>
+                <ToastProvider />
+                <IOSInstallPrompt />
+                {children}
+              </VideoProvider>
             </CollectionsProvider>
           </ChatProvider>
         </AuthProvider>

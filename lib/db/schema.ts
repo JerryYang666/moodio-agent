@@ -201,6 +201,29 @@ export const events = pgTable("events", {
   metadata: jsonb("metadata").notNull(),
 });
 
+/**
+ * Video Generations table
+ * Stores video generation requests and their results
+ */
+export const videoGenerations = pgTable("video_generations", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  modelId: varchar("model_id", { length: 255 }).notNull(),
+  falRequestId: varchar("fal_request_id", { length: 255 }), // For webhook correlation
+  status: varchar("status", { length: 50 }).notNull().default("pending"), // pending, processing, completed, failed
+  sourceImageId: varchar("source_image_id", { length: 255 }).notNull(),
+  endImageId: varchar("end_image_id", { length: 255 }),
+  videoId: varchar("video_id", { length: 255 }), // S3 video ID
+  thumbnailImageId: varchar("thumbnail_image_id", { length: 255 }),
+  params: jsonb("params").notNull(), // User-provided + defaults merged
+  error: text("error"),
+  seed: bigint("seed", { mode: "number" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  completedAt: timestamp("completed_at"),
+});
+
 // Export types for TypeScript
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
@@ -237,3 +260,6 @@ export type NewAuthChallenge = typeof authChallenges.$inferInsert;
 
 export type Event = typeof events.$inferSelect;
 export type NewEvent = typeof events.$inferInsert;
+
+export type VideoGeneration = typeof videoGenerations.$inferSelect;
+export type NewVideoGeneration = typeof videoGenerations.$inferInsert;

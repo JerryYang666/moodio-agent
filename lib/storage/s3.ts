@@ -230,3 +230,121 @@ export function getSignedImageUrl(
     privateKey: CLOUDFRONT_PRIVATE_KEY,
   });
 }
+
+// ============================================================================
+// Video Storage Functions
+// ============================================================================
+
+/**
+ * Generate a unique video ID for tracking purposes
+ */
+export function generateVideoId(): string {
+  return randomUUID();
+}
+
+/**
+ * Upload a video to S3
+ * @param file The video data as Buffer or Blob
+ * @param contentType The MIME type of the video (e.g., "video/mp4")
+ * @param preGeneratedId Optional pre-generated videoId
+ * @returns The videoId used for storage
+ */
+export async function uploadVideo(
+  file: Buffer | Blob,
+  contentType: string,
+  preGeneratedId?: string
+): Promise<string> {
+  const videoId = preGeneratedId || randomUUID();
+  const key = `videos/${videoId}`;
+
+  let body;
+  if (file instanceof Blob) {
+    body = Buffer.from(await file.arrayBuffer());
+  } else {
+    body = file;
+  }
+
+  await s3Client.send(
+    new PutObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: key,
+      Body: body,
+      ContentType: contentType,
+    })
+  );
+
+  return videoId;
+}
+
+/**
+ * Download a video from S3
+ * @param videoId The video ID (stored in S3 as videos/{videoId})
+ * @returns Buffer containing the video data, or null if not found
+ */
+export async function downloadVideo(videoId: string): Promise<Buffer | null> {
+  const key = `videos/${videoId}`;
+  try {
+    const response = await s3Client.send(
+      new GetObjectCommand({
+        Bucket: BUCKET_NAME,
+        Key: key,
+      })
+    );
+
+    if (!response.Body) return null;
+    const byteArray = await response.Body.transformToByteArray();
+    return Buffer.from(byteArray);
+  } catch (error) {
+    console.error("Error downloading video:", error);
+    return null;
+  }
+}
+
+/**
+ * Generate a signed CloudFront URL for a video
+ * @param videoId The video ID (stored in S3 as videos/{videoId})
+ * @param expirationSeconds Optional expiration time in seconds (defaults to siteConfig)
+ * @returns Signed CloudFront URL
+ */
+export function getSignedVideoUrl(
+  videoId: string,
+  expirationSeconds?: number
+): string {
+  if (
+    !CLOUDFRONT_DOMAIN ||
+    !CLOUDFRONT_KEY_PAIR_ID ||
+    !CLOUDFRONT_PRIVATE_KEY
+  ) {
+    console.warn(
+      "[CloudFront] Missing CloudFront configuration, falling back to unsigned URL"
+    );
+    return `https://${CLOUDFRONT_DOMAIN || "s3-fallback"}/videos/${videoId}`;
+  }
+
+  const url = `https://${CLOUDFRONT_DOMAIN}/videos/${videoId}`;
+  const expiration =
+    expirationSeconds || siteConfig.cloudfront.signedUrlExpirationSeconds;
+  const dateLessThan = new Date(Date.now() + expiration * 1000);
+
+  return getSignedUrl({
+    url,
+    keyPairId: CLOUDFRONT_KEY_PAIR_ID,
+    dateLessThan: dateLessThan.toISOString(),
+    privateKey: CLOUDFRONT_PRIVATE_KEY,
+  });
+}
+
+/**
+ * Download a file from an external URL
+ * Used for downloading video results from Fal
+ * @param url The URL to download from
+ * @returns Buffer containing the file data
+ */
+export async function downloadFromUrl(url: string): Promise<Buffer> {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Failed to download from URL: ${response.status} ${response.statusText}`);
+  }
+  const arrayBuffer = await response.arrayBuffer();
+  return Buffer.from(arrayBuffer);
+}
