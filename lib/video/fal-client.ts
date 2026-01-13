@@ -96,3 +96,61 @@ export interface FalWebhookPayload {
   error?: string;
   payload_error?: string;
 }
+
+/**
+ * Fal queue status response
+ */
+export interface FalQueueStatus {
+  status: "IN_QUEUE" | "IN_PROGRESS" | "COMPLETED" | "FAILED";
+  logs?: Array<{ message: string; timestamp: string }>;
+}
+
+/**
+ * Try to recover a video generation result directly from Fal's queue
+ * Used when webhook might have failed
+ *
+ * @param modelId The Fal model ID
+ * @param requestId The Fal request ID
+ * @returns The result if completed, null if still in progress, or throws on error
+ */
+export async function tryRecoverVideoGeneration(
+  modelId: string,
+  requestId: string
+): Promise<{ status: "completed" | "in_progress" | "failed"; result?: SeedanceVideoResult; error?: string }> {
+  try {
+    // First check the status
+    const statusResponse = await fal.queue.status(modelId, {
+      requestId,
+      logs: false,
+    }) as FalQueueStatus;
+
+    if (statusResponse.status === "IN_QUEUE" || statusResponse.status === "IN_PROGRESS") {
+      return { status: "in_progress" };
+    }
+
+    if (statusResponse.status === "FAILED") {
+      return { status: "failed", error: "Generation failed on Fal" };
+    }
+
+    if (statusResponse.status === "COMPLETED") {
+      // Get the result
+      const resultResponse = await fal.queue.result(modelId, {
+        requestId,
+      });
+
+      // Type assertion - the result structure matches SeedanceVideoResult
+      const result = resultResponse.data as SeedanceVideoResult;
+
+      if (!result?.video?.url) {
+        return { status: "failed", error: "No video URL in result" };
+      }
+
+      return { status: "completed", result };
+    }
+
+    return { status: "failed", error: `Unknown status: ${statusResponse.status}` };
+  } catch (error: any) {
+    console.error("[Fal Recovery] Error recovering generation:", error);
+    return { status: "failed", error: error.message || "Failed to recover from Fal" };
+  }
+}

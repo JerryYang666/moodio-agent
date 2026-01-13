@@ -5,10 +5,15 @@ import { db } from "@/lib/db";
 import { videoGenerations } from "@/lib/db/schema";
 import { eq, desc } from "drizzle-orm";
 import { getSignedImageUrl, getSignedVideoUrl } from "@/lib/storage/s3";
+import { checkAndRecoverStaleGenerations } from "@/lib/video/recovery";
+import { waitUntil } from "@vercel/functions";
 
 /**
  * GET /api/video/generations
  * List current user's video generations
+ *
+ * Also triggers background recovery of stale generations (60+ minutes old)
+ * where webhooks may have failed.
  *
  * Query params:
  * - limit: number (default 20, max 100)
@@ -34,6 +39,13 @@ export async function GET(request: NextRequest) {
   );
   const offset = parseInt(searchParams.get("offset") || "0", 10);
   const statusFilter = searchParams.get("status");
+
+  // Trigger background recovery of stale generations (non-blocking)
+  waitUntil(
+    checkAndRecoverStaleGenerations(payload.userId).catch((err) => {
+      console.error("[Video Generations] Background recovery error:", err);
+    })
+  );
 
   try {
     // Build query
