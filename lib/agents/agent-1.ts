@@ -46,11 +46,11 @@ interface AgentOutput {
 
 interface PreparedMessages {
   messages: any[];
-  userImageId: string | undefined;
-  userImageBase64Promise: Promise<string | undefined>;
+  // All selected image IDs (from frontend selection)
+  selectedImageIds: string[];
+  // Base64 data for all selected images (for image editing)
+  selectedImageBase64Promises: Promise<string | undefined>[];
   precisionEditing?: boolean;
-  precisionEditImageId?: string;
-  precisionEditImageBase64Promise?: Promise<string | undefined>;
   aspectRatioOverride?: AspectRatio;
 }
 
@@ -65,7 +65,7 @@ export class Agent1 implements Agent {
     isAdmin: boolean,
     requestStartTime?: number,
     precisionEditing?: boolean,
-    precisionEditImageId?: string,
+    selectedImageIds?: string[], // New: array of selected image IDs
     systemPromptOverride?: string,
     aspectRatioOverride?: string
   ): Promise<AgentResponse> {
@@ -98,7 +98,7 @@ export class Agent1 implements Agent {
       userMessage,
       startTime,
       precisionEditing,
-      precisionEditImageId,
+      selectedImageIds, // Pass selected image IDs
       systemPromptOverride,
       validatedAspectRatio
     );
@@ -174,7 +174,7 @@ export class Agent1 implements Agent {
     userMessage: Message,
     startTime: number,
     precisionEditing?: boolean,
-    precisionEditImageId?: string,
+    selectedImageIds?: string[], // Array of selected image IDs from frontend
     systemPromptOverride?: string,
     aspectRatioOverride?: AspectRatio
   ): Promise<PreparedMessages> {
@@ -214,34 +214,19 @@ export class Agent1 implements Agent {
       );
     }
 
-    // Check for user image - search through history and current message for last user image
-    let userImageId: string | undefined;
-    const allMessages = [...history, userMessage];
-    for (const message of allMessages) {
-      if (message.role === "user" && Array.isArray(message.content)) {
-        const imgPart = message.content.find((p) => p.type === "image") as
-          | { type: "image"; imageId: string }
-          | undefined;
-        if (imgPart) {
-          userImageId = imgPart.imageId;
-        }
-      }
-    }
+    // Use the selectedImageIds provided by frontend (no more traversing history!)
+    const effectiveImageIds = selectedImageIds || [];
+    console.log(
+      `[Agent-1] Using ${effectiveImageIds.length} selected images from frontend`
+    );
 
-    // Pre-fetch user image base64 if needed
-    const userImageBase64Promise = userImageId
-      ? downloadImage(userImageId).then((buf) => buf?.toString("base64"))
-      : Promise.resolve(undefined);
-
-    // Pre-fetch precision edit image base64 if needed
-    const precisionEditImageBase64Promise = precisionEditImageId
-      ? downloadImage(precisionEditImageId).then((buf) =>
-          buf?.toString("base64")
-        )
-      : Promise.resolve(undefined);
+    // Pre-fetch base64 for all selected images (for image editing)
+    const selectedImageBase64Promises = effectiveImageIds.map((imgId) =>
+      downloadImage(imgId).then((buf) => buf?.toString("base64"))
+    );
 
     console.log(
-      "[Perf] User/Precision image base64 prepared",
+      "[Perf] Selected images base64 prepared",
       `[${Date.now() - startTime}ms]`
     );
 
@@ -265,23 +250,15 @@ export class Agent1 implements Agent {
           ],
     };
 
-    // Add precision editing prompt and image if applicable
+    // Add precision editing prompt if applicable
+    // Note: Images are now included in the userMessage from the frontend
+    // via the unified selection system, so we don't need to add them here
     if (precisionEditing) {
       if (Array.isArray(formattedUserMessage.content)) {
         formattedUserMessage.content.push({
           type: "text",
           text: "\nPrecision Editing on. Make sure that your prompt is describing an edit to the picture.",
         });
-
-        if (precisionEditImageId) {
-          // Prepend the precision edit image so it appears first/with context
-          formattedUserMessage.content.unshift({
-            type: "image_url",
-            image_url: {
-              url: getSignedImageUrl(precisionEditImageId),
-            },
-          });
-        }
       }
     }
 
@@ -350,11 +327,9 @@ export class Agent1 implements Agent {
 
     return {
       messages,
-      userImageId,
-      userImageBase64Promise,
+      selectedImageIds: effectiveImageIds,
+      selectedImageBase64Promises,
       precisionEditing,
-      precisionEditImageId,
-      precisionEditImageBase64Promise,
       aspectRatioOverride,
     };
   }
@@ -880,40 +855,37 @@ export class Agent1 implements Agent {
     }
 
     let finalImageId: string;
-    const userImageBase64 = await prepared.userImageBase64Promise;
-    const precisionEditImageBase64 = prepared.precisionEditImageBase64Promise
-      ? await prepared.precisionEditImageBase64Promise
-      : undefined;
+
+    // Resolve all selected image base64 data
+    const selectedImageBase64s = await Promise.all(
+      prepared.selectedImageBase64Promises
+    );
+
+    // Filter out undefined values
+    const validImageBase64s = selectedImageBase64s.filter(
+      (b64): b64 is string => b64 !== undefined
+    );
 
     // Determine if we should use image editing
+    // Use image editing if precision editing is enabled AND we have images
+    // OR if we have any selected images (for general image-to-image workflows)
     const useImageEditing =
-      (prepared.precisionEditing &&
-        (precisionEditImageBase64 || userImageBase64)) ||
-      (prepared.userImageId && userImageBase64);
+      (prepared.precisionEditing && validImageBase64s.length > 0) ||
+      (validImageBase64s.length > 0 && prepared.selectedImageIds.length > 0);
 
     let response: any;
 
     try {
       if (useImageEditing) {
-        // Image editing
+        // Image editing - use all selected images
         const prompt: any[] = [{ text: suggestion.prompt }];
 
-        // Include precision edit image if available
-        if (precisionEditImageBase64) {
+        // Add all selected images to the prompt (up to 5)
+        for (const base64 of validImageBase64s) {
           prompt.push({
             inlineData: {
               mimeType: "image/png",
-              data: precisionEditImageBase64,
-            },
-          });
-        }
-        // Include user uploaded image ONLY if precision edit image is NOT provided
-        // If precision editing is on but no specific image ID was passed, we edit the last user image
-        else if (userImageBase64) {
-          prompt.push({
-            inlineData: {
-              mimeType: "image/png",
-              data: userImageBase64,
+              data: base64,
             },
           });
         }
@@ -1017,7 +989,7 @@ export class Agent1 implements Agent {
     variantCount: number,
     requestStartTime?: number,
     precisionEditing?: boolean,
-    precisionEditImageId?: string,
+    selectedImageIds?: string[], // New: array of selected image IDs (replaces precisionEditImageId)
     systemPromptOverride?: string,
     aspectRatioOverride?: string
   ): Promise<ParallelAgentResponse> {
@@ -1043,7 +1015,7 @@ export class Agent1 implements Agent {
       userMessage,
       startTime,
       precisionEditing,
-      precisionEditImageId,
+      selectedImageIds, // Pass array of selected image IDs
       systemPromptOverride,
       validatedAspectRatio
     );

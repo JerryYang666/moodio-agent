@@ -17,6 +17,8 @@ import {
   Message,
   MessageContentPart,
   PARALLEL_VARIANT_COUNT,
+  SelectedImage,
+  MAX_SELECTED_IMAGES,
 } from "@/lib/llm/types";
 import ImageDetailModal, { ImageInfo } from "./image-detail-modal";
 import ChatMessage from "./chat-message";
@@ -46,6 +48,103 @@ interface SelectedAgentPart {
   partIndex: number;
   imageId?: string;
   variantId?: string;
+}
+
+/**
+ * Image selection algorithm that runs to find images to send to AI.
+ * Priority order (most recent first within each category):
+ * 1. User uploaded images in current message (pending uploads)
+ * 2. User uploaded images in chat history
+ * 3. Agent-generated images that user has selected (isSelected: true)
+ * 4. Most recent agent-generated images
+ *
+ * @param messages - The chat messages array
+ * @param pendingUploads - Files being uploaded (not yet in messages)
+ * @returns Array of SelectedImage (max MAX_SELECTED_IMAGES)
+ */
+function computeSelectedImages(
+  messages: Message[],
+  pendingUploads: Array<{ file: File; previewUrl: string }> = []
+): SelectedImage[] {
+  const selectedImages: SelectedImage[] = [];
+
+  // 1. Add pending uploads first (highest priority)
+  for (const upload of pendingUploads) {
+    if (selectedImages.length >= MAX_SELECTED_IMAGES) break;
+    selectedImages.push({
+      id: upload.previewUrl, // Use blob URL as temporary ID
+      url: upload.previewUrl,
+      source: "pending_upload",
+      title: upload.file.name,
+      isPending: true,
+      pendingFile: upload.file,
+    });
+  }
+
+  // 2. Search backwards through messages for user uploads
+  for (let i = messages.length - 1; i >= 0 && selectedImages.length < MAX_SELECTED_IMAGES; i--) {
+    const msg = messages[i];
+    if (msg.role !== "user" || !Array.isArray(msg.content)) continue;
+
+    for (const part of msg.content) {
+      if (selectedImages.length >= MAX_SELECTED_IMAGES) break;
+      if (part.type === "image" && part.imageId) {
+        // Check if already added
+        if (selectedImages.some(si => si.id === part.imageId)) continue;
+        selectedImages.push({
+          id: part.imageId,
+          url: part.imageUrl || "",
+          source: "user_upload",
+          title: "Uploaded image",
+          messageIndex: i,
+        });
+      }
+    }
+  }
+
+  // 3. Search for selected agent images (isSelected: true)
+  for (let i = messages.length - 1; i >= 0 && selectedImages.length < MAX_SELECTED_IMAGES; i--) {
+    const msg = messages[i];
+    if (msg.role !== "assistant" || !Array.isArray(msg.content)) continue;
+
+    for (const part of msg.content) {
+      if (selectedImages.length >= MAX_SELECTED_IMAGES) break;
+      if (part.type === "agent_image" && part.isSelected && part.imageId && part.status === "generated") {
+        if (selectedImages.some(si => si.id === part.imageId)) continue;
+        selectedImages.push({
+          id: part.imageId,
+          url: part.imageUrl || "",
+          source: "agent_image",
+          title: part.title,
+          messageIndex: i,
+          variantId: msg.variantId,
+        });
+      }
+    }
+  }
+
+  // 4. Search for most recent agent-generated images (up to remaining slots)
+  for (let i = messages.length - 1; i >= 0 && selectedImages.length < MAX_SELECTED_IMAGES; i--) {
+    const msg = messages[i];
+    if (msg.role !== "assistant" || !Array.isArray(msg.content)) continue;
+
+    for (const part of msg.content) {
+      if (selectedImages.length >= MAX_SELECTED_IMAGES) break;
+      if (part.type === "agent_image" && part.imageId && part.status === "generated" && !part.isSelected) {
+        if (selectedImages.some(si => si.id === part.imageId)) continue;
+        selectedImages.push({
+          id: part.imageId,
+          url: part.imageUrl || "",
+          source: "agent_image",
+          title: part.title,
+          messageIndex: i,
+          variantId: msg.variantId,
+        });
+      }
+    }
+  }
+
+  return selectedImages;
 }
 
 // Helper to group consecutive assistant messages with the same timestamp as variants
@@ -81,6 +180,10 @@ export default function ChatInterface({
   const [precisionEditing, setPrecisionEditing] = useState(false);
   const [menuState, setMenuState] = useState<MenuState>(INITIAL_MENU_STATE);
 
+  // New unified image selection state
+  const [selectedImages, setSelectedImages] = useState<SelectedImage[]>([]);
+  const [pendingUploads, setPendingUploads] = useState<Array<{ file: File; previewUrl: string }>>([]);
+
   // Listen for reset-chat event (triggered when clicking New Chat button while technically already on /chat)
   useEffect(() => {
     const handleReset = () => {
@@ -94,6 +197,11 @@ export default function ChatInterface({
       setSelectedAgentPart(null);
       setPrecisionEditing(false);
       setIsSending(false);
+      // Clear new unified image selection state
+      setSelectedImages([]);
+      // Clean up pending upload blob URLs
+      pendingUploads.forEach(u => URL.revokeObjectURL(u.previewUrl));
+      setPendingUploads([]);
 
       // Ensure we clean up any draft that might be lingering
       localStorage.removeItem(`${siteConfig.chatInputPrefix}new-chat`);
@@ -101,7 +209,17 @@ export default function ChatInterface({
 
     window.addEventListener("reset-chat", handleReset);
     return () => window.removeEventListener("reset-chat", handleReset);
-  }, [previewUrl]);
+  }, [previewUrl, pendingUploads]);
+
+  // Compute selected images automatically when messages change or pending uploads change
+  // This runs on page load and after AI finishes responding
+  useEffect(() => {
+    // Only recompute when NOT sending to avoid flickering during response streaming
+    if (!isSending) {
+      const computed = computeSelectedImages(messages, pendingUploads);
+      setSelectedImages(computed);
+    }
+  }, [messages, pendingUploads, isSending]);
 
   // Draft saving logic
   const [prevChatId, setPrevChatId] = useState(chatId);
@@ -288,6 +406,87 @@ export default function ChatInterface({
     });
   }, []);
 
+  // New function to add a file to pending uploads (unified image selection)
+  const addPendingUpload = useCallback((file: File) => {
+    if (file.size > 5 * 1024 * 1024) {
+      alert("File size too large. Max 5MB.");
+      return;
+    }
+    // Check if we can add more images
+    if (selectedImages.length >= MAX_SELECTED_IMAGES) {
+      alert(`Maximum ${MAX_SELECTED_IMAGES} images allowed.`);
+      return;
+    }
+    const previewUrl = URL.createObjectURL(file);
+    setPendingUploads(prev => [...prev, { file, previewUrl }]);
+  }, [selectedImages.length]);
+
+  // Remove an image from selection by ID
+  const removeSelectedImage = useCallback((imageId: string) => {
+    // Check if it's a pending upload
+    const pendingUpload = pendingUploads.find(u => u.previewUrl === imageId);
+    if (pendingUpload) {
+      URL.revokeObjectURL(pendingUpload.previewUrl);
+      setPendingUploads(prev => prev.filter(u => u.previewUrl !== imageId));
+      return;
+    }
+
+    // Otherwise it's a selected image from messages - we need to deselect it
+    // This will be handled by removing it from the computed selection
+    // For now, we'll add it to a "deselected" set that the algorithm considers
+    // Actually, since the algorithm auto-computes, we just need to clear the isSelected flag
+    // For agent images, we need to update the message
+    setMessages(prev => {
+      return prev.map(msg => {
+        if (!Array.isArray(msg.content)) return msg;
+        const updatedContent = msg.content.map(part => {
+          if (part.type === "agent_image" && part.imageId === imageId) {
+            return { ...part, isSelected: false };
+          }
+          return part;
+        });
+        return { ...msg, content: updatedContent };
+      });
+    });
+  }, [pendingUploads]);
+
+  // Manually add an image to selection (toggle)
+  const toggleImageSelection = useCallback((image: SelectedImage) => {
+    // Check if already selected
+    const isSelected = selectedImages.some(si => si.id === image.id);
+
+    if (isSelected) {
+      removeSelectedImage(image.id);
+    } else {
+      // Check if we can add more images
+      if (selectedImages.length >= MAX_SELECTED_IMAGES) {
+        alert(`Maximum ${MAX_SELECTED_IMAGES} images allowed.`);
+        return;
+      }
+      // For agent images, toggle the isSelected flag
+      if (image.source === "agent_image" && image.messageIndex !== undefined) {
+        setMessages(prev => {
+          return prev.map((msg, idx) => {
+            // Match by variantId if available, otherwise by index
+            const matches = image.variantId
+              ? msg.variantId === image.variantId
+              : idx === image.messageIndex;
+
+            if (!matches || !Array.isArray(msg.content)) return msg;
+
+            const updatedContent = msg.content.map(part => {
+              if (part.type === "agent_image" && part.imageId === image.id) {
+                return { ...part, isSelected: true };
+              }
+              return part;
+            });
+            return { ...msg, content: updatedContent };
+          });
+        });
+      }
+    }
+  }, [selectedImages, removeSelectedImage]);
+
   const clearFile = useCallback(() => {
     setSelectedFile(null);
     if (previewUrl) URL.revokeObjectURL(previewUrl);
@@ -319,6 +518,18 @@ export default function ChatInterface({
     },
     [previewUrl]
   );
+
+  // New function to add an asset to selection
+  const addAssetToSelection = useCallback((payload: SelectedAsset) => {
+    if (selectedImages.length >= MAX_SELECTED_IMAGES) {
+      alert(`Maximum ${MAX_SELECTED_IMAGES} images allowed.`);
+      return;
+    }
+    // Add to selected images by marking it
+    // Since assets come from the library, we need to track them separately
+    // For now, we'll use the old selectedAsset state until we refactor further
+    setSelectedAsset(payload);
+  }, [selectedImages.length]);
 
   // Listen for asset selection events from the hover sidebar
   useEffect(() => {
@@ -383,8 +594,10 @@ export default function ChatInterface({
   );
 
   const handleSend = async () => {
+    // Check if there's content to send - include selectedImages in the check
+    const hasSelectedImages = selectedImages.length > 0;
     if (
-      (!input.trim() && !selectedFile && !selectedAgentPart && !selectedAsset) ||
+      (!input.trim() && !selectedFile && !selectedAgentPart && !selectedAsset && !hasSelectedImages) ||
       isSending ||
       isRecording ||
       isTranscribing
@@ -392,10 +605,8 @@ export default function ChatInterface({
       return;
 
     let currentInput = input;
-    if (selectedAgentPart) {
-      const prefix = `I select ${selectedAgentPart.title}`;
-      currentInput = currentInput ? `${prefix}\n\n${currentInput}` : prefix;
-    }
+    // Note: We no longer add "I select X" prefix since images are shown in the UI
+    // The backend will know which images are selected from the selectedImageIds
 
     // Save the original input for potential retry exhausted scenario
     lastUserInputRef.current = input;
@@ -403,20 +614,28 @@ export default function ChatInterface({
     const currentFile = selectedFile;
     const currentPreviewUrl = previewUrl;
     const currentAsset = selectedAsset;
+    const currentSelectedImages = [...selectedImages];
+    const currentPendingUploads = [...pendingUploads];
 
-    // Optimistic message with current timestamp
-    const optimisticContent: Message["content"] =
-      (currentFile && currentPreviewUrl) || currentAsset
-        ? (() => {
-            const parts: MessageContentPart[] = [];
-            if (currentInput) {
-              parts.push({ type: "text", text: currentInput });
-            }
-            const imageUrl = currentAsset ? currentAsset.url : currentPreviewUrl!;
-            parts.push({ type: "image_url", image_url: { url: imageUrl } });
-            return parts;
-          })()
-        : currentInput;
+    // Build optimistic message content from selectedImages
+    const optimisticContent: Message["content"] = (() => {
+      const parts: MessageContentPart[] = [];
+      if (currentInput) {
+        parts.push({ type: "text", text: currentInput });
+      }
+      // Add all selected images as image_url for display
+      for (const img of currentSelectedImages) {
+        parts.push({ type: "image_url", image_url: { url: img.url } });
+      }
+      // Fallback to legacy behavior if no selectedImages
+      if (parts.length === 1 && !currentInput) {
+        return currentInput;
+      }
+      if (parts.length === 0) {
+        return currentInput;
+      }
+      return parts;
+    })();
 
     const userMessage: Message = {
       role: "user",
@@ -481,6 +700,9 @@ export default function ChatInterface({
     setSelectedAsset(null);
     setSelectedAgentPart(null);
     setPrecisionEditing(false);
+    // Clear pending uploads (keep blob URLs for optimistic display)
+    setPendingUploads([]);
+    // Note: selectedImages will be recomputed after response
 
     setIsSending(true);
 
@@ -508,10 +730,38 @@ export default function ChatInterface({
       let body;
       let headers: Record<string, string> = {};
 
-      if (currentFile) {
+      // Collect selectedImageIds (excluding pending uploads which have no ID yet)
+      const selectedImageIds = currentSelectedImages
+        .filter(img => !img.isPending && img.id)
+        .map(img => img.id);
+
+      // Check if there are pending uploads that need to be uploaded
+      const hasPendingUploads = currentPendingUploads.length > 0;
+
+      if (currentFile || hasPendingUploads) {
+        // Use FormData when uploading files
         const formData = new FormData();
         formData.append("message", currentInput);
-        formData.append("file", currentFile);
+
+        // Handle legacy single file upload
+        if (currentFile) {
+          formData.append("file", currentFile);
+        }
+
+        // Handle pending uploads (new system)
+        if (hasPendingUploads) {
+          for (let i = 0; i < currentPendingUploads.length; i++) {
+            formData.append(`pendingFile_${i}`, currentPendingUploads[i].file);
+          }
+          formData.append("pendingFileCount", String(currentPendingUploads.length));
+        }
+
+        // Send selected image IDs (images that already have IDs)
+        if (selectedImageIds.length > 0) {
+          formData.append("selectedImageIds", JSON.stringify(selectedImageIds));
+        }
+
+        // Legacy selection support (will be removed later)
         if (selectedAgentPart) {
           formData.append(
             "selection",
@@ -523,12 +773,12 @@ export default function ChatInterface({
             })
           );
         }
+
+        // Precision editing flag (no longer needs precisionEditImageId)
         if (precisionEditing) {
           formData.append("precisionEditing", "true");
-          if (selectedAgentPart?.imageId) {
-            formData.append("precisionEditImageId", selectedAgentPart.imageId);
-          }
         }
+
         // Pass aspect ratio if not "smart" (let agent decide)
         if (menuState.aspectRatio && menuState.aspectRatio !== "smart") {
           formData.append("aspectRatio", menuState.aspectRatio);
@@ -549,6 +799,13 @@ export default function ChatInterface({
         body = formData;
       } else {
         const payload: any = { content: currentInput };
+
+        // Send selected image IDs
+        if (selectedImageIds.length > 0) {
+          payload.selectedImageIds = selectedImageIds;
+        }
+
+        // Legacy support
         if (currentAsset) {
           payload.assetId = currentAsset.assetId;
         }
@@ -560,12 +817,12 @@ export default function ChatInterface({
             variantId: selectedAgentPart.variantId,
           };
         }
+
+        // Precision editing flag
         if (precisionEditing) {
           payload.precisionEditing = true;
-          if (selectedAgentPart?.imageId) {
-            payload.precisionEditImageId = selectedAgentPart.imageId;
-          }
         }
+
         // Pass aspect ratio if not "smart" (let agent decide)
         if (menuState.aspectRatio && menuState.aspectRatio !== "smart") {
           payload.aspectRatio = menuState.aspectRatio;
@@ -723,6 +980,45 @@ export default function ChatInterface({
                   );
                 });
               }
+              continue;
+            }
+
+            // Handle image_id_ready event - update optimistic message with real image ID
+            if (event.type === "image_id_ready") {
+              // This event contains: { tempUrl: string, imageId: string, imageUrl: string }
+              // We need to update the user message that has the blob URL with the real imageId/URL
+              console.log(`[Chat] Image ID ready: ${event.tempUrl} -> ${event.imageId}`);
+
+              setMessages((prev) => {
+                const newMessages = [...prev];
+                // Find the user message with the blob URL and update it
+                for (let i = newMessages.length - 1; i >= 0; i--) {
+                  const msg = newMessages[i];
+                  if (msg.role === "user" && Array.isArray(msg.content)) {
+                    let updated = false;
+                    const newContent = msg.content.map((part) => {
+                      if (
+                        part.type === "image_url" &&
+                        part.image_url.url === event.tempUrl
+                      ) {
+                        updated = true;
+                        // Replace with real image data
+                        return {
+                          type: "image" as const,
+                          imageId: event.imageId,
+                          imageUrl: event.imageUrl,
+                        };
+                      }
+                      return part;
+                    });
+                    if (updated) {
+                      newMessages[i] = { ...msg, content: newContent };
+                      break;
+                    }
+                  }
+                }
+                return newMessages;
+              });
               continue;
             }
 
@@ -1036,6 +1332,8 @@ export default function ChatInterface({
         onPrecisionEditingChange={handlePrecisionEditingChange}
         menuState={menuState}
         onMenuStateChange={setMenuState}
+        selectedImages={selectedImages}
+        onRemoveSelectedImage={removeSelectedImage}
       />
 
       <AssetPickerModal

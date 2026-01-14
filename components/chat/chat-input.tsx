@@ -11,6 +11,7 @@ import { Send, X, ImagePlus, Mic, Square, Info } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import MenuConfiguration, { MenuState } from "./menu-configuration";
 import clsx from "clsx";
+import { SelectedImage, MAX_SELECTED_IMAGES } from "@/lib/llm/types";
 
 interface SelectedAgentPart {
   url: string;
@@ -37,6 +38,7 @@ interface ChatInputProps {
   recordingTime: number;
   onStartRecording: () => void;
   onStopRecording: () => void;
+  // Legacy props - kept for backward compatibility
   previewUrl: string | null;
   onClearFile: () => void;
   selectedAgentPart: SelectedAgentPart | null;
@@ -50,6 +52,9 @@ interface ChatInputProps {
   onPrecisionEditingChange: (value: boolean) => void;
   menuState: MenuState;
   onMenuStateChange: (newState: MenuState) => void;
+  // New unified image selection props
+  selectedImages?: SelectedImage[];
+  onRemoveSelectedImage?: (imageId: string) => void;
 }
 
 export default function ChatInput({
@@ -75,6 +80,8 @@ export default function ChatInput({
   onPrecisionEditingChange,
   menuState,
   onMenuStateChange,
+  selectedImages = [],
+  onRemoveSelectedImage,
 }: ChatInputProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isExpanded, setIsExpanded] = useState(false);
@@ -142,10 +149,10 @@ export default function ChatInput({
 
   // Auto-expand if there are attachments or recording
   useEffect(() => {
-    if (previewUrl || selectedAgentPart || selectedAsset || isRecording) {
+    if (previewUrl || selectedAgentPart || selectedAsset || isRecording || selectedImages.length > 0) {
       setIsExpanded(true);
     }
-  }, [previewUrl, selectedAgentPart, selectedAsset, isRecording]);
+  }, [previewUrl, selectedAgentPart, selectedAsset, isRecording, selectedImages.length]);
 
   return (
     <div className="absolute bottom-4 left-0 right-0 z-50 flex justify-center px-4 pointer-events-none">
@@ -160,9 +167,81 @@ export default function ChatInput({
         className="bg-background/80 backdrop-blur-md rounded-2xl border border-divider shadow-lg pointer-events-auto overflow-hidden transition-[max-width] duration-300 ease-out"
       >
         <div className="flex flex-col">
-          {/* Previews Area */}
+          {/* Selected Images Area - Unified display */}
           <AnimatePresence>
-            {isExpanded && (previewUrl || selectedAgentPart || selectedAsset) && (
+            {isExpanded && selectedImages.length > 0 && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="px-4 pt-4 overflow-hidden"
+              >
+                <div className="flex gap-2 flex-wrap mb-2">
+                  {selectedImages.map((image) => (
+                    <div key={image.id} className="relative w-fit group">
+                      <div className={clsx(
+                        "h-20 w-20 rounded-lg border overflow-hidden relative",
+                        image.isPending ? "border-primary animate-pulse" : "border-divider"
+                      )}>
+                        <img
+                          src={image.url}
+                          alt={image.title || "Selected image"}
+                          className="w-full h-full object-cover"
+                        />
+                        <div className="absolute inset-0 bg-black/40 flex items-end p-1">
+                          <span className="text-white text-[9px] text-center leading-tight font-medium line-clamp-2 w-full">
+                            {image.isPending ? "Uploading..." : (
+                              image.source === "user_upload" ? "Uploaded" :
+                              image.source === "agent_image" ? "AI Generated" :
+                              image.source === "asset" ? "Asset" : ""
+                            )}
+                          </span>
+                        </div>
+                      </div>
+                      {onRemoveSelectedImage && (
+                        <button
+                          onClick={() => onRemoveSelectedImage(image.id)}
+                          className="absolute -top-2 -right-2 bg-default-100 rounded-full p-1 hover:bg-default-200 shadow-sm border border-divider"
+                        >
+                          <X size={14} />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+
+                  {/* Show count and limit */}
+                  <div className="flex flex-col justify-center h-20 ml-2 gap-1">
+                    <span className="text-xs text-default-500">
+                      {selectedImages.length}/{MAX_SELECTED_IMAGES} images
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <Switch
+                        size="sm"
+                        color="secondary"
+                        isSelected={precisionEditing}
+                        onValueChange={onPrecisionEditingChange}
+                      >
+                        <span className="text-xs font-medium">
+                          Precision Editing
+                        </span>
+                      </Switch>
+                      <Tooltip content="When enabled, Agent will try its best to only edit the part of the image that you want to change and keeping everything else the same.">
+                        <Info
+                          size={14}
+                          className="text-default-400 cursor-help"
+                        />
+                      </Tooltip>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Legacy Previews Area - kept for backward compatibility when selectedImages is not used */}
+          <AnimatePresence>
+            {isExpanded && selectedImages.length === 0 && (previewUrl || selectedAgentPart || selectedAsset) && (
               <motion.div
                 initial={{ height: 0, opacity: 0 }}
                 animate={{ height: "auto", opacity: 1 }}

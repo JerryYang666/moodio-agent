@@ -21,7 +21,7 @@ export interface Agent {
     isAdmin: boolean,
     requestStartTime?: number,
     precisionEditing?: boolean,
-    precisionEditImageId?: string,
+    selectedImageIds?: string[], // Array of selected image IDs (replaces precisionEditImageId)
     systemPromptOverride?: string,
     aspectRatioOverride?: string
   ): Promise<AgentResponse>;
@@ -35,7 +35,7 @@ export interface Agent {
     variantCount: number,
     requestStartTime?: number,
     precisionEditing?: boolean,
-    precisionEditImageId?: string,
+    selectedImageIds?: string[], // Array of selected image IDs
     systemPromptOverride?: string,
     aspectRatioOverride?: string
   ): Promise<ParallelAgentResponse>;

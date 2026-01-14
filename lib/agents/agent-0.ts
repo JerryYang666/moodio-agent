@@ -30,7 +30,7 @@ export class Agent0 implements Agent {
     isAdmin: boolean,
     requestStartTime?: number,
     precisionEditing?: boolean,
-    precisionEditImageId?: string,
+    selectedImageIds?: string[], // Changed from precisionEditImageId for consistency
     systemPromptOverride?: string,
     aspectRatioOverride?: string
   ): Promise<AgentResponse> {

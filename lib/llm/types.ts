@@ -1,5 +1,31 @@
 // Common types for LLM integration
 
+/**
+ * Represents an image selected to be sent to the AI.
+ * This can be from user uploads, agent-generated images, or assets.
+ */
+export interface SelectedImage {
+  /** Unique identifier - either imageId or a temporary blob URL for pending uploads */
+  id: string;
+  /** Display URL (signed CloudFront URL or blob URL for pending uploads) */
+  url: string;
+  /** Source of the image */
+  source: "user_upload" | "agent_image" | "asset" | "pending_upload";
+  /** Title for display */
+  title?: string;
+  /** Original message index if from chat history */
+  messageIndex?: number;
+  /** For agent images - the variantId of the message */
+  variantId?: string;
+  /** Whether this is a pending upload (blob URL, no imageId yet) */
+  isPending?: boolean;
+  /** The File object for pending uploads */
+  pendingFile?: File;
+}
+
+/** Maximum number of images that can be selected at once */
+export const MAX_SELECTED_IMAGES = 5;
+
 export type MessageContentPart =
   | { type: "text"; text: string }
   | { type: "internal_think"; text: string }

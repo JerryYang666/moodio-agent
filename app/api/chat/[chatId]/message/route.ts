@@ -80,6 +80,10 @@ export async function POST(
     let precisionEditImageId: string | undefined;
     let systemPromptOverride: string | undefined;
     let aspectRatioOverride: string | undefined;
+    // New: array of selected image IDs
+    let selectedImageIds: string[] = [];
+    // New: pending file uploads (files that need to be uploaded and get IDs)
+    let pendingFiles: File[] = [];
 
     const contentType = request.headers.get("content-type") || "";
     if (contentType.includes("multipart/form-data")) {
@@ -105,6 +109,28 @@ export async function POST(
       if (spo) systemPromptOverride = spo;
       const ar = formData.get("aspectRatio") as string;
       if (ar) aspectRatioOverride = ar;
+
+      // Parse selectedImageIds
+      const selectedImageIdsStr = formData.get("selectedImageIds") as string;
+      if (selectedImageIdsStr) {
+        try {
+          selectedImageIds = JSON.parse(selectedImageIdsStr);
+        } catch (e) {
+          console.error("Failed to parse selectedImageIds", e);
+        }
+      }
+
+      // Parse pending files
+      const pendingFileCountStr = formData.get("pendingFileCount") as string;
+      if (pendingFileCountStr) {
+        const count = parseInt(pendingFileCountStr, 10);
+        for (let i = 0; i < count; i++) {
+          const pendingFile = formData.get(`pendingFile_${i}`) as File | null;
+          if (pendingFile) {
+            pendingFiles.push(pendingFile);
+          }
+        }
+      }
     } else {
       const json = await request.json();
       content = json.content;
@@ -122,18 +148,17 @@ export async function POST(
       if (json.aspectRatio) {
         aspectRatioOverride = json.aspectRatio;
       }
+      // Parse selectedImageIds from JSON
+      if (json.selectedImageIds && Array.isArray(json.selectedImageIds)) {
+        selectedImageIds = json.selectedImageIds;
+      }
     }
 
-    if (file && assetId) {
+    // Validation relaxed - we now allow selectedImageIds without file/assetId
+    const hasSelectedImages = selectedImageIds.length > 0 || pendingFiles.length > 0;
+    if (!content && !file && !assetId && !hasSelectedImages) {
       return NextResponse.json(
-        { error: "Provide either file or assetId, not both" },
-        { status: 400 }
-      );
-    }
-
-    if (!content && !file && !assetId) {
-      return NextResponse.json(
-        { error: "Content, file, or assetId is required" },
+        { error: "Content, file, assetId, or selectedImageIds is required" },
         { status: 400 }
       );
     }
@@ -257,9 +282,11 @@ export async function POST(
       `[${Date.now() - requestStartTime}ms]`
     );
 
-    // Handle image upload
-    let imageId: string | undefined;
+    // Handle image upload - collect all image IDs for this message
+    // This will hold: newly uploaded images, resolved assets, and already-selected images
+    const allImageIds: string[] = [...selectedImageIds];
 
+    // Handle legacy single file upload
     if (file) {
       if (file.size > 5 * 1024 * 1024) {
         return NextResponse.json(
@@ -267,8 +294,25 @@ export async function POST(
           { status: 400 }
         );
       }
-      imageId = await uploadImage(file, file.type);
-    } else if (assetId) {
+      const uploadedId = await uploadImage(file, file.type);
+      allImageIds.push(uploadedId);
+    }
+
+    // Handle pending file uploads (new multi-image system)
+    // Note: We'll upload these and the imageIds will be sent via SSE to update the frontend
+    const pendingUploadResults: Array<{ imageId: string }> = [];
+    for (const pendingFile of pendingFiles) {
+      if (pendingFile.size > 5 * 1024 * 1024) {
+        console.warn("Skipping pending file - too large:", pendingFile.name);
+        continue;
+      }
+      const uploadedId = await uploadImage(pendingFile, pendingFile.type);
+      pendingUploadResults.push({ imageId: uploadedId });
+      allImageIds.push(uploadedId);
+    }
+
+    // Handle asset selection (legacy)
+    if (assetId) {
       // Resolve asset to its underlying S3 imageId with access checks.
       const [asset] = await db
         .select({
@@ -326,22 +370,26 @@ export async function POST(
         );
       }
 
-      imageId = asset.imageId;
+      allImageIds.push(asset.imageId);
     }
 
     console.log(
       "[Perf] Image upload end",
-      `[${Date.now() - requestStartTime}ms]`
+      `[${Date.now() - requestStartTime}ms]`,
+      `allImageIds: ${allImageIds.length}`
     );
 
-    // Construct new user message
+    // Construct new user message with all images
     let userMessage: Message;
-    if (imageId) {
+    if (allImageIds.length > 0) {
       const parts: MessageContentPart[] = [];
       if (content) {
         parts.push({ type: "text", text: content });
       }
-      parts.push({ type: "image", imageId: imageId });
+      // Add all images to the message
+      for (const imgId of allImageIds) {
+        parts.push({ type: "image", imageId: imgId });
+      }
       userMessage = {
         role: "user",
         content: parts,
@@ -361,6 +409,7 @@ export async function POST(
     console.log("[Perf] Calling agent", `[${Date.now() - requestStartTime}ms]`);
 
     // Use Agent 1 with parallel variants
+    // Pass allImageIds (unified selection) instead of precisionEditImageId
     const { stream: agentStream, completions } =
       await agent1.processRequestParallel(
         history,
@@ -370,7 +419,7 @@ export async function POST(
         PARALLEL_VARIANT_COUNT,
         requestStartTime,
         precisionEditing,
-        precisionEditImageId,
+        allImageIds, // New: array of all selected image IDs
         isAdmin ? systemPromptOverride : undefined,
         aspectRatioOverride
       );
