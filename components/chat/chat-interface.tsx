@@ -52,19 +52,22 @@ interface SelectedAgentPart {
 
 /**
  * Image selection algorithm that runs to find images to send to AI.
- * Priority order (most recent first within each category):
- * 1. User uploaded images in current message (pending uploads)
- * 2. User uploaded images in chat history
- * 3. Agent-generated images that user has selected (isSelected: true)
- * 4. Most recent agent-generated images
+ * Priority order:
+ * 1. Pending uploads (files being uploaded now) - highest priority
+ * 2. Explicitly selected AI images (isSelected: true) - user's explicit choice
+ * 3. User uploads from chat history - auto-included, fills remaining slots
+ *
+ * This ensures explicit selections always take priority over auto-selections.
  *
  * @param messages - The chat messages array
  * @param pendingUploads - Files being uploaded (not yet in messages)
+ * @param deselectedImageIds - Set of image IDs that user has explicitly removed
  * @returns Array of SelectedImage (max MAX_SELECTED_IMAGES)
  */
 function computeSelectedImages(
   messages: Message[],
-  pendingUploads: Array<{ file: File; previewUrl: string }> = []
+  pendingUploads: Array<{ file: File; previewUrl: string }> = [],
+  deselectedImageIds: Set<string> = new Set()
 ): SelectedImage[] {
   const selectedImages: SelectedImage[] = [];
 
@@ -81,64 +84,58 @@ function computeSelectedImages(
     });
   }
 
-  // 2. Search backwards through messages for user uploads
-  for (let i = messages.length - 1; i >= 0 && selectedImages.length < MAX_SELECTED_IMAGES; i--) {
+  // 2. Search for explicitly selected agent images (isSelected: true)
+  // These have priority over auto-selected user uploads
+  for (
+    let i = messages.length - 1;
+    i >= 0 && selectedImages.length < MAX_SELECTED_IMAGES;
+    i--
+  ) {
+    const msg = messages[i];
+    if (msg.role !== "assistant" || !Array.isArray(msg.content)) continue;
+
+    for (const part of msg.content) {
+      if (selectedImages.length >= MAX_SELECTED_IMAGES) break;
+      if (
+        part.type === "agent_image" &&
+        part.isSelected &&
+        part.imageId &&
+        part.status === "generated"
+      ) {
+        if (selectedImages.some((si) => si.id === part.imageId)) continue;
+        selectedImages.push({
+          id: part.imageId,
+          url: part.imageUrl || "",
+          source: "agent_image",
+          title: part.title,
+          messageIndex: i,
+          variantId: msg.variantId,
+        });
+      }
+    }
+  }
+
+  // 3. Search backwards through messages for user uploads (fills remaining slots)
+  for (
+    let i = messages.length - 1;
+    i >= 0 && selectedImages.length < MAX_SELECTED_IMAGES;
+    i--
+  ) {
     const msg = messages[i];
     if (msg.role !== "user" || !Array.isArray(msg.content)) continue;
 
     for (const part of msg.content) {
       if (selectedImages.length >= MAX_SELECTED_IMAGES) break;
       if (part.type === "image" && part.imageId) {
-        // Check if already added
-        if (selectedImages.some(si => si.id === part.imageId)) continue;
+        // Skip if already added or explicitly deselected
+        if (selectedImages.some((si) => si.id === part.imageId)) continue;
+        if (deselectedImageIds.has(part.imageId)) continue;
         selectedImages.push({
           id: part.imageId,
           url: part.imageUrl || "",
           source: "user_upload",
           title: "Uploaded image",
           messageIndex: i,
-        });
-      }
-    }
-  }
-
-  // 3. Search for selected agent images (isSelected: true)
-  for (let i = messages.length - 1; i >= 0 && selectedImages.length < MAX_SELECTED_IMAGES; i--) {
-    const msg = messages[i];
-    if (msg.role !== "assistant" || !Array.isArray(msg.content)) continue;
-
-    for (const part of msg.content) {
-      if (selectedImages.length >= MAX_SELECTED_IMAGES) break;
-      if (part.type === "agent_image" && part.isSelected && part.imageId && part.status === "generated") {
-        if (selectedImages.some(si => si.id === part.imageId)) continue;
-        selectedImages.push({
-          id: part.imageId,
-          url: part.imageUrl || "",
-          source: "agent_image",
-          title: part.title,
-          messageIndex: i,
-          variantId: msg.variantId,
-        });
-      }
-    }
-  }
-
-  // 4. Search for most recent agent-generated images (up to remaining slots)
-  for (let i = messages.length - 1; i >= 0 && selectedImages.length < MAX_SELECTED_IMAGES; i--) {
-    const msg = messages[i];
-    if (msg.role !== "assistant" || !Array.isArray(msg.content)) continue;
-
-    for (const part of msg.content) {
-      if (selectedImages.length >= MAX_SELECTED_IMAGES) break;
-      if (part.type === "agent_image" && part.imageId && part.status === "generated" && !part.isSelected) {
-        if (selectedImages.some(si => si.id === part.imageId)) continue;
-        selectedImages.push({
-          id: part.imageId,
-          url: part.imageUrl || "",
-          source: "agent_image",
-          title: part.title,
-          messageIndex: i,
-          variantId: msg.variantId,
         });
       }
     }
@@ -175,14 +172,21 @@ export default function ChatInterface({
   const [isSending, setIsSending] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [selectedAsset, setSelectedAsset] = useState<SelectedAsset | null>(null);
+  const [selectedAsset, setSelectedAsset] = useState<SelectedAsset | null>(
+    null
+  );
   const [isAssetPickerOpen, setIsAssetPickerOpen] = useState(false);
   const [precisionEditing, setPrecisionEditing] = useState(false);
   const [menuState, setMenuState] = useState<MenuState>(INITIAL_MENU_STATE);
 
   // New unified image selection state
   const [selectedImages, setSelectedImages] = useState<SelectedImage[]>([]);
-  const [pendingUploads, setPendingUploads] = useState<Array<{ file: File; previewUrl: string }>>([]);
+  const [pendingUploads, setPendingUploads] = useState<
+    Array<{ file: File; previewUrl: string }>
+  >([]);
+  const [deselectedImageIds, setDeselectedImageIds] = useState<Set<string>>(
+    new Set()
+  );
 
   // Listen for reset-chat event (triggered when clicking New Chat button while technically already on /chat)
   useEffect(() => {
@@ -200,8 +204,10 @@ export default function ChatInterface({
       // Clear new unified image selection state
       setSelectedImages([]);
       // Clean up pending upload blob URLs
-      pendingUploads.forEach(u => URL.revokeObjectURL(u.previewUrl));
+      pendingUploads.forEach((u) => URL.revokeObjectURL(u.previewUrl));
       setPendingUploads([]);
+      // Clear deselected image IDs
+      setDeselectedImageIds(new Set());
 
       // Ensure we clean up any draft that might be lingering
       localStorage.removeItem(`${siteConfig.chatInputPrefix}new-chat`);
@@ -216,10 +222,14 @@ export default function ChatInterface({
   useEffect(() => {
     // Only recompute when NOT sending to avoid flickering during response streaming
     if (!isSending) {
-      const computed = computeSelectedImages(messages, pendingUploads);
+      const computed = computeSelectedImages(
+        messages,
+        pendingUploads,
+        deselectedImageIds
+      );
       setSelectedImages(computed);
     }
-  }, [messages, pendingUploads, isSending]);
+  }, [messages, pendingUploads, deselectedImageIds, isSending]);
 
   // Draft saving logic
   const [prevChatId, setPrevChatId] = useState(chatId);
@@ -407,85 +417,111 @@ export default function ChatInterface({
   }, []);
 
   // New function to add a file to pending uploads (unified image selection)
-  const addPendingUpload = useCallback((file: File) => {
-    if (file.size > 5 * 1024 * 1024) {
-      alert("File size too large. Max 5MB.");
-      return;
-    }
-    // Check if we can add more images
-    if (selectedImages.length >= MAX_SELECTED_IMAGES) {
-      alert(`Maximum ${MAX_SELECTED_IMAGES} images allowed.`);
-      return;
-    }
-    const previewUrl = URL.createObjectURL(file);
-    setPendingUploads(prev => [...prev, { file, previewUrl }]);
-  }, [selectedImages.length]);
-
-  // Remove an image from selection by ID
-  const removeSelectedImage = useCallback((imageId: string) => {
-    // Check if it's a pending upload
-    const pendingUpload = pendingUploads.find(u => u.previewUrl === imageId);
-    if (pendingUpload) {
-      URL.revokeObjectURL(pendingUpload.previewUrl);
-      setPendingUploads(prev => prev.filter(u => u.previewUrl !== imageId));
-      return;
-    }
-
-    // Otherwise it's a selected image from messages - we need to deselect it
-    // This will be handled by removing it from the computed selection
-    // For now, we'll add it to a "deselected" set that the algorithm considers
-    // Actually, since the algorithm auto-computes, we just need to clear the isSelected flag
-    // For agent images, we need to update the message
-    setMessages(prev => {
-      return prev.map(msg => {
-        if (!Array.isArray(msg.content)) return msg;
-        const updatedContent = msg.content.map(part => {
-          if (part.type === "agent_image" && part.imageId === imageId) {
-            return { ...part, isSelected: false };
-          }
-          return part;
-        });
-        return { ...msg, content: updatedContent };
-      });
-    });
-  }, [pendingUploads]);
-
-  // Manually add an image to selection (toggle)
-  const toggleImageSelection = useCallback((image: SelectedImage) => {
-    // Check if already selected
-    const isSelected = selectedImages.some(si => si.id === image.id);
-
-    if (isSelected) {
-      removeSelectedImage(image.id);
-    } else {
+  const addPendingUpload = useCallback(
+    (file: File) => {
+      if (file.size > 5 * 1024 * 1024) {
+        alert("File size too large. Max 5MB.");
+        return;
+      }
       // Check if we can add more images
       if (selectedImages.length >= MAX_SELECTED_IMAGES) {
         alert(`Maximum ${MAX_SELECTED_IMAGES} images allowed.`);
         return;
       }
-      // For agent images, toggle the isSelected flag
-      if (image.source === "agent_image" && image.messageIndex !== undefined) {
-        setMessages(prev => {
-          return prev.map((msg, idx) => {
-            // Match by variantId if available, otherwise by index
-            const matches = image.variantId
-              ? msg.variantId === image.variantId
-              : idx === image.messageIndex;
+      const previewUrl = URL.createObjectURL(file);
+      setPendingUploads((prev) => [...prev, { file, previewUrl }]);
+    },
+    [selectedImages.length]
+  );
 
-            if (!matches || !Array.isArray(msg.content)) return msg;
-
-            const updatedContent = msg.content.map(part => {
-              if (part.type === "agent_image" && part.imageId === image.id) {
-                return { ...part, isSelected: true };
-              }
-              return part;
-            });
-            return { ...msg, content: updatedContent };
-          });
-        });
+  // Remove an image from selection by ID
+  const removeSelectedImage = useCallback(
+    (imageId: string) => {
+      // Check if it's a pending upload
+      const pendingUpload = pendingUploads.find(
+        (u) => u.previewUrl === imageId
+      );
+      if (pendingUpload) {
+        URL.revokeObjectURL(pendingUpload.previewUrl);
+        setPendingUploads((prev) =>
+          prev.filter((u) => u.previewUrl !== imageId)
+        );
+        return;
       }
-    }
-  }, [selectedImages, removeSelectedImage]);
+
+      // Check if it's a user upload from chat history
+      const isUserUpload = selectedImages.some(
+        (img) => img.id === imageId && img.source === "user_upload"
+      );
+      if (isUserUpload) {
+        // Add to deselected set so it won't be auto-added again
+        setDeselectedImageIds((prev) => {
+          const next = new Set(prev);
+          next.add(imageId);
+          return next;
+        });
+        return;
+      }
+
+      // Otherwise it's an agent image - clear the isSelected flag
+      setMessages((prev) => {
+        return prev.map((msg) => {
+          if (!Array.isArray(msg.content)) return msg;
+          const updatedContent = msg.content.map((part) => {
+            if (part.type === "agent_image" && part.imageId === imageId) {
+              return { ...part, isSelected: false };
+            }
+            return part;
+          });
+          return { ...msg, content: updatedContent };
+        });
+      });
+    },
+    [pendingUploads, selectedImages]
+  );
+
+  // Manually add an image to selection (toggle)
+  const toggleImageSelection = useCallback(
+    (image: SelectedImage) => {
+      // Check if already selected
+      const isSelected = selectedImages.some((si) => si.id === image.id);
+
+      if (isSelected) {
+        removeSelectedImage(image.id);
+      } else {
+        // Check if we can add more images
+        if (selectedImages.length >= MAX_SELECTED_IMAGES) {
+          alert(`Maximum ${MAX_SELECTED_IMAGES} images allowed.`);
+          return;
+        }
+        // For agent images, toggle the isSelected flag
+        if (
+          image.source === "agent_image" &&
+          image.messageIndex !== undefined
+        ) {
+          setMessages((prev) => {
+            return prev.map((msg, idx) => {
+              // Match by variantId if available, otherwise by index
+              const matches = image.variantId
+                ? msg.variantId === image.variantId
+                : idx === image.messageIndex;
+
+              if (!matches || !Array.isArray(msg.content)) return msg;
+
+              const updatedContent = msg.content.map((part) => {
+                if (part.type === "agent_image" && part.imageId === image.id) {
+                  return { ...part, isSelected: true };
+                }
+                return part;
+              });
+              return { ...msg, content: updatedContent };
+            });
+          });
+        }
+      }
+    },
+    [selectedImages, removeSelectedImage]
+  );
 
   const clearFile = useCallback(() => {
     setSelectedFile(null);
@@ -520,16 +556,19 @@ export default function ChatInterface({
   );
 
   // New function to add an asset to selection
-  const addAssetToSelection = useCallback((payload: SelectedAsset) => {
-    if (selectedImages.length >= MAX_SELECTED_IMAGES) {
-      alert(`Maximum ${MAX_SELECTED_IMAGES} images allowed.`);
-      return;
-    }
-    // Add to selected images by marking it
-    // Since assets come from the library, we need to track them separately
-    // For now, we'll use the old selectedAsset state until we refactor further
-    setSelectedAsset(payload);
-  }, [selectedImages.length]);
+  const addAssetToSelection = useCallback(
+    (payload: SelectedAsset) => {
+      if (selectedImages.length >= MAX_SELECTED_IMAGES) {
+        alert(`Maximum ${MAX_SELECTED_IMAGES} images allowed.`);
+        return;
+      }
+      // Add to selected images by marking it
+      // Since assets come from the library, we need to track them separately
+      // For now, we'll use the old selectedAsset state until we refactor further
+      setSelectedAsset(payload);
+    },
+    [selectedImages.length]
+  );
 
   // Listen for asset selection events from the hover sidebar
   useEffect(() => {
@@ -545,7 +584,8 @@ export default function ChatInterface({
       });
     };
     window.addEventListener("moodio-asset-selected", handler as any);
-    return () => window.removeEventListener("moodio-asset-selected", handler as any);
+    return () =>
+      window.removeEventListener("moodio-asset-selected", handler as any);
   }, [applySelectedAsset]);
 
   const handleAssetDrop = useCallback(
@@ -597,7 +637,11 @@ export default function ChatInterface({
     // Check if there's content to send - include selectedImages in the check
     const hasSelectedImages = selectedImages.length > 0;
     if (
-      (!input.trim() && !selectedFile && !selectedAgentPart && !selectedAsset && !hasSelectedImages) ||
+      (!input.trim() &&
+        !selectedFile &&
+        !selectedAgentPart &&
+        !selectedAsset &&
+        !hasSelectedImages) ||
       isSending ||
       isRecording ||
       isTranscribing
@@ -647,7 +691,7 @@ export default function ChatInterface({
     if (selectedAgentPart) {
       setMessages((prev) => {
         const newMessages = [...prev];
-        
+
         // Find the correct message - use variantId if available, otherwise fall back to messageIndex
         let msgIndex = selectedAgentPart.messageIndex;
         if (selectedAgentPart.variantId) {
@@ -658,7 +702,7 @@ export default function ChatInterface({
             msgIndex = variantIndex;
           }
         }
-        
+
         if (newMessages[msgIndex]) {
           const msg = newMessages[msgIndex];
           if (Array.isArray(msg.content)) {
@@ -667,7 +711,9 @@ export default function ChatInterface({
             let partIndex = selectedAgentPart.partIndex;
             if (selectedAgentPart.imageId) {
               const imgIndex = newContent.findIndex(
-                (p) => p.type === "agent_image" && p.imageId === selectedAgentPart.imageId
+                (p) =>
+                  p.type === "agent_image" &&
+                  p.imageId === selectedAgentPart.imageId
               );
               if (imgIndex !== -1) {
                 partIndex = imgIndex;
@@ -677,7 +723,10 @@ export default function ChatInterface({
               newContent[partIndex] &&
               newContent[partIndex].type === "agent_image"
             ) {
-              const agentImagePart = newContent[partIndex] as Extract<MessageContentPart, { type: "agent_image" }>;
+              const agentImagePart = newContent[partIndex] as Extract<
+                MessageContentPart,
+                { type: "agent_image" }
+              >;
               newContent[partIndex] = {
                 ...agentImagePart,
                 isSelected: true,
@@ -732,8 +781,8 @@ export default function ChatInterface({
 
       // Collect selectedImageIds (excluding pending uploads which have no ID yet)
       const selectedImageIds = currentSelectedImages
-        .filter(img => !img.isPending && img.id)
-        .map(img => img.id);
+        .filter((img) => !img.isPending && img.id)
+        .map((img) => img.id);
 
       // Check if there are pending uploads that need to be uploaded
       const hasPendingUploads = currentPendingUploads.length > 0;
@@ -753,7 +802,10 @@ export default function ChatInterface({
           for (let i = 0; i < currentPendingUploads.length; i++) {
             formData.append(`pendingFile_${i}`, currentPendingUploads[i].file);
           }
-          formData.append("pendingFileCount", String(currentPendingUploads.length));
+          formData.append(
+            "pendingFileCount",
+            String(currentPendingUploads.length)
+          );
         }
 
         // Send selected image IDs (images that already have IDs)
@@ -987,7 +1039,9 @@ export default function ChatInterface({
             if (event.type === "image_id_ready") {
               // This event contains: { tempUrl: string, imageId: string, imageUrl: string }
               // We need to update the user message that has the blob URL with the real imageId/URL
-              console.log(`[Chat] Image ID ready: ${event.tempUrl} -> ${event.imageId}`);
+              console.log(
+                `[Chat] Image ID ready: ${event.tempUrl} -> ${event.imageId}`
+              );
 
               setMessages((prev) => {
                 const newMessages = [...prev];
@@ -1165,22 +1219,73 @@ export default function ChatInterface({
     partIndex: number,
     variantId?: string
   ) => {
-    if (part.status === "generated") {
-      const url = part.imageUrl || ""; // Use signed CloudFront URL from API
-      if (
-        selectedAgentPart?.url === url &&
-        selectedAgentPart?.messageIndex === messageIndex &&
-        selectedAgentPart?.variantId === variantId
-      ) {
-        setSelectedAgentPart(null);
+    if (part.status === "generated" && part.imageId) {
+      // Check if this image is already selected
+      const isCurrentlySelected = part.isSelected === true;
+
+      if (isCurrentlySelected) {
+        // Deselect: set isSelected to false on the message part
+        setMessages((prev) => {
+          return prev.map((msg, idx) => {
+            const matches = variantId
+              ? msg.variantId === variantId
+              : idx === messageIndex;
+            if (!matches || !Array.isArray(msg.content)) return msg;
+
+            const updatedContent = msg.content.map((p) => {
+              if (p.type === "agent_image" && p.imageId === part.imageId) {
+                return { ...p, isSelected: false };
+              }
+              return p;
+            });
+            return { ...msg, content: updatedContent };
+          });
+        });
+        // Clear legacy selectedAgentPart if it was this image
+        if (selectedAgentPart?.imageId === part.imageId) {
+          setSelectedAgentPart(null);
+        }
       } else {
-        setSelectedAgentPart({
-          url,
-          title: part.title,
-          messageIndex,
-          partIndex,
-          imageId: part.imageId,
-          variantId,
+        // Count how many explicitly selected agent images there are already
+        const explicitlySelectedCount = messages.reduce((count, msg) => {
+          if (msg.role !== "assistant" || !Array.isArray(msg.content))
+            return count;
+          return (
+            count +
+            msg.content.filter(
+              (p): p is Extract<MessageContentPart, { type: "agent_image" }> =>
+                p.type === "agent_image" &&
+                p.isSelected === true &&
+                p.status === "generated"
+            ).length
+          );
+        }, 0);
+
+        // Check limit: pending uploads + explicitly selected AI images (including this one)
+        if (
+          pendingUploads.length + explicitlySelectedCount + 1 >
+          MAX_SELECTED_IMAGES
+        ) {
+          alert(`Maximum ${MAX_SELECTED_IMAGES} images allowed.`);
+          return;
+        }
+
+        // Select: set isSelected to true on the message part
+        setMessages((prev) => {
+          return prev.map((msg, idx) => {
+            const matches = variantId
+              ? msg.variantId === variantId
+              : idx === messageIndex;
+            if (!matches || !Array.isArray(msg.content)) return msg;
+
+            const updatedContent = msg.content.map((p) => {
+              if (p.type === "agent_image" && p.imageId === part.imageId) {
+                return { ...p, isSelected: true };
+              }
+              return p;
+            });
+            return { ...msg, content: updatedContent };
+          });
         });
       }
     }
