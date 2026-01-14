@@ -257,16 +257,6 @@ export default function ImageWithMenu({
               >
                 Generate Video
               </DropdownItem>
-              <DropdownSection title="Save" showDivider>
-                <DropdownItem
-                  key="save-project"
-                  startContent={<Folder size={16} />}
-                  className="font-semibold"
-                  isDisabled={isSavingToProject}
-                >
-                  Save to Project
-                </DropdownItem>
-              </DropdownSection>
               <DropdownSection title="Add to Collection" showDivider>
                 <DropdownItem
                   key="create-new"
