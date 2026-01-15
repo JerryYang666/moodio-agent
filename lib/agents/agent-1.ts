@@ -871,17 +871,17 @@ export class Agent1 implements Agent {
 
     try {
       if (useImageEditing && validImageBase64.length > 0) {
-        // Image editing - use the first image for editing
-        // In the future, we could support multiple images, but Gemini currently works best with one
+        // Image editing - include all provided images in the prompt
         const prompt: any[] = [{ text: suggestion.prompt }];
 
-        // Use the first available image for editing
-        prompt.push({
-          inlineData: {
-            mimeType: "image/png",
-            data: validImageBase64[0],
-          },
-        });
+        for (const imageBase64 of validImageBase64) {
+          prompt.push({
+            inlineData: {
+              mimeType: "image/png",
+              data: imageBase64,
+            },
+          });
+        }
 
         console.log(
           `[Agent-1] Using image editing mode with ${validImageBase64.length} image(s) for index=${index}`

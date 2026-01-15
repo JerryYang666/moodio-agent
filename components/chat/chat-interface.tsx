@@ -328,10 +328,12 @@ export default function ChatInterface({
                   imageId,
                   url: imageUrl,
                   isUploading: false,
+                  localPreviewUrl: undefined,
                 }
               : img
           )
         );
+        URL.revokeObjectURL(localPreviewUrl);
       } catch (error) {
         console.error("Image upload failed:", error);
         // Remove the failed upload from pending images

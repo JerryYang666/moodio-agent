@@ -209,7 +209,11 @@ export default function ChatInput({
                       <div className="h-20 w-20 rounded-lg border border-divider overflow-hidden relative">
                         {/* Image with loading overlay if uploading */}
                         <img
-                          src={img.localPreviewUrl || img.url}
+                          src={
+                            img.isUploading && img.localPreviewUrl
+                              ? img.localPreviewUrl
+                              : img.url
+                          }
                           alt={img.title || t("chat.image")}
                           className={clsx(
                             "w-full h-full object-cover",
