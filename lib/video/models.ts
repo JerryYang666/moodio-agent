@@ -150,6 +150,44 @@ const seedanceV15Pro: VideoModelConfig = {
 };
 
 /**
+ * MiniMax Hailuo 2.3 Fast Pro - Image to Video
+ * Advanced fast image-to-video generation model with 1080p resolution
+ */
+const hailuo23FastPro: VideoModelConfig = {
+  id: "fal-ai/minimax/hailuo-2.3-fast/pro/image-to-video",
+  name: "Hailuo 2.3 Fast Pro",
+  description:
+    "MiniMax's fast image-to-video model with 1080p output and prompt optimization",
+  imageParams: {
+    sourceImage: "image_url",
+  },
+  params: [
+    {
+      name: "prompt",
+      label: "Prompt",
+      type: "string",
+      required: true,
+      description: "Text prompt for video generation",
+    },
+    {
+      name: "prompt_optimizer",
+      label: "Prompt Optimizer",
+      type: "boolean",
+      required: false,
+      default: true,
+      description: "Whether to use the model's prompt optimizer",
+    },
+    {
+      name: "image_url",
+      label: "Source Image",
+      type: "string",
+      required: true,
+      description: "URL of the image to use as the first frame",
+    },
+  ],
+};
+
+/**
  * Wan v2.6 Image to Video
  * High-quality image-to-video generation with support for multi-shot segmentation
  */
@@ -319,12 +357,62 @@ const klingV26Pro: VideoModelConfig = {
 };
 
 /**
+ * Kling O1 Pro - First Frame / Last Frame Image to Video
+ * Generate a video by animating the transition between start and end frames
+ */
+const klingO1Pro: VideoModelConfig = {
+  id: "fal-ai/kling-video/o1/image-to-video",
+  name: "Kling O1 Pro",
+  description:
+    "Generate a video by animating the transition between start and end frames",
+  imageParams: {
+    sourceImage: "start_image_url",
+    endImage: "end_image_url",
+  },
+  params: [
+    {
+      name: "prompt",
+      label: "Prompt",
+      type: "string",
+      required: true,
+      description:
+        "Use @Image1 to reference the start frame, @Image2 to reference the end frame.",
+    },
+    {
+      name: "start_image_url",
+      label: "Start Image",
+      type: "string",
+      required: true,
+      description: "Image to use as the first frame of the video",
+    },
+    {
+      name: "end_image_url",
+      label: "End Image",
+      type: "string",
+      required: false,
+      description: "Image to use as the last frame of the video",
+    },
+    {
+      name: "duration",
+      label: "Duration (seconds)",
+      type: "enum",
+      required: false,
+      default: "5",
+      options: ["5", "10"],
+      description: "Video duration in seconds",
+    },
+  ],
+};
+
+/**
  * Registry of all supported video models
  */
 export const VIDEO_MODELS: VideoModelConfig[] = [
   seedanceV15Pro,
+  hailuo23FastPro,
   wanV26ImageToVideo,
   klingV26Pro,
+  klingO1Pro,
 ];
 
 /**
