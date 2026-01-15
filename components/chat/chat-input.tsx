@@ -9,7 +9,17 @@ import { Switch } from "@heroui/switch";
 import { Tooltip } from "@heroui/tooltip";
 import { Spinner } from "@heroui/spinner";
 import { siteConfig } from "@/config/site";
-import { Send, X, ImagePlus, Mic, Square, Info, Upload, Library, Sparkles } from "lucide-react";
+import {
+  Send,
+  X,
+  ImagePlus,
+  Mic,
+  Square,
+  Info,
+  Upload,
+  Library,
+  Sparkles,
+} from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import MenuConfiguration, { MenuState } from "./menu-configuration";
 import { PendingImage, MAX_PENDING_IMAGES } from "./pending-image-types";
@@ -28,7 +38,12 @@ interface ChatInputProps {
   pendingImages: PendingImage[];
   onRemovePendingImage: (imageId: string) => void;
   onOpenAssetPicker: () => void;
-  onAssetDrop: (payload: { assetId: string; imageId?: string; url?: string; title?: string }) => void;
+  onAssetDrop: (payload: {
+    assetId: string;
+    imageId?: string;
+    url?: string;
+    title?: string;
+  }) => void;
   showFileUpload: boolean;
   precisionEditing: boolean;
   onPrecisionEditingChange: (value: boolean) => void;
@@ -211,7 +226,7 @@ export default function ChatInput({
 
                         {/* Source indicator and title overlay */}
                         {!img.isUploading && (
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent flex flex-col justify-end p-1">
+                          <div className="absolute inset-0 bg-linear-to-t from-black/70 to-transparent flex flex-col justify-end p-1">
                             <div className="flex items-center gap-1 text-white/80">
                               {getSourceIcon(img.source)}
                               <span className="text-[8px] uppercase tracking-wide">

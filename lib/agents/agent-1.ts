@@ -224,8 +224,9 @@ export class Agent1 implements Agent {
     );
 
     console.log(
-      `[Perf] ${allImageIds.length} image base64 downloads started`,
-      `[${Date.now() - startTime}ms]`
+      "[Perf] %s image base64 downloads started [%sms]",
+      allImageIds.length,
+      Date.now() - startTime
     );
 
     const formattedUserMessage: any = {
@@ -991,8 +992,10 @@ export class Agent1 implements Agent {
   ): Promise<ParallelAgentResponse> {
     const startTime = requestStartTime || Date.now();
     console.log(
-      `[Perf] Agent processRequestParallel start with ${variantCount} variants, ${imageIds?.length || 0} images`,
-      `[${Date.now() - startTime}ms]`
+      "[Perf] Agent processRequestParallel start with %s variants, %s images [%sms]",
+      variantCount,
+      imageIds?.length || 0,
+      Date.now() - startTime
     );
 
     // Validate aspect ratio override
