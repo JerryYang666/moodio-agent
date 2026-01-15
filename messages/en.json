@@ -309,6 +309,12 @@
       "subtitle": "Cost & Usage",
       "description": "Monitor Fal.ai API usage and estimated costs.",
       "goTo": "Go to Fal Usage"
+    },
+    "videos": {
+      "title": "Videos",
+      "subtitle": "Generation History",
+      "description": "Review all video generation requests and results.",
+      "goTo": "Go to Video History"
     }
   },
   "dashboard": {

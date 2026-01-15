@@ -309,6 +309,12 @@
       "subtitle": "成本与使用",
       "description": "监控 Fal.ai API 使用情况和预估成本。",
       "goTo": "前往 Fal 使用"
+    },
+    "videos": {
+      "title": "视频",
+      "subtitle": "生成历史",
+      "description": "查看所有视频生成请求及结果。",
+      "goTo": "前往视频历史"
     }
   },
   "dashboard": {
