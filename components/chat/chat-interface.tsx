@@ -337,7 +337,9 @@ export default function ChatInterface({
       } catch (error) {
         console.error("Image upload failed:", error);
         // Remove the failed upload from pending images
-        setPendingImages((prev) => prev.filter((img) => img.imageId !== tempId));
+        setPendingImages((prev) =>
+          prev.filter((img) => img.imageId !== tempId)
+        );
         URL.revokeObjectURL(localPreviewUrl);
 
         addToast({
@@ -373,7 +375,12 @@ export default function ChatInterface({
 
   // Add an asset from the library to pending images
   const addAssetImage = useCallback(
-    (asset: { assetId: string; imageId: string; url: string; title: string }) => {
+    (asset: {
+      assetId: string;
+      imageId: string;
+      url: string;
+      title: string;
+    }) => {
       if (!canAddImage(pendingImages)) {
         addToast({
           title: t("chat.maxImagesReached", { max: MAX_PENDING_IMAGES }),
@@ -526,7 +533,9 @@ export default function ChatInterface({
 
     // Build the message content with selected image titles
     let currentInput = input;
-    const agentImages = pendingImages.filter((img) => img.source === "ai_generated");
+    const agentImages = pendingImages.filter(
+      (img) => img.source === "ai_generated"
+    );
     if (agentImages.length > 0) {
       const titles = agentImages.map((img) => img.title || "image").join(", ");
       const prefix = `I select ${titles}`;
@@ -591,7 +600,10 @@ export default function ChatInterface({
                 (p) =>
                   p.type === "agent_image" && p.imageId === selection.imageId
               );
-              if (imgIndex !== -1 && newContent[imgIndex].type === "agent_image") {
+              if (
+                imgIndex !== -1 &&
+                newContent[imgIndex].type === "agent_image"
+              ) {
                 const agentImagePart = newContent[imgIndex] as Extract<
                   MessageContentPart,
                   { type: "agent_image" }
@@ -648,6 +660,15 @@ export default function ChatInterface({
         content: currentInput,
         // Send all image IDs as unified array
         imageIds: currentPendingImages.map((img) => img.imageId),
+        // Include source metadata for each image
+        imageSources: currentPendingImages.map((img) => ({
+          imageId: img.imageId,
+          source: img.source,
+          title: img.title,
+          messageIndex: img.messageIndex,
+          partIndex: img.partIndex,
+          variantId: img.variantId,
+        })),
       };
 
       // Add precision editing flag if enabled
@@ -936,6 +957,14 @@ export default function ChatInterface({
     }
   };
 
+  const handleUserImageClick = (images: ImageInfo[], index: number) => {
+    if (!images.length || index < 0 || index >= images.length) return;
+    setAllImages(images);
+    setCurrentImageIndex(index);
+    setSelectedImage(images[index]);
+    onOpen();
+  };
+
   const handleImageNavigate = useCallback(
     (index: number) => {
       if (index >= 0 && index < allImages.length) {
@@ -1044,6 +1073,7 @@ export default function ChatInterface({
                 selectedImageIds={pendingImages.map((img) => img.imageId)}
                 onAgentImageSelect={handleAgentImageSelect}
                 onAgentTitleClick={handleAgentTitleClick}
+                onUserImageClick={handleUserImageClick}
                 onForkChat={handleForkChat}
               />
             );

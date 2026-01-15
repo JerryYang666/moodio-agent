@@ -4,7 +4,12 @@ export type MessageContentPart =
   | { type: "text"; text: string }
   | { type: "internal_think"; text: string }
   | { type: "image_url"; image_url: { url: string } }
-  | { type: "image"; imageId: string; imageUrl?: string } // imageUrl is signed CloudFront URL from API
+  | {
+      type: "image";
+      imageId: string;
+      imageUrl?: string; // imageUrl is signed CloudFront URL from API
+      source?: "upload" | "asset" | "ai_generated";
+    }
   | {
       type: "agent_image";
       imageId?: string; // Generated at start of image generation for tracking

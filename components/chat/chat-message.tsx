@@ -9,6 +9,7 @@ import clsx from "clsx";
 import ReactMarkdown from "react-markdown";
 import { Message, MessageContentPart } from "@/lib/llm/types";
 import ImageWithMenu from "@/components/collection/image-with-menu";
+import { ImageInfo } from "./image-detail-modal";
 import { formatTime } from "./utils";
 import { Button } from "@heroui/button";
 import { Popover, PopoverTrigger, PopoverContent } from "@heroui/popover";
@@ -33,6 +34,7 @@ interface ChatMessageProps {
     variantId?: string
   ) => void;
   onAgentTitleClick: (part: any) => void;
+  onUserImageClick?: (images: ImageInfo[], index: number) => void;
   onForkChat?: (messageIndex: number) => void;
   hideAvatar?: boolean;
 }
@@ -45,6 +47,7 @@ export default function ChatMessage({
   selectedImageIds,
   onAgentImageSelect,
   onAgentTitleClick,
+  onUserImageClick,
   onForkChat,
   hideAvatar = false,
 }: ChatMessageProps) {
@@ -106,23 +109,47 @@ export default function ChatMessage({
           <ReactMarkdown key={`text-${i}`}>{part.text}</ReactMarkdown>
         ))}
 
-        {imageParts.length > 0 && (
-          <div className="space-y-2">
-            {imageParts.map((part: any, i) => (
-              <Image
-                key={`img-${i}`}
-                src={
+        {isUser && imageParts.length > 0 && (
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {(() => {
+              const images: ImageInfo[] = imageParts
+                .map((p: any) => {
+                  const imageUrl =
+                    p.type === "image" ? p.imageUrl || "" : p.image_url.url;
+                  if (!imageUrl) return null;
+                  return {
+                    url: imageUrl,
+                    title: t("chat.image"),
+                    prompt: undefined,
+                    imageId: p.type === "image" ? p.imageId : undefined,
+                  };
+                })
+                .filter(Boolean) as ImageInfo[];
+
+              return imageParts.map((part: any, i) => {
+                const url =
                   part.type === "image"
-                    ? part.imageUrl || "" // Use signed CloudFront URL from API
-                    : part.image_url.url
-                }
-                alt={t("chat.userUpload")}
-                classNames={{
-                  wrapper: "max-w-full",
-                  img: "max-w-full max-h-[300px] object-contain rounded-lg",
-                }}
-              />
-            ))}
+                    ? part.imageUrl || ""
+                    : part.image_url.url;
+                if (!url) return null;
+                return (
+                  <button
+                    key={`img-${i}`}
+                    type="button"
+                    onClick={() =>
+                      onUserImageClick && onUserImageClick(images, i)
+                    }
+                    className="h-20 w-20 rounded-lg border border-divider overflow-hidden shrink-0 focus:outline-none focus:ring-2 focus:ring-primary"
+                  >
+                    <img
+                      src={url}
+                      alt={t("chat.userUpload")}
+                      className="h-full w-full object-cover"
+                    />
+                  </button>
+                );
+              });
+            })()}
           </div>
         )}
 

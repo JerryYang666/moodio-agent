@@ -22,6 +22,77 @@ import { recordEvent } from "@/lib/telemetry";
 /** Maximum number of images allowed per message */
 const MAX_IMAGES_PER_MESSAGE = 5;
 
+type ImageSourceEntry = {
+  imageId: string;
+  source?: "upload" | "asset" | "ai_generated";
+  title?: string;
+  messageIndex?: number;
+  partIndex?: number;
+  variantId?: string;
+};
+
+const applyImageSelections = (
+  history: Message[],
+  imageSources: ImageSourceEntry[]
+): Message[] => {
+  const selections = imageSources.filter(
+    (entry) => entry.source === "ai_generated"
+  );
+  if (selections.length === 0) return history;
+
+  const updated = [...history];
+
+  for (const selection of selections) {
+    let targetIndex = -1;
+    if (selection.variantId) {
+      targetIndex = updated.findIndex(
+        (msg) => msg.variantId === selection.variantId
+      );
+    }
+    if (targetIndex === -1 && typeof selection.messageIndex === "number") {
+      targetIndex = selection.messageIndex;
+    }
+
+    // Fallback: find by imageId
+    if (targetIndex === -1 && selection.imageId) {
+      targetIndex = updated.findIndex((msg) => {
+        if (!Array.isArray(msg.content)) return false;
+        return msg.content.some(
+          (part) =>
+            part.type === "agent_image" && part.imageId === selection.imageId
+        );
+      });
+    }
+
+    if (targetIndex < 0 || targetIndex >= updated.length) continue;
+    const target = updated[targetIndex];
+    if (!Array.isArray(target.content)) continue;
+
+    const content = [...target.content];
+    let partIndex = content.findIndex(
+      (part) =>
+        part.type === "agent_image" && part.imageId === selection.imageId
+    );
+
+    if (
+      partIndex === -1 &&
+      typeof selection.partIndex === "number" &&
+      selection.partIndex >= 0 &&
+      selection.partIndex < content.length
+    ) {
+      partIndex = selection.partIndex;
+    }
+
+    const part = content[partIndex];
+    if (part && part.type === "agent_image" && !part.isSelected) {
+      content[partIndex] = { ...part, isSelected: true };
+      updated[targetIndex] = { ...target, content };
+    }
+  }
+
+  return updated;
+};
+
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ chatId: string }> }
@@ -50,6 +121,29 @@ export async function POST(
     const json = await request.json();
     const content: string = json.content || "";
     const imageIds: string[] = json.imageIds || []; // Unified array of pre-uploaded image IDs
+    const rawImageSources = Array.isArray(json.imageSources)
+      ? json.imageSources
+      : [];
+    const imageSources: ImageSourceEntry[] = rawImageSources
+      .filter((entry: any) => typeof entry?.imageId === "string")
+      .map((entry: any) => ({
+        imageId: entry.imageId as string,
+        source:
+          entry.source === "upload" ||
+          entry.source === "asset" ||
+          entry.source === "ai_generated"
+            ? (entry.source as "upload" | "asset" | "ai_generated")
+            : undefined,
+        title: typeof entry.title === "string" ? entry.title : undefined,
+        messageIndex:
+          typeof entry.messageIndex === "number"
+            ? entry.messageIndex
+            : undefined,
+        partIndex:
+          typeof entry.partIndex === "number" ? entry.partIndex : undefined,
+        variantId:
+          typeof entry.variantId === "string" ? entry.variantId : undefined,
+      }));
     const precisionEditing: boolean = !!json.precisionEditing;
     const systemPromptOverride: string | undefined = json.systemPromptOverride;
     const aspectRatioOverride: string | undefined = json.aspectRatio;
@@ -79,6 +173,7 @@ export async function POST(
         content,
         imageCount: imageIds.length,
         imageIds,
+        imageSources,
         precisionEditing,
         systemPromptOverride,
         aspectRatioOverride,
@@ -118,13 +213,21 @@ export async function POST(
     // Images are already uploaded, we just reference them by ID
     let userMessage: Message;
     if (imageIds.length > 0) {
+      const sourceById = new Map<string, ImageSourceEntry>(
+        imageSources.map((entry) => [entry.imageId, entry])
+      );
       const parts: MessageContentPart[] = [];
       if (content) {
         parts.push({ type: "text", text: content });
       }
       // Add all images to the message
       for (const imgId of imageIds) {
-        parts.push({ type: "image", imageId: imgId });
+        const sourceEntry = sourceById.get(imgId);
+        parts.push({
+          type: "image",
+          imageId: imgId,
+          source: sourceEntry?.source,
+        });
       }
       userMessage = {
         role: "user",
@@ -167,7 +270,15 @@ export async function POST(
 
           // For backward compatibility, store as array of messages with variantId
           // Frontend will group messages with the same timestamp but different variantIds
-          const updatedHistory = [...history, userMessage, ...messagesToSave];
+          const historyWithSelections = applyImageSelections(
+            history,
+            imageSources
+          );
+          const updatedHistory = [
+            ...historyWithSelections,
+            userMessage,
+            ...messagesToSave,
+          ];
           await saveChatHistory(chatId, updatedHistory);
 
           // Use the first variant for thumbnail calculation
