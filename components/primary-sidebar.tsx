@@ -4,6 +4,7 @@ import React from "react";
 import { usePathname } from "next/navigation";
 import NextLink from "next/link";
 import clsx from "clsx";
+import { useTranslations } from "next-intl";
 import {
   BotMessageSquare,
   Folder,
@@ -13,13 +14,13 @@ import {
   User as UserIcon,
   BookOpen,
 } from "lucide-react";
-import { User } from "@heroui/user";
 import { Avatar } from "@heroui/avatar";
 import { Tooltip } from "@heroui/tooltip";
 import { useAuth } from "@/hooks/use-auth";
 import { motion } from "framer-motion";
 import { Button } from "@heroui/button";
 import { ThemeSwitch } from "@/components/theme-switch";
+import { LanguageSwitch } from "@/components/language-switch";
 import {
   Popover,
   PopoverTrigger,
@@ -29,28 +30,29 @@ import {
 export const PrimarySidebar = () => {
   const pathname = usePathname();
   const { user, logout } = useAuth();
+  const t = useTranslations("nav");
 
   const navItems = [
     {
-      label: "Browse",
+      label: t("browse"),
       href: "/browse",
       icon: <BookOpen size={20} />,
     },
     {
-      label: "Agent",
+      label: t("agent"),
       href: "/chat",
       icon: <BotMessageSquare size={20} />,
       isActive: (path: string) => path.startsWith("/chat") || path === "/",
     },
     {
-      label: "Projects",
+      label: t("projects"),
       href: "/projects",
       icon: <Folder size={20} />,
       isActive: (path: string) =>
         path.startsWith("/projects") || path.startsWith("/collection"),
     },
     {
-      label: "Storyboard",
+      label: t("storyboard"),
       href: "/storyboard",
       icon: <Clapperboard size={20} />,
     },
@@ -108,7 +110,7 @@ export const PrimarySidebar = () => {
 
         {/* Admin Link */}
         {user && user.roles.includes("admin") && (
-          <Tooltip content="Admin" placement="right" closeDelay={0}>
+          <Tooltip content={t("admin")} placement="right" closeDelay={0}>
             <NextLink
               href="/admin"
               className={clsx(
@@ -135,8 +137,9 @@ export const PrimarySidebar = () => {
 
       {/* User Profile */}
       <div className="mt-auto pt-4 pb-2 px-2 w-full flex flex-col items-center gap-4">
+        <LanguageSwitch />
         <ThemeSwitch />
-        
+
         {user && (
           <Popover placement="right">
             <PopoverTrigger>
@@ -172,7 +175,7 @@ export const PrimarySidebar = () => {
                     className="w-full justify-start"
                     startContent={<UserIcon size={16} />}
                   >
-                    Profile
+                    {t("profile")}
                   </Button>
                 </NextLink>
                 <Button
@@ -183,7 +186,7 @@ export const PrimarySidebar = () => {
                   onPress={logout}
                   className="w-full justify-start"
                 >
-                  Logout
+                  {t("logout")}
                 </Button>
               </div>
             </PopoverContent>

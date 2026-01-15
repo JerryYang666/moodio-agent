@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import {
   Navbar as HeroUINavbar,
   NavbarContent,
@@ -10,19 +11,13 @@ import {
   NavbarBrand,
   NavbarItem,
 } from "@heroui/navbar";
-import { Link } from "@heroui/link";
-import { link as linkStyles } from "@heroui/theme";
 import NextLink from "next/link";
 import clsx from "clsx";
 
-import { siteConfig } from "@/config/site";
 import { ThemeSwitch } from "@/components/theme-switch";
+import { LanguageSwitch } from "@/components/language-switch";
 import {
   BotMessageSquare,
-  Home,
-  LayoutDashboard,
-  Settings,
-  User as UserIcon,
   Shield,
   SquarePen,
   MessageSquare,
@@ -37,16 +32,13 @@ import {
   Check,
   Trash2,
 } from "lucide-react";
-import { User } from "@heroui/user";
 import { Avatar } from "@heroui/avatar";
-import { Card, CardBody } from "@heroui/card";
 import { Popover, PopoverTrigger, PopoverContent } from "@heroui/popover";
 import { Button } from "@heroui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { useChat } from "@/hooks/use-chat";
-import { Divider } from "@heroui/divider";
 import { Chat } from "@/components/chat-provider";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { Spinner } from "@heroui/spinner";
 import { Image } from "@heroui/image";
 import { Input } from "@heroui/input";
@@ -67,6 +59,8 @@ interface ChatItemProps {
 const MobileChatItem = ({ chat, isActive, viewMode }: ChatItemProps) => {
   const router = useRouter();
   const pathname = usePathname();
+  const t = useTranslations("chat");
+  const tCommon = useTranslations("common");
   const { renameChat, deleteChat, isChatMonitored } = useChat();
   const [isRenameOpen, setIsRenameOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
@@ -103,7 +97,7 @@ const MobileChatItem = ({ chat, isActive, viewMode }: ChatItemProps) => {
     }
   };
 
-  const chatName = chat.name || "New Chat";
+  const chatName = chat.name || t("newChat");
   const isMonitored = isChatMonitored(chat.id);
   // Use signed CloudFront URL from API response
   const thumbnailUrl = chat.thumbnailImageUrl || null;
@@ -125,7 +119,7 @@ const MobileChatItem = ({ chat, isActive, viewMode }: ChatItemProps) => {
         <PopoverContent>
           <div className="px-1 py-2 w-64">
             <p className="text-small font-bold text-foreground mb-2">
-              Rename Chat
+              {t("renameChat")}
             </p>
             <div className="flex gap-2">
               <Input
@@ -163,11 +157,10 @@ const MobileChatItem = ({ chat, isActive, viewMode }: ChatItemProps) => {
         <PopoverContent>
           <div className="px-1 py-2 w-64">
             <p className="text-small font-bold text-foreground mb-1">
-              Delete Chat
+              {t("deleteChat")}
             </p>
             <p className="text-tiny text-default-500 mb-3">
-              Are you sure you want to delete this chat? This action cannot be
-              undone.
+              {t("deleteConfirm")}
             </p>
             <div className="flex gap-2 justify-end">
               <Button
@@ -175,7 +168,7 @@ const MobileChatItem = ({ chat, isActive, viewMode }: ChatItemProps) => {
                 variant="flat"
                 onPress={() => setIsDeleteOpen(false)}
               >
-                Cancel
+                {tCommon("cancel")}
               </Button>
               <Button
                 size="sm"
@@ -183,7 +176,7 @@ const MobileChatItem = ({ chat, isActive, viewMode }: ChatItemProps) => {
                 isLoading={isDeleting}
                 onPress={handleDelete}
               >
-                Delete
+                {tCommon("delete")}
               </Button>
             </div>
           </div>
@@ -306,7 +299,7 @@ const MobileChatItem = ({ chat, isActive, viewMode }: ChatItemProps) => {
                 startContent={<Pencil size={16} />}
                 onPress={() => setIsRenameOpen(true)}
               >
-                Rename
+                {tCommon("rename")}
               </DropdownItem>
               <DropdownItem
                 key="delete"
@@ -315,7 +308,7 @@ const MobileChatItem = ({ chat, isActive, viewMode }: ChatItemProps) => {
                 color="danger"
                 onPress={() => setIsDeleteOpen(true)}
               >
-                Delete
+                {tCommon("delete")}
               </DropdownItem>
             </DropdownMenu>
           </Dropdown>
@@ -330,6 +323,7 @@ export const Navbar = () => {
   const router = useRouter();
   const { user, logout } = useAuth();
   const { chats, refreshChats } = useChat();
+  const t = useTranslations();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [activeSection, setActiveSection] = useState<
     "browse" | "agent" | "projects" | "storyboard"
@@ -368,25 +362,25 @@ export const Navbar = () => {
   const navTabs = [
     {
       id: "browse",
-      label: "Browse",
+      label: t("nav.browse"),
       icon: <Globe size={20} />,
       href: "/browse",
     },
     {
       id: "agent",
-      label: "Agent",
+      label: t("nav.agent"),
       icon: <BotMessageSquare size={20} />,
       href: "/chat",
     },
     {
       id: "projects",
-      label: "Projects",
+      label: t("nav.projects"),
       icon: <Folder size={20} />,
       href: "/projects",
     },
     {
       id: "storyboard",
-      label: "Story.",
+      label: t("nav.storyboardShort"),
       icon: <Clapperboard size={20} />,
       href: "/storyboard",
     },
@@ -408,7 +402,7 @@ export const Navbar = () => {
           <NextLink className="flex justify-start items-center gap-1" href="/">
             <BotMessageSquare className="md:w-6 md:h-6 w-5 h-5" />
             <p className="font-bold text-inherit md:text-base text-sm">
-              moodio agent
+              {t("common.appName")}
             </p>
           </NextLink>
         </NavbarBrand>
@@ -434,13 +428,6 @@ export const Navbar = () => {
                 onClick={() => {
                   setActiveSection(tab.id as any);
                   router.push(tab.href);
-                  // Don't close menu immediately to allow interaction with sub-nav if needed
-                  // But usually navigating changes page.
-                  // For "Agent", we might want to stay open to pick a chat?
-                  // Let's follow typical behavior: navigating usually closes, but here we are building navigation INSIDE the menu.
-                  // If it's just a tab switch, we don't route yet? Or do we?
-                  // The prompt says "switch between these sort of pages".
-                  // If I click "Agent", I expect to see the chat list.
                 }}
                 className={clsx(
                   "flex flex-col items-center justify-center p-2 rounded-xl transition-colors gap-1",
@@ -465,7 +452,7 @@ export const Navbar = () => {
                     className="flex items-center gap-2 px-3 py-2 rounded-xl transition-colors text-default-500 hover:bg-default-100/80 hover:text-default-900 w-full justify-center bg-default-100/50 mb-2"
                   >
                     <SquarePen size={20} />
-                    <span className="text-sm">New Chat</span>
+                    <span className="text-sm">{t("chat.newChat")}</span>
                   </button>
 
                   <div className="relative py-0 flex items-center justify-center my-0">
@@ -478,7 +465,7 @@ export const Navbar = () => {
                             ? "text-primary"
                             : "text-default-400"
                         )}
-                        title="List View"
+                        title={t("nav.listView")}
                       >
                         <List size={16} />
                       </button>
@@ -490,7 +477,7 @@ export const Navbar = () => {
                             ? "text-primary"
                             : "text-default-400"
                         )}
-                        title="Grid View"
+                        title={t("nav.gridView")}
                       >
                         <GalleryThumbnails size={16} />
                       </button>
@@ -518,7 +505,7 @@ export const Navbar = () => {
                     ))
                   ) : (
                     <p className="text-center text-default-400 py-4 text-sm">
-                      No chats yet
+                      {t("chat.noChatsYet")}
                     </p>
                   )}
                 </div>
@@ -528,7 +515,7 @@ export const Navbar = () => {
             {activeSection === "projects" && (
               <div className="flex flex-col items-center justify-center h-full text-default-500">
                 <Folder size={48} className="mb-2 opacity-50" />
-                <p>Manage your projects here</p>
+                <p>{t("projects.manageProjectsHere")}</p>
                 <Button
                   className="mt-4"
                   color="primary"
@@ -538,7 +525,7 @@ export const Navbar = () => {
                     setIsMenuOpen(false);
                   }}
                 >
-                  Go to Projects
+                  {t("projects.goToProjects")}
                 </Button>
               </div>
             )}
@@ -546,7 +533,7 @@ export const Navbar = () => {
             {activeSection === "browse" && (
               <div className="flex flex-col items-center justify-center h-full text-default-500">
                 <Globe size={48} className="mb-2 opacity-50" />
-                <p>Browse content</p>
+                <p>{t("browse.subtitle")}</p>
                 <Button
                   className="mt-4"
                   color="primary"
@@ -556,7 +543,7 @@ export const Navbar = () => {
                     setIsMenuOpen(false);
                   }}
                 >
-                  Go to Browse
+                  {t("browse.goToBrowse")}
                 </Button>
               </div>
             )}
@@ -564,7 +551,7 @@ export const Navbar = () => {
             {activeSection === "storyboard" && (
               <div className="flex flex-col items-center justify-center h-full text-default-500">
                 <Clapperboard size={48} className="mb-2 opacity-50" />
-                <p>Storyboard your ideas</p>
+                <p>{t("storyboard.subtitle")}</p>
                 <Button
                   className="mt-4"
                   color="primary"
@@ -574,7 +561,7 @@ export const Navbar = () => {
                     setIsMenuOpen(false);
                   }}
                 >
-                  Go to Storyboard
+                  {t("storyboard.goToStoryboard")}
                 </Button>
               </div>
             )}
@@ -591,7 +578,7 @@ export const Navbar = () => {
                     className="flex items-center gap-2 px-3 py-2 rounded-xl transition-colors text-default-500 hover:bg-default-100"
                   >
                     <Shield size={20} />
-                    <span>Admin Dashboard</span>
+                    <span>{t("nav.adminDashboard")}</span>
                   </NextLink>
                 )}
 
@@ -642,8 +629,9 @@ export const Navbar = () => {
                             setIsMenuOpen(false);
                           }}
                         >
-                          Logout
+                          {t("nav.logout")}
                         </Button>
+                        <LanguageSwitch />
                         <ThemeSwitch />
                       </div>
                     </PopoverContent>

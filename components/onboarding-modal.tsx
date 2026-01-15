@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useTranslations } from "next-intl";
 import {
   Modal,
   ModalContent,
@@ -18,6 +19,7 @@ import { Key, Check } from "lucide-react";
 import { addToast } from "@heroui/toast";
 
 export const OnboardingModal = () => {
+  const t = useTranslations();
   const { user, refreshUser } = useAuth();
   const { isOpen, onOpen, onOpenChange, onClose } = useDisclosure();
   const [step, setStep] = useState(1);
@@ -57,7 +59,7 @@ export const OnboardingModal = () => {
       onClose();
     } catch (error) {
       console.error("Failed to complete onboarding:", error);
-      addToast({ title: "Failed to complete onboarding", color: "danger" });
+      addToast({ title: t("onboarding.failedToCompleteOnboarding"), color: "danger" });
     } finally {
       setLoading(false);
     }
@@ -97,14 +99,14 @@ export const OnboardingModal = () => {
 
       if (verification.verified) {
         setPasskeyAdded(true);
-        addToast({ title: "Passkey added successfully", color: "success" });
+        addToast({ title: t("onboarding.passkeyAddedSuccess"), color: "success" });
       } else {
-        throw new Error(verification.error || "Verification failed");
+        throw new Error(verification.error || t("auth.verificationFailed"));
       }
     } catch (error) {
       console.error(error);
       addToast({
-        title: error instanceof Error ? error.message : "Failed to add passkey",
+        title: error instanceof Error ? error.message : t("onboarding.failedToAddPasskey"),
         color: "danger",
       });
     } finally {
@@ -125,18 +127,18 @@ export const OnboardingModal = () => {
           <>
             <ModalHeader className="flex flex-col gap-1">
               {step === 1
-                ? "Welcome to moodio agent!"
-                : "Enhance your Security"}
+                ? t("onboarding.welcomeTitle")
+                : t("onboarding.enhanceSecurityTitle")}
             </ModalHeader>
             <ModalBody>
               {step === 1 ? (
                 <>
                   <p className="text-default-500 text-sm mb-2">
-                    What should moodio agent call you?
+                    {t("onboarding.whatToCallYou")}
                   </p>
                   <div className="flex flex-col gap-4">
                     <Input
-                      placeholder="Your name"
+                      placeholder={t("onboarding.yourName")}
                       value={name}
                       onValueChange={setName}
                       variant="bordered"
@@ -152,9 +154,7 @@ export const OnboardingModal = () => {
               ) : (
                 <>
                   <p className="text-default-500 text-sm mb-2">
-                    Want an easier and faster way to login? Add a passkey to
-                    sign in without a password, and no more waiting for the
-                    email code.
+                    {t("onboarding.passkeyDescription")}
                   </p>
                   <div className="flex flex-col gap-4 items-center py-4">
                     {passkeyAdded ? (
@@ -162,7 +162,7 @@ export const OnboardingModal = () => {
                         <div className="p-3 rounded-full bg-success/10">
                           <Check size={32} />
                         </div>
-                        <p className="font-medium">Passkey Added!</p>
+                        <p className="font-medium">{t("onboarding.passkeyAddedTitle")}</p>
                       </div>
                     ) : (
                       <Button
@@ -174,7 +174,7 @@ export const OnboardingModal = () => {
                         isLoading={passkeyLoading}
                         startContent={<Key />}
                       >
-                        Add Passkey
+                        {t("onboarding.addPasskey")}
                       </Button>
                     )}
                   </div>
@@ -189,14 +189,14 @@ export const OnboardingModal = () => {
                     variant="light"
                     onPress={handleStep1Skip}
                   >
-                    Skip
+                    {t("common.skip")}
                   </Button>
                   <Button
                     color="primary"
                     onPress={handleStep1Next}
                     isDisabled={!name.trim()}
                   >
-                    Next
+                    {t("common.next")}
                   </Button>
                 </>
               ) : (
@@ -207,14 +207,14 @@ export const OnboardingModal = () => {
                     onPress={() => handleFinalize(false)}
                     isDisabled={loading}
                   >
-                    {passkeyAdded ? "Skip" : "Skip"}
+                    {t("common.skip")}
                   </Button>
                   <Button
                     color="primary"
                     onPress={() => handleFinalize(false)}
                     isLoading={loading}
                   >
-                    Finish
+                    {t("common.finish")}
                   </Button>
                 </>
               )}

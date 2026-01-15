@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useCallback } from "react";
+import { useTranslations } from "next-intl";
 import {
   Dropdown,
   DropdownTrigger,
@@ -130,6 +131,7 @@ export default function MenuConfiguration({
   onStateChange,
   hasSelectedImages = false,
 }: MenuConfigurationProps) {
+  const t = useTranslations("menu");
   // Handlers for changes
   const handleModeChange = (keys: any) => {
     const selected = Array.from(keys)[0] as string;
@@ -268,7 +270,7 @@ export default function MenuConfiguration({
     return (
       <div className="flex flex-col gap-0.5">
         <span className="text-[10px] text-default-400 uppercase tracking-wide pl-1">
-          Mode
+          {t("mode")}
         </span>
         <Dropdown>
           <DropdownTrigger>
@@ -301,7 +303,7 @@ export default function MenuConfiguration({
               const hasDescription = (value as any).description;
               const isEditDisabled = key === "edit" && !hasSelectedImages;
               const tooltipContent = isEditDisabled
-                ? "Select or upload an image first to use Edit mode"
+                ? t("editModeHint")
                 : (value as any).description;
               const showTooltip = hasDescription || isEditDisabled;
               return (
@@ -340,7 +342,7 @@ export default function MenuConfiguration({
     <div className="overflow-x-auto scrollbar-hide -mx-2 px-2">
       <div className="flex gap-2 items-center p-2 bg-transparent pt-0 rounded-lg min-w-max">
         {renderModeDropdown()}
-        <span className="text-default-400 text-sm mx-1 mt-4">with</span>
+        <span className="text-default-400 text-sm mx-1 mt-4">{t("with")}</span>
         {renderDropdown("model")}
         {renderDropdown("expertise")}
         {renderDropdown("aspectRatio")}

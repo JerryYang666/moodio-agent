@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, useEffect } from "react";
+import { useTranslations } from "next-intl";
 import { Button } from "@heroui/button";
 import { Textarea } from "@heroui/input";
 import { Popover, PopoverTrigger, PopoverContent } from "@heroui/popover";
@@ -76,6 +77,7 @@ export default function ChatInput({
   menuState,
   onMenuStateChange,
 }: ChatInputProps) {
+  const t = useTranslations();
   const containerRef = useRef<HTMLDivElement>(null);
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -196,7 +198,7 @@ export default function ChatInput({
                         />
                         <div className="absolute inset-0 bg-black/50 flex items-center justify-center p-1">
                           <span className="text-white text-[10px] text-center leading-tight font-medium line-clamp-3">
-                            Select: {selectedAgentPart.title}
+                            {t("chat.selectImage", { title: selectedAgentPart.title })}
                           </span>
                         </div>
                       </div>
@@ -218,7 +220,7 @@ export default function ChatInput({
                         />
                         <div className="absolute inset-0 bg-black/50 flex items-center justify-center p-1">
                           <span className="text-white text-[10px] text-center leading-tight font-medium line-clamp-3">
-                            Asset: {selectedAsset.title}
+                            {t("chat.asset", { title: selectedAsset.title })}
                           </span>
                         </div>
                       </div>
@@ -240,10 +242,10 @@ export default function ChatInput({
                         onValueChange={onPrecisionEditingChange}
                       >
                         <span className="text-xs font-medium">
-                          Precision Editing
+                          {t("chat.precisionEditing")}
                         </span>
                       </Switch>
-                      <Tooltip content="When enabled, Agent will try its best to only edit the part of the image that you want to change and keeping everything else the same.">
+                      <Tooltip content={t("chat.precisionEditingDesc")}>
                         <Info
                           size={14}
                           className="text-default-400 cursor-help"
@@ -269,7 +271,7 @@ export default function ChatInput({
                   isIconOnly
                   variant="flat"
                   onPress={onOpenAssetPicker}
-                  aria-label="Add image"
+                  aria-label={t("chat.addImage")}
                 >
                   <ImagePlus size={24} className="text-default-500" />
                 </Button>
@@ -290,7 +292,7 @@ export default function ChatInput({
                       variant={isRecording ? "solid" : "flat"}
                       color={isRecording ? "danger" : "default"}
                       onPress={isRecording ? onStopRecording : onStartRecording}
-                      aria-label="Record voice"
+                      aria-label={t("chat.recordVoice")}
                       isLoading={isTranscribing}
                     >
                       {isRecording ? (
@@ -304,11 +306,7 @@ export default function ChatInput({
                 <PopoverContent className="bg-danger text-danger-foreground">
                   <div className="px-1 py-1">
                     <div className="text-small font-bold">
-                      {Math.max(
-                        0,
-                        siteConfig.audioRecording.maxDuration - recordingTime
-                      )}
-                      s remaining
+                      {t("chat.timeRemaining", { seconds: Math.max(0, siteConfig.audioRecording.maxDuration - recordingTime) })}
                     </div>
                   </div>
                 </PopoverContent>
@@ -316,7 +314,7 @@ export default function ChatInput({
             </div>
 
             <Textarea
-              placeholder="Type a message..."
+              placeholder={t("chat.typeMessage")}
               minRows={1}
               maxRows={isExpanded ? 5 : 1}
               value={input}

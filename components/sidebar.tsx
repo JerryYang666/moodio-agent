@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import NextLink from "next/link";
 import clsx from "clsx";
 import {
@@ -43,6 +44,8 @@ interface ChatItemProps {
 const ChatItem = ({ chat, isActive, isCollapsed, viewMode }: ChatItemProps) => {
   const router = useRouter();
   const pathname = usePathname();
+  const t = useTranslations("chat");
+  const tCommon = useTranslations("common");
   const { renameChat, deleteChat, isChatMonitored } = useChat();
   const [isRenameOpen, setIsRenameOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
@@ -79,7 +82,7 @@ const ChatItem = ({ chat, isActive, isCollapsed, viewMode }: ChatItemProps) => {
     }
   };
 
-  const chatName = chat.name || "New Chat";
+  const chatName = chat.name || t("newChat");
   const isMonitored = isChatMonitored(chat.id);
   // Use signed CloudFront URL from API response
   const thumbnailUrl = chat.thumbnailImageUrl || null;
@@ -209,7 +212,7 @@ const ChatItem = ({ chat, isActive, isCollapsed, viewMode }: ChatItemProps) => {
                 startContent={<Pencil size={16} />}
                 onPress={() => setIsRenameOpen(true)}
               >
-                Rename
+                {tCommon("rename")}
               </DropdownItem>
               <DropdownItem
                 key="delete"
@@ -218,7 +221,7 @@ const ChatItem = ({ chat, isActive, isCollapsed, viewMode }: ChatItemProps) => {
                 color="danger"
                 onPress={() => setIsDeleteOpen(true)}
               >
-                Delete
+                {tCommon("delete")}
               </DropdownItem>
             </DropdownMenu>
           </Dropdown>
@@ -244,7 +247,7 @@ const ChatItem = ({ chat, isActive, isCollapsed, viewMode }: ChatItemProps) => {
         <PopoverContent>
           <div className="px-1 py-2 w-64">
             <p className="text-small font-bold text-foreground mb-2">
-              Rename Chat
+              {t("renameChat")}
             </p>
             <div className="flex gap-2">
               <Input
@@ -282,11 +285,10 @@ const ChatItem = ({ chat, isActive, isCollapsed, viewMode }: ChatItemProps) => {
         <PopoverContent>
           <div className="px-1 py-2 w-64">
             <p className="text-small font-bold text-foreground mb-1">
-              Delete Chat
+              {t("deleteChat")}
             </p>
             <p className="text-tiny text-default-500 mb-3">
-              Are you sure you want to delete this chat? This action cannot be
-              undone.
+              {t("deleteConfirm")}
             </p>
             <div className="flex gap-2 justify-end">
               <Button
@@ -294,7 +296,7 @@ const ChatItem = ({ chat, isActive, isCollapsed, viewMode }: ChatItemProps) => {
                 variant="flat"
                 onPress={() => setIsDeleteOpen(false)}
               >
-                Cancel
+                {tCommon("cancel")}
               </Button>
               <Button
                 size="sm"
@@ -302,7 +304,7 @@ const ChatItem = ({ chat, isActive, isCollapsed, viewMode }: ChatItemProps) => {
                 isLoading={isDeleting}
                 onPress={handleDelete}
               >
-                Delete
+                {tCommon("delete")}
               </Button>
             </div>
           </div>
@@ -337,6 +339,7 @@ const ChatItem = ({ chat, isActive, isCollapsed, viewMode }: ChatItemProps) => {
 export const Sidebar = () => {
   const pathname = usePathname();
   const router = useRouter();
+  const t = useTranslations();
   const { chats, refreshChats } = useChat();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
@@ -384,7 +387,7 @@ export const Sidebar = () => {
                 exit={{ opacity: 0, width: 0 }}
                 className="font-bold text-lg whitespace-nowrap overflow-hidden"
               >
-                Chats
+                {t("nav.agent")}
               </motion.p>
             )}
           </AnimatePresence>
@@ -429,7 +432,7 @@ export const Sidebar = () => {
                   exit={{ opacity: 0, width: 0 }}
                   className="overflow-hidden text-sm"
                 >
-                  New Chat
+                  {t("chat.newChat")}
                 </motion.span>
               )}
             </AnimatePresence>
@@ -448,7 +451,7 @@ export const Sidebar = () => {
                     "p-1 rounded hover:bg-default-100 transition-colors",
                     viewMode === "list" ? "text-primary" : "text-default-400"
                   )}
-                  title="List View"
+                  title={t("nav.listView")}
                 >
                   <List size={16} />
                 </button>
@@ -458,7 +461,7 @@ export const Sidebar = () => {
                     "p-1 rounded hover:bg-default-100 transition-colors",
                     viewMode === "grid" ? "text-primary" : "text-default-400"
                   )}
-                  title="Grid View"
+                  title={t("nav.gridView")}
                 >
                   <GalleryThumbnails size={16} />
                 </button>

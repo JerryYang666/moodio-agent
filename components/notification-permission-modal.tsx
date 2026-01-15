@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter } from "@heroui/modal";
 import { Button } from "@heroui/button";
 import { Bell } from "lucide-react";
@@ -12,6 +13,7 @@ export interface NotificationPermissionModalRef {
 }
 
 export const NotificationPermissionModal = forwardRef<NotificationPermissionModalRef>((props, ref) => {
+  const t = useTranslations("notifications");
   const [isOpen, setIsOpen] = useState(false);
 
   useImperativeHandle(ref, () => ({
@@ -20,7 +22,7 @@ export const NotificationPermissionModal = forwardRef<NotificationPermissionModa
         if (!("Notification" in window)) return;
 
         const hasAsked = localStorage.getItem(NOTIFICATION_ASKED_KEY);
-        
+
         if (Notification.permission === "default" && !hasAsked) {
           setIsOpen(true);
         }
@@ -52,19 +54,19 @@ export const NotificationPermissionModal = forwardRef<NotificationPermissionModa
           <div className="bg-primary/10 p-3 rounded-full mb-2">
             <Bell size={24} className="text-primary" />
           </div>
-          Enable Notifications
+          {t("enableTitle")}
         </ModalHeader>
         <ModalBody className="text-center">
           <p className="text-default-500">
-            Image generation can take some time. Enable notifications to get alerted when your results are ready, so you can freely browse other tabs or pages.
+            {t("enableDescription")}
           </p>
         </ModalBody>
         <ModalFooter className="justify-center">
           <Button variant="light" onPress={handleDecline}>
-            No thanks
+            {t("noThanks")}
           </Button>
           <Button color="primary" onPress={handleAllow}>
-            Enable Notifications
+            {t("enable")}
           </Button>
         </ModalFooter>
       </ModalContent>
