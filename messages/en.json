@@ -352,6 +352,8 @@
   "assetsSidebar": {
     "title": "Assets",
     "dragOrClick": "Drag or click",
+    "pinSidebar": "Pin sidebar",
+    "unpinSidebar": "Unpin sidebar",
     "recent": "Recent",
     "projects": "Projects",
     "defaultSuffix": "Default",
@@ -363,7 +365,9 @@
     },
     "noAssets": "No assets",
     "assetAlt": "Asset",
-    "untitled": "Untitled"
+    "untitled": "Untitled",
+    "addedToCollection": "Added to collection",
+    "addToCollectionFailed": "Failed to add to collection"
   },
   "imageDetail": {
     "title": "Image Details",

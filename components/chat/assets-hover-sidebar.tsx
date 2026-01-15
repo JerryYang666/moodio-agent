@@ -7,8 +7,10 @@ import { Button } from "@heroui/button";
 import { Spinner } from "@heroui/spinner";
 import { Chip } from "@heroui/chip";
 import { Image } from "@heroui/image";
-import { Folder, Clock, Images, ChevronLeft } from "lucide-react";
+import { Folder, Clock, Images, ChevronLeft, Pin, PinOff, X } from "lucide-react";
 import clsx from "clsx";
+import { addToast } from "@heroui/toast";
+import { ASSET_DRAG_MIME, AI_IMAGE_DRAG_MIME } from "./asset-dnd";
 
 type Project = {
   id: string;
@@ -45,16 +47,29 @@ type AssetDragPayload = {
   title: string;
 };
 
-const DRAG_MIME = "application/x-moodio-asset";
+type AiImageDragPayload = {
+  imageId: string;
+  url: string;
+  title?: string;
+  prompt?: string;
+  status?: "loading" | "generated" | "error";
+  chatId?: string | null;
+};
+
 const SELECT_EVENT = "moodio-asset-selected";
+const SIDEBAR_WIDTH = 360;
 
 export default function AssetsHoverSidebar() {
   const t = useTranslations();
   const [isOpen, setIsOpen] = useState(false);
+  const [isPinned, setIsPinned] = useState(false);
   const [loading, setLoading] = useState(false);
   const [projects, setProjects] = useState<Project[]>([]);
   const [collections, setCollections] = useState<Collection[]>([]);
   const [assets, setAssets] = useState<Asset[]>([]);
+  const [dragOverCollectionId, setDragOverCollectionId] = useState<string | null>(
+    null
+  );
   const [scope, setScope] = useState<
     | { kind: "recent" }
     | { kind: "project"; id: string }
@@ -142,17 +157,84 @@ export default function AssetsHoverSidebar() {
       title: asset.generationDetails?.title || t("chat.selectedAsset"),
     };
     try {
-      e.dataTransfer.setData(DRAG_MIME, JSON.stringify(payload));
+      e.dataTransfer.setData(ASSET_DRAG_MIME, JSON.stringify(payload));
     } catch {}
     e.dataTransfer.setData("text/plain", asset.id);
     e.dataTransfer.effectAllowed = "copy";
   };
 
+  const parseAiDropPayload = (e: React.DragEvent): AiImageDragPayload | null => {
+    try {
+      const json = e.dataTransfer.getData(AI_IMAGE_DRAG_MIME);
+      if (!json) return null;
+      const parsed = JSON.parse(json);
+      if (!parsed?.imageId || !parsed?.url) return null;
+      return parsed as AiImageDragPayload;
+    } catch (err) {
+      console.error("Failed to parse AI image drop payload", err);
+      return null;
+    }
+  };
+
+  const handleCollectionDrop = async (
+    collectionId: string,
+    e: React.DragEvent
+  ) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOverCollectionId(null);
+
+    const payload = parseAiDropPayload(e);
+    if (!payload?.imageId || !payload?.url) return;
+
+    try {
+      const res = await fetch(`/api/collection/${collectionId}/images`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          imageId: payload.imageId,
+          chatId: payload.chatId || null,
+          generationDetails: {
+            title: payload.title || t("assetsSidebar.untitled"),
+            prompt: payload.prompt || "",
+            status: payload.status || "generated",
+            imageUrl: payload.url,
+          },
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error("Failed to add image to collection");
+      }
+
+      addToast({ title: t("assetsSidebar.addedToCollection"), color: "success" });
+    } catch (err) {
+      console.error("Failed to add AI image to collection", err);
+      addToast({ title: t("assetsSidebar.addToCollectionFailed"), color: "danger" });
+    }
+  };
+
+  const handleClose = () => {
+    setIsPinned(false);
+    setIsOpen(false);
+  };
+
+  const isVisible = isOpen || isPinned;
+
+  useEffect(() => {
+    const root = document.documentElement;
+    const offset = isVisible ? `${SIDEBAR_WIDTH}px` : "0px";
+    root.style.setProperty("--assets-sidebar-offset", offset);
+    return () => {
+      root.style.setProperty("--assets-sidebar-offset", "0px");
+    };
+  }, [isVisible]);
+
   return (
     <div className="hidden lg:block absolute inset-y-0 right-0 z-50">
       {/* Hover handle with glow indicator */}
       <AnimatePresence>
-        {!isOpen && (
+        {!isVisible && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -160,6 +242,7 @@ export default function AssetsHoverSidebar() {
             transition={{ duration: 0.3 }}
             className="absolute right-0 top-0 h-full w-10 cursor-pointer group"
             onMouseEnter={() => setIsOpen(true)}
+            onDragEnter={() => setIsOpen(true)}
           >
             {/* Glowing edge effect */}
             <div className="absolute right-0 top-0 h-full w-1 bg-linear-to-l from-primary/40 to-transparent" />
@@ -197,7 +280,7 @@ export default function AssetsHoverSidebar() {
       </AnimatePresence>
 
       <AnimatePresence>
-        {isOpen && (
+        {isVisible && (
           <motion.aside
             initial={{ x: 380 }}
             animate={{ x: 0 }}
@@ -205,19 +288,48 @@ export default function AssetsHoverSidebar() {
             transition={{ type: "spring", stiffness: 260, damping: 30 }}
             className="absolute right-0 top-0 h-full w-[360px] bg-background border-l border-divider shadow-2xl"
             onMouseEnter={() => setIsOpen(true)}
-            onMouseLeave={() => setIsOpen(false)}
+            onMouseLeave={() => {
+              if (!isPinned) setIsOpen(false);
+            }}
           >
             <div className="h-full flex flex-col">
               <div className="p-4 border-b border-divider flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Button
+                    isIconOnly
+                    size="sm"
+                    variant="flat"
+                    aria-label={
+                      isPinned
+                        ? t("assetsSidebar.unpinSidebar")
+                        : t("assetsSidebar.pinSidebar")
+                    }
+                    onPress={() => {
+                      setIsPinned((prev) => !prev);
+                      setIsOpen(true);
+                    }}
+                  >
+                    {isPinned ? <PinOff size={16} /> : <Pin size={16} />}
+                  </Button>
+                  <Button
+                    isIconOnly
+                    size="sm"
+                    variant="flat"
+                    aria-label={t("common.close")}
+                    onPress={handleClose}
+                  >
+                    <X size={16} />
+                  </Button>
+                  <Chip size="sm" variant="flat" color="secondary">
+                    {t("assetsSidebar.dragOrClick")}
+                  </Chip>
+                </div>
                 <div className="flex items-center gap-2">
                   <Folder size={18} className="text-default-500" />
                   <div className="font-semibold">
                     {t("assetsSidebar.title")}
                   </div>
                 </div>
-                <Chip size="sm" variant="flat" color="secondary">
-                  {t("assetsSidebar.dragOrClick")}
-                </Chip>
               </div>
 
               <div className="p-3 border-b border-divider flex flex-col gap-2">
@@ -252,22 +364,43 @@ export default function AssetsHoverSidebar() {
                             : p.name}
                         </span>
                       </button>
-                      {(ownedCollectionsByProject.get(p.id) || []).map((c) => (
+                      {(ownedCollectionsByProject.get(p.id) || []).map((c) => {
+                        const canDrop = c.permission !== "viewer";
+                        return (
                         <button
                           key={c.id}
                           className={clsx(
                             "ml-3 w-[calc(100%-12px)] text-left px-2 py-1 rounded-md text-xs transition-colors",
                             scope.kind === "collection" && scope.id === c.id
                               ? "bg-primary/10 text-primary"
-                              : "hover:bg-default-100 text-default-600"
+                              : "hover:bg-default-100 text-default-600",
+                            dragOverCollectionId === c.id &&
+                              "ring-2 ring-primary/40 bg-primary/5"
                           )}
                           onClick={() =>
                             setScope({ kind: "collection", id: c.id })
                           }
+                          onDragOver={(e) => {
+                            if (!canDrop) return;
+                            e.preventDefault();
+                          }}
+                          onDragEnter={() => {
+                            if (canDrop) setDragOverCollectionId(c.id);
+                          }}
+                          onDragLeave={() => {
+                            if (dragOverCollectionId === c.id) {
+                              setDragOverCollectionId(null);
+                            }
+                          }}
+                          onDrop={(e) => {
+                            if (!canDrop) return;
+                            handleCollectionDrop(c.id, e);
+                          }}
                         >
                           {c.name}
                         </button>
-                      ))}
+                        );
+                      })}
                     </div>
                   ))}
                 </div>
@@ -278,25 +411,46 @@ export default function AssetsHoverSidebar() {
                       {t("assetsSidebar.sharedCollections")}
                     </div>
                     <div className="flex flex-col gap-1 max-h-[140px] overflow-y-auto pr-1">
-                      {sharedCollections.map((c) => (
+                      {sharedCollections.map((c) => {
+                        const canDrop = c.permission !== "viewer";
+                        return (
                         <button
                           key={c.id}
                           className={clsx(
                             "w-full text-left px-2 py-1 rounded-md text-xs transition-colors",
                             scope.kind === "collection" && scope.id === c.id
                               ? "bg-primary/10 text-primary"
-                              : "hover:bg-default-100 text-default-600"
+                              : "hover:bg-default-100 text-default-600",
+                            dragOverCollectionId === c.id &&
+                              "ring-2 ring-primary/40 bg-primary/5"
                           )}
                           onClick={() =>
                             setScope({ kind: "collection", id: c.id })
                           }
+                          onDragOver={(e) => {
+                            if (!canDrop) return;
+                            e.preventDefault();
+                          }}
+                          onDragEnter={() => {
+                            if (canDrop) setDragOverCollectionId(c.id);
+                          }}
+                          onDragLeave={() => {
+                            if (dragOverCollectionId === c.id) {
+                              setDragOverCollectionId(null);
+                            }
+                          }}
+                          onDrop={(e) => {
+                            if (!canDrop) return;
+                            handleCollectionDrop(c.id, e);
+                          }}
                         >
                           {c.name}{" "}
                           <span className="opacity-70">
                             ({t(`assetsSidebar.permissions.${c.permission}`)})
                           </span>
                         </button>
-                      ))}
+                        );
+                      })}
                     </div>
                   </>
                 )}
@@ -354,4 +508,4 @@ export default function AssetsHoverSidebar() {
   );
 }
 
-export { DRAG_MIME, SELECT_EVENT };
+export { SELECT_EVENT };

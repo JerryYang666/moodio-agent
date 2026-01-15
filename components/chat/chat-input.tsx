@@ -24,6 +24,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import MenuConfiguration, { MenuState } from "./menu-configuration";
 import { PendingImage, MAX_PENDING_IMAGES } from "./pending-image-types";
 import clsx from "clsx";
+import { ASSET_DRAG_MIME } from "./asset-dnd";
 
 interface ChatInputProps {
   input: string;
@@ -81,7 +82,7 @@ export default function ChatInput({
     e.preventDefault();
     e.stopPropagation();
     try {
-      const json = e.dataTransfer.getData("application/x-moodio-asset");
+      const json = e.dataTransfer.getData(ASSET_DRAG_MIME);
       if (json) {
         const parsed = JSON.parse(json);
         if (parsed?.assetId) {

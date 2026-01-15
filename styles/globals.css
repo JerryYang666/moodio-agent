@@ -2,6 +2,17 @@
 
 @config "../tailwind.config.mjs";
 
+/* Chat assets sidebar offset */
+.chat-with-assets {
+  padding-right: calc(var(--assets-sidebar-offset, 0px) + 1rem);
+}
+
+@media (min-width: 768px) {
+  .chat-with-assets {
+    padding-right: calc(var(--assets-sidebar-offset, 0px) + 1.25rem);
+  }
+}
+
 /* Custom scrollbar styles for sidebar */
 .sidebar-scrollbar {
   /* Ensure standard overflow handling */

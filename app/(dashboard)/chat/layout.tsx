@@ -9,7 +9,7 @@ export default function ChatLayout({
   return (
     <div className="flex h-full w-full overflow-hidden">
       <Sidebar />
-      <div className="flex-1 h-full w-full overflow-hidden relative bg-background px-4 md:px-5 py-0">
+      <div className="flex-1 h-full w-full overflow-hidden relative bg-background px-4 md:px-5 py-0 chat-with-assets">
         {children}
         <AssetsHoverSidebar />
       </div>

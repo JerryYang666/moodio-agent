@@ -352,6 +352,8 @@
   "assetsSidebar": {
     "title": "素材",
     "dragOrClick": "拖拽或点击",
+    "pinSidebar": "固定侧边栏",
+    "unpinSidebar": "取消固定",
     "recent": "最近",
     "projects": "项目",
     "defaultSuffix": "默认",
@@ -363,7 +365,9 @@
     },
     "noAssets": "暂无素材",
     "assetAlt": "素材",
-    "untitled": "未命名"
+    "untitled": "未命名",
+    "addedToCollection": "已添加到集合",
+    "addToCollectionFailed": "添加到集合失败"
   },
   "imageDetail": {
     "title": "图片详情",

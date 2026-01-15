@@ -16,6 +16,7 @@ import { Popover, PopoverTrigger, PopoverContent } from "@heroui/popover";
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { useAuth } from "@/hooks/use-auth";
+import { AI_IMAGE_DRAG_MIME } from "./asset-dnd";
 
 interface ChatMessageProps {
   message: Message;
@@ -57,6 +58,24 @@ export default function ChatMessage({
   const { user: currentUser } = useAuth();
   const isAdmin = currentUser?.roles?.includes("admin");
   const t = useTranslations();
+
+  const handleAgentDragStart = (e: React.DragEvent, part: any) => {
+    if (part.status !== "generated" || !part.imageId || !part.imageUrl) return;
+    const payload = {
+      imageId: part.imageId,
+      url: part.imageUrl,
+      title: part.title,
+      prompt: part.prompt,
+      status: part.status,
+      chatId: chatId || null,
+    };
+    try {
+      e.dataTransfer.setData(AI_IMAGE_DRAG_MIME, JSON.stringify(payload));
+      e.dataTransfer.effectAllowed = "copy";
+    } catch (err) {
+      console.error("Failed to start AI image drag", err);
+    }
+  };
 
   const renderContent = (
     content: string | MessageContentPart[],
@@ -194,6 +213,7 @@ export default function ChatMessage({
                   >
                     <CardBody
                       className="p-0 overflow-hidden relative aspect-square cursor-pointer group/image rounded-lg"
+                      draggable={effectiveStatus === "generated"}
                       onClick={() =>
                         effectiveStatus === "generated" &&
                         msgIndex !== undefined &&
@@ -204,6 +224,7 @@ export default function ChatMessage({
                           message.variantId
                         )
                       }
+                      onDragStart={(e) => handleAgentDragStart(e, part)}
                       onDoubleClick={(e) => {
                         e.preventDefault();
                         if (
