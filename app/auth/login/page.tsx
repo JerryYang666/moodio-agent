@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { Input } from "@heroui/input";
 import { InputOtp } from "@heroui/input-otp";
 import { Button } from "@heroui/button";
@@ -9,8 +9,10 @@ import { Card } from "@heroui/card";
 import { siteConfig } from "@/config/site";
 import { startAuthentication } from "@simplewebauthn/browser";
 import { Key } from "lucide-react";
+import { LanguageSwitch } from "@/components/language-switch";
 
 export default function LoginPage() {
+  const t = useTranslations();
   const [step, setStep] = useState<"email" | "otp">("email");
   const [email, setEmail] = useState("");
   const [otp, setOtp] = useState("");
@@ -35,12 +37,12 @@ export default function LoginPage() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || "Failed to send OTP");
+        throw new Error(data.error || t("auth.failedToSendOtp"));
       }
 
       setStep("otp");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to send OTP");
+      setError(err instanceof Error ? err.message : t("auth.failedToSendOtp"));
     } finally {
       setLoading(false);
     }
@@ -63,13 +65,13 @@ export default function LoginPage() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || "Failed to verify OTP");
+        throw new Error(data.error || t("auth.failedToVerifyOtp"));
       }
 
       // Hard redirect to home page to ensure cookies are properly loaded
       window.location.href = "/";
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to verify OTP");
+      setError(err instanceof Error ? err.message : t("auth.failedToVerifyOtp"));
       setOtp("");
     } finally {
       setLoading(false);
@@ -97,7 +99,7 @@ export default function LoginPage() {
         asseResp = await startAuthentication(options);
       } catch (err) {
         if ((err as Error).name === "NotAllowedError") {
-          throw new Error("Passkey authentication cancelled.");
+          throw new Error(t("auth.passkeyAuthCancelled"));
         }
         throw err;
       }
@@ -114,11 +116,11 @@ export default function LoginPage() {
       if (verification.verified) {
         window.location.href = "/";
       } else {
-        throw new Error(verification.error || "Verification failed");
+        throw new Error(verification.error || t("auth.verificationFailed"));
       }
     } catch (err) {
       console.error(err);
-      setError(err instanceof Error ? err.message : "Passkey login failed");
+      setError(err instanceof Error ? err.message : t("auth.passkeyLoginFailed"));
     } finally {
       setPasskeyLoading(false);
     }
@@ -136,12 +138,15 @@ export default function LoginPage() {
     <div className="flex items-center justify-center min-h-screen">
       <Card className="w-full max-w-md p-8">
         <div className="space-y-6">
-          <div className="text-center">
-            <h1 className="text-3xl font-bold mb-2">moodio agent</h1>
+          <div className="text-center relative">
+            <div className="absolute right-0 top-0">
+              <LanguageSwitch />
+            </div>
+            <h1 className="text-3xl font-bold mb-2">{t("common.appName")}</h1>
             <p className="text-gray-600 dark:text-gray-400">
               {step === "email"
-                ? "Sign in to access your account"
-                : `Enter the ${OTP_LENGTH}-digit code sent to your email`}
+                ? t("auth.signInTitle")
+                : t("auth.enterOtpCode", { count: OTP_LENGTH })}
             </p>
           </div>
 
@@ -156,8 +161,8 @@ export default function LoginPage() {
               <form onSubmit={handleRequestOTP} className="space-y-4">
                 <Input
                   type="email"
-                  label="Email"
-                  placeholder="you@example.com"
+                  label={t("auth.emailLabel")}
+                  placeholder={t("auth.emailPlaceholder")}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   isRequired
@@ -173,7 +178,7 @@ export default function LoginPage() {
                   isLoading={loading}
                   isDisabled={!email || loading || passkeyLoading}
                 >
-                  Send Login Code
+                  {t("auth.sendLoginCode")}
                 </Button>
               </form>
 
@@ -192,19 +197,18 @@ export default function LoginPage() {
                 isDisabled={loading}
                 startContent={<Key size={20} />}
               >
-                Sign in with Passkey
+                {t("auth.signInWithPasskey")}
               </Button>
-              
+
               <p className="text-xs text-center text-gray-500 dark:text-gray-400 mt-2">
-                <strong>New user?</strong> First-time login requires email verification. 
-                You can set up passkey during onboarding for faster access next time.
+                {t("auth.newUserHint")}
               </p>
             </div>
           ) : (
             <div className="space-y-6">
               <div className="flex flex-col items-center space-y-4">
                 <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Code sent to: <strong>{email}</strong>
+                  {t("auth.codeSentTo")} <strong>{email}</strong>
                 </p>
 
                 <InputOtp
@@ -212,11 +216,11 @@ export default function LoginPage() {
                   value={otp}
                   onValueChange={handleOTPChange}
                   isDisabled={loading}
-                  errorMessage="Invalid OTP code"
+                  errorMessage={t("auth.invalidOtpCode")}
                 />
 
                 {loading && (
-                  <p className="text-sm text-gray-500">Verifying...</p>
+                  <p className="text-sm text-gray-500">{t("auth.verifying")}</p>
                 )}
               </div>
 
@@ -229,7 +233,7 @@ export default function LoginPage() {
                   isLoading={loading}
                   isDisabled={otp.length !== OTP_LENGTH || loading}
                 >
-                  Verify & Login
+                  {t("auth.verifyAndLogin")}
                 </Button>
 
                 <Button
@@ -243,7 +247,7 @@ export default function LoginPage() {
                   }}
                   isDisabled={loading}
                 >
-                  Use a different email
+                  {t("auth.useDifferentEmail")}
                 </Button>
 
                 <Button
@@ -253,7 +257,7 @@ export default function LoginPage() {
                   onPress={() => handleRequestOTP()}
                   isDisabled={loading}
                 >
-                  Resend code
+                  {t("auth.resendCode")}
                 </Button>
               </div>
             </div>

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { Card, CardBody, CardFooter } from "@heroui/card";
 import { Button } from "@heroui/button";
 import { Input } from "@heroui/input";
@@ -40,6 +41,7 @@ type Collection = {
 
 export default function ProjectsPage() {
   const router = useRouter();
+  const t = useTranslations();
   const { isOpen, onOpen, onOpenChange } = useDisclosure();
   const [loading, setLoading] = useState(true);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -114,9 +116,9 @@ export default function ProjectsPage() {
     <div className="container mx-auto px-4 py-8 max-w-7xl">
       <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 sm:gap-0 mb-8">
         <div>
-          <h1 className="text-3xl font-bold">Projects</h1>
+          <h1 className="text-3xl font-bold">{t("projects.title")}</h1>
           <p className="text-default-500 mt-1">
-            Organize assets with Projects and Collections
+            {t("projects.subtitle")}
           </p>
         </div>
         <Button
@@ -128,16 +130,16 @@ export default function ProjectsPage() {
           }}
           className="w-full sm:w-auto"
         >
-          New Project
+          {t("projects.newProject")}
         </Button>
       </div>
 
       {projects.length === 0 ? (
         <div className="text-center py-20">
           <FolderOpen size={64} className="mx-auto mb-4 text-default-300" />
-          <h2 className="text-xl font-semibold mb-2">No projects yet</h2>
+          <h2 className="text-xl font-semibold mb-2">{t("projects.noProjectsYet")}</h2>
           <p className="text-default-500 mb-6">
-            Create your first project to start organizing assets
+            {t("projects.createFirstProject")}
           </p>
           <Button
             color="primary"
@@ -147,7 +149,7 @@ export default function ProjectsPage() {
               onOpen();
             }}
           >
-            Create Project
+            {t("projects.createProject")}
           </Button>
         </div>
       ) : (
@@ -171,7 +173,7 @@ export default function ProjectsPage() {
                 <div className="flex items-center gap-2">
                   {project.isDefault && (
                     <Chip size="sm" variant="flat" color="primary">
-                      Default
+                      {t("projects.default")}
                     </Chip>
                   )}
                 </div>
@@ -185,7 +187,7 @@ export default function ProjectsPage() {
         <div className="mt-10">
           <div className="flex items-center gap-2 mb-4">
             <Share2 size={18} className="text-default-500" />
-            <h2 className="text-lg font-semibold">Shared collections</h2>
+            <h2 className="text-lg font-semibold">{t("projects.sharedCollections")}</h2>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {sharedCollections.map((c) => (
@@ -217,11 +219,11 @@ export default function ProjectsPage() {
         <ModalContent>
           {(onClose) => (
             <>
-              <ModalHeader>Create New Project</ModalHeader>
+              <ModalHeader>{t("projects.createNewProject")}</ModalHeader>
               <ModalBody>
                 <Input
-                  label="Project Name"
-                  placeholder="Enter project name"
+                  label={t("projects.projectName")}
+                  placeholder={t("projects.enterProjectName")}
                   value={newProjectName}
                   onValueChange={setNewProjectName}
                   onKeyDown={(e) => {
@@ -232,7 +234,7 @@ export default function ProjectsPage() {
               </ModalBody>
               <ModalFooter>
                 <Button variant="light" onPress={onClose}>
-                  Cancel
+                  {t("common.cancel")}
                 </Button>
                 <Button
                   color="primary"
@@ -240,7 +242,7 @@ export default function ProjectsPage() {
                   isLoading={isCreating}
                   isDisabled={!newProjectName.trim()}
                 >
-                  Create
+                  {t("common.create")}
                 </Button>
               </ModalFooter>
             </>
@@ -250,5 +252,3 @@ export default function ProjectsPage() {
     </div>
   );
 }
-
-

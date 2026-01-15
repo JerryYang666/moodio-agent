@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useTranslations } from "next-intl";
 import { useAuth } from "@/hooks/use-auth";
 import { Spinner } from "@heroui/spinner";
 import { useDisclosure } from "@heroui/modal";
@@ -64,6 +65,7 @@ export default function ChatInterface({
   chatId: initialChatId,
   initialMessages = [],
 }: ChatInterfaceProps) {
+  const t = useTranslations();
   const { user } = useAuth();
   const { monitorChat, cancelMonitorChat } = useChat();
   const router = useRouter();
@@ -276,7 +278,7 @@ export default function ChatInterface({
 
   const applySelectedFile = useCallback((file: File) => {
     if (file.size > 5 * 1024 * 1024) {
-      alert("File size too large. Max 5MB.");
+      alert(t("chat.fileSizeTooLarge"));
       return;
     }
     // Local upload and asset selection are mutually exclusive
@@ -636,11 +638,11 @@ export default function ChatInterface({
               // Show a cute toast notification (only once per retry cycle)
               if (Object.keys(variantContents).length <= 1) {
                 const cuteMessages = [
-                  "Oops! Let me think about that again... 🤔",
-                  "Hmm, let me rephrase that better! 💭",
-                  "One sec, organizing my thoughts... ✨",
-                  "Wait, I can do better! 🎨",
-                  "Let me try that again with more sparkle! ⭐",
+                  t("chat.retryMessages.rethink"),
+                  t("chat.retryMessages.rephrase"),
+                  t("chat.retryMessages.organizing"),
+                  t("chat.retryMessages.better"),
+                  t("chat.retryMessages.sparkle"),
                 ];
                 const randomMessage =
                   cuteMessages[Math.floor(Math.random() * cuteMessages.length)];
@@ -695,9 +697,9 @@ export default function ChatInterface({
 
                 // Show error toast
                 const cuteErrorMessages = [
-                  "Oops! Our agent got a bit overwhelmed... 🥺 Mind trying again?",
-                  "So sorry! Our agent is taking a coffee break ☕ Please try again!",
-                  "Uh oh! Our agent tripped over their thoughts 🤭 Give it another go?",
+                  t("chat.errorMessages.overwhelmed"),
+                  t("chat.errorMessages.coffeeBreak"),
+                  t("chat.errorMessages.tripped"),
                 ];
                 const randomErrorMessage =
                   cuteErrorMessages[
@@ -932,7 +934,7 @@ export default function ChatInterface({
     } catch (error) {
       console.error("Error forking chat:", error);
       addToast({
-        title: "Failed to fork chat",
+        title: t("chat.failedToForkChat"),
         color: "danger",
       });
     }
@@ -952,7 +954,7 @@ export default function ChatInterface({
         {messages.length === 0 && (
           <div className="text-center text-default-500 mt-60">
             <Bot size={48} className="mx-auto mb-4 opacity-20" />
-            <p>Start a conversation with Moodio Agent</p>
+            <p>{t("chat.startConversation")}</p>
           </div>
         )}
 

@@ -1,0 +1,301 @@
+{
+  "common": {
+    "appName": "moodio agent",
+    "cancel": "取消",
+    "delete": "删除",
+    "save": "保存",
+    "skip": "跳过",
+    "next": "下一步",
+    "finish": "完成",
+    "close": "关闭",
+    "open": "打开",
+    "download": "下载",
+    "back": "返回",
+    "loading": "加载中...",
+    "error": "发生错误",
+    "success": "成功",
+    "confirm": "确认",
+    "search": "搜索",
+    "select": "选择",
+    "change": "更改",
+    "submit": "提交",
+    "edit": "编辑",
+    "rename": "重命名",
+    "create": "创建",
+    "new": "新建"
+  },
+  "nav": {
+    "browse": "浏览",
+    "agent": "助手",
+    "projects": "项目",
+    "storyboard": "故事板",
+    "storyboardShort": "故事",
+    "admin": "管理",
+    "adminDashboard": "管理面板",
+    "home": "首页",
+    "profile": "个人资料",
+    "logout": "退出登录",
+    "listView": "列表视图",
+    "gridView": "网格视图"
+  },
+  "auth": {
+    "signInTitle": "登录以访问您的账户",
+    "emailLabel": "邮箱",
+    "emailPlaceholder": "you@example.com",
+    "sendLoginCode": "发送登录验证码",
+    "enterOtpCode": "请输入发送到您邮箱的{count}位验证码",
+    "verifyAndLogin": "验证并登录",
+    "useDifferentEmail": "使用其他邮箱",
+    "resendCode": "重新发送验证码",
+    "signInWithPasskey": "使用通行密钥登录",
+    "newUserHint": "新用户？首次登录需要邮箱验证。您可以在引导流程中设置通行密钥以便下次更快登录。",
+    "codeSentTo": "验证码已发送至：",
+    "invalidOtpCode": "验证码无效",
+    "verifying": "验证中...",
+    "passkeyAuthCancelled": "通行密钥验证已取消。",
+    "failedToSendOtp": "发送验证码失败",
+    "failedToVerifyOtp": "验证失败",
+    "passkeyLoginFailed": "通行密钥登录失败",
+    "verificationFailed": "验证失败"
+  },
+  "onboarding": {
+    "welcomeTitle": "欢迎使用 moodio agent！",
+    "enhanceSecurityTitle": "增强您的安全性",
+    "whatToCallYou": "moodio agent 应该怎么称呼您？",
+    "yourName": "您的名字",
+    "addPasskey": "添加通行密钥",
+    "passkeyDescription": "想要更简单快捷的登录方式吗？添加通行密钥后，无需密码即可登录，也无需等待邮箱验证码。",
+    "passkeyAddedTitle": "通行密钥已添加！",
+    "failedToCompleteOnboarding": "完成引导流程失败",
+    "passkeyAddedSuccess": "通行密钥添加成功",
+    "failedToAddPasskey": "添加通行密钥失败"
+  },
+  "chat": {
+    "startConversation": "开始与 Moodio Agent 对话",
+    "newChat": "新对话",
+    "renameChat": "重命名对话",
+    "deleteChat": "删除对话",
+    "deleteConfirm": "确定要删除这个对话吗？此操作无法撤销。",
+    "noChatsYet": "暂无对话",
+    "typeMessage": "输入消息...",
+    "addImage": "添加图片",
+    "recordVoice": "录制语音",
+    "precisionEditing": "精准编辑",
+    "precisionEditingDesc": "启用后，助手会尽力只编辑您想要更改的图像部分，保持其他部分不变。",
+    "timeRemaining": "剩余 {seconds} 秒",
+    "fileSizeTooLarge": "文件过大，最大支持 5MB。",
+    "failedToForkChat": "复制对话失败",
+    "selectImage": "选择：{title}",
+    "asset": "素材：{title}",
+    "retryMessages": {
+      "rethink": "哎呀！让我重新思考一下...",
+      "rephrase": "嗯，让我换个方式表达！",
+      "organizing": "稍等，正在整理思路...",
+      "better": "等等，我可以做得更好！",
+      "sparkle": "让我再试一次，加点创意！"
+    },
+    "errorMessages": {
+      "overwhelmed": "哎呀！我们的助手有点忙不过来了... 请再试一次？",
+      "coffeeBreak": "抱歉！我们的助手正在休息中，请稍后再试！",
+      "tripped": "糟糕！我们的助手走神了，请再试一次？"
+    }
+  },
+  "profile": {
+    "title": "个人设置",
+    "subtitle": "管理您的账户信息和安全设置",
+    "personalInfo": "个人信息",
+    "firstName": "名字",
+    "lastName": "姓氏",
+    "email": "邮箱",
+    "saveChanges": "保存更改",
+    "security": "安全设置",
+    "managePasskeys": "管理您的通行密钥以实现免密登录",
+    "passkeys": "通行密钥",
+    "noPasskeysYet": "暂未注册通行密钥。",
+    "passkeyDevice": "通行密钥（{deviceType}）",
+    "addedOn": "添加于 {date}",
+    "profileUpdated": "个人资料更新成功",
+    "failedToUpdateProfile": "更新个人资料失败",
+    "failedToFetchPasskeys": "获取通行密钥失败"
+  },
+  "projects": {
+    "title": "项目",
+    "subtitle": "使用项目和集合整理素材",
+    "newProject": "新建项目",
+    "noProjectsYet": "暂无项目",
+    "createFirstProject": "创建您的第一个项目以开始整理素材",
+    "createProject": "创建项目",
+    "createNewProject": "创建新项目",
+    "projectName": "项目名称",
+    "enterProjectName": "输入项目名称",
+    "sharedCollections": "共享集合",
+    "default": "默认",
+    "manageProjectsHere": "在这里管理您的项目",
+    "goToProjects": "前往项目",
+    "errorCreatingProject": "创建项目出错"
+  },
+  "collections": {
+    "title": "集合",
+    "subtitle": "整理和管理您生成的图片",
+    "newCollection": "新建集合",
+    "noCollectionsYet": "暂无集合",
+    "createFirstCollection": "创建您的第一个集合以整理生成的图片",
+    "createCollection": "创建集合",
+    "createNewCollection": "创建新集合",
+    "collectionName": "集合名称",
+    "enterCollectionName": "输入集合名称",
+    "shared": "共享",
+    "errorCreatingCollection": "创建集合出错"
+  },
+  "storyboard": {
+    "title": "故事板",
+    "subtitle": "将您的想法可视化",
+    "goToStoryboard": "前往故事板"
+  },
+  "browse": {
+    "title": "浏览",
+    "subtitle": "浏览内容",
+    "goToBrowse": "前往浏览"
+  },
+  "video": {
+    "generateVideo": "生成视频",
+    "generateVideoDesc": "使用 AI 将您的图片转换为视频",
+    "model": "模型",
+    "sourceImage": "源图片 *",
+    "clickToSelectFirstFrame": "点击选择第一帧",
+    "endImage": "结束图片（可选）",
+    "selectLastFrame": "可选：选择最后一帧",
+    "promptPlaceholder": "描述视频中发生的内容...",
+    "starting": "启动中...",
+    "selectSourceImageError": "请选择源图片",
+    "enterPromptError": "请输入提示词",
+    "failedToLoadVideoModels": "加载视频模型失败",
+    "failedToUploadImage": "上传图片失败",
+    "yourVideos": "我的视频",
+    "queued": "排队中",
+    "generating": "生成中...",
+    "failed": "失败",
+    "noVideosYet": "暂无视频",
+    "generateFirstVideo": "从图片生成您的第一个视频",
+    "videoDetails": "视频详情",
+    "prompt": "提示词",
+    "parameters": "参数",
+    "created": "创建于：{date}",
+    "done": "完成于：{date}",
+    "seed": "种子：{seed}",
+    "openInNewTab": "在新标签页中打开",
+    "videoCount": "{count} 个视频"
+  },
+  "menu": {
+    "mode": "模式",
+    "model": "模型",
+    "expertise": "专业领域",
+    "aspectRatio": "宽高比",
+    "selectMode": "选择模式",
+    "selectCategory": "选择{category}",
+    "with": "使用",
+    "modes": {
+      "create": "创建新图片",
+      "createDesc": "完整的生成工作流",
+      "edit": "编辑已选图片",
+      "editDesc": "编辑现有图片",
+      "chat": "对话",
+      "chatDesc": "对话交互"
+    },
+    "models": {
+      "nano-banana-pro": "Nano-banana Pro",
+      "midjourney": "Midjourney",
+      "gpt-5.2": "gpt-5.2",
+      "gemini-3": "gemini-3"
+    },
+    "expertiseOptions": {
+      "commercial": "商业",
+      "film": "影视",
+      "game": "游戏",
+      "uiux": "UI/UX",
+      "product": "产品"
+    },
+    "aspectRatioOptions": {
+      "smart": "智能",
+      "smartDesc": "让模型为您的内容选择最佳宽高比"
+    },
+    "editModeHint": "请先选择或上传图片以使用编辑模式",
+    "expertiseNotAvailable": "编辑已选图片模式下不支持专业领域选项。",
+    "aspectRatioNotApplicable": "对话模式下不适用宽高比设置。"
+  },
+  "notifications": {
+    "enableTitle": "启用通知",
+    "enableDescription": "图片生成可能需要一些时间。启用通知后，当结果准备就绪时会提醒您，您可以自由浏览其他标签页或页面。",
+    "noThanks": "暂不需要",
+    "enable": "启用通知"
+  },
+  "install": {
+    "title": "安装 Moodio Agent",
+    "description": "添加到主屏幕以获得全屏体验和快速访问",
+    "step1": "点击下方的分享按钮",
+    "step2": "滚动并点击「添加到主屏幕」",
+    "maybeLater": "稍后再说"
+  },
+  "admin": {
+    "title": "管理面板",
+    "unauthorized": "未授权",
+    "users": {
+      "title": "用户",
+      "subtitle": "管理",
+      "description": "管理用户、角色、邀请和验证码。",
+      "goTo": "前往用户管理"
+    },
+    "chats": {
+      "title": "对话",
+      "description": "查看所有对话、监控活动和历史记录。",
+      "goTo": "前往对话管理"
+    },
+    "events": {
+      "title": "事件",
+      "subtitle": "遥测",
+      "description": "查看系统事件、用户操作和错误。",
+      "goTo": "前往事件"
+    },
+    "system": {
+      "title": "系统",
+      "description": "管理系统设置、清理令牌和维护。",
+      "goTo": "前往系统管理"
+    },
+    "falUsage": {
+      "title": "Fal.ai 使用",
+      "subtitle": "成本与使用",
+      "description": "监控 Fal.ai API 使用情况和预估成本。",
+      "goTo": "前往 Fal 使用"
+    }
+  },
+  "dashboard": {
+    "welcomeBack": "欢迎回来！",
+    "authProvider": "认证方式",
+    "roles": "角色",
+    "memberSince": "注册时间",
+    "testProtectedApi": "测试受保护的 API",
+    "goToAgent": "前往助手",
+    "apiResponse": "/api/test/protected 的响应："
+  },
+  "assetPicker": {
+    "title": "选择素材",
+    "noAssets": "暂无可用素材",
+    "selectFromChat": "从对话中选择",
+    "selectFromCollection": "从集合中选择"
+  },
+  "imageDetail": {
+    "title": "图片详情",
+    "copyPrompt": "复制提示词",
+    "promptCopied": "提示词已复制！",
+    "saveToProject": "保存到项目",
+    "viewFullSize": "查看原图",
+    "download": "下载",
+    "delete": "删除",
+    "deleteConfirm": "确定要删除这张图片吗？"
+  },
+  "language": {
+    "switchLanguage": "语言",
+    "english": "English",
+    "chinese": "简体中文"
+  }
+}

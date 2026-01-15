@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { Card, CardBody, CardFooter, CardHeader } from "@heroui/card";
 import { Button } from "@heroui/button";
 import { useAuth } from "@/hooks/use-auth";
@@ -10,35 +11,36 @@ import { Users, MessageSquare, Settings, Activity } from "lucide-react";
 export default function AdminPage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
+  const t = useTranslations("admin");
 
   if (authLoading) {
     return <Spinner size="lg" className="flex justify-center mt-10" />;
   }
 
   if (!user || !user.roles.includes("admin")) {
-    return <div className="p-8 text-center">Unauthorized</div>;
+    return <div className="p-8 text-center">{t("unauthorized")}</div>;
   }
 
   return (
     <div className="space-y-8">
-      <h1 className="text-3xl font-bold">Admin Dashboard</h1>
-      
+      <h1 className="text-3xl font-bold">{t("title")}</h1>
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {/* User Management Card */}
         <Card className="py-4 cursor-pointer hover:scale-[1.02] transition-transform" onPress={() => router.push("/admin/user-management")}>
           <CardHeader className="pb-0 pt-2 px-4 flex-row gap-2 items-center">
             <Users className="w-6 h-6 text-primary" />
             <div className="flex flex-col">
-              <p className="text-tiny uppercase font-bold">Management</p>
-              <h4 className="font-bold text-large">Users</h4>
+              <p className="text-tiny uppercase font-bold">{t("users.subtitle")}</p>
+              <h4 className="font-bold text-large">{t("users.title")}</h4>
             </div>
           </CardHeader>
           <CardBody className="overflow-visible py-2">
-            <p className="text-default-500">Manage users, roles, invitations, and OTPs.</p>
+            <p className="text-default-500">{t("users.description")}</p>
           </CardBody>
           <CardFooter>
             <Button color="primary" variant="flat" onPress={() => router.push("/admin/user-management")}>
-              Go to User Management
+              {t("users.goTo")}
             </Button>
           </CardFooter>
         </Card>
@@ -48,16 +50,16 @@ export default function AdminPage() {
           <CardHeader className="pb-0 pt-2 px-4 flex-row gap-2 items-center">
             <MessageSquare className="w-6 h-6 text-primary" />
             <div className="flex flex-col">
-               <p className="text-tiny uppercase font-bold">Management</p>
-               <h4 className="font-bold text-large">Chats</h4>
+              <p className="text-tiny uppercase font-bold">{t("users.subtitle")}</p>
+              <h4 className="font-bold text-large">{t("chats.title")}</h4>
             </div>
           </CardHeader>
           <CardBody className="overflow-visible py-2">
-             <p className="text-default-500">View all chats, monitor activity, and history.</p>
+            <p className="text-default-500">{t("chats.description")}</p>
           </CardBody>
           <CardFooter>
             <Button color="primary" variant="flat" onPress={() => router.push("/admin/chat-management")}>
-              Go to Chat Management
+              {t("chats.goTo")}
             </Button>
           </CardFooter>
         </Card>
@@ -67,16 +69,16 @@ export default function AdminPage() {
           <CardHeader className="pb-0 pt-2 px-4 flex-row gap-2 items-center">
             <Activity className="w-6 h-6 text-primary" />
             <div className="flex flex-col">
-               <p className="text-tiny uppercase font-bold">Telemetry</p>
-               <h4 className="font-bold text-large">Events</h4>
+              <p className="text-tiny uppercase font-bold">{t("events.subtitle")}</p>
+              <h4 className="font-bold text-large">{t("events.title")}</h4>
             </div>
           </CardHeader>
           <CardBody className="overflow-visible py-2">
-             <p className="text-default-500">View system events, user actions, and errors.</p>
+            <p className="text-default-500">{t("events.description")}</p>
           </CardBody>
           <CardFooter>
             <Button color="primary" variant="flat" onPress={() => router.push("/admin/events")}>
-              Go to Events
+              {t("events.goTo")}
             </Button>
           </CardFooter>
         </Card>
@@ -86,16 +88,16 @@ export default function AdminPage() {
           <CardHeader className="pb-0 pt-2 px-4 flex-row gap-2 items-center">
             <Settings className="w-6 h-6 text-primary" />
             <div className="flex flex-col">
-               <p className="text-tiny uppercase font-bold">Management</p>
-               <h4 className="font-bold text-large">System</h4>
+              <p className="text-tiny uppercase font-bold">{t("users.subtitle")}</p>
+              <h4 className="font-bold text-large">{t("system.title")}</h4>
             </div>
           </CardHeader>
           <CardBody className="overflow-visible py-2">
-             <p className="text-default-500">Manage system settings, cleanup tokens, and maintenance.</p>
+            <p className="text-default-500">{t("system.description")}</p>
           </CardBody>
           <CardFooter>
             <Button color="primary" variant="flat" onPress={() => router.push("/admin/system-management")}>
-              Go to System Management
+              {t("system.goTo")}
             </Button>
           </CardFooter>
         </Card>
@@ -105,16 +107,16 @@ export default function AdminPage() {
           <CardHeader className="pb-0 pt-2 px-4 flex-row gap-2 items-center">
             <Activity className="w-6 h-6 text-primary" />
             <div className="flex flex-col">
-               <p className="text-tiny uppercase font-bold">Cost & Usage</p>
-               <h4 className="font-bold text-large">Fal.ai Usage</h4>
+              <p className="text-tiny uppercase font-bold">{t("falUsage.subtitle")}</p>
+              <h4 className="font-bold text-large">{t("falUsage.title")}</h4>
             </div>
           </CardHeader>
           <CardBody className="overflow-visible py-2">
-             <p className="text-default-500">Monitor Fal.ai API usage and estimated costs.</p>
+            <p className="text-default-500">{t("falUsage.description")}</p>
           </CardBody>
           <CardFooter>
             <Button color="primary" variant="flat" onPress={() => router.push("/admin/fal-usage")}>
-              Go to Fal Usage
+              {t("falUsage.goTo")}
             </Button>
           </CardFooter>
         </Card>

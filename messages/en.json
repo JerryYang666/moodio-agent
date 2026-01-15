@@ -1,0 +1,301 @@
+{
+  "common": {
+    "appName": "moodio agent",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "save": "Save",
+    "skip": "Skip",
+    "next": "Next",
+    "finish": "Finish",
+    "close": "Close",
+    "open": "Open",
+    "download": "Download",
+    "back": "Back",
+    "loading": "Loading...",
+    "error": "An error occurred",
+    "success": "Success",
+    "confirm": "Confirm",
+    "search": "Search",
+    "select": "Select",
+    "change": "Change",
+    "submit": "Submit",
+    "edit": "Edit",
+    "rename": "Rename",
+    "create": "Create",
+    "new": "New"
+  },
+  "nav": {
+    "browse": "Browse",
+    "agent": "Agent",
+    "projects": "Projects",
+    "storyboard": "Storyboard",
+    "storyboardShort": "Story.",
+    "admin": "Admin",
+    "adminDashboard": "Admin Dashboard",
+    "home": "Home",
+    "profile": "Profile",
+    "logout": "Logout",
+    "listView": "List View",
+    "gridView": "Grid View"
+  },
+  "auth": {
+    "signInTitle": "Sign in to access your account",
+    "emailLabel": "Email",
+    "emailPlaceholder": "you@example.com",
+    "sendLoginCode": "Send Login Code",
+    "enterOtpCode": "Enter the {count}-digit code sent to your email",
+    "verifyAndLogin": "Verify & Login",
+    "useDifferentEmail": "Use a different email",
+    "resendCode": "Resend code",
+    "signInWithPasskey": "Sign in with Passkey",
+    "newUserHint": "New user? First-time login requires email verification. You can set up passkey during onboarding for faster access next time.",
+    "codeSentTo": "Code sent to:",
+    "invalidOtpCode": "Invalid OTP code",
+    "verifying": "Verifying...",
+    "passkeyAuthCancelled": "Passkey authentication cancelled.",
+    "failedToSendOtp": "Failed to send OTP",
+    "failedToVerifyOtp": "Failed to verify OTP",
+    "passkeyLoginFailed": "Passkey login failed",
+    "verificationFailed": "Verification failed"
+  },
+  "onboarding": {
+    "welcomeTitle": "Welcome to moodio agent!",
+    "enhanceSecurityTitle": "Enhance your Security",
+    "whatToCallYou": "What should moodio agent call you?",
+    "yourName": "Your name",
+    "addPasskey": "Add Passkey",
+    "passkeyDescription": "Want an easier and faster way to login? Add a passkey to sign in without a password, and no more waiting for the email code.",
+    "passkeyAddedTitle": "Passkey Added!",
+    "failedToCompleteOnboarding": "Failed to complete onboarding",
+    "passkeyAddedSuccess": "Passkey added successfully",
+    "failedToAddPasskey": "Failed to add passkey"
+  },
+  "chat": {
+    "startConversation": "Start a conversation with Moodio Agent",
+    "newChat": "New Chat",
+    "renameChat": "Rename Chat",
+    "deleteChat": "Delete Chat",
+    "deleteConfirm": "Are you sure you want to delete this chat? This action cannot be undone.",
+    "noChatsYet": "No chats yet",
+    "typeMessage": "Type a message...",
+    "addImage": "Add image",
+    "recordVoice": "Record voice",
+    "precisionEditing": "Precision Editing",
+    "precisionEditingDesc": "When enabled, Agent will try its best to only edit the part of the image that you want to change and keeping everything else the same.",
+    "timeRemaining": "{seconds}s remaining",
+    "fileSizeTooLarge": "File size too large. Max 5MB.",
+    "failedToForkChat": "Failed to fork chat",
+    "selectImage": "Select: {title}",
+    "asset": "Asset: {title}",
+    "retryMessages": {
+      "rethink": "Oops! Let me think about that again...",
+      "rephrase": "Hmm, let me rephrase that better!",
+      "organizing": "One sec, organizing my thoughts...",
+      "better": "Wait, I can do better!",
+      "sparkle": "Let me try that again with more sparkle!"
+    },
+    "errorMessages": {
+      "overwhelmed": "Oops! Our agent got a bit overwhelmed... Mind trying again?",
+      "coffeeBreak": "So sorry! Our agent is taking a coffee break. Please try again!",
+      "tripped": "Uh oh! Our agent tripped over their thoughts. Give it another go?"
+    }
+  },
+  "profile": {
+    "title": "Profile Settings",
+    "subtitle": "Manage your account information and security",
+    "personalInfo": "Personal Information",
+    "firstName": "First Name",
+    "lastName": "Last Name",
+    "email": "Email",
+    "saveChanges": "Save Changes",
+    "security": "Security",
+    "managePasskeys": "Manage your passkeys for passwordless login",
+    "passkeys": "Passkeys",
+    "noPasskeysYet": "No passkeys registered yet.",
+    "passkeyDevice": "Passkey ({deviceType})",
+    "addedOn": "Added on {date}",
+    "profileUpdated": "Profile updated successfully",
+    "failedToUpdateProfile": "Failed to update profile",
+    "failedToFetchPasskeys": "Failed to fetch passkeys"
+  },
+  "projects": {
+    "title": "Projects",
+    "subtitle": "Organize assets with Projects and Collections",
+    "newProject": "New Project",
+    "noProjectsYet": "No projects yet",
+    "createFirstProject": "Create your first project to start organizing assets",
+    "createProject": "Create Project",
+    "createNewProject": "Create New Project",
+    "projectName": "Project Name",
+    "enterProjectName": "Enter project name",
+    "sharedCollections": "Shared collections",
+    "default": "Default",
+    "manageProjectsHere": "Manage your projects here",
+    "goToProjects": "Go to Projects",
+    "errorCreatingProject": "Error creating project"
+  },
+  "collections": {
+    "title": "Collections",
+    "subtitle": "Organize and manage your generated images",
+    "newCollection": "New Collection",
+    "noCollectionsYet": "No collections yet",
+    "createFirstCollection": "Create your first collection to organize your generated images",
+    "createCollection": "Create Collection",
+    "createNewCollection": "Create New Collection",
+    "collectionName": "Collection Name",
+    "enterCollectionName": "Enter collection name",
+    "shared": "Shared",
+    "errorCreatingCollection": "Error creating collection"
+  },
+  "storyboard": {
+    "title": "Storyboard",
+    "subtitle": "Storyboard your ideas",
+    "goToStoryboard": "Go to Storyboard"
+  },
+  "browse": {
+    "title": "Browse",
+    "subtitle": "Browse content",
+    "goToBrowse": "Go to Browse"
+  },
+  "video": {
+    "generateVideo": "Generate Video",
+    "generateVideoDesc": "Turn your images into videos using AI",
+    "model": "Model",
+    "sourceImage": "Source Image *",
+    "clickToSelectFirstFrame": "Click to select first frame",
+    "endImage": "End Image (optional)",
+    "selectLastFrame": "Optional: select last frame",
+    "promptPlaceholder": "Describe what happens in the video...",
+    "starting": "Starting...",
+    "selectSourceImageError": "Please select a source image",
+    "enterPromptError": "Please enter a prompt",
+    "failedToLoadVideoModels": "Failed to load video models",
+    "failedToUploadImage": "Failed to upload image",
+    "yourVideos": "Your Videos",
+    "queued": "Queued",
+    "generating": "Generating...",
+    "failed": "Failed",
+    "noVideosYet": "No videos yet",
+    "generateFirstVideo": "Generate your first video from an image",
+    "videoDetails": "Video Details",
+    "prompt": "Prompt",
+    "parameters": "Parameters",
+    "created": "Created: {date}",
+    "done": "Done: {date}",
+    "seed": "Seed: {seed}",
+    "openInNewTab": "Open in New Tab",
+    "videoCount": "{count} videos"
+  },
+  "menu": {
+    "mode": "Mode",
+    "model": "Model",
+    "expertise": "Expertise",
+    "aspectRatio": "Aspect Ratio",
+    "selectMode": "Select Mode",
+    "selectCategory": "Select {category}",
+    "with": "with",
+    "modes": {
+      "create": "Create new image",
+      "createDesc": "Full generation workflow",
+      "edit": "Edit selected images",
+      "editDesc": "Edit existing images",
+      "chat": "Chat",
+      "chatDesc": "Conversational interaction"
+    },
+    "models": {
+      "nano-banana-pro": "Nano-banana Pro",
+      "midjourney": "Midjourney",
+      "gpt-5.2": "gpt-5.2",
+      "gemini-3": "gemini-3"
+    },
+    "expertiseOptions": {
+      "commercial": "Commercial",
+      "film": "Film",
+      "game": "Game",
+      "uiux": "UI/UX",
+      "product": "Product"
+    },
+    "aspectRatioOptions": {
+      "smart": "Smart",
+      "smartDesc": "Let the model choose the best aspect ratio for your content"
+    },
+    "editModeHint": "Select or upload an image first to use Edit mode",
+    "expertiseNotAvailable": "Expertise is not available in Edit selected images mode.",
+    "aspectRatioNotApplicable": "Aspect ratio is not applicable in Chat mode."
+  },
+  "notifications": {
+    "enableTitle": "Enable Notifications",
+    "enableDescription": "Image generation can take some time. Enable notifications to get alerted when your results are ready, so you can freely browse other tabs or pages.",
+    "noThanks": "No thanks",
+    "enable": "Enable Notifications"
+  },
+  "install": {
+    "title": "Install Moodio Agent",
+    "description": "Add to your home screen for a full-screen experience and quick access",
+    "step1": "Tap the Share button below",
+    "step2": "Scroll and tap \"Add to Home Screen\"",
+    "maybeLater": "Maybe Later"
+  },
+  "admin": {
+    "title": "Admin Dashboard",
+    "unauthorized": "Unauthorized",
+    "users": {
+      "title": "Users",
+      "subtitle": "Management",
+      "description": "Manage users, roles, invitations, and OTPs.",
+      "goTo": "Go to User Management"
+    },
+    "chats": {
+      "title": "Chats",
+      "description": "View all chats, monitor activity, and history.",
+      "goTo": "Go to Chat Management"
+    },
+    "events": {
+      "title": "Events",
+      "subtitle": "Telemetry",
+      "description": "View system events, user actions, and errors.",
+      "goTo": "Go to Events"
+    },
+    "system": {
+      "title": "System",
+      "description": "Manage system settings, cleanup tokens, and maintenance.",
+      "goTo": "Go to System Management"
+    },
+    "falUsage": {
+      "title": "Fal.ai Usage",
+      "subtitle": "Cost & Usage",
+      "description": "Monitor Fal.ai API usage and estimated costs.",
+      "goTo": "Go to Fal Usage"
+    }
+  },
+  "dashboard": {
+    "welcomeBack": "Welcome back!",
+    "authProvider": "Auth Provider",
+    "roles": "Roles",
+    "memberSince": "Member Since",
+    "testProtectedApi": "Test Protected API",
+    "goToAgent": "Go to agent",
+    "apiResponse": "Response from /api/test/protected:"
+  },
+  "assetPicker": {
+    "title": "Select Asset",
+    "noAssets": "No assets available",
+    "selectFromChat": "Select from chat",
+    "selectFromCollection": "Select from collection"
+  },
+  "imageDetail": {
+    "title": "Image Details",
+    "copyPrompt": "Copy prompt",
+    "promptCopied": "Prompt copied!",
+    "saveToProject": "Save to Project",
+    "viewFullSize": "View full size",
+    "download": "Download",
+    "delete": "Delete",
+    "deleteConfirm": "Are you sure you want to delete this image?"
+  },
+  "language": {
+    "switchLanguage": "Language",
+    "english": "English",
+    "chinese": "简体中文"
+  }
+}

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { Button } from "@heroui/button";
 import { Card } from "@heroui/card";
 import { Spinner } from "@heroui/spinner";
@@ -10,6 +11,7 @@ import { useAuth } from "@/hooks/use-auth";
 
 export default function Home() {
   const router = useRouter();
+  const t = useTranslations();
   const { user, loading, error, logout, loggingOut } = useAuth();
   const [testResult, setTestResult] = useState<any>(null);
   const [testLoading, setTestLoading] = useState(false);
@@ -67,7 +69,7 @@ export default function Home() {
       <Card className="w-full max-w-2xl p-8">
         <div className="space-y-6">
           <div className="text-center">
-            <h1 className="text-4xl font-bold mb-2">Welcome back!</h1>
+            <h1 className="text-4xl font-bold mb-2">{t("dashboard.welcomeBack")}</h1>
             <p className="text-xl text-gray-600 dark:text-gray-400">
               {displayName}
             </p>
@@ -77,7 +79,7 @@ export default function Home() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <p className="text-sm text-gray-500 dark:text-gray-400">
-                  Email
+                  {t("profile.email")}
                 </p>
                 <p className="font-medium">{user.email}</p>
               </div>
@@ -85,7 +87,7 @@ export default function Home() {
               {user.firstName && (
                 <div>
                   <p className="text-sm text-gray-500 dark:text-gray-400">
-                    First Name
+                    {t("profile.firstName")}
                   </p>
                   <p className="font-medium">{user.firstName}</p>
                 </div>
@@ -94,7 +96,7 @@ export default function Home() {
               {user.lastName && (
                 <div>
                   <p className="text-sm text-gray-500 dark:text-gray-400">
-                    Last Name
+                    {t("profile.lastName")}
                   </p>
                   <p className="font-medium">{user.lastName}</p>
                 </div>
@@ -102,14 +104,14 @@ export default function Home() {
 
               <div>
                 <p className="text-sm text-gray-500 dark:text-gray-400">
-                  Auth Provider
+                  {t("dashboard.authProvider")}
                 </p>
                 <p className="font-medium capitalize">{user.authProvider}</p>
               </div>
 
               <div>
                 <p className="text-sm text-gray-500 dark:text-gray-400">
-                  Roles
+                  {t("dashboard.roles")}
                 </p>
                 <div className="flex gap-2 flex-wrap">
                   {user.roles.map((role) => (
@@ -127,7 +129,7 @@ export default function Home() {
 
               <div>
                 <p className="text-sm text-gray-500 dark:text-gray-400">
-                  Member Since
+                  {t("dashboard.memberSince")}
                 </p>
                 <p className="font-medium">
                   {new Date(user.createdAt).toLocaleDateString()}
@@ -145,7 +147,7 @@ export default function Home() {
                 onPress={handleTestProtectedAPI}
                 isLoading={testLoading}
               >
-                Test Protected API
+                {t("dashboard.testProtectedApi")}
               </Button>
               <Button
                 color="secondary"
@@ -153,14 +155,14 @@ export default function Home() {
                 size="lg"
                 onPress={() => router.push("/chat")}
               >
-                Go to agent
+                {t("dashboard.goToAgent")}
               </Button>
             </div>
 
             {testResult && (
               <div className="p-4 rounded-lg bg-gray-100 dark:bg-gray-800">
                 <p className="text-xs text-gray-500 dark:text-gray-400 mb-2 font-mono">
-                  Response from /api/test/protected:
+                  {t("dashboard.apiResponse")}
                 </p>
                 <pre className="text-sm overflow-x-auto">
                   {JSON.stringify(testResult, null, 2)}
@@ -177,7 +179,7 @@ export default function Home() {
               onPress={logout}
               isLoading={loggingOut}
             >
-              Logout
+              {t("nav.logout")}
             </Button>
           </div>
         </div>

@@ -2,6 +2,8 @@ import "@/styles/globals.css";
 import "@/styles/jsoneditor.css";
 import { Metadata, Viewport } from "next";
 import clsx from "clsx";
+import { NextIntlClientProvider } from "next-intl";
+import { getLocale, getMessages } from "next-intl/server";
 
 import { Providers } from "./providers";
 
@@ -43,13 +45,16 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const locale = await getLocale();
+  const messages = await getMessages();
+
   return (
-    <html suppressHydrationWarning lang="en">
+    <html suppressHydrationWarning lang={locale}>
       <head />
       <body
         className={clsx(
@@ -57,9 +62,11 @@ export default function RootLayout({
           fontSans.variable
         )}
       >
-        <Providers themeProps={{ attribute: "class", defaultTheme: "dark" }}>
-          {children}
-        </Providers>
+        <NextIntlClientProvider messages={messages}>
+          <Providers themeProps={{ attribute: "class", defaultTheme: "dark" }}>
+            {children}
+          </Providers>
+        </NextIntlClientProvider>
       </body>
     </html>
   );
