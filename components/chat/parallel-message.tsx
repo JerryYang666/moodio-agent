@@ -8,15 +8,6 @@ import clsx from "clsx";
 import { Message } from "@/lib/llm/types";
 import ChatMessage from "./chat-message";
 
-interface SelectedAgentPart {
-  url: string;
-  title: string;
-  messageIndex: number;
-  partIndex: number;
-  imageId?: string;
-  variantId?: string;
-}
-
 interface ParallelMessageProps {
   variants: Message[];
   messageIndex: number;
@@ -25,7 +16,8 @@ interface ParallelMessageProps {
     firstName?: string | null;
     email?: string | null;
   } | null;
-  selectedAgentPart: SelectedAgentPart | null;
+  /** Array of image IDs that are currently selected/pending */
+  selectedImageIds: string[];
   onAgentImageSelect: (
     part: any,
     messageIndex: number,
@@ -41,7 +33,7 @@ export default function ParallelMessage({
   messageIndex,
   chatId,
   user,
-  selectedAgentPart,
+  selectedImageIds,
   onAgentImageSelect,
   onAgentTitleClick,
   onForkChat,
@@ -122,7 +114,7 @@ export default function ParallelMessage({
         messageIndex={messageIndex}
         chatId={chatId}
         user={user}
-        selectedAgentPart={selectedAgentPart}
+        selectedImageIds={selectedImageIds}
         onAgentImageSelect={onAgentImageSelect}
         onAgentTitleClick={onAgentTitleClick}
         onForkChat={onForkChat}
@@ -147,11 +139,7 @@ export default function ParallelMessage({
               messageIndex={messageIndex}
               chatId={chatId}
               user={user}
-              selectedAgentPart={
-                selectedAgentPart?.variantId === variant.variantId
-                  ? selectedAgentPart
-                  : null
-              }
+              selectedImageIds={selectedImageIds}
               onAgentImageSelect={(part, msgIdx, partIdx) =>
                 onAgentImageSelect(part, msgIdx, partIdx, variant.variantId)
               }
@@ -234,12 +222,7 @@ export default function ParallelMessage({
               messageIndex={messageIndex}
               chatId={chatId}
               user={user}
-              selectedAgentPart={
-                selectedAgentPart?.variantId ===
-                variants[currentVariantIndex]?.variantId
-                  ? selectedAgentPart
-                  : null
-              }
+              selectedImageIds={selectedImageIds}
               onAgentImageSelect={handleAgentImageSelect}
               onAgentTitleClick={onAgentTitleClick}
               onForkChat={onForkChat}

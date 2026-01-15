@@ -46,11 +46,11 @@ interface AgentOutput {
 
 interface PreparedMessages {
   messages: any[];
-  userImageId: string | undefined;
-  userImageBase64Promise: Promise<string | undefined>;
+  /** All image IDs provided in the request (from user uploads, asset library, or AI-generated selections) */
+  imageIds: string[];
+  /** Pre-fetched base64 data for all images (used for image editing/generation) */
+  imageBase64Promises: Promise<string | undefined>[];
   precisionEditing?: boolean;
-  precisionEditImageId?: string;
-  precisionEditImageBase64Promise?: Promise<string | undefined>;
   aspectRatioOverride?: AspectRatio;
 }
 
@@ -65,7 +65,7 @@ export class Agent1 implements Agent {
     isAdmin: boolean,
     requestStartTime?: number,
     precisionEditing?: boolean,
-    precisionEditImageId?: string,
+    imageIds?: string[], // Unified array of image IDs
     systemPromptOverride?: string,
     aspectRatioOverride?: string
   ): Promise<AgentResponse> {
@@ -98,7 +98,7 @@ export class Agent1 implements Agent {
       userMessage,
       startTime,
       precisionEditing,
-      precisionEditImageId,
+      imageIds || [],
       systemPromptOverride,
       validatedAspectRatio
     );
@@ -174,7 +174,7 @@ export class Agent1 implements Agent {
     userMessage: Message,
     startTime: number,
     precisionEditing?: boolean,
-    precisionEditImageId?: string,
+    imageIds?: string[], // Unified array of image IDs from frontend
     systemPromptOverride?: string,
     aspectRatioOverride?: AspectRatio
   ): Promise<PreparedMessages> {
@@ -214,34 +214,17 @@ export class Agent1 implements Agent {
       );
     }
 
-    // Check for user image - search through history and current message for last user image
-    let userImageId: string | undefined;
-    const allMessages = [...history, userMessage];
-    for (const message of allMessages) {
-      if (message.role === "user" && Array.isArray(message.content)) {
-        const imgPart = message.content.find((p) => p.type === "image") as
-          | { type: "image"; imageId: string }
-          | undefined;
-        if (imgPart) {
-          userImageId = imgPart.imageId;
-        }
-      }
-    }
+    // Get all image IDs from the current user message (these are already in imageIds from frontend)
+    // The imageIds parameter contains all images the user wants to use for this request
+    const allImageIds = imageIds || [];
 
-    // Pre-fetch user image base64 if needed
-    const userImageBase64Promise = userImageId
-      ? downloadImage(userImageId).then((buf) => buf?.toString("base64"))
-      : Promise.resolve(undefined);
-
-    // Pre-fetch precision edit image base64 if needed
-    const precisionEditImageBase64Promise = precisionEditImageId
-      ? downloadImage(precisionEditImageId).then((buf) =>
-          buf?.toString("base64")
-        )
-      : Promise.resolve(undefined);
+    // Pre-fetch all image base64 data in parallel
+    const imageBase64Promises = allImageIds.map((id) =>
+      downloadImage(id).then((buf) => buf?.toString("base64"))
+    );
 
     console.log(
-      "[Perf] User/Precision image base64 prepared",
+      `[Perf] ${allImageIds.length} image base64 downloads started`,
       `[${Date.now() - startTime}ms]`
     );
 
@@ -265,23 +248,13 @@ export class Agent1 implements Agent {
           ],
     };
 
-    // Add precision editing prompt and image if applicable
-    if (precisionEditing) {
+    // Add precision editing prompt if applicable
+    if (precisionEditing && allImageIds.length > 0) {
       if (Array.isArray(formattedUserMessage.content)) {
         formattedUserMessage.content.push({
           type: "text",
-          text: "\nPrecision Editing on. Make sure that your prompt is describing an edit to the picture.",
+          text: "\nPrecision Editing on. Make sure that your prompt is describing an edit to the picture(s).",
         });
-
-        if (precisionEditImageId) {
-          // Prepend the precision edit image so it appears first/with context
-          formattedUserMessage.content.unshift({
-            type: "image_url",
-            image_url: {
-              url: getSignedImageUrl(precisionEditImageId),
-            },
-          });
-        }
       }
     }
 
@@ -350,11 +323,9 @@ export class Agent1 implements Agent {
 
     return {
       messages,
-      userImageId,
-      userImageBase64Promise,
+      imageIds: allImageIds,
+      imageBase64Promises,
       precisionEditing,
-      precisionEditImageId,
-      precisionEditImageBase64Promise,
       aspectRatioOverride,
     };
   }
@@ -880,43 +851,40 @@ export class Agent1 implements Agent {
     }
 
     let finalImageId: string;
-    const userImageBase64 = await prepared.userImageBase64Promise;
-    const precisionEditImageBase64 = prepared.precisionEditImageBase64Promise
-      ? await prepared.precisionEditImageBase64Promise
-      : undefined;
 
-    // Determine if we should use image editing
+    // Await all image base64 data
+    const imageBase64Data = await Promise.all(prepared.imageBase64Promises);
+
+    // Filter out undefined values and get valid base64 strings
+    const validImageBase64: string[] = imageBase64Data.filter(
+      (data): data is string => data !== undefined
+    );
+
+    // Determine if we should use image editing (if we have any images and precision editing is on)
+    // or if we have images at all (for image-to-image generation)
     const useImageEditing =
-      (prepared.precisionEditing &&
-        (precisionEditImageBase64 || userImageBase64)) ||
-      (prepared.userImageId && userImageBase64);
+      (prepared.precisionEditing && validImageBase64.length > 0) ||
+      validImageBase64.length > 0;
 
     let response: any;
 
     try {
-      if (useImageEditing) {
-        // Image editing
+      if (useImageEditing && validImageBase64.length > 0) {
+        // Image editing - use the first image for editing
+        // In the future, we could support multiple images, but Gemini currently works best with one
         const prompt: any[] = [{ text: suggestion.prompt }];
 
-        // Include precision edit image if available
-        if (precisionEditImageBase64) {
-          prompt.push({
-            inlineData: {
-              mimeType: "image/png",
-              data: precisionEditImageBase64,
-            },
-          });
-        }
-        // Include user uploaded image ONLY if precision edit image is NOT provided
-        // If precision editing is on but no specific image ID was passed, we edit the last user image
-        else if (userImageBase64) {
-          prompt.push({
-            inlineData: {
-              mimeType: "image/png",
-              data: userImageBase64,
-            },
-          });
-        }
+        // Use the first available image for editing
+        prompt.push({
+          inlineData: {
+            mimeType: "image/png",
+            data: validImageBase64[0],
+          },
+        });
+
+        console.log(
+          `[Agent-1] Using image editing mode with ${validImageBase64.length} image(s) for index=${index}`
+        );
 
         response = await ai.models.generateContent({
           model: "gemini-3-pro-image-preview",
@@ -931,7 +899,7 @@ export class Agent1 implements Agent {
           },
         });
       } else {
-        // Text to image
+        // Text to image (no input images)
         response = await ai.models.generateContent({
           model: "gemini-3-pro-image-preview",
           contents: suggestion.prompt,
@@ -1017,13 +985,13 @@ export class Agent1 implements Agent {
     variantCount: number,
     requestStartTime?: number,
     precisionEditing?: boolean,
-    precisionEditImageId?: string,
+    imageIds?: string[], // Unified array of image IDs to use for generation
     systemPromptOverride?: string,
     aspectRatioOverride?: string
   ): Promise<ParallelAgentResponse> {
     const startTime = requestStartTime || Date.now();
     console.log(
-      `[Perf] Agent processRequestParallel start with ${variantCount} variants`,
+      `[Perf] Agent processRequestParallel start with ${variantCount} variants, ${imageIds?.length || 0} images`,
       `[${Date.now() - startTime}ms]`
     );
 
@@ -1043,7 +1011,7 @@ export class Agent1 implements Agent {
       userMessage,
       startTime,
       precisionEditing,
-      precisionEditImageId,
+      imageIds || [],
       systemPromptOverride,
       validatedAspectRatio
     );

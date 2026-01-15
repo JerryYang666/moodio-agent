@@ -16,15 +16,6 @@ import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { useAuth } from "@/hooks/use-auth";
 
-interface SelectedAgentPart {
-  url: string;
-  title: string;
-  messageIndex: number;
-  partIndex: number;
-  imageId?: string;
-  variantId?: string;
-}
-
 interface ChatMessageProps {
   message: Message;
   messageIndex: number;
@@ -33,7 +24,8 @@ interface ChatMessageProps {
     firstName?: string | null;
     email?: string | null;
   } | null;
-  selectedAgentPart: SelectedAgentPart | null;
+  /** Array of image IDs that are currently selected/pending */
+  selectedImageIds: string[];
   onAgentImageSelect: (
     part: any,
     messageIndex: number,
@@ -50,7 +42,7 @@ export default function ChatMessage({
   messageIndex,
   chatId,
   user,
-  selectedAgentPart,
+  selectedImageIds,
   onAgentImageSelect,
   onAgentTitleClick,
   onForkChat,
@@ -139,11 +131,9 @@ export default function ChatMessage({
             {agentParts.map((part: any, i) => {
               // Use imageUrl from API response (CloudFront signed URL)
               const url = part.imageUrl || "";
+              // Check if this image is selected by checking if its imageId is in selectedImageIds
               const isSelected =
-                (selectedAgentPart?.url === url &&
-                  selectedAgentPart?.messageIndex === msgIndex &&
-                  (selectedAgentPart?.variantId === message.variantId ||
-                    !message.variantId)) ||
+                (part.imageId && selectedImageIds.includes(part.imageId)) ||
                 part.isSelected;
 
               const realPartIndex = (content as MessageContentPart[]).indexOf(

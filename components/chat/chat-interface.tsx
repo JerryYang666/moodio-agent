@@ -32,22 +32,12 @@ import {
   INITIAL_MENU_STATE,
   resolveMenuState,
 } from "./menu-configuration";
-
-interface SelectedAsset {
-  assetId: string;
-  url: string;
-  title: string;
-  imageId: string;
-}
-
-interface SelectedAgentPart {
-  url: string;
-  title: string;
-  messageIndex: number;
-  partIndex: number;
-  imageId?: string;
-  variantId?: string;
-}
+import {
+  PendingImage,
+  MAX_PENDING_IMAGES,
+  canAddImage,
+  hasUploadingImages,
+} from "./pending-image-types";
 
 // Helper to group consecutive assistant messages with the same timestamp as variants
 interface MessageGroup {
@@ -76,11 +66,8 @@ export default function ChatInterface({
     !!initialChatId && initialMessages.length === 0
   );
   const [isSending, setIsSending] = useState(false);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [selectedAsset, setSelectedAsset] = useState<SelectedAsset | null>(
-    null
-  );
+  // Unified pending images array - replaces selectedFile, previewUrl, selectedAsset, selectedAgentPart
+  const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
   const [isAssetPickerOpen, setIsAssetPickerOpen] = useState(false);
   const [precisionEditing, setPrecisionEditing] = useState(false);
   const [menuState, setMenuState] = useState<MenuState>(INITIAL_MENU_STATE);
@@ -91,11 +78,11 @@ export default function ChatInterface({
       setChatId(undefined);
       setMessages([]);
       setInput("");
-      setSelectedFile(null);
-      if (previewUrl) URL.revokeObjectURL(previewUrl);
-      setPreviewUrl(null);
-      setSelectedAsset(null);
-      setSelectedAgentPart(null);
+      // Clean up any local preview URLs before clearing
+      pendingImages.forEach((img) => {
+        if (img.localPreviewUrl) URL.revokeObjectURL(img.localPreviewUrl);
+      });
+      setPendingImages([]);
       setPrecisionEditing(false);
       setIsSending(false);
 
@@ -105,7 +92,7 @@ export default function ChatInterface({
 
     window.addEventListener("reset-chat", handleReset);
     return () => window.removeEventListener("reset-chat", handleReset);
-  }, [previewUrl]);
+  }, [pendingImages]);
 
   // Draft saving logic
   const [prevChatId, setPrevChatId] = useState(chatId);
@@ -218,9 +205,11 @@ export default function ChatInterface({
     return images;
   }, [messages]);
 
-  // State for selected agent image (for sending in next message)
-  const [selectedAgentPart, setSelectedAgentPart] =
-    useState<SelectedAgentPart | null>(null);
+  // Helper to check if there are any AI-generated images selected
+  const selectedAgentImages = useMemo(
+    () => pendingImages.filter((img) => img.source === "ai_generated"),
+    [pendingImages]
+  );
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const notificationModalRef = useRef<NotificationPermissionModalRef>(null);
@@ -278,50 +267,178 @@ export default function ChatInterface({
     }
   }, [chatId, user]);
 
-  const applySelectedFile = useCallback((file: File) => {
-    if (file.size > 5 * 1024 * 1024) {
-      alert(t("chat.fileSizeTooLarge"));
-      return;
-    }
-    // Local upload and asset selection are mutually exclusive
-    setSelectedAsset(null);
-    setSelectedFile(file);
-    setPreviewUrl((prev) => {
-      if (prev) URL.revokeObjectURL(prev);
-      return URL.createObjectURL(file);
-    });
-  }, []);
+  // Upload a file immediately and add it to pending images
+  const uploadAndAddImage = useCallback(
+    async (file: File) => {
+      if (file.size > 5 * 1024 * 1024) {
+        addToast({
+          title: t("chat.fileSizeTooLarge"),
+          color: "danger",
+        });
+        return;
+      }
 
-  const clearFile = useCallback(() => {
-    setSelectedFile(null);
-    if (previewUrl) URL.revokeObjectURL(previewUrl);
-    setPreviewUrl(null);
+      if (!canAddImage(pendingImages)) {
+        addToast({
+          title: t("chat.maxImagesReached", { max: MAX_PENDING_IMAGES }),
+          color: "warning",
+        });
+        return;
+      }
 
-    // If in "edit" mode and no other images remain, switch to "create" mode
-    if (menuState.mode === "edit" && !selectedAgentPart) {
-      const newState = resolveMenuState(menuState, "create");
-      setMenuState(newState);
-    }
-  }, [previewUrl, menuState, selectedAgentPart]);
+      // Create a temporary ID for tracking during upload
+      const tempId = `uploading-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const localPreviewUrl = URL.createObjectURL(file);
 
-  const clearSelectedAsset = useCallback(() => {
-    setSelectedAsset(null);
-    // If in "edit" mode and no other images remain, switch to "create" mode
-    if (menuState.mode === "edit" && !previewUrl) {
-      const newState = resolveMenuState(menuState, "create");
-      setMenuState(newState);
-    }
-  }, [menuState, previewUrl]);
+      // Add placeholder to pending images with uploading state
+      const uploadingImage: PendingImage = {
+        imageId: tempId,
+        url: localPreviewUrl,
+        source: "upload",
+        title: file.name,
+        isUploading: true,
+        localPreviewUrl,
+      };
 
-  const applySelectedAsset = useCallback(
-    (payload: SelectedAsset) => {
-      // Asset selection and local upload are mutually exclusive
-      setSelectedFile(null);
-      if (previewUrl) URL.revokeObjectURL(previewUrl);
-      setPreviewUrl(null);
-      setSelectedAsset(payload);
+      setPendingImages((prev) => [...prev, uploadingImage]);
+
+      try {
+        // Upload the file immediately
+        const formData = new FormData();
+        formData.append("file", file);
+
+        const response = await fetch("/api/image/upload", {
+          method: "POST",
+          body: formData,
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || "Upload failed");
+        }
+
+        const { imageId, imageUrl } = await response.json();
+
+        // Update the pending image with the real ID and URL
+        setPendingImages((prev) =>
+          prev.map((img) =>
+            img.imageId === tempId
+              ? {
+                  ...img,
+                  imageId,
+                  url: imageUrl,
+                  isUploading: false,
+                }
+              : img
+          )
+        );
+      } catch (error) {
+        console.error("Image upload failed:", error);
+        // Remove the failed upload from pending images
+        setPendingImages((prev) => prev.filter((img) => img.imageId !== tempId));
+        URL.revokeObjectURL(localPreviewUrl);
+
+        addToast({
+          title: t("chat.uploadFailed"),
+          color: "danger",
+        });
+      }
     },
-    [previewUrl]
+    [pendingImages, t]
+  );
+
+  // Remove a pending image by its imageId
+  const removePendingImage = useCallback(
+    (imageId: string) => {
+      setPendingImages((prev) => {
+        const img = prev.find((i) => i.imageId === imageId);
+        if (img?.localPreviewUrl) {
+          URL.revokeObjectURL(img.localPreviewUrl);
+        }
+        const newImages = prev.filter((i) => i.imageId !== imageId);
+
+        // If in "edit" mode and no images remain, switch to "create" mode
+        if (menuState.mode === "edit" && newImages.length === 0) {
+          const newState = resolveMenuState(menuState, "create");
+          setMenuState(newState);
+        }
+
+        return newImages;
+      });
+    },
+    [menuState]
+  );
+
+  // Add an asset from the library to pending images
+  const addAssetImage = useCallback(
+    (asset: { assetId: string; imageId: string; url: string; title: string }) => {
+      if (!canAddImage(pendingImages)) {
+        addToast({
+          title: t("chat.maxImagesReached", { max: MAX_PENDING_IMAGES }),
+          color: "warning",
+        });
+        return;
+      }
+
+      // Check if this image is already in the pending list
+      if (pendingImages.some((img) => img.imageId === asset.imageId)) {
+        addToast({
+          title: t("chat.imageAlreadyAdded"),
+          color: "warning",
+        });
+        return;
+      }
+
+      const newImage: PendingImage = {
+        imageId: asset.imageId,
+        url: asset.url,
+        source: "asset",
+        title: asset.title,
+      };
+
+      setPendingImages((prev) => [...prev, newImage]);
+    },
+    [pendingImages, t]
+  );
+
+  // Add an AI-generated image to pending images
+  const addAgentImage = useCallback(
+    (image: {
+      imageId: string;
+      url: string;
+      title: string;
+      messageIndex: number;
+      partIndex: number;
+      variantId?: string;
+    }) => {
+      if (!canAddImage(pendingImages)) {
+        addToast({
+          title: t("chat.maxImagesReached", { max: MAX_PENDING_IMAGES }),
+          color: "warning",
+        });
+        return;
+      }
+
+      // Check if this image is already in the pending list
+      if (pendingImages.some((img) => img.imageId === image.imageId)) {
+        // Toggle off - remove if already selected
+        removePendingImage(image.imageId);
+        return;
+      }
+
+      const newImage: PendingImage = {
+        imageId: image.imageId,
+        url: image.url,
+        source: "ai_generated",
+        title: image.title,
+        messageIndex: image.messageIndex,
+        partIndex: image.partIndex,
+        variantId: image.variantId,
+      };
+
+      setPendingImages((prev) => [...prev, newImage]);
+    },
+    [pendingImages, t, removePendingImage]
   );
 
   // Listen for asset selection events from the hover sidebar
@@ -330,7 +447,7 @@ export default function ChatInterface({
       const ce = e as CustomEvent;
       const d = ce.detail as any;
       if (!d?.assetId || !d?.url || !d?.imageId) return;
-      applySelectedAsset({
+      addAssetImage({
         assetId: d.assetId,
         url: d.url,
         title: d.title || "Selected asset",
@@ -340,12 +457,12 @@ export default function ChatInterface({
     window.addEventListener("moodio-asset-selected", handler as any);
     return () =>
       window.removeEventListener("moodio-asset-selected", handler as any);
-  }, [applySelectedAsset]);
+  }, [addAssetImage]);
 
   const handleAssetDrop = useCallback(
     async (payload: any) => {
       if (payload?.assetId && payload?.url && payload?.imageId) {
-        applySelectedAsset({
+        addAssetImage({
           assetId: payload.assetId,
           url: payload.url,
           title: payload.title || t("chat.selectedAsset"),
@@ -361,7 +478,7 @@ export default function ChatInterface({
           const data = await res.json();
           const a = data.asset;
           if (!a?.id || !a?.imageUrl || !a?.imageId) return;
-          applySelectedAsset({
+          addAssetImage({
             assetId: a.id,
             url: a.imageUrl,
             title: a.generationDetails?.title || t("chat.selectedAsset"),
@@ -372,58 +489,66 @@ export default function ChatInterface({
         }
       }
     },
-    [applySelectedAsset]
+    [addAssetImage, t]
   );
 
   const handleAssetPicked = useCallback(
     (asset: AssetSummary) => {
-      applySelectedAsset({
+      addAssetImage({
         assetId: asset.id,
         url: asset.imageUrl,
         title: asset.generationDetails?.title || t("chat.selectedAsset"),
         imageId: asset.imageId,
       });
     },
-    [applySelectedAsset]
+    [addAssetImage, t]
   );
 
   const handleSend = async () => {
+    // Block send if uploading images or no content
+    if (hasUploadingImages(pendingImages)) {
+      addToast({
+        title: t("chat.waitForUpload"),
+        color: "warning",
+      });
+      return;
+    }
+
     if (
-      (!input.trim() &&
-        !selectedFile &&
-        !selectedAgentPart &&
-        !selectedAsset) ||
+      (!input.trim() && pendingImages.length === 0) ||
       isSending ||
       isRecording ||
       isTranscribing
     )
       return;
 
+    // Build the message content with selected image titles
     let currentInput = input;
-    if (selectedAgentPart) {
-      const prefix = `I select ${selectedAgentPart.title}`;
+    const agentImages = pendingImages.filter((img) => img.source === "ai_generated");
+    if (agentImages.length > 0) {
+      const titles = agentImages.map((img) => img.title || "image").join(", ");
+      const prefix = `I select ${titles}`;
       currentInput = currentInput ? `${prefix}\n\n${currentInput}` : prefix;
     }
 
     // Save the original input for potential retry exhausted scenario
     lastUserInputRef.current = input;
 
-    const currentFile = selectedFile;
-    const currentPreviewUrl = previewUrl;
-    const currentAsset = selectedAsset;
+    // Capture current pending images before clearing
+    const currentPendingImages = [...pendingImages];
 
-    // Optimistic message with current timestamp
+    // Build optimistic message content with image URLs for display
     const optimisticContent: Message["content"] =
-      (currentFile && currentPreviewUrl) || currentAsset
+      currentPendingImages.length > 0
         ? (() => {
             const parts: MessageContentPart[] = [];
             if (currentInput) {
               parts.push({ type: "text", text: currentInput });
             }
-            const imageUrl = currentAsset
-              ? currentAsset.url
-              : currentPreviewUrl!;
-            parts.push({ type: "image_url", image_url: { url: imageUrl } });
+            // Add images to the optimistic content
+            for (const img of currentPendingImages) {
+              parts.push({ type: "image_url", image_url: { url: img.url } });
+            }
             return parts;
           })()
         : currentInput;
@@ -434,51 +559,47 @@ export default function ChatInterface({
       createdAt: Date.now(),
     };
 
-    // Optimistically update previous message if selection exists
-    if (selectedAgentPart) {
+    // Optimistically update previous messages to mark selected agent images
+    const agentImageSelections = currentPendingImages.filter(
+      (img) => img.source === "ai_generated" && img.messageIndex !== undefined
+    );
+
+    if (agentImageSelections.length > 0) {
       setMessages((prev) => {
         const newMessages = [...prev];
 
-        // Find the correct message - use variantId if available, otherwise fall back to messageIndex
-        let msgIndex = selectedAgentPart.messageIndex;
-        if (selectedAgentPart.variantId) {
-          const variantIndex = newMessages.findIndex(
-            (m) => m.variantId === selectedAgentPart.variantId
-          );
-          if (variantIndex !== -1) {
-            msgIndex = variantIndex;
+        for (const selection of agentImageSelections) {
+          // Find the correct message
+          let msgIndex = selection.messageIndex!;
+          if (selection.variantId) {
+            const variantIndex = newMessages.findIndex(
+              (m) => m.variantId === selection.variantId
+            );
+            if (variantIndex !== -1) {
+              msgIndex = variantIndex;
+            }
           }
-        }
 
-        if (newMessages[msgIndex]) {
-          const msg = newMessages[msgIndex];
-          if (Array.isArray(msg.content)) {
-            const newContent = [...msg.content];
-            // Find the part by imageId for reliability
-            let partIndex = selectedAgentPart.partIndex;
-            if (selectedAgentPart.imageId) {
+          if (newMessages[msgIndex]) {
+            const msg = newMessages[msgIndex];
+            if (Array.isArray(msg.content)) {
+              const newContent = [...msg.content];
+              // Find the part by imageId
               const imgIndex = newContent.findIndex(
                 (p) =>
-                  p.type === "agent_image" &&
-                  p.imageId === selectedAgentPart.imageId
+                  p.type === "agent_image" && p.imageId === selection.imageId
               );
-              if (imgIndex !== -1) {
-                partIndex = imgIndex;
+              if (imgIndex !== -1 && newContent[imgIndex].type === "agent_image") {
+                const agentImagePart = newContent[imgIndex] as Extract<
+                  MessageContentPart,
+                  { type: "agent_image" }
+                >;
+                newContent[imgIndex] = {
+                  ...agentImagePart,
+                  isSelected: true,
+                };
+                newMessages[msgIndex] = { ...msg, content: newContent };
               }
-            }
-            if (
-              newContent[partIndex] &&
-              newContent[partIndex].type === "agent_image"
-            ) {
-              const agentImagePart = newContent[partIndex] as Extract<
-                MessageContentPart,
-                { type: "agent_image" }
-              >;
-              newContent[partIndex] = {
-                ...agentImagePart,
-                isSelected: true,
-              };
-              newMessages[msgIndex] = { ...msg, content: newContent };
             }
           }
         }
@@ -488,13 +609,13 @@ export default function ChatInterface({
       setMessages((prev) => [...prev, userMessage]);
     }
 
+    // Clear input and pending images
     setInput("");
-    setSelectedFile(null);
-    // NOTE: Do NOT revoke previewUrl here — the blob URL is used in the optimistic
-    // message and must remain valid until the message re-renders with the real URL.
-    setPreviewUrl(null);
-    setSelectedAsset(null);
-    setSelectedAgentPart(null);
+    // Clean up local preview URLs
+    currentPendingImages.forEach((img) => {
+      if (img.localPreviewUrl) URL.revokeObjectURL(img.localPreviewUrl);
+    });
+    setPendingImages([]);
     setPrecisionEditing(false);
 
     setIsSending(true);
@@ -520,92 +641,37 @@ export default function ChatInterface({
         monitorChat(currentChatId, messages.length + 1);
       }
 
-      let body;
-      let headers: Record<string, string> = {};
+      // Build the unified JSON payload with imageIds array
+      const payload: any = {
+        content: currentInput,
+        // Send all image IDs as unified array
+        imageIds: currentPendingImages.map((img) => img.imageId),
+      };
 
-      if (currentFile) {
-        const formData = new FormData();
-        formData.append("message", currentInput);
-        formData.append("file", currentFile);
-        if (selectedAgentPart) {
-          formData.append(
-            "selection",
-            JSON.stringify({
-              messageIndex: selectedAgentPart.messageIndex,
-              partIndex: selectedAgentPart.partIndex,
-              imageId: selectedAgentPart.imageId,
-              variantId: selectedAgentPart.variantId,
-            })
-          );
-        }
-        if (precisionEditing) {
-          formData.append("precisionEditing", "true");
-          if (selectedAgentPart?.imageId) {
-            formData.append("precisionEditImageId", selectedAgentPart.imageId);
-          }
-        }
-        // Pass aspect ratio if not "smart" (let agent decide)
-        if (menuState.aspectRatio && menuState.aspectRatio !== "smart") {
-          formData.append("aspectRatio", menuState.aspectRatio);
-        }
+      // Add precision editing flag if enabled
+      if (precisionEditing) {
+        payload.precisionEditing = true;
+      }
 
-        const overrideEnabled =
-          localStorage.getItem(SYSTEM_PROMPT_STORAGE_KEY + "_enabled") ===
-          "true";
-        if (overrideEnabled) {
-          const overridePrompt = localStorage.getItem(
-            SYSTEM_PROMPT_STORAGE_KEY
-          );
-          if (overridePrompt) {
-            formData.append("systemPromptOverride", overridePrompt);
-          }
-        }
+      // Pass aspect ratio if not "smart" (let agent decide)
+      if (menuState.aspectRatio && menuState.aspectRatio !== "smart") {
+        payload.aspectRatio = menuState.aspectRatio;
+      }
 
-        body = formData;
-      } else {
-        const payload: any = { content: currentInput };
-        if (currentAsset) {
-          payload.assetId = currentAsset.assetId;
+      // Check for system prompt override
+      const overrideEnabled =
+        localStorage.getItem(SYSTEM_PROMPT_STORAGE_KEY + "_enabled") === "true";
+      if (overrideEnabled) {
+        const overridePrompt = localStorage.getItem(SYSTEM_PROMPT_STORAGE_KEY);
+        if (overridePrompt) {
+          payload.systemPromptOverride = overridePrompt;
         }
-        if (selectedAgentPart) {
-          payload.selection = {
-            messageIndex: selectedAgentPart.messageIndex,
-            partIndex: selectedAgentPart.partIndex,
-            imageId: selectedAgentPart.imageId,
-            variantId: selectedAgentPart.variantId,
-          };
-        }
-        if (precisionEditing) {
-          payload.precisionEditing = true;
-          if (selectedAgentPart?.imageId) {
-            payload.precisionEditImageId = selectedAgentPart.imageId;
-          }
-        }
-        // Pass aspect ratio if not "smart" (let agent decide)
-        if (menuState.aspectRatio && menuState.aspectRatio !== "smart") {
-          payload.aspectRatio = menuState.aspectRatio;
-        }
-
-        const overrideEnabled =
-          localStorage.getItem(SYSTEM_PROMPT_STORAGE_KEY + "_enabled") ===
-          "true";
-        if (overrideEnabled) {
-          const overridePrompt = localStorage.getItem(
-            SYSTEM_PROMPT_STORAGE_KEY
-          );
-          if (overridePrompt) {
-            payload.systemPromptOverride = overridePrompt;
-          }
-        }
-
-        body = JSON.stringify(payload);
-        headers = { "Content-Type": "application/json" };
       }
 
       const res = await fetch(`/api/chat/${currentChatId}/message`, {
         method: "POST",
-        headers,
-        body,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
       });
 
       if (!res.ok || !res.body) {
@@ -884,24 +950,17 @@ export default function ChatInterface({
     partIndex: number,
     variantId?: string
   ) => {
-    if (part.status === "generated") {
-      const url = part.imageUrl || ""; // Use signed CloudFront URL from API
-      if (
-        selectedAgentPart?.url === url &&
-        selectedAgentPart?.messageIndex === messageIndex &&
-        selectedAgentPart?.variantId === variantId
-      ) {
-        setSelectedAgentPart(null);
-      } else {
-        setSelectedAgentPart({
-          url,
-          title: part.title,
-          messageIndex,
-          partIndex,
-          imageId: part.imageId,
-          variantId,
-        });
-      }
+    if (part.status === "generated" && part.imageId) {
+      const url = part.imageUrl || "";
+      // Use addAgentImage which handles toggle logic internally
+      addAgentImage({
+        imageId: part.imageId,
+        url,
+        title: part.title,
+        messageIndex,
+        partIndex,
+        variantId,
+      });
     }
   };
 
@@ -980,7 +1039,7 @@ export default function ChatInterface({
                 messageIndex={group.originalIndex}
                 chatId={chatId}
                 user={user}
-                selectedAgentPart={selectedAgentPart}
+                selectedImageIds={pendingImages.map((img) => img.imageId)}
                 onAgentImageSelect={handleAgentImageSelect}
                 onAgentTitleClick={handleAgentTitleClick}
                 onForkChat={handleForkChat}
@@ -995,7 +1054,7 @@ export default function ChatInterface({
                 messageIndex={group.originalIndex}
                 chatId={chatId}
                 user={user}
-                selectedAgentPart={selectedAgentPart}
+                selectedImageIds={pendingImages.map((img) => img.imageId)}
                 onAgentImageSelect={handleAgentImageSelect}
                 onAgentTitleClick={handleAgentTitleClick}
                 onForkChat={handleForkChat}
@@ -1031,19 +1090,8 @@ export default function ChatInterface({
         recordingTime={recordingTime}
         onStartRecording={startRecording}
         onStopRecording={stopRecording}
-        previewUrl={previewUrl}
-        onClearFile={clearFile}
-        selectedAgentPart={selectedAgentPart}
-        onClearSelectedAgentPart={() => {
-          setSelectedAgentPart(null);
-          // If in "edit" mode and no other images remain, switch to "create" mode
-          if (menuState.mode === "edit" && !previewUrl) {
-            const newState = resolveMenuState(menuState, "create");
-            setMenuState(newState);
-          }
-        }}
-        selectedAsset={selectedAsset}
-        onClearSelectedAsset={clearSelectedAsset}
+        pendingImages={pendingImages}
+        onRemovePendingImage={removePendingImage}
         onOpenAssetPicker={() => setIsAssetPickerOpen(true)}
         onAssetDrop={handleAssetDrop}
         showFileUpload={true}
@@ -1051,13 +1099,14 @@ export default function ChatInterface({
         onPrecisionEditingChange={handlePrecisionEditingChange}
         menuState={menuState}
         onMenuStateChange={setMenuState}
+        hasUploadingImages={hasUploadingImages(pendingImages)}
       />
 
       <AssetPickerModal
         isOpen={isAssetPickerOpen}
         onOpenChange={() => setIsAssetPickerOpen((v) => !v)}
         onSelect={handleAssetPicked}
-        onUpload={applySelectedFile}
+        onUpload={uploadAndAddImage}
       />
 
       <ImageDetailModal
