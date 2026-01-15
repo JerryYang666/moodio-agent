@@ -9,7 +9,7 @@ import {
   DropdownItem,
 } from "@heroui/dropdown";
 import { Button } from "@heroui/button";
-import { Globe } from "lucide-react";
+import { Languages } from "lucide-react";
 import { locales, localeNames, Locale } from "@/i18n/config";
 
 export function LanguageSwitch() {
@@ -35,7 +35,7 @@ export function LanguageSwitch() {
           aria-label={t("switchLanguage")}
           isLoading={isPending}
         >
-          <Globe size={20} />
+          <Languages size={20} />
         </Button>
       </DropdownTrigger>
       <DropdownMenu

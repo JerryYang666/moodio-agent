@@ -12,6 +12,7 @@ import { ChatProvider } from "@/components/chat-provider";
 import { CollectionsProvider } from "@/components/collections-provider";
 import { VideoProvider } from "@/components/video-provider";
 import { IOSInstallPrompt } from "@/components/ios-install-prompt";
+import { LocaleAutoDetect } from "@/components/locale-auto-detect";
 
 export interface ProvidersProps {
   children: React.ReactNode;
@@ -37,6 +38,7 @@ export function Providers({ children, themeProps }: ProvidersProps) {
             <CollectionsProvider>
               <VideoProvider>
                 <ToastProvider />
+                <LocaleAutoDetect />
                 <IOSInstallPrompt />
                 {children}
               </VideoProvider>
