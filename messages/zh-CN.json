@@ -353,11 +353,20 @@
     "title": "图片详情",
     "copyPrompt": "复制提示词",
     "promptCopied": "提示词已复制！",
+    "promptLabel": "提示词：",
     "saveToProject": "保存到项目",
     "viewFullSize": "查看原图",
     "download": "下载",
     "delete": "删除",
     "deleteConfirm": "确定要删除这张图片吗？"
+  },
+  "imageMenu": {
+    "actionsLabel": "图片操作",
+    "viewDetails": "查看详情",
+    "addToCollection": "添加到集合",
+    "yourCollections": "我的集合",
+    "createAndAdd": "创建并添加",
+    "flyingImageAlt": "飞行图片"
   },
   "language": {
     "switchLanguage": "语言",

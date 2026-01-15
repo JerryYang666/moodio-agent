@@ -15,6 +15,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
+import { useTranslations } from "next-intl";
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 import { downloadImage } from "./utils";
 
@@ -45,6 +46,7 @@ export default function ImageDetailModal({
   onNavigate,
   onClose,
 }: ImageDetailModalProps) {
+  const t = useTranslations("imageDetail");
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   const canNavigatePrev = currentIndex > 0;
@@ -326,7 +328,7 @@ export default function ImageDetailModal({
                       <div className="w-full md:w-1/2 flex flex-col">
                         <div className="bg-default-100 p-4 rounded-lg text-sm md:flex-1 md:overflow-y-auto">
                           <p className="font-semibold mb-2 text-base">
-                            Prompt:
+                            {t("promptLabel")}
                           </p>
                           <p className="text-default-600 leading-relaxed whitespace-pre-wrap">
                             {selectedImage.prompt}

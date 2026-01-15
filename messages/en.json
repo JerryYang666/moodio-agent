@@ -353,11 +353,20 @@
     "title": "Image Details",
     "copyPrompt": "Copy prompt",
     "promptCopied": "Prompt copied!",
+    "promptLabel": "Prompt:",
     "saveToProject": "Save to Project",
     "viewFullSize": "View full size",
     "download": "Download",
     "delete": "Delete",
     "deleteConfirm": "Are you sure you want to delete this image?"
+  },
+  "imageMenu": {
+    "actionsLabel": "Image actions",
+    "viewDetails": "View Details",
+    "addToCollection": "Add to Collection",
+    "yourCollections": "Your Collections",
+    "createAndAdd": "Create & Add",
+    "flyingImageAlt": "Flying image"
   },
   "language": {
     "switchLanguage": "Language",

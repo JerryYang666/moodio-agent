@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
+import { useTranslations } from "next-intl";
 import { Button } from "@heroui/button";
 import {
   Dropdown,
@@ -18,7 +19,14 @@ import {
   useDisclosure,
 } from "@heroui/modal";
 import { Input } from "@heroui/input";
-import { MoreVertical, Eye, FolderPlus, Plus, Folder, Video } from "lucide-react";
+import {
+  MoreVertical,
+  Eye,
+  FolderPlus,
+  Plus,
+  Folder,
+  Video,
+} from "lucide-react";
 import { useCollections } from "@/hooks/use-collections";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
@@ -41,6 +49,7 @@ interface FlyingImageProps {
   startPosition: { x: number; y: number };
   endPosition: { x: number; y: number };
   onComplete: () => void;
+  altText: string;
 }
 
 const FlyingImage = ({
@@ -48,6 +57,7 @@ const FlyingImage = ({
   startPosition,
   endPosition,
   onComplete,
+  altText,
 }: FlyingImageProps) => {
   return (
     <motion.div
@@ -76,7 +86,7 @@ const FlyingImage = ({
     >
       <img
         src={imageUrl}
-        alt="Flying image"
+        alt={altText}
         className="w-full h-full object-cover"
       />
     </motion.div>
@@ -91,6 +101,10 @@ export default function ImageWithMenu({
   onViewDetails,
   children,
 }: ImageWithMenuProps) {
+  const tMenu = useTranslations("imageMenu");
+  const tCollections = useTranslations("collections");
+  const tCommon = useTranslations("common");
+  const tVideo = useTranslations("video");
   const router = useRouter();
   const {
     collections,
@@ -214,12 +228,9 @@ export default function ImageWithMenu({
     <>
       <div ref={imageRef} className="relative group">
         {children}
-        
+
         <div className="absolute top-2 right-2 md:opacity-0 md:group-hover:opacity-100 transition-opacity z-10">
-          <Dropdown
-            isOpen={isMenuOpen}
-            onOpenChange={setIsMenuOpen}
-          >
+          <Dropdown isOpen={isMenuOpen} onOpenChange={setIsMenuOpen}>
             <DropdownTrigger>
               <Button
                 isIconOnly
@@ -231,7 +242,7 @@ export default function ImageWithMenu({
               </Button>
             </DropdownTrigger>
             <DropdownMenu
-              aria-label="Image actions"
+              aria-label={tMenu("actionsLabel")}
               onAction={(key) => {
                 if (key === "view") {
                   onViewDetails();
@@ -244,33 +255,34 @@ export default function ImageWithMenu({
                 }
               }}
             >
-              <DropdownItem
-                key="view"
-                startContent={<Eye size={16} />}
-              >
-                View Details
+              <DropdownItem key="view" startContent={<Eye size={16} />}>
+                {tMenu("viewDetails")}
               </DropdownItem>
               <DropdownItem
                 key="generate-video"
                 startContent={<Video size={16} />}
                 className="text-primary"
               >
-                Generate Video
+                {tVideo("generateVideo")}
               </DropdownItem>
-              <DropdownSection title="Add to Collection" showDivider>
+              <DropdownSection title={tMenu("addToCollection")} showDivider>
                 <DropdownItem
                   key="create-new"
                   startContent={<Plus size={16} />}
                   className="font-semibold"
                 >
-                  Create New Collection
+                  {tCollections("createNewCollection")}
                 </DropdownItem>
               </DropdownSection>
-              <DropdownSection title={collections.length > 0 ? "Your Collections" : undefined}>
+              <DropdownSection
+                title={
+                  collections.length > 0 ? tMenu("yourCollections") : undefined
+                }
+              >
                 {collections.length === 0 ? (
                   <DropdownItem key="no-collections" isReadOnly>
                     <span className="text-xs text-default-400">
-                      No collections yet
+                      {tCollections("noCollectionsYet")}
                     </span>
                   </DropdownItem>
                 ) : (
@@ -305,6 +317,7 @@ export default function ImageWithMenu({
             startPosition={flying.startPos}
             endPosition={endPos}
             onComplete={() => removeFlyingImage(flying.id)}
+            altText={tMenu("flyingImageAlt")}
           />
         ))}
       </AnimatePresence>
@@ -314,11 +327,11 @@ export default function ImageWithMenu({
         <ModalContent>
           {(onClose) => (
             <>
-              <ModalHeader>Create New Collection</ModalHeader>
+              <ModalHeader>{tCollections("createNewCollection")}</ModalHeader>
               <ModalBody>
                 <Input
-                  label="Collection Name"
-                  placeholder="Enter collection name"
+                  label={tCollections("collectionName")}
+                  placeholder={tCollections("enterCollectionName")}
                   value={newCollectionName}
                   onValueChange={setNewCollectionName}
                   onKeyDown={(e) => {
@@ -331,7 +344,7 @@ export default function ImageWithMenu({
               </ModalBody>
               <ModalFooter>
                 <Button variant="light" onPress={onClose}>
-                  Cancel
+                  {tCommon("cancel")}
                 </Button>
                 <Button
                   color="primary"
@@ -339,7 +352,7 @@ export default function ImageWithMenu({
                   isLoading={isCreating}
                   isDisabled={!newCollectionName.trim()}
                 >
-                  Create & Add
+                  {tMenu("createAndAdd")}
                 </Button>
               </ModalFooter>
             </>
@@ -349,4 +362,3 @@ export default function ImageWithMenu({
     </>
   );
 }
-
