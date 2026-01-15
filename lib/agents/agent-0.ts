@@ -32,7 +32,8 @@ export class Agent0 implements Agent {
     precisionEditing?: boolean,
     imageIds?: string[], // Unified array of image IDs (not used by this agent)
     systemPromptOverride?: string,
-    aspectRatioOverride?: string
+    aspectRatioOverride?: string,
+    imageModelId?: string
   ): Promise<AgentResponse> {
     const startTime = requestStartTime || Date.now();
     console.log(

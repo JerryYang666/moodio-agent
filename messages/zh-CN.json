@@ -239,6 +239,7 @@
     },
     "models": {
       "nano-banana-pro": "Nano-banana Pro",
+      "seedream-45": "Seedream 4.5",
       "midjourney": "Midjourney",
       "gpt-52": "gpt-5.2",
       "gemini-3": "gemini-3"

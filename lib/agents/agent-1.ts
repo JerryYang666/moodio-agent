@@ -7,9 +7,13 @@ import {
   generateImageId,
 } from "@/lib/storage/s3";
 import OpenAI from "openai";
-import { GoogleGenAI } from "@google/genai";
 import { getSystemPrompt } from "./system-prompts";
 import { recordEvent, sanitizeGeminiResponse } from "@/lib/telemetry";
+import {
+  editImageWithModel,
+  generateImageWithModel,
+} from "@/lib/image/service";
+import { getImageModel } from "@/lib/image/models";
 
 // Maximum number of retries for failed operations
 const MAX_RETRY = 2;
@@ -52,6 +56,7 @@ interface PreparedMessages {
   imageBase64Promises: Promise<string | undefined>[];
   precisionEditing?: boolean;
   aspectRatioOverride?: AspectRatio;
+  imageModelId?: string;
 }
 
 export class Agent1 implements Agent {
@@ -67,7 +72,8 @@ export class Agent1 implements Agent {
     precisionEditing?: boolean,
     imageIds?: string[], // Unified array of image IDs
     systemPromptOverride?: string,
-    aspectRatioOverride?: string
+    aspectRatioOverride?: string,
+    imageModelId?: string
   ): Promise<AgentResponse> {
     const startTime = requestStartTime || Date.now();
     console.log(
@@ -100,7 +106,8 @@ export class Agent1 implements Agent {
       precisionEditing,
       imageIds || [],
       systemPromptOverride,
-      validatedAspectRatio
+      validatedAspectRatio,
+      imageModelId
     );
 
     // Step 2: Call LLM and parse response
@@ -176,7 +183,8 @@ export class Agent1 implements Agent {
     precisionEditing?: boolean,
     imageIds?: string[], // Unified array of image IDs from frontend
     systemPromptOverride?: string,
-    aspectRatioOverride?: AspectRatio
+    aspectRatioOverride?: AspectRatio,
+    imageModelId?: string
   ): Promise<PreparedMessages> {
     const rawSystemPrompt = systemPromptOverride || getSystemPrompt(this.id);
     const systemPrompt = rawSystemPrompt.replace(
@@ -328,6 +336,7 @@ export class Agent1 implements Agent {
       imageBase64Promises,
       precisionEditing,
       aspectRatioOverride,
+      imageModelId,
     };
   }
 
@@ -803,19 +812,21 @@ export class Agent1 implements Agent {
     );
 
     // Record failure event
+    const modelConfig = prepared.imageModelId
+      ? getImageModel(prepared.imageModelId)
+      : undefined;
     const failureMetadata: any = {
       status: "failed",
-      provider: "google",
+      provider: modelConfig?.provider || "unknown",
+      modelId: prepared.imageModelId,
       error: lastError?.message || "Image generation failed",
       prompt: suggestion.prompt,
       aspectRatio: suggestion.aspectRatio,
     };
 
-    // Attach response if available (sent from generateImageCore via error property)
     if (lastError && "response" in lastError) {
-      failureMetadata.response = sanitizeGeminiResponse(
-        (lastError as any).response
-      );
+      const response = (lastError as any).response;
+      failureMetadata.response = sanitizeGeminiResponse(response);
     }
 
     await recordEvent("image_generation", userId, failureMetadata);
@@ -831,10 +842,6 @@ export class Agent1 implements Agent {
     userId: string,
     preGeneratedImageId?: string
   ): Promise<MessageContentPart> {
-    const ai = new GoogleGenAI({
-      apiKey: process.env.GOOGLE_API_KEY,
-    });
-
     // Use user-selected aspect ratio if provided, otherwise use agent's suggestion
     // If agent's suggestion is also invalid, fall back to "1:1"
     let aspectRatio: AspectRatio;
@@ -867,95 +874,53 @@ export class Agent1 implements Agent {
       (prepared.precisionEditing && validImageBase64.length > 0) ||
       validImageBase64.length > 0;
 
-    let response: any;
-
     try {
+      const modelId = prepared.imageModelId;
+      let result;
       if (useImageEditing && validImageBase64.length > 0) {
-        // Image editing - include all provided images in the prompt
-        const prompt: any[] = [{ text: suggestion.prompt }];
-
-        for (const imageBase64 of validImageBase64) {
-          prompt.push({
-            inlineData: {
-              mimeType: "image/png",
-              data: imageBase64,
-            },
-          });
-        }
-
         console.log(
           `[Agent-1] Using image editing mode with ${validImageBase64.length} image(s) for index=${index}`
         );
-
-        response = await ai.models.generateContent({
-          model: "gemini-3-pro-image-preview",
-          contents: prompt,
-          config: {
-            responseModalities: ["TEXT", "IMAGE"],
-            imageConfig: {
-              aspectRatio: aspectRatio,
-              imageSize: "2K",
-            },
-            tools: [{ googleSearch: {} }],
-          },
+        result = await editImageWithModel(modelId, {
+          prompt: suggestion.prompt,
+          imageIds: prepared.imageIds,
+          imageBase64: validImageBase64,
+          aspectRatio,
         });
       } else {
-        // Text to image (no input images)
-        response = await ai.models.generateContent({
-          model: "gemini-3-pro-image-preview",
-          contents: suggestion.prompt,
-          config: {
-            responseModalities: ["TEXT", "IMAGE"],
-            imageConfig: {
-              aspectRatio: aspectRatio,
-              imageSize: "2K",
-            },
-            tools: [{ googleSearch: {} }],
-          },
+        result = await generateImageWithModel(modelId, {
+          prompt: suggestion.prompt,
+          aspectRatio,
         });
       }
 
-      const candidates = (response as any).candidates;
-      let generatedImageData: string | undefined;
-      if (candidates && candidates.length > 0) {
-        const parts = candidates[0].content?.parts;
-        if (parts) {
-          for (const part of parts) {
-            if (part.inlineData) {
-              generatedImageData = part.inlineData.data;
-              break;
-            }
-          }
-        }
-      }
-
-      if (!generatedImageData) {
-        console.log(
-          "[Agent-1] No image data in Gemini response. Full response:",
-          JSON.stringify(response, null, 2)
-        );
-        const error = new Error("No image data in Gemini response");
-        // Attach response to error object so we can log it upstream
-        (error as any).response = response;
-        throw error;
-      }
-      const buf = Buffer.from(generatedImageData, "base64");
       // Use pre-generated imageId if provided (for parallel tracking), otherwise generate new
-      finalImageId = await uploadImage(buf, "image/png", preGeneratedImageId);
+      finalImageId = await uploadImage(
+        result.imageBuffer,
+        result.contentType,
+        preGeneratedImageId
+      );
+
+      const response =
+        result.provider === "google"
+          ? sanitizeGeminiResponse(result.response)
+          : result.response;
+
+      // Record success event
+      await recordEvent("image_generation", userId, {
+        status: "success",
+        provider: result.provider,
+        modelId: result.modelId,
+        providerModelId: result.providerModelId,
+        prompt: suggestion.prompt,
+        aspectRatio: aspectRatio,
+        response,
+      });
     } catch (error) {
       // If we have a response in the error (from our manual throw above), or if it's a GoogleGenerativeAIError that contains response data
       // we want to ensure it propagates up
       throw error;
     }
-
-    // Record success event
-    await recordEvent("image_generation", userId, {
-      status: "success",
-      provider: "google",
-      prompt: suggestion.prompt,
-      aspectRatio: aspectRatio,
-      response: sanitizeGeminiResponse(response),
-    });
 
     const result: MessageContentPart = {
       type: "agent_image",
@@ -988,7 +953,8 @@ export class Agent1 implements Agent {
     precisionEditing?: boolean,
     imageIds?: string[], // Unified array of image IDs to use for generation
     systemPromptOverride?: string,
-    aspectRatioOverride?: string
+    aspectRatioOverride?: string,
+    imageModelId?: string
   ): Promise<ParallelAgentResponse> {
     const startTime = requestStartTime || Date.now();
     console.log(
@@ -1016,7 +982,8 @@ export class Agent1 implements Agent {
       precisionEditing,
       imageIds || [],
       systemPromptOverride,
-      validatedAspectRatio
+      validatedAspectRatio,
+      imageModelId
     );
 
     const encoder = new TextEncoder();

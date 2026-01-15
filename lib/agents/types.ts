@@ -23,7 +23,8 @@ export interface Agent {
     precisionEditing?: boolean,
     imageIds?: string[], // Unified array of image IDs
     systemPromptOverride?: string,
-    aspectRatioOverride?: string
+    aspectRatioOverride?: string,
+    imageModelId?: string
   ): Promise<AgentResponse>;
 
   // Process request with parallel variants
@@ -37,6 +38,7 @@ export interface Agent {
     precisionEditing?: boolean,
     imageIds?: string[], // Unified array of image IDs
     systemPromptOverride?: string,
-    aspectRatioOverride?: string
+    aspectRatioOverride?: string,
+    imageModelId?: string
   ): Promise<ParallelAgentResponse>;
 }

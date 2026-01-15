@@ -671,6 +671,10 @@ export default function ChatInterface({
         })),
       };
 
+      if (menuState.mode === "create" || menuState.mode === "edit") {
+        payload.imageModelId = menuState.model;
+      }
+
       // Add precision editing flag if enabled
       if (precisionEditing) {
         payload.precisionEditing = true;

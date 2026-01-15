@@ -28,6 +28,7 @@ export const MENU_CONFIG = {
       default: "nano-banana-pro",
       options: {
         "nano-banana-pro": { label: "Nano-banana Pro" },
+        "seedream-45": { label: "Seedream 4.5" },
         midjourney: { label: "Midjourney" },
         "gpt-5.2": { label: "gpt-5.2" },
         "gemini-3": { label: "gemini-3" },
@@ -78,7 +79,7 @@ export const MENU_CONFIG = {
       availability: {
         model: {
           enabled: true,
-          allowed: ["nano-banana-pro"],
+          allowed: ["nano-banana-pro", "seedream-45"],
         },
         expertise: {
           enabled: true,
@@ -107,7 +108,7 @@ export const MENU_CONFIG = {
         aspectRatio: "smart",
       },
       availability: {
-        model: { enabled: true, allowed: ["nano-banana-pro"] },
+        model: { enabled: true, allowed: ["nano-banana-pro", "seedream-45"] },
         expertise: {
           enabled: false,
           reason: "Expertise is not available in Edit selected images mode.",
