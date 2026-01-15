@@ -2,12 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAccessToken } from "@/lib/auth/cookies";
 import { verifyAccessToken } from "@/lib/auth/jwt";
 import { db } from "@/lib/db";
-import { chats, collectionImages, collectionShares, collections, projects } from "@/lib/db/schema";
+import { chats } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import {
   getChatHistory,
   saveChatHistory,
-  uploadImage,
   getSignedImageUrl,
 } from "@/lib/storage/s3";
 import { createLLMClient } from "@/lib/llm/client";
@@ -20,28 +19,79 @@ import { agent1 } from "@/lib/agents/agent-1";
 import { waitUntil } from "@vercel/functions";
 import { recordEvent } from "@/lib/telemetry";
 
-function convertToLLMFormat(message: Message): Message {
-  if (typeof message.content === "string") {
-    return message;
+/** Maximum number of images allowed per message */
+const MAX_IMAGES_PER_MESSAGE = 5;
+
+type ImageSourceEntry = {
+  imageId: string;
+  source?: "upload" | "asset" | "ai_generated";
+  title?: string;
+  messageIndex?: number;
+  partIndex?: number;
+  variantId?: string;
+};
+
+const applyImageSelections = (
+  history: Message[],
+  imageSources: ImageSourceEntry[]
+): Message[] => {
+  const selections = imageSources.filter(
+    (entry) => entry.source === "ai_generated"
+  );
+  if (selections.length === 0) return history;
+
+  const updated = [...history];
+
+  for (const selection of selections) {
+    let targetIndex = -1;
+    if (selection.variantId) {
+      targetIndex = updated.findIndex(
+        (msg) => msg.variantId === selection.variantId
+      );
+    }
+    if (targetIndex === -1 && typeof selection.messageIndex === "number") {
+      targetIndex = selection.messageIndex;
+    }
+
+    // Fallback: find by imageId
+    if (targetIndex === -1 && selection.imageId) {
+      targetIndex = updated.findIndex((msg) => {
+        if (!Array.isArray(msg.content)) return false;
+        return msg.content.some(
+          (part) =>
+            part.type === "agent_image" && part.imageId === selection.imageId
+        );
+      });
+    }
+
+    if (targetIndex < 0 || targetIndex >= updated.length) continue;
+    const target = updated[targetIndex];
+    if (!Array.isArray(target.content)) continue;
+
+    const content = [...target.content];
+    let partIndex = content.findIndex(
+      (part) =>
+        part.type === "agent_image" && part.imageId === selection.imageId
+    );
+
+    if (
+      partIndex === -1 &&
+      typeof selection.partIndex === "number" &&
+      selection.partIndex >= 0 &&
+      selection.partIndex < content.length
+    ) {
+      partIndex = selection.partIndex;
+    }
+
+    const part = content[partIndex];
+    if (part && part.type === "agent_image" && !part.isSelected) {
+      content[partIndex] = { ...part, isSelected: true };
+      updated[targetIndex] = { ...target, content };
+    }
   }
 
-  const newContent: MessageContentPart[] = message.content.map((part) => {
-    if (part.type === "image") {
-      return {
-        type: "image_url",
-        image_url: {
-          url: getSignedImageUrl(part.imageId),
-        },
-      };
-    }
-    return part;
-  });
-
-  return {
-    ...message,
-    content: newContent,
-  };
-}
+  return updated;
+};
 
 export async function POST(
   request: NextRequest,
@@ -66,74 +116,50 @@ export async function POST(
       request.headers.get("x-real-ip") ||
       undefined;
 
-    // Handle FormData or JSON
-    let content = "";
-    let file: File | null = null;
-    let assetId: string | undefined;
-    let selection: {
-      messageIndex: number;
-      partIndex: number;
-      imageId?: string;
-      variantId?: string;
-    } | null = null;
-    let precisionEditing = false;
-    let precisionEditImageId: string | undefined;
-    let systemPromptOverride: string | undefined;
-    let aspectRatioOverride: string | undefined;
+    // Parse JSON request - unified format with imageIds array
+    // All images are pre-uploaded, we only receive their IDs
+    const json = await request.json();
+    const content: string = json.content || "";
+    const imageIds: string[] = json.imageIds || []; // Unified array of pre-uploaded image IDs
+    const rawImageSources = Array.isArray(json.imageSources)
+      ? json.imageSources
+      : [];
+    const imageSources: ImageSourceEntry[] = rawImageSources
+      .filter((entry: any) => typeof entry?.imageId === "string")
+      .map((entry: any) => ({
+        imageId: entry.imageId as string,
+        source:
+          entry.source === "upload" ||
+          entry.source === "asset" ||
+          entry.source === "ai_generated"
+            ? (entry.source as "upload" | "asset" | "ai_generated")
+            : undefined,
+        title: typeof entry.title === "string" ? entry.title : undefined,
+        messageIndex:
+          typeof entry.messageIndex === "number"
+            ? entry.messageIndex
+            : undefined,
+        partIndex:
+          typeof entry.partIndex === "number" ? entry.partIndex : undefined,
+        variantId:
+          typeof entry.variantId === "string" ? entry.variantId : undefined,
+      }));
+    const precisionEditing: boolean = !!json.precisionEditing;
+    const systemPromptOverride: string | undefined = json.systemPromptOverride;
+    const aspectRatioOverride: string | undefined = json.aspectRatio;
 
-    const contentType = request.headers.get("content-type") || "";
-    if (contentType.includes("multipart/form-data")) {
-      const formData = await request.formData();
-      content = (formData.get("message") as string) || "";
-      file = formData.get("file") as File | null;
-      const assetIdStr = formData.get("assetId") as string;
-      if (assetIdStr) assetId = assetIdStr;
-      const selectionStr = formData.get("selection") as string;
-      if (selectionStr) {
-        try {
-          selection = JSON.parse(selectionStr);
-        } catch (e) {
-          console.error("Failed to parse selection from FormData", e);
-        }
-      }
-      if (formData.get("precisionEditing") === "true") {
-        precisionEditing = true;
-      }
-      const pId = formData.get("precisionEditImageId") as string;
-      if (pId) precisionEditImageId = pId;
-      const spo = formData.get("systemPromptOverride") as string;
-      if (spo) systemPromptOverride = spo;
-      const ar = formData.get("aspectRatio") as string;
-      if (ar) aspectRatioOverride = ar;
-    } else {
-      const json = await request.json();
-      content = json.content;
-      assetId = json.assetId;
-      selection = json.selection;
-      if (json.precisionEditing) {
-        precisionEditing = true;
-      }
-      if (json.precisionEditImageId) {
-        precisionEditImageId = json.precisionEditImageId;
-      }
-      if (json.systemPromptOverride) {
-        systemPromptOverride = json.systemPromptOverride;
-      }
-      if (json.aspectRatio) {
-        aspectRatioOverride = json.aspectRatio;
-      }
-    }
-
-    if (file && assetId) {
+    // Validate: must have content or images
+    if (!content && imageIds.length === 0) {
       return NextResponse.json(
-        { error: "Provide either file or assetId, not both" },
+        { error: "Content or imageIds is required" },
         { status: 400 }
       );
     }
 
-    if (!content && !file && !assetId) {
+    // Validate image count limit
+    if (imageIds.length > MAX_IMAGES_PER_MESSAGE) {
       return NextResponse.json(
-        { error: "Content, file, or assetId is required" },
+        { error: `Maximum ${MAX_IMAGES_PER_MESSAGE} images allowed` },
         { status: 400 }
       );
     }
@@ -145,11 +171,9 @@ export async function POST(
       {
         chatId,
         content,
-        hasImage: !!file || !!assetId,
-        imageSize: file ? file.size : undefined,
-        imageType: file ? file.type : undefined,
-        assetId: assetId || undefined,
-        selection,
+        imageCount: imageIds.length,
+        imageIds,
+        imageSources,
         precisionEditing,
         systemPromptOverride,
         aspectRatioOverride,
@@ -179,169 +203,32 @@ export async function POST(
     }
 
     // Get existing history
-    let history = await getChatHistory(chatId);
+    const history = await getChatHistory(chatId);
     console.log(
       "[Perf] Chat history Got",
       `[${Date.now() - requestStartTime}ms]`
     );
 
-    // Update history if selection is present
-    if (selection) {
-      const { messageIndex, imageId, variantId } = selection;
-
-      // Find the actual message index in the flat history array
-      // With variants, messageIndex from frontend is the group's originalIndex
-      // We need to use variantId to find the correct message
-      let actualMessageIndex = messageIndex;
-
-      if (variantId) {
-        // Find message by variantId (for parallel variants)
-        const variantMsgIndex = history.findIndex(
-          (msg) => msg.variantId === variantId
-        );
-        if (variantMsgIndex !== -1) {
-          actualMessageIndex = variantMsgIndex;
-        }
-      }
-
-      if (
-        history[actualMessageIndex] &&
-        Array.isArray(history[actualMessageIndex].content)
-      ) {
-        const content = history[actualMessageIndex]
-          .content as MessageContentPart[];
-
-        // Find the part by imageId (more reliable than partIndex)
-        let targetPartIndex = -1;
-        if (imageId) {
-          targetPartIndex = content.findIndex(
-            (p) => p.type === "agent_image" && p.imageId === imageId
-          );
-        }
-
-        // Fallback to partIndex if imageId not found (backward compatibility)
-        if (targetPartIndex === -1 && selection.partIndex !== undefined) {
-          targetPartIndex = selection.partIndex;
-        }
-
-        if (
-          targetPartIndex >= 0 &&
-          content[targetPartIndex] &&
-          content[targetPartIndex].type === "agent_image"
-        ) {
-          // Create a deep copy of history to modify
-          history = history.map((msg, mIdx) => {
-            if (mIdx !== actualMessageIndex) return msg;
-
-            const newContent = [...(msg.content as MessageContentPart[])];
-            newContent[targetPartIndex] = {
-              ...newContent[targetPartIndex],
-              // @ts-ignore - isSelected is optional
-              isSelected: true,
-            };
-
-            return {
-              ...msg,
-              content: newContent,
-            };
-          });
-
-          // We should save the updated history, but we can do it along with the new message
-          // to minimize S3 writes.
-        }
-      }
-    }
-
-    console.log(
-      "[Perf] Image upload start",
-      `[${Date.now() - requestStartTime}ms]`
-    );
-
-    // Handle image upload
-    let imageId: string | undefined;
-
-    if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        return NextResponse.json(
-          { error: "Image size limit is 5MB" },
-          { status: 400 }
-        );
-      }
-      imageId = await uploadImage(file, file.type);
-    } else if (assetId) {
-      // Resolve asset to its underlying S3 imageId with access checks.
-      const [asset] = await db
-        .select({
-          id: collectionImages.id,
-          imageId: collectionImages.imageId,
-          projectId: collectionImages.projectId,
-          collectionId: collectionImages.collectionId,
-        })
-        .from(collectionImages)
-        .where(eq(collectionImages.id, assetId))
-        .limit(1);
-
-      if (!asset) {
-        return NextResponse.json({ error: "Asset not found" }, { status: 404 });
-      }
-
-      // Owner access via project ownership (projects are not shareable yet)
-      const [ownedProject] = await db
-        .select({ id: projects.id })
-        .from(projects)
-        .where(and(eq(projects.id, asset.projectId), eq(projects.userId, payload.userId)))
-        .limit(1);
-
-      let canAccess = !!ownedProject;
-
-      // Shared access via collection sharing
-      if (!canAccess && asset.collectionId) {
-        const [ownedCollection] = await db
-          .select({ id: collections.id })
-          .from(collections)
-          .where(and(eq(collections.id, asset.collectionId), eq(collections.userId, payload.userId)))
-          .limit(1);
-
-        if (ownedCollection) {
-          canAccess = true;
-        } else {
-          const [share] = await db
-            .select({ id: collectionShares.id })
-            .from(collectionShares)
-            .where(
-              and(
-                eq(collectionShares.collectionId, asset.collectionId),
-                eq(collectionShares.sharedWithUserId, payload.userId)
-              )
-            )
-            .limit(1);
-          if (share) canAccess = true;
-        }
-      }
-
-      if (!canAccess) {
-        return NextResponse.json(
-          { error: "Asset not found or access denied" },
-          { status: 404 }
-        );
-      }
-
-      imageId = asset.imageId;
-    }
-
-    console.log(
-      "[Perf] Image upload end",
-      `[${Date.now() - requestStartTime}ms]`
-    );
-
-    // Construct new user message
+    // Construct new user message with all image IDs
+    // Images are already uploaded, we just reference them by ID
     let userMessage: Message;
-    if (imageId) {
+    if (imageIds.length > 0) {
+      const sourceById = new Map<string, ImageSourceEntry>(
+        imageSources.map((entry) => [entry.imageId, entry])
+      );
       const parts: MessageContentPart[] = [];
       if (content) {
         parts.push({ type: "text", text: content });
       }
-      parts.push({ type: "image", imageId: imageId });
+      // Add all images to the message
+      for (const imgId of imageIds) {
+        const sourceEntry = sourceById.get(imgId);
+        parts.push({
+          type: "image",
+          imageId: imgId,
+          source: sourceEntry?.source,
+        });
+      }
       userMessage = {
         role: "user",
         content: parts,
@@ -351,16 +238,10 @@ export async function POST(
       userMessage = { role: "user", content, createdAt: Date.now() };
     }
 
-    // Combine history + new message (Storage Format)
-    // Wait, we shouldn't save userMessage to history YET if we want the agent to process it?
-    // Actually we save it now so we have the full context.
-    // But wait, if agent fails, we might want to rollback?
-    // Let's assume we save user message first.
-    // However, standard chat usually saves user message immediately.
-    // Let's proceed with creating the Agent stream.
     console.log("[Perf] Calling agent", `[${Date.now() - requestStartTime}ms]`);
 
     // Use Agent 1 with parallel variants
+    // Pass all imageIds directly - the agent will use these for image generation
     const { stream: agentStream, completions } =
       await agent1.processRequestParallel(
         history,
@@ -370,7 +251,7 @@ export async function POST(
         PARALLEL_VARIANT_COUNT,
         requestStartTime,
         precisionEditing,
-        precisionEditImageId,
+        imageIds, // Pass the unified array of image IDs
         isAdmin ? systemPromptOverride : undefined,
         aspectRatioOverride
       );
@@ -389,16 +270,28 @@ export async function POST(
 
           // For backward compatibility, store as array of messages with variantId
           // Frontend will group messages with the same timestamp but different variantIds
-          const updatedHistory = [...history, userMessage, ...messagesToSave];
+          const historyWithSelections = applyImageSelections(
+            history,
+            imageSources
+          );
+          const updatedHistory = [
+            ...historyWithSelections,
+            userMessage,
+            ...messagesToSave,
+          ];
           await saveChatHistory(chatId, updatedHistory);
 
           // Use the first variant for thumbnail calculation
           const primaryMessage = messagesToSave[0];
 
-          // Calculate thumbnail image ID
+          // Calculate thumbnail image ID - simplified logic
+          // Priority:
+          // 1. First image from current user message (most recent user upload/selection)
+          // 2. First generated image from assistant response
+          // 3. Latest image from history
           let thumbnailImageId: string | null = null;
 
-          // 1. Check current user upload
+          // 1. Check current user images
           if (Array.isArray(userMessage.content)) {
             const userImage = userMessage.content.find(
               (c) => c.type === "image"
@@ -408,43 +301,7 @@ export async function POST(
             }
           }
 
-          // 2. Check current selection (use variantId to find correct message)
-          if (!thumbnailImageId && selection) {
-            let selectedMsg;
-            if (selection.variantId) {
-              // Find message by variantId for parallel variants
-              selectedMsg = history.find(
-                (msg) => msg.variantId === selection.variantId
-              );
-            } else {
-              // Fallback to messageIndex for backward compatibility
-              selectedMsg = history[selection.messageIndex];
-            }
-            
-            if (selectedMsg && Array.isArray(selectedMsg.content)) {
-              // Find part by imageId for reliability
-              let part;
-              if (selection.imageId) {
-                part = selectedMsg.content.find(
-                  (p) => p.type === "agent_image" && p.imageId === selection.imageId
-                );
-              }
-              // Fallback to partIndex
-              if (!part && selection.partIndex !== undefined) {
-                part = selectedMsg.content[selection.partIndex];
-              }
-              
-              if (part) {
-                if (part.type === "image") {
-                  thumbnailImageId = part.imageId;
-                } else if (part.type === "agent_image" && part.imageId) {
-                  thumbnailImageId = part.imageId;
-                }
-              }
-            }
-          }
-
-          // 3. Fallback: Check the primary message for generated images
+          // 2. Check the primary message for generated images
           if (!thumbnailImageId && Array.isArray(primaryMessage.content)) {
             for (const part of primaryMessage.content) {
               if (
@@ -458,53 +315,30 @@ export async function POST(
             }
           }
 
-          // 4. Fallback: Traverse backwards to find the latest image
-          // Priority:
-          // 1. User uploaded image (type: "image")
-          // 2. Selected agent image (type: "agent_image", isSelected: true)
-          // 3. Latest generated image (type: "agent_image", status: "generated")
+          // 3. Fallback: Traverse backwards to find the latest image
           if (!thumbnailImageId) {
-            let latestGeneratedImageId: string | null = null;
-
             for (let i = updatedHistory.length - 1; i >= 0; i--) {
               const msg = updatedHistory[i];
               if (Array.isArray(msg.content)) {
                 for (let j = msg.content.length - 1; j >= 0; j--) {
                   const part = msg.content[j];
 
-                  // User uploaded image - High priority (most recent)
                   if (part.type === "image") {
                     thumbnailImageId = part.imageId;
                     break;
                   }
 
-                  // Selected agent image - High priority
                   if (
                     part.type === "agent_image" &&
-                    part.isSelected &&
-                    part.imageId
+                    part.imageId &&
+                    part.status === "generated"
                   ) {
                     thumbnailImageId = part.imageId;
                     break;
                   }
-
-                  // Generated agent image - Fallback candidate
-                  if (
-                    part.type === "agent_image" &&
-                    part.imageId &&
-                    part.status === "generated" &&
-                    !latestGeneratedImageId
-                  ) {
-                    latestGeneratedImageId = part.imageId;
-                  }
                 }
               }
               if (thumbnailImageId) break;
-            }
-
-            // If no user upload or selected image found, use the latest generated one
-            if (!thumbnailImageId && latestGeneratedImageId) {
-              thumbnailImageId = latestGeneratedImageId;
             }
           }
 

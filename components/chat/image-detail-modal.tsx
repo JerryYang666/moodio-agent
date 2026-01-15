@@ -21,8 +21,8 @@ import { downloadImage } from "./utils";
 
 export interface ImageInfo {
   url: string;
-  title: string;
-  prompt: string;
+  title?: string;
+  prompt?: string;
   imageId?: string;
   status?: "loading" | "generated" | "error";
 }
@@ -82,10 +82,19 @@ export default function ImageDetailModal({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, handlePrevious, handleNext]);
 
+  const hasPrompt = !!selectedImage?.prompt?.trim();
+
   // Reset fullscreen when modal closes
   useEffect(() => {
     if (!isOpen) setIsFullscreen(false);
   }, [isOpen]);
+
+  // Auto-enter fullscreen for images without prompts (user uploads)
+  useEffect(() => {
+    if (isOpen && !hasPrompt) {
+      setIsFullscreen(true);
+    }
+  }, [isOpen, hasPrompt]);
 
   const handleClose = () => {
     setIsFullscreen(false);
@@ -112,7 +121,7 @@ export default function ImageDetailModal({
       <ModalContent>
         {(onClose) => (
           <>
-            {!isFullscreen && (
+            {!isFullscreen && selectedImage?.title && (
               <ModalHeader className="flex flex-col gap-1">
                 {selectedImage?.title}
               </ModalHeader>
@@ -169,7 +178,7 @@ export default function ImageDetailModal({
                                 onPress={() =>
                                   downloadImage(
                                     selectedImage.imageId,
-                                    selectedImage.title,
+                                    selectedImage.title || "image",
                                     selectedImage.url
                                   )
                                 }
@@ -252,7 +261,13 @@ export default function ImageDetailModal({
                     </div>
                   ) : (
                     <>
-                      <div className="w-full md:w-1/2 flex items-center justify-center bg-black/5 rounded-lg min-h-[200px] md:min-h-[400px] relative group">
+                      <div
+                        className={
+                          hasPrompt
+                            ? "w-full md:w-1/2 flex items-center justify-center bg-black/5 rounded-lg min-h-[200px] md:min-h-[400px] relative group"
+                            : "w-full flex items-center justify-center bg-black/5 rounded-lg min-h-[200px] md:min-h-[400px] relative group"
+                        }
+                      >
                         {/* Navigation arrows */}
                         {canNavigatePrev && (
                           <Button
@@ -306,7 +321,7 @@ export default function ImageDetailModal({
                                 onPress={() =>
                                   downloadImage(
                                     selectedImage.imageId,
-                                    selectedImage.title,
+                                    selectedImage.title || "image",
                                     selectedImage.url
                                   )
                                 }
@@ -325,16 +340,18 @@ export default function ImageDetailModal({
                           </div>
                         )}
                       </div>
-                      <div className="w-full md:w-1/2 flex flex-col">
-                        <div className="bg-default-100 p-4 rounded-lg text-sm md:flex-1 md:overflow-y-auto">
-                          <p className="font-semibold mb-2 text-base">
-                            {t("promptLabel")}
-                          </p>
-                          <p className="text-default-600 leading-relaxed whitespace-pre-wrap">
-                            {selectedImage.prompt}
-                          </p>
+                      {hasPrompt && (
+                        <div className="w-full md:w-1/2 flex flex-col">
+                          <div className="bg-default-100 p-4 rounded-lg text-sm md:flex-1 md:overflow-y-auto">
+                            <p className="font-semibold mb-2 text-base">
+                              {t("promptLabel")}
+                            </p>
+                            <p className="text-default-600 leading-relaxed whitespace-pre-wrap">
+                              {selectedImage.prompt}
+                            </p>
+                          </div>
                         </div>
-                      </div>
+                      )}
                     </>
                   )}
                 </div>

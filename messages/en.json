@@ -107,7 +107,16 @@
       "overwhelmed": "Oops! Our agent got a bit overwhelmed... Mind trying again?",
       "coffeeBreak": "So sorry! Our agent is taking a coffee break. Please try again!",
       "tripped": "Uh oh! Our agent tripped over their thoughts. Give it another go?"
-    }
+    },
+    "waitForUpload": "Please wait for images to finish uploading",
+    "uploadFailed": "Failed to upload image",
+    "maxImagesReached": "Maximum {max} images allowed",
+    "imageAlreadyAdded": "This image is already added",
+    "pendingImagesCount": "{count} of {max} images selected",
+    "image": "Image",
+    "sourceUpload": "Upload",
+    "sourceAsset": "Library",
+    "sourceAiGenerated": "AI Generated"
   },
   "profile": {
     "title": "Profile Settings",
@@ -300,6 +309,12 @@
       "subtitle": "Cost & Usage",
       "description": "Monitor Fal.ai API usage and estimated costs.",
       "goTo": "Go to Fal Usage"
+    },
+    "videos": {
+      "title": "Videos",
+      "subtitle": "Generation History",
+      "description": "Review all video generation requests and results.",
+      "goTo": "Go to Video History"
     }
   },
   "dashboard": {
