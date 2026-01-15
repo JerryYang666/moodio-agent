@@ -78,7 +78,9 @@ export default function ChatInterface({
   const [isSending, setIsSending] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [selectedAsset, setSelectedAsset] = useState<SelectedAsset | null>(null);
+  const [selectedAsset, setSelectedAsset] = useState<SelectedAsset | null>(
+    null
+  );
   const [isAssetPickerOpen, setIsAssetPickerOpen] = useState(false);
   const [precisionEditing, setPrecisionEditing] = useState(false);
   const [menuState, setMenuState] = useState<MenuState>(INITIAL_MENU_STATE);
@@ -336,7 +338,8 @@ export default function ChatInterface({
       });
     };
     window.addEventListener("moodio-asset-selected", handler as any);
-    return () => window.removeEventListener("moodio-asset-selected", handler as any);
+    return () =>
+      window.removeEventListener("moodio-asset-selected", handler as any);
   }, [applySelectedAsset]);
 
   const handleAssetDrop = useCallback(
@@ -345,7 +348,7 @@ export default function ChatInterface({
         applySelectedAsset({
           assetId: payload.assetId,
           url: payload.url,
-          title: payload.title || "Selected asset",
+          title: payload.title || t("chat.selectedAsset"),
           imageId: payload.imageId,
         });
         return;
@@ -361,7 +364,7 @@ export default function ChatInterface({
           applySelectedAsset({
             assetId: a.id,
             url: a.imageUrl,
-            title: a.generationDetails?.title || "Selected asset",
+            title: a.generationDetails?.title || t("chat.selectedAsset"),
             imageId: a.imageId,
           });
         } catch (e) {
@@ -377,7 +380,7 @@ export default function ChatInterface({
       applySelectedAsset({
         assetId: asset.id,
         url: asset.imageUrl,
-        title: asset.generationDetails?.title || "Selected asset",
+        title: asset.generationDetails?.title || t("chat.selectedAsset"),
         imageId: asset.imageId,
       });
     },
@@ -386,7 +389,10 @@ export default function ChatInterface({
 
   const handleSend = async () => {
     if (
-      (!input.trim() && !selectedFile && !selectedAgentPart && !selectedAsset) ||
+      (!input.trim() &&
+        !selectedFile &&
+        !selectedAgentPart &&
+        !selectedAsset) ||
       isSending ||
       isRecording ||
       isTranscribing
@@ -414,7 +420,9 @@ export default function ChatInterface({
             if (currentInput) {
               parts.push({ type: "text", text: currentInput });
             }
-            const imageUrl = currentAsset ? currentAsset.url : currentPreviewUrl!;
+            const imageUrl = currentAsset
+              ? currentAsset.url
+              : currentPreviewUrl!;
             parts.push({ type: "image_url", image_url: { url: imageUrl } });
             return parts;
           })()
@@ -430,7 +438,7 @@ export default function ChatInterface({
     if (selectedAgentPart) {
       setMessages((prev) => {
         const newMessages = [...prev];
-        
+
         // Find the correct message - use variantId if available, otherwise fall back to messageIndex
         let msgIndex = selectedAgentPart.messageIndex;
         if (selectedAgentPart.variantId) {
@@ -441,7 +449,7 @@ export default function ChatInterface({
             msgIndex = variantIndex;
           }
         }
-        
+
         if (newMessages[msgIndex]) {
           const msg = newMessages[msgIndex];
           if (Array.isArray(msg.content)) {
@@ -450,7 +458,9 @@ export default function ChatInterface({
             let partIndex = selectedAgentPart.partIndex;
             if (selectedAgentPart.imageId) {
               const imgIndex = newContent.findIndex(
-                (p) => p.type === "agent_image" && p.imageId === selectedAgentPart.imageId
+                (p) =>
+                  p.type === "agent_image" &&
+                  p.imageId === selectedAgentPart.imageId
               );
               if (imgIndex !== -1) {
                 partIndex = imgIndex;
@@ -460,7 +470,10 @@ export default function ChatInterface({
               newContent[partIndex] &&
               newContent[partIndex].type === "agent_image"
             ) {
-              const agentImagePart = newContent[partIndex] as Extract<MessageContentPart, { type: "agent_image" }>;
+              const agentImagePart = newContent[partIndex] as Extract<
+                MessageContentPart,
+                { type: "agent_image" }
+              >;
               newContent[partIndex] = {
                 ...agentImagePart,
                 isSelected: true,

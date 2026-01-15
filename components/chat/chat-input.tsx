@@ -164,98 +164,101 @@ export default function ChatInput({
         <div className="flex flex-col">
           {/* Previews Area */}
           <AnimatePresence>
-            {isExpanded && (previewUrl || selectedAgentPart || selectedAsset) && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: "auto", opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: 0.2 }}
-                className="px-4 pt-4 overflow-hidden"
-              >
-                <div className="flex gap-2 flex-wrap mb-2">
-                  {previewUrl && (
-                    <div className="relative w-fit">
-                      <img
-                        src={previewUrl}
-                        alt="Preview"
-                        className="h-20 rounded-lg border border-divider"
-                      />
-                      <button
-                        onClick={onClearFile}
-                        className="absolute -top-2 -right-2 bg-default-100 rounded-full p-1 hover:bg-default-200"
-                      >
-                        <X size={14} />
-                      </button>
-                    </div>
-                  )}
-                  {selectedAgentPart && (
-                    <div className="relative w-fit group">
-                      <div className="h-20 w-20 rounded-lg border border-divider overflow-hidden relative">
+            {isExpanded &&
+              (previewUrl || selectedAgentPart || selectedAsset) && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="px-4 pt-4 overflow-hidden"
+                >
+                  <div className="flex gap-2 flex-wrap mb-2">
+                    {previewUrl && (
+                      <div className="relative w-fit">
                         <img
-                          src={selectedAgentPart.url}
-                          alt={selectedAgentPart.title}
-                          className="w-full h-full object-cover"
+                          src={previewUrl}
+                          alt={t("chat.preview")}
+                          className="h-20 rounded-lg border border-divider"
                         />
-                        <div className="absolute inset-0 bg-black/50 flex items-center justify-center p-1">
-                          <span className="text-white text-[10px] text-center leading-tight font-medium line-clamp-3">
-                            {t("chat.selectImage", { title: selectedAgentPart.title })}
-                          </span>
-                        </div>
+                        <button
+                          onClick={onClearFile}
+                          className="absolute -top-2 -right-2 bg-default-100 rounded-full p-1 hover:bg-default-200"
+                        >
+                          <X size={14} />
+                        </button>
                       </div>
-                      <button
-                        onClick={onClearSelectedAgentPart}
-                        className="absolute -top-2 -right-2 bg-default-100 rounded-full p-1 hover:bg-default-200 shadow-sm border border-divider"
-                      >
-                        <X size={14} />
-                      </button>
-                    </div>
-                  )}
-                  {selectedAsset && (
-                    <div className="relative w-fit group">
-                      <div className="h-20 w-20 rounded-lg border border-divider overflow-hidden relative">
-                        <img
-                          src={selectedAsset.url}
-                          alt={selectedAsset.title}
-                          className="w-full h-full object-cover"
-                        />
-                        <div className="absolute inset-0 bg-black/50 flex items-center justify-center p-1">
-                          <span className="text-white text-[10px] text-center leading-tight font-medium line-clamp-3">
-                            {t("chat.asset", { title: selectedAsset.title })}
-                          </span>
+                    )}
+                    {selectedAgentPart && (
+                      <div className="relative w-fit group">
+                        <div className="h-20 w-20 rounded-lg border border-divider overflow-hidden relative">
+                          <img
+                            src={selectedAgentPart.url}
+                            alt={selectedAgentPart.title}
+                            className="w-full h-full object-cover"
+                          />
+                          <div className="absolute inset-0 bg-black/50 flex items-center justify-center p-1">
+                            <span className="text-white text-[10px] text-center leading-tight font-medium line-clamp-3">
+                              {t("chat.selectImage", {
+                                title: selectedAgentPart.title,
+                              })}
+                            </span>
+                          </div>
                         </div>
+                        <button
+                          onClick={onClearSelectedAgentPart}
+                          className="absolute -top-2 -right-2 bg-default-100 rounded-full p-1 hover:bg-default-200 shadow-sm border border-divider"
+                        >
+                          <X size={14} />
+                        </button>
                       </div>
-                      <button
-                        onClick={onClearSelectedAsset}
-                        className="absolute -top-2 -right-2 bg-default-100 rounded-full p-1 hover:bg-default-200 shadow-sm border border-divider"
-                      >
-                        <X size={14} />
-                      </button>
-                    </div>
-                  )}
+                    )}
+                    {selectedAsset && (
+                      <div className="relative w-fit group">
+                        <div className="h-20 w-20 rounded-lg border border-divider overflow-hidden relative">
+                          <img
+                            src={selectedAsset.url}
+                            alt={selectedAsset.title}
+                            className="w-full h-full object-cover"
+                          />
+                          <div className="absolute inset-0 bg-black/50 flex items-center justify-center p-1">
+                            <span className="text-white text-[10px] text-center leading-tight font-medium line-clamp-3">
+                              {t("chat.asset", { title: selectedAsset.title })}
+                            </span>
+                          </div>
+                        </div>
+                        <button
+                          onClick={onClearSelectedAsset}
+                          className="absolute -top-2 -right-2 bg-default-100 rounded-full p-1 hover:bg-default-200 shadow-sm border border-divider"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    )}
 
-                  {(previewUrl || selectedAgentPart || selectedAsset) && (
-                    <div className="flex items-center h-20 ml-2 gap-1">
-                      <Switch
-                        size="sm"
-                        color="secondary"
-                        isSelected={precisionEditing}
-                        onValueChange={onPrecisionEditingChange}
-                      >
-                        <span className="text-xs font-medium">
-                          {t("chat.precisionEditing")}
-                        </span>
-                      </Switch>
-                      <Tooltip content={t("chat.precisionEditingDesc")}>
-                        <Info
-                          size={14}
-                          className="text-default-400 cursor-help"
-                        />
-                      </Tooltip>
-                    </div>
-                  )}
-                </div>
-              </motion.div>
-            )}
+                    {(previewUrl || selectedAgentPart || selectedAsset) && (
+                      <div className="flex items-center h-20 ml-2 gap-1">
+                        <Switch
+                          size="sm"
+                          color="secondary"
+                          isSelected={precisionEditing}
+                          onValueChange={onPrecisionEditingChange}
+                        >
+                          <span className="text-xs font-medium">
+                            {t("chat.precisionEditing")}
+                          </span>
+                        </Switch>
+                        <Tooltip content={t("chat.precisionEditingDesc")}>
+                          <Info
+                            size={14}
+                            className="text-default-400 cursor-help"
+                          />
+                        </Tooltip>
+                      </div>
+                    )}
+                  </div>
+                </motion.div>
+              )}
           </AnimatePresence>
 
           {/* Input Row */}
@@ -306,7 +309,12 @@ export default function ChatInput({
                 <PopoverContent className="bg-danger text-danger-foreground">
                   <div className="px-1 py-1">
                     <div className="text-small font-bold">
-                      {t("chat.timeRemaining", { seconds: Math.max(0, siteConfig.audioRecording.maxDuration - recordingTime) })}
+                      {t("chat.timeRemaining", {
+                        seconds: Math.max(
+                          0,
+                          siteConfig.audioRecording.maxDuration - recordingTime
+                        ),
+                      })}
                     </div>
                   </div>
                 </PopoverContent>
@@ -333,7 +341,7 @@ export default function ChatInput({
             <Button
               isIconOnly
               color="primary"
-              aria-label="Send"
+              aria-label={t("chat.send")}
               onPress={onSend}
               isLoading={isSending}
               isDisabled={isRecording || isTranscribing}

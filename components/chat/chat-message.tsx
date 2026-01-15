@@ -13,6 +13,7 @@ import { formatTime } from "./utils";
 import { Button } from "@heroui/button";
 import { Popover, PopoverTrigger, PopoverContent } from "@heroui/popover";
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { useAuth } from "@/hooks/use-auth";
 
 interface SelectedAgentPart {
@@ -60,6 +61,7 @@ export default function ChatMessage({
   const [isThinkingOpen, setIsThinkingOpen] = useState(false);
   const { user: currentUser } = useAuth();
   const isAdmin = currentUser?.roles?.includes("admin");
+  const t = useTranslations();
 
   const renderContent = (
     content: string | MessageContentPart[],
@@ -96,7 +98,7 @@ export default function ChatMessage({
                 <ChevronRight size={14} />
               )}
               <Brain size={14} />
-              <span>Thinking Process</span>
+              <span>{t("chat.thinkingProcess")}</span>
             </button>
             {isThinkingOpen && (
               <div className="mt-2 p-3 bg-default-100 rounded-lg text-xs font-mono text-default-600 whitespace-pre-wrap border border-default-200">
@@ -122,7 +124,7 @@ export default function ChatMessage({
                     ? part.imageUrl || "" // Use signed CloudFront URL from API
                     : part.image_url.url
                 }
-                alt="User upload"
+                alt={t("chat.userUpload")}
                 classNames={{
                   wrapper: "max-w-full",
                   img: "max-w-full max-h-[300px] object-contain rounded-lg",
@@ -291,7 +293,7 @@ export default function ChatMessage({
                 <PopoverTrigger>
                   <button
                     className="md:opacity-0 md:group-hover:opacity-100 transition-opacity p-1 hover:bg-default-100 rounded-full text-default-400 hover:text-default-600"
-                    aria-label="Edit message"
+                    aria-label={t("chat.editMessage")}
                   >
                     <Pencil size={12} />
                   </button>
@@ -299,11 +301,10 @@ export default function ChatMessage({
                 <PopoverContent>
                   <div className="px-1 py-2 w-60">
                     <div className="text-small font-bold mb-1">
-                      Edit in new chat?
+                      {t("chat.editInNewChatTitle")}
                     </div>
                     <div className="text-tiny text-default-500 mb-2">
-                      This will create a new chat starting from here, preserving
-                      the conversation history up to this point.
+                      {t("chat.editInNewChatDescription")}
                     </div>
                     <div className="flex justify-end gap-2">
                       <Button
@@ -311,7 +312,7 @@ export default function ChatMessage({
                         variant="light"
                         onPress={() => setIsForkPopoverOpen(false)}
                       >
-                        Cancel
+                        {t("common.cancel")}
                       </Button>
                       <Button
                         size="sm"
@@ -321,7 +322,7 @@ export default function ChatMessage({
                           onForkChat(messageIndex);
                         }}
                       >
-                        Edit & Fork
+                        {t("chat.editAndFork")}
                       </Button>
                     </div>
                   </div>

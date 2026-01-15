@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 import {
   Modal,
   ModalContent,
@@ -56,6 +57,7 @@ export default function AssetPickerModal({
   onSelect: (asset: AssetSummary) => void;
   onUpload: (file: File) => void;
 }) {
+  const t = useTranslations();
   const [loading, setLoading] = useState(false);
   const [projects, setProjects] = useState<Project[]>([]);
   const [collections, setCollections] = useState<Collection[]>([]);
@@ -144,15 +146,15 @@ export default function AssetPickerModal({
         {(onClose) => (
           <>
             <ModalHeader className="flex flex-col gap-2">
-              <div>Select an image</div>
+              <div>{t("assetPicker.title")}</div>
               <Tabs
                 selectedKey={tabKey}
                 onSelectionChange={(k) => setTabKey(k as "library" | "upload")}
                 size="sm"
                 variant="underlined"
               >
-                <Tab key="library" title="Library" />
-                <Tab key="upload" title="Upload" />
+                <Tab key="library" title={t("assetPicker.libraryTab")} />
+                <Tab key="upload" title={t("assetPicker.uploadTab")} />
               </Tabs>
             </ModalHeader>
 
@@ -175,19 +177,24 @@ export default function AssetPickerModal({
                   />
 
                   <div className="rounded-xl border border-divider bg-default-50 p-4">
-                    <div className="font-medium">Upload from device</div>
+                    <div className="font-medium">
+                      {t("assetPicker.uploadFromDevice")}
+                    </div>
                     <div className="text-sm text-default-500 mt-1">
-                      Choose an image file to attach to your next message.
+                      {t("assetPicker.uploadDescription")}
                     </div>
                     <div className="mt-4 flex gap-2">
                       <Button
                         color="primary"
                         onPress={() => fileInputRef.current?.click()}
                       >
-                        Choose file
+                        {t("assetPicker.chooseFile")}
                       </Button>
-                      <Button variant="flat" onPress={() => setTabKey("library")}>
-                        Browse library instead
+                      <Button
+                        variant="flat"
+                        onPress={() => setTabKey("library")}
+                      >
+                        {t("assetPicker.browseLibrary")}
                       </Button>
                     </div>
                   </div>
@@ -196,7 +203,7 @@ export default function AssetPickerModal({
                 <div className="flex flex-col gap-4 min-h-0">
                   <div className="flex flex-col md:flex-row gap-3 shrink-0">
                     <Select
-                      label="Project"
+                      label={t("assetPicker.projectLabel")}
                       selectedKeys={[projectId]}
                       onChange={(e) => {
                         const next = e.target.value;
@@ -205,27 +212,33 @@ export default function AssetPickerModal({
                       }}
                       className="md:w-1/2"
                     >
-                      <SelectItem key="recent">Recent</SelectItem>
+                      <SelectItem key="recent">
+                        {t("assetPicker.recent")}
+                      </SelectItem>
                       <>
                         {projects.map((p) => (
                           <SelectItem key={p.id}>
-                            {p.isDefault ? `${p.name} (Default)` : p.name}
+                            {p.isDefault
+                              ? `${p.name} (${t("assetPicker.defaultSuffix")})`
+                              : p.name}
                           </SelectItem>
                         ))}
                       </>
                     </Select>
 
                     <Select
-                      label="Collection"
+                      label={t("assetPicker.collectionLabel")}
                       selectedKeys={[collectionId]}
                       onChange={(e) => setCollectionId(e.target.value)}
                       className="md:w-1/2"
                     >
-                      <SelectItem key="all">All</SelectItem>
+                      <SelectItem key="all">{t("assetPicker.all")}</SelectItem>
                       <>
                         {visibleCollections.map((c) => (
                           <SelectItem key={c.id}>
-                            {c.isOwner ? c.name : `${c.name} (Shared)`}
+                            {c.isOwner
+                              ? c.name
+                              : `${c.name} (${t("assetPicker.sharedSuffix")})`}
                           </SelectItem>
                         ))}
                       </>
@@ -236,7 +249,7 @@ export default function AssetPickerModal({
                     startContent={
                       <Search size={16} className="text-default-400" />
                     }
-                    placeholder="Search by title…"
+                    placeholder={t("assetPicker.searchByTitle")}
                     value={query}
                     onValueChange={setQuery}
                     className="shrink-0"
@@ -248,7 +261,7 @@ export default function AssetPickerModal({
                     </div>
                   ) : filteredAssets.length === 0 ? (
                     <div className="text-center py-10 text-default-500">
-                      No assets found
+                      {t("assetPicker.noAssetsFound")}
                     </div>
                   ) : (
                     <div className="flex-1 min-h-0 overflow-y-auto pr-1">
@@ -265,7 +278,10 @@ export default function AssetPickerModal({
                             <div className="rounded-lg overflow-hidden border border-divider bg-default-100 aspect-square">
                               <Image
                                 src={a.imageUrl}
-                                alt={a.generationDetails?.title || "Asset"}
+                                alt={
+                                  a.generationDetails?.title ||
+                                  t("assetPicker.assetAlt")
+                                }
                                 radius="none"
                                 classNames={{
                                   wrapper: "w-full h-full !max-w-full",
@@ -274,7 +290,8 @@ export default function AssetPickerModal({
                               />
                             </div>
                             <div className="mt-1 text-xs text-default-600 truncate">
-                              {a.generationDetails?.title || "Untitled"}
+                              {a.generationDetails?.title ||
+                                t("assetPicker.untitled")}
                             </div>
                           </button>
                         ))}
@@ -286,7 +303,7 @@ export default function AssetPickerModal({
             </ModalBody>
             <ModalFooter>
               <Button variant="light" onPress={onClose}>
-                Close
+                {t("common.close")}
               </Button>
             </ModalFooter>
           </>
@@ -295,5 +312,3 @@ export default function AssetPickerModal({
     </Modal>
   );
 }
-
-

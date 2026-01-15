@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@heroui/button";
 import { Spinner } from "@heroui/spinner";
@@ -48,6 +49,7 @@ const DRAG_MIME = "application/x-moodio-asset";
 const SELECT_EVENT = "moodio-asset-selected";
 
 export default function AssetsHoverSidebar() {
+  const t = useTranslations();
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -127,7 +129,7 @@ export default function AssetsHoverSidebar() {
       assetId: asset.id,
       imageId: asset.imageId,
       url: asset.imageUrl,
-      title: asset.generationDetails?.title || "Selected asset",
+      title: asset.generationDetails?.title || t("chat.selectedAsset"),
     };
     window.dispatchEvent(new CustomEvent(SELECT_EVENT, { detail: payload }));
   };
@@ -137,7 +139,7 @@ export default function AssetsHoverSidebar() {
       assetId: asset.id,
       imageId: asset.imageId,
       url: asset.imageUrl,
-      title: asset.generationDetails?.title || "Selected asset",
+      title: asset.generationDetails?.title || t("chat.selectedAsset"),
     };
     try {
       e.dataTransfer.setData(DRAG_MIME, JSON.stringify(payload));
@@ -209,10 +211,12 @@ export default function AssetsHoverSidebar() {
               <div className="p-4 border-b border-divider flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Folder size={18} className="text-default-500" />
-                  <div className="font-semibold">Assets</div>
+                  <div className="font-semibold">
+                    {t("assetsSidebar.title")}
+                  </div>
                 </div>
                 <Chip size="sm" variant="flat" color="secondary">
-                  Drag or click
+                  {t("assetsSidebar.dragOrClick")}
                 </Chip>
               </div>
 
@@ -224,10 +228,12 @@ export default function AssetsHoverSidebar() {
                   startContent={<Clock size={16} />}
                   onPress={() => setScope({ kind: "recent" })}
                 >
-                  Recent
+                  {t("assetsSidebar.recent")}
                 </Button>
 
-                <div className="text-xs text-default-500 mt-2">Projects</div>
+                <div className="text-xs text-default-500 mt-2">
+                  {t("assetsSidebar.projects")}
+                </div>
                 <div className="flex flex-col gap-1 max-h-[220px] overflow-y-auto pr-1">
                   {projects.map((p) => (
                     <div key={p.id} className="flex flex-col">
@@ -241,7 +247,9 @@ export default function AssetsHoverSidebar() {
                         onClick={() => setScope({ kind: "project", id: p.id })}
                       >
                         <span className="truncate">
-                          {p.isDefault ? `${p.name} (Default)` : p.name}
+                          {p.isDefault
+                            ? `${p.name} (${t("assetsSidebar.defaultSuffix")})`
+                            : p.name}
                         </span>
                       </button>
                       {(ownedCollectionsByProject.get(p.id) || []).map((c) => (
@@ -267,7 +275,7 @@ export default function AssetsHoverSidebar() {
                 {sharedCollections.length > 0 && (
                   <>
                     <div className="text-xs text-default-500 mt-2">
-                      Shared collections
+                      {t("assetsSidebar.sharedCollections")}
                     </div>
                     <div className="flex flex-col gap-1 max-h-[140px] overflow-y-auto pr-1">
                       {sharedCollections.map((c) => (
@@ -284,7 +292,9 @@ export default function AssetsHoverSidebar() {
                           }
                         >
                           {c.name}{" "}
-                          <span className="opacity-70">({c.permission})</span>
+                          <span className="opacity-70">
+                            ({t(`assetsSidebar.permissions.${c.permission}`)})
+                          </span>
                         </button>
                       ))}
                     </div>
@@ -299,7 +309,7 @@ export default function AssetsHoverSidebar() {
                   </div>
                 ) : assets.length === 0 ? (
                   <div className="text-center py-10 text-default-500 text-sm">
-                    No assets
+                    {t("assetsSidebar.noAssets")}
                   </div>
                 ) : (
                   <div className="grid grid-cols-2 gap-2">
@@ -316,7 +326,10 @@ export default function AssetsHoverSidebar() {
                         <div className="rounded-lg overflow-hidden border border-divider bg-default-100 aspect-square">
                           <Image
                             src={a.imageUrl}
-                            alt={a.generationDetails?.title || "Asset"}
+                            alt={
+                              a.generationDetails?.title ||
+                              t("assetsSidebar.assetAlt")
+                            }
                             radius="none"
                             classNames={{
                               wrapper: "w-full h-full !max-w-full",
@@ -325,7 +338,8 @@ export default function AssetsHoverSidebar() {
                           />
                         </div>
                         <div className="mt-1 text-[11px] text-default-600 truncate">
-                          {a.generationDetails?.title || "Untitled"}
+                          {a.generationDetails?.title ||
+                            t("assetsSidebar.untitled")}
                         </div>
                       </div>
                     ))}

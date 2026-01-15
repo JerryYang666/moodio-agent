@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useTranslations } from "next-intl";
 import { Button } from "@heroui/button";
 import { Input, Textarea } from "@heroui/input";
 import { Select, SelectItem } from "@heroui/select";
@@ -50,6 +51,8 @@ export default function VideoGenerationPanel({
   initialImageUrl,
   onGenerationStarted,
 }: VideoGenerationPanelProps) {
+  const t = useTranslations("video");
+  const tCommon = useTranslations("common");
   const { monitorGeneration } = useVideo();
   const [models, setModels] = useState<VideoModelConfig[]>([]);
   const [defaultModelId, setDefaultModelId] = useState<string>("");
@@ -83,13 +86,13 @@ export default function VideoGenerationPanel({
     const loadModels = async () => {
       try {
         const res = await fetch("/api/video/models");
-        if (!res.ok) throw new Error("Failed to load models");
+        if (!res.ok) throw new Error(t("failedToLoadVideoModels"));
         const data = await res.json();
         setModels(data.models);
         setDefaultModelId(data.defaultModelId);
         setSelectedModelId(data.defaultModelId);
       } catch (e) {
-        setError("Failed to load video models");
+        setError(t("failedToLoadVideoModels"));
         console.error(e);
       } finally {
         setLoading(false);
@@ -151,7 +154,7 @@ export default function VideoGenerationPanel({
         method: "POST",
         body: formData,
       });
-      if (!res.ok) throw new Error("Upload failed");
+      if (!res.ok) throw new Error(t("failedToUploadImage"));
       const data = await res.json();
 
       if (pickerTarget === "source") {
@@ -163,18 +166,18 @@ export default function VideoGenerationPanel({
       }
     } catch (e) {
       console.error("Upload error:", e);
-      setError("Failed to upload image");
+      setError(t("failedToUploadImage"));
     }
   };
 
   const handleGenerate = async () => {
     if (!sourceImageId) {
-      setError("Please select a source image");
+      setError(t("selectSourceImageError"));
       return;
     }
 
     if (!params.prompt?.trim()) {
-      setError("Please enter a prompt");
+      setError(t("enterPromptError"));
       return;
     }
 
@@ -195,7 +198,7 @@ export default function VideoGenerationPanel({
 
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.error || "Generation failed");
+        throw new Error(data.error || t("failedToStartGeneration"));
       }
 
       const data = await res.json();
@@ -212,7 +215,7 @@ export default function VideoGenerationPanel({
       setEndImageUrl(null);
       setParams((prev) => ({ ...prev, prompt: "" }));
     } catch (e: any) {
-      setError(e.message || "Failed to start generation");
+      setError(e.message || t("failedToStartGeneration"));
     } finally {
       setSubmitting(false);
     }
@@ -235,18 +238,18 @@ export default function VideoGenerationPanel({
           <div className="flex items-center gap-2">
             <Video size={20} className="text-primary" />
             <h2 className="text-base sm:text-lg font-semibold">
-              Generate Video
+              {t("generateVideo")}
             </h2>
           </div>
           <p className="text-xs sm:text-sm text-default-500">
-            Turn your images into videos using AI
+            {t("generateVideoDesc")}
           </p>
         </CardHeader>
 
         <CardBody className="gap-3 sm:gap-4 pt-0 overflow-auto flex-1 px-3 sm:px-4">
           {/* Model Selector */}
           <Select
-            label="Model"
+            label={t("model")}
             selectedKeys={selectedModelId ? [selectedModelId] : []}
             onChange={(e) => setSelectedModelId(e.target.value)}
             description={selectedModel?.description}
@@ -261,20 +264,20 @@ export default function VideoGenerationPanel({
           {/* Source Image */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">Source Image *</span>
+              <span className="text-sm font-medium">{t("sourceImage")}</span>
               <Button
                 size="sm"
                 variant="flat"
                 onPress={() => openPicker("source")}
               >
-                {sourceImageId ? "Change" : "Select"}
+                {sourceImageId ? tCommon("change") : tCommon("select")}
               </Button>
             </div>
             {sourceImageUrl ? (
               <div className="relative rounded-lg overflow-hidden border border-divider">
                 <Image
                   src={sourceImageUrl}
-                  alt="Source image"
+                  alt={t("sourceImageAlt")}
                   classNames={{
                     wrapper: "w-full aspect-video",
                     img: "w-full h-full object-cover",
@@ -300,7 +303,7 @@ export default function VideoGenerationPanel({
               >
                 <ImageIcon size={32} className="text-default-400" />
                 <span className="text-sm text-default-500">
-                  Click to select first frame
+                  {t("clickToSelectFirstFrame")}
                 </span>
               </button>
             )}
@@ -310,22 +313,20 @@ export default function VideoGenerationPanel({
           {selectedModel?.imageParams.endImage && (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">
-                  End Image (optional)
-                </span>
+                <span className="text-sm font-medium">{t("endImage")}</span>
                 <Button
                   size="sm"
                   variant="flat"
                   onPress={() => openPicker("end")}
                 >
-                  {endImageId ? "Change" : "Select"}
+                  {endImageId ? tCommon("change") : tCommon("select")}
                 </Button>
               </div>
               {endImageUrl ? (
                 <div className="relative rounded-lg overflow-hidden border border-divider">
                   <Image
                     src={endImageUrl}
-                    alt="End image"
+                    alt={t("endImageAlt")}
                     classNames={{
                       wrapper: "w-full aspect-video",
                       img: "w-full h-full object-cover",
@@ -351,7 +352,7 @@ export default function VideoGenerationPanel({
                 >
                   <ImageIcon size={24} className="text-default-400" />
                   <span className="text-xs text-default-500">
-                    Optional: select last frame
+                    {t("selectLastFrame")}
                   </span>
                 </button>
               )}
@@ -482,7 +483,14 @@ export default function VideoGenerationPanel({
                       {canAddMore && (
                         <Input
                           size="sm"
-                          placeholder={`Add voice ID${param.maxItems ? ` (${arrayValue.length}/${param.maxItems})` : ""}`}
+                          placeholder={
+                            param.maxItems
+                              ? t("addVoiceIdWithCount", {
+                                  current: arrayValue.length,
+                                  max: param.maxItems,
+                                })
+                              : t("addVoiceId")
+                          }
                           classNames={{
                             base: "w-full sm:w-48",
                             input: "font-mono text-sm",
@@ -527,7 +535,7 @@ export default function VideoGenerationPanel({
                     description={param.description}
                     isRequired={param.required}
                     minRows={3}
-                    placeholder="Describe what happens in the video..."
+                    placeholder={t("promptPlaceholder")}
                   />
                 );
               }
@@ -564,7 +572,7 @@ export default function VideoGenerationPanel({
             isDisabled={!sourceImageId || !params.prompt?.trim()}
             onPress={handleGenerate}
           >
-            {submitting ? "Starting..." : "Generate Video"}
+            {submitting ? t("starting") : t("generateVideo")}
           </Button>
         </div>
       </Card>

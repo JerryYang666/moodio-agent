@@ -1,6 +1,7 @@
 "use client";
 
 import { Chip } from "@heroui/chip";
+import { useTranslations } from "next-intl";
 import { Clock, CheckCircle, XCircle, Loader2 } from "lucide-react";
 
 export type VideoStatus = "pending" | "processing" | "completed" | "failed";
@@ -41,6 +42,22 @@ export default function VideoStatusChip({
   status,
   responsive = true,
 }: VideoStatusChipProps) {
+  const t = useTranslations("video");
+  const labelMap: Record<VideoStatus, string> = {
+    pending: t("statusQueued"),
+    processing: t("statusGenerating"),
+    completed: t("statusCompleted"),
+    failed: t("statusFailed"),
+  };
+  const shortLabelMap: Record<VideoStatus, string> = {
+    pending: t("statusQueuedShort"),
+    processing: t("statusGeneratingShort"),
+    completed: t("statusCompletedShort"),
+    failed: t("statusFailedShort"),
+  };
+  const label = labelMap[status];
+  const shortLabel = shortLabelMap[status];
+
   return (
     <Chip
       size="sm"
@@ -54,11 +71,11 @@ export default function VideoStatusChip({
     >
       {responsive ? (
         <>
-          <span className="hidden sm:inline">{status}</span>
-          <span className="sm:hidden">{status.slice(0, 4)}</span>
+          <span className="hidden sm:inline">{label}</span>
+          <span className="sm:hidden">{shortLabel}</span>
         </>
       ) : (
-        status
+        label
       )}
     </Chip>
   );

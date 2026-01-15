@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useTranslations } from "next-intl";
 import { Card, CardBody, CardHeader } from "@heroui/card";
 import { Spinner } from "@heroui/spinner";
 import { Button } from "@heroui/button";
@@ -51,6 +52,8 @@ interface VideoListProps {
 const POLL_INTERVAL = 5000; // 5 seconds
 
 export default function VideoList({ refreshTrigger }: VideoListProps) {
+  const t = useTranslations("video");
+  const tCommon = useTranslations("common");
   const [generations, setGenerations] = useState<VideoGeneration[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -61,13 +64,13 @@ export default function VideoList({ refreshTrigger }: VideoListProps) {
   const fetchGenerations = useCallback(async () => {
     try {
       const res = await fetch("/api/video/generations?limit=50");
-      if (!res.ok) throw new Error("Failed to fetch generations");
+      if (!res.ok) throw new Error(t("failedToLoadVideos"));
       const data = await res.json();
       setGenerations(data.generations);
       setError(null);
     } catch (e) {
       console.error("Error fetching generations:", e);
-      setError("Failed to load videos");
+      setError(t("failedToLoadVideos"));
     } finally {
       setLoading(false);
     }
@@ -146,9 +149,11 @@ export default function VideoList({ refreshTrigger }: VideoListProps) {
         <CardHeader className="flex items-center justify-between shrink-0 px-3 sm:px-4">
           <div className="flex items-center gap-2">
             <Video size={18} className="text-primary sm:w-5 sm:h-5" />
-            <h2 className="text-base sm:text-lg font-semibold">Your Videos</h2>
+            <h2 className="text-base sm:text-lg font-semibold">
+              {t("yourVideos")}
+            </h2>
             <Chip size="sm" variant="flat">
-              {generations.length}
+              {t("videoCount", { count: generations.length })}
             </Chip>
           </div>
           <Button
@@ -175,10 +180,10 @@ export default function VideoList({ refreshTrigger }: VideoListProps) {
                 className="sm:w-12 sm:h-12 text-default-300 mb-3 sm:mb-4"
               />
               <p className="text-default-500 text-sm sm:text-base">
-                No videos yet
+                {t("noVideosYet")}
               </p>
               <p className="text-xs sm:text-sm text-default-400">
-                Generate your first video from an image
+                {t("generateFirstVideo")}
               </p>
             </div>
           ) : (
@@ -194,7 +199,7 @@ export default function VideoList({ refreshTrigger }: VideoListProps) {
                     <div className="relative aspect-video bg-default-100">
                       <Image
                         src={gen.thumbnailUrl || gen.sourceImageUrl}
-                        alt="Video thumbnail"
+                        alt={t("videoThumbnailAlt")}
                         radius="none"
                         classNames={{
                           wrapper: "w-full h-full !max-w-full",
@@ -212,7 +217,7 @@ export default function VideoList({ refreshTrigger }: VideoListProps) {
                                 className="sm:w-8 sm:h-8 text-white animate-spin mx-auto mb-1 sm:mb-2"
                               />
                               <span className="text-white text-xs sm:text-sm">
-                                Generating...
+                                {t("generating")}
                               </span>
                             </div>
                           )}
@@ -223,7 +228,7 @@ export default function VideoList({ refreshTrigger }: VideoListProps) {
                                 className="sm:w-8 sm:h-8 text-white mx-auto mb-1 sm:mb-2"
                               />
                               <span className="text-white text-xs sm:text-sm">
-                                Queued
+                                {t("queued")}
                               </span>
                             </div>
                           )}
@@ -234,7 +239,7 @@ export default function VideoList({ refreshTrigger }: VideoListProps) {
                                 className="sm:w-8 sm:h-8 text-danger mx-auto mb-1 sm:mb-2"
                               />
                               <span className="text-white text-xs sm:text-sm">
-                                Failed
+                                {t("failed")}
                               </span>
                             </div>
                           )}
@@ -264,7 +269,7 @@ export default function VideoList({ refreshTrigger }: VideoListProps) {
                         </span>
                       </div>
                       <p className="text-xs sm:text-sm text-default-600 line-clamp-2">
-                        {gen.params.prompt || "No prompt"}
+                        {gen.params.prompt || t("noPrompt")}
                       </p>
                     </div>
                   </div>
@@ -291,7 +296,7 @@ export default function VideoList({ refreshTrigger }: VideoListProps) {
             <>
               <ModalHeader className="flex items-center gap-2 text-base sm:text-lg px-3 sm:px-6">
                 <Video size={18} className="sm:w-5 sm:h-5" />
-                Video Details
+                {t("videoDetails")}
               </ModalHeader>
               <ModalBody className="px-3 sm:px-6">
                 {selectedVideo && (
@@ -314,7 +319,7 @@ export default function VideoList({ refreshTrigger }: VideoListProps) {
                               selectedVideo.thumbnailUrl ||
                               selectedVideo.sourceImageUrl
                             }
-                            alt="Thumbnail"
+                            alt={t("thumbnailAlt")}
                             classNames={{
                               wrapper: "w-full h-full",
                               img: "w-full h-full object-contain",
@@ -353,16 +358,20 @@ export default function VideoList({ refreshTrigger }: VideoListProps) {
                         responsive={false}
                       />
                       <span className="text-xs sm:text-sm text-default-500">
-                        Created: {formatDate(selectedVideo.createdAt)}
+                        {t("created", {
+                          date: formatDate(selectedVideo.createdAt),
+                        })}
                       </span>
                       {selectedVideo.completedAt && (
                         <span className="text-xs sm:text-sm text-default-500">
-                          Done: {formatDate(selectedVideo.completedAt)}
+                          {t("done", {
+                            date: formatDate(selectedVideo.completedAt),
+                          })}
                         </span>
                       )}
                       {selectedVideo.seed && (
                         <span className="text-xs sm:text-sm text-default-500">
-                          Seed: {selectedVideo.seed}
+                          {t("seed", { seed: selectedVideo.seed })}
                         </span>
                       )}
                     </div>
@@ -377,17 +386,17 @@ export default function VideoList({ refreshTrigger }: VideoListProps) {
                     {/* Prompt */}
                     <div className="bg-default-100 p-3 sm:p-4 rounded-lg">
                       <h4 className="font-medium mb-1 sm:mb-2 text-sm sm:text-base">
-                        Prompt
+                        {t("prompt")}
                       </h4>
                       <p className="text-xs sm:text-sm text-default-600 whitespace-pre-wrap">
-                        {selectedVideo.params.prompt || "No prompt"}
+                        {selectedVideo.params.prompt || t("noPrompt")}
                       </p>
                     </div>
 
                     {/* Parameters */}
                     <div className="bg-default-100 p-3 sm:p-4 rounded-lg">
                       <h4 className="font-medium mb-1 sm:mb-2 text-sm sm:text-base">
-                        Parameters
+                        {t("parameters")}
                       </h4>
                       <div className="grid grid-cols-2 gap-1 sm:gap-2 text-xs sm:text-sm">
                         {Object.entries(selectedVideo.params)
@@ -426,9 +435,9 @@ export default function VideoList({ refreshTrigger }: VideoListProps) {
                         }
                       >
                         <span className="hidden sm:inline">
-                          Open in New Tab
+                          {t("openInNewTab")}
                         </span>
-                        <span className="sm:hidden">Open</span>
+                        <span className="sm:hidden">{tCommon("open")}</span>
                       </Button>
                       <Button
                         color="primary"
@@ -444,7 +453,7 @@ export default function VideoList({ refreshTrigger }: VideoListProps) {
                           )
                         }
                       >
-                        Download
+                        {tCommon("download")}
                       </Button>
                     </>
                   )}
@@ -454,7 +463,7 @@ export default function VideoList({ refreshTrigger }: VideoListProps) {
                   className="sm:size-md"
                   onPress={onClose}
                 >
-                  Close
+                  {tCommon("close")}
                 </Button>
               </ModalFooter>
             </>

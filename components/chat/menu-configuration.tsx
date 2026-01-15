@@ -132,6 +132,16 @@ export default function MenuConfiguration({
   hasSelectedImages = false,
 }: MenuConfigurationProps) {
   const t = useTranslations("menu");
+  const getCategoryLabel = (
+    categoryKey: "model" | "expertise" | "aspectRatio"
+  ) => t(categoryKey);
+  const getModeLabel = (key: string) => t(`modes.${key}`);
+  const getModeDescription = (key: string) => t(`modes.${key}Desc`);
+  const getModelLabel = (key: string) => t(`models.${key}`);
+  const getExpertiseLabel = (key: string) => t(`expertiseOptions.${key}`);
+  const getAspectRatioLabel = (key: string) => t(`aspectRatioOptions.${key}`);
+  const getAspectRatioDescription = (key: string) =>
+    key === "smart" ? t("aspectRatioOptions.smartDesc") : undefined;
   // Handlers for changes
   const handleModeChange = (keys: any) => {
     const selected = Array.from(keys)[0] as string;
@@ -169,8 +179,12 @@ export default function MenuConfiguration({
     const allowedKeys = availability.allowed;
 
     const selectedKey = state[categoryKey];
-    const selectedOption = (options as any)[selectedKey];
-    const selectedLabel = selectedOption?.label || selectedKey;
+    const selectedLabel =
+      categoryKey === "model"
+        ? getModelLabel(selectedKey)
+        : categoryKey === "expertise"
+          ? getExpertiseLabel(selectedKey)
+          : getAspectRatioLabel(selectedKey);
     const isAspectRatio = categoryKey === "aspectRatio";
 
     // Get icon for aspect ratio options (if defined in config)
@@ -188,7 +202,7 @@ export default function MenuConfiguration({
     return (
       <div key={categoryKey} className="flex flex-col gap-0.5">
         <span className="text-[10px] text-default-400 uppercase tracking-wide pl-1">
-          {categoryDef.label}
+          {getCategoryLabel(categoryKey)}
         </span>
         <Dropdown>
           <DropdownTrigger>
@@ -206,7 +220,9 @@ export default function MenuConfiguration({
           </DropdownTrigger>
           <DropdownMenu
             disallowEmptySelection
-            aria-label={`Select ${categoryDef.label}`}
+            aria-label={t("selectCategory", {
+              category: getCategoryLabel(categoryKey),
+            })}
             selectedKeys={new Set([selectedKey])}
             selectionMode="single"
             variant="flat"
@@ -215,8 +231,17 @@ export default function MenuConfiguration({
             }
           >
             {allowedKeys.map((key) => {
-              const option = (options as any)[key];
-              const hasDescription = option?.description;
+              const description =
+                categoryKey === "aspectRatio"
+                  ? getAspectRatioDescription(key)
+                  : undefined;
+              const hasDescription = Boolean(description);
+              const optionLabel =
+                categoryKey === "model"
+                  ? getModelLabel(key)
+                  : categoryKey === "expertise"
+                    ? getExpertiseLabel(key)
+                    : getAspectRatioLabel(key);
 
               return (
                 <DropdownItem
@@ -226,7 +251,7 @@ export default function MenuConfiguration({
                   }
                   endContent={
                     hasDescription ? (
-                      <Tooltip content={option.description} placement="right">
+                      <Tooltip content={description} placement="right">
                         <Info
                           size={14}
                           className="text-default-400 hover:text-default-600 cursor-help"
@@ -235,7 +260,7 @@ export default function MenuConfiguration({
                     ) : undefined
                   }
                 >
-                  {option?.label || key}
+                  {optionLabel || key}
                 </DropdownItem>
               );
             })}
@@ -249,9 +274,11 @@ export default function MenuConfiguration({
   const renderModeDropdown = () => {
     const categoryDef = MENU_CONFIG.categories.mode;
     const selectedKey = state.mode;
-    const selectedLabel =
-      categoryDef.options[selectedKey as keyof typeof categoryDef.options]
-        ?.label || selectedKey;
+    const selectedLabel = categoryDef.options[
+      selectedKey as keyof typeof categoryDef.options
+    ]
+      ? getModeLabel(selectedKey)
+      : selectedKey;
     const selectedIconName = (
       categoryDef.options[
         selectedKey as keyof typeof categoryDef.options
@@ -289,7 +316,7 @@ export default function MenuConfiguration({
           </DropdownTrigger>
           <DropdownMenu
             disallowEmptySelection
-            aria-label="Select Mode"
+            aria-label={t("selectMode")}
             selectedKeys={new Set([selectedKey])}
             selectionMode="single"
             variant="flat"
@@ -300,11 +327,12 @@ export default function MenuConfiguration({
               const Icon = (value as any).icon
                 ? ICON_MAP[(value as any).icon]
                 : null;
-              const hasDescription = (value as any).description;
+              const description = getModeDescription(key);
+              const hasDescription = Boolean(description);
               const isEditDisabled = key === "edit" && !hasSelectedImages;
               const tooltipContent = isEditDisabled
                 ? t("editModeHint")
-                : (value as any).description;
+                : description;
               const showTooltip = hasDescription || isEditDisabled;
               return (
                 <DropdownItem
@@ -316,10 +344,7 @@ export default function MenuConfiguration({
                   }
                   endContent={
                     showTooltip ? (
-                      <Tooltip
-                        content={tooltipContent}
-                        placement="right"
-                      >
+                      <Tooltip content={tooltipContent} placement="right">
                         <Info
                           size={14}
                           className="text-default-400 hover:text-default-600 cursor-help"
@@ -328,7 +353,7 @@ export default function MenuConfiguration({
                     ) : undefined
                   }
                 >
-                  {value.label}
+                  {getModeLabel(key)}
                 </DropdownItem>
               );
             })}
