@@ -81,6 +81,10 @@ export default function VideoGenerationPanel({
     Record<string, string>
   >({});
 
+  // Upload state
+  const [uploadingTarget, setUploadingTarget] = useState<"source" | "end" | null>(null);
+  const [uploadPreviewUrl, setUploadPreviewUrl] = useState<string | null>(null);
+
   // Load models
   useEffect(() => {
     const loadModels = async () => {
@@ -145,7 +149,12 @@ export default function VideoGenerationPanel({
   };
 
   const handleUpload = async (file: File) => {
-    // Upload file and get imageId
+    // Create local preview and show uploading state
+    const localPreview = URL.createObjectURL(file);
+    setUploadPreviewUrl(localPreview);
+    setUploadingTarget(pickerTarget);
+    setPickerOpen(false);
+
     const formData = new FormData();
     formData.append("file", file);
 
@@ -167,6 +176,11 @@ export default function VideoGenerationPanel({
     } catch (e) {
       console.error("Upload error:", e);
       setError(t("failedToUploadImage"));
+    } finally {
+      // Clean up
+      URL.revokeObjectURL(localPreview);
+      setUploadPreviewUrl(null);
+      setUploadingTarget(null);
     }
   };
 
@@ -269,32 +283,39 @@ export default function VideoGenerationPanel({
                 size="sm"
                 variant="flat"
                 onPress={() => openPicker("source")}
+                isDisabled={uploadingTarget === "source"}
               >
                 {sourceImageId ? tCommon("change") : tCommon("select")}
               </Button>
             </div>
-            {sourceImageUrl ? (
+            {sourceImageUrl || uploadingTarget === "source" ? (
               <div className="relative rounded-lg overflow-hidden border border-divider">
                 <Image
-                  src={sourceImageUrl}
+                  src={uploadingTarget === "source" && uploadPreviewUrl ? uploadPreviewUrl : sourceImageUrl!}
                   alt={t("sourceImageAlt")}
                   classNames={{
                     wrapper: "w-full aspect-video",
-                    img: "w-full h-full object-cover",
+                    img: `w-full h-full object-cover ${uploadingTarget === "source" ? "opacity-50" : ""}`,
                   }}
                 />
-                <Button
-                  isIconOnly
-                  size="sm"
-                  variant="flat"
-                  className="absolute top-2 right-2 bg-background/80"
-                  onPress={() => {
-                    setSourceImageId(null);
-                    setSourceImageUrl(null);
-                  }}
-                >
-                  <X size={14} />
-                </Button>
+                {uploadingTarget === "source" ? (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                    <Spinner size="lg" color="white" />
+                  </div>
+                ) : (
+                  <Button
+                    isIconOnly
+                    size="sm"
+                    variant="flat"
+                    className="absolute top-2 right-2 bg-background/80"
+                    onPress={() => {
+                      setSourceImageId(null);
+                      setSourceImageUrl(null);
+                    }}
+                  >
+                    <X size={14} />
+                  </Button>
+                )}
               </div>
             ) : (
               <button
@@ -318,32 +339,39 @@ export default function VideoGenerationPanel({
                   size="sm"
                   variant="flat"
                   onPress={() => openPicker("end")}
+                  isDisabled={uploadingTarget === "end"}
                 >
                   {endImageId ? tCommon("change") : tCommon("select")}
                 </Button>
               </div>
-              {endImageUrl ? (
+              {endImageUrl || uploadingTarget === "end" ? (
                 <div className="relative rounded-lg overflow-hidden border border-divider">
                   <Image
-                    src={endImageUrl}
+                    src={uploadingTarget === "end" && uploadPreviewUrl ? uploadPreviewUrl : endImageUrl!}
                     alt={t("endImageAlt")}
                     classNames={{
                       wrapper: "w-full aspect-video",
-                      img: "w-full h-full object-cover",
+                      img: `w-full h-full object-cover ${uploadingTarget === "end" ? "opacity-50" : ""}`,
                     }}
                   />
-                  <Button
-                    isIconOnly
-                    size="sm"
-                    variant="flat"
-                    className="absolute top-2 right-2 bg-background/80"
-                    onPress={() => {
-                      setEndImageId(null);
-                      setEndImageUrl(null);
-                    }}
-                  >
-                    <X size={14} />
-                  </Button>
+                  {uploadingTarget === "end" ? (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                      <Spinner size="lg" color="white" />
+                    </div>
+                  ) : (
+                    <Button
+                      isIconOnly
+                      size="sm"
+                      variant="flat"
+                      className="absolute top-2 right-2 bg-background/80"
+                      onPress={() => {
+                        setEndImageId(null);
+                        setEndImageUrl(null);
+                      }}
+                    >
+                      <X size={14} />
+                    </Button>
+                  )}
                 </div>
               ) : (
                 <button
