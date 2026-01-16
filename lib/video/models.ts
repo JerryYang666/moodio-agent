@@ -188,6 +188,90 @@ const hailuo23FastPro: VideoModelConfig = {
 };
 
 /**
+ * MiniMax Hailuo 2.3 Pro - Image to Video
+ * Advanced image-to-video generation model with 1080p resolution
+ */
+const hailuo23Pro: VideoModelConfig = {
+  id: "fal-ai/minimax/hailuo-2.3/pro/image-to-video",
+  name: "Hailuo 2.3 Pro",
+  description:
+    "MiniMax's high-quality image-to-video model with 1080p output and prompt optimization",
+  imageParams: {
+    sourceImage: "image_url",
+  },
+  params: [
+    {
+      name: "prompt",
+      label: "Prompt",
+      type: "string",
+      required: true,
+      description: "Text prompt for video generation",
+    },
+    {
+      name: "prompt_optimizer",
+      label: "Prompt Optimizer",
+      type: "boolean",
+      required: false,
+      default: true,
+      description: "Whether to use the model's prompt optimizer",
+    },
+    {
+      name: "image_url",
+      label: "Source Image",
+      type: "string",
+      required: true,
+      description: "URL of the image to use as the first frame",
+    },
+  ],
+};
+
+/**
+ * MiniMax Hailuo 02 Pro - Image to Video
+ * Advanced image-to-video generation model with 1080p resolution
+ */
+const hailuo02Pro: VideoModelConfig = {
+  id: "fal-ai/minimax/hailuo-02/pro/image-to-video",
+  name: "Hailuo 02 Pro",
+  description:
+    "MiniMax's high-quality image-to-video model with 1080p output and prompt optimization",
+  imageParams: {
+    sourceImage: "image_url",
+    endImage: "end_image_url",
+  },
+  params: [
+    {
+      name: "prompt",
+      label: "Prompt",
+      type: "string",
+      required: true,
+      description: "Text prompt for video generation",
+    },
+    {
+      name: "image_url",
+      label: "Source Image",
+      type: "string",
+      required: true,
+      description: "URL of the image to use as the first frame",
+    },
+    {
+      name: "prompt_optimizer",
+      label: "Prompt Optimizer",
+      type: "boolean",
+      required: false,
+      default: true,
+      description: "Whether to use the model's prompt optimizer",
+    },
+    {
+      name: "end_image_url",
+      label: "End Image",
+      type: "string",
+      required: false,
+      description: "Optional URL of the image to use as the last frame",
+    },
+  ],
+};
+
+/**
  * Wan v2.6 Image to Video
  * High-quality image-to-video generation with support for multi-shot segmentation
  */
@@ -410,6 +494,8 @@ const klingO1Pro: VideoModelConfig = {
 export const VIDEO_MODELS: VideoModelConfig[] = [
   seedanceV15Pro,
   hailuo23FastPro,
+  hailuo23Pro,
+  hailuo02Pro,
   wanV26ImageToVideo,
   klingV26Pro,
   klingO1Pro,
