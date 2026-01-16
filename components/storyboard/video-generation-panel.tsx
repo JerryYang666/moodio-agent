@@ -150,7 +150,7 @@ export default function VideoGenerationPanel({
     formData.append("file", file);
 
     try {
-      const res = await fetch("/api/assets", {
+      const res = await fetch("/api/image/upload", {
         method: "POST",
         body: formData,
       });
