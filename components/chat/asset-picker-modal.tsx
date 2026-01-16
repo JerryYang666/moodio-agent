@@ -67,10 +67,12 @@ export default function AssetPickerModal({
   const [query, setQuery] = useState("");
   const [tabKey, setTabKey] = useState<"library" | "upload">("library");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isOpen) return;
     setTabKey("library");
+    setUploadError(null);
     const load = async () => {
       setLoading(true);
       try {
@@ -169,6 +171,24 @@ export default function AssetPickerModal({
                     onChange={(e) => {
                       const file = e.target.files?.[0];
                       if (!file) return;
+                      const maxBytes = 5 * 1024 * 1024;
+                      const validTypes = [
+                        "image/jpeg",
+                        "image/png",
+                        "image/gif",
+                        "image/webp",
+                      ];
+                      if (file.size > maxBytes) {
+                        setUploadError(t("assetPicker.uploadTooLarge"));
+                        e.currentTarget.value = "";
+                        return;
+                      }
+                      if (!validTypes.includes(file.type)) {
+                        setUploadError(t("assetPicker.uploadUnsupportedType"));
+                        e.currentTarget.value = "";
+                        return;
+                      }
+                      setUploadError(null);
                       onUpload(file);
                       onClose();
                       // allow re-selecting the same file later
@@ -183,6 +203,11 @@ export default function AssetPickerModal({
                     <div className="text-sm text-default-500 mt-1">
                       {t("assetPicker.uploadDescription")}
                     </div>
+                    {uploadError && (
+                      <div className="text-xs text-danger mt-2">
+                        {uploadError}
+                      </div>
+                    )}
                     <div className="mt-4 flex gap-2">
                       <Button
                         color="primary"

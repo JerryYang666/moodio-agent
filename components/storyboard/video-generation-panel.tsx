@@ -84,6 +84,7 @@ export default function VideoGenerationPanel({
   // Upload state
   const [uploadingTarget, setUploadingTarget] = useState<"source" | "end" | null>(null);
   const [uploadPreviewUrl, setUploadPreviewUrl] = useState<string | null>(null);
+  const isUploading = uploadingTarget !== null;
 
   // Load models
   useEffect(() => {
@@ -185,6 +186,11 @@ export default function VideoGenerationPanel({
   };
 
   const handleGenerate = async () => {
+    if (isUploading) {
+      setError(tCommon("waitForUpload"));
+      return;
+    }
+
     if (!sourceImageId) {
       setError(t("selectSourceImageError"));
       return;
@@ -583,6 +589,12 @@ export default function VideoGenerationPanel({
 
         {/* Fixed Footer with Error and Button */}
         <div className="p-3 sm:p-4 pt-2 border-t border-divider shrink-0 space-y-2 sm:space-y-3 safe-area-bottom">
+          {isUploading && (
+            <div className="flex items-center gap-2 text-xs sm:text-sm text-default-500">
+              <Spinner size="sm" />
+              <span>{tCommon("waitForUpload")}</span>
+            </div>
+          )}
           {/* Error Message */}
           {error && (
             <div className="text-xs sm:text-sm text-danger bg-danger-50 p-2 sm:p-3 rounded-lg">
@@ -597,7 +609,7 @@ export default function VideoGenerationPanel({
             className="w-full text-sm sm:text-base"
             startContent={!submitting && <Sparkles size={18} />}
             isLoading={submitting}
-            isDisabled={!sourceImageId || !params.prompt?.trim()}
+            isDisabled={!sourceImageId || !params.prompt?.trim() || isUploading}
             onPress={handleGenerate}
           >
             {submitting ? t("starting") : t("generateVideo")}
