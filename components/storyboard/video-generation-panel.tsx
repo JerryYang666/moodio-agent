@@ -53,6 +53,7 @@ export default function VideoGenerationPanel({
 }: VideoGenerationPanelProps) {
   const t = useTranslations("video");
   const tCommon = useTranslations("common");
+  const tChat = useTranslations("chat");
   const { monitorGeneration } = useVideo();
   const [models, setModels] = useState<VideoModelConfig[]>([]);
   const [defaultModelId, setDefaultModelId] = useState<string>("");
@@ -187,7 +188,7 @@ export default function VideoGenerationPanel({
 
   const handleGenerate = async () => {
     if (isUploading) {
-      setError(tCommon("waitForUpload"));
+      setError(tChat("waitForUpload"));
       return;
     }
 
@@ -592,7 +593,7 @@ export default function VideoGenerationPanel({
           {isUploading && (
             <div className="flex items-center gap-2 text-xs sm:text-sm text-default-500">
               <Spinner size="sm" />
-              <span>{tCommon("waitForUpload")}</span>
+              <span>{tChat("waitForUpload")}</span>
             </div>
           )}
           {/* Error Message */}
