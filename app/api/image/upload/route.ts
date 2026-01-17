@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAccessToken } from "@/lib/auth/cookies";
 import { verifyAccessToken } from "@/lib/auth/jwt";
+import { db } from "@/lib/db";
+import { collectionImages, collections } from "@/lib/db/schema";
+import { ensureDefaultProject } from "@/lib/db/projects";
 import { uploadImage, getSignedImageUrl } from "@/lib/storage/s3";
+import { and, desc, eq } from "drizzle-orm";
+
+const UPLOADS_COLLECTION_NAME = "My Uploads";
 
 /**
  * POST /api/image/upload
@@ -54,8 +60,57 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const defaultProject = await ensureDefaultProject(payload.userId);
+
+    // Ensure the "My Uploads" collection exists in the default project.
+    let uploadsCollection = (
+      await db
+        .select()
+        .from(collections)
+        .where(
+          and(
+            eq(collections.userId, payload.userId),
+            eq(collections.projectId, defaultProject.id),
+            eq(collections.name, UPLOADS_COLLECTION_NAME)
+          )
+        )
+        .orderBy(desc(collections.updatedAt))
+        .limit(1)
+    )[0];
+
+    if (!uploadsCollection) {
+      const [created] = await db
+        .insert(collections)
+        .values({
+          userId: payload.userId,
+          projectId: defaultProject.id,
+          name: UPLOADS_COLLECTION_NAME,
+        })
+        .returning();
+      uploadsCollection = created;
+    }
+
     // Upload to S3
     const imageId = await uploadImage(file, file.type);
+
+    // Save uploaded image in "My Uploads"
+    await db.insert(collectionImages).values({
+      projectId: defaultProject.id,
+      collectionId: uploadsCollection.id,
+      imageId,
+      chatId: null,
+      generationDetails: {
+        title: file.name || "Uploaded image",
+        prompt: "",
+        status: "generated",
+      },
+    });
+
+    // Update collection timestamp
+    await db
+      .update(collections)
+      .set({ updatedAt: new Date() })
+      .where(eq(collections.id, uploadsCollection.id));
 
     // Generate signed URL for immediate display
     const imageUrl = getSignedImageUrl(imageId);
