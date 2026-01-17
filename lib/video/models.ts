@@ -489,6 +489,95 @@ const klingO1Pro: VideoModelConfig = {
 };
 
 /**
+ * Veo 3.1 - Image to Video
+ * Google's state-of-the-art image-to-video generation model
+ */
+const veo31: VideoModelConfig = {
+  id: "fal-ai/veo3.1/image-to-video",
+  name: "Veo 3.1",
+  description:
+    "Google DeepMind's state-of-the-art image-to-video model with optional audio generation",
+  imageParams: {
+    sourceImage: "image_url",
+  },
+  params: [
+    {
+      name: "prompt",
+      label: "Prompt",
+      type: "string",
+      required: true,
+      description: "The text prompt describing the video to generate",
+    },
+    {
+      name: "image_url",
+      label: "Source Image",
+      type: "string",
+      required: true,
+      description:
+        "URL of the image to animate (720p+ in 16:9 or 9:16 will work best)",
+    },
+    {
+      name: "aspect_ratio",
+      label: "Aspect Ratio",
+      type: "enum",
+      required: false,
+      default: "auto",
+      options: ["auto", "16:9", "9:16"],
+      description: "Aspect ratio of the generated video",
+    },
+    {
+      name: "duration",
+      label: "Duration",
+      type: "enum",
+      required: false,
+      default: "8s",
+      options: ["4s", "6s", "8s"],
+      description: "Length of the generated video",
+    },
+    {
+      name: "resolution",
+      label: "Resolution",
+      type: "enum",
+      required: false,
+      default: "720p",
+      options: ["720p", "1080p", "4k"],
+      description: "Output video resolution",
+    },
+    {
+      name: "negative_prompt",
+      label: "Negative Prompt",
+      type: "string",
+      required: false,
+      description: "Text prompt describing content to avoid",
+    },
+    {
+      name: "generate_audio",
+      label: "Generate Audio",
+      type: "boolean",
+      required: false,
+      default: true,
+      description: "Whether to generate audio along with the video",
+    },
+    {
+      name: "seed",
+      label: "Seed",
+      type: "number",
+      required: false,
+      description: "Random seed for reproducible results",
+    },
+    {
+      name: "auto_fix",
+      label: "Auto Fix",
+      type: "boolean",
+      required: false,
+      default: false,
+      description:
+        "Whether to auto-rewrite prompts that fail content or validation checks",
+    },
+  ],
+};
+
+/**
  * Registry of all supported video models
  */
 export const VIDEO_MODELS: VideoModelConfig[] = [
@@ -499,6 +588,7 @@ export const VIDEO_MODELS: VideoModelConfig[] = [
   wanV26ImageToVideo,
   klingV26Pro,
   klingO1Pro,
+  veo31,
 ];
 
 /**
