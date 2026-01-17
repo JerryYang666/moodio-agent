@@ -147,6 +147,10 @@ export async function POST(
     const precisionEditing: boolean = !!json.precisionEditing;
     const systemPromptOverride: string | undefined = json.systemPromptOverride;
     const aspectRatioOverride: string | undefined = json.aspectRatio;
+    const imageSizeOverride: "2k" | "4k" | undefined =
+      json.imageSize === "2k" || json.imageSize === "4k"
+        ? json.imageSize
+        : undefined;
     const imageModelId: string | undefined =
       typeof json.imageModelId === "string" ? json.imageModelId : undefined;
 
@@ -179,6 +183,7 @@ export async function POST(
         precisionEditing,
         systemPromptOverride,
         aspectRatioOverride,
+        imageSizeOverride,
         imageModelId,
       },
       ipAddress
@@ -257,6 +262,7 @@ export async function POST(
         imageIds, // Pass the unified array of image IDs
         isAdmin ? systemPromptOverride : undefined,
         aspectRatioOverride,
+        imageSizeOverride,
         imageModelId
       );
 

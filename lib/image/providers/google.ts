@@ -4,10 +4,15 @@ import {
   ImageEditInput,
   ImageGenerationInput,
   ImageProviderResult,
+  ImageSize,
 } from "../types";
 
 function resolveAspectRatio(aspectRatio?: string): string {
   return aspectRatio || "1:1";
+}
+
+function resolveImageSize(imageSize?: ImageSize): "2K" | "4K" {
+  return imageSize === "4k" ? "4K" : "2K";
 }
 
 export async function generateWithGemini(
@@ -25,7 +30,7 @@ export async function generateWithGemini(
       responseModalities: ["TEXT", "IMAGE"],
       imageConfig: {
         aspectRatio: resolveAspectRatio(input.aspectRatio),
-        imageSize: "2K",
+        imageSize: resolveImageSize(input.imageSize),
       },
       tools: [{ googleSearch: {} }],
     },
@@ -99,7 +104,7 @@ export async function editWithGemini(
       responseModalities: ["TEXT", "IMAGE"],
       imageConfig: {
         aspectRatio: resolveAspectRatio(input.aspectRatio),
-        imageSize: "2K",
+        imageSize: resolveImageSize(input.imageSize),
       },
       tools: [{ googleSearch: {} }],
     },

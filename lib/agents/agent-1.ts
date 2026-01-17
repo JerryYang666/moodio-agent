@@ -1,5 +1,6 @@
 import { Agent, AgentResponse, ParallelAgentResponse } from "./types";
 import { Message, MessageContentPart } from "@/lib/llm/types";
+import { ImageSize } from "@/lib/image/types";
 import {
   downloadImage,
   uploadImage,
@@ -36,6 +37,7 @@ const SUPPORTED_ASPECT_RATIOS = [
 ] as const;
 
 type AspectRatio = (typeof SUPPORTED_ASPECT_RATIOS)[number];
+const SUPPORTED_IMAGE_SIZES: ImageSize[] = ["2k", "4k"];
 
 interface Suggestion {
   title: string;
@@ -56,6 +58,7 @@ interface PreparedMessages {
   imageBase64Promises: Promise<string | undefined>[];
   precisionEditing?: boolean;
   aspectRatioOverride?: AspectRatio;
+  imageSizeOverride?: ImageSize;
   imageModelId?: string;
 }
 
@@ -73,6 +76,7 @@ export class Agent1 implements Agent {
     imageIds?: string[], // Unified array of image IDs
     systemPromptOverride?: string,
     aspectRatioOverride?: string,
+    imageSizeOverride?: ImageSize,
     imageModelId?: string
   ): Promise<AgentResponse> {
     const startTime = requestStartTime || Date.now();
@@ -98,6 +102,18 @@ export class Agent1 implements Agent {
       }
     }
 
+    let validatedImageSize: ImageSize | undefined;
+    if (imageSizeOverride) {
+      if (SUPPORTED_IMAGE_SIZES.includes(imageSizeOverride)) {
+        validatedImageSize = imageSizeOverride;
+        console.log(`[Agent-1] User selected image size: ${validatedImageSize}`);
+      } else {
+        console.log(
+          `[Agent-1] Invalid image size "${imageSizeOverride}" provided, falling back to 2k`
+        );
+      }
+    }
+
     // Step 1: Prepare messages
     const prepared = await this.prepareMessages(
       history,
@@ -107,6 +123,7 @@ export class Agent1 implements Agent {
       imageIds || [],
       systemPromptOverride,
       validatedAspectRatio,
+      validatedImageSize,
       imageModelId
     );
 
@@ -184,6 +201,7 @@ export class Agent1 implements Agent {
     imageIds?: string[], // Unified array of image IDs from frontend
     systemPromptOverride?: string,
     aspectRatioOverride?: AspectRatio,
+    imageSizeOverride?: ImageSize,
     imageModelId?: string
   ): Promise<PreparedMessages> {
     const rawSystemPrompt = systemPromptOverride || getSystemPrompt(this.id);
@@ -336,6 +354,7 @@ export class Agent1 implements Agent {
       imageBase64Promises,
       precisionEditing,
       aspectRatioOverride,
+      imageSizeOverride,
       imageModelId,
     };
   }
@@ -822,6 +841,7 @@ export class Agent1 implements Agent {
       error: lastError?.message || "Image generation failed",
       prompt: suggestion.prompt,
       aspectRatio: suggestion.aspectRatio,
+      imageSize: prepared.imageSizeOverride || "2k",
     };
 
     if (lastError && "response" in lastError) {
@@ -857,6 +877,7 @@ export class Agent1 implements Agent {
     } else {
       aspectRatio = "1:1";
     }
+    const imageSize = prepared.imageSizeOverride || "2k";
 
     let finalImageId: string;
 
@@ -886,11 +907,13 @@ export class Agent1 implements Agent {
           imageIds: prepared.imageIds,
           imageBase64: validImageBase64,
           aspectRatio,
+          imageSize,
         });
       } else {
         result = await generateImageWithModel(modelId, {
           prompt: suggestion.prompt,
           aspectRatio,
+          imageSize,
         });
       }
 
@@ -914,6 +937,7 @@ export class Agent1 implements Agent {
         providerModelId: result.providerModelId,
         prompt: suggestion.prompt,
         aspectRatio: aspectRatio,
+        imageSize,
         response,
       });
     } catch (error) {
@@ -954,6 +978,7 @@ export class Agent1 implements Agent {
     imageIds?: string[], // Unified array of image IDs to use for generation
     systemPromptOverride?: string,
     aspectRatioOverride?: string,
+    imageSizeOverride?: ImageSize,
     imageModelId?: string
   ): Promise<ParallelAgentResponse> {
     const startTime = requestStartTime || Date.now();
@@ -974,6 +999,13 @@ export class Agent1 implements Agent {
       }
     }
 
+    let validatedImageSize: ImageSize | undefined;
+    if (imageSizeOverride) {
+      if (SUPPORTED_IMAGE_SIZES.includes(imageSizeOverride)) {
+        validatedImageSize = imageSizeOverride;
+      }
+    }
+
     // Prepare messages once (shared across all variants)
     const prepared = await this.prepareMessages(
       history,
@@ -983,6 +1015,7 @@ export class Agent1 implements Agent {
       imageIds || [],
       systemPromptOverride,
       validatedAspectRatio,
+      validatedImageSize,
       imageModelId
     );
 

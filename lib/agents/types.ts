@@ -1,4 +1,5 @@
 import { Message } from "@/lib/llm/types";
+import { ImageSize } from "@/lib/image/types";
 
 export interface AgentResponse {
   stream: ReadableStream<Uint8Array>;
@@ -24,6 +25,7 @@ export interface Agent {
     imageIds?: string[], // Unified array of image IDs
     systemPromptOverride?: string,
     aspectRatioOverride?: string,
+    imageSizeOverride?: ImageSize,
     imageModelId?: string
   ): Promise<AgentResponse>;
 
@@ -39,6 +41,7 @@ export interface Agent {
     imageIds?: string[], // Unified array of image IDs
     systemPromptOverride?: string,
     aspectRatioOverride?: string,
+    imageSizeOverride?: ImageSize,
     imageModelId?: string
   ): Promise<ParallelAgentResponse>;
 }

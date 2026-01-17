@@ -1,8 +1,10 @@
 export type ImageOperation = "generate" | "edit";
+export type ImageSize = "2k" | "4k";
 
 export interface ImageGenerationInput {
   prompt: string;
   aspectRatio?: string;
+  imageSize?: ImageSize;
 }
 
 export interface ImageEditInput {
@@ -10,6 +12,7 @@ export interface ImageEditInput {
   imageIds?: string[];
   imageBase64?: string[];
   aspectRatio?: string;
+  imageSize?: ImageSize;
 }
 
 export interface ImageProviderResult {

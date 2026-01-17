@@ -673,6 +673,9 @@ export default function ChatInterface({
 
       if (menuState.mode === "create" || menuState.mode === "edit") {
         payload.imageModelId = menuState.model;
+        if (menuState.imageSize) {
+          payload.imageSize = menuState.imageSize;
+        }
       }
 
       // Add precision editing flag if enabled

@@ -226,6 +226,7 @@
     "model": "模型",
     "expertise": "专业领域",
     "aspectRatio": "宽高比",
+    "imageSize": "图片尺寸",
     "selectMode": "选择模式",
     "selectCategory": "选择{category}",
     "with": "使用",
@@ -262,6 +263,10 @@
       "3:4": "3:4",
       "2:3": "2:3",
       "9:16": "9:16"
+    },
+    "imageSizeOptions": {
+      "2k": "2K",
+      "4k": "4K"
     },
     "editModeHint": "请先选择或上传图片以使用编辑模式",
     "expertiseNotAvailable": "编辑已选图片模式下不支持专业领域选项。",

@@ -33,6 +33,7 @@ export type MenuState = {
   model: string;
   expertise: string;
   aspectRatio: string;
+  imageSize: string;
 };
 
 // Default initial state
@@ -41,6 +42,7 @@ export const INITIAL_MENU_STATE: MenuState = {
   model: MENU_CONFIG.categories.model.default,
   expertise: MENU_CONFIG.categories.expertise.default,
   aspectRatio: MENU_CONFIG.categories.aspectRatio.default,
+  imageSize: MENU_CONFIG.categories.imageSize.default,
 };
 
 // Helper to resolve state based on mode and rules
@@ -70,7 +72,7 @@ export const resolveMenuState = (
   const newState = { ...currentState, mode };
 
   // Categories to resolve
-  const categories = ["model", "expertise", "aspectRatio"] as const;
+  const categories = ["model", "expertise", "aspectRatio", "imageSize"] as const;
 
   categories.forEach((category) => {
     const categoryConfig = availability[category];
@@ -133,13 +135,14 @@ export default function MenuConfiguration({
 }: MenuConfigurationProps) {
   const t = useTranslations("menu");
   const getCategoryLabel = (
-    categoryKey: "model" | "expertise" | "aspectRatio"
+    categoryKey: "model" | "expertise" | "aspectRatio" | "imageSize"
   ) => t(categoryKey);
   const getModeLabel = (key: string) => t(`modes.${key}`);
   const getModeDescription = (key: string) => t(`modes.${key}Desc`);
   const getModelLabel = (key: string) => t(`models.${key}`);
   const getExpertiseLabel = (key: string) => t(`expertiseOptions.${key}`);
   const getAspectRatioLabel = (key: string) => t(`aspectRatioOptions.${key}`);
+  const getImageSizeLabel = (key: string) => t(`imageSizeOptions.${key}`);
   const getAspectRatioDescription = (key: string) =>
     key === "smart" ? t("aspectRatioOptions.smartDesc") : undefined;
   // Handlers for changes
@@ -163,7 +166,7 @@ export default function MenuConfiguration({
 
   // Render a dropdown for a category
   const renderDropdown = (
-    categoryKey: "model" | "expertise" | "aspectRatio"
+    categoryKey: "model" | "expertise" | "aspectRatio" | "imageSize"
   ) => {
     const availability = currentContext.availability[categoryKey];
 
@@ -184,7 +187,9 @@ export default function MenuConfiguration({
         ? getModelLabel(selectedKey)
         : categoryKey === "expertise"
           ? getExpertiseLabel(selectedKey)
-          : getAspectRatioLabel(selectedKey);
+          : categoryKey === "aspectRatio"
+            ? getAspectRatioLabel(selectedKey)
+            : getImageSizeLabel(selectedKey);
     const isAspectRatio = categoryKey === "aspectRatio";
 
     // Get icon for aspect ratio options (if defined in config)
@@ -241,7 +246,9 @@ export default function MenuConfiguration({
                   ? getModelLabel(key)
                   : categoryKey === "expertise"
                     ? getExpertiseLabel(key)
-                    : getAspectRatioLabel(key);
+                    : categoryKey === "aspectRatio"
+                      ? getAspectRatioLabel(key)
+                      : getImageSizeLabel(key);
 
               return (
                 <DropdownItem
@@ -371,6 +378,7 @@ export default function MenuConfiguration({
         {renderDropdown("model")}
         {renderDropdown("expertise")}
         {renderDropdown("aspectRatio")}
+        {renderDropdown("imageSize")}
       </div>
     </div>
   );

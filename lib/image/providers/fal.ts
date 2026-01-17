@@ -4,11 +4,16 @@ import {
   ImageEditInput,
   ImageGenerationInput,
   ImageProviderResult,
+  ImageSize,
 } from "../types";
 
 fal.config({
   credentials: process.env.FAL_API_KEY,
 });
+
+function resolveFalImageSize(size?: ImageSize): "auto_2K" | "auto_4K" {
+  return size === "4k" ? "auto_4K" : "auto_2K";
+}
 
 async function downloadFromUrlWithType(url: string): Promise<{
   buffer: Buffer;
@@ -34,7 +39,7 @@ export async function generateWithSeedream(
   const result = await fal.subscribe(modelId, {
     input: {
       prompt: input.prompt,
-      image_size: "auto_2K",
+      image_size: resolveFalImageSize(input.imageSize),
       num_images: 1,
       max_images: 1,
       enable_safety_checker: true,
@@ -75,7 +80,7 @@ export async function editWithSeedream(
     input: {
       prompt: input.prompt,
       image_urls: imageUrls,
-      image_size: "auto_2K",
+      image_size: resolveFalImageSize(input.imageSize),
       num_images: 1,
       max_images: 1,
       enable_safety_checker: true,

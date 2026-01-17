@@ -1,5 +1,6 @@
 import { Agent, AgentResponse } from "./types";
 import { Message, MessageContentPart } from "@/lib/llm/types";
+import { ImageSize } from "@/lib/image/types";
 import {
   downloadImage,
   uploadImage,
@@ -33,6 +34,7 @@ export class Agent0 implements Agent {
     imageIds?: string[], // Unified array of image IDs (not used by this agent)
     systemPromptOverride?: string,
     aspectRatioOverride?: string,
+    imageSizeOverride?: ImageSize,
     imageModelId?: string
   ): Promise<AgentResponse> {
     const startTime = requestStartTime || Date.now();

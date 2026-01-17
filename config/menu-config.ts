@@ -67,6 +67,14 @@ export const MENU_CONFIG = {
         "9:16": { label: "9:16" },
       },
     },
+    imageSize: {
+      label: "Image Size",
+      default: "2k",
+      options: {
+        "2k": { label: "2k" },
+        "4k": { label: "4k" },
+      },
+    },
   },
 
   contexts: {
@@ -75,6 +83,7 @@ export const MENU_CONFIG = {
         model: "nano-banana-pro",
         expertise: "commercial",
         aspectRatio: "smart",
+        imageSize: "2k",
       },
       availability: {
         model: {
@@ -99,6 +108,10 @@ export const MENU_CONFIG = {
             "9:16",
           ],
         },
+        imageSize: {
+          enabled: true,
+          allowed: ["2k", "4k"],
+        },
       },
     },
 
@@ -106,6 +119,7 @@ export const MENU_CONFIG = {
       defaults: {
         model: "nano-banana-pro",
         aspectRatio: "smart",
+        imageSize: "2k",
       },
       availability: {
         model: { enabled: true, allowed: ["nano-banana-pro", "seedream-45"] },
@@ -127,6 +141,10 @@ export const MENU_CONFIG = {
             "9:16",
           ],
         },
+        imageSize: {
+          enabled: true,
+          allowed: ["2k", "4k"],
+        },
       },
     },
 
@@ -144,6 +162,10 @@ export const MENU_CONFIG = {
         aspectRatio: {
           enabled: false,
           reason: "Aspect ratio is not applicable in Chat mode.",
+        },
+        imageSize: {
+          enabled: false,
+          reason: "Image size is not applicable in Chat mode.",
         },
       },
     },
