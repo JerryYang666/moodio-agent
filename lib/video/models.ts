@@ -578,6 +578,73 @@ const veo31: VideoModelConfig = {
 };
 
 /**
+ * Sora 2 Pro - Image to Video
+ * OpenAI's state-of-the-art image-to-video model with audio
+ */
+const sora2Pro: VideoModelConfig = {
+  id: "fal-ai/sora-2/image-to-video/pro",
+  name: "Sora 2 Pro",
+  description:
+    "OpenAI's state-of-the-art image-to-video model capable of detailed clips with audio",
+  imageParams: {
+    sourceImage: "image_url",
+  },
+  params: [
+    {
+      name: "prompt",
+      label: "Prompt",
+      type: "string",
+      required: true,
+      description: "The text prompt describing the video to generate",
+    },
+    {
+      name: "image_url",
+      label: "Source Image",
+      type: "string",
+      required: true,
+      description: "The URL of the image to use as the first frame",
+    },
+    {
+      name: "resolution",
+      label: "Resolution",
+      type: "enum",
+      required: false,
+      default: "auto",
+      options: ["auto", "720p", "1080p"],
+      description: "Output video resolution",
+    },
+    {
+      name: "aspect_ratio",
+      label: "Aspect Ratio",
+      type: "enum",
+      required: false,
+      default: "auto",
+      options: ["auto", "9:16", "16:9"],
+      description: "Aspect ratio of the generated video",
+    },
+    {
+      name: "duration",
+      label: "Duration (seconds)",
+      type: "enum",
+      required: false,
+      default: 4,
+      options: ["4", "8", "12"],
+      description: "Duration of the generated video in seconds",
+    },
+    {
+      name: "delete_video",
+      label: "Delete Video",
+      type: "boolean",
+      required: false,
+      default: true,
+      description:
+        "Whether to delete the video after generation for privacy reasons",
+      status: "hidden",
+    },
+  ],
+};
+
+/**
  * Registry of all supported video models
  */
 export const VIDEO_MODELS: VideoModelConfig[] = [
@@ -589,6 +656,7 @@ export const VIDEO_MODELS: VideoModelConfig[] = [
   klingV26Pro,
   klingO1Pro,
   veo31,
+  sora2Pro,
 ];
 
 /**
