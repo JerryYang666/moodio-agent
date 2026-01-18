@@ -25,6 +25,7 @@ import {
   ExternalLink,
 } from "lucide-react";
 import VideoStatusChip from "./video-status-chip";
+import { getVideoModel } from "@/lib/video/models";
 
 interface VideoGeneration {
   id: string;
@@ -132,6 +133,9 @@ export default function VideoList({ refreshTrigger }: VideoListProps) {
       console.error("Download error:", e);
     }
   };
+
+  const getModelLabel = (modelId: string) =>
+    getVideoModel(modelId)?.name ?? modelId;
 
   if (loading) {
     return (
@@ -267,6 +271,9 @@ export default function VideoList({ refreshTrigger }: VideoListProps) {
                         <span className="text-[10px] sm:text-xs text-default-400 shrink-0">
                           {formatDate(gen.createdAt)}
                         </span>
+                      </div>
+                      <div className="text-[10px] sm:text-xs text-default-400 mb-1">
+                        {t("model")}: {getModelLabel(gen.modelId)}
                       </div>
                       <p className="text-xs sm:text-sm text-default-600 line-clamp-2">
                         {gen.params.prompt || t("noPrompt")}
