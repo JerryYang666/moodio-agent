@@ -27,7 +27,7 @@ export interface VideoModelParam {
   type: VideoModelParamType;
   required: boolean;
   default?: string | number | boolean | string[];
-  options?: string[]; // For enum types
+  options?: Array<string | number>; // For enum types
   description?: string;
   label?: string; // Human-readable label for UI
   min?: number; // For number types
@@ -628,7 +628,7 @@ const sora2Pro: VideoModelConfig = {
       type: "enum",
       required: false,
       default: 4,
-      options: ["4", "8", "12"],
+      options: [4, 8, 12],
       description: "Duration of the generated video in seconds",
     },
     {
@@ -777,10 +777,23 @@ export function validateAndMergeParams(
         break;
 
       case "enum":
-        if (!param.options?.includes(String(userValue))) {
+        if (
+          !param.options?.some(
+            (option) => String(option) === String(userValue)
+          )
+        ) {
           throw new Error(
             `Parameter ${param.name} must be one of: ${param.options?.join(", ")}`
           );
+        }
+        {
+          const matchedOption = param.options?.find(
+            (option) => String(option) === String(userValue)
+          );
+          if (matchedOption !== undefined) {
+            merged[param.name] = matchedOption;
+            continue;
+          }
         }
         break;
 

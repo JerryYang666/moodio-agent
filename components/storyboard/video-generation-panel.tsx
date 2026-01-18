@@ -22,7 +22,7 @@ interface VideoModelParam {
   type: "string" | "number" | "boolean" | "enum" | "string_array";
   required: boolean;
   default?: string | number | boolean | string[];
-  options?: string[];
+  options?: Array<string | number>;
   description?: string;
   min?: number;
   max?: number;
@@ -413,13 +413,18 @@ export default function VideoGenerationPanel({
                     label={param.label}
                     selectedKeys={value ? [String(value)] : []}
                     onChange={(e) =>
-                      handleParamChange(param.name, e.target.value)
+                      handleParamChange(
+                        param.name,
+                        param.options?.find(
+                          (option) => String(option) === e.target.value
+                        ) ?? e.target.value
+                      )
                     }
                     description={param.description}
                     isRequired={param.required}
                   >
                     {param.options.map((opt) => (
-                      <SelectItem key={opt}>{opt}</SelectItem>
+                      <SelectItem key={String(opt)}>{String(opt)}</SelectItem>
                     ))}
                   </Select>
                 );
