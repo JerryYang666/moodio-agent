@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { jwtVerify } from "jose";
 import { siteConfig } from "@/config/site";
+import { clearCloudFrontCookies } from "@/lib/auth/cloudfront-cookie-config";
 
 /**
  * Check if a path is public (doesn't require authentication)
@@ -53,7 +54,9 @@ async function verifyAccessToken(
 ): Promise<{ userId: string } | null> {
   try {
     const secret = getJWTSecret();
-    const { payload } = await jwtVerify(token, secret);
+    const { payload } = await jwtVerify(token, secret, {
+      clockTolerance: siteConfig.auth.clockSkewSeconds,
+    });
 
     if (!payload.userId || typeof payload.userId !== "string") {
       return null;
@@ -256,6 +259,7 @@ export async function middleware(request: NextRequest) {
   // Delete cookies to clean up
   response.cookies.delete(siteConfig.auth.accessToken.cookieName);
   response.cookies.delete(siteConfig.auth.refreshToken.cookieName);
+  clearCloudFrontCookies(response);
 
   return response;
 }

@@ -6,6 +6,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getRefreshToken, setAuthCookies } from "@/lib/auth/cookies";
+import { setCloudFrontCookies } from "@/lib/auth/cloudfront-cookies";
 import { refreshAccessToken } from "@/lib/auth/tokens";
 
 export async function POST(request: NextRequest) {
@@ -37,6 +38,7 @@ export async function POST(request: NextRequest) {
 
     // Set both new access and refresh token cookies (single-use refresh tokens)
     setAuthCookies(response, result.accessToken!, result.refreshToken!);
+    setCloudFrontCookies(response);
 
     return response;
   } catch (error) {

@@ -4,7 +4,7 @@ import { collectionImages, collectionShares, collections, projects } from "@/lib
 import { getAccessToken } from "@/lib/auth/cookies";
 import { verifyAccessToken } from "@/lib/auth/jwt";
 import { and, eq } from "drizzle-orm";
-import { getSignedImageUrl } from "@/lib/storage/s3";
+import { getImageUrl } from "@/lib/storage/s3";
 
 /**
  * GET /api/assets/[assetId]
@@ -83,7 +83,7 @@ export async function GET(
     return NextResponse.json({
       asset: {
         ...asset,
-        imageUrl: getSignedImageUrl(asset.imageId),
+        imageUrl: getImageUrl(asset.imageId),
       },
     });
   } catch (error) {

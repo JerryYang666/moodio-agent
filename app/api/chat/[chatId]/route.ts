@@ -4,8 +4,7 @@ import { verifyAccessToken } from "@/lib/auth/jwt";
 import { db } from "@/lib/db";
 import { chats } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
-import { getChatHistory, getSignedImageUrl } from "@/lib/storage/s3";
-import { Message, MessageContentPart } from "@/lib/llm/types";
+import { getChatHistory, getImageUrl } from "@/lib/storage/s3";
 
 export async function GET(
   request: NextRequest,
@@ -42,25 +41,25 @@ export async function GET(
 
     const messages = await getChatHistory(chatId);
 
-    // Filter out internal_* for non-admins and add signed URLs for images
+    // Filter out internal_* for non-admins and add CloudFront URLs for images
     const processedMessages = messages.map((msg) => {
       if (typeof msg.content === "string") return msg;
 
       const processedContent = msg.content
         .filter((part) => isAdmin || !part.type.startsWith("internal_"))
         .map((part) => {
-          // Add signed URL for agent_image parts
+          // Add CloudFront URL for agent_image parts
           if (part.type === "agent_image" && part.imageId && !part.imageUrl) {
             return {
               ...part,
-              imageUrl: getSignedImageUrl(part.imageId),
+              imageUrl: getImageUrl(part.imageId),
             };
           }
-          // Add signed URL for image parts (user uploaded images)
+          // Add CloudFront URL for image parts (user uploaded images)
           if (part.type === "image" && part.imageId) {
             return {
               ...part,
-              imageUrl: getSignedImageUrl(part.imageId),
+              imageUrl: getImageUrl(part.imageId),
             };
           }
           return part;

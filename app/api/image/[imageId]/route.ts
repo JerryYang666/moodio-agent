@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAccessToken } from "@/lib/auth/cookies";
 import { verifyAccessToken } from "@/lib/auth/jwt";
-import { getSignedImageUrl } from "@/lib/storage/s3";
+import { getImageUrl } from "@/lib/storage/s3";
 
 /**
  * GET /api/image/[imageId]
- * Returns a signed URL for an image
+ * Returns a CloudFront URL for an image
  */
 export async function GET(
   request: NextRequest,
@@ -29,10 +29,10 @@ export async function GET(
   }
 
   try {
-    const imageUrl = getSignedImageUrl(imageId);
+    const imageUrl = getImageUrl(imageId);
     return NextResponse.json({ imageId, imageUrl });
   } catch (error) {
-    console.error("[Image] Error getting signed URL:", error);
+    console.error("[Image] Error getting CloudFront URL:", error);
     return NextResponse.json(
       { error: "Failed to get image URL" },
       { status: 500 }

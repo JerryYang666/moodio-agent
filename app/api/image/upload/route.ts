@@ -4,14 +4,14 @@ import { verifyAccessToken } from "@/lib/auth/jwt";
 import { db } from "@/lib/db";
 import { collectionImages, collections } from "@/lib/db/schema";
 import { ensureDefaultProject } from "@/lib/db/projects";
-import { uploadImage, getSignedImageUrl } from "@/lib/storage/s3";
+import { uploadImage, getImageUrl } from "@/lib/storage/s3";
 import { and, desc, eq } from "drizzle-orm";
 
 const UPLOADS_COLLECTION_NAME = "My Uploads";
 
 /**
  * POST /api/image/upload
- * Immediately upload an image and return the imageId and signed URL
+ * Immediately upload an image and return the imageId and CloudFront URL
  * This endpoint is used for immediate upload when user selects a file
  */
 export async function POST(request: NextRequest) {
@@ -112,8 +112,8 @@ export async function POST(request: NextRequest) {
       .set({ updatedAt: new Date() })
       .where(eq(collections.id, uploadsCollection.id));
 
-    // Generate signed URL for immediate display
-    const imageUrl = getSignedImageUrl(imageId);
+    // Generate CloudFront URL for immediate display
+    const imageUrl = getImageUrl(imageId);
 
     return NextResponse.json({
       imageId,

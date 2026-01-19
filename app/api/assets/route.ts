@@ -9,7 +9,7 @@ import {
 import { getAccessToken } from "@/lib/auth/cookies";
 import { verifyAccessToken } from "@/lib/auth/jwt";
 import { and, desc, eq, inArray, isNull } from "drizzle-orm";
-import { getSignedImageUrl } from "@/lib/storage/s3";
+import { getImageUrl } from "@/lib/storage/s3";
 import { ensureDefaultProject } from "@/lib/db/projects";
 
 function parseLimit(value: string | null, fallback: number) {
@@ -83,7 +83,7 @@ export async function GET(req: NextRequest) {
 
       const assets = rows.map((a) => ({
         ...a,
-        imageUrl: getSignedImageUrl(a.imageId),
+        imageUrl: getImageUrl(a.imageId),
       }));
 
       return NextResponse.json({ assets });
@@ -113,7 +113,7 @@ export async function GET(req: NextRequest) {
 
       const assets = rows.map((a) => ({
         ...a,
-        imageUrl: getSignedImageUrl(a.imageId),
+        imageUrl: getImageUrl(a.imageId),
       }));
 
       return NextResponse.json({ assets });
@@ -162,7 +162,7 @@ export async function GET(req: NextRequest) {
       .slice(0, limit)
       .map((a) => ({
         ...a,
-        imageUrl: getSignedImageUrl(a.imageId),
+        imageUrl: getImageUrl(a.imageId),
       }));
 
     return NextResponse.json({ assets });
@@ -269,7 +269,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       asset: {
         ...created,
-        imageUrl: getSignedImageUrl(created.imageId),
+        imageUrl: getImageUrl(created.imageId),
       },
     });
   } catch (error) {

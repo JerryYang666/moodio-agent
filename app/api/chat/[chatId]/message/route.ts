@@ -4,11 +4,7 @@ import { verifyAccessToken } from "@/lib/auth/jwt";
 import { db } from "@/lib/db";
 import { chats } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
-import {
-  getChatHistory,
-  saveChatHistory,
-  getSignedImageUrl,
-} from "@/lib/storage/s3";
+import { getChatHistory, saveChatHistory } from "@/lib/storage/s3";
 import { createLLMClient } from "@/lib/llm/client";
 import {
   Message,

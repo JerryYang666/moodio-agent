@@ -7,6 +7,7 @@ import { eq } from "drizzle-orm";
 import { generateAccessToken } from "@/lib/auth/jwt";
 import { generateRefreshToken, createRefreshToken } from "@/lib/auth/tokens";
 import { setAuthCookies } from "@/lib/auth/cookies";
+import { setCloudFrontCookies } from "@/lib/auth/cloudfront-cookies";
 
 export async function POST(request: NextRequest) {
   try {
@@ -75,7 +76,9 @@ export async function POST(request: NextRequest) {
        await createRefreshToken(user.id, refreshToken);
        
        const res = NextResponse.json({ verified: true });
-       return setAuthCookies(res, accessToken, refreshToken);
+       const response = setAuthCookies(res, accessToken, refreshToken);
+       setCloudFrontCookies(response);
+       return response;
     }
 
     return NextResponse.json({ verified: false, error: "Verification failed" }, { status: 400 });

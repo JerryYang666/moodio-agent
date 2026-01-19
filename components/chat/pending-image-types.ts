@@ -14,7 +14,7 @@ export type PendingImageSource = "upload" | "asset" | "ai_generated";
 export interface PendingImage {
   /** Unique ID of the image in S3 storage */
   imageId: string;
-  /** Signed URL for displaying the image */
+  /** CloudFront URL for displaying the image (access via signed cookies) */
   url: string;
   /** Source of the image */
   source: PendingImageSource;

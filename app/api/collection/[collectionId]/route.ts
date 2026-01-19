@@ -9,8 +9,8 @@ import {
 } from "@/lib/db/schema";
 import { getAccessToken } from "@/lib/auth/cookies";
 import { verifyAccessToken } from "@/lib/auth/jwt";
-import { eq, and, or, desc } from "drizzle-orm";
-import { getSignedImageUrl } from "@/lib/storage/s3";
+import { eq, and, desc } from "drizzle-orm";
+import { getImageUrl } from "@/lib/storage/s3";
 
 // Helper to check user's permission for a collection
 async function getUserPermission(
@@ -99,10 +99,10 @@ export async function GET(
       .where(eq(collectionImages.collectionId, collectionId))
       .orderBy(desc(collectionImages.addedAt));
 
-    // Add signed CloudFront URLs to images
+    // Add CloudFront URLs to images
     const images = rawImages.map((img) => ({
       ...img,
-      imageUrl: getSignedImageUrl(img.imageId),
+      imageUrl: getImageUrl(img.imageId),
     }));
 
     // Get shares if user is owner

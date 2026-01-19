@@ -54,7 +54,7 @@ interface CollectionData {
     id: string;
     collectionId: string;
     imageId: string;
-    imageUrl: string; // Signed CloudFront URL from API
+    imageUrl: string; // CloudFront URL from API (access via signed cookies)
     chatId: string | null;
     generationDetails: {
       title: string;
@@ -321,7 +321,7 @@ export default function CollectionPage({
     setAllImages(imagesForNav);
     setCurrentImageIndex(clickedIndex >= 0 ? clickedIndex : 0);
     setSelectedImage({
-      url: image.imageUrl, // Use signed CloudFront URL from API
+      url: image.imageUrl, // Use CloudFront URL from API (signed cookies)
       title: image.generationDetails.title,
       prompt: image.generationDetails.prompt,
       status: image.generationDetails.status,
@@ -444,7 +444,7 @@ export default function CollectionPage({
             <Card key={image.id} className="group relative">
               <CardBody className="p-0 overflow-hidden aspect-square relative rounded-lg">
                 <Image
-                  src={image.imageUrl} // Use signed CloudFront URL from API
+                  src={image.imageUrl} // Use CloudFront URL from API (signed cookies)
                   alt={image.generationDetails.title}
                   radius="none"
                   classNames={{

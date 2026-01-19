@@ -11,6 +11,7 @@ import { verifyOTP } from "@/lib/auth/otp";
 import { generateAccessToken } from "@/lib/auth/jwt";
 import { generateRefreshToken, createRefreshToken } from "@/lib/auth/tokens";
 import { setAuthCookies } from "@/lib/auth/cookies";
+import { setCloudFrontCookies } from "@/lib/auth/cloudfront-cookies";
 
 export async function POST(request: NextRequest) {
   try {
@@ -79,6 +80,7 @@ export async function POST(request: NextRequest) {
 
     // Set authentication cookies
     setAuthCookies(response, accessToken, refreshToken);
+    setCloudFrontCookies(response);
 
     return response;
   } catch (error) {

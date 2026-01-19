@@ -62,7 +62,9 @@ export async function verifyAccessToken(
 ): Promise<AccessTokenPayload | null> {
   try {
     const secret = getJWTSecret();
-    const { payload } = await jwtVerify(token, secret);
+    const { payload } = await jwtVerify(token, secret, {
+      clockTolerance: siteConfig.auth.clockSkewSeconds,
+    });
 
     if (!payload.userId || typeof payload.userId !== "string") {
       return null;

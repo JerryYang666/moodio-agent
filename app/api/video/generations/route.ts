@@ -4,7 +4,7 @@ import { verifyAccessToken } from "@/lib/auth/jwt";
 import { db } from "@/lib/db";
 import { videoGenerations } from "@/lib/db/schema";
 import { eq, desc } from "drizzle-orm";
-import { getSignedImageUrl, getSignedVideoUrl } from "@/lib/storage/s3";
+import { getImageUrl, getVideoUrl } from "@/lib/storage/s3";
 import { checkAndRecoverStaleGenerations } from "@/lib/video/recovery";
 import { waitUntil } from "@vercel/functions";
 
@@ -65,20 +65,20 @@ export async function GET(request: NextRequest) {
       filteredGenerations = generations.filter((g) => g.status === statusFilter);
     }
 
-    // Add signed URLs
+    // Add CloudFront URLs
     const generationsWithUrls = filteredGenerations.map((g) => ({
       id: g.id,
       modelId: g.modelId,
       status: g.status,
       sourceImageId: g.sourceImageId,
-      sourceImageUrl: getSignedImageUrl(g.sourceImageId),
+      sourceImageUrl: getImageUrl(g.sourceImageId),
       endImageId: g.endImageId,
-      endImageUrl: g.endImageId ? getSignedImageUrl(g.endImageId) : null,
+      endImageUrl: g.endImageId ? getImageUrl(g.endImageId) : null,
       videoId: g.videoId,
-      videoUrl: g.videoId ? getSignedVideoUrl(g.videoId) : null,
+      videoUrl: g.videoId ? getVideoUrl(g.videoId) : null,
       thumbnailImageId: g.thumbnailImageId,
       thumbnailUrl: g.thumbnailImageId
-        ? getSignedImageUrl(g.thumbnailImageId)
+        ? getImageUrl(g.thumbnailImageId)
         : null,
       params: g.params,
       error: g.error,

@@ -4,7 +4,7 @@ import { verifyAccessToken } from "@/lib/auth/jwt";
 import { db } from "@/lib/db";
 import { videoGenerations, users } from "@/lib/db/schema";
 import { desc, eq } from "drizzle-orm";
-import { getSignedImageUrl, getSignedVideoUrl } from "@/lib/storage/s3";
+import { getImageUrl, getVideoUrl } from "@/lib/storage/s3";
 
 export async function GET(request: NextRequest) {
   try {
@@ -43,11 +43,11 @@ export async function GET(request: NextRequest) {
 
     const generationsWithUrls = allGenerations.map((g) => ({
       ...g,
-      sourceImageUrl: getSignedImageUrl(g.sourceImageId),
-      endImageUrl: g.endImageId ? getSignedImageUrl(g.endImageId) : null,
-      videoUrl: g.videoId ? getSignedVideoUrl(g.videoId) : null,
+      sourceImageUrl: getImageUrl(g.sourceImageId),
+      endImageUrl: g.endImageId ? getImageUrl(g.endImageId) : null,
+      videoUrl: g.videoId ? getVideoUrl(g.videoId) : null,
       thumbnailUrl: g.thumbnailImageId
-        ? getSignedImageUrl(g.thumbnailImageId)
+        ? getImageUrl(g.thumbnailImageId)
         : null,
     }));
 

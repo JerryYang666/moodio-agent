@@ -954,7 +954,7 @@ export default function ChatInterface({
       setAllImages(images);
       setCurrentImageIndex(index >= 0 ? index : 0);
       setSelectedImage({
-        url, // Use signed CloudFront URL from API
+        url, // Use CloudFront URL from API (access via signed cookies)
         title: part.title,
         prompt: part.prompt,
         imageId: part.imageId,

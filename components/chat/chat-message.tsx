@@ -175,7 +175,7 @@ export default function ChatMessage({
         {agentParts.length > 0 && (
           <div className="grid grid-cols-2 gap-3 mt-2">
             {agentParts.map((part: any, i) => {
-              // Use imageUrl from API response (CloudFront signed URL)
+              // Use imageUrl from API response (CloudFront + signed cookies)
               const url = part.imageUrl || "";
               // Check if this image is selected by checking if its imageId is in selectedImageIds
               const isSelected =

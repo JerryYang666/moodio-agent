@@ -15,7 +15,7 @@ function StoryboardContent() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [loading, setLoading] = useState(!!imageIdParam);
 
-  // Fetch signed URL for initial image if provided
+  // Fetch CloudFront URL for initial image if provided
   useEffect(() => {
     if (!imageIdParam) {
       setLoading(false);
@@ -24,7 +24,7 @@ function StoryboardContent() {
 
     const fetchImageUrl = async () => {
       try {
-        // Get signed URL from server
+        // Get CloudFront URL from server
         const res = await fetch(`/api/image/${imageIdParam}`);
         if (res.ok) {
           const data = await res.json();

@@ -4,7 +4,7 @@ import { verifyAccessToken } from "@/lib/auth/jwt";
 import { db } from "@/lib/db";
 import { videoGenerations } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
-import { getSignedImageUrl, getSignedVideoUrl } from "@/lib/storage/s3";
+import { getImageUrl, getVideoUrl } from "@/lib/storage/s3";
 
 /**
  * GET /api/video/generations/[id]
@@ -48,24 +48,24 @@ export async function GET(
       );
     }
 
-    // Add signed URLs
+    // Add CloudFront URLs
     const generationWithUrls = {
       id: generation.id,
       modelId: generation.modelId,
       status: generation.status,
       sourceImageId: generation.sourceImageId,
-      sourceImageUrl: getSignedImageUrl(generation.sourceImageId),
+      sourceImageUrl: getImageUrl(generation.sourceImageId),
       endImageId: generation.endImageId,
       endImageUrl: generation.endImageId
-        ? getSignedImageUrl(generation.endImageId)
+        ? getImageUrl(generation.endImageId)
         : null,
       videoId: generation.videoId,
       videoUrl: generation.videoId
-        ? getSignedVideoUrl(generation.videoId)
+        ? getVideoUrl(generation.videoId)
         : null,
       thumbnailImageId: generation.thumbnailImageId,
       thumbnailUrl: generation.thumbnailImageId
-        ? getSignedImageUrl(generation.thumbnailImageId)
+        ? getImageUrl(generation.thumbnailImageId)
         : null,
       params: generation.params,
       error: generation.error,

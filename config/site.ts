@@ -28,6 +28,8 @@ export const siteConfig = {
       cookieName: "moodio_access_token",
       maxAge: 30 * 60, // 30 minutes in seconds
     },
+    // Allow small clock skew on backend verification
+    clockSkewSeconds: 60,
 
     // Refresh Token Configuration
     refreshToken: {
@@ -60,7 +62,10 @@ export const siteConfig = {
 
   // CloudFront Configuration
   cloudfront: {
-    signedUrlExpirationSeconds: 30 * 60, // 30 minutes default expiration for signed URLs
+    signedUrlExpirationSeconds: 30 * 60, // 30 minutes default expiration for legacy signed URLs
+    signedCookieExpirationSeconds: 30 * 60, // 30 minutes default expiration for signed cookies
+    signedCookieClockSkewSeconds: 60, // Allow CloudFront policy to outlive cookie by 60s
+    cookieDomain: process.env.CLOUDFRONT_COOKIE_DOMAIN,
   },
 
   // PWA Configuration

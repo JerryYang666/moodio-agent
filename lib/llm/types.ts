@@ -7,13 +7,13 @@ export type MessageContentPart =
   | {
       type: "image";
       imageId: string;
-      imageUrl?: string; // imageUrl is signed CloudFront URL from API
+      imageUrl?: string; // CloudFront URL from API (access via signed cookies)
       source?: "upload" | "asset" | "ai_generated";
     }
   | {
       type: "agent_image";
       imageId?: string; // Generated at start of image generation for tracking
-      imageUrl?: string; // Signed CloudFront URL for display
+      imageUrl?: string; // CloudFront URL for display (access via signed cookies)
       title: string;
       aspectRatio?: string;
       prompt: string;

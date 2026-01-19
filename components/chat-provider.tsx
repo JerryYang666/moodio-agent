@@ -9,7 +9,7 @@ export interface Chat {
   id: string;
   name: string | null;
   thumbnailImageId: string | null;
-  thumbnailImageUrl: string | null; // Signed CloudFront URL
+  thumbnailImageUrl: string | null; // CloudFront URL (access via signed cookies)
   updatedAt: string;
 }
 

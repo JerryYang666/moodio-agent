@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getRefreshToken, clearAuthCookies } from "@/lib/auth/cookies";
+import { clearCloudFrontCookies } from "@/lib/auth/cloudfront-cookie-config";
 import { deleteRefreshToken } from "@/lib/auth/tokens";
 
 export async function POST(request: NextRequest) {
@@ -25,6 +26,7 @@ export async function POST(request: NextRequest) {
 
     // Clear authentication cookies
     clearAuthCookies(response);
+    clearCloudFrontCookies(response);
 
     return response;
   } catch (error) {

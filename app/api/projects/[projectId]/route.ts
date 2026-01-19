@@ -4,7 +4,7 @@ import { collectionImages, collections, projects } from "@/lib/db/schema";
 import { getAccessToken } from "@/lib/auth/cookies";
 import { verifyAccessToken } from "@/lib/auth/jwt";
 import { and, desc, eq, isNull } from "drizzle-orm";
-import { getSignedImageUrl } from "@/lib/storage/s3";
+import { getImageUrl } from "@/lib/storage/s3";
 
 /**
  * GET /api/projects/[projectId]
@@ -53,7 +53,7 @@ export async function GET(
 
     const assetsWithUrls = rootAssets.map((a) => ({
       ...a,
-      imageUrl: getSignedImageUrl(a.imageId),
+      imageUrl: getImageUrl(a.imageId),
     }));
 
     return NextResponse.json({

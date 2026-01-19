@@ -99,7 +99,7 @@ const MobileChatItem = ({ chat, isActive, viewMode }: ChatItemProps) => {
 
   const chatName = chat.name || t("newChat");
   const isMonitored = isChatMonitored(chat.id);
-  // Use signed CloudFront URL from API response
+  // Use CloudFront URL from API response (access via signed cookies)
   const thumbnailUrl = chat.thumbnailImageUrl || null;
 
   return (

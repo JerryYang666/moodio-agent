@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { setAccessTokenCookie } from "@/lib/auth/cookies";
+import { setCloudFrontCookies } from "@/lib/auth/cloudfront-cookies";
 
 export async function POST(request: NextRequest) {
   try {
@@ -66,6 +67,7 @@ export async function POST(request: NextRequest) {
 
     // Update the cookie
     setAccessTokenCookie(response, newAccessToken);
+    setCloudFrontCookies(response);
 
     return response;
 
