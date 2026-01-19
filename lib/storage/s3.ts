@@ -198,6 +198,14 @@ export async function downloadImage(imageId: string): Promise<Buffer | null> {
 
 /**
  * Generate a CloudFront URL for an image (access via signed cookies)
+ *
+ * Rule of thumb:
+ * - Use cookie-based URLs when a fresh API call or user action happens
+ *   ~1s before render (cookies are refreshed). Benefit: stable URLs improve
+ *   browser caching.
+ * - Use signed URLs when an image can appear without a near-term API call
+ *   (e.g., SSE image generation updates or upload completion).
+ *
  * @param imageId The image ID (stored in S3 as images/{imageId})
  * @returns CloudFront URL
  */
@@ -214,7 +222,9 @@ export function getImageUrl(imageId: string): string {
 }
 
 /**
- * Generate a signed CloudFront URL for an image (for external services)
+ * Generate a signed CloudFront URL for an image (for external services or async UI updates)
+ * See getImageUrl() for the rule of thumb.
+ *
  * @param imageId The image ID (stored in S3 as images/{imageId})
  * @param expirationSeconds Optional expiration time in seconds (defaults to siteConfig)
  * @returns Signed CloudFront URL
@@ -318,6 +328,8 @@ export async function downloadVideo(videoId: string): Promise<Buffer | null> {
 
 /**
  * Generate a CloudFront URL for a video (access via signed cookies)
+ * See getImageUrl() for the rule of thumb and caching benefit.
+ *
  * @param videoId The video ID (stored in S3 as videos/{videoId})
  * @returns CloudFront URL
  */
@@ -333,7 +345,9 @@ export function getVideoUrl(videoId: string): string {
 }
 
 /**
- * Generate a signed CloudFront URL for a video (for external services)
+ * Generate a signed CloudFront URL for a video (for external services or async UI updates)
+ * See getImageUrl() for the rule of thumb.
+ *
  * @param videoId The video ID (stored in S3 as videos/{videoId})
  * @param expirationSeconds Optional expiration time in seconds (defaults to siteConfig)
  * @returns Signed CloudFront URL
