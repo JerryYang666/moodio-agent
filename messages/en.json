@@ -399,5 +399,26 @@
     "switchLanguage": "Language",
     "english": "English",
     "chinese": "简体中文"
+  },
+  "credits": {
+    "title": "Credits",
+    "name": "Credit",
+    "namePlural": "Credits",
+    "balance": "{count, plural, one {# Credit} other {# Credits}}",
+    "currentBalance": "Current Balance",
+    "transactionHistory": "Transaction History",
+    "addCredits": "Add Credits",
+    "amount": "Amount",
+    "description": "Description (optional)",
+    "descriptionPlaceholder": "Reason for adjustment...",
+    "grantSuccess": "Successfully added {amount} credits",
+    "grantError": "Failed to add credits",
+    "noTransactions": "No transactions yet",
+    "transactionTypes": {
+      "admin_grant": "Admin Grant",
+      "video_generation": "Video Generation"
+    },
+    "date": "Date",
+    "type": "Type"
   }
 }

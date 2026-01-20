@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo, useCallback } from "react";
+import { useTranslations } from "next-intl";
 import {
   Table,
   TableHeader,
@@ -30,6 +31,7 @@ import { User } from "@/hooks/use-auth";
 import { Pagination } from "@heroui/pagination";
 import { SearchIcon } from "@/components/icons";
 import { addToast } from "@heroui/toast";
+import { Bean } from "lucide-react";
 
 interface InvitationCode {
   code: string;
@@ -37,11 +39,16 @@ interface InvitationCode {
   createdAt: string;
 }
 
+interface UserWithCredits extends User {
+  credits: number;
+}
+
 export default function AdminPage() {
   const { user, loading: authLoading } = useAuth();
-  const [users, setUsers] = useState<User[]>([]);
+  const t = useTranslations("credits");
+  const [users, setUsers] = useState<UserWithCredits[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [selectedUser, setSelectedUser] = useState<UserWithCredits | null>(null);
 
   // Pagination & Search State
   const [filterValue, setFilterValue] = useState("");
@@ -80,6 +87,17 @@ export default function AdminPage() {
     roles: [] as string[],
   });
   const [savingUser, setSavingUser] = useState(false);
+
+  // Add Credits State
+  const {
+    isOpen: isCreditsOpen,
+    onOpen: onCreditsOpen,
+    onOpenChange: onCreditsOpenChange,
+    onClose: onCreditsClose,
+  } = useDisclosure();
+  const [creditsAmount, setCreditsAmount] = useState("");
+  const [creditsDescription, setCreditsDescription] = useState("");
+  const [addingCredits, setAddingCredits] = useState(false);
 
   useEffect(() => {
     if (user && user.roles.includes("admin")) {
@@ -191,7 +209,7 @@ export default function AdminPage() {
     }
   };
 
-  const handleEditUser = (userToEdit: User) => {
+  const handleEditUser = (userToEdit: UserWithCredits) => {
     setSelectedUser(userToEdit);
     setEditFormData({
       firstName: userToEdit.firstName || "",
@@ -199,6 +217,41 @@ export default function AdminPage() {
       roles: userToEdit.roles,
     });
     onEditOpen();
+  };
+
+  const handleOpenCreditsModal = (userToEdit: UserWithCredits) => {
+    setSelectedUser(userToEdit);
+    setCreditsAmount("");
+    setCreditsDescription("");
+    onCreditsOpen();
+  };
+
+  const handleAddCredits = async () => {
+    if (!selectedUser || !creditsAmount) return;
+    setAddingCredits(true);
+    try {
+      await api.post("/api/admin/credits", {
+        userId: selectedUser.id,
+        amount: parseInt(creditsAmount),
+        description: creditsDescription || null,
+      });
+      await fetchUsers();
+      onCreditsClose();
+      addToast({
+        title: "Success",
+        description: t("grantSuccess", { amount: creditsAmount }),
+        color: "success",
+      });
+    } catch (error) {
+      console.error("Failed to add credits:", error);
+      addToast({
+        title: "Error",
+        description: t("grantError"),
+        color: "danger",
+      });
+    } finally {
+      setAddingCredits(false);
+    }
   };
 
   const handleSaveUser = async () => {
@@ -298,6 +351,7 @@ export default function AdminPage() {
               <TableHeader>
                 <TableColumn>USER</TableColumn>
                 <TableColumn>ROLES</TableColumn>
+                <TableColumn>CREDITS</TableColumn>
                 <TableColumn>PROVIDER</TableColumn>
                 <TableColumn>JOINED</TableColumn>
                 <TableColumn>ACTIONS</TableColumn>
@@ -344,6 +398,14 @@ export default function AdminPage() {
                         ))}
                       </div>
                     </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1">
+                        <Bean size={16} className="text-primary" />
+                        <span className="font-medium">
+                          {item.credits.toLocaleString()}
+                        </span>
+                      </div>
+                    </TableCell>
                     <TableCell className="capitalize">
                       {item.authProvider}
                     </TableCell>
@@ -351,13 +413,24 @@ export default function AdminPage() {
                       {new Date(item.createdAt).toLocaleDateString()}
                     </TableCell>
                     <TableCell>
-                      <Button
-                        size="sm"
-                        variant="flat"
-                        onPress={() => handleEditUser(item)}
-                      >
-                        Edit
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="flat"
+                          onPress={() => handleEditUser(item)}
+                        >
+                          Edit
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="flat"
+                          color="success"
+                          startContent={<Bean size={14} />}
+                          onPress={() => handleOpenCreditsModal(item)}
+                        >
+                          {t("addCredits")}
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 )}
@@ -529,6 +602,67 @@ export default function AdminPage() {
                   isLoading={savingUser}
                 >
                   Save Changes
+                </Button>
+              </ModalFooter>
+            </>
+          )}
+        </ModalContent>
+      </Modal>
+
+      {/* Add Credits Modal */}
+      <Modal isOpen={isCreditsOpen} onOpenChange={onCreditsOpenChange}>
+        <ModalContent>
+          {(onClose) => (
+            <>
+              <ModalHeader>{t("addCredits")}</ModalHeader>
+              <ModalBody>
+                {selectedUser && (
+                  <div className="mb-4 p-3 bg-default-100 rounded-lg">
+                    <p className="text-sm text-default-500">User</p>
+                    <p className="font-medium">
+                      {selectedUser.firstName && selectedUser.lastName
+                        ? `${selectedUser.firstName} ${selectedUser.lastName}`
+                        : selectedUser.firstName || selectedUser.email}
+                    </p>
+                    <div className="flex items-center gap-1 mt-2">
+                      <Bean size={16} className="text-primary" />
+                      <span className="text-sm">
+                        {t("currentBalance")}:{" "}
+                        <span className="font-medium">
+                          {selectedUser.credits.toLocaleString()}
+                        </span>
+                      </span>
+                    </div>
+                  </div>
+                )}
+                <Input
+                  type="number"
+                  label={t("amount")}
+                  placeholder="100"
+                  value={creditsAmount}
+                  onValueChange={setCreditsAmount}
+                  startContent={<Bean size={16} className="text-default-400" />}
+                />
+                <Textarea
+                  label={t("description")}
+                  placeholder={t("descriptionPlaceholder")}
+                  value={creditsDescription}
+                  onValueChange={setCreditsDescription}
+                  minRows={2}
+                />
+              </ModalBody>
+              <ModalFooter>
+                <Button variant="light" onPress={onClose}>
+                  Cancel
+                </Button>
+                <Button
+                  color="success"
+                  onPress={handleAddCredits}
+                  isLoading={addingCredits}
+                  isDisabled={!creditsAmount || parseInt(creditsAmount) === 0}
+                  startContent={<Bean size={16} />}
+                >
+                  {t("addCredits")}
                 </Button>
               </ModalFooter>
             </>

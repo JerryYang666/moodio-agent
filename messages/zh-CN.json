@@ -399,5 +399,26 @@
     "switchLanguage": "语言",
     "english": "English",
     "chinese": "简体中文"
+  },
+  "credits": {
+    "title": "积分",
+    "name": "积分",
+    "namePlural": "积分",
+    "balance": "{count} 积分",
+    "currentBalance": "当前余额",
+    "transactionHistory": "交易记录",
+    "addCredits": "添加积分",
+    "amount": "数量",
+    "description": "描述（可选）",
+    "descriptionPlaceholder": "调整原因...",
+    "grantSuccess": "成功添加 {amount} 积分",
+    "grantError": "添加积分失败",
+    "noTransactions": "暂无交易记录",
+    "transactionTypes": {
+      "admin_grant": "管理员发放",
+      "video_generation": "视频生成"
+    },
+    "date": "日期",
+    "type": "类型"
   }
 }

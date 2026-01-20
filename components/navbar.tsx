@@ -31,6 +31,8 @@ import {
   Pencil,
   Check,
   Trash2,
+  Bean,
+  User as UserIcon,
 } from "lucide-react";
 import { Avatar } from "@heroui/avatar";
 import { Popover, PopoverTrigger, PopoverContent } from "@heroui/popover";
@@ -48,6 +50,7 @@ import {
   DropdownMenu,
   DropdownItem,
 } from "@heroui/dropdown";
+import { api } from "@/lib/api/client";
 
 interface ChatItemProps {
   chat: Chat;
@@ -324,11 +327,22 @@ export const Navbar = () => {
   const { user, logout } = useAuth();
   const { chats, refreshChats } = useChat();
   const t = useTranslations();
+  const tCredits = useTranslations("credits");
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [activeSection, setActiveSection] = useState<
     "browse" | "agent" | "projects" | "storyboard"
   >("agent");
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
+  const [credits, setCredits] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (user) {
+      api
+        .get("/api/users/credits")
+        .then((data) => setCredits(data.balance))
+        .catch((error) => console.error("Failed to fetch credits:", error));
+    }
+  }, [user]);
 
   useEffect(() => {
     if (pathname?.startsWith("/browse")) setActiveSection("browse");
@@ -618,12 +632,40 @@ export const Navbar = () => {
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent>
-                      <div className="flex items-center gap-20 p-2">
+                      <div className="flex flex-col gap-2 p-2 min-w-48">
+                        {/* Credits */}
+                        {credits !== null && (
+                          <NextLink
+                            href="/credits"
+                            onClick={() => setIsMenuOpen(false)}
+                            className="flex items-center gap-2 px-2 py-1.5 rounded-lg transition-colors hover:bg-default-100"
+                          >
+                            <Bean size={16} className="text-primary" />
+                            <span className="font-medium">{credits.toLocaleString()}</span>
+                            <span className="text-default-400 text-sm">{tCredits("namePlural")}</span>
+                          </NextLink>
+                        )}
+                        {/* Profile */}
+                        <NextLink
+                          href="/profile"
+                          onClick={() => setIsMenuOpen(false)}
+                          className="flex items-center gap-2 px-2 py-1.5 rounded-lg transition-colors hover:bg-default-100"
+                        >
+                          <UserIcon size={16} />
+                          <span>{t("nav.profile")}</span>
+                        </NextLink>
+                        <div className="h-px bg-divider my-1" />
+                        <div className="flex items-center justify-between gap-4 px-2">
+                          <LanguageSwitch />
+                          <ThemeSwitch />
+                        </div>
+                        <div className="h-px bg-divider my-1" />
                         <Button
                           size="sm"
                           variant="flat"
                           color="danger"
                           startContent={<LogOut size={16} />}
+                          className="w-full"
                           onPress={() => {
                             logout();
                             setIsMenuOpen(false);
@@ -631,8 +673,6 @@ export const Navbar = () => {
                         >
                           {t("nav.logout")}
                         </Button>
-                        <LanguageSwitch />
-                        <ThemeSwitch />
                       </div>
                     </PopoverContent>
                   </Popover>

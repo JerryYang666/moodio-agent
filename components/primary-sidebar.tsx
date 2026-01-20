@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import NextLink from "next/link";
 import clsx from "clsx";
@@ -13,6 +13,7 @@ import {
   LogOut,
   User as UserIcon,
   BookOpen,
+  Bean,
 } from "lucide-react";
 import { Avatar } from "@heroui/avatar";
 import { Tooltip } from "@heroui/tooltip";
@@ -26,11 +27,23 @@ import {
   PopoverTrigger,
   PopoverContent,
 } from "@heroui/popover";
+import { api } from "@/lib/api/client";
 
 export const PrimarySidebar = () => {
   const pathname = usePathname();
   const { user, logout } = useAuth();
   const t = useTranslations("nav");
+  const tCredits = useTranslations("credits");
+  const [credits, setCredits] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (user) {
+      api
+        .get("/api/users/credits")
+        .then((data) => setCredits(data.balance))
+        .catch((error) => console.error("Failed to fetch credits:", error));
+    }
+  }, [user]);
 
   const navItems = [
     {
@@ -121,19 +134,50 @@ export const PrimarySidebar = () => {
               )}
             >
               <Shield size={20} />
-               {pathname?.startsWith("/admin") && (
-                  <motion.div
-                    layoutId="active-indicator"
-                    className="absolute inset-0 bg-primary/10 rounded-xl -z-10 shadow-sm"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                  />
-                )}
+              {pathname?.startsWith("/admin") && (
+                <motion.div
+                  layoutId="active-indicator"
+                  className="absolute inset-0 bg-primary/10 rounded-xl -z-10 shadow-sm"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                />
+              )}
             </NextLink>
           </Tooltip>
         )}
       </div>
+
+      {/* Credits Display */}
+      {user && credits !== null && (
+        <Tooltip
+          content={tCredits("balance", { count: credits })}
+          placement="right"
+          closeDelay={0}
+        >
+          <NextLink
+            href="/credits"
+            className={clsx(
+              "flex items-center gap-1 px-2 py-1.5 mt-4 rounded-xl transition-all duration-300 relative z-0",
+              pathname === "/credits"
+                ? "text-primary"
+                : "text-default-500 hover:bg-default-100 hover:text-default-900"
+            )}
+          >
+            <Bean size={18} />
+            <span className="text-sm font-medium">{credits}</span>
+            {pathname === "/credits" && (
+              <motion.div
+                layoutId="active-indicator"
+                className="absolute inset-0 bg-primary/10 rounded-xl -z-10 shadow-sm"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+              />
+            )}
+          </NextLink>
+        </Tooltip>
+      )}
 
       {/* User Profile */}
       <div className="mt-auto pt-4 pb-2 px-2 w-full flex flex-col items-center gap-4">

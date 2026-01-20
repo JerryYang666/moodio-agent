@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAccessToken } from "@/lib/auth/cookies";
 import { verifyAccessToken } from "@/lib/auth/jwt";
 import { db } from "@/lib/db";
-import { users } from "@/lib/db/schema";
-import { desc } from "drizzle-orm";
+import { users, userCredits } from "@/lib/db/schema";
+import { desc, eq } from "drizzle-orm";
 
 export async function GET(request: NextRequest) {
   try {
@@ -26,11 +26,19 @@ export async function GET(request: NextRequest) {
         authProvider: users.authProvider,
         createdAt: users.createdAt,
         updatedAt: users.updatedAt,
+        credits: userCredits.balance,
       })
       .from(users)
+      .leftJoin(userCredits, eq(users.id, userCredits.userId))
       .orderBy(desc(users.createdAt));
 
-    return NextResponse.json({ users: allUsers });
+    // Map null credits to 0
+    const usersWithCredits = allUsers.map((user) => ({
+      ...user,
+      credits: user.credits ?? 0,
+    }));
+
+    return NextResponse.json({ users: usersWithCredits });
   } catch (error) {
     console.error("Error fetching users:", error);
     return NextResponse.json({ error: "Failed to fetch users" }, { status: 500 });

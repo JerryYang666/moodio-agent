@@ -224,6 +224,36 @@ export const videoGenerations = pgTable("video_generations", {
   completedAt: timestamp("completed_at"),
 });
 
+/**
+ * User Credits table
+ * Stores user credit balances
+ */
+export const userCredits = pgTable("user_credits", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .notNull()
+    .unique()
+    .references(() => users.id, { onDelete: "cascade" }),
+  balance: bigint("balance", { mode: "number" }).notNull().default(0),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+/**
+ * Credit Transactions table
+ * Stores credit transaction history
+ */
+export const creditTransactions = pgTable("credit_transactions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  amount: bigint("amount", { mode: "number" }).notNull(), // positive for credits, negative for debits
+  type: varchar("type", { length: 50 }).notNull(), // 'admin_grant', 'video_generation', etc.
+  description: text("description"),
+  performedBy: uuid("performed_by").references(() => users.id), // admin who performed the action
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // Export types for TypeScript
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
@@ -263,3 +293,9 @@ export type NewEvent = typeof events.$inferInsert;
 
 export type VideoGeneration = typeof videoGenerations.$inferSelect;
 export type NewVideoGeneration = typeof videoGenerations.$inferInsert;
+
+export type UserCredit = typeof userCredits.$inferSelect;
+export type NewUserCredit = typeof userCredits.$inferInsert;
+
+export type CreditTransaction = typeof creditTransactions.$inferSelect;
+export type NewCreditTransaction = typeof creditTransactions.$inferInsert;
