@@ -11,6 +11,7 @@ import { AuthProvider } from "@/components/auth-provider";
 import { ChatProvider } from "@/components/chat-provider";
 import { CollectionsProvider } from "@/components/collections-provider";
 import { VideoProvider } from "@/components/video-provider";
+import { CreditsProvider } from "@/hooks/use-credits";
 import { IOSInstallPrompt } from "@/components/ios-install-prompt";
 import { LocaleAutoDetect } from "@/components/locale-auto-detect";
 
@@ -34,16 +35,18 @@ export function Providers({ children, themeProps }: ProvidersProps) {
     <HeroUIProvider navigate={router.push}>
       <NextThemesProvider {...themeProps}>
         <AuthProvider>
-          <ChatProvider>
-            <CollectionsProvider>
-              <VideoProvider>
-                <ToastProvider />
-                <LocaleAutoDetect />
-                <IOSInstallPrompt />
-                {children}
-              </VideoProvider>
-            </CollectionsProvider>
-          </ChatProvider>
+          <CreditsProvider>
+            <ChatProvider>
+              <CollectionsProvider>
+                <VideoProvider>
+                  <ToastProvider />
+                  <LocaleAutoDetect />
+                  <IOSInstallPrompt />
+                  {children}
+                </VideoProvider>
+              </CollectionsProvider>
+            </ChatProvider>
+          </CreditsProvider>
         </AuthProvider>
       </NextThemesProvider>
     </HeroUIProvider>

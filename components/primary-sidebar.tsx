@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { usePathname } from "next/navigation";
 import NextLink from "next/link";
 import clsx from "clsx";
@@ -18,6 +18,7 @@ import {
 import { Avatar } from "@heroui/avatar";
 import { Tooltip } from "@heroui/tooltip";
 import { useAuth } from "@/hooks/use-auth";
+import { useCredits } from "@/hooks/use-credits";
 import { motion } from "framer-motion";
 import { Button } from "@heroui/button";
 import { ThemeSwitch } from "@/components/theme-switch";
@@ -27,23 +28,13 @@ import {
   PopoverTrigger,
   PopoverContent,
 } from "@heroui/popover";
-import { api } from "@/lib/api/client";
 
 export const PrimarySidebar = () => {
   const pathname = usePathname();
   const { user, logout } = useAuth();
+  const { balance: credits } = useCredits();
   const t = useTranslations("nav");
   const tCredits = useTranslations("credits");
-  const [credits, setCredits] = useState<number | null>(null);
-
-  useEffect(() => {
-    if (user) {
-      api
-        .get("/api/users/credits")
-        .then((data) => setCredits(data.balance))
-        .catch((error) => console.error("Failed to fetch credits:", error));
-    }
-  }, [user]);
 
   const navItems = [
     {

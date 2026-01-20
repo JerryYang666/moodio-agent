@@ -39,6 +39,7 @@ import { Popover, PopoverTrigger, PopoverContent } from "@heroui/popover";
 import { Button } from "@heroui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { useChat } from "@/hooks/use-chat";
+import { useCredits } from "@/hooks/use-credits";
 import { Chat } from "@/components/chat-provider";
 import { motion } from "framer-motion";
 import { Spinner } from "@heroui/spinner";
@@ -50,7 +51,6 @@ import {
   DropdownMenu,
   DropdownItem,
 } from "@heroui/dropdown";
-import { api } from "@/lib/api/client";
 
 interface ChatItemProps {
   chat: Chat;
@@ -326,6 +326,7 @@ export const Navbar = () => {
   const router = useRouter();
   const { user, logout } = useAuth();
   const { chats, refreshChats } = useChat();
+  const { balance: credits } = useCredits();
   const t = useTranslations();
   const tCredits = useTranslations("credits");
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -333,16 +334,6 @@ export const Navbar = () => {
     "browse" | "agent" | "projects" | "storyboard"
   >("agent");
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
-  const [credits, setCredits] = useState<number | null>(null);
-
-  useEffect(() => {
-    if (user) {
-      api
-        .get("/api/users/credits")
-        .then((data) => setCredits(data.balance))
-        .catch((error) => console.error("Failed to fetch credits:", error));
-    }
-  }, [user]);
 
   useEffect(() => {
     if (pathname?.startsWith("/browse")) setActiveSection("browse");
