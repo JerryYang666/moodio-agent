@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useTranslations } from "next-intl";
 import { Button } from "@heroui/button";
 import { Input, Textarea } from "@heroui/input";
@@ -133,7 +133,32 @@ export default function VideoGenerationPanel({
     setParams(initialParams);
   }, [selectedModelId, models]);
 
-  // Fetch cost preview when model or params change
+  const costEntries = useMemo(
+    () =>
+      Object.entries(params).filter(
+        ([key, value]) =>
+          !key.toLowerCase().includes("prompt") &&
+          value !== undefined &&
+          value !== null &&
+          value !== ""
+      ),
+    [params]
+  );
+
+  const costParams = useMemo(
+    () => Object.fromEntries(costEntries),
+    [costEntries]
+  );
+
+  const costParamsKey = useMemo(
+    () =>
+      JSON.stringify(
+        [...costEntries].sort(([a], [b]) => a.localeCompare(b))
+      ),
+    [costEntries]
+  );
+
+  // Fetch cost preview when model or non-prompt params change
   useEffect(() => {
     if (!selectedModelId) {
       setEstimatedCost(null);
@@ -146,11 +171,9 @@ export default function VideoGenerationPanel({
         const searchParams = new URLSearchParams();
         searchParams.set("modelId", selectedModelId);
         
-        // Add all params to the query string
-        Object.entries(params).forEach(([key, value]) => {
-          if (value !== undefined && value !== null && value !== "") {
-            searchParams.set(key, String(value));
-          }
+        // Add all params to the query string (excluding prompts)
+        Object.entries(costParams).forEach(([key, value]) => {
+          searchParams.set(key, String(value));
         });
 
         const res = await fetch(`/api/video/cost?${searchParams.toString()}`);
@@ -171,7 +194,7 @@ export default function VideoGenerationPanel({
     // Debounce the cost fetch
     const timeoutId = setTimeout(fetchCost, 300);
     return () => clearTimeout(timeoutId);
-  }, [selectedModelId, params]);
+  }, [selectedModelId, costParamsKey]);
 
   const selectedModel = models.find((m) => m.id === selectedModelId);
 
