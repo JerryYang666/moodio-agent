@@ -149,14 +149,14 @@ export const PrimarySidebar = () => {
           <NextLink
             href="/credits"
             className={clsx(
-              "flex items-center gap-1 px-2 py-1.5 mt-4 rounded-xl transition-all duration-300 relative z-0",
+              "flex flex-col items-center gap-1 px-2 py-1.5 mt-4 rounded-xl transition-all duration-300 relative z-0",
               pathname === "/credits"
                 ? "text-primary"
                 : "text-default-500 hover:bg-default-100 hover:text-default-900"
             )}
           >
             <Bean size={18} />
-            <span className="text-sm font-medium">{credits}</span>
+            <span className="text-xs font-medium">{credits}</span>
             {pathname === "/credits" && (
               <motion.div
                 layoutId="active-indicator"
