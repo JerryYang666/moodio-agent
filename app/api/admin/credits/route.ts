@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAccessToken } from "@/lib/auth/cookies";
 import { verifyAccessToken } from "@/lib/auth/jwt";
 import { db } from "@/lib/db";
-import { userCredits, creditTransactions } from "@/lib/db/schema";
-import { eq, sql } from "drizzle-orm";
+import { userCredits } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
+import { grantCredits, deductCredits } from "@/lib/credits";
 
 export async function POST(request: NextRequest) {
   try {
@@ -35,41 +36,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if user has a credits record, if not create one
-    const existingCredits = await db
-      .select()
-      .from(userCredits)
-      .where(eq(userCredits.userId, userId))
-      .limit(1);
-
-    if (existingCredits.length === 0) {
-      // Create credits record for user
-      await db.insert(userCredits).values({
+    // Use shared credit functions
+    if (amountNum > 0) {
+      await grantCredits(
         userId,
-        balance: 0,
-      });
+        amountNum,
+        "admin_grant",
+        description || null,
+        payload.userId
+      );
+    } else {
+      // Deducting (amountNum is negative)
+      await deductCredits(
+        userId,
+        Math.abs(amountNum),
+        "admin_grant",
+        description || null
+      );
     }
-
-    // Insert transaction and update balance atomically
-    await db.transaction(async (tx) => {
-      // Insert transaction record
-      await tx.insert(creditTransactions).values({
-        userId,
-        amount: amountNum,
-        type: "admin_grant",
-        description: description || null,
-        performedBy: payload.userId,
-      });
-
-      // Update balance
-      await tx
-        .update(userCredits)
-        .set({
-          balance: sql`${userCredits.balance} + ${amountNum}`,
-          updatedAt: new Date(),
-        })
-        .where(eq(userCredits.userId, userId));
-    });
 
     // Get updated balance
     const [updatedCredits] = await db
@@ -80,10 +64,19 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      balance: updatedCredits.balance,
+      balance: updatedCredits?.balance || 0,
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error adjusting credits:", error);
+    
+    // Handle insufficient credits error
+    if (error.name === "InsufficientCreditsError") {
+      return NextResponse.json(
+        { error: "Insufficient credits for deduction" },
+        { status: 400 }
+      );
+    }
+
     return NextResponse.json(
       { error: "Failed to adjust credits" },
       { status: 500 }

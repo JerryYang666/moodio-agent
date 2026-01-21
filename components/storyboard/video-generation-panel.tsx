@@ -6,11 +6,11 @@ import { Button } from "@heroui/button";
 import { Input, Textarea } from "@heroui/input";
 import { Select, SelectItem } from "@heroui/select";
 import { Switch } from "@heroui/switch";
-import { Card, CardBody, CardHeader } from "@heroui/card";
+import { Card, CardBody, CardHeader, CardFooter } from "@heroui/card";
 import { Spinner } from "@heroui/spinner";
 import { Image } from "@heroui/image";
 import { Divider } from "@heroui/divider";
-import { Video, ImageIcon, Sparkles, X, Plus } from "lucide-react";
+import { Video, ImageIcon, Sparkles, X, Plus, Bean } from "lucide-react";
 import AssetPickerModal, {
   AssetSummary,
 } from "@/components/chat/asset-picker-modal";
@@ -87,6 +87,10 @@ export default function VideoGenerationPanel({
   const [uploadPreviewUrl, setUploadPreviewUrl] = useState<string | null>(null);
   const isUploading = uploadingTarget !== null;
 
+  // Cost preview state
+  const [estimatedCost, setEstimatedCost] = useState<number | null>(null);
+  const [costLoading, setCostLoading] = useState(false);
+
   // Load models
   useEffect(() => {
     const loadModels = async () => {
@@ -128,6 +132,46 @@ export default function VideoGenerationPanel({
     }
     setParams(initialParams);
   }, [selectedModelId, models]);
+
+  // Fetch cost preview when model or params change
+  useEffect(() => {
+    if (!selectedModelId) {
+      setEstimatedCost(null);
+      return;
+    }
+
+    const fetchCost = async () => {
+      setCostLoading(true);
+      try {
+        const searchParams = new URLSearchParams();
+        searchParams.set("modelId", selectedModelId);
+        
+        // Add all params to the query string
+        Object.entries(params).forEach(([key, value]) => {
+          if (value !== undefined && value !== null && value !== "") {
+            searchParams.set(key, String(value));
+          }
+        });
+
+        const res = await fetch(`/api/video/cost?${searchParams.toString()}`);
+        if (res.ok) {
+          const data = await res.json();
+          setEstimatedCost(data.cost);
+        } else {
+          setEstimatedCost(null);
+        }
+      } catch (e) {
+        console.error("Failed to fetch cost:", e);
+        setEstimatedCost(null);
+      } finally {
+        setCostLoading(false);
+      }
+    };
+
+    // Debounce the cost fetch
+    const timeoutId = setTimeout(fetchCost, 300);
+    return () => clearTimeout(timeoutId);
+  }, [selectedModelId, params]);
 
   const selectedModel = models.find((m) => m.id === selectedModelId);
 
@@ -244,7 +288,7 @@ export default function VideoGenerationPanel({
 
   if (loading) {
     return (
-      <Card className="h-full">
+      <Card className="h-full shadow-none">
         <CardBody className="flex items-center justify-center">
           <Spinner />
         </CardBody>
@@ -254,7 +298,7 @@ export default function VideoGenerationPanel({
 
   return (
     <>
-      <Card className="h-full flex flex-col">
+      <Card className="h-full flex flex-col shadow-none">
         <CardHeader className="flex-col items-start gap-1 pb-2 shrink-0 px-3 sm:px-4">
           <div className="flex items-center gap-2">
             <Video size={20} className="text-primary" />
@@ -594,33 +638,47 @@ export default function VideoGenerationPanel({
         </CardBody>
 
         {/* Fixed Footer with Error and Button */}
-        <div className="p-3 sm:p-4 pt-2 border-t border-divider shrink-0 space-y-2 sm:space-y-3 safe-area-bottom">
-          {isUploading && (
-            <div className="flex items-center gap-2 text-xs sm:text-sm text-default-500">
-              <Spinner size="sm" />
-              <span>{tChat("waitForUpload")}</span>
-            </div>
-          )}
-          {/* Error Message */}
-          {error && (
-            <div className="text-xs sm:text-sm text-danger bg-danger-50 p-2 sm:p-3 rounded-lg">
-              {error}
-            </div>
-          )}
+        <CardFooter className="p-0 border-t border-divider shrink-0 safe-area-bottom">
+          <div className="w-full flex flex-col gap-2 sm:gap-3 p-3">
+            {isUploading && (
+              <div className="flex items-center gap-2 text-xs sm:text-sm text-default-500 w-full">
+                <Spinner size="sm" />
+                <span>{tChat("waitForUpload")}</span>
+              </div>
+            )}
+            {/* Error Message */}
+            {error && (
+              <div className="text-xs sm:text-sm text-danger bg-danger-50 p-2 sm:p-3 rounded-lg w-full">
+                {error}
+              </div>
+            )}
 
-          {/* Generate Button */}
-          <Button
-            color="primary"
-            size="lg"
-            className="w-full text-sm sm:text-base"
-            startContent={!submitting && <Sparkles size={18} />}
-            isLoading={submitting}
-            isDisabled={!sourceImageId || !params.prompt?.trim() || isUploading}
-            onPress={handleGenerate}
-          >
-            {submitting ? t("starting") : t("generateVideo")}
-          </Button>
-        </div>
+            {/* Generate Button */}
+            <Button
+              color="primary"
+              size="lg"
+              className="w-full text-sm sm:text-base"
+              startContent={!submitting && <Sparkles size={18} />}
+              isLoading={submitting}
+              isDisabled={!sourceImageId || !params.prompt?.trim() || isUploading}
+              onPress={handleGenerate}
+            >
+              {submitting ? (
+                t("starting")
+              ) : (
+                <span className="flex items-center justify-center gap-2">
+                  <span>{t("generateVideo")}</span>
+                  {selectedModelId && !costLoading && estimatedCost !== null ? (
+                    <span className="flex items-center gap-1 font-semibold">
+                      <Bean size={16} />
+                      <span>{estimatedCost.toLocaleString()}</span>
+                    </span>
+                  ) : null}
+                </span>
+              )}
+            </Button>
+          </div>
+        </CardFooter>
       </Card>
 
       {/* Asset Picker Modal */}

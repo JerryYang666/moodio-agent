@@ -248,10 +248,29 @@ export const creditTransactions = pgTable("credit_transactions", {
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
   amount: bigint("amount", { mode: "number" }).notNull(), // positive for credits, negative for debits
-  type: varchar("type", { length: 50 }).notNull(), // 'admin_grant', 'video_generation', etc.
+  type: varchar("type", { length: 50 }).notNull(), // 'admin_grant', 'video_generation', 'refund', etc.
   description: text("description"),
   performedBy: uuid("performed_by").references(() => users.id), // admin who performed the action
+  // Link to related entity (e.g., video generation)
+  relatedEntityType: varchar("related_entity_type", { length: 50 }), // 'video_generation', etc.
+  relatedEntityId: uuid("related_entity_id"), // ID of the related entity
   createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+/**
+ * Model Pricing table
+ * Stores admin-configurable pricing formulas for video models
+ * 
+ * Formulas use expr-eval syntax with model params as variables.
+ * Example: "100 * (resolution == '1080p' ? 1.5 : 1) + (generate_audio ? 50 : 0)"
+ */
+export const modelPricing = pgTable("model_pricing", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  modelId: varchar("model_id", { length: 255 }).notNull().unique(),
+  formula: text("formula").notNull(), // expr-eval expression
+  description: text("description"), // Admin notes about the formula
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 // Export types for TypeScript
@@ -299,3 +318,6 @@ export type NewUserCredit = typeof userCredits.$inferInsert;
 
 export type CreditTransaction = typeof creditTransactions.$inferSelect;
 export type NewCreditTransaction = typeof creditTransactions.$inferInsert;
+
+export type ModelPricing = typeof modelPricing.$inferSelect;
+export type NewModelPricing = typeof modelPricing.$inferInsert;

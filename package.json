@@ -71,6 +71,7 @@
     "diff": "^8.0.2",
     "dotenv": "^17.2.3",
     "drizzle-orm": "^0.44.7",
+    "expr-eval-fork": "^3.0.1",
     "framer-motion": "12.23.24",
     "intl-messageformat": "10.7.18",
     "jose": "^6.1.2",

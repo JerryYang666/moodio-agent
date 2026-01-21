@@ -3,11 +3,14 @@ import { getAccessToken } from "@/lib/auth/cookies";
 import { verifyAccessToken } from "@/lib/auth/jwt";
 import { db } from "@/lib/db";
 import { videoGenerations } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 import {
   getVideoModel,
   validateAndMergeParams,
   DEFAULT_VIDEO_MODEL_ID,
 } from "@/lib/video/models";
+import { deductCredits, refundCharge, InsufficientCreditsError } from "@/lib/credits";
+import { calculateCost } from "@/lib/pricing";
 import { submitVideoGeneration } from "@/lib/video/fal-client";
 import { getSignedImageUrl } from "@/lib/storage/s3";
 
@@ -81,32 +84,72 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create database record
-    const [generation] = await db
-      .insert(videoGenerations)
-      .values({
-        userId: payload.userId,
-        modelId,
-        status: "pending",
-        sourceImageId,
-        endImageId: endImageId || null,
-        params: mergedParams,
-      })
-      .returning();
+    // Calculate cost from pricing formula
+    const cost = await calculateCost(modelId, mergedParams);
+
+    // Create database record and deduct credits transactionally
+    let generation;
+    try {
+      generation = await db.transaction(async (tx) => {
+        // Create generation record first to get ID
+        const [gen] = await tx
+          .insert(videoGenerations)
+          .values({
+            userId: payload.userId,
+            modelId,
+            status: "pending",
+            sourceImageId,
+            endImageId: endImageId || null,
+            params: mergedParams,
+          })
+          .returning();
+
+        // Deduct credits with reference to generation
+        await deductCredits(
+          payload.userId,
+          cost,
+          "video_generation",
+          `Generated video with model ${model.name}`,
+          { type: "video_generation", id: gen.id },
+          tx
+        );
+
+        return gen;
+      });
+    } catch (error: any) {
+      if (
+        error.message === "INSUFFICIENT_CREDITS" ||
+        error instanceof InsufficientCreditsError
+      ) {
+        return NextResponse.json(
+          { error: "Insufficient credits", cost },
+          { status: 402 }
+        );
+      }
+      throw error;
+    }
 
     // Build webhook URL
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL;
     if (!baseUrl) {
-      // Update record to failed status
-      await db
-        .update(videoGenerations)
-        .set({
-          status: "failed",
-          error: "Server configuration error: Missing base URL",
-        })
-        .where(
-          require("drizzle-orm").eq(videoGenerations.id, generation.id)
+      // Refund credits and update record to failed status
+      await db.transaction(async (tx) => {
+        // Refund by looking up original charge
+        await refundCharge(
+          { type: "video_generation", id: generation.id },
+          `Config Error: ${model.name}`,
+          tx
         );
+
+        // Update record
+        await tx
+          .update(videoGenerations)
+          .set({
+            status: "failed",
+            error: "Server configuration error: Missing base URL",
+          })
+          .where(eq(videoGenerations.id, generation.id));
+      });
 
       return NextResponse.json(
         { error: "Server configuration error" },
@@ -131,9 +174,7 @@ export async function POST(request: NextRequest) {
           falRequestId: requestId,
           status: "processing",
         })
-        .where(
-          require("drizzle-orm").eq(videoGenerations.id, generation.id)
-        );
+        .where(eq(videoGenerations.id, generation.id));
 
       return NextResponse.json({
         success: true,
@@ -144,16 +185,24 @@ export async function POST(request: NextRequest) {
     } catch (falError: any) {
       console.error("[Video Generate] Fal submission error:", falError);
 
-      // Update record to failed status
-      await db
-        .update(videoGenerations)
-        .set({
-          status: "failed",
-          error: falError.message || "Failed to submit to Fal",
-        })
-        .where(
-          require("drizzle-orm").eq(videoGenerations.id, generation.id)
+      // Refund credits and update record to failed status
+      await db.transaction(async (tx) => {
+        // Refund by looking up original charge
+        await refundCharge(
+          { type: "video_generation", id: generation.id },
+          `Fal Error: ${model.name}`,
+          tx
         );
+
+        // Update record
+        await tx
+          .update(videoGenerations)
+          .set({
+            status: "failed",
+            error: falError.message || "Failed to submit to Fal",
+          })
+          .where(eq(videoGenerations.id, generation.id));
+      });
 
       return NextResponse.json(
         { error: "Failed to start video generation" },

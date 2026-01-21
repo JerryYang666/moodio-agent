@@ -219,7 +219,10 @@
     "done": "Done: {date}",
     "seed": "Seed: {seed}",
     "openInNewTab": "Open in New Tab",
-    "videoCount": "{count} videos"
+    "videoCount": "{count} videos",
+    "estimatedCost": "Estimated Cost",
+    "credits": "credits",
+    "costUnavailable": "Cost unavailable"
   },
   "menu": {
     "mode": "Mode",
@@ -321,6 +324,24 @@
       "subtitle": "Generation History",
       "description": "Review all video generation requests and results.",
       "goTo": "Go to Video History"
+    },
+    "pricing": {
+      "title": "Pricing",
+      "subtitle": "Model Pricing",
+      "description": "Configure pricing formulas for video generation models.",
+      "goTo": "Go to Pricing",
+      "formula": "Formula",
+      "formulaPlaceholder": "e.g., 100 * (resolution == \"1080p\" ? 1.5 : 1)",
+      "formulaHelp": "Use expr-eval syntax. Available operators: +, -, *, /, %, ^, ==, !=, <, >, <=, >=, and, or, not, ? :. Functions: min, max, abs, round, floor, ceil.",
+      "testParams": "Test Parameters",
+      "testResult": "Test Result",
+      "validate": "Validate",
+      "validFormula": "Valid formula",
+      "invalidFormula": "Invalid formula",
+      "noFormula": "No formula configured (using default: 100 credits)",
+      "saveSuccess": "Pricing formula saved",
+      "deleteSuccess": "Pricing formula deleted",
+      "availableParams": "Available Parameters"
     }
   },
   "dashboard": {
@@ -416,7 +437,8 @@
     "noTransactions": "No transactions yet",
     "transactionTypes": {
       "admin_grant": "Admin Grant",
-      "video_generation": "Video Generation"
+      "video_generation": "Video Generation",
+      "refund": "Refund"
     },
     "date": "Date",
     "type": "Type"

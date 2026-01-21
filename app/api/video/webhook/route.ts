@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { videoGenerations } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
+import { refundCharge } from "@/lib/credits";
 import {
   verifyFalWebhook,
   extractWebhookHeaders,
@@ -71,31 +72,23 @@ export async function POST(request: NextRequest) {
 
   // Handle error status
   if (status === "ERROR") {
-    await db
-      .update(videoGenerations)
-      .set({
-        status: "failed",
-        error: error || payload_error || "Unknown error from Fal",
-        completedAt: new Date(),
-      })
-      .where(eq(videoGenerations.id, generation.id));
+    const errorMsg = error || payload_error || "Unknown error from Fal";
+    
+    // Refund user by looking up original charge
+    await refundGeneration(generation.id, errorMsg);
 
-    console.error(`[Webhook] Generation ${generation.id} failed:`, error || payload_error);
+    console.error(`[Webhook] Generation ${generation.id} failed:`, errorMsg);
     return NextResponse.json({ received: true, status: "failed" });
   }
 
   // Handle payload error
   if (payload_error || !resultPayload) {
-    await db
-      .update(videoGenerations)
-      .set({
-        status: "failed",
-        error: payload_error || "No result payload received",
-        completedAt: new Date(),
-      })
-      .where(eq(videoGenerations.id, generation.id));
+    const errorMsg = payload_error || "No result payload received";
+    
+    // Refund user by looking up original charge
+    await refundGeneration(generation.id, errorMsg);
 
-    console.error(`[Webhook] Generation ${generation.id} payload error:`, payload_error);
+    console.error(`[Webhook] Generation ${generation.id} payload error:`, errorMsg);
     return NextResponse.json({ received: true, status: "failed" });
   }
 
@@ -157,13 +150,59 @@ async function processVideoResult(
   } catch (error) {
     console.error(`[Webhook] Error processing video for ${generationId}:`, error);
 
-    await db
-      .update(videoGenerations)
-      .set({
-        status: "failed",
-        error: error instanceof Error ? error.message : "Failed to process video",
-        completedAt: new Date(),
-      })
-      .where(eq(videoGenerations.id, generationId));
+    // Refund by looking up original charge
+    await refundGeneration(
+      generationId,
+      error instanceof Error ? error.message : "Failed to process video"
+    );
+  }
+}
+
+/**
+ * Refund credits to user on failure by looking up the original charge
+ */
+async function refundGeneration(generationId: string, reason: string) {
+  try {
+    const refundedAmount = await db.transaction(async (tx) => {
+      // Refund by looking up the original charge
+      const amount = await refundCharge(
+        { type: "video_generation", id: generationId },
+        `Refund: ${reason}`,
+        tx
+      );
+
+      // Update generation status
+      await tx
+        .update(videoGenerations)
+        .set({
+          status: "failed",
+          error: reason,
+          completedAt: new Date(),
+        })
+        .where(eq(videoGenerations.id, generationId));
+
+      return amount;
+    });
+
+    if (refundedAmount) {
+      console.log(`[Refund] Refunded ${refundedAmount} credits for generation ${generationId}`);
+    } else {
+      console.warn(`[Refund] No charge found to refund for generation ${generationId}`);
+    }
+  } catch (error) {
+    console.error(`[Refund] Failed to refund generation ${generationId}:`, error);
+    // Ensure generation is marked as failed even if refund fails
+    try {
+      await db
+        .update(videoGenerations)
+        .set({
+          status: "failed",
+          error: `Refund failed: ${reason}`,
+          completedAt: new Date(),
+        })
+        .where(eq(videoGenerations.id, generationId));
+    } catch (e) {
+      console.error("Failed to update generation status after failed refund", e);
+    }
   }
 }

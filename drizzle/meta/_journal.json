@@ -85,6 +85,20 @@
       "when": 1768928011315,
       "tag": "0011_mixed_doomsday",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1768972006221,
+      "tag": "0012_add_related_entity_to_credit_transactions",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1768972765568,
+      "tag": "0013_add_model_pricing",
+      "breakpoints": true
     }
   ]
 }

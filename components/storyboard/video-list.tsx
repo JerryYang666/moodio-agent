@@ -139,7 +139,7 @@ export default function VideoList({ refreshTrigger }: VideoListProps) {
 
   if (loading) {
     return (
-      <Card className="h-full">
+      <Card className="h-full shadow-none">
         <CardBody className="flex items-center justify-center">
           <Spinner />
         </CardBody>
@@ -149,7 +149,7 @@ export default function VideoList({ refreshTrigger }: VideoListProps) {
 
   return (
     <>
-      <Card className="h-full overflow-hidden flex flex-col">
+      <Card className="h-full overflow-hidden flex flex-col shadow-none">
         <CardHeader className="flex items-center justify-between shrink-0 px-3 sm:px-4">
           <div className="flex items-center gap-2">
             <Video size={18} className="text-primary sm:w-5 sm:h-5" />

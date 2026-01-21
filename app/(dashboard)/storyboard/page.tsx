@@ -55,19 +55,21 @@ function StoryboardContent() {
   }
 
   return (
-    <div className="flex flex-col lg:flex-row gap-4 min-h-full lg:h-full p-3 sm:p-4 lg:overflow-hidden">
-      {/* Left Panel - Video Generation */}
-      <div className="w-full lg:w-[400px] shrink-0 lg:h-full lg:overflow-auto">
-        <VideoGenerationPanel
-          initialImageId={initialImageId}
-          initialImageUrl={initialImageUrl}
-          onGenerationStarted={handleGenerationStarted}
-        />
-      </div>
+    <div className="relative h-[calc(100vh-env(safe-area-inset-bottom))] md:h-screen">
+      <div className="absolute inset-0 flex flex-col lg:flex-row gap-4 p-3 sm:p-4">
+        {/* Left Panel - Video Generation */}
+        <div className="w-full lg:w-[400px] shrink-0 min-h-0 lg:h-full flex flex-col overflow-hidden">
+          <VideoGenerationPanel
+            initialImageId={initialImageId}
+            initialImageUrl={initialImageUrl}
+            onGenerationStarted={handleGenerationStarted}
+          />
+        </div>
 
-      {/* Right Panel - Video List */}
-      <div className="flex-1 min-w-0 min-h-[400px] lg:min-h-0 lg:overflow-hidden">
-        <VideoList refreshTrigger={refreshTrigger} />
+        {/* Right Panel - Video List */}
+        <div className="flex-1 min-w-0 min-h-[300px] lg:min-h-0 lg:h-full flex flex-col overflow-hidden">
+          <VideoList refreshTrigger={refreshTrigger} />
+        </div>
       </div>
     </div>
   );
