@@ -354,7 +354,7 @@
       "exampleComplex": "Combined formula",
       "exampleComplexDesc": "Resolution-based rate × duration, plus audio add-on",
       "exampleAspectRatio": "Aspect ratio multiplier",
-      "exampleAspectRatioDesc": "21:9 (extracts as 21) costs 1.5× more",
+      "exampleAspectRatioDesc": "21:9 extracts as 21 (numbers before the first non-digit character). Ultra-wide costs 1.5× more",
       "exampleMinMax": "Minimum charge",
       "exampleMinMaxDesc": "At least 50 credits, or duration × 15 if higher"
     }

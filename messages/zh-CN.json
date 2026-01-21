@@ -354,7 +354,7 @@
       "exampleComplex": "组合公式",
       "exampleComplexDesc": "基于分辨率的费率 × 时长，加上音频附加费",
       "exampleAspectRatio": "宽高比乘数",
-      "exampleAspectRatioDesc": "21:9（提取为 21）费用增加 1.5 倍",
+      "exampleAspectRatioDesc": "21:9 提取为 21（取第一个非数字字符之前的数字）。超宽屏费用增加 1.5 倍",
       "exampleMinMax": "最低收费",
       "exampleMinMaxDesc": "至少 50 积分，或时长 × 15（取较高者）"
     }
