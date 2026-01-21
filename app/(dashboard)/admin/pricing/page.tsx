@@ -32,7 +32,7 @@ import { api } from "@/lib/api/client";
 import { useAuth } from "@/hooks/use-auth";
 import { Spinner } from "@heroui/spinner";
 import { addToast } from "@heroui/toast";
-import { Calculator, Check, X, Trash2, Edit, Info, Copy } from "lucide-react";
+import { Calculator, Check, X, Trash2, Edit, Info, Copy, BookOpen } from "lucide-react";
 
 interface ModelParam {
   name: string;
@@ -71,6 +71,13 @@ export default function PricingPage() {
     onOpen: onEditOpen,
     onOpenChange: onEditOpenChange,
     onClose: onEditClose,
+  } = useDisclosure();
+  
+  // Examples Modal State
+  const {
+    isOpen: isExamplesOpen,
+    onOpen: onExamplesOpen,
+    onOpenChange: onExamplesOpenChange,
   } = useDisclosure();
   const [selectedModel, setSelectedModel] = useState<ModelInfo | null>(null);
   const [formula, setFormula] = useState("");
@@ -232,7 +239,17 @@ export default function PricingPage() {
 
       <Card>
         <CardHeader className="flex-col items-start gap-2">
-          <h2 className="text-lg font-semibold">{t("subtitle")}</h2>
+          <div className="flex items-center justify-between w-full">
+            <h2 className="text-lg font-semibold">{t("subtitle")}</h2>
+            <Button
+              size="sm"
+              variant="flat"
+              startContent={<BookOpen size={14} />}
+              onPress={onExamplesOpen}
+            >
+              {t("examples")}
+            </Button>
+          </div>
           <div className="flex items-start gap-2 p-3 bg-default-100 rounded-lg w-full">
             <Info size={16} className="text-default-500 mt-0.5 shrink-0" />
             <p className="text-sm text-default-500">
@@ -438,7 +455,7 @@ export default function PricingPage() {
                                   const selected = Array.from(keys)[0] as string;
                                   setTestParams({ ...testParams, [param.name]: selected || "" });
                                 }}
-                                description={param.type}
+                                description="numbers extracted, letters ignored"
                               >
                                 {param.options.map((option) => (
                                   <SelectItem key={String(option)}>
@@ -448,7 +465,10 @@ export default function PricingPage() {
                               </Select>
                             ) : param.type === "boolean" ? (
                               <div className="flex items-center justify-between py-2">
-                                <span className="text-sm">{param.name}</span>
+                                <div>
+                                  <span className="text-sm">{param.name}</span>
+                                  <p className="text-xs text-default-400">on = 1, off = 0</p>
+                                </div>
                                 <Switch
                                   size="sm"
                                   isSelected={testParams[param.name] === "true"}
@@ -505,6 +525,84 @@ export default function PricingPage() {
                   isDisabled={!formula.trim() || (validationResult !== null && !validationResult.valid)}
                 >
                   {tCommon("save")}
+                </Button>
+              </ModalFooter>
+            </>
+          )}
+        </ModalContent>
+      </Modal>
+
+      {/* Examples Modal */}
+      <Modal
+        isOpen={isExamplesOpen}
+        onOpenChange={onExamplesOpenChange}
+        size="2xl"
+        scrollBehavior="inside"
+      >
+        <ModalContent>
+          {(onClose) => (
+            <>
+              <ModalHeader>{t("examples")}</ModalHeader>
+              <ModalBody>
+                <div className="space-y-4">
+                  {/* Example 1 */}
+                  <div className="p-3 bg-default-50 rounded-lg space-y-1">
+                    <p className="text-sm font-medium">{t("exampleDuration")}</p>
+                    <code className="block text-xs bg-default-100 px-2 py-1.5 rounded font-mono">
+                      duration * 20
+                    </code>
+                    <p className="text-xs text-default-500">{t("exampleDurationDesc")}</p>
+                  </div>
+
+                  {/* Example 2 */}
+                  <div className="p-3 bg-default-50 rounded-lg space-y-1">
+                    <p className="text-sm font-medium">{t("exampleResolution")}</p>
+                    <code className="block text-xs bg-default-100 px-2 py-1.5 rounded font-mono">
+                      {"duration * (resolution == 4 ? 30 : resolution >= 1080 ? 20 : 10)"}
+                    </code>
+                    <p className="text-xs text-default-500">{t("exampleResolutionDesc")}</p>
+                  </div>
+
+                  {/* Example 3 */}
+                  <div className="p-3 bg-default-50 rounded-lg space-y-1">
+                    <p className="text-sm font-medium">{t("exampleBoolean")}</p>
+                    <code className="block text-xs bg-default-100 px-2 py-1.5 rounded font-mono">
+                      100 + generate_audio * 50
+                    </code>
+                    <p className="text-xs text-default-500">{t("exampleBooleanDesc")}</p>
+                  </div>
+
+                  {/* Example 4 */}
+                  <div className="p-3 bg-default-50 rounded-lg space-y-1">
+                    <p className="text-sm font-medium">{t("exampleComplex")}</p>
+                    <code className="block text-xs bg-default-100 px-2 py-1.5 rounded font-mono whitespace-pre-wrap">
+                      {"duration * (resolution == 4 ? 30 : resolution >= 1080 ? 20 : 10) + generate_audio * 50"}
+                    </code>
+                    <p className="text-xs text-default-500">{t("exampleComplexDesc")}</p>
+                  </div>
+
+                  {/* Example 5 */}
+                  <div className="p-3 bg-default-50 rounded-lg space-y-1">
+                    <p className="text-sm font-medium">{t("exampleAspectRatio")}</p>
+                    <code className="block text-xs bg-default-100 px-2 py-1.5 rounded font-mono">
+                      100 * (aspect_ratio == 21 ? 1.5 : 1)
+                    </code>
+                    <p className="text-xs text-default-500">{t("exampleAspectRatioDesc")}</p>
+                  </div>
+
+                  {/* Example 6 */}
+                  <div className="p-3 bg-default-50 rounded-lg space-y-1">
+                    <p className="text-sm font-medium">{t("exampleMinMax")}</p>
+                    <code className="block text-xs bg-default-100 px-2 py-1.5 rounded font-mono">
+                      max(50, duration * 15)
+                    </code>
+                    <p className="text-xs text-default-500">{t("exampleMinMaxDesc")}</p>
+                  </div>
+                </div>
+              </ModalBody>
+              <ModalFooter>
+                <Button variant="light" onPress={onClose}>
+                  {tCommon("close")}
                 </Button>
               </ModalFooter>
             </>

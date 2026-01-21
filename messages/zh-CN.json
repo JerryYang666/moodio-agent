@@ -331,7 +331,7 @@
       "description": "配置视频生成模型的定价公式。",
       "goTo": "前往定价",
       "formula": "公式",
-      "formulaPlaceholder": "例如：100 * (resolution == \"1080p\" ? 1.5 : 1)",
+      "formulaPlaceholder": "例如：duration * (resolution == 4 ? 30 : resolution >= 1080 ? 20 : 10)",
       "formulaHelp": "使用 expr-eval 语法。可用运算符：+、-、*、/、%、^、==、!=、<、>、<=、>=、and、or、not、? :。函数：min、max、abs、round、floor、ceil。",
       "testParams": "测试参数",
       "testResult": "测试结果",
@@ -343,7 +343,20 @@
       "deleteSuccess": "定价公式已删除",
       "availableParams": "可用参数",
       "clickToCopy": "点击复制参数名：",
-      "copied": "已复制！"
+      "copied": "已复制！",
+      "examples": "示例",
+      "exampleDuration": "简单时长计费",
+      "exampleDurationDesc": "每秒视频 20 积分",
+      "exampleResolution": "分辨率分级",
+      "exampleResolutionDesc": "4K（提取为 4）= 30 倍，1080p+ = 20 倍，720p 及以下 = 10 倍/秒",
+      "exampleBoolean": "布尔值附加费",
+      "exampleBooleanDesc": "基础 100 积分，启用音频 +50（开=1，关=0）",
+      "exampleComplex": "组合公式",
+      "exampleComplexDesc": "基于分辨率的费率 × 时长，加上音频附加费",
+      "exampleAspectRatio": "宽高比乘数",
+      "exampleAspectRatioDesc": "21:9（提取为 21）费用增加 1.5 倍",
+      "exampleMinMax": "最低收费",
+      "exampleMinMaxDesc": "至少 50 积分，或时长 × 15（取较高者）"
     }
   },
   "dashboard": {

@@ -331,7 +331,7 @@
       "description": "Configure pricing formulas for video generation models.",
       "goTo": "Go to Pricing",
       "formula": "Formula",
-      "formulaPlaceholder": "e.g., 100 * (resolution == \"1080p\" ? 1.5 : 1)",
+      "formulaPlaceholder": "e.g., duration * (resolution == 4 ? 30 : resolution >= 1080 ? 20 : 10)",
       "formulaHelp": "Use expr-eval syntax. Available operators: +, -, *, /, %, ^, ==, !=, <, >, <=, >=, and, or, not, ? :. Functions: min, max, abs, round, floor, ceil.",
       "testParams": "Test Parameters",
       "testResult": "Test Result",
@@ -343,7 +343,20 @@
       "deleteSuccess": "Pricing formula deleted",
       "availableParams": "Available Parameters",
       "clickToCopy": "Click to copy parameter name:",
-      "copied": "Copied!"
+      "copied": "Copied!",
+      "examples": "Examples",
+      "exampleDuration": "Simple duration-based",
+      "exampleDurationDesc": "20 credits per second of video",
+      "exampleResolution": "Resolution tiers",
+      "exampleResolutionDesc": "4K (extracts as 4) = 30×, 1080p+ = 20×, 720p or lower = 10× per second",
+      "exampleBoolean": "Boolean add-on",
+      "exampleBooleanDesc": "Base 100 credits, +50 if audio is enabled (on=1, off=0)",
+      "exampleComplex": "Combined formula",
+      "exampleComplexDesc": "Resolution-based rate × duration, plus audio add-on",
+      "exampleAspectRatio": "Aspect ratio multiplier",
+      "exampleAspectRatioDesc": "21:9 (extracts as 21) costs 1.5× more",
+      "exampleMinMax": "Minimum charge",
+      "exampleMinMaxDesc": "At least 50 credits, or duration × 15 if higher"
     }
   },
   "dashboard": {
