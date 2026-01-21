@@ -338,7 +338,7 @@
       "validate": "Validate",
       "validFormula": "Valid formula",
       "invalidFormula": "Invalid formula",
-      "noFormula": "No formula configured (using default: 100 credits)",
+      "noFormula": "No formula configured (default: 0 credits)",
       "saveSuccess": "Pricing formula saved",
       "deleteSuccess": "Pricing formula deleted",
       "availableParams": "Available Parameters",

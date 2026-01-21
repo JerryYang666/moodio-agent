@@ -338,7 +338,7 @@
       "validate": "验证",
       "validFormula": "公式有效",
       "invalidFormula": "公式无效",
-      "noFormula": "未配置公式（使用默认值：100 积分）",
+      "noFormula": "未配置公式（默认：0 积分）",
       "saveSuccess": "定价公式已保存",
       "deleteSuccess": "定价公式已删除",
       "availableParams": "可用参数",

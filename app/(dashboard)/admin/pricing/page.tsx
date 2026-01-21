@@ -300,7 +300,7 @@ export default function PricingPage() {
                         </Chip>
                       ) : (
                         <Chip size="sm" color="warning" variant="flat">
-                          Default (100)
+                          Default
                         </Chip>
                       )}
                     </TableCell>
