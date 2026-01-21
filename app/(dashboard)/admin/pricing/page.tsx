@@ -26,6 +26,8 @@ import {
   Accordion,
   AccordionItem,
 } from "@heroui/accordion";
+import { Select, SelectItem } from "@heroui/select";
+import { Switch } from "@heroui/switch";
 import { api } from "@/lib/api/client";
 import { useAuth } from "@/hooks/use-auth";
 import { Spinner } from "@heroui/spinner";
@@ -427,26 +429,46 @@ export default function PricingPage() {
                       <div className="grid grid-cols-2 gap-3">
                         {selectedModel?.params.map((param) => (
                           <div key={param.name}>
-                            <Input
-                              size="sm"
-                              label={param.name}
-                              placeholder={
-                                param.options
-                                  ? param.options.join(" | ")
-                                  : param.type
-                              }
-                              value={testParams[param.name] || ""}
-                              onValueChange={(v) =>
-                                setTestParams({ ...testParams, [param.name]: v })
-                              }
-                              description={
-                                param.type === "boolean"
-                                  ? "true / false"
-                                  : param.type === "enum"
-                                    ? `Options: ${param.options?.join(", ")}`
-                                    : param.type
-                              }
-                            />
+                            {param.options && param.options.length > 0 ? (
+                              <Select
+                                size="sm"
+                                label={param.name}
+                                selectedKeys={testParams[param.name] ? [testParams[param.name]] : []}
+                                onSelectionChange={(keys) => {
+                                  const selected = Array.from(keys)[0] as string;
+                                  setTestParams({ ...testParams, [param.name]: selected || "" });
+                                }}
+                                description={param.type}
+                              >
+                                {param.options.map((option) => (
+                                  <SelectItem key={String(option)}>
+                                    {String(option)}
+                                  </SelectItem>
+                                ))}
+                              </Select>
+                            ) : param.type === "boolean" ? (
+                              <div className="flex items-center justify-between py-2">
+                                <span className="text-sm">{param.name}</span>
+                                <Switch
+                                  size="sm"
+                                  isSelected={testParams[param.name] === "true"}
+                                  onValueChange={(v) =>
+                                    setTestParams({ ...testParams, [param.name]: v ? "true" : "false" })
+                                  }
+                                />
+                              </div>
+                            ) : (
+                              <Input
+                                size="sm"
+                                label={param.name}
+                                placeholder={param.type}
+                                value={testParams[param.name] || ""}
+                                onValueChange={(v) =>
+                                  setTestParams({ ...testParams, [param.name]: v })
+                                }
+                                description={param.type}
+                              />
+                            )}
                           </div>
                         ))}
                       </div>
