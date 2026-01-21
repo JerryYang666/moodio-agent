@@ -341,7 +341,9 @@
       "noFormula": "No formula configured (using default: 100 credits)",
       "saveSuccess": "Pricing formula saved",
       "deleteSuccess": "Pricing formula deleted",
-      "availableParams": "Available Parameters"
+      "availableParams": "Available Parameters",
+      "clickToCopy": "Click to copy parameter name:",
+      "copied": "Copied!"
     }
   },
   "dashboard": {

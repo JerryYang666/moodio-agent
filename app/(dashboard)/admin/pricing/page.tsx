@@ -30,7 +30,7 @@ import { api } from "@/lib/api/client";
 import { useAuth } from "@/hooks/use-auth";
 import { Spinner } from "@heroui/spinner";
 import { addToast } from "@heroui/toast";
-import { Calculator, Check, X, Trash2, Edit, Info } from "lucide-react";
+import { Calculator, Check, X, Trash2, Edit, Info, Copy } from "lucide-react";
 
 interface ModelParam {
   name: string;
@@ -354,6 +354,35 @@ export default function PricingPage() {
                     }}
                   />
 
+                  {/* Available Parameters - Click to Copy */}
+                  {selectedModel && selectedModel.params.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="text-xs text-default-500">
+                        {t("clickToCopy")}
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {selectedModel.params.map((param) => (
+                          <button
+                            key={param.name}
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard.writeText(param.name);
+                              addToast({
+                                title: t("copied"),
+                                description: param.name,
+                                color: "success",
+                              });
+                            }}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-default-100 hover:bg-default-200 rounded-md text-xs font-mono transition-colors cursor-pointer group"
+                          >
+                            <span>{param.name}</span>
+                            <Copy size={12} className="text-default-400 group-hover:text-default-600" />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Validation Result */}
                   {validationResult && (
                     <div
@@ -385,13 +414,13 @@ export default function PricingPage() {
                   )}
 
                   {/* Test Parameters */}
-                  <Accordion>
+                  <Accordion defaultExpandedKeys={["params"]}>
                     <AccordionItem
                       key="params"
                       aria-label="Test Parameters"
                       title={
                         <span className="text-sm font-medium">
-                          {t("testParams")} & {t("availableParams")}
+                          {t("testParams")}
                         </span>
                       }
                     >

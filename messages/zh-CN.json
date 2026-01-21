@@ -341,7 +341,9 @@
       "noFormula": "未配置公式（使用默认值：100 积分）",
       "saveSuccess": "定价公式已保存",
       "deleteSuccess": "定价公式已删除",
-      "availableParams": "可用参数"
+      "availableParams": "可用参数",
+      "clickToCopy": "点击复制参数名：",
+      "copied": "已复制！"
     }
   },
   "dashboard": {
