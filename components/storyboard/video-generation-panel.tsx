@@ -54,6 +54,7 @@ export default function VideoGenerationPanel({
   const t = useTranslations("video");
   const tCommon = useTranslations("common");
   const tChat = useTranslations("chat");
+  const tCredits = useTranslations("credits");
   const { monitorGeneration } = useVideo();
   const [models, setModels] = useState<VideoModelConfig[]>([]);
   const [defaultModelId, setDefaultModelId] = useState<string>("");
@@ -286,7 +287,11 @@ export default function VideoGenerationPanel({
 
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.error || t("failedToStartGeneration"));
+        const errorMessage =
+          data.error === "INSUFFICIENT_CREDITS"
+            ? tCredits("insufficientCredits")
+            : data.error || t("failedToStartGeneration");
+        throw new Error(errorMessage);
       }
 
       const data = await res.json();

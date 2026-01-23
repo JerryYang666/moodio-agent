@@ -122,7 +122,7 @@ export async function POST(request: NextRequest) {
         error instanceof InsufficientCreditsError
       ) {
         return NextResponse.json(
-          { error: "Insufficient credits", cost },
+          { error: "INSUFFICIENT_CREDITS", cost },
           { status: 402 }
         );
       }

@@ -456,6 +456,7 @@
       "refund": "退款"
     },
     "date": "日期",
-    "type": "类型"
+    "type": "类型",
+    "insufficientCredits": "积分不足"
   }
 }

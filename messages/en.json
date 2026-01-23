@@ -456,6 +456,7 @@
       "refund": "Refund"
     },
     "date": "Date",
-    "type": "Type"
+    "type": "Type",
+    "insufficientCredits": "Insufficient credits"
   }
 }
