@@ -578,6 +578,102 @@ const veo31: VideoModelConfig = {
 };
 
 /**
+ * Veo 3.1 - First-Last-Frame to Video
+ * Google's state-of-the-art video generation from first and last frames
+ */
+const veo31FirstLastFrame: VideoModelConfig = {
+  id: "fal-ai/veo3.1/first-last-frame-to-video",
+  name: "Veo 3.1 First-Last-Frame",
+  description:
+    "Google DeepMind's video generation from first and last frames with optional audio",
+  imageParams: {
+    sourceImage: "first_frame_url",
+    endImage: "last_frame_url",
+  },
+  params: [
+    {
+      name: "prompt",
+      label: "Prompt",
+      type: "string",
+      required: true,
+      description: "The text prompt describing the video you want to generate",
+    },
+    {
+      name: "first_frame_url",
+      label: "First Frame",
+      type: "string",
+      required: true,
+      description: "URL of the first frame of the video",
+    },
+    {
+      name: "last_frame_url",
+      label: "Last Frame",
+      type: "string",
+      required: true,
+      description: "URL of the last frame of the video",
+    },
+    {
+      name: "aspect_ratio",
+      label: "Aspect Ratio",
+      type: "enum",
+      required: false,
+      default: "auto",
+      options: ["auto", "16:9", "9:16"],
+      description: "Aspect ratio of the generated video",
+    },
+    {
+      name: "duration",
+      label: "Duration",
+      type: "enum",
+      required: false,
+      default: "8s",
+      options: ["4s", "6s", "8s"],
+      description: "Length of the generated video",
+    },
+    {
+      name: "resolution",
+      label: "Resolution",
+      type: "enum",
+      required: false,
+      default: "720p",
+      options: ["720p", "1080p", "4k"],
+      description: "Output video resolution",
+    },
+    {
+      name: "negative_prompt",
+      label: "Negative Prompt",
+      type: "string",
+      required: false,
+      description: "A negative prompt to guide the video generation",
+    },
+    {
+      name: "generate_audio",
+      label: "Generate Audio",
+      type: "boolean",
+      required: false,
+      default: true,
+      description: "Whether to generate audio for the video",
+    },
+    {
+      name: "seed",
+      label: "Seed",
+      type: "number",
+      required: false,
+      description: "Random seed for reproducible results",
+    },
+    {
+      name: "auto_fix",
+      label: "Auto Fix",
+      type: "boolean",
+      required: false,
+      default: false,
+      description:
+        "Whether to auto-rewrite prompts that fail content policy or validation checks",
+    },
+  ],
+};
+
+/**
  * Sora 2 Pro - Image to Video
  * OpenAI's state-of-the-art image-to-video model with audio
  */
@@ -656,6 +752,7 @@ export const VIDEO_MODELS: VideoModelConfig[] = [
   klingV26Pro,
   klingO1Pro,
   veo31,
+  veo31FirstLastFrame,
   sora2Pro,
 ];
 
