@@ -325,6 +325,12 @@
       "description": "Review all video generation requests and results.",
       "goTo": "Go to Video History"
     },
+    "creditTransactions": {
+      "title": "Credit Transactions",
+      "subtitle": "Transaction History",
+      "description": "View and manage all credit transactions across users.",
+      "goTo": "Go to Transactions"
+    },
     "pricing": {
       "title": "Pricing",
       "subtitle": "Model Pricing",

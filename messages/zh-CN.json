@@ -325,6 +325,12 @@
       "description": "查看所有视频生成请求及结果。",
       "goTo": "前往视频历史"
     },
+    "creditTransactions": {
+      "title": "积分交易",
+      "subtitle": "交易记录",
+      "description": "查看和管理所有用户的积分交易记录。",
+      "goTo": "前往交易记录"
+    },
     "pricing": {
       "title": "定价",
       "subtitle": "模型定价",
