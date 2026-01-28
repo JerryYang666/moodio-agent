@@ -116,7 +116,12 @@
     "image": "图片",
     "sourceUpload": "上传",
     "sourceAsset": "素材库",
-    "sourceAiGenerated": "AI 生成"
+    "sourceAiGenerated": "AI 生成",
+    "markForChange": "标记要更改的区域",
+    "clearDrawing": "清除",
+    "saveMarkedImage": "完成",
+    "drawingInstructions": "圈出您想要更改的区域",
+    "markedImage": "标记：{title}"
   },
   "profile": {
     "title": "个人设置",

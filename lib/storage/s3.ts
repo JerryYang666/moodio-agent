@@ -27,6 +27,8 @@ const CLOUDFRONT_PRIVATE_KEY = process.env.CLOUDFRONT_PRIVATE_KEY?.replace(
   "\n"
 );
 
+const IS_DEV = process.env.NODE_ENV === "development";
+
 export interface ChatHistory {
   messages: Message[];
 }
@@ -269,8 +271,11 @@ export async function downloadImage(imageId: string): Promise<Buffer | null> {
  * - Use signed URLs when an image can appear without a near-term API call
  *   (e.g., SSE image generation updates or upload completion).
  *
+ * Note: In development, signed URLs are always returned since CloudFront
+ * cookies cannot be set locally.
+ *
  * @param imageId The image ID (stored in S3 as images/{imageId})
- * @returns CloudFront URL
+ * @returns CloudFront URL (signed in dev, cookie-based in production)
  */
 export function getImageUrl(imageId: string): string {
   if (!CLOUDFRONT_DOMAIN) {
@@ -279,6 +284,11 @@ export function getImageUrl(imageId: string): string {
     );
     // Fallback to direct S3 URL if CloudFront is not configured
     return `https://${CLOUDFRONT_DOMAIN || "s3-fallback"}/images/${imageId}`;
+  }
+
+  // In development, always use signed URLs since cookies can't be set locally
+  if (IS_DEV) {
+    return getSignedImageUrl(imageId);
   }
 
   return `https://${CLOUDFRONT_DOMAIN}/images/${imageId}`;
@@ -393,8 +403,11 @@ export async function downloadVideo(videoId: string): Promise<Buffer | null> {
  * Generate a CloudFront URL for a video (access via signed cookies)
  * See getImageUrl() for the rule of thumb and caching benefit.
  *
+ * Note: In development, signed URLs are always returned since CloudFront
+ * cookies cannot be set locally.
+ *
  * @param videoId The video ID (stored in S3 as videos/{videoId})
- * @returns CloudFront URL
+ * @returns CloudFront URL (signed in dev, cookie-based in production)
  */
 export function getVideoUrl(videoId: string): string {
   if (!CLOUDFRONT_DOMAIN) {
@@ -402,6 +415,11 @@ export function getVideoUrl(videoId: string): string {
       "[CloudFront] Missing CloudFront configuration, falling back to unsigned URL"
     );
     return `https://${CLOUDFRONT_DOMAIN || "s3-fallback"}/videos/${videoId}`;
+  }
+
+  // In development, always use signed URLs since cookies can't be set locally
+  if (IS_DEV) {
+    return getSignedVideoUrl(videoId);
   }
 
   return `https://${CLOUDFRONT_DOMAIN}/videos/${videoId}`;

@@ -116,7 +116,12 @@
     "image": "Image",
     "sourceUpload": "Upload",
     "sourceAsset": "Library",
-    "sourceAiGenerated": "AI Generated"
+    "sourceAiGenerated": "AI Generated",
+    "markForChange": "Mark area to change",
+    "clearDrawing": "Clear",
+    "saveMarkedImage": "Done",
+    "drawingInstructions": "Circle the area you want to change",
+    "markedImage": "Marked: {title}"
   },
   "profile": {
     "title": "Profile Settings",

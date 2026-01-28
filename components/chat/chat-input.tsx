@@ -5,7 +5,6 @@ import { useTranslations } from "next-intl";
 import { Button } from "@heroui/button";
 import { Textarea } from "@heroui/input";
 import { Popover, PopoverTrigger, PopoverContent } from "@heroui/popover";
-import { Switch } from "@heroui/switch";
 import { Tooltip } from "@heroui/tooltip";
 import { Spinner } from "@heroui/spinner";
 import { siteConfig } from "@/config/site";
@@ -15,10 +14,10 @@ import {
   ImagePlus,
   Mic,
   Square,
-  Info,
   Upload,
   Library,
   Sparkles,
+  Pencil,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import MenuConfiguration, { MenuState } from "./menu-configuration";
@@ -46,8 +45,11 @@ interface ChatInputProps {
     title?: string;
   }) => void;
   showFileUpload: boolean;
+  /** Precision editing state - kept for logic but not rendered as UI */
   precisionEditing: boolean;
   onPrecisionEditingChange: (value: boolean) => void;
+  /** Handler to open drawing modal for an image */
+  onDrawImage: (imageId: string, imageUrl: string, imageTitle?: string) => void;
   menuState: MenuState;
   onMenuStateChange: (newState: MenuState) => void;
   hasUploadingImages: boolean;
@@ -68,8 +70,10 @@ export default function ChatInput({
   onOpenAssetPicker,
   onAssetDrop,
   showFileUpload,
-  precisionEditing,
-  onPrecisionEditingChange,
+  // precisionEditing state is kept but not rendered - auto-enabled by drawing or edit mode
+  precisionEditing: _precisionEditing,
+  onPrecisionEditingChange: _onPrecisionEditingChange,
+  onDrawImage,
   menuState,
   onMenuStateChange,
   hasUploadingImages,
@@ -77,6 +81,8 @@ export default function ChatInput({
   const t = useTranslations();
   const containerRef = useRef<HTMLDivElement>(null);
   const [isExpanded, setIsExpanded] = useState(false);
+  // Track which image's popover is open (by imageId)
+  const [openPopoverId, setOpenPopoverId] = useState<string | null>(null);
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
@@ -204,84 +210,123 @@ export default function ChatInput({
                     </div>
                   )}
 
-                  {/* Render each pending image */}
+                  {/* Render each pending image with hover preview */}
                   {pendingImages.map((img) => (
-                    <div key={img.imageId} className="relative w-fit group">
-                      <div className="h-20 w-20 rounded-lg border border-divider overflow-hidden relative">
-                        {/* Image with loading overlay if uploading */}
-                        <img
-                          src={
-                            img.isUploading && img.localPreviewUrl
-                              ? img.localPreviewUrl
-                              : img.url
-                          }
-                          alt={img.title || t("chat.image")}
-                          className={clsx(
-                            "w-full h-full object-cover",
-                            img.isUploading && "opacity-50"
-                          )}
-                        />
+                    <Popover
+                      key={img.imageId}
+                      placement="top"
+                      showArrow
+                      offset={10}
+                      isOpen={openPopoverId === img.imageId}
+                      onOpenChange={(open) => setOpenPopoverId(open ? img.imageId : null)}
+                    >
+                      <PopoverTrigger>
+                        <div className="relative w-fit group cursor-pointer">
+                          <div className="h-20 w-20 rounded-lg border border-divider overflow-hidden relative">
+                            {/* Image with loading overlay if uploading */}
+                            <img
+                              src={
+                                img.isUploading && img.localPreviewUrl
+                                  ? img.localPreviewUrl
+                                  : img.url
+                              }
+                              alt={img.title || t("chat.image")}
+                              className={clsx(
+                                "w-full h-full object-cover",
+                                img.isUploading && "opacity-50"
+                              )}
+                            />
 
-                        {/* Uploading spinner overlay */}
-                        {img.isUploading && (
-                          <div className="absolute inset-0 flex items-center justify-center bg-black/30">
-                            <Spinner size="sm" color="white" />
-                          </div>
-                        )}
+                            {/* Uploading spinner overlay */}
+                            {img.isUploading && (
+                              <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                                <Spinner size="sm" color="white" />
+                              </div>
+                            )}
 
-                        {/* Source indicator and title overlay */}
-                        {!img.isUploading && (
-                          <div className="absolute inset-0 bg-linear-to-t from-black/70 to-transparent flex flex-col justify-end p-1">
-                            <div className="flex items-center gap-1 text-white/80">
-                              {getSourceIcon(img.source)}
-                              <span className="text-[8px] uppercase tracking-wide">
-                                {getSourceLabel(img.source)}
-                              </span>
-                            </div>
-                            {img.title && (
-                              <span className="text-white text-[10px] leading-tight font-medium line-clamp-2">
-                                {img.title}
-                              </span>
+                            {/* Source indicator and title overlay */}
+                            {!img.isUploading && (
+                              <div className="absolute inset-0 bg-linear-to-t from-black/70 to-transparent flex flex-col justify-end p-1">
+                                <div className="flex items-center gap-1 text-white/80">
+                                  {getSourceIcon(img.source)}
+                                  <span className="text-[8px] uppercase tracking-wide">
+                                    {getSourceLabel(img.source)}
+                                  </span>
+                                </div>
+                                {img.title && (
+                                  <span className="text-white text-[10px] leading-tight font-medium line-clamp-2">
+                                    {img.title}
+                                  </span>
+                                )}
+                              </div>
                             )}
                           </div>
-                        )}
-                      </div>
 
-                      {/* Remove button */}
-                      <button
-                        onClick={() => onRemovePendingImage(img.imageId)}
-                        disabled={img.isUploading}
-                        className={clsx(
-                          "absolute -top-2 -right-2 bg-default-100 rounded-full p-1 shadow-sm border border-divider",
-                          img.isUploading
-                            ? "opacity-50 cursor-not-allowed"
-                            : "hover:bg-default-200"
-                        )}
-                      >
-                        <X size={14} />
-                      </button>
-                    </div>
+                          {/* Remove button */}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onRemovePendingImage(img.imageId);
+                            }}
+                            disabled={img.isUploading}
+                            className={clsx(
+                              "absolute -top-2 -right-2 bg-default-100 rounded-full p-1 shadow-sm border border-divider z-10",
+                              img.isUploading
+                                ? "opacity-50 cursor-not-allowed"
+                                : "hover:bg-default-200"
+                            )}
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
+                      </PopoverTrigger>
+
+                      {/* Hover preview popover */}
+                      <PopoverContent className="p-0 overflow-hidden">
+                        <div className="relative">
+                          {/* Larger preview image */}
+                          <img
+                            src={
+                              img.isUploading && img.localPreviewUrl
+                                ? img.localPreviewUrl
+                                : img.url
+                            }
+                            alt={img.title || t("chat.image")}
+                            className="max-w-[300px] max-h-[300px] object-contain"
+                          />
+
+                          {/* Drawing button overlay - only show when not uploading */}
+                          {!img.isUploading && (
+                            <div className="absolute top-2 right-2">
+                              <Tooltip content={t("chat.markForChange")}>
+                                <Button
+                                  isIconOnly
+                                  size="sm"
+                                  color="secondary"
+                                  variant="solid"
+                                  onPress={() => {
+                                    setOpenPopoverId(null); // Close popover first
+                                    onDrawImage(img.imageId, img.url, img.title);
+                                  }}
+                                  aria-label={t("chat.markForChange")}
+                                  className="shadow-lg"
+                                >
+                                  <Pencil size={16} />
+                                </Button>
+                              </Tooltip>
+                            </div>
+                          )}
+
+                          {/* Title overlay */}
+                          {img.title && (
+                            <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-xs p-2">
+                              {img.title}
+                            </div>
+                          )}
+                        </div>
+                      </PopoverContent>
+                    </Popover>
                   ))}
-
-                  {/* Precision editing toggle */}
-                  <div className="flex items-center h-20 ml-2 gap-1">
-                    <Switch
-                      size="sm"
-                      color="secondary"
-                      isSelected={precisionEditing}
-                      onValueChange={onPrecisionEditingChange}
-                    >
-                      <span className="text-xs font-medium">
-                        {t("chat.precisionEditing")}
-                      </span>
-                    </Switch>
-                    <Tooltip content={t("chat.precisionEditingDesc")}>
-                      <Info
-                        size={14}
-                        className="text-default-400 cursor-help"
-                      />
-                    </Tooltip>
-                  </div>
                 </div>
               </motion.div>
             )}
@@ -310,7 +355,7 @@ export default function ChatInput({
                 isOpen={
                   isRecording &&
                   siteConfig.audioRecording.maxDuration - recordingTime <=
-                    siteConfig.audioRecording.countdownThreshold
+                  siteConfig.audioRecording.countdownThreshold
                 }
                 placement="top"
               >

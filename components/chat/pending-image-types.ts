@@ -30,6 +30,8 @@ export interface PendingImage {
   partIndex?: number;
   /** Variant ID if from a parallel variant (only for 'ai_generated' source) */
   variantId?: string;
+  /** ID of the original image this was marked/drawn from (for inpaint/局部重绘 images) */
+  markedFromImageId?: string;
 }
 
 /** Maximum number of images that can be added to a single message */

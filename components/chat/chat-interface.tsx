@@ -20,6 +20,7 @@ import {
   PARALLEL_VARIANT_COUNT,
 } from "@/lib/llm/types";
 import ImageDetailModal, { ImageInfo } from "./image-detail-modal";
+import ImageDrawingModal from "./image-drawing-modal";
 import ChatMessage from "./chat-message";
 import ChatInput from "./chat-input";
 import ParallelMessage from "./parallel-message";
@@ -76,6 +77,13 @@ export default function ChatInterface({
   const [isAssetPickerOpen, setIsAssetPickerOpen] = useState(false);
   const [precisionEditing, setPrecisionEditing] = useState(false);
   const [menuState, setMenuState] = useState<MenuState>(INITIAL_MENU_STATE);
+
+  // Drawing modal state for "circle to change" feature (局部重绘)
+  const [drawingImage, setDrawingImage] = useState<{
+    imageId: string;
+    url: string;
+    title?: string;
+  } | null>(null);
 
   // Listen for reset-chat event (triggered when clicking New Chat button while technically already on /chat)
   useEffect(() => {
@@ -320,12 +328,12 @@ export default function ChatInterface({
           prev.map((img) =>
             img.imageId === tempId
               ? {
-                  ...img,
-                  imageId: result.data.imageId,
-                  url: result.data.imageUrl,
-                  isUploading: false,
-                  localPreviewUrl: undefined,
-                }
+                ...img,
+                imageId: result.data.imageId,
+                url: result.data.imageUrl,
+                isUploading: false,
+                localPreviewUrl: undefined,
+              }
               : img
           )
         );
@@ -509,6 +517,110 @@ export default function ChatInterface({
     [addAssetImage, t]
   );
 
+  // Handler to open drawing modal for an image
+  const handleDrawImage = useCallback(
+    (imageId: string, imageUrl: string, imageTitle?: string) => {
+      setDrawingImage({ imageId, url: imageUrl, title: imageTitle });
+    },
+    []
+  );
+
+  // Handler to save marked image from drawing modal
+  const handleSaveMarkedImage = useCallback(
+    async (file: File, originalImageId: string) => {
+      // Find the original image to get its title
+      const originalImage = pendingImages.find(
+        (img) => img.imageId === originalImageId
+      );
+      const originalTitle = originalImage?.title || t("chat.image");
+
+      // Validate file before upload
+      const validationError = validateFile(file);
+      if (validationError) {
+        addToast({
+          title:
+            validationError.code === "FILE_TOO_LARGE"
+              ? t("chat.fileSizeTooLarge", { maxSize: getMaxFileSizeMB() })
+              : t("chat.uploadFailed"),
+          color: "danger",
+        });
+        return;
+      }
+
+      if (!canAddImage(pendingImages)) {
+        addToast({
+          title: t("chat.maxImagesReached", { max: MAX_PENDING_IMAGES }),
+          color: "warning",
+        });
+        return;
+      }
+
+      // Create a temporary ID for tracking during upload
+      const tempId = `uploading-marked-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const localPreviewUrl = URL.createObjectURL(file);
+
+      // Add placeholder to pending images with uploading state
+      const uploadingImage: PendingImage = {
+        imageId: tempId,
+        url: localPreviewUrl,
+        source: "upload",
+        title: t("chat.markedImage", { title: originalTitle }),
+        isUploading: true,
+        localPreviewUrl,
+        markedFromImageId: originalImageId,
+      };
+
+      setPendingImages((prev) => [...prev, uploadingImage]);
+
+      const result = await uploadImage(file);
+
+      if (result.success) {
+        // Update the pending image with the real ID and URL
+        setPendingImages((prev) =>
+          prev.map((img) =>
+            img.imageId === tempId
+              ? {
+                ...img,
+                imageId: result.data.imageId,
+                url: result.data.imageUrl,
+                isUploading: false,
+                localPreviewUrl: undefined,
+              }
+              : img
+          )
+        );
+        URL.revokeObjectURL(localPreviewUrl);
+
+        // Auto-enable precision editing when user creates a marked image
+        setPrecisionEditing(true);
+
+        // Auto-switch to edit mode if in create mode
+        if (menuState.mode === "create") {
+          const newState = resolveMenuState(menuState, "edit");
+          setMenuState(newState);
+        }
+      } else {
+        console.error("Marked image upload failed:", result.error);
+        // Remove the failed upload from pending images
+        setPendingImages((prev) =>
+          prev.filter((img) => img.imageId !== tempId)
+        );
+        URL.revokeObjectURL(localPreviewUrl);
+
+        addToast({
+          title: t("chat.uploadFailed"),
+          color: "danger",
+        });
+      }
+    },
+    [pendingImages, t, menuState]
+  );
+
+  // Close drawing modal
+  const handleDrawingModalClose = useCallback(() => {
+    setDrawingImage(null);
+  }, []);
+
   const handleSend = async () => {
     // Block send if uploading images or no content
     if (hasUploadingImages(pendingImages)) {
@@ -548,16 +660,16 @@ export default function ChatInterface({
     const optimisticContent: Message["content"] =
       currentPendingImages.length > 0
         ? (() => {
-            const parts: MessageContentPart[] = [];
-            if (currentInput) {
-              parts.push({ type: "text", text: currentInput });
-            }
-            // Add images to the optimistic content
-            for (const img of currentPendingImages) {
-              parts.push({ type: "image_url", image_url: { url: img.url } });
-            }
-            return parts;
-          })()
+          const parts: MessageContentPart[] = [];
+          if (currentInput) {
+            parts.push({ type: "text", text: currentInput });
+          }
+          // Add images to the optimistic content
+          for (const img of currentPendingImages) {
+            parts.push({ type: "image_url", image_url: { url: img.url } });
+          }
+          return parts;
+        })()
         : currentInput;
 
     const userMessage: Message = {
@@ -808,7 +920,7 @@ export default function ChatInterface({
                 ];
                 const randomErrorMessage =
                   cuteErrorMessages[
-                    Math.floor(Math.random() * cuteErrorMessages.length)
+                  Math.floor(Math.random() * cuteErrorMessages.length)
                   ];
 
                 addToast({
@@ -939,6 +1051,18 @@ export default function ChatInterface({
       }
     },
     [menuState]
+  );
+
+  // Handle menu state change - auto-enable precision editing when switching to edit mode
+  const handleMenuStateChange = useCallback(
+    (newState: MenuState) => {
+      setMenuState(newState);
+      // Auto-enable precision editing when switching to edit mode
+      if (newState.mode === "edit") {
+        setPrecisionEditing(true);
+      }
+    },
+    []
   );
 
   const handleAgentTitleClick = (part: any) => {
@@ -1132,8 +1256,9 @@ export default function ChatInterface({
         showFileUpload={true}
         precisionEditing={precisionEditing}
         onPrecisionEditingChange={handlePrecisionEditingChange}
+        onDrawImage={handleDrawImage}
         menuState={menuState}
-        onMenuStateChange={setMenuState}
+        onMenuStateChange={handleMenuStateChange}
         hasUploadingImages={hasUploadingImages(pendingImages)}
       />
 
@@ -1153,6 +1278,19 @@ export default function ChatInterface({
         onNavigate={handleImageNavigate}
         onClose={onClose}
       />
+
+      {/* Drawing modal for "circle to change" feature (局部重绘) */}
+      {drawingImage && (
+        <ImageDrawingModal
+          isOpen={!!drawingImage}
+          onClose={handleDrawingModalClose}
+          imageUrl={drawingImage.url}
+          imageId={drawingImage.imageId}
+          imageTitle={drawingImage.title}
+          onSaveMarkedImage={handleSaveMarkedImage}
+        />
+      )}
+
       <NotificationPermissionModal ref={notificationModalRef} />
     </div>
   );
