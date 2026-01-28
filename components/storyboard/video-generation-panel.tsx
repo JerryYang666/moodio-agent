@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useTranslations } from "next-intl";
 import { Button } from "@heroui/button";
 import { Input, Textarea } from "@heroui/input";
@@ -156,6 +156,9 @@ export default function VideoGenerationPanel({
   const [estimatedCost, setEstimatedCost] = useState<number | null>(null);
   const [costLoading, setCostLoading] = useState(false);
 
+  // Ref to store pending restore params (used to coordinate between restore and model init effects)
+  const pendingRestoreParamsRef = useRef<Record<string, any> | null>(null);
+
   // Load models
   useEffect(() => {
     const loadModels = async () => {
@@ -177,10 +180,19 @@ export default function VideoGenerationPanel({
   }, []);
 
   // Initialize params when model changes - merge defaults with saved localStorage values
+  // Or use pending restore params if available (from "put back" action)
   useEffect(() => {
     if (!selectedModelId) return;
     const model = models.find((m) => m.id === selectedModelId);
     if (!model) return;
+
+    // Check if we have pending restore params (from "put back" action)
+    if (pendingRestoreParamsRef.current) {
+      const restoredParams = pendingRestoreParamsRef.current;
+      pendingRestoreParamsRef.current = null; // Clear the ref
+      setParams(restoredParams);
+      return;
+    }
 
     // Start with default params
     const initialParams: Record<string, any> = {};
@@ -227,19 +239,9 @@ export default function VideoGenerationPanel({
   useEffect(() => {
     if (!restoreData) return;
     
-    // Set the model first
-    setSelectedModelId(restoreData.modelId);
-    
-    // Set images
-    setSourceImageId(restoreData.sourceImageId);
-    setSourceImageUrl(restoreData.sourceImageUrl);
-    setEndImageId(restoreData.endImageId);
-    setEndImageUrl(restoreData.endImageUrl);
-    
-    // Set params - need to wait for model to be set and params initialized
-    // We'll set params directly since the model change effect will run first
     const model = models.find((m) => m.id === restoreData.modelId);
     if (model) {
+      // Build the restored params
       const restoredParams: Record<string, any> = {};
       for (const param of model.params) {
         // Skip image params
@@ -256,12 +258,27 @@ export default function VideoGenerationPanel({
           restoredParams[param.name] = param.default;
         }
       }
-      setParams(restoredParams);
+      
+      // If we're changing to a different model, store params in ref so the model init
+      // effect will use them instead of defaults/localStorage. Otherwise set directly.
+      if (restoreData.modelId !== selectedModelId) {
+        pendingRestoreParamsRef.current = restoredParams;
+        setSelectedModelId(restoreData.modelId);
+      } else {
+        // Same model - just set params directly
+        setParams(restoredParams);
+      }
     }
+    
+    // Set images
+    setSourceImageId(restoreData.sourceImageId);
+    setSourceImageUrl(restoreData.sourceImageUrl);
+    setEndImageId(restoreData.endImageId);
+    setEndImageUrl(restoreData.endImageUrl);
     
     // Notify parent that restore is complete
     onRestoreComplete?.();
-  }, [restoreData, models, onRestoreComplete]);
+  }, [restoreData, models, onRestoreComplete, selectedModelId]);
 
   const costEntries = useMemo(
     () =>
