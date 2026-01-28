@@ -1,8 +1,23 @@
 "use client";
 
-import { Modal, ModalContent, ModalHeader, ModalBody } from "@heroui/modal";
+import {
+  Modal,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
+  useDisclosure,
+} from "@heroui/modal";
 import { Button } from "@heroui/button";
 import { Image } from "@heroui/image";
+import { Input } from "@heroui/input";
+import {
+  Dropdown,
+  DropdownTrigger,
+  DropdownMenu,
+  DropdownItem,
+  DropdownSection,
+} from "@heroui/dropdown";
 import {
   X,
   Download,
@@ -13,10 +28,17 @@ import {
   Undo2,
   ChevronLeft,
   ChevronRight,
+  MoreVertical,
+  FolderPlus,
+  Plus,
+  Video,
 } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 import { useTranslations } from "next-intl";
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
+import { useRouter } from "next/navigation";
+import { useCollections } from "@/hooks/use-collections";
+import { motion, AnimatePresence } from "framer-motion";
 import { downloadImage } from "./utils";
 
 export interface ImageInfo {
@@ -35,7 +57,58 @@ interface ImageDetailModalProps {
   currentIndex: number;
   onNavigate: (index: number) => void;
   onClose: () => void;
+  chatId?: string;
 }
+
+// Flying image animation component (same as ImageWithMenu)
+interface FlyingImageProps {
+  imageUrl: string;
+  startPosition: { x: number; y: number };
+  endPosition: { x: number; y: number };
+  onComplete: () => void;
+  altText: string;
+}
+
+const FlyingImage = ({
+  imageUrl,
+  startPosition,
+  endPosition,
+  onComplete,
+  altText,
+}: FlyingImageProps) => {
+  return (
+    <motion.div
+      initial={{
+        position: "fixed",
+        left: startPosition.x,
+        top: startPosition.y,
+        width: 100,
+        height: 100,
+        opacity: 1,
+        zIndex: 9999,
+      }}
+      animate={{
+        left: endPosition.x,
+        top: endPosition.y,
+        width: 40,
+        height: 40,
+        opacity: 0,
+      }}
+      transition={{
+        duration: 0.7,
+        ease: "easeInOut",
+      }}
+      onAnimationComplete={onComplete}
+      className="pointer-events-none rounded-lg overflow-hidden shadow-lg"
+    >
+      <img
+        src={imageUrl}
+        alt={altText}
+        className="w-full h-full object-cover"
+      />
+    </motion.div>
+  );
+};
 
 export default function ImageDetailModal({
   isOpen,
@@ -45,9 +118,35 @@ export default function ImageDetailModal({
   currentIndex,
   onNavigate,
   onClose,
+  chatId,
 }: ImageDetailModalProps) {
   const t = useTranslations("imageDetail");
+  const tMenu = useTranslations("imageMenu");
+  const tCollections = useTranslations("collections");
+  const tCommon = useTranslations("common");
+  const tVideo = useTranslations("video");
+  const router = useRouter();
+  const {
+    collections,
+    createCollection,
+    addImageToCollection,
+    getDefaultCollectionName,
+  } = useCollections();
+
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [flyingImages, setFlyingImages] = useState<
+    Array<{ id: string; startPos: { x: number; y: number } }>
+  >([]);
+
+  // Create collection modal state
+  const {
+    isOpen: isCreateOpen,
+    onOpen: onCreateOpen,
+    onOpenChange: onCreateOpenChange,
+  } = useDisclosure();
+  const [newCollectionName, setNewCollectionName] = useState("");
+  const [isCreating, setIsCreating] = useState(false);
 
   const canNavigatePrev = currentIndex > 0;
   const canNavigateNext = currentIndex < allImages.length - 1;
@@ -83,6 +182,91 @@ export default function ImageDetailModal({
   }, [isOpen, handlePrevious, handleNext]);
 
   const hasPrompt = !!selectedImage?.prompt?.trim();
+
+  // Collection menu handlers - simplified animation to fly to right side of screen
+  const startFlyingAnimation = () => {
+    if (typeof window === "undefined") return;
+
+    const startPos = {
+      x: window.innerWidth / 2 - 50,
+      y: window.innerHeight / 2 - 50,
+    };
+
+    const flyingId = `flying-${Date.now()}`;
+    setFlyingImages((prev) => [...prev, { id: flyingId, startPos }]);
+  };
+
+  // Simple end position: right side of screen
+  const getEndPosition = () => {
+    if (typeof window === "undefined") return { x: 0, y: 100 };
+    return { x: window.innerWidth - 60, y: 100 };
+  };
+
+  const handleAddToCollection = async (collectionId: string) => {
+    if (!selectedImage?.imageId) return;
+
+    const success = await addImageToCollection(
+      collectionId,
+      selectedImage.imageId,
+      chatId || null,
+      {
+        title: selectedImage.title || "",
+        prompt: selectedImage.prompt || "",
+        status: selectedImage.status || "generated",
+      }
+    );
+
+    if (success) {
+      startFlyingAnimation();
+    }
+  };
+
+  const handleCreateAndAdd = async () => {
+    if (!newCollectionName.trim() || !selectedImage?.imageId) return;
+
+    setIsCreating(true);
+    try {
+      const collection = await createCollection(newCollectionName.trim());
+      if (collection) {
+        await addImageToCollection(
+          collection.id,
+          selectedImage.imageId,
+          chatId || null,
+          {
+            title: selectedImage.title || "",
+            prompt: selectedImage.prompt || "",
+            status: selectedImage.status || "generated",
+          }
+        );
+        setNewCollectionName("");
+        onCreateOpenChange();
+        startFlyingAnimation();
+      }
+    } catch (error) {
+      console.error("Error creating collection:", error);
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  const handleCreateNewCollection = () => {
+    setNewCollectionName(getDefaultCollectionName());
+    onCreateOpen();
+  };
+
+  const handleGenerateVideo = () => {
+    if (selectedImage?.imageId) {
+      router.push(`/storyboard?imageId=${selectedImage.imageId}`);
+    }
+  };
+
+  const removeFlyingImage = (id: string) => {
+    setFlyingImages((prev) => prev.filter((img) => img.id !== id));
+  };
+
+  // Check if the current image can be added to collection (has imageId and is generated)
+  const canAddToCollection =
+    selectedImage?.imageId && selectedImage?.status === "generated";
 
   // Reset fullscreen when modal closes
   useEffect(() => {
@@ -185,6 +369,93 @@ export default function ImageDetailModal({
                               >
                                 <Download size={20} />
                               </Button>
+                              {/* Collection menu dropdown */}
+                              {canAddToCollection && (
+                                <Dropdown
+                                  isOpen={isMenuOpen}
+                                  onOpenChange={setIsMenuOpen}
+                                >
+                                  <DropdownTrigger>
+                                    <Button
+                                      isIconOnly
+                                      variant="flat"
+                                      className="bg-black/50 text-white"
+                                    >
+                                      <MoreVertical size={20} />
+                                    </Button>
+                                  </DropdownTrigger>
+                                  <DropdownMenu
+                                    aria-label={tMenu("actionsLabel")}
+                                    onAction={(key) => {
+                                      if (key === "generate-video") {
+                                        handleGenerateVideo();
+                                      } else if (key === "create-new") {
+                                        handleCreateNewCollection();
+                                      }
+                                    }}
+                                  >
+                                    <DropdownItem
+                                      key="generate-video"
+                                      startContent={<Video size={16} />}
+                                      className="text-primary"
+                                    >
+                                      {tVideo("generateVideo")}
+                                    </DropdownItem>
+                                    <DropdownSection
+                                      title={tMenu("addToCollection")}
+                                      showDivider
+                                    >
+                                      <DropdownItem
+                                        key="create-new"
+                                        startContent={<Plus size={16} />}
+                                        className="font-semibold"
+                                      >
+                                        {tCollections("createNewCollection")}
+                                      </DropdownItem>
+                                    </DropdownSection>
+                                    <DropdownSection
+                                      title={
+                                        collections.length > 0
+                                          ? tMenu("yourCollections")
+                                          : undefined
+                                      }
+                                    >
+                                      {collections.length === 0 ? (
+                                        <DropdownItem
+                                          key="no-collections"
+                                          isReadOnly
+                                        >
+                                          <span className="text-xs text-default-400">
+                                            {tCollections("noCollectionsYet")}
+                                          </span>
+                                        </DropdownItem>
+                                      ) : (
+                                        collections
+                                          .filter(
+                                            (c) =>
+                                              c.permission === "owner" ||
+                                              c.permission === "collaborator"
+                                          )
+                                          .map((collection) => (
+                                            <DropdownItem
+                                              key={collection.id}
+                                              startContent={
+                                                <FolderPlus size={16} />
+                                              }
+                                              onPress={() =>
+                                                handleAddToCollection(
+                                                  collection.id
+                                                )
+                                              }
+                                            >
+                                              {collection.name}
+                                            </DropdownItem>
+                                          ))
+                                      )}
+                                    </DropdownSection>
+                                  </DropdownMenu>
+                                </Dropdown>
+                              )}
                               <Button
                                 isIconOnly
                                 variant="flat"
@@ -328,6 +599,93 @@ export default function ImageDetailModal({
                               >
                                 <Download size={16} />
                               </Button>
+                              {/* Collection menu dropdown */}
+                              {canAddToCollection && (
+                                <Dropdown
+                                  isOpen={isMenuOpen}
+                                  onOpenChange={setIsMenuOpen}
+                                >
+                                  <DropdownTrigger>
+                                    <Button
+                                      isIconOnly
+                                      variant="flat"
+                                      className="bg-black/50 text-white"
+                                    >
+                                      <MoreVertical size={16} />
+                                    </Button>
+                                  </DropdownTrigger>
+                                  <DropdownMenu
+                                    aria-label={tMenu("actionsLabel")}
+                                    onAction={(key) => {
+                                      if (key === "generate-video") {
+                                        handleGenerateVideo();
+                                      } else if (key === "create-new") {
+                                        handleCreateNewCollection();
+                                      }
+                                    }}
+                                  >
+                                    <DropdownItem
+                                      key="generate-video"
+                                      startContent={<Video size={16} />}
+                                      className="text-primary"
+                                    >
+                                      {tVideo("generateVideo")}
+                                    </DropdownItem>
+                                    <DropdownSection
+                                      title={tMenu("addToCollection")}
+                                      showDivider
+                                    >
+                                      <DropdownItem
+                                        key="create-new"
+                                        startContent={<Plus size={16} />}
+                                        className="font-semibold"
+                                      >
+                                        {tCollections("createNewCollection")}
+                                      </DropdownItem>
+                                    </DropdownSection>
+                                    <DropdownSection
+                                      title={
+                                        collections.length > 0
+                                          ? tMenu("yourCollections")
+                                          : undefined
+                                      }
+                                    >
+                                      {collections.length === 0 ? (
+                                        <DropdownItem
+                                          key="no-collections"
+                                          isReadOnly
+                                        >
+                                          <span className="text-xs text-default-400">
+                                            {tCollections("noCollectionsYet")}
+                                          </span>
+                                        </DropdownItem>
+                                      ) : (
+                                        collections
+                                          .filter(
+                                            (c) =>
+                                              c.permission === "owner" ||
+                                              c.permission === "collaborator"
+                                          )
+                                          .map((collection) => (
+                                            <DropdownItem
+                                              key={collection.id}
+                                              startContent={
+                                                <FolderPlus size={16} />
+                                              }
+                                              onPress={() =>
+                                                handleAddToCollection(
+                                                  collection.id
+                                                )
+                                              }
+                                            >
+                                              {collection.name}
+                                            </DropdownItem>
+                                          ))
+                                      )}
+                                    </DropdownSection>
+                                  </DropdownMenu>
+                                </Dropdown>
+                              )}
                               <Button
                                 isIconOnly
                                 variant="flat"
@@ -360,6 +718,58 @@ export default function ImageDetailModal({
           </>
         )}
       </ModalContent>
+
+      {/* Flying Images Animation */}
+      <AnimatePresence>
+        {flyingImages.map((flying) => (
+          <FlyingImage
+            key={flying.id}
+            imageUrl={selectedImage?.url || ""}
+            startPosition={flying.startPos}
+            endPosition={getEndPosition()}
+            onComplete={() => removeFlyingImage(flying.id)}
+            altText={tMenu("flyingImageAlt")}
+          />
+        ))}
+      </AnimatePresence>
+
+      {/* Create Collection Modal */}
+      <Modal isOpen={isCreateOpen} onOpenChange={onCreateOpenChange}>
+        <ModalContent>
+          {(onCloseCreate) => (
+            <>
+              <ModalHeader>{tCollections("createNewCollection")}</ModalHeader>
+              <ModalBody>
+                <Input
+                  label={tCollections("collectionName")}
+                  placeholder={tCollections("enterCollectionName")}
+                  value={newCollectionName}
+                  onValueChange={setNewCollectionName}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      handleCreateAndAdd();
+                    }
+                  }}
+                  autoFocus
+                />
+              </ModalBody>
+              <ModalFooter>
+                <Button variant="light" onPress={onCloseCreate}>
+                  {tCommon("cancel")}
+                </Button>
+                <Button
+                  color="primary"
+                  onPress={handleCreateAndAdd}
+                  isLoading={isCreating}
+                  isDisabled={!newCollectionName.trim()}
+                >
+                  {tMenu("createAndAdd")}
+                </Button>
+              </ModalFooter>
+            </>
+          )}
+        </ModalContent>
+      </Modal>
     </Modal>
   );
 }
