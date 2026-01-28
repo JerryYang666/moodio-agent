@@ -45,6 +45,70 @@ export const INITIAL_MENU_STATE: MenuState = {
   imageSize: MENU_CONFIG.categories.imageSize.default,
 };
 
+// localStorage key for persisting menu preferences
+const MENU_STORAGE_KEY = "chat-menu-params";
+
+// Save menu state to localStorage (excludes mode as it's context-dependent)
+export const saveMenuState = (state: MenuState) => {
+  if (typeof window === "undefined") return;
+  
+  // Save all preferences except mode (mode is contextual and resets per session)
+  const toSave = {
+    model: state.model,
+    expertise: state.expertise,
+    aspectRatio: state.aspectRatio,
+    imageSize: state.imageSize,
+  };
+  
+  try {
+    localStorage.setItem(MENU_STORAGE_KEY, JSON.stringify(toSave));
+  } catch (e) {
+    console.warn("Failed to save menu state to localStorage:", e);
+  }
+};
+
+// Load menu state from localStorage and merge with defaults
+export const loadMenuState = (): MenuState => {
+  if (typeof window === "undefined") return INITIAL_MENU_STATE;
+  
+  try {
+    const stored = localStorage.getItem(MENU_STORAGE_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      
+      // Merge with initial state, validating each value
+      const loaded: MenuState = { ...INITIAL_MENU_STATE };
+      
+      // Validate and apply saved model
+      if (parsed.model && MENU_CONFIG.categories.model.options[parsed.model as keyof typeof MENU_CONFIG.categories.model.options]) {
+        loaded.model = parsed.model;
+      }
+      
+      // Validate and apply saved expertise
+      if (parsed.expertise && MENU_CONFIG.categories.expertise.options[parsed.expertise as keyof typeof MENU_CONFIG.categories.expertise.options]) {
+        loaded.expertise = parsed.expertise;
+      }
+      
+      // Validate and apply saved aspectRatio
+      if (parsed.aspectRatio && MENU_CONFIG.categories.aspectRatio.options[parsed.aspectRatio as keyof typeof MENU_CONFIG.categories.aspectRatio.options]) {
+        loaded.aspectRatio = parsed.aspectRatio;
+      }
+      
+      // Validate and apply saved imageSize
+      if (parsed.imageSize && MENU_CONFIG.categories.imageSize.options[parsed.imageSize as keyof typeof MENU_CONFIG.categories.imageSize.options]) {
+        loaded.imageSize = parsed.imageSize;
+      }
+      
+      // Now resolve the state to ensure it's valid for the current mode
+      return resolveMenuState(loaded);
+    }
+  } catch (e) {
+    console.warn("Failed to load menu state from localStorage:", e);
+  }
+  
+  return INITIAL_MENU_STATE;
+};
+
 // Helper to resolve state based on mode and rules
 export const resolveMenuState = (
   currentState: MenuState,

@@ -32,6 +32,8 @@ import {
   MenuState,
   INITIAL_MENU_STATE,
   resolveMenuState,
+  loadMenuState,
+  saveMenuState,
 } from "./menu-configuration";
 import {
   PendingImage,
@@ -76,7 +78,13 @@ export default function ChatInterface({
   const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
   const [isAssetPickerOpen, setIsAssetPickerOpen] = useState(false);
   const [precisionEditing, setPrecisionEditing] = useState(false);
-  const [menuState, setMenuState] = useState<MenuState>(INITIAL_MENU_STATE);
+  const [menuState, setMenuState] = useState<MenuState>(() => {
+    // Load saved preferences from localStorage on mount
+    if (typeof window !== "undefined") {
+      return loadMenuState();
+    }
+    return INITIAL_MENU_STATE;
+  });
 
   // Drawing modal state for "circle to change" feature (局部重绘)
   const [drawingImage, setDrawingImage] = useState<{
@@ -137,6 +145,15 @@ export default function ChatInterface({
       }
     }
   }, [input, chatId, isDraftLoaded]);
+
+  // Save menu state to localStorage when it changes (debounced)
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      saveMenuState(menuState);
+    }, 300);
+    
+    return () => clearTimeout(timeoutId);
+  }, [menuState]);
 
   // Modal state for agent images
   const { isOpen, onOpen, onOpenChange, onClose } = useDisclosure();
