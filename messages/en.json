@@ -402,7 +402,9 @@
     "sharedSuffix": "Shared",
     "noAssets": "No assets available",
     "selectFromChat": "Select from chat",
-    "selectFromCollection": "Select from collection"
+    "selectFromCollection": "Select from collection",
+    "viewFull": "View full image",
+    "selectThisImage": "Select this image"
   },
   "assetsSidebar": {
     "title": "Assets",

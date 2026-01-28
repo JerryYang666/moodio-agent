@@ -402,7 +402,9 @@
     "sharedSuffix": "共享",
     "noAssets": "暂无可用素材",
     "selectFromChat": "从对话中选择",
-    "selectFromCollection": "从集合中选择"
+    "selectFromCollection": "从集合中选择",
+    "viewFull": "查看大图",
+    "selectThisImage": "选择此图片"
   },
   "assetsSidebar": {
     "title": "素材",

@@ -292,7 +292,7 @@ export default function ChatInput({
                                 : img.url
                             }
                             alt={img.title || t("chat.image")}
-                            className="max-w-[300px] max-h-[300px] object-contain"
+                            className="max-w-[600px] max-h-[600px] object-contain"
                           />
 
                           {/* Drawing button overlay - only show when not uploading */}
