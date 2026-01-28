@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { useTranslations } from "next-intl";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@heroui/button";
@@ -11,6 +11,8 @@ import { Folder, Clock, Images, ChevronLeft, Pin, PinOff, X } from "lucide-react
 import clsx from "clsx";
 import { addToast } from "@heroui/toast";
 import { ASSET_DRAG_MIME, AI_IMAGE_DRAG_MIME } from "./asset-dnd";
+import { useCollections } from "@/hooks/use-collections";
+import { ASSETS_UPDATED_EVENT, COLLECTIONS_UPDATED_EVENT } from "@/components/collections-provider";
 
 type Project = {
   id: string;
@@ -61,11 +63,12 @@ const SIDEBAR_WIDTH = 360;
 
 export default function AssetsHoverSidebar() {
   const t = useTranslations();
+  const { collections, refreshCollections } = useCollections();
   const [isOpen, setIsOpen] = useState(false);
   const [isPinned, setIsPinned] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [projectsLoading, setProjectsLoading] = useState(false);
   const [projects, setProjects] = useState<Project[]>([]);
-  const [collections, setCollections] = useState<Collection[]>([]);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [dragOverCollectionId, setDragOverCollectionId] = useState<string | null>(
     null
@@ -92,52 +95,75 @@ export default function AssetsHoverSidebar() {
     [collections]
   );
 
+  // Load projects once when mounted
   useEffect(() => {
-    // Load metadata once when mounted.
-    const load = async () => {
-      setLoading(true);
+    const loadProjects = async () => {
+      setProjectsLoading(true);
       try {
-        const [projectsRes, collectionsRes] = await Promise.all([
-          fetch("/api/projects"),
-          fetch("/api/collection"),
-        ]);
-        if (projectsRes.ok) {
-          const data = await projectsRes.json();
+        const res = await fetch("/api/projects");
+        if (res.ok) {
+          const data = await res.json();
           setProjects(data.projects || []);
         }
-        if (collectionsRes.ok) {
-          const data = await collectionsRes.json();
-          setCollections(data.collections || []);
-        }
       } catch (e) {
-        console.error("Failed to load assets sidebar metadata", e);
+        console.error("Failed to load projects", e);
       } finally {
-        setLoading(false);
+        setProjectsLoading(false);
       }
     };
-    load();
+    loadProjects();
   }, []);
 
-  useEffect(() => {
-    const loadAssets = async () => {
-      setLoading(true);
-      try {
-        const params = new URLSearchParams();
-        params.set("limit", "60");
-        if (scope.kind === "project") params.set("projectId", scope.id);
-        if (scope.kind === "collection") params.set("collectionId", scope.id);
-        const res = await fetch(`/api/assets?${params.toString()}`);
-        if (!res.ok) return;
-        const data = await res.json();
-        setAssets(data.assets || []);
-      } catch (e) {
-        console.error("Failed to load assets", e);
-      } finally {
-        setLoading(false);
-      }
-    };
-    loadAssets();
+  // Function to load assets based on current scope
+  const loadAssets = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams();
+      params.set("limit", "60");
+      if (scope.kind === "project") params.set("projectId", scope.id);
+      if (scope.kind === "collection") params.set("collectionId", scope.id);
+      const res = await fetch(`/api/assets?${params.toString()}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      setAssets(data.assets || []);
+    } catch (e) {
+      console.error("Failed to load assets", e);
+    } finally {
+      setLoading(false);
+    }
   }, [scope]);
+
+  // Load assets when scope changes
+  useEffect(() => {
+    loadAssets();
+  }, [loadAssets]);
+
+  // Listen for asset updates (when images are added to collections)
+  useEffect(() => {
+    const handleAssetsUpdated = () => {
+      // Refresh assets to show the newly added image
+      loadAssets();
+    };
+
+    window.addEventListener(ASSETS_UPDATED_EVENT, handleAssetsUpdated);
+    return () => {
+      window.removeEventListener(ASSETS_UPDATED_EVENT, handleAssetsUpdated);
+    };
+  }, [loadAssets]);
+
+  // Listen for collections updates
+  useEffect(() => {
+    const handleCollectionsUpdated = () => {
+      // Collections are already managed by useCollections hook,
+      // but we refresh to ensure sync
+      refreshCollections();
+    };
+
+    window.addEventListener(COLLECTIONS_UPDATED_EVENT, handleCollectionsUpdated);
+    return () => {
+      window.removeEventListener(COLLECTIONS_UPDATED_EVENT, handleCollectionsUpdated);
+    };
+  }, [refreshCollections]);
 
   const handlePick = (asset: Asset) => {
     const payload: AssetDragPayload = {
@@ -206,6 +232,11 @@ export default function AssetsHoverSidebar() {
       if (!res.ok) {
         throw new Error("Failed to add image to collection");
       }
+
+      // Dispatch event for real-time sync (refresh assets list)
+      window.dispatchEvent(new CustomEvent(ASSETS_UPDATED_EVENT, { 
+        detail: { collectionId } 
+      }));
 
       addToast({ title: t("assetsSidebar.addedToCollection"), color: "success" });
     } catch (err) {

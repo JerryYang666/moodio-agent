@@ -128,16 +128,10 @@ export default function ImageWithMenu({
   const [newCollectionName, setNewCollectionName] = useState("");
   const [isCreating, setIsCreating] = useState(false);
 
-  const getCollectionsButtonPosition = () => {
-    const button = document.getElementById("collections-button");
-    if (button) {
-      const rect = button.getBoundingClientRect();
-      return {
-        x: rect.left + rect.width / 2 - 20,
-        y: rect.top + rect.height / 2 - 20,
-      };
-    }
-    return { x: window.innerWidth / 2, y: 100 };
+  // End position: right side of screen (aligned with assets sidebar)
+  const getEndPosition = () => {
+    if (typeof window === "undefined") return { x: 0, y: 100 };
+    return { x: window.innerWidth - 60, y: 100 };
   };
 
   const startFlyingAnimation = () => {
@@ -222,7 +216,7 @@ export default function ImageWithMenu({
     setFlyingImages((prev) => prev.filter((img) => img.id !== id));
   };
 
-  const endPos = getCollectionsButtonPosition();
+  const endPos = getEndPosition();
 
   return (
     <>

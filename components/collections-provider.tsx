@@ -3,6 +3,10 @@
 import React, { createContext, useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/hooks/use-auth";
 
+// Custom event names for real-time sync
+export const ASSETS_UPDATED_EVENT = "moodio-assets-updated";
+export const COLLECTIONS_UPDATED_EVENT = "moodio-collections-updated";
+
 export interface Collection {
   id: string;
   userId: string;
@@ -143,6 +147,10 @@ export function CollectionsProvider({
 
         const data = await res.json();
         setCollections((prev) => [data.collection, ...prev]);
+        
+        // Dispatch event for real-time sync (e.g., assets sidebar)
+        window.dispatchEvent(new CustomEvent(COLLECTIONS_UPDATED_EVENT));
+        
         return data.collection;
       } catch (err) {
         console.error("Error creating collection:", err);
@@ -220,6 +228,12 @@ export function CollectionsProvider({
             col.id === collectionId ? { ...col, updatedAt: new Date() } : col
           )
         );
+        
+        // Dispatch event for real-time sync (e.g., assets sidebar)
+        window.dispatchEvent(new CustomEvent(ASSETS_UPDATED_EVENT, { 
+          detail: { collectionId } 
+        }));
+        
         return true;
       } catch (err) {
         console.error("Error adding image to collection:", err);
