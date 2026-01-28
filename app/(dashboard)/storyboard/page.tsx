@@ -1,9 +1,11 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, Suspense, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import { Spinner } from "@heroui/spinner";
-import VideoGenerationPanel from "@/components/storyboard/video-generation-panel";
+import VideoGenerationPanel, {
+  VideoGenerationRestore,
+} from "@/components/storyboard/video-generation-panel";
 import VideoList from "@/components/storyboard/video-list";
 
 function StoryboardContent() {
@@ -14,6 +16,9 @@ function StoryboardContent() {
   const [initialImageUrl, setInitialImageUrl] = useState<string | null>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [loading, setLoading] = useState(!!imageIdParam);
+  const [restoreData, setRestoreData] = useState<VideoGenerationRestore | null>(
+    null
+  );
 
   // Fetch CloudFront URL for initial image if provided
   useEffect(() => {
@@ -46,6 +51,14 @@ function StoryboardContent() {
     setRefreshTrigger((prev) => prev + 1);
   };
 
+  const handleRestore = useCallback((data: VideoGenerationRestore) => {
+    setRestoreData(data);
+  }, []);
+
+  const handleRestoreComplete = useCallback(() => {
+    setRestoreData(null);
+  }, []);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -63,12 +76,14 @@ function StoryboardContent() {
             initialImageId={initialImageId}
             initialImageUrl={initialImageUrl}
             onGenerationStarted={handleGenerationStarted}
+            restoreData={restoreData}
+            onRestoreComplete={handleRestoreComplete}
           />
         </div>
 
         {/* Right Panel - Video List */}
         <div className="flex-1 min-w-0 min-h-[300px] lg:min-h-0 lg:h-full flex flex-col overflow-hidden">
-          <VideoList refreshTrigger={refreshTrigger} />
+          <VideoList refreshTrigger={refreshTrigger} onRestore={handleRestore} />
         </div>
       </div>
     </div>

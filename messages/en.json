@@ -222,7 +222,8 @@
     "videoCount": "{count} videos",
     "estimatedCost": "Estimated Cost",
     "credits": "credits",
-    "costUnavailable": "Cost unavailable"
+    "costUnavailable": "Cost unavailable",
+    "putBack": "Put Back"
   },
   "menu": {
     "mode": "Mode",

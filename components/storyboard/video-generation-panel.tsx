@@ -41,16 +41,79 @@ interface VideoModelConfig {
   params: VideoModelParam[];
 }
 
+// Data structure for restoring a previous generation
+export interface VideoGenerationRestore {
+  modelId: string;
+  sourceImageId: string;
+  sourceImageUrl: string;
+  endImageId: string | null;
+  endImageUrl: string | null;
+  params: Record<string, any>;
+}
+
 interface VideoGenerationPanelProps {
   initialImageId?: string | null;
   initialImageUrl?: string | null;
   onGenerationStarted?: (generationId: string) => void;
+  restoreData?: VideoGenerationRestore | null;
+  onRestoreComplete?: () => void;
 }
+
+// localStorage key prefix for model parameters
+const STORAGE_KEY_PREFIX = "video-model-params-";
+
+// Get localStorage key for a specific model
+const getStorageKey = (modelId: string) => `${STORAGE_KEY_PREFIX}${modelId}`;
+
+// Save model params to localStorage (excluding images and prompt)
+const saveModelParams = (modelId: string, params: Record<string, any>) => {
+  if (typeof window === "undefined") return;
+  
+  // Filter out prompt and any image-related params
+  const paramsToSave: Record<string, any> = {};
+  for (const [key, value] of Object.entries(params)) {
+    // Skip prompt and image URLs
+    if (
+      key === "prompt" ||
+      key.includes("image") ||
+      key.includes("url") ||
+      value === undefined ||
+      value === null ||
+      value === ""
+    ) {
+      continue;
+    }
+    paramsToSave[key] = value;
+  }
+  
+  try {
+    localStorage.setItem(getStorageKey(modelId), JSON.stringify(paramsToSave));
+  } catch (e) {
+    console.warn("Failed to save model params to localStorage:", e);
+  }
+};
+
+// Load model params from localStorage
+const loadModelParams = (modelId: string): Record<string, any> | null => {
+  if (typeof window === "undefined") return null;
+  
+  try {
+    const stored = localStorage.getItem(getStorageKey(modelId));
+    if (stored) {
+      return JSON.parse(stored);
+    }
+  } catch (e) {
+    console.warn("Failed to load model params from localStorage:", e);
+  }
+  return null;
+};
 
 export default function VideoGenerationPanel({
   initialImageId,
   initialImageUrl,
   onGenerationStarted,
+  restoreData,
+  onRestoreComplete,
 }: VideoGenerationPanelProps) {
   const t = useTranslations("video");
   const tCommon = useTranslations("common");
@@ -113,12 +176,13 @@ export default function VideoGenerationPanel({
     loadModels();
   }, []);
 
-  // Initialize params when model changes
+  // Initialize params when model changes - merge defaults with saved localStorage values
   useEffect(() => {
     if (!selectedModelId) return;
     const model = models.find((m) => m.id === selectedModelId);
     if (!model) return;
 
+    // Start with default params
     const initialParams: Record<string, any> = {};
     for (const param of model.params) {
       // Skip image params - handled separately
@@ -132,8 +196,72 @@ export default function VideoGenerationPanel({
         initialParams[param.name] = param.default;
       }
     }
+    
+    // Load saved params from localStorage and merge (overwrite defaults)
+    const savedParams = loadModelParams(selectedModelId);
+    if (savedParams) {
+      for (const [key, value] of Object.entries(savedParams)) {
+        // Only apply saved value if the param still exists in the model
+        const paramExists = model.params.some((p) => p.name === key);
+        if (paramExists && value !== undefined && value !== null) {
+          initialParams[key] = value;
+        }
+      }
+    }
+    
     setParams(initialParams);
   }, [selectedModelId, models]);
+
+  // Save params to localStorage when they change (debounced)
+  useEffect(() => {
+    if (!selectedModelId) return;
+    
+    const timeoutId = setTimeout(() => {
+      saveModelParams(selectedModelId, params);
+    }, 500);
+    
+    return () => clearTimeout(timeoutId);
+  }, [selectedModelId, params]);
+
+  // Handle restore data - restore all state from a previous generation
+  useEffect(() => {
+    if (!restoreData) return;
+    
+    // Set the model first
+    setSelectedModelId(restoreData.modelId);
+    
+    // Set images
+    setSourceImageId(restoreData.sourceImageId);
+    setSourceImageUrl(restoreData.sourceImageUrl);
+    setEndImageId(restoreData.endImageId);
+    setEndImageUrl(restoreData.endImageUrl);
+    
+    // Set params - need to wait for model to be set and params initialized
+    // We'll set params directly since the model change effect will run first
+    const model = models.find((m) => m.id === restoreData.modelId);
+    if (model) {
+      const restoredParams: Record<string, any> = {};
+      for (const param of model.params) {
+        // Skip image params
+        if (
+          param.name === model.imageParams.sourceImage ||
+          param.name === model.imageParams.endImage
+        ) {
+          continue;
+        }
+        // Use restored value if available, otherwise use default
+        if (restoreData.params[param.name] !== undefined) {
+          restoredParams[param.name] = restoreData.params[param.name];
+        } else if (param.default !== undefined) {
+          restoredParams[param.name] = param.default;
+        }
+      }
+      setParams(restoredParams);
+    }
+    
+    // Notify parent that restore is complete
+    onRestoreComplete?.();
+  }, [restoreData, models, onRestoreComplete]);
 
   const costEntries = useMemo(
     () =>

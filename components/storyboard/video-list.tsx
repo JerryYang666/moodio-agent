@@ -23,7 +23,9 @@ import {
   XCircle,
   Loader2,
   ExternalLink,
+  RotateCcw,
 } from "lucide-react";
+import type { VideoGenerationRestore } from "./video-generation-panel";
 import VideoStatusChip from "./video-status-chip";
 import { getVideoModel } from "@/lib/video/models";
 
@@ -48,11 +50,12 @@ interface VideoGeneration {
 
 interface VideoListProps {
   refreshTrigger?: number;
+  onRestore?: (data: VideoGenerationRestore) => void;
 }
 
 const POLL_INTERVAL = 5000; // 5 seconds
 
-export default function VideoList({ refreshTrigger }: VideoListProps) {
+export default function VideoList({ refreshTrigger, onRestore }: VideoListProps) {
   const t = useTranslations("video");
   const tCommon = useTranslations("common");
   const [generations, setGenerations] = useState<VideoGeneration[]>([]);
@@ -136,6 +139,22 @@ export default function VideoList({ refreshTrigger }: VideoListProps) {
 
   const getModelLabel = (modelId: string) =>
     getVideoModel(modelId)?.name ?? modelId;
+
+  const handleRestore = (gen: VideoGeneration) => {
+    if (!onRestore) return;
+    
+    onRestore({
+      modelId: gen.modelId,
+      sourceImageId: gen.sourceImageId,
+      sourceImageUrl: gen.sourceImageUrl,
+      endImageId: gen.endImageId,
+      endImageUrl: gen.endImageUrl,
+      params: gen.params,
+    });
+    
+    // Close the modal after restoring
+    setSelectedVideo(null);
+  };
 
   if (loading) {
     return (
@@ -427,6 +446,21 @@ export default function VideoList({ refreshTrigger }: VideoListProps) {
                 )}
               </ModalBody>
               <ModalFooter className="flex-wrap gap-2 px-3 sm:px-6 safe-area-bottom">
+                {/* Put Back button - restore generation parameters */}
+                {selectedVideo && onRestore && (
+                  <Button
+                    variant="flat"
+                    color="secondary"
+                    size="sm"
+                    className="sm:size-md flex-1 sm:flex-none"
+                    startContent={
+                      <RotateCcw size={14} className="sm:w-4 sm:h-4" />
+                    }
+                    onPress={() => handleRestore(selectedVideo)}
+                  >
+                    {t("putBack")}
+                  </Button>
+                )}
                 {selectedVideo?.status === "completed" &&
                   selectedVideo.videoUrl && (
                     <>

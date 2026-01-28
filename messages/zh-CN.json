@@ -222,7 +222,8 @@
     "videoCount": "{count} 个视频",
     "estimatedCost": "预估费用",
     "credits": "积分",
-    "costUnavailable": "无法计算费用"
+    "costUnavailable": "无法计算费用",
+    "putBack": "恢复参数"
   },
   "menu": {
     "mode": "模式",
