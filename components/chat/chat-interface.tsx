@@ -38,6 +38,11 @@ import {
   canAddImage,
   hasUploadingImages,
 } from "./pending-image-types";
+import {
+  uploadImage,
+  validateFile,
+  getMaxFileSizeMB,
+} from "@/lib/upload/client";
 
 // Helper to group consecutive assistant messages with the same timestamp as variants
 interface MessageGroup {
@@ -267,12 +272,17 @@ export default function ChatInterface({
     }
   }, [chatId, user]);
 
-  // Upload a file immediately and add it to pending images
+  // Upload a file using presigned URL (bypasses Vercel's 4.5MB limit)
   const uploadAndAddImage = useCallback(
     async (file: File) => {
-      if (file.size > 5 * 1024 * 1024) {
+      // Validate file before upload
+      const validationError = validateFile(file);
+      if (validationError) {
         addToast({
-          title: t("chat.fileSizeTooLarge"),
+          title:
+            validationError.code === "FILE_TOO_LARGE"
+              ? t("chat.fileSizeTooLarge", { maxSize: getMaxFileSizeMB() })
+              : t("chat.uploadFailed"),
           color: "danger",
         });
         return;
@@ -302,31 +312,17 @@ export default function ChatInterface({
 
       setPendingImages((prev) => [...prev, uploadingImage]);
 
-      try {
-        // Upload the file immediately
-        const formData = new FormData();
-        formData.append("file", file);
+      const result = await uploadImage(file);
 
-        const response = await fetch("/api/image/upload", {
-          method: "POST",
-          body: formData,
-        });
-
-        if (!response.ok) {
-          const error = await response.json();
-          throw new Error(error.error || "Upload failed");
-        }
-
-        const { imageId, imageUrl } = await response.json();
-
+      if (result.success) {
         // Update the pending image with the real ID and URL
         setPendingImages((prev) =>
           prev.map((img) =>
             img.imageId === tempId
               ? {
                   ...img,
-                  imageId,
-                  url: imageUrl,
+                  imageId: result.data.imageId,
+                  url: result.data.imageUrl,
                   isUploading: false,
                   localPreviewUrl: undefined,
                 }
@@ -334,8 +330,8 @@ export default function ChatInterface({
           )
         );
         URL.revokeObjectURL(localPreviewUrl);
-      } catch (error) {
-        console.error("Image upload failed:", error);
+      } else {
+        console.error("Image upload failed:", result.error);
         // Remove the failed upload from pending images
         setPendingImages((prev) =>
           prev.filter((img) => img.imageId !== tempId)

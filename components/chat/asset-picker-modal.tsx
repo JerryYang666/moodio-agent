@@ -16,6 +16,7 @@ import { Input } from "@heroui/input";
 import { Image } from "@heroui/image";
 import { Tab, Tabs } from "@heroui/tabs";
 import { Search } from "lucide-react";
+import { siteConfig } from "@/config/site";
 
 export type AssetSummary = {
   id: string;
@@ -171,15 +172,10 @@ export default function AssetPickerModal({
                     onChange={(e) => {
                       const file = e.target.files?.[0];
                       if (!file) return;
-                      const maxBytes = 5 * 1024 * 1024;
-                      const validTypes = [
-                        "image/jpeg",
-                        "image/png",
-                        "image/gif",
-                        "image/webp",
-                      ];
+                      const maxBytes = siteConfig.upload.maxFileSizeMB * 1024 * 1024;
+                      const validTypes = siteConfig.upload.allowedImageTypes;
                       if (file.size > maxBytes) {
-                        setUploadError(t("assetPicker.uploadTooLarge"));
+                        setUploadError(t("assetPicker.uploadTooLarge", { maxSize: siteConfig.upload.maxFileSizeMB }));
                         e.currentTarget.value = "";
                         return;
                       }
@@ -201,7 +197,7 @@ export default function AssetPickerModal({
                       {t("assetPicker.uploadFromDevice")}
                     </div>
                     <div className="text-sm text-default-500 mt-1">
-                      {t("assetPicker.uploadDescription")}
+                      {t("assetPicker.uploadDescription", { maxSize: siteConfig.upload.maxFileSizeMB })}
                     </div>
                     {uploadError && (
                       <div className="text-xs text-danger mt-2">

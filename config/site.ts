@@ -72,4 +72,11 @@ export const siteConfig = {
   pwa: {
     enableInstallPrompt: false, // Set to true when icons are ready in /public/icons/
   },
+
+  // Upload Configuration
+  upload: {
+    maxFileSizeMB: 15, // Maximum file size in MB for image uploads
+    allowedImageTypes: ["image/jpeg", "image/png", "image/gif", "image/webp"],
+    presignedUrlExpiresIn: 300, // 5 minutes in seconds
+  },
 };

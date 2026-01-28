@@ -15,6 +15,7 @@ import AssetPickerModal, {
   AssetSummary,
 } from "@/components/chat/asset-picker-modal";
 import { useVideo } from "@/components/video-provider";
+import { uploadImage } from "@/lib/upload/client";
 
 interface VideoModelParam {
   name: string;
@@ -225,33 +226,25 @@ export default function VideoGenerationPanel({
     setUploadingTarget(pickerTarget);
     setPickerOpen(false);
 
-    const formData = new FormData();
-    formData.append("file", file);
+    const result = await uploadImage(file);
 
-    try {
-      const res = await fetch("/api/image/upload", {
-        method: "POST",
-        body: formData,
-      });
-      if (!res.ok) throw new Error(t("failedToUploadImage"));
-      const data = await res.json();
-
+    if (result.success) {
       if (pickerTarget === "source") {
-        setSourceImageId(data.imageId);
-        setSourceImageUrl(data.imageUrl);
+        setSourceImageId(result.data.imageId);
+        setSourceImageUrl(result.data.imageUrl);
       } else {
-        setEndImageId(data.imageId);
-        setEndImageUrl(data.imageUrl);
+        setEndImageId(result.data.imageId);
+        setEndImageUrl(result.data.imageUrl);
       }
-    } catch (e) {
-      console.error("Upload error:", e);
+    } else {
+      console.error("Upload error:", result.error);
       setError(t("failedToUploadImage"));
-    } finally {
-      // Clean up
-      URL.revokeObjectURL(localPreview);
-      setUploadPreviewUrl(null);
-      setUploadingTarget(null);
     }
+
+    // Clean up
+    URL.revokeObjectURL(localPreview);
+    setUploadPreviewUrl(null);
+    setUploadingTarget(null);
   };
 
   const handleGenerate = async () => {

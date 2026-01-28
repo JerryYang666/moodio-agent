@@ -4,20 +4,18 @@ import { verifyAccessToken } from "@/lib/auth/jwt";
 import { db } from "@/lib/db";
 import { collectionImages, collections } from "@/lib/db/schema";
 import { ensureDefaultProject } from "@/lib/db/projects";
-import { uploadImage, getSignedImageUrl } from "@/lib/storage/s3";
-import { siteConfig } from "@/config/site";
+import { checkImageExists, getSignedImageUrl } from "@/lib/storage/s3";
 import { and, desc, eq } from "drizzle-orm";
 
 const UPLOADS_COLLECTION_NAME = "My Uploads";
 
 /**
- * POST /api/image/upload
- * Legacy direct upload endpoint - limited by Vercel's 4.5MB request body limit
+ * POST /api/image/upload/confirm
+ * Confirm that a direct-to-S3 upload completed successfully
+ * Creates the database records for the uploaded image
  *
- * For larger uploads, use the presigned URL flow:
- * 1. POST /api/image/upload/presign
- * 2. PUT to S3 presigned URL
- * 3. POST /api/image/upload/confirm
+ * Request body: { imageId: string, filename?: string }
+ * Response: { imageId: string, imageUrl: string }
  */
 export async function POST(request: NextRequest) {
   // Verify authentication
@@ -32,44 +30,29 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const contentType = request.headers.get("content-type") || "";
+    const body = await request.json();
+    const { imageId, filename } = body;
 
-    if (!contentType.includes("multipart/form-data")) {
+    // Validate required fields
+    if (!imageId || typeof imageId !== "string") {
       return NextResponse.json(
-        { error: "Content-Type must be multipart/form-data" },
+        { error: "imageId is required" },
         { status: 400 }
       );
     }
 
-    const formData = await request.formData();
-    const file = formData.get("file") as File | null;
-
-    if (!file) {
-      return NextResponse.json({ error: "File is required" }, { status: 400 });
-    }
-
-    // Validate file size
-    // Note: This endpoint is limited by Vercel's 4.5MB request body limit
-    // For larger uploads, use the presigned URL flow (/api/image/upload/presign)
-    const maxFileSize = siteConfig.upload.maxFileSizeMB * 1024 * 1024;
-    if (file.size > maxFileSize) {
+    // Verify the image exists in S3
+    const imageCheck = await checkImageExists(imageId);
+    if (!imageCheck.exists) {
       return NextResponse.json(
-        { error: `Image size limit is ${siteConfig.upload.maxFileSizeMB}MB` },
-        { status: 400 }
-      );
-    }
-
-    // Validate file type
-    if (!siteConfig.upload.allowedImageTypes.includes(file.type)) {
-      return NextResponse.json(
-        { error: "Invalid file type. Supported: JPEG, PNG, GIF, WebP" },
-        { status: 400 }
+        { error: "Image not found in storage. Upload may have failed." },
+        { status: 404 }
       );
     }
 
     const defaultProject = await ensureDefaultProject(payload.userId);
 
-    // Ensure the "My Uploads" collection exists in the default project.
+    // Ensure the "My Uploads" collection exists in the default project
     let uploadsCollection = (
       await db
         .select()
@@ -97,9 +80,6 @@ export async function POST(request: NextRequest) {
       uploadsCollection = created;
     }
 
-    // Upload to S3
-    const imageId = await uploadImage(file, file.type);
-
     // Save uploaded image in "My Uploads"
     await db.insert(collectionImages).values({
       projectId: defaultProject.id,
@@ -107,7 +87,7 @@ export async function POST(request: NextRequest) {
       imageId,
       chatId: null,
       generationDetails: {
-        title: file.name || "Uploaded image",
+        title: filename || "Uploaded image",
         prompt: "",
         status: "generated",
       },
@@ -119,7 +99,7 @@ export async function POST(request: NextRequest) {
       .set({ updatedAt: new Date() })
       .where(eq(collections.id, uploadsCollection.id));
 
-    // Generate signed URL for immediate display (upload may finish after cookie expiry)
+    // Generate signed URL for immediate display
     const imageUrl = getSignedImageUrl(imageId);
 
     return NextResponse.json({
@@ -127,9 +107,9 @@ export async function POST(request: NextRequest) {
       imageUrl,
     });
   } catch (error) {
-    console.error("[Image Upload] Error:", error);
+    console.error("[Image Confirm] Error:", error);
     return NextResponse.json(
-      { error: "Failed to upload image" },
+      { error: "Failed to confirm upload" },
       { status: 500 }
     );
   }

@@ -2,8 +2,10 @@ import {
   S3Client,
   PutObjectCommand,
   GetObjectCommand,
+  HeadObjectCommand,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/cloudfront-signer";
+import { getSignedUrl as getS3SignedUrl } from "@aws-sdk/s3-request-presigner";
 import { Message } from "@/lib/llm/types";
 import { randomUUID } from "crypto";
 import { siteConfig } from "@/config/site";
@@ -70,6 +72,67 @@ export async function uploadImage(
  */
 export function generateImageId(): string {
   return randomUUID();
+}
+
+/**
+ * Generate a presigned URL for direct client-to-S3 upload
+ * This bypasses Vercel's 4.5MB request body limit
+ *
+ * @param imageId The image ID to use for the upload
+ * @param contentType The MIME type of the image
+ * @param contentLength The size of the file in bytes (for validation)
+ * @param expiresIn Expiration time in seconds (default: 5 minutes)
+ * @returns Presigned PUT URL for direct upload
+ */
+export async function getPresignedUploadUrl(
+  imageId: string,
+  contentType: string,
+  contentLength: number,
+  expiresIn: number = 300
+): Promise<string> {
+  const key = `images/${imageId}`;
+
+  const command = new PutObjectCommand({
+    Bucket: BUCKET_NAME,
+    Key: key,
+    ContentType: contentType,
+    ContentLength: contentLength,
+  });
+
+  return await getS3SignedUrl(s3Client, command, { expiresIn });
+}
+
+/**
+ * Check if an image exists in S3
+ * Used to verify that a client upload completed successfully
+ *
+ * @param imageId The image ID to check
+ * @returns Object with exists boolean and optional metadata
+ */
+export async function checkImageExists(
+  imageId: string
+): Promise<{ exists: boolean; contentType?: string; contentLength?: number }> {
+  const key = `images/${imageId}`;
+
+  try {
+    const response = await s3Client.send(
+      new HeadObjectCommand({
+        Bucket: BUCKET_NAME,
+        Key: key,
+      })
+    );
+
+    return {
+      exists: true,
+      contentType: response.ContentType,
+      contentLength: response.ContentLength,
+    };
+  } catch (error: any) {
+    if (error.name === "NotFound" || error.$metadata?.httpStatusCode === 404) {
+      return { exists: false };
+    }
+    throw error;
+  }
 }
 
 /**
