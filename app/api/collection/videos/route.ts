@@ -4,26 +4,34 @@ import {
   collectionImages,
   collections,
   collectionShares,
+  videoGenerations,
 } from "@/lib/db/schema";
 import { getAccessToken } from "@/lib/auth/cookies";
 import { verifyAccessToken } from "@/lib/auth/jwt";
 import { and, desc, eq, inArray, isNotNull } from "drizzle-orm";
 import { getImageUrl, getVideoUrl } from "@/lib/storage/s3";
 
-interface CollectionVideo {
+// Full video generation details - same structure as /api/video/generations
+interface VideoGenerationDetails {
   id: string;
-  collectionId: string;
-  imageId: string;
-  assetId: string;
-  assetType: string;
-  imageUrl: string;
+  modelId: string;
+  status: string;
+  sourceImageId: string;
+  sourceImageUrl: string;
+  endImageId: string | null;
+  endImageUrl: string | null;
+  videoId: string | null;
   videoUrl: string | null;
-  generationDetails: {
-    title: string;
-    prompt: string;
-    status: string;
-  };
-  addedAt: Date;
+  thumbnailImageId: string | null;
+  thumbnailUrl: string | null;
+  params: Record<string, any>;
+  error: string | null;
+  seed: number | null;
+  createdAt: Date;
+  completedAt: Date | null;
+  // Additional fields for collection context
+  collectionImageId: string;
+  collectionId: string;
 }
 
 interface CollectionWithVideos {
@@ -35,14 +43,16 @@ interface CollectionWithVideos {
   updatedAt: Date;
   permission: "owner" | "collaborator" | "viewer";
   isOwner: boolean;
-  videos: CollectionVideo[];
+  videos: VideoGenerationDetails[];
 }
 
 /**
  * GET /api/collection/videos
- * Get all collections that contain videos, with their video assets.
+ * Get all collections that contain videos, with full video generation details.
  * Returns collections grouped with their videos in a single query.
  * Only returns collections that have at least one video.
+ * 
+ * The video details match the structure from /api/video/generations for consistency.
  */
 export async function GET(req: NextRequest) {
   try {
@@ -132,7 +142,32 @@ export async function GET(req: NextRequest) {
       )
       .orderBy(desc(collectionImages.addedAt));
 
-    // Step 3: Group videos by collection and add URLs
+    if (videoAssets.length === 0) {
+      return NextResponse.json({ collections: [] });
+    }
+
+    // Step 3: Get video IDs and fetch full generation details
+    const videoIds = videoAssets
+      .map((a) => a.assetId)
+      .filter((id): id is string => !!id);
+
+    // Fetch video generation records for these video IDs
+    const videoGenerationRecords = videoIds.length > 0
+      ? await db
+          .select()
+          .from(videoGenerations)
+          .where(inArray(videoGenerations.videoId, videoIds))
+      : [];
+
+    // Create a map of videoId -> generation record for quick lookup
+    const generationMap = new Map<string, typeof videoGenerationRecords[0]>();
+    for (const gen of videoGenerationRecords) {
+      if (gen.videoId) {
+        generationMap.set(gen.videoId, gen);
+      }
+    }
+
+    // Step 4: Group videos by collection with full generation details
     for (const asset of videoAssets) {
       const collectionId = asset.collectionId;
       if (!collectionId) continue;
@@ -140,31 +175,65 @@ export async function GET(req: NextRequest) {
       const collection = collectionMap.get(collectionId);
       if (!collection) continue;
 
-      const generationDetails = asset.generationDetails as {
-        title?: string;
-        prompt?: string;
-        status?: string;
-        videoUrl?: string;
-      };
+      // Get the full generation record
+      const generation = generationMap.get(asset.assetId);
 
-      collection.videos.push({
-        id: asset.id,
-        collectionId: collectionId,
-        imageId: asset.imageId,
-        assetId: asset.assetId,
-        assetType: asset.assetType,
-        imageUrl: getImageUrl(asset.imageId),
-        videoUrl: generationDetails.videoUrl || getVideoUrl(asset.assetId),
-        generationDetails: {
-          title: generationDetails.title || "",
-          prompt: generationDetails.prompt || "",
+      if (generation) {
+        // Use full generation details
+        collection.videos.push({
+          id: generation.id,
+          modelId: generation.modelId,
+          status: generation.status,
+          sourceImageId: generation.sourceImageId,
+          sourceImageUrl: getImageUrl(generation.sourceImageId),
+          endImageId: generation.endImageId,
+          endImageUrl: generation.endImageId ? getImageUrl(generation.endImageId) : null,
+          videoId: generation.videoId,
+          videoUrl: generation.videoId ? getVideoUrl(generation.videoId) : null,
+          thumbnailImageId: generation.thumbnailImageId,
+          thumbnailUrl: generation.thumbnailImageId ? getImageUrl(generation.thumbnailImageId) : null,
+          params: generation.params as Record<string, any>,
+          error: generation.error,
+          seed: generation.seed,
+          createdAt: generation.createdAt,
+          completedAt: generation.completedAt,
+          collectionImageId: asset.id,
+          collectionId: collectionId,
+        });
+      } else {
+        // Fallback: construct from collection image data if generation record not found
+        // This handles edge cases where video was added but generation record is missing
+        const generationDetails = asset.generationDetails as {
+          title?: string;
+          prompt?: string;
+          status?: string;
+          videoUrl?: string;
+        };
+
+        collection.videos.push({
+          id: asset.id, // Use collection image ID as fallback
+          modelId: "unknown",
           status: generationDetails.status || "completed",
-        },
-        addedAt: asset.addedAt,
-      });
+          sourceImageId: asset.imageId,
+          sourceImageUrl: getImageUrl(asset.imageId),
+          endImageId: null,
+          endImageUrl: null,
+          videoId: asset.assetId,
+          videoUrl: generationDetails.videoUrl || getVideoUrl(asset.assetId),
+          thumbnailImageId: asset.imageId,
+          thumbnailUrl: getImageUrl(asset.imageId),
+          params: { prompt: generationDetails.prompt || "" },
+          error: null,
+          seed: null,
+          createdAt: asset.addedAt,
+          completedAt: null,
+          collectionImageId: asset.id,
+          collectionId: collectionId,
+        });
+      }
     }
 
-    // Step 4: Filter to only collections that have videos and convert to array
+    // Step 5: Filter to only collections that have videos and convert to array
     const collectionsWithVideos = Array.from(collectionMap.values())
       .filter((col) => col.videos.length > 0)
       .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());

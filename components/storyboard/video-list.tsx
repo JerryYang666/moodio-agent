@@ -71,24 +71,14 @@ interface VideoListProps {
   onRestore?: (data: VideoGenerationRestore) => void;
 }
 
-interface CollectionVideo {
-  id: string;
+// Collection video now has full VideoGeneration details from the API
+interface CollectionVideoGeneration extends VideoGeneration {
+  collectionImageId: string;
   collectionId: string;
-  imageId: string;
-  assetId: string;
-  assetType: "image" | "video";
-  imageUrl: string;
-  videoUrl?: string;
-  generationDetails: {
-    title: string;
-    prompt: string;
-    status: string;
-  };
-  addedAt: Date;
 }
 
 interface CollectionWithVideos extends Collection {
-  videos: CollectionVideo[];
+  videos: CollectionVideoGeneration[];
 }
 
 type ViewMode = "all" | "by-collection";
@@ -162,7 +152,6 @@ export default function VideoList({ refreshTrigger, onRestore }: VideoListProps)
   const [collectionsWithVideos, setCollectionsWithVideos] = useState<CollectionWithVideos[]>([]);
   const [collectionsLoading, setCollectionsLoading] = useState(false);
   const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(null);
-  const [selectedCollectionVideo, setSelectedCollectionVideo] = useState<CollectionVideo | null>(null);
 
   // Collection-related state
   const {
@@ -712,8 +701,8 @@ export default function VideoList({ refreshTrigger, onRestore }: VideoListProps)
                             {collection.videos.slice(0, 4).map((video, idx) => (
                               <div key={video.id} className="relative overflow-hidden">
                                 <Image
-                                  src={video.imageUrl}
-                                  alt={video.generationDetails.title || t("videoThumbnailAlt")}
+                                  src={video.thumbnailUrl || video.sourceImageUrl}
+                                  alt={t("videoThumbnailAlt")}
                                   radius="none"
                                   classNames={{
                                     wrapper: "w-full h-full !max-w-full",
@@ -769,15 +758,15 @@ export default function VideoList({ refreshTrigger, onRestore }: VideoListProps)
               {selectedCollection.videos.map((video) => (
                 <button
                   key={video.id}
-                  onClick={() => setSelectedCollectionVideo(video)}
+                  onClick={() => setSelectedVideo(video)}
                   className="text-left w-full group"
                 >
                   <div className="rounded-lg overflow-hidden border border-divider bg-default-50 hover:border-primary transition-colors">
                     {/* Thumbnail */}
                     <div className="relative aspect-video bg-default-100">
                       <Image
-                        src={video.imageUrl}
-                        alt={video.generationDetails.title || t("videoThumbnailAlt")}
+                        src={video.thumbnailUrl || video.sourceImageUrl}
+                        alt={t("videoThumbnailAlt")}
                         radius="none"
                         classNames={{
                           wrapper: "w-full h-full !max-w-full",
@@ -785,33 +774,72 @@ export default function VideoList({ refreshTrigger, onRestore }: VideoListProps)
                         }}
                       />
 
-                      {/* Video Badge */}
-                      <div className="absolute top-2 left-2 z-10">
-                        <div className="bg-black/70 text-white rounded-full p-1.5 flex items-center gap-1">
-                          <Play size={12} fill="white" />
-                          <span className="text-[10px] font-medium pr-1">Video</span>
+                      {/* Status Overlay */}
+                      {video.status !== "completed" && (
+                        <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                          {video.status === "processing" && (
+                            <div className="text-center">
+                              <Loader2
+                                size={24}
+                                className="sm:w-8 sm:h-8 text-white animate-spin mx-auto mb-1 sm:mb-2"
+                              />
+                              <span className="text-white text-xs sm:text-sm">
+                                {t("generating")}
+                              </span>
+                            </div>
+                          )}
+                          {video.status === "pending" && (
+                            <div className="text-center">
+                              <Clock
+                                size={24}
+                                className="sm:w-8 sm:h-8 text-white mx-auto mb-1 sm:mb-2"
+                              />
+                              <span className="text-white text-xs sm:text-sm">
+                                {t("queued")}
+                              </span>
+                            </div>
+                          )}
+                          {video.status === "failed" && (
+                            <div className="text-center">
+                              <XCircle
+                                size={24}
+                                className="sm:w-8 sm:h-8 text-danger mx-auto mb-1 sm:mb-2"
+                              />
+                              <span className="text-white text-xs sm:text-sm">
+                                {t("failed")}
+                              </span>
+                            </div>
+                          )}
                         </div>
-                      </div>
+                      )}
 
                       {/* Play Button Overlay */}
-                      <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 sm:transition-opacity">
-                        <div className="bg-black/50 rounded-full p-2 sm:p-3">
-                          <Play
-                            size={20}
-                            className="sm:w-6 sm:h-6 text-white"
-                            fill="white"
-                          />
+                      {video.status === "completed" && (
+                        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 sm:transition-opacity">
+                          <div className="bg-black/50 rounded-full p-2 sm:p-3">
+                            <Play
+                              size={20}
+                              className="sm:w-6 sm:h-6 text-white"
+                              fill="white"
+                            />
+                          </div>
                         </div>
-                      </div>
+                      )}
                     </div>
 
                     {/* Info */}
                     <div className="p-2 sm:p-3">
-                      <p className="text-xs sm:text-sm text-default-600 line-clamp-2 font-medium">
-                        {video.generationDetails.title || t("untitledVideo")}
-                      </p>
-                      <p className="text-xs text-default-400 line-clamp-1 mt-1">
-                        {video.generationDetails.prompt || t("noPrompt")}
+                      <div className="flex items-center justify-between mb-1 gap-1">
+                        <VideoStatusChip status={video.status} />
+                        <span className="text-[10px] sm:text-xs text-default-400 shrink-0">
+                          {formatDate(video.createdAt)}
+                        </span>
+                      </div>
+                      <div className="text-[10px] sm:text-xs text-default-400 mb-1">
+                        {t("model")}: {getModelLabel(video.modelId)}
+                      </div>
+                      <p className="text-xs sm:text-sm text-default-600 line-clamp-2">
+                        {video.params.prompt || t("noPrompt")}
                       </p>
                     </div>
                   </div>
@@ -1154,126 +1182,6 @@ export default function VideoList({ refreshTrigger, onRestore }: VideoListProps)
         </ModalContent>
       </Modal>
 
-      {/* Collection Video Detail Modal */}
-      <Modal
-        isOpen={!!selectedCollectionVideo}
-        onOpenChange={() => setSelectedCollectionVideo(null)}
-        size="4xl"
-        scrollBehavior="inside"
-        classNames={{
-          base: "max-sm:m-0 max-sm:rounded-none",
-          wrapper: "max-sm:items-end",
-        }}
-      >
-        <ModalContent className="max-sm:max-h-[90vh]">
-          {(onClose) => (
-            <>
-              <ModalHeader className="flex items-center gap-2 text-base sm:text-lg px-3 sm:px-6">
-                <Video size={18} className="sm:w-5 sm:h-5" />
-                {t("videoDetails")}
-              </ModalHeader>
-              <ModalBody className="px-3 sm:px-6">
-                {selectedCollectionVideo && (
-                  <div className="space-y-3 sm:space-y-4">
-                    {/* Video Player */}
-                    <div className="rounded-lg overflow-hidden bg-black">
-                      {selectedCollectionVideo.videoUrl ? (
-                        <video
-                          src={selectedCollectionVideo.videoUrl}
-                          controls
-                          autoPlay
-                          playsInline
-                          className="w-full max-h-[40vh] sm:max-h-[60vh]"
-                        />
-                      ) : (
-                        <div className="aspect-video flex items-center justify-center">
-                          <Image
-                            src={selectedCollectionVideo.imageUrl}
-                            alt={selectedCollectionVideo.generationDetails.title || t("thumbnailAlt")}
-                            classNames={{
-                              wrapper: "w-full h-full",
-                              img: "w-full h-full object-contain",
-                            }}
-                          />
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Title & Prompt */}
-                    <div className="bg-default-100 p-3 sm:p-4 rounded-lg">
-                      <h4 className="font-medium mb-1 sm:mb-2 text-sm sm:text-base">
-                        {selectedCollectionVideo.generationDetails.title || t("untitledVideo")}
-                      </h4>
-                      {selectedCollectionVideo.generationDetails.prompt && (
-                        <p className="text-xs sm:text-sm text-default-600 whitespace-pre-wrap">
-                          {selectedCollectionVideo.generationDetails.prompt}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </ModalBody>
-              <ModalFooter className="flex-wrap gap-2 px-3 sm:px-6 safe-area-bottom">
-                {selectedCollectionVideo?.videoUrl && (
-                  <>
-                    <Button
-                      variant="flat"
-                      size="sm"
-                      className="sm:size-md flex-1 sm:flex-none"
-                      startContent={
-                        <ExternalLink size={14} className="sm:w-4 sm:h-4" />
-                      }
-                      onPress={() =>
-                        window.open(selectedCollectionVideo.videoUrl!, "_blank")
-                      }
-                    >
-                      <span className="hidden sm:inline">
-                        {t("openInNewTab")}
-                      </span>
-                      <span className="sm:hidden">{tCommon("open")}</span>
-                    </Button>
-                    <Button
-                      color="primary"
-                      size="sm"
-                      className="sm:size-md flex-1 sm:flex-none"
-                      startContent={
-                        <Download size={14} className="sm:w-4 sm:h-4" />
-                      }
-                      onPress={async () => {
-                        if (!selectedCollectionVideo.videoUrl) return;
-                        try {
-                          const response = await fetch(selectedCollectionVideo.videoUrl);
-                          const blob = await response.blob();
-                          const url = window.URL.createObjectURL(blob);
-                          const a = document.createElement("a");
-                          a.href = url;
-                          a.download = `video-${selectedCollectionVideo.assetId}.mp4`;
-                          document.body.appendChild(a);
-                          a.click();
-                          window.URL.revokeObjectURL(url);
-                          document.body.removeChild(a);
-                        } catch (e) {
-                          console.error("Download error:", e);
-                        }
-                      }}
-                    >
-                      {tCommon("download")}
-                    </Button>
-                  </>
-                )}
-                <Button
-                  variant="light"
-                  size="sm"
-                  className="sm:size-md"
-                  onPress={onClose}
-                >
-                  {tCommon("close")}
-                </Button>
-              </ModalFooter>
-            </>
-          )}
-        </ModalContent>
-      </Modal>
     </>
   );
 }
