@@ -231,7 +231,10 @@
     "estimatedCost": "Estimated Cost",
     "credits": "credits",
     "costUnavailable": "Cost unavailable",
-    "putBack": "Put Back"
+    "putBack": "Put Back",
+    "untitledVideo": "Untitled Video",
+    "videoActions": "Video actions",
+    "addedToCollection": "Video added to collection"
   },
   "menu": {
     "mode": "Mode",

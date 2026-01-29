@@ -231,7 +231,10 @@
     "estimatedCost": "预估费用",
     "credits": "积分",
     "costUnavailable": "无法计算费用",
-    "putBack": "恢复参数"
+    "putBack": "恢复参数",
+    "untitledVideo": "未命名视频",
+    "videoActions": "视频操作",
+    "addedToCollection": "视频已添加到收藏夹"
   },
   "menu": {
     "mode": "模式",

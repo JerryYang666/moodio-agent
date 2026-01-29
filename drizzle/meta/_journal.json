@@ -99,6 +99,13 @@
       "when": 1768972765568,
       "tag": "0013_add_model_pricing",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1769649822059,
+      "tag": "0014_add_asset_fields_to_collection_images",
+      "breakpoints": true
     }
   ]
 }

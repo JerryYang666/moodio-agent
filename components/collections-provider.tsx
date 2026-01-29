@@ -23,13 +23,16 @@ export interface CollectionImage {
   id: string;
   projectId: string;
   collectionId: string | null;
-  imageId: string;
+  imageId: string; // Thumbnail/display image ID (for both images and videos)
+  assetId: string; // Actual asset ID (same as imageId for images, video ID for videos)
+  assetType: "image" | "video";
   chatId: string | null;
   generationDetails: {
     title: string;
     prompt: string;
-    status: "loading" | "generated" | "error";
-    imageUrl?: string;
+    status: "loading" | "generated" | "error" | "pending" | "processing" | "completed" | "failed";
+    imageUrl?: string; // Resolved thumbnail URL
+    videoUrl?: string; // Resolved video URL (for videos only)
   };
   addedAt: Date;
 }
@@ -54,6 +57,12 @@ interface CollectionsContextValue {
     collectionId: string,
     imageId: string,
     chatId: string | null,
+    generationDetails: any
+  ) => Promise<boolean>;
+  addVideoToCollection: (
+    collectionId: string,
+    thumbnailImageId: string,
+    videoId: string,
     generationDetails: any
   ) => Promise<boolean>;
   removeImageFromCollection: (
@@ -243,6 +252,54 @@ export function CollectionsProvider({
     []
   );
 
+  const addVideoToCollection = useCallback(
+    async (
+      collectionId: string,
+      thumbnailImageId: string,
+      videoId: string,
+      generationDetails: any
+    ) => {
+      try {
+        const res = await fetch(`/api/collection/${collectionId}/images`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            imageId: thumbnailImageId, // Thumbnail for display
+            assetId: videoId, // Actual video asset
+            assetType: "video",
+            chatId: null, // Videos don't come from chats
+            generationDetails,
+          }),
+        });
+
+        if (!res.ok) {
+          const data = await res.json();
+          throw new Error(data.error || "Failed to add video to collection");
+        }
+
+        // Update collection's updatedAt
+        setCollections((prev) =>
+          prev.map((col) =>
+            col.id === collectionId ? { ...col, updatedAt: new Date() } : col
+          )
+        );
+
+        // Dispatch event for real-time sync (e.g., assets sidebar)
+        window.dispatchEvent(
+          new CustomEvent(ASSETS_UPDATED_EVENT, {
+            detail: { collectionId },
+          })
+        );
+
+        return true;
+      } catch (err) {
+        console.error("Error adding video to collection:", err);
+        return false;
+      }
+    },
+    []
+  );
+
   const removeImageFromCollection = useCallback(
     async (collectionId: string, imageId: string) => {
       try {
@@ -324,6 +381,7 @@ export function CollectionsProvider({
     renameCollection,
     deleteCollection,
     addImageToCollection,
+    addVideoToCollection,
     removeImageFromCollection,
     shareCollection,
     removeShare,

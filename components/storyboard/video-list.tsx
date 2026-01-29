@@ -1,19 +1,28 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useTranslations } from "next-intl";
 import { Card, CardBody, CardHeader } from "@heroui/card";
 import { Spinner } from "@heroui/spinner";
 import { Button } from "@heroui/button";
 import { Chip } from "@heroui/chip";
 import { Image } from "@heroui/image";
+import { Input } from "@heroui/input";
 import {
   Modal,
   ModalContent,
   ModalHeader,
   ModalBody,
   ModalFooter,
+  useDisclosure,
 } from "@heroui/modal";
+import {
+  Dropdown,
+  DropdownTrigger,
+  DropdownMenu,
+  DropdownItem,
+  DropdownSection,
+} from "@heroui/dropdown";
 import {
   Video,
   RefreshCw,
@@ -24,10 +33,15 @@ import {
   Loader2,
   ExternalLink,
   RotateCcw,
+  MoreVertical,
+  FolderPlus,
+  Plus,
 } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import type { VideoGenerationRestore } from "./video-generation-panel";
 import VideoStatusChip from "./video-status-chip";
 import { getVideoModel } from "@/lib/video/models";
+import { useCollections } from "@/hooks/use-collections";
 
 interface VideoGeneration {
   id: string;
@@ -55,15 +69,89 @@ interface VideoListProps {
 
 const POLL_INTERVAL = 5000; // 5 seconds
 
+// Flying image animation component
+interface FlyingImageProps {
+  imageUrl: string;
+  startPosition: { x: number; y: number };
+  endPosition: { x: number; y: number };
+  onComplete: () => void;
+  altText: string;
+}
+
+const FlyingImage = ({
+  imageUrl,
+  startPosition,
+  endPosition,
+  onComplete,
+  altText,
+}: FlyingImageProps) => {
+  return (
+    <motion.div
+      initial={{
+        position: "fixed",
+        left: startPosition.x,
+        top: startPosition.y,
+        width: 100,
+        height: 100,
+        opacity: 1,
+        zIndex: 9999,
+      }}
+      animate={{
+        left: endPosition.x,
+        top: endPosition.y,
+        width: 40,
+        height: 40,
+        opacity: 0,
+      }}
+      transition={{
+        duration: 0.7,
+        ease: "easeInOut",
+      }}
+      onAnimationComplete={onComplete}
+      className="pointer-events-none rounded-lg overflow-hidden shadow-lg"
+    >
+      <img
+        src={imageUrl}
+        alt={altText}
+        className="w-full h-full object-cover"
+      />
+    </motion.div>
+  );
+};
+
 export default function VideoList({ refreshTrigger, onRestore }: VideoListProps) {
   const t = useTranslations("video");
   const tCommon = useTranslations("common");
+  const tCollections = useTranslations("collections");
+  const tMenu = useTranslations("imageMenu");
   const [generations, setGenerations] = useState<VideoGeneration[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedVideo, setSelectedVideo] = useState<VideoGeneration | null>(
     null
   );
+
+  // Collection-related state
+  const {
+    collections,
+    createCollection,
+    addVideoToCollection,
+    getDefaultCollectionName,
+  } = useCollections();
+  const [flyingImages, setFlyingImages] = useState<
+    Array<{ id: string; imageUrl: string; startPos: { x: number; y: number } }>
+  >([]);
+  const [newCollectionName, setNewCollectionName] = useState("");
+  const [isCreating, setIsCreating] = useState(false);
+  const [pendingVideoForCollection, setPendingVideoForCollection] =
+    useState<VideoGeneration | null>(null);
+  const cardRefs = useRef<Map<string, HTMLElement>>(new Map());
+
+  const {
+    isOpen: isCreateOpen,
+    onOpen: onCreateOpen,
+    onOpenChange: onCreateOpenChange,
+  } = useDisclosure();
 
   const fetchGenerations = useCallback(async () => {
     try {
@@ -156,6 +244,96 @@ export default function VideoList({ refreshTrigger, onRestore }: VideoListProps)
     setSelectedVideo(null);
   };
 
+  // Collection-related handlers
+  const getEndPosition = () => {
+    if (typeof window === "undefined") return { x: 0, y: 100 };
+    return { x: window.innerWidth - 60, y: 100 };
+  };
+
+  const startFlyingAnimation = (videoId: string, imageUrl: string) => {
+    const cardElement = cardRefs.current.get(videoId);
+    if (!cardElement) return;
+
+    const cardRect = cardElement.getBoundingClientRect();
+    const startPos = {
+      x: cardRect.left + cardRect.width / 2 - 50,
+      y: cardRect.top + cardRect.height / 2 - 50,
+    };
+
+    const flyingId = `flying-${Date.now()}`;
+    setFlyingImages((prev) => [...prev, { id: flyingId, imageUrl, startPos }]);
+  };
+
+  const removeFlyingImage = (id: string) => {
+    setFlyingImages((prev) => prev.filter((img) => img.id !== id));
+  };
+
+  const handleAddVideoToCollection = async (
+    collectionId: string,
+    gen: VideoGeneration
+  ) => {
+    if (!gen.videoId || !gen.thumbnailImageId) return;
+
+    const success = await addVideoToCollection(
+      collectionId,
+      gen.thumbnailImageId, // imageId = thumbnail
+      gen.videoId, // assetId = video
+      {
+        title: gen.params.prompt?.slice(0, 50) || t("untitledVideo"),
+        prompt: gen.params.prompt || "",
+        status: gen.status,
+      }
+    );
+
+    if (success) {
+      startFlyingAnimation(gen.id, gen.thumbnailUrl || gen.sourceImageUrl);
+    }
+  };
+
+  const handleCreateNewCollection = (gen: VideoGeneration) => {
+    setPendingVideoForCollection(gen);
+    setNewCollectionName(getDefaultCollectionName());
+    onCreateOpen();
+  };
+
+  const handleCreateAndAddVideo = async () => {
+    if (!newCollectionName.trim() || !pendingVideoForCollection) return;
+    if (!pendingVideoForCollection.videoId || !pendingVideoForCollection.thumbnailImageId) return;
+
+    setIsCreating(true);
+    try {
+      const collection = await createCollection(newCollectionName.trim());
+      if (collection) {
+        await addVideoToCollection(
+          collection.id,
+          pendingVideoForCollection.thumbnailImageId,
+          pendingVideoForCollection.videoId,
+          {
+            title:
+              pendingVideoForCollection.params.prompt?.slice(0, 50) ||
+              t("untitledVideo"),
+            prompt: pendingVideoForCollection.params.prompt || "",
+            status: pendingVideoForCollection.status,
+          }
+        );
+        startFlyingAnimation(
+          pendingVideoForCollection.id,
+          pendingVideoForCollection.thumbnailUrl ||
+            pendingVideoForCollection.sourceImageUrl
+        );
+        setNewCollectionName("");
+        setPendingVideoForCollection(null);
+        onCreateOpenChange();
+      }
+    } catch (error) {
+      console.error("Error creating collection:", error);
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  const endPos = getEndPosition();
+
   if (loading) {
     return (
       <Card className="h-full shadow-none">
@@ -212,94 +390,180 @@ export default function VideoList({ refreshTrigger, onRestore }: VideoListProps)
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-4">
               {generations.map((gen) => (
-                <button
+                <div
                   key={gen.id}
-                  onClick={() => setSelectedVideo(gen)}
-                  className="text-left group"
+                  ref={(el) => {
+                    if (el) cardRefs.current.set(gen.id, el);
+                    else cardRefs.current.delete(gen.id);
+                  }}
+                  className="relative group"
                 >
-                  <div className="rounded-lg overflow-hidden border border-divider bg-default-50 hover:border-primary transition-colors">
-                    {/* Thumbnail */}
-                    <div className="relative aspect-video bg-default-100">
-                      <Image
-                        src={gen.thumbnailUrl || gen.sourceImageUrl}
-                        alt={t("videoThumbnailAlt")}
-                        radius="none"
-                        classNames={{
-                          wrapper: "w-full h-full !max-w-full",
-                          img: "w-full h-full object-cover",
-                        }}
-                      />
+                  <button
+                    onClick={() => setSelectedVideo(gen)}
+                    className="text-left w-full"
+                  >
+                    <div className="rounded-lg overflow-hidden border border-divider bg-default-50 hover:border-primary transition-colors">
+                      {/* Thumbnail */}
+                      <div className="relative aspect-video bg-default-100">
+                        <Image
+                          src={gen.thumbnailUrl || gen.sourceImageUrl}
+                          alt={t("videoThumbnailAlt")}
+                          radius="none"
+                          classNames={{
+                            wrapper: "w-full h-full !max-w-full",
+                            img: "w-full h-full object-cover",
+                          }}
+                        />
 
-                      {/* Status Overlay */}
-                      {gen.status !== "completed" && (
-                        <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                          {gen.status === "processing" && (
-                            <div className="text-center">
-                              <Loader2
-                                size={24}
-                                className="sm:w-8 sm:h-8 text-white animate-spin mx-auto mb-1 sm:mb-2"
-                              />
-                              <span className="text-white text-xs sm:text-sm">
-                                {t("generating")}
-                              </span>
-                            </div>
-                          )}
-                          {gen.status === "pending" && (
-                            <div className="text-center">
-                              <Clock
-                                size={24}
-                                className="sm:w-8 sm:h-8 text-white mx-auto mb-1 sm:mb-2"
-                              />
-                              <span className="text-white text-xs sm:text-sm">
-                                {t("queued")}
-                              </span>
-                            </div>
-                          )}
-                          {gen.status === "failed" && (
-                            <div className="text-center">
-                              <XCircle
-                                size={24}
-                                className="sm:w-8 sm:h-8 text-danger mx-auto mb-1 sm:mb-2"
-                              />
-                              <span className="text-white text-xs sm:text-sm">
-                                {t("failed")}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      )}
-
-                      {/* Play Button Overlay */}
-                      {gen.status === "completed" && (
-                        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 sm:transition-opacity">
-                          <div className="bg-black/50 rounded-full p-2 sm:p-3">
-                            <Play
-                              size={20}
-                              className="sm:w-6 sm:h-6 text-white"
-                              fill="white"
-                            />
+                        {/* Status Overlay */}
+                        {gen.status !== "completed" && (
+                          <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                            {gen.status === "processing" && (
+                              <div className="text-center">
+                                <Loader2
+                                  size={24}
+                                  className="sm:w-8 sm:h-8 text-white animate-spin mx-auto mb-1 sm:mb-2"
+                                />
+                                <span className="text-white text-xs sm:text-sm">
+                                  {t("generating")}
+                                </span>
+                              </div>
+                            )}
+                            {gen.status === "pending" && (
+                              <div className="text-center">
+                                <Clock
+                                  size={24}
+                                  className="sm:w-8 sm:h-8 text-white mx-auto mb-1 sm:mb-2"
+                                />
+                                <span className="text-white text-xs sm:text-sm">
+                                  {t("queued")}
+                                </span>
+                              </div>
+                            )}
+                            {gen.status === "failed" && (
+                              <div className="text-center">
+                                <XCircle
+                                  size={24}
+                                  className="sm:w-8 sm:h-8 text-danger mx-auto mb-1 sm:mb-2"
+                                />
+                                <span className="text-white text-xs sm:text-sm">
+                                  {t("failed")}
+                                </span>
+                              </div>
+                            )}
                           </div>
-                        </div>
-                      )}
-                    </div>
+                        )}
 
-                    {/* Info */}
-                    <div className="p-2 sm:p-3">
-                      <div className="flex items-center justify-between mb-1 gap-1">
-                        <VideoStatusChip status={gen.status} />
-                        <span className="text-[10px] sm:text-xs text-default-400 shrink-0">
-                          {formatDate(gen.createdAt)}
-                        </span>
+                        {/* Play Button Overlay */}
+                        {gen.status === "completed" && (
+                          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 sm:transition-opacity">
+                            <div className="bg-black/50 rounded-full p-2 sm:p-3">
+                              <Play
+                                size={20}
+                                className="sm:w-6 sm:h-6 text-white"
+                                fill="white"
+                              />
+                            </div>
+                          </div>
+                        )}
                       </div>
-                      <div className="text-[10px] sm:text-xs text-default-400 mb-1">
-                        {t("model")}: {getModelLabel(gen.modelId)}
+
+                      {/* Info */}
+                      <div className="p-2 sm:p-3">
+                        <div className="flex items-center justify-between mb-1 gap-1">
+                          <VideoStatusChip status={gen.status} />
+                          <span className="text-[10px] sm:text-xs text-default-400 shrink-0">
+                            {formatDate(gen.createdAt)}
+                          </span>
+                        </div>
+                        <div className="text-[10px] sm:text-xs text-default-400 mb-1">
+                          {t("model")}: {getModelLabel(gen.modelId)}
+                        </div>
+                        <p className="text-xs sm:text-sm text-default-600 line-clamp-2">
+                          {gen.params.prompt || t("noPrompt")}
+                        </p>
                       </div>
-                      <p className="text-xs sm:text-sm text-default-600 line-clamp-2">
-                        {gen.params.prompt || t("noPrompt")}
-                      </p>
                     </div>
-                  </div>
-                </button>
+                  </button>
+
+                  {/* Add to Collection Menu - only for completed videos with thumbnail */}
+                  {gen.status === "completed" &&
+                    gen.videoId &&
+                    gen.thumbnailImageId && (
+                      <div className="absolute top-2 right-2 md:opacity-0 md:group-hover:opacity-100 transition-opacity z-10">
+                        <Dropdown>
+                          <DropdownTrigger>
+                            <Button
+                              isIconOnly
+                              size="sm"
+                              variant="solid"
+                              className="bg-background/80 backdrop-blur-sm"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <MoreVertical size={16} />
+                            </Button>
+                          </DropdownTrigger>
+                          <DropdownMenu
+                            aria-label={t("videoActions")}
+                            onAction={(key) => {
+                              if (key === "create-new") {
+                                handleCreateNewCollection(gen);
+                              }
+                            }}
+                          >
+                            <DropdownSection
+                              title={tMenu("addToCollection")}
+                              showDivider
+                            >
+                              <DropdownItem
+                                key="create-new"
+                                startContent={<Plus size={16} />}
+                                className="font-semibold"
+                              >
+                                {tCollections("createNewCollection")}
+                              </DropdownItem>
+                            </DropdownSection>
+                            <DropdownSection
+                              title={
+                                collections.length > 0
+                                  ? tMenu("yourCollections")
+                                  : undefined
+                              }
+                            >
+                              {collections.length === 0 ? (
+                                <DropdownItem key="no-collections" isReadOnly>
+                                  <span className="text-xs text-default-400">
+                                    {tCollections("noCollectionsYet")}
+                                  </span>
+                                </DropdownItem>
+                              ) : (
+                                collections
+                                  .filter(
+                                    (c) =>
+                                      c.permission === "owner" ||
+                                      c.permission === "collaborator"
+                                  )
+                                  .map((collection) => (
+                                    <DropdownItem
+                                      key={collection.id}
+                                      startContent={<FolderPlus size={16} />}
+                                      onPress={() =>
+                                        handleAddVideoToCollection(
+                                          collection.id,
+                                          gen
+                                        )
+                                      }
+                                    >
+                                      {collection.name}
+                                    </DropdownItem>
+                                  ))
+                              )}
+                            </DropdownSection>
+                          </DropdownMenu>
+                        </Dropdown>
+                      </div>
+                    )}
+                </div>
               ))}
             </div>
           )}
@@ -505,6 +769,58 @@ export default function VideoList({ refreshTrigger, onRestore }: VideoListProps)
                   onPress={onClose}
                 >
                   {tCommon("close")}
+                </Button>
+              </ModalFooter>
+            </>
+          )}
+        </ModalContent>
+      </Modal>
+
+      {/* Flying Images Animation */}
+      <AnimatePresence>
+        {flyingImages.map((flying) => (
+          <FlyingImage
+            key={flying.id}
+            imageUrl={flying.imageUrl}
+            startPosition={flying.startPos}
+            endPosition={endPos}
+            onComplete={() => removeFlyingImage(flying.id)}
+            altText={t("videoThumbnailAlt")}
+          />
+        ))}
+      </AnimatePresence>
+
+      {/* Create Collection Modal */}
+      <Modal isOpen={isCreateOpen} onOpenChange={onCreateOpenChange}>
+        <ModalContent>
+          {(onClose) => (
+            <>
+              <ModalHeader>{tCollections("createNewCollection")}</ModalHeader>
+              <ModalBody>
+                <Input
+                  label={tCollections("collectionName")}
+                  placeholder={tCollections("enterCollectionName")}
+                  value={newCollectionName}
+                  onValueChange={setNewCollectionName}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      handleCreateAndAddVideo();
+                    }
+                  }}
+                  autoFocus
+                />
+              </ModalBody>
+              <ModalFooter>
+                <Button variant="light" onPress={onClose}>
+                  {tCommon("cancel")}
+                </Button>
+                <Button
+                  color="primary"
+                  onPress={handleCreateAndAddVideo}
+                  isLoading={isCreating}
+                  isDisabled={!newCollectionName.trim()}
+                >
+                  {tMenu("createAndAdd")}
                 </Button>
               </ModalFooter>
             </>

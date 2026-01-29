@@ -10,7 +10,7 @@ import {
 import { getAccessToken } from "@/lib/auth/cookies";
 import { verifyAccessToken } from "@/lib/auth/jwt";
 import { eq, and, desc } from "drizzle-orm";
-import { getImageUrl } from "@/lib/storage/s3";
+import { getImageUrl, getVideoUrl } from "@/lib/storage/s3";
 
 // Helper to check user's permission for a collection
 async function getUserPermission(
@@ -92,17 +92,18 @@ export async function GET(
       );
     }
 
-    // Get images in collection
-    const rawImages = await db
+    // Get assets (images and videos) in collection
+    const rawAssets = await db
       .select()
       .from(collectionImages)
       .where(eq(collectionImages.collectionId, collectionId))
       .orderBy(desc(collectionImages.addedAt));
 
-    // Add CloudFront URLs to images
-    const images = rawImages.map((img) => ({
-      ...img,
-      imageUrl: getImageUrl(img.imageId),
+    // Add CloudFront URLs to assets
+    const images = rawAssets.map((asset) => ({
+      ...asset,
+      imageUrl: getImageUrl(asset.imageId), // Thumbnail URL (works for both images and videos)
+      videoUrl: asset.assetType === "video" ? getVideoUrl(asset.assetId) : undefined, // Video URL for videos only
     }));
 
     // Get shares if user is owner

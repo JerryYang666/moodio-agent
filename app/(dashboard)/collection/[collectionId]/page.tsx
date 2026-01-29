@@ -27,6 +27,9 @@ import {
   MoreVertical,
   Eye,
   MessageSquare,
+  Play,
+  Video,
+  Download,
 } from "lucide-react";
 import { useCollections } from "@/hooks/use-collections";
 import ImageDetailModal, {
@@ -39,6 +42,25 @@ import {
   DropdownItem,
 } from "@heroui/dropdown";
 
+interface CollectionAsset {
+  id: string;
+  collectionId: string;
+  imageId: string; // Thumbnail/display image ID
+  assetId: string; // Actual asset ID (same as imageId for images, video ID for videos)
+  assetType: "image" | "video";
+  imageUrl: string; // CloudFront URL for thumbnail (access via signed cookies)
+  videoUrl?: string; // CloudFront URL for video (only for videos)
+  chatId: string | null;
+  generationDetails: {
+    title: string;
+    prompt: string;
+    status: "loading" | "generated" | "error" | "pending" | "processing" | "completed" | "failed";
+    imageUrl?: string;
+    videoUrl?: string;
+  };
+  addedAt: Date;
+}
+
 interface CollectionData {
   collection: {
     id: string;
@@ -50,20 +72,7 @@ interface CollectionData {
     permission: "owner" | "collaborator" | "viewer";
     isOwner: boolean;
   };
-  images: Array<{
-    id: string;
-    collectionId: string;
-    imageId: string;
-    imageUrl: string; // CloudFront URL from API (access via signed cookies)
-    chatId: string | null;
-    generationDetails: {
-      title: string;
-      prompt: string;
-      status: "loading" | "generated" | "error";
-      imageUrl?: string;
-    };
-    addedAt: Date;
-  }>;
+  images: CollectionAsset[];
   shares: Array<{
     id: string;
     collectionId: string;
@@ -124,11 +133,17 @@ export default function CollectionPage({
     onOpen: onRemoveImageOpen,
     onOpenChange: onRemoveImageOpenChange,
   } = useDisclosure();
+  const {
+    isOpen: isVideoDetailOpen,
+    onOpen: onVideoDetailOpen,
+    onOpenChange: onVideoDetailOpenChange,
+  } = useDisclosure();
 
   const [selectedImage, setSelectedImage] = useState<ImageInfo | null>(null);
   const [allImages, setAllImages] = useState<ImageInfo[]>([]);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [imageToRemoveId, setImageToRemoveId] = useState<string | null>(null);
+  const [selectedVideo, setSelectedVideo] = useState<CollectionAsset | null>(null);
 
   const [searchEmail, setSearchEmail] = useState("");
   const [searchedUser, setSearchedUser] = useState<User | null>(null);
@@ -202,9 +217,9 @@ export default function CollectionPage({
         setCollectionData((prev) =>
           prev
             ? {
-                ...prev,
-                collection: { ...prev.collection, name: newName },
-              }
+              ...prev,
+              collection: { ...prev.collection, name: newName },
+            }
             : null
         );
         onRenameOpenChange();
@@ -238,11 +253,11 @@ export default function CollectionPage({
         setCollectionData((prev) =>
           prev
             ? {
-                ...prev,
-                images: prev.images.filter(
-                  (img) => img.imageId !== imageToRemoveId
-                ),
-              }
+              ...prev,
+              images: prev.images.filter(
+                (img) => img.imageId !== imageToRemoveId
+              ),
+            }
             : null
         );
         onRemoveImageOpenChange();
@@ -302,32 +317,56 @@ export default function CollectionPage({
     }
   };
 
-  const handleImageClick = (image: CollectionData["images"][0]) => {
-    // Build allImages array from collection images
-    const imagesForNav: ImageInfo[] = (collectionData?.images || []).map(
-      (img) => ({
-        url: img.imageUrl,
-        title: img.generationDetails.title,
-        prompt: img.generationDetails.prompt,
-        status: img.generationDetails.status,
-        imageId: img.imageId,
-      })
-    );
+  const handleAssetClick = (asset: CollectionAsset) => {
+    if (asset.assetType === "video") {
+      // Open video detail modal
+      setSelectedVideo(asset);
+      onVideoDetailOpen();
+    } else {
+      // Build allImages array from collection images (only images, not videos)
+      const imagesForNav: ImageInfo[] = (collectionData?.images || [])
+        .filter((img) => img.assetType === "image")
+        .map((img) => ({
+          url: img.imageUrl,
+          title: img.generationDetails.title,
+          prompt: img.generationDetails.prompt,
+          status: img.generationDetails.status as "loading" | "generated" | "error",
+          imageId: img.imageId,
+        }));
 
-    const clickedIndex = imagesForNav.findIndex(
-      (img) => img.imageId === image.imageId
-    );
+      const clickedIndex = imagesForNav.findIndex(
+        (img) => img.imageId === asset.imageId
+      );
 
-    setAllImages(imagesForNav);
-    setCurrentImageIndex(clickedIndex >= 0 ? clickedIndex : 0);
-    setSelectedImage({
-      url: image.imageUrl, // Use CloudFront URL from API (signed cookies)
-      title: image.generationDetails.title,
-      prompt: image.generationDetails.prompt,
-      status: image.generationDetails.status,
-      imageId: image.imageId,
-    });
-    onImageDetailOpen();
+      setAllImages(imagesForNav);
+      setCurrentImageIndex(clickedIndex >= 0 ? clickedIndex : 0);
+      setSelectedImage({
+        url: asset.imageUrl, // Use CloudFront URL from API (signed cookies)
+        title: asset.generationDetails.title,
+        prompt: asset.generationDetails.prompt,
+        status: asset.generationDetails.status as "loading" | "generated" | "error",
+        imageId: asset.imageId,
+      });
+      onImageDetailOpen();
+    }
+  };
+
+  const handleVideoDownload = async (asset: CollectionAsset) => {
+    if (!asset.videoUrl) return;
+    try {
+      const response = await fetch(asset.videoUrl);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `video-${asset.assetId}.mp4`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (e) {
+      console.error("Download error:", e);
+    }
   };
 
   const handleImageNavigate = useCallback(
@@ -361,6 +400,24 @@ export default function CollectionPage({
   const canAddImages =
     collection.permission === "owner" ||
     collection.permission === "collaborator";
+
+  // Count images and videos separately
+  const imageCount = images.filter((a) => a.assetType === "image").length;
+  const videoCount = images.filter((a) => a.assetType === "video").length;
+
+  const getAssetCountText = () => {
+    const parts = [];
+    if (imageCount > 0) {
+      parts.push(`${imageCount} ${imageCount === 1 ? "image" : "images"}`);
+    }
+    if (videoCount > 0) {
+      parts.push(`${videoCount} ${videoCount === 1 ? "video" : "videos"}`);
+    }
+    if (parts.length === 0) {
+      return "No assets";
+    }
+    return parts.join(", ");
+  };
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-7xl">
@@ -396,9 +453,7 @@ export default function CollectionPage({
                 </Button>
               )}
             </div>
-            <p className="text-default-500">
-              {images.length} {images.length === 1 ? "image" : "images"}
-            </p>
+            <p className="text-default-500">{getAssetCountText()}</p>
           </div>
 
           {canEdit && (
@@ -433,28 +488,37 @@ export default function CollectionPage({
         </div>
       </div>
 
-      {/* Images Grid */}
+      {/* Assets Grid */}
       {images.length === 0 ? (
         <div className="text-center py-20">
-          <p className="text-default-500">No images in this collection yet</p>
+          <p className="text-default-500">No assets in this collection yet</p>
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-          {images.map((image) => (
-            <Card key={image.id} className="group relative">
+          {images.map((asset) => (
+            <Card key={asset.id} className="group relative">
               <CardBody className="p-0 overflow-hidden aspect-square relative rounded-lg">
                 <Image
-                  src={image.imageUrl} // Use CloudFront URL from API (signed cookies)
-                  alt={image.generationDetails.title}
+                  src={asset.imageUrl} // Use CloudFront URL from API (signed cookies)
+                  alt={asset.generationDetails.title}
                   radius="none"
                   classNames={{
                     wrapper: "w-full h-full !max-w-full cursor-pointer",
                     img: "w-full h-full object-cover",
                   }}
-                  onClick={() => handleImageClick(image)}
+                  onClick={() => handleAssetClick(asset)}
                 />
+                {/* Video Badge */}
+                {asset.assetType === "video" && (
+                  <div className="absolute top-2 left-2 z-10">
+                    <div className="bg-black/70 text-white rounded-full p-1.5 flex items-center gap-1">
+                      <Play size={12} fill="white" />
+                      <span className="text-[10px] font-medium pr-1">Video</span>
+                    </div>
+                  </div>
+                )}
                 <div className="absolute bottom-0 left-0 right-0 bg-white/90 dark:bg-black/60 text-black dark:text-white p-2 text-xs truncate opacity-0 group-hover:opacity-100 transition-opacity">
-                  {image.generationDetails.title}
+                  {asset.generationDetails.title}
                 </div>
                 {canAddImages && (
                   <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
@@ -469,19 +533,19 @@ export default function CollectionPage({
                           <MoreVertical size={16} />
                         </Button>
                       </DropdownTrigger>
-                      <DropdownMenu aria-label="Image actions">
+                      <DropdownMenu aria-label="Asset actions">
                         <DropdownItem
                           key="view"
                           startContent={<Eye size={16} />}
-                          onPress={() => handleImageClick(image)}
+                          onPress={() => handleAssetClick(asset)}
                         >
                           View Details
                         </DropdownItem>
-                        {image.chatId && collection.isOwner ? (
+                        {asset.chatId && collection.isOwner ? (
                           <DropdownItem
                             key="chat"
                             startContent={<MessageSquare size={16} />}
-                            onPress={() => router.push(`/chat/${image.chatId}`)}
+                            onPress={() => router.push(`/chat/${asset.chatId}`)}
                           >
                             Go to Chat
                           </DropdownItem>
@@ -491,7 +555,7 @@ export default function CollectionPage({
                           className="text-danger"
                           color="danger"
                           startContent={<Trash2 size={16} />}
-                          onPress={() => confirmRemoveImage(image.imageId)}
+                          onPress={() => confirmRemoveImage(asset.imageId)}
                         >
                           Remove from Collection
                         </DropdownItem>
@@ -612,8 +676,8 @@ export default function CollectionPage({
                               Owner
                             </Chip>
                           ) : shares.some(
-                              (s) => s.sharedWithUserId === searchedUser.id
-                            ) ? (
+                            (s) => s.sharedWithUserId === searchedUser.id
+                          ) ? (
                             <Chip color="primary" variant="flat" size="sm">
                               Already Shared
                             </Chip>
@@ -742,6 +806,80 @@ export default function CollectionPage({
         onNavigate={handleImageNavigate}
         onClose={onImageDetailClose}
       />
+
+      {/* Video Detail Modal */}
+      <Modal
+        isOpen={isVideoDetailOpen}
+        onOpenChange={onVideoDetailOpenChange}
+        size="4xl"
+        scrollBehavior="inside"
+      >
+        <ModalContent>
+          {(onClose) => (
+            <>
+              <ModalHeader className="flex items-center gap-2">
+                <Video size={20} />
+                Video Details
+              </ModalHeader>
+              <ModalBody>
+                {selectedVideo && (
+                  <div className="space-y-4">
+                    {/* Video Player */}
+                    <div className="rounded-lg overflow-hidden bg-black">
+                      {selectedVideo.videoUrl ? (
+                        <video
+                          src={selectedVideo.videoUrl}
+                          controls
+                          autoPlay
+                          playsInline
+                          className="w-full max-h-[60vh]"
+                        />
+                      ) : (
+                        <div className="aspect-video flex items-center justify-center">
+                          <Image
+                            src={selectedVideo.imageUrl}
+                            alt={selectedVideo.generationDetails.title}
+                            classNames={{
+                              wrapper: "w-full h-full",
+                              img: "w-full h-full object-contain",
+                            }}
+                          />
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Title & Prompt */}
+                    <div className="bg-default-100 p-4 rounded-lg">
+                      <h4 className="font-medium mb-2">
+                        {selectedVideo.generationDetails.title || "Untitled Video"}
+                      </h4>
+                      {selectedVideo.generationDetails.prompt && (
+                        <p className="text-sm text-default-600 whitespace-pre-wrap">
+                          {selectedVideo.generationDetails.prompt}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </ModalBody>
+              <ModalFooter>
+                {selectedVideo?.videoUrl && (
+                  <Button
+                    color="primary"
+                    startContent={<Download size={16} />}
+                    onPress={() => handleVideoDownload(selectedVideo)}
+                  >
+                    Download
+                  </Button>
+                )}
+                <Button variant="light" onPress={onClose}>
+                  Close
+                </Button>
+              </ModalFooter>
+            </>
+          )}
+        </ModalContent>
+      </Modal>
     </div>
   );
 }

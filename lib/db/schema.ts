@@ -122,7 +122,12 @@ export const collections = pgTable("collections", {
 
 /**
  * Collection Images table
- * Stores images within projects, optionally within a collection, along with their generation details
+ * Stores assets (images and videos) within projects, optionally within a collection, along with their generation details
+ *
+ * ID Strategy:
+ * - imageId: Always the thumbnail/display image (S3 image ID for images, thumbnail ID for videos)
+ * - assetId: The actual asset reference (same as imageId for images, S3 video ID for videos)
+ * - assetType: "image" or "video"
  */
 export const collectionImages = pgTable("collection_images", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -133,7 +138,9 @@ export const collectionImages = pgTable("collection_images", {
   collectionId: uuid("collection_id").references(() => collections.id, {
     onDelete: "cascade",
   }),
-  imageId: varchar("image_id", { length: 255 }).notNull(), // S3 image ID
+  imageId: varchar("image_id", { length: 255 }).notNull(), // Thumbnail/display image ID (S3 image ID)
+  assetId: varchar("asset_id", { length: 255 }).notNull(), // Actual asset ID (same as imageId for images, video ID for videos)
+  assetType: varchar("asset_type", { length: 20 }).notNull().default("image"), // "image" or "video"
   chatId: uuid("chat_id").references(() => chats.id, { onDelete: "set null" }), // Which chat this image came from
   generationDetails: jsonb("generation_details").notNull(), // Prompt, title, status, etc.
   addedAt: timestamp("added_at").defaultNow().notNull(),

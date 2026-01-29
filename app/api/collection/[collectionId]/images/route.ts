@@ -42,7 +42,17 @@ async function getUserPermission(
 
 /**
  * POST /api/collection/[collectionId]/images
- * Add image to collection
+ * Add image or video to collection
+ *
+ * For images:
+ *   - imageId: S3 image ID (required)
+ *   - assetId: defaults to imageId
+ *   - assetType: defaults to "image"
+ *
+ * For videos:
+ *   - imageId: S3 thumbnail image ID (required)
+ *   - assetId: S3 video ID (required)
+ *   - assetType: "video" (required)
  */
 export async function POST(
   req: NextRequest,
@@ -66,7 +76,7 @@ export async function POST(
     const permission = await getUserPermission(collectionId, userId);
     if (permission !== "owner" && permission !== "collaborator") {
       return NextResponse.json(
-        { error: "You don't have permission to add images to this collection" },
+        { error: "You don't have permission to add assets to this collection" },
         { status: 403 }
       );
     }
@@ -86,7 +96,7 @@ export async function POST(
     }
 
     const body = await req.json();
-    const { imageId, chatId, generationDetails } = body;
+    const { imageId, assetId, assetType, chatId, generationDetails } = body;
 
     if (!imageId || !generationDetails) {
       return NextResponse.json(
@@ -95,32 +105,45 @@ export async function POST(
       );
     }
 
-    // Check if image already exists in collection
-    const [existingImage] = await db
+    // For videos, assetId must be provided
+    const resolvedAssetType = assetType || "image";
+    const resolvedAssetId = assetId || imageId; // For images, assetId defaults to imageId
+
+    if (resolvedAssetType === "video" && !assetId) {
+      return NextResponse.json(
+        { error: "assetId (video ID) is required for videos" },
+        { status: 400 }
+      );
+    }
+
+    // Check if asset already exists in collection (check by assetId to avoid duplicates)
+    const [existingAsset] = await db
       .select()
       .from(collectionImages)
       .where(
         and(
           eq(collectionImages.collectionId, collectionId),
-          eq(collectionImages.imageId, imageId)
+          eq(collectionImages.assetId, resolvedAssetId)
         )
       )
       .limit(1);
 
-    if (existingImage) {
+    if (existingAsset) {
       return NextResponse.json(
-        { error: "Image already exists in this collection" },
+        { error: `${resolvedAssetType === "video" ? "Video" : "Image"} already exists in this collection` },
         { status: 400 }
       );
     }
 
-    // Add image to collection
-    const [newImage] = await db
+    // Add asset to collection
+    const [newAsset] = await db
       .insert(collectionImages)
       .values({
         projectId: collection.projectId,
         collectionId,
         imageId,
+        assetId: resolvedAssetId,
+        assetType: resolvedAssetType,
         chatId: chatId || null,
         generationDetails,
       })
@@ -133,12 +156,12 @@ export async function POST(
       .where(eq(collections.id, collectionId));
 
     return NextResponse.json({
-      image: newImage,
+      image: newAsset,
     });
   } catch (error) {
-    console.error("Error adding image to collection:", error);
+    console.error("Error adding asset to collection:", error);
     return NextResponse.json(
-      { error: "Failed to add image to collection" },
+      { error: "Failed to add asset to collection" },
       { status: 500 }
     );
   }
