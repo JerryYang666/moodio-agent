@@ -261,6 +261,8 @@ export async function POST(req: NextRequest) {
         projectId: resolvedProjectId,
         collectionId: null,
         imageId,
+        assetId: imageId, // For images, assetId = imageId
+        assetType: "image",
         chatId: typeof chatId === "string" ? chatId : null,
         generationDetails,
       })

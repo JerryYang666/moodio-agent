@@ -105,6 +105,8 @@ export async function POST(request: NextRequest) {
       projectId: defaultProject.id,
       collectionId: uploadsCollection.id,
       imageId,
+      assetId: imageId, // For images, assetId = imageId
+      assetType: "image",
       chatId: null,
       generationDetails: {
         title: file.name || "Uploaded image",
