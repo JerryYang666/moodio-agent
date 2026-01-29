@@ -121,7 +121,10 @@
     "clearDrawing": "Clear",
     "saveMarkedImage": "Done",
     "drawingInstructions": "Circle the area you want to change",
-    "markedImage": "Marked: {title}"
+    "markedImage": "Marked: {title}",
+    "original": "Original",
+    "marked": "Marked",
+    "redraw": "Redraw"
   },
   "profile": {
     "title": "Profile Settings",

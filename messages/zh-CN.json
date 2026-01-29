@@ -121,7 +121,10 @@
     "clearDrawing": "清除",
     "saveMarkedImage": "完成",
     "drawingInstructions": "圈出您想要更改的区域",
-    "markedImage": "标记：{title}"
+    "markedImage": "标记：{title}",
+    "original": "原图",
+    "marked": "标记",
+    "redraw": "重新标记"
   },
   "profile": {
     "title": "个人设置",

@@ -551,6 +551,11 @@ export default function ChatInterface({
       );
       const originalTitle = originalImage?.title || t("chat.image");
 
+      // Check if there's an existing marked image for this original (redraw case)
+      const existingMarkedImage = pendingImages.find(
+        (img) => img.markedFromImageId === originalImageId
+      );
+
       // Validate file before upload
       const validationError = validateFile(file);
       if (validationError) {
@@ -564,7 +569,12 @@ export default function ChatInterface({
         return;
       }
 
-      if (!canAddImage(pendingImages)) {
+      // Check image limit - but if we're replacing an existing marked image, don't count it
+      const effectivePendingImages = existingMarkedImage
+        ? pendingImages.filter((img) => img.imageId !== existingMarkedImage.imageId)
+        : pendingImages;
+      
+      if (!canAddImage(effectivePendingImages)) {
         addToast({
           title: t("chat.maxImagesReached", { max: MAX_PENDING_IMAGES }),
           color: "warning",
@@ -587,7 +597,23 @@ export default function ChatInterface({
         markedFromImageId: originalImageId,
       };
 
-      setPendingImages((prev) => [...prev, uploadingImage]);
+      // Remove existing marked image (if redrawing) and add new one
+      setPendingImages((prev) => {
+        let newImages = prev;
+        
+        // Remove the old marked image if it exists
+        if (existingMarkedImage) {
+          // Clean up the old preview URL if any
+          if (existingMarkedImage.localPreviewUrl) {
+            URL.revokeObjectURL(existingMarkedImage.localPreviewUrl);
+          }
+          newImages = newImages.filter(
+            (img) => img.imageId !== existingMarkedImage.imageId
+          );
+        }
+        
+        return [...newImages, uploadingImage];
+      });
 
       const result = await uploadImage(file);
 
