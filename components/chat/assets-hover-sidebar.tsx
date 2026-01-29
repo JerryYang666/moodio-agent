@@ -7,7 +7,7 @@ import { Button } from "@heroui/button";
 import { Spinner } from "@heroui/spinner";
 import { Chip } from "@heroui/chip";
 import { Image } from "@heroui/image";
-import { Folder, Clock, Images, ChevronLeft, Pin, PinOff, X } from "lucide-react";
+import { Folder, Clock, Images, ChevronLeft, Pin, PinOff, X, Play } from "lucide-react";
 import clsx from "clsx";
 import { addToast } from "@heroui/toast";
 import { ASSET_DRAG_MIME, AI_IMAGE_DRAG_MIME } from "./asset-dnd";
@@ -33,6 +33,8 @@ type Asset = {
   projectId: string;
   collectionId: string | null;
   imageId: string;
+  assetId: string;
+  assetType: "image" | "video";
   imageUrl: string;
   generationDetails: {
     title: string;
@@ -508,7 +510,7 @@ export default function AssetsHoverSidebar() {
                         role="button"
                         tabIndex={0}
                       >
-                        <div className="rounded-lg overflow-hidden border border-divider bg-default-100 aspect-square">
+                        <div className="relative rounded-lg overflow-hidden border border-divider bg-default-100 aspect-square">
                           <Image
                             src={a.imageUrl}
                             alt={
@@ -521,6 +523,15 @@ export default function AssetsHoverSidebar() {
                               img: "w-full h-full object-cover",
                             }}
                           />
+                          {/* Video Badge */}
+                          {a.assetType === "video" && (
+                            <div className="absolute top-1 left-1 z-10">
+                              <div className="bg-black/70 text-white rounded-full p-1 flex items-center gap-0.5">
+                                <Play size={10} fill="white" />
+                                <span className="text-[8px] font-medium pr-0.5">Video</span>
+                              </div>
+                            </div>
+                          )}
                         </div>
                         <div className="mt-1 text-[11px] text-default-600 truncate">
                           {a.generationDetails?.title ||

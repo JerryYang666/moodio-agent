@@ -234,7 +234,11 @@
     "putBack": "Put Back",
     "untitledVideo": "Untitled Video",
     "videoActions": "Video actions",
-    "addedToCollection": "Video added to collection"
+    "addedToCollection": "Video added to collection",
+    "allVideos": "All Videos",
+    "byCollection": "By Collection",
+    "noCollectionsWithVideos": "No collections with videos",
+    "addVideosToCollections": "Add videos to collections to organize them here"
   },
   "menu": {
     "mode": "Mode",

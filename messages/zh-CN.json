@@ -234,7 +234,11 @@
     "putBack": "恢复参数",
     "untitledVideo": "未命名视频",
     "videoActions": "视频操作",
-    "addedToCollection": "视频已添加到收藏夹"
+    "addedToCollection": "视频已添加到收藏夹",
+    "allVideos": "全部视频",
+    "byCollection": "按收藏夹",
+    "noCollectionsWithVideos": "暂无包含视频的收藏夹",
+    "addVideosToCollections": "将视频添加到收藏夹以在此处整理"
   },
   "menu": {
     "mode": "模式",
