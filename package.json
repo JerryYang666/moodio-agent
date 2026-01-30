@@ -63,6 +63,7 @@
     "@heroui/user": "^2.2.24",
     "@react-aria/ssr": "3.9.10",
     "@react-aria/visually-hidden": "3.8.28",
+    "@reduxjs/toolkit": "^2.11.2",
     "@simplewebauthn/browser": "^13.2.2",
     "@simplewebauthn/server": "^13.2.2",
     "@types/prismjs": "^1.26.5",
@@ -88,6 +89,7 @@
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-markdown": "^10.1.0",
+    "react-redux": "^9.2.0",
     "react-simple-code-editor": "^0.14.1",
     "react-zoom-pan-pinch": "^3.7.0",
     "uuid": "^13.0.0"
