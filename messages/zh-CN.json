@@ -242,7 +242,10 @@
     "allVideos": "全部视频",
     "byCollection": "按收藏夹",
     "noCollectionsWithVideos": "暂无包含视频的收藏夹",
-    "addVideosToCollections": "将视频添加到收藏夹以在此处整理"
+    "addVideosToCollections": "将视频添加到收藏夹以在此处整理",
+    "frameCapture": "截帧",
+    "frameCaptureSuccess": "截帧已保存到我的截帧",
+    "frameCaptureFailed": "截帧失败"
   },
   "menu": {
     "mode": "模式",

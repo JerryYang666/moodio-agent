@@ -4,7 +4,7 @@ import { verifyAccessToken } from "@/lib/auth/jwt";
 import { db } from "@/lib/db";
 import { videoGenerations } from "@/lib/db/schema";
 import { eq, desc } from "drizzle-orm";
-import { getImageUrl, getVideoUrl } from "@/lib/storage/s3";
+import { getImageUrl, getVideoUrl, getSignedVideoUrl } from "@/lib/storage/s3";
 import { checkAndRecoverStaleGenerations } from "@/lib/video/recovery";
 import { waitUntil } from "@vercel/functions";
 
@@ -76,6 +76,8 @@ export async function GET(request: NextRequest) {
       endImageUrl: g.endImageId ? getImageUrl(g.endImageId) : null,
       videoId: g.videoId,
       videoUrl: g.videoId ? getVideoUrl(g.videoId) : null,
+      // Signed URL for frame capture (works with crossOrigin="anonymous" + CORS)
+      signedVideoUrl: g.videoId ? getSignedVideoUrl(g.videoId) : null,
       thumbnailImageId: g.thumbnailImageId,
       thumbnailUrl: g.thumbnailImageId
         ? getImageUrl(g.thumbnailImageId)

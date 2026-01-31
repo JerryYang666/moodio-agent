@@ -46,6 +46,7 @@ import VideoStatusChip from "./video-status-chip";
 import { getVideoModel } from "@/lib/video/models";
 import { useCollections } from "@/hooks/use-collections";
 import type { Collection } from "@/components/collections-provider";
+import VideoPlayer from "./video-player";
 
 interface VideoGeneration {
   id: string;
@@ -57,6 +58,7 @@ interface VideoGeneration {
   endImageUrl: string | null;
   videoId: string | null;
   videoUrl: string | null;
+  signedVideoUrl: string | null; // Signed URL for frame capture (CORS-compatible)
   thumbnailImageId: string | null;
   thumbnailUrl: string | null;
   params: Record<string, any>;
@@ -872,54 +874,14 @@ export default function VideoList({ refreshTrigger, onRestore }: VideoListProps)
                 {selectedVideo && (
                   <div className="space-y-3 sm:space-y-4">
                     {/* Video Player / Preview */}
-                    <div className="rounded-lg overflow-hidden bg-black">
-                      {selectedVideo.status === "completed" &&
-                        selectedVideo.videoUrl ? (
-                        <video
-                          src={selectedVideo.videoUrl}
-                          controls
-                          autoPlay
-                          playsInline
-                          className="w-full max-h-[40vh] sm:max-h-[60vh]"
-                        />
-                      ) : (
-                        <div className="aspect-video flex items-center justify-center relative">
-                          <Image
-                            src={
-                              selectedVideo.thumbnailUrl ||
-                              selectedVideo.sourceImageUrl
-                            }
-                            alt={t("thumbnailAlt")}
-                            classNames={{
-                              wrapper: "w-full h-full",
-                              img: "w-full h-full object-contain",
-                            }}
-                          />
-                          {selectedVideo.status !== "completed" && (
-                            <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                              {selectedVideo.status === "processing" && (
-                                <Loader2
-                                  size={32}
-                                  className="sm:w-12 sm:h-12 text-white animate-spin"
-                                />
-                              )}
-                              {selectedVideo.status === "pending" && (
-                                <Clock
-                                  size={32}
-                                  className="sm:w-12 sm:h-12 text-white"
-                                />
-                              )}
-                              {selectedVideo.status === "failed" && (
-                                <XCircle
-                                  size={32}
-                                  className="sm:w-12 sm:h-12 text-danger"
-                                />
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
+                    <VideoPlayer
+                      videoUrl={selectedVideo.videoUrl}
+                      signedVideoUrl={selectedVideo.signedVideoUrl}
+                      thumbnailUrl={selectedVideo.thumbnailUrl}
+                      fallbackImageUrl={selectedVideo.sourceImageUrl}
+                      status={selectedVideo.status}
+                      videoId={selectedVideo.id}
+                    />
 
                     {/* Status & Info - Mobile optimized */}
                     <div className="flex flex-wrap items-center gap-2 sm:gap-4">

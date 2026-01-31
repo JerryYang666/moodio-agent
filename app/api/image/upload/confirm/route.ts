@@ -7,14 +7,25 @@ import { ensureDefaultProject } from "@/lib/db/projects";
 import { checkImageExists, getSignedImageUrl } from "@/lib/storage/s3";
 import { and, desc, eq } from "drizzle-orm";
 
-const UPLOADS_COLLECTION_NAME = "My Uploads";
+// Collection names for different upload sources
+const COLLECTION_NAMES = {
+  upload: "My Uploads",
+  "frame-capture": "My Frame Captures",
+} as const;
+
+type UploadSource = keyof typeof COLLECTION_NAMES;
 
 /**
  * POST /api/image/upload/confirm
  * Confirm that a direct-to-S3 upload completed successfully
  * Creates the database records for the uploaded image
  *
- * Request body: { imageId: string, filename?: string }
+ * Request body: { 
+ *   imageId: string, 
+ *   filename?: string, 
+ *   source?: "upload" | "frame-capture",  // defaults to "upload"
+ *   sourceVideoId?: string  // only for frame-capture source
+ * }
  * Response: { imageId: string, imageUrl: string }
  */
 export async function POST(request: NextRequest) {
@@ -31,7 +42,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { imageId, filename } = body;
+    const { imageId, filename, source = "upload", sourceVideoId } = body;
 
     // Validate required fields
     if (!imageId || typeof imageId !== "string") {
@@ -40,6 +51,10 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    // Validate source parameter
+    const uploadSource: UploadSource = source in COLLECTION_NAMES ? source : "upload";
+    const collectionName = COLLECTION_NAMES[uploadSource];
 
     // Verify the image exists in S3
     const imageCheck = await checkImageExists(imageId);
@@ -52,8 +67,8 @@ export async function POST(request: NextRequest) {
 
     const defaultProject = await ensureDefaultProject(payload.userId);
 
-    // Ensure the "My Uploads" collection exists in the default project
-    let uploadsCollection = (
+    // Ensure the target collection exists in the default project
+    let targetCollection = (
       await db
         .select()
         .from(collections)
@@ -61,37 +76,41 @@ export async function POST(request: NextRequest) {
           and(
             eq(collections.userId, payload.userId),
             eq(collections.projectId, defaultProject.id),
-            eq(collections.name, UPLOADS_COLLECTION_NAME)
+            eq(collections.name, collectionName)
           )
         )
         .orderBy(desc(collections.updatedAt))
         .limit(1)
     )[0];
 
-    if (!uploadsCollection) {
+    if (!targetCollection) {
       const [created] = await db
         .insert(collections)
         .values({
           userId: payload.userId,
           projectId: defaultProject.id,
-          name: UPLOADS_COLLECTION_NAME,
+          name: collectionName,
         })
         .returning();
-      uploadsCollection = created;
+      targetCollection = created;
     }
 
-    // Save uploaded image in "My Uploads"
+    // Determine title based on source
+    const defaultTitle = uploadSource === "frame-capture" ? "Frame capture" : "Uploaded image";
+
+    // Save image in the target collection
     await db.insert(collectionImages).values({
       projectId: defaultProject.id,
-      collectionId: uploadsCollection.id,
+      collectionId: targetCollection.id,
       imageId,
       assetId: imageId, // For images, assetId = imageId
       assetType: "image",
       chatId: null,
       generationDetails: {
-        title: filename || "Uploaded image",
+        title: filename || defaultTitle,
         prompt: "",
         status: "generated",
+        ...(sourceVideoId && { sourceVideoId }),
       },
     });
 
@@ -99,7 +118,7 @@ export async function POST(request: NextRequest) {
     await db
       .update(collections)
       .set({ updatedAt: new Date() })
-      .where(eq(collections.id, uploadsCollection.id));
+      .where(eq(collections.id, targetCollection.id));
 
     // Generate signed URL for immediate display
     const imageUrl = getSignedImageUrl(imageId);

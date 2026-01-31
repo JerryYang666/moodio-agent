@@ -242,7 +242,10 @@
     "allVideos": "All Videos",
     "byCollection": "By Collection",
     "noCollectionsWithVideos": "No collections with videos",
-    "addVideosToCollections": "Add videos to collections to organize them here"
+    "addVideosToCollections": "Add videos to collections to organize them here",
+    "frameCapture": "Frame Capture",
+    "frameCaptureSuccess": "Frame captured and saved to My Frame Captures",
+    "frameCaptureFailed": "Failed to capture frame"
   },
   "menu": {
     "mode": "Mode",
