@@ -17,6 +17,7 @@ import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { useAuth } from "@/hooks/use-auth";
 import { AI_IMAGE_DRAG_MIME } from "./asset-dnd";
+import VideoPromptBlock from "./video-prompt-block";
 
 interface ChatMessageProps {
   message: Message;
@@ -82,8 +83,36 @@ export default function ChatMessage({
     msgIndex?: number,
     messageTimestamp?: number
   ) => {
+    // Custom components for ReactMarkdown to handle video-prompt code blocks
+    const markdownComponents = {
+      code({ node, className, children, ...props }: any) {
+        const match = /language-video-prompt/.exec(className || "");
+        if (match) {
+          const promptText = String(children).replace(/\n$/, "");
+          return <VideoPromptBlock prompt={promptText} />;
+        }
+        // Default inline code rendering
+        return (
+          <code className={className} {...props}>
+            {children}
+          </code>
+        );
+      },
+      pre({ children }: any) {
+        // Check if the child is a video-prompt code block
+        // If so, don't wrap it in <pre> to avoid double styling
+        const childProps = children?.props;
+        if (childProps?.className?.includes("language-video-prompt")) {
+          return <>{children}</>;
+        }
+        return <pre>{children}</pre>;
+      },
+    };
+
     if (typeof content === "string") {
-      return <ReactMarkdown>{content}</ReactMarkdown>;
+      return (
+        <ReactMarkdown components={markdownComponents}>{content}</ReactMarkdown>
+      );
     }
 
     // Check if message is more than 10 minutes old (10 * 60 * 1000 ms)
@@ -125,7 +154,9 @@ export default function ChatMessage({
         )}
 
         {textParts.map((part: any, i) => (
-          <ReactMarkdown key={`text-${i}`}>{part.text}</ReactMarkdown>
+          <ReactMarkdown key={`text-${i}`} components={markdownComponents}>
+            {part.text}
+          </ReactMarkdown>
         ))}
 
         {isUser && imageParts.length > 0 && (

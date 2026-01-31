@@ -128,7 +128,9 @@
     "markedImage": "Marked: {title}",
     "original": "Original",
     "marked": "Marked",
-    "redraw": "Redraw"
+    "redraw": "Redraw",
+    "videoPrompt": "Video Prompt",
+    "usePrompt": "Use Prompt"
   },
   "profile": {
     "title": "Profile Settings",

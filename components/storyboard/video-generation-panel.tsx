@@ -280,6 +280,22 @@ export default function VideoGenerationPanel({
     onRestoreComplete?.();
   }, [restoreData, models, onRestoreComplete, selectedModelId]);
 
+  // Listen for "use-video-prompt" custom event from chat VideoPromptBlock
+  useEffect(() => {
+    const handleUseVideoPrompt = (e: Event) => {
+      const customEvent = e as CustomEvent<{ prompt: string }>;
+      const { prompt } = customEvent.detail;
+      if (prompt) {
+        setParams((prev) => ({ ...prev, prompt }));
+      }
+    };
+
+    window.addEventListener("use-video-prompt", handleUseVideoPrompt);
+    return () => {
+      window.removeEventListener("use-video-prompt", handleUseVideoPrompt);
+    };
+  }, []);
+
   const costEntries = useMemo(
     () =>
       Object.entries(params).filter(

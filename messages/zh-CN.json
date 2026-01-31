@@ -128,7 +128,9 @@
     "markedImage": "标记：{title}",
     "original": "原图",
     "marked": "标记",
-    "redraw": "重新标记"
+    "redraw": "重新标记",
+    "videoPrompt": "视频提示词",
+    "usePrompt": "使用提示词"
   },
   "profile": {
     "title": "个人设置",

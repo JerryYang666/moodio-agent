@@ -462,7 +462,7 @@ export default function VideoList({ refreshTrigger, onRestore }: VideoListProps)
           )}
         </CardHeader>
 
-        <CardBody className="overflow-auto pt-2 px-3 sm:px-4">
+        <CardBody className="overflow-auto pt-2 px-3 sm:px-4 @container">
           {error && (
             <div className="text-xs sm:text-sm text-danger bg-danger-50 p-2 sm:p-3 rounded-lg mb-3 sm:mb-4">
               {error}
@@ -486,7 +486,7 @@ export default function VideoList({ refreshTrigger, onRestore }: VideoListProps)
                   </p>
                 </div>
               ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-4">
+                <div className="grid grid-cols-2 @3xl:grid-cols-3 gap-2 @sm:gap-4">
                   {generations.map((gen) => (
                     <div
                       key={gen.id}
@@ -689,7 +689,7 @@ export default function VideoList({ refreshTrigger, onRestore }: VideoListProps)
                   </p>
                 </div>
               ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-4">
+                <div className="grid grid-cols-2 @3xl:grid-cols-3 gap-2 @sm:gap-4">
                   {collectionsWithVideos.map((collection) => (
                     <button
                       key={collection.id}
@@ -756,7 +756,7 @@ export default function VideoList({ refreshTrigger, onRestore }: VideoListProps)
 
           {/* View Mode: By Collection - Selected Collection Videos */}
           {viewMode === "by-collection" && selectedCollectionId && selectedCollection && (
-            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-4">
+            <div className="grid grid-cols-2 @3xl:grid-cols-3 gap-2 @sm:gap-4">
               {selectedCollection.videos.map((video) => (
                 <button
                   key={video.id}
