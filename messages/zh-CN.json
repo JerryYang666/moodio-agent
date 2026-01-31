@@ -90,6 +90,10 @@
     "failedToForkChat": "复制对话失败",
     "selectImage": "选择：{title}",
     "asset": "素材：{title}",
+    "chat": "对话",
+    "loading": "加载中...",
+    "expandChat": "展开对话面板",
+    "collapseChat": "收起对话面板",
     "retryMessages": {
       "rethink": "哎呀！让我重新思考一下...",
       "rephrase": "嗯，让我换个方式表达！",

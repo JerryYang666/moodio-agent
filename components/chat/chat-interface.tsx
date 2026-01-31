@@ -57,11 +57,23 @@ interface MessageGroup {
 interface ChatInterfaceProps {
   chatId?: string;
   initialMessages?: Message[];
+  /** If true, this instance won't update the activeChatId in localStorage (used in side panel) */
+  disableActiveChatPersistence?: boolean;
+  /** Callback when a new chat is created (chatId is assigned) */
+  onChatCreated?: (chatId: string) => void;
+  /** Force compact mode for message display (swipeable variants instead of side-by-side) */
+  compactMode?: boolean;
+  /** Hide avatars for both user and assistant messages */
+  hideAvatars?: boolean;
 }
 
 export default function ChatInterface({
   chatId: initialChatId,
   initialMessages = [],
+  disableActiveChatPersistence = false,
+  onChatCreated,
+  compactMode = false,
+  hideAvatars = false,
 }: ChatInterfaceProps) {
   const t = useTranslations();
   const { user } = useAuth();
@@ -296,6 +308,20 @@ export default function ChatInterface({
       setIsLoading(false);
     }
   }, [chatId, user]);
+
+  // Persist active chat ID for cross-page continuity
+  // Use "new" as a special marker for new chat state (no chatId yet)
+  // Skip if disableActiveChatPersistence is true (used in side panel where parent controls this)
+  useEffect(() => {
+    if (disableActiveChatPersistence) return;
+    
+    if (chatId) {
+      localStorage.setItem(siteConfig.activeChatId, chatId);
+    } else {
+      // Mark as "new chat" state so side panel knows to show fresh chat
+      localStorage.setItem(siteConfig.activeChatId, "new");
+    }
+  }, [chatId, disableActiveChatPersistence]);
 
   // Upload a file using presigned URL (bypasses Vercel's 4.5MB limit)
   const uploadAndAddImage = useCallback(
@@ -795,10 +821,16 @@ export default function ChatInterface({
         const createRes = await fetch("/api/chat", { method: "POST" });
         if (!createRes.ok) throw new Error("Failed to create chat");
         const createData = await createRes.json();
-        currentChatId = createData.chat.id;
+        currentChatId = createData.chat.id as string;
         setChatId(currentChatId);
         window.history.replaceState(null, "", `/chat/${currentChatId}`);
         window.dispatchEvent(new Event("refresh-chats"));
+        // Persist active chat ID for cross-page continuity (unless disabled)
+        if (!disableActiveChatPersistence) {
+          localStorage.setItem(siteConfig.activeChatId, currentChatId);
+        }
+        // Notify parent of new chat creation
+        onChatCreated?.(currentChatId);
       }
 
       // Start monitoring for background completion (in case user leaves)
@@ -1245,6 +1277,7 @@ export default function ChatInterface({
                 onAgentTitleClick={handleAgentTitleClick}
                 onUserImageClick={handleUserImageClick}
                 onForkChat={handleForkChat}
+                hideAvatar={hideAvatars}
               />
             );
           } else {
@@ -1260,6 +1293,8 @@ export default function ChatInterface({
                 onAgentImageSelect={handleAgentImageSelect}
                 onAgentTitleClick={handleAgentTitleClick}
                 onForkChat={handleForkChat}
+                compactMode={compactMode}
+                hideAvatars={hideAvatars}
               />
             );
           }
@@ -1269,9 +1304,11 @@ export default function ChatInterface({
           groupedMessages.length > 0 &&
           groupedMessages[groupedMessages.length - 1]?.type === "user" && (
             <div className="flex gap-3 max-w-3xl mx-auto justify-start items-center">
-              <div className="hidden md:flex w-8 h-8 rounded-full bg-primary/10 items-center justify-center shrink-0">
-                <Bot size={16} className="text-primary" />
-              </div>
+              {!hideAvatars && (
+                <div className="hidden md:flex w-8 h-8 rounded-full bg-primary/10 items-center justify-center shrink-0">
+                  <Bot size={16} className="text-primary" />
+                </div>
+              )}
               <Card className="max-w-full md:max-w-[80%] shadow-none bg-default-100 dark:bg-default-50/10">
                 <CardBody className="px-4 pt-[2px] pb-1 overflow-hidden flex justify-center">
                   <Spinner variant="dots" size="md" />

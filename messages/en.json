@@ -90,6 +90,10 @@
     "failedToForkChat": "Failed to fork chat",
     "selectImage": "Select: {title}",
     "asset": "Asset: {title}",
+    "chat": "Chat",
+    "loading": "Loading...",
+    "expandChat": "Expand chat panel",
+    "collapseChat": "Collapse chat panel",
     "retryMessages": {
       "rethink": "Oops! Let me think about that again...",
       "rephrase": "Hmm, let me rephrase that better!",

@@ -26,6 +26,10 @@ interface ParallelMessageProps {
   ) => void;
   onAgentTitleClick: (part: any) => void;
   onForkChat?: (messageIndex: number) => void;
+  /** Force compact/mobile view regardless of viewport width */
+  compactMode?: boolean;
+  /** Hide avatars for both user and assistant messages */
+  hideAvatars?: boolean;
 }
 
 export default function ParallelMessage({
@@ -37,6 +41,8 @@ export default function ParallelMessage({
   onAgentImageSelect,
   onAgentTitleClick,
   onForkChat,
+  compactMode = false,
+  hideAvatars = false,
 }: ParallelMessageProps) {
   const [currentVariantIndex, setCurrentVariantIndex] = useState(0);
   const [isSwiping, setIsSwiping] = useState(false);
@@ -118,41 +124,47 @@ export default function ParallelMessage({
         onAgentImageSelect={onAgentImageSelect}
         onAgentTitleClick={onAgentTitleClick}
         onForkChat={onForkChat}
+        hideAvatar={hideAvatars}
       />
     );
   }
 
+  // Use compact mode when prop is set, otherwise use responsive classes
+  const showCompactView = compactMode;
+
   return (
     <div className="w-full max-w-6xl mx-auto">
-      {/* Desktop: Side by side */}
-      <div className="hidden lg:grid lg:grid-cols-2 gap-2">
-        {variants.map((variant, idx) => (
-          <div key={variant.variantId || idx} className="relative">
-            {/* Variant label */}
-            <div className="absolute -top-2 left-1/2 -translate-x-1/2 z-10">
-              <span className="px-2 py-0.5 text-xs bg-default-100 text-default-500 rounded-full">
-                Option {idx + 1}
-              </span>
+      {/* Desktop: Side by side (hidden in compact mode) */}
+      {!showCompactView && (
+        <div className="hidden lg:grid lg:grid-cols-2 gap-2">
+          {variants.map((variant, idx) => (
+            <div key={variant.variantId || idx} className="relative">
+              {/* Variant label */}
+              <div className="absolute -top-2 left-1/2 -translate-x-1/2 z-10">
+                <span className="px-2 py-0.5 text-xs bg-default-100 text-default-500 rounded-full">
+                  Option {idx + 1}
+                </span>
+              </div>
+              <ChatMessage
+                message={variant}
+                messageIndex={messageIndex}
+                chatId={chatId}
+                user={user}
+                selectedImageIds={selectedImageIds}
+                onAgentImageSelect={(part, msgIdx, partIdx) =>
+                  onAgentImageSelect(part, msgIdx, partIdx, variant.variantId)
+                }
+                onAgentTitleClick={onAgentTitleClick}
+                onForkChat={onForkChat}
+                hideAvatar={idx > 0 || hideAvatars}
+              />
             </div>
-            <ChatMessage
-              message={variant}
-              messageIndex={messageIndex}
-              chatId={chatId}
-              user={user}
-              selectedImageIds={selectedImageIds}
-              onAgentImageSelect={(part, msgIdx, partIdx) =>
-                onAgentImageSelect(part, msgIdx, partIdx, variant.variantId)
-              }
-              onAgentTitleClick={onAgentTitleClick}
-              onForkChat={onForkChat}
-              hideAvatar={idx > 0}
-            />
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
-      {/* Mobile: Swipeable carousel */}
-      <div className="lg:hidden">
+      {/* Mobile/Compact: Swipeable carousel */}
+      <div className={showCompactView ? "block" : "lg:hidden"}>
         {/* Navigation dots */}
         <div className="flex justify-center items-center gap-2 mb-3">
           <Button
@@ -226,6 +238,7 @@ export default function ParallelMessage({
               onAgentImageSelect={handleAgentImageSelect}
               onAgentTitleClick={onAgentTitleClick}
               onForkChat={onForkChat}
+              hideAvatar={hideAvatars}
             />
           </div>
         </div>

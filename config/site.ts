@@ -4,6 +4,12 @@ export const siteConfig = {
   name: "moodio agent",
   description: "moodio agent",
   chatInputPrefix: "moodio_chat_draft_",
+  // Active chat tracking for cross-page continuity
+  activeChatId: "moodio_active_chat_id",
+  // Chat side panel collapse state (defaults to expanded)
+  chatPanelCollapsed: "moodio_chat_panel_collapsed",
+  // Chat side panel width (for resizable panel)
+  chatPanelWidth: "moodio_chat_panel_width",
   navItems: [
     {
       label: "Home",

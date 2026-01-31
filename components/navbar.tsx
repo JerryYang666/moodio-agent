@@ -19,18 +19,11 @@ import { LanguageSwitch } from "@/components/language-switch";
 import {
   BotMessageSquare,
   Shield,
-  SquarePen,
-  MessageSquare,
   Folder,
   LogOut,
   Globe,
   Clapperboard,
-  List,
-  GalleryThumbnails,
   MoreHorizontal,
-  Pencil,
-  Check,
-  Trash2,
   Bean,
   User as UserIcon,
 } from "lucide-react";
@@ -40,292 +33,13 @@ import { Button } from "@heroui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { useChat } from "@/hooks/use-chat";
 import { useCredits } from "@/hooks/use-credits";
-import { Chat } from "@/components/chat-provider";
-import { motion } from "framer-motion";
-import { Spinner } from "@heroui/spinner";
-import { Image } from "@heroui/image";
-import { Input } from "@heroui/input";
-import {
-  Dropdown,
-  DropdownTrigger,
-  DropdownMenu,
-  DropdownItem,
-} from "@heroui/dropdown";
-
-interface ChatItemProps {
-  chat: Chat;
-  isActive: boolean;
-  viewMode: "list" | "grid";
-}
-
-// Re-implementation of ChatItem for Mobile Navbar to handle interactions properly in mobile context
-const MobileChatItem = ({ chat, isActive, viewMode }: ChatItemProps) => {
-  const router = useRouter();
-  const pathname = usePathname();
-  const t = useTranslations("chat");
-  const tCommon = useTranslations("common");
-  const { renameChat, deleteChat, isChatMonitored } = useChat();
-  const [isRenameOpen, setIsRenameOpen] = useState(false);
-  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
-  const [newName, setNewName] = useState(chat.name || "");
-  const [isRenaming, setIsRenaming] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
-
-  const handleRename = async () => {
-    if (!newName.trim()) return;
-    setIsRenaming(true);
-    try {
-      await renameChat(chat.id, newName);
-      setIsRenameOpen(false);
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setIsRenaming(false);
-    }
-  };
-
-  const handleDelete = async () => {
-    setIsDeleting(true);
-    try {
-      await deleteChat(chat.id);
-      setIsDeleteOpen(false);
-      // If we're on the deleted chat's page, redirect to /chat
-      if (pathname === `/chat/${chat.id}`) {
-        router.push("/chat");
-      }
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setIsDeleting(false);
-    }
-  };
-
-  const chatName = chat.name || t("newChat");
-  const isMonitored = isChatMonitored(chat.id);
-  // Use CloudFront URL from API response (access via signed cookies)
-  const thumbnailUrl = chat.thumbnailImageUrl || null;
-
-  return (
-    <div className="relative group">
-      {/* Rename Popover */}
-      <Popover
-        isOpen={isRenameOpen}
-        onOpenChange={(open) => {
-          setIsRenameOpen(open);
-          if (!open) setNewName(chat.name || "");
-        }}
-        placement="bottom"
-      >
-        <PopoverTrigger>
-          <div className="absolute right-2 top-1/2 w-1 h-1 opacity-0 pointer-events-none" />
-        </PopoverTrigger>
-        <PopoverContent>
-          <div className="px-1 py-2 w-64">
-            <p className="text-small font-bold text-foreground mb-2">
-              {t("renameChat")}
-            </p>
-            <div className="flex gap-2">
-              <Input
-                size="sm"
-                value={newName}
-                onValueChange={setNewName}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") handleRename();
-                }}
-                autoFocus
-              />
-              <Button
-                size="sm"
-                color="primary"
-                isIconOnly
-                isLoading={isRenaming}
-                onPress={handleRename}
-              >
-                <Check size={16} />
-              </Button>
-            </div>
-          </div>
-        </PopoverContent>
-      </Popover>
-
-      {/* Delete Confirmation Popover */}
-      <Popover
-        isOpen={isDeleteOpen}
-        onOpenChange={setIsDeleteOpen}
-        placement="bottom"
-      >
-        <PopoverTrigger>
-          <div className="absolute right-2 top-1/2 w-1 h-1 opacity-0 pointer-events-none" />
-        </PopoverTrigger>
-        <PopoverContent>
-          <div className="px-1 py-2 w-64">
-            <p className="text-small font-bold text-foreground mb-1">
-              {t("deleteChat")}
-            </p>
-            <p className="text-tiny text-default-500 mb-3">
-              {t("deleteConfirm")}
-            </p>
-            <div className="flex gap-2 justify-end">
-              <Button
-                size="sm"
-                variant="flat"
-                onPress={() => setIsDeleteOpen(false)}
-              >
-                {tCommon("cancel")}
-              </Button>
-              <Button
-                size="sm"
-                color="danger"
-                isLoading={isDeleting}
-                onPress={handleDelete}
-              >
-                {tCommon("delete")}
-              </Button>
-            </div>
-          </div>
-        </PopoverContent>
-      </Popover>
-
-      <NextLink
-        href={`/chat/${chat.id}`}
-        className={clsx(
-          "transition-colors relative group/item w-full",
-          viewMode === "list"
-            ? "flex items-center gap-2 px-3 py-2 rounded-xl whitespace-nowrap text-sm"
-            : "flex flex-col p-2 rounded-xl gap-2 h-auto",
-          isActive
-            ? "bg-primary/10 text-primary font-medium"
-            : "text-default-500 hover:bg-default-100 hover:text-default-900"
-        )}
-      >
-        {/* Grid View: Thumbnail */}
-        {viewMode === "grid" && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.9 }}
-            className={clsx(
-              "w-full rounded-lg overflow-hidden bg-default-100 relative border border-default-200",
-              !thumbnailUrl && "aspect-square"
-            )}
-          >
-            {thumbnailUrl ? (
-              <Image
-                src={thumbnailUrl}
-                alt={chatName}
-                width={300}
-                radius="none"
-                classNames={{
-                  wrapper: "w-full !max-w-full",
-                  img: "w-full h-auto",
-                }}
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-default-300">
-                <MessageSquare size={24} />
-              </div>
-            )}
-            {isMonitored && (
-              <div className="absolute top-2 right-2 z-10">
-                <Spinner
-                  size="sm"
-                  color="current"
-                  classNames={{
-                    wrapper: "w-4 h-4",
-                    circle1: "border-b-current",
-                    circle2: "border-b-current",
-                  }}
-                />
-              </div>
-            )}
-          </motion.div>
-        )}
-
-        {/* List View: Spinner */}
-        {viewMode === "list" && isMonitored && (
-          <span className="shrink-0 flex items-center justify-center w-4 h-4">
-            <Spinner
-              size="sm"
-              color="current"
-              classNames={{
-                wrapper: "w-4 h-4",
-                circle1: "border-b-current",
-                circle2: "border-b-current",
-              }}
-            />
-          </span>
-        )}
-
-        <span
-          className={clsx(
-            "overflow-hidden truncate text-sm",
-            viewMode === "grid" ? "w-full text-center font-medium" : "flex-1"
-          )}
-        >
-          {chatName}
-        </span>
-
-        <div
-          className={clsx(
-            "absolute opacity-100 transition-opacity rounded-lg z-20",
-            viewMode === "list"
-              ? "right-2 top-1/2 -translate-y-1/2"
-              : "top-2 right-2"
-          )}
-        >
-          <Dropdown>
-            <DropdownTrigger>
-              <Button
-                isIconOnly
-                size="sm"
-                variant="light"
-                className={clsx(
-                  "min-w-6 w-6 h-6 p-0",
-                  viewMode === "grid"
-                    ? "bg-background/50 backdrop-blur-sm text-foreground"
-                    : "text-default-500"
-                )}
-                onPress={(e) => {
-                  // Prevent navigation
-                }}
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                }}
-              >
-                <MoreHorizontal size={16} />
-              </Button>
-            </DropdownTrigger>
-            <DropdownMenu aria-label="Chat Actions">
-              <DropdownItem
-                key="rename"
-                startContent={<Pencil size={16} />}
-                onPress={() => setIsRenameOpen(true)}
-              >
-                {tCommon("rename")}
-              </DropdownItem>
-              <DropdownItem
-                key="delete"
-                startContent={<Trash2 size={16} />}
-                className="text-danger"
-                color="danger"
-                onPress={() => setIsDeleteOpen(true)}
-              >
-                {tCommon("delete")}
-              </DropdownItem>
-            </DropdownMenu>
-          </Dropdown>
-        </div>
-      </NextLink>
-    </div>
-  );
-};
+import { ChatHistorySelector } from "@/components/chat/chat-history-selector";
 
 export const Navbar = () => {
   const pathname = usePathname();
   const router = useRouter();
   const { user, logout } = useAuth();
-  const { chats, refreshChats } = useChat();
+  const { refreshChats } = useChat();
   const { balance: credits } = useCredits();
   const t = useTranslations();
   const tCredits = useTranslations("credits");
@@ -333,7 +47,6 @@ export const Navbar = () => {
   const [activeSection, setActiveSection] = useState<
     "browse" | "agent" | "projects" | "storyboard"
   >("agent");
-  const [viewMode, setViewMode] = useState<"list" | "grid">("list");
 
   useEffect(() => {
     if (pathname?.startsWith("/browse")) setActiveSection("browse");
@@ -450,71 +163,11 @@ export const Navbar = () => {
           {/* Dynamic Content Area based on activeSection */}
           <div className="flex-1 overflow-y-auto overflow-x-hidden px-4 flex flex-col gap-2 min-h-0">
             {activeSection === "agent" && (
-              <>
-                <div className="flex flex-col gap-0 pb-2 shrink-0 sticky top-0 z-30 bg-background/60 backdrop-blur-xl -mx-4 px-4 pt-2 rounded-2xl mt-1">
-                  <button
-                    onClick={handleNewChat}
-                    className="flex items-center gap-2 px-3 py-2 rounded-xl transition-colors text-default-500 hover:bg-default-100/80 hover:text-default-900 w-full justify-center bg-default-100/50 mb-2"
-                  >
-                    <SquarePen size={20} />
-                    <span className="text-sm">{t("chat.newChat")}</span>
-                  </button>
-
-                  <div className="relative py-0 flex items-center justify-center my-0">
-                    <div className="relative px-2 flex gap-1">
-                      <button
-                        onClick={() => setViewMode("list")}
-                        className={clsx(
-                          "p-1 rounded hover:bg-default-100 transition-colors",
-                          viewMode === "list"
-                            ? "text-primary"
-                            : "text-default-400"
-                        )}
-                        title={t("nav.listView")}
-                      >
-                        <List size={16} />
-                      </button>
-                      <button
-                        onClick={() => setViewMode("grid")}
-                        className={clsx(
-                          "p-1 rounded hover:bg-default-100 transition-colors",
-                          viewMode === "grid"
-                            ? "text-primary"
-                            : "text-default-400"
-                        )}
-                        title={t("nav.gridView")}
-                      >
-                        <GalleryThumbnails size={16} />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                <div
-                  className={clsx(
-                    "pb-4",
-                    viewMode === "grid"
-                      ? "grid grid-cols-1 gap-2"
-                      : "flex flex-col gap-1"
-                  )}
-                >
-                  {chats.length > 0 ? (
-                    chats.map((chat) => (
-                      <div key={chat.id} onClick={() => setIsMenuOpen(false)}>
-                        <MobileChatItem
-                          chat={chat}
-                          isActive={pathname === `/chat/${chat.id}`}
-                          viewMode={viewMode}
-                        />
-                      </div>
-                    ))
-                  ) : (
-                    <p className="text-center text-default-400 py-4 text-sm">
-                      {t("chat.noChatsYet")}
-                    </p>
-                  )}
-                </div>
-              </>
+              <ChatHistorySelector
+                onChatSelect={() => setIsMenuOpen(false)}
+                onNewChat={handleNewChat}
+                className="flex-1 pt-2"
+              />
             )}
 
             {activeSection === "projects" && (

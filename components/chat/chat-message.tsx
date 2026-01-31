@@ -371,7 +371,7 @@ export default function ChatMessage({
         )}
       </div>
 
-      {isUser && (
+      {isUser && !hideAvatar && (
         <Avatar
           name={
             user?.firstName?.charAt(0) ||

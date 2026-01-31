@@ -7,6 +7,11 @@ import VideoGenerationPanel, {
   VideoGenerationRestore,
 } from "@/components/storyboard/video-generation-panel";
 import VideoList from "@/components/storyboard/video-list";
+import ChatSidePanel from "@/components/chat/chat-side-panel";
+import { siteConfig } from "@/config/site";
+
+const DEFAULT_PANEL_WIDTH = 380;
+const COLLAPSED_WIDTH = 48;
 
 function StoryboardContent() {
   const searchParams = useSearchParams();
@@ -19,6 +24,28 @@ function StoryboardContent() {
   const [restoreData, setRestoreData] = useState<VideoGenerationRestore | null>(
     null
   );
+  
+  // Chat panel collapse state - defaults to expanded (false = not collapsed)
+  const [isChatPanelCollapsed, setIsChatPanelCollapsed] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem(siteConfig.chatPanelCollapsed) === "true";
+  });
+
+  // Chat panel width state
+  const [chatPanelWidth, setChatPanelWidth] = useState(() => {
+    if (typeof window === "undefined") return DEFAULT_PANEL_WIDTH;
+    const stored = localStorage.getItem(siteConfig.chatPanelWidth);
+    return stored ? parseInt(stored, 10) : DEFAULT_PANEL_WIDTH;
+  });
+
+  const handleChatPanelCollapseChange = useCallback((collapsed: boolean) => {
+    setIsChatPanelCollapsed(collapsed);
+    localStorage.setItem(siteConfig.chatPanelCollapsed, String(collapsed));
+  }, []);
+
+  const handleChatPanelWidthChange = useCallback((width: number) => {
+    setChatPanelWidth(width);
+  }, []);
 
   // Fetch CloudFront URL for initial image if provided
   useEffect(() => {
@@ -69,9 +96,9 @@ function StoryboardContent() {
 
   return (
     <div className="relative h-[calc(100vh-env(safe-area-inset-bottom))] md:h-screen">
-      <div className="absolute inset-0 flex flex-col lg:flex-row gap-4 p-3 sm:p-4">
+      <div className="absolute inset-0 flex flex-col lg:flex-row gap-4 p-3 sm:p-4 lg:gap-0 lg:p-0">
         {/* Left Panel - Video Generation */}
-        <div className="w-full lg:w-[400px] shrink-0 min-h-0 lg:h-full flex flex-col overflow-hidden">
+        <div className="w-full lg:w-[400px] shrink-0 min-h-0 lg:h-full flex flex-col overflow-hidden lg:p-4">
           <VideoGenerationPanel
             initialImageId={initialImageId}
             initialImageUrl={initialImageUrl}
@@ -81,9 +108,24 @@ function StoryboardContent() {
           />
         </div>
 
-        {/* Right Panel - Video List */}
-        <div className="flex-1 min-w-0 min-h-[300px] lg:min-h-0 lg:h-full flex flex-col overflow-hidden">
+        {/* Middle Panel - Video List */}
+        <div className="flex-1 min-w-0 min-h-[300px] lg:min-h-0 lg:h-full flex flex-col overflow-hidden lg:py-4 lg:pr-4">
           <VideoList refreshTrigger={refreshTrigger} onRestore={handleRestore} />
+        </div>
+
+        {/* Right Panel - Chat Side Panel (Desktop only) */}
+        <div
+          className="hidden lg:block shrink-0 h-full"
+          style={{ 
+            width: isChatPanelCollapsed ? COLLAPSED_WIDTH : chatPanelWidth,
+            transition: isChatPanelCollapsed ? 'width 0.3s ease-in-out' : undefined
+          }}
+        >
+          <ChatSidePanel
+            defaultExpanded={!isChatPanelCollapsed}
+            onCollapseChange={handleChatPanelCollapseChange}
+            onWidthChange={handleChatPanelWidthChange}
+          />
         </div>
       </div>
     </div>
