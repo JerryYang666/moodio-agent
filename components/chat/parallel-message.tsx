@@ -3,7 +3,9 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { Card, CardBody } from "@heroui/card";
 import { Button } from "@heroui/button";
-import { ChevronLeft, ChevronRight, Layers } from "lucide-react";
+import { Spinner } from "@heroui/spinner";
+import { ChevronLeft, ChevronRight, Layers, Sparkles } from "lucide-react";
+import { useTranslations } from "next-intl";
 import clsx from "clsx";
 import { Message } from "@/lib/llm/types";
 import ChatMessage from "./chat-message";
@@ -30,6 +32,12 @@ interface ParallelMessageProps {
   compactMode?: boolean;
   /** Hide avatars for both user and assistant messages */
   hideAvatars?: boolean;
+  /** Callback to generate an additional variant */
+  onGenerateVariant?: () => void;
+  /** Whether a variant is currently being generated for this message group */
+  isGeneratingVariant?: boolean;
+  /** Whether a message is currently being sent (disables New Idea button) */
+  isSending?: boolean;
 }
 
 export default function ParallelMessage({
@@ -43,7 +51,11 @@ export default function ParallelMessage({
   onForkChat,
   compactMode = false,
   hideAvatars = false,
+  onGenerateVariant,
+  isGeneratingVariant = false,
+  isSending = false,
 }: ParallelMessageProps) {
+  const t = useTranslations();
   const [currentVariantIndex, setCurrentVariantIndex] = useState(0);
   const [isSwiping, setIsSwiping] = useState(false);
   const [swipeOffset, setSwipeOffset] = useState(0);
@@ -112,20 +124,43 @@ export default function ParallelMessage({
     [onAgentImageSelect, variants, currentVariantIndex]
   );
 
-  // If only one variant, render normally
+  // If only one variant, render normally with option to generate another
   if (variants.length === 1) {
     return (
-      <ChatMessage
-        message={variants[0]}
-        messageIndex={messageIndex}
-        chatId={chatId}
-        user={user}
-        selectedImageIds={selectedImageIds}
-        onAgentImageSelect={onAgentImageSelect}
-        onAgentTitleClick={onAgentTitleClick}
-        onForkChat={onForkChat}
-        hideAvatar={hideAvatars}
-      />
+      <div className="w-full">
+        <ChatMessage
+          message={variants[0]}
+          messageIndex={messageIndex}
+          chatId={chatId}
+          user={user}
+          selectedImageIds={selectedImageIds}
+          onAgentImageSelect={onAgentImageSelect}
+          onAgentTitleClick={onAgentTitleClick}
+          onForkChat={onForkChat}
+          hideAvatar={hideAvatars}
+        />
+        {/* Generate Another Option button - only show when not sending */}
+        {onGenerateVariant && !isSending && (
+          <div className="flex justify-center mt-3">
+            <Button
+              size="sm"
+              variant="flat"
+              color="default"
+              onPress={onGenerateVariant}
+              isLoading={isGeneratingVariant}
+              isDisabled={isGeneratingVariant}
+              startContent={
+                !isGeneratingVariant && <Sparkles size={14} />
+              }
+              className="text-default-500 hover:text-default-700"
+            >
+              {isGeneratingVariant
+                ? t("chat.generatingVariant")
+                : t("chat.generateAnotherOption")}
+            </Button>
+          </div>
+        )}
+      </div>
     );
   }
 

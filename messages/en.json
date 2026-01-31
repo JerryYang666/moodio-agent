@@ -130,7 +130,11 @@
     "marked": "Marked",
     "redraw": "Redraw",
     "videoPrompt": "Video Prompt",
-    "usePrompt": "Use Prompt"
+    "usePrompt": "Use Prompt",
+    "generateAnotherOption": "New Idea",
+    "generatingVariant": "Generating new idea...",
+    "variantGenerated": "New idea generated!",
+    "failedToGenerateVariant": "Failed to generate new idea"
   },
   "profile": {
     "title": "Profile Settings",

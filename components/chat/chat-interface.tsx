@@ -14,11 +14,7 @@ import {
   NotificationPermissionModal,
   NotificationPermissionModalRef,
 } from "@/components/notification-permission-modal";
-import {
-  Message,
-  MessageContentPart,
-  PARALLEL_VARIANT_COUNT,
-} from "@/lib/llm/types";
+import { Message, MessageContentPart } from "@/lib/llm/types";
 import ImageDetailModal, { ImageInfo } from "./image-detail-modal";
 import ImageDrawingModal from "./image-drawing-modal";
 import ChatMessage from "./chat-message";
@@ -86,6 +82,10 @@ export default function ChatInterface({
     !!initialChatId && initialMessages.length === 0
   );
   const [isSending, setIsSending] = useState(false);
+  // Track which message timestamp is currently generating an additional variant
+  const [generatingVariantTimestamp, setGeneratingVariantTimestamp] = useState<
+    number | null
+  >(null);
   // Unified pending images array - replaces selectedFile, previewUrl, selectedAsset, selectedAgentPart
   const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
   const [isAssetPickerOpen, setIsAssetPickerOpen] = useState(false);
@@ -163,7 +163,7 @@ export default function ChatInterface({
     const timeoutId = setTimeout(() => {
       saveMenuState(menuState);
     }, 300);
-    
+
     return () => clearTimeout(timeoutId);
   }, [menuState]);
 
@@ -314,7 +314,7 @@ export default function ChatInterface({
   // Skip if disableActiveChatPersistence is true (used in side panel where parent controls this)
   useEffect(() => {
     if (disableActiveChatPersistence) return;
-    
+
     if (chatId) {
       localStorage.setItem(siteConfig.activeChatId, chatId);
     } else {
@@ -599,7 +599,7 @@ export default function ChatInterface({
       const effectivePendingImages = existingMarkedImage
         ? pendingImages.filter((img) => img.imageId !== existingMarkedImage.imageId)
         : pendingImages;
-      
+
       if (!canAddImage(effectivePendingImages)) {
         addToast({
           title: t("chat.maxImagesReached", { max: MAX_PENDING_IMAGES }),
@@ -626,7 +626,7 @@ export default function ChatInterface({
       // Remove existing marked image (if redrawing) and add new one
       setPendingImages((prev) => {
         let newImages = prev;
-        
+
         // Remove the old marked image if it exists
         if (existingMarkedImage) {
           // Clean up the old preview URL if any
@@ -637,7 +637,7 @@ export default function ChatInterface({
             (img) => img.imageId !== existingMarkedImage.imageId
           );
         }
-        
+
         return [...newImages, uploadingImage];
       });
 
@@ -899,7 +899,8 @@ export default function ChatInterface({
 
       // Temporary storage for the message content parts per variant
       const variantContents: Record<string, MessageContentPart[]> = {};
-      const variantTimestamp = Date.now();
+      // Will be set from backend's message_timestamp event
+      let variantTimestamp: number | null = null;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -913,6 +914,13 @@ export default function ChatInterface({
           if (!line.trim()) continue;
           try {
             const event = JSON.parse(line);
+
+            // Handle message_timestamp event from backend (sync timestamp)
+            if (event.type === "message_timestamp") {
+              variantTimestamp = event.timestamp;
+              continue;
+            }
+
             const variantId = event.variantId || "default";
 
             // Initialize variant tracking if needed
@@ -980,7 +988,7 @@ export default function ChatInterface({
 
               if (
                 allFailed &&
-                Object.keys(variantContents).length >= PARALLEL_VARIANT_COUNT
+                Object.keys(variantContents).length >= 1
               ) {
                 // Cancel chat monitoring since all requests failed
                 if (currentChatId) {
@@ -1022,12 +1030,14 @@ export default function ChatInterface({
 
             // Initialize variant message if this is the first chunk for this variant
             if (isFirstChunkByVariant[variantId]) {
+              // Use backend timestamp, fallback to current time if not received yet
+              const timestamp = variantTimestamp || Date.now();
               setMessages((prev) => [
                 ...prev,
                 {
                   role: "assistant",
                   content: [],
-                  createdAt: variantTimestamp,
+                  createdAt: timestamp,
                   variantId: variantId,
                 },
               ]);
@@ -1245,6 +1255,163 @@ export default function ChatInterface({
     }
   };
 
+  // Handler for generating an additional variant for a message group
+  const handleGenerateVariant = async (messageTimestamp: number) => {
+    if (!chatId || generatingVariantTimestamp !== null) return;
+
+    setGeneratingVariantTimestamp(messageTimestamp);
+
+    try {
+      const res = await fetch(`/api/chat/${chatId}/variant`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messageTimestamp }),
+      });
+
+      if (!res.ok || !res.body) {
+        throw new Error("Failed to generate variant");
+      }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let isFirstChunk = true;
+      let variantContent: MessageContentPart[] = [];
+      let newVariantId: string | null = null;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          try {
+            const event = JSON.parse(line);
+
+            // Skip message_timestamp event (used for main message sync, not needed here)
+            if (event.type === "message_timestamp") {
+              continue;
+            }
+
+            const variantId = event.variantId || "default";
+
+            // Track the variant ID
+            if (!newVariantId) {
+              newVariantId = variantId;
+            }
+
+            if (event.type === "invalidate") {
+              // Retry - clear content
+              variantContent = [];
+              isFirstChunk = true;
+              continue;
+            }
+
+            if (
+              event.type === "retry_exhausted" ||
+              event.type === "variant_failed"
+            ) {
+              console.log(`[Chat] Variant generation failed: ${event.reason}`);
+              continue;
+            }
+
+            // Initialize the new variant message on first chunk
+            if (isFirstChunk) {
+              setMessages((prev) => [
+                ...prev,
+                {
+                  role: "assistant",
+                  content: [],
+                  createdAt: messageTimestamp,
+                  variantId: variantId,
+                },
+              ]);
+              isFirstChunk = false;
+            }
+
+            // Process content events
+            if (event.type === "internal_think") {
+              // Add internal_think part
+              variantContent.push({
+                type: "internal_think",
+                text: event.content,
+              });
+            } else if (event.type === "text") {
+              if (
+                variantContent.length === 0 ||
+                variantContent[0].type !== "text"
+              ) {
+                variantContent = [
+                  { type: "text", text: event.content },
+                  ...variantContent,
+                ];
+              } else {
+                variantContent[0] = { type: "text", text: event.content };
+              }
+            } else if (event.type === "part") {
+              variantContent.push(event.part);
+            } else if (event.type === "part_update") {
+              // Update existing part by imageId
+              if (event.imageId) {
+                const partIdx = variantContent.findIndex(
+                  (p) => p.type === "agent_image" && p.imageId === event.imageId
+                );
+                if (partIdx !== -1) {
+                  variantContent[partIdx] = event.part;
+                }
+              } else if (event.index !== undefined) {
+                // Legacy: Update by index (backward compatibility)
+                const hasThink = variantContent.some(
+                  (p) => p.type === "internal_think"
+                );
+                const offset = hasThink ? 2 : 1;
+                if (variantContent[event.index + offset]) {
+                  variantContent[event.index + offset] = event.part;
+                }
+              }
+            }
+
+            // Update the message in state
+            setMessages((prev) => {
+              const newMessages = [...prev];
+              for (let i = newMessages.length - 1; i >= 0; i--) {
+                const msg = newMessages[i];
+                if (
+                  msg.role === "assistant" &&
+                  msg.variantId === variantId &&
+                  msg.createdAt === messageTimestamp
+                ) {
+                  newMessages[i] = { ...msg, content: [...variantContent] };
+                  break;
+                }
+              }
+              return newMessages;
+            });
+          } catch (e) {
+            console.error("Parse error in variant stream", e);
+          }
+        }
+      }
+
+      addToast({
+        title: t("chat.variantGenerated"),
+        color: "success",
+      });
+    } catch (error) {
+      console.error("Error generating variant:", error);
+      addToast({
+        title: t("chat.failedToGenerateVariant"),
+        color: "danger",
+      });
+    } finally {
+      setGeneratingVariantTimestamp(null);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-full min-h-[50vh]">
@@ -1282,6 +1449,12 @@ export default function ChatInterface({
             );
           } else {
             // Assistant message(s) - use ParallelMessage for variants
+            const messageTimestamp = group.messages[0]?.createdAt;
+            // Only show "New Idea" button on the last assistant message group
+            const isLastAssistantGroup =
+              groupIdx === groupedMessages.length - 1 ||
+              (groupIdx === groupedMessages.length - 2 &&
+                groupedMessages[groupedMessages.length - 1]?.type === "user");
             return (
               <ParallelMessage
                 key={`assistant-${group.originalIndex}`}
@@ -1295,6 +1468,15 @@ export default function ChatInterface({
                 onForkChat={handleForkChat}
                 compactMode={compactMode}
                 hideAvatars={hideAvatars}
+                onGenerateVariant={
+                  isLastAssistantGroup && messageTimestamp
+                    ? () => handleGenerateVariant(messageTimestamp)
+                    : undefined
+                }
+                isGeneratingVariant={
+                  generatingVariantTimestamp === messageTimestamp
+                }
+                isSending={isSending}
               />
             );
           }

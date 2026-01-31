@@ -130,7 +130,11 @@
     "marked": "标记",
     "redraw": "重新标记",
     "videoPrompt": "视频提示词",
-    "usePrompt": "使用提示词"
+    "usePrompt": "使用提示词",
+    "generateAnotherOption": "新的灵感",
+    "generatingVariant": "正在生成新灵感...",
+    "variantGenerated": "新灵感已生成！",
+    "failedToGenerateVariant": "生成新灵感失败"
   },
   "profile": {
     "title": "个人设置",

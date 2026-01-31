@@ -219,9 +219,8 @@ export class Agent1 implements Agent {
             if (p.type === "agent_image") {
               return {
                 type: "text" as const,
-                text: `Suggestion: ${p.title}\nAspect Ratio: ${
-                  p.aspectRatio || "1:1"
-                }\nPrompt: ${p.prompt}`,
+                text: `Suggestion: ${p.title}\nAspect Ratio: ${p.aspectRatio || "1:1"
+                  }\nPrompt: ${p.prompt}`,
               };
             }
             return p;
@@ -259,20 +258,20 @@ export class Agent1 implements Agent {
       role: userMessage.role,
       content: Array.isArray(userMessage.content)
         ? userMessage.content.map((p) => {
-            if (p.type === "image") {
-              return {
-                type: "image_url",
-                image_url: {
-                  url: getSignedImageUrl(p.imageId),
-                },
-              };
-            }
-            return p;
-          })
+          if (p.type === "image") {
+            return {
+              type: "image_url",
+              image_url: {
+                url: getSignedImageUrl(p.imageId),
+              },
+            };
+          }
+          return p;
+        })
         : [
-            // If userMessage.content is string, convert to array format for consistency
-            { type: "text", text: userMessage.content as string },
-          ],
+          // If userMessage.content is string, convert to array format for consistency
+          { type: "text", text: userMessage.content as string },
+        ],
     };
 
     // Add precision editing prompt if applicable
@@ -397,8 +396,7 @@ export class Agent1 implements Agent {
           try {
             if (attempt > 0) {
               console.log(
-                `[Agent-1] Retrying LLM call and parse, attempt ${
-                  attempt + 1
+                `[Agent-1] Retrying LLM call and parse, attempt ${attempt + 1
                 }/${MAX_RETRY + 1}`
               );
 
@@ -432,8 +430,7 @@ export class Agent1 implements Agent {
 
             if (attempt > 0) {
               console.log(
-                `[Agent-1] LLM call and parse succeeded on retry attempt ${
-                  attempt + 1
+                `[Agent-1] LLM call and parse succeeded on retry attempt ${attempt + 1
                 }`
               );
             }
@@ -445,8 +442,7 @@ export class Agent1 implements Agent {
           } catch (error) {
             lastError = error as Error;
             console.error(
-              `[Agent-1] LLM call and parse attempt ${attempt + 1}/${
-                MAX_RETRY + 1
+              `[Agent-1] LLM call and parse attempt ${attempt + 1}/${MAX_RETRY + 1
               } failed:`,
               error
             );
@@ -468,7 +464,7 @@ export class Agent1 implements Agent {
         rejectCompletion(lastError || new Error("LLM call and parse failed"));
         try {
           controller.close();
-        } catch (e) {}
+        } catch (e) { }
       },
     });
 
@@ -788,8 +784,7 @@ export class Agent1 implements Agent {
       try {
         if (attempt > 0) {
           console.log(
-            `[Agent-1] Retrying image generation for index=${index}, attempt ${
-              attempt + 1
+            `[Agent-1] Retrying image generation for index=${index}, attempt ${attempt + 1
             }/${MAX_RETRY + 1}`
           );
         }
@@ -805,8 +800,7 @@ export class Agent1 implements Agent {
 
         if (attempt > 0) {
           console.log(
-            `[Agent-1] Image generation succeeded on retry attempt ${
-              attempt + 1
+            `[Agent-1] Image generation succeeded on retry attempt ${attempt + 1
             } for index=${index}`
           );
         }
@@ -815,8 +809,7 @@ export class Agent1 implements Agent {
       } catch (error) {
         lastError = error as Error;
         console.error(
-          `[Agent-1] Image generation attempt ${attempt + 1}/${
-            MAX_RETRY + 1
+          `[Agent-1] Image generation attempt ${attempt + 1}/${MAX_RETRY + 1
           } failed for index=${index}:`,
           error
         );
@@ -825,8 +818,7 @@ export class Agent1 implements Agent {
 
     // All retries exhausted
     console.error(
-      `[Agent-1] Image generation failed after ${
-        MAX_RETRY + 1
+      `[Agent-1] Image generation failed after ${MAX_RETRY + 1
       } attempts for index=${index}`
     );
 
@@ -979,9 +971,12 @@ export class Agent1 implements Agent {
     systemPromptOverride?: string,
     aspectRatioOverride?: string,
     imageSizeOverride?: ImageSize,
-    imageModelId?: string
+    imageModelId?: string,
+    messageTimestamp?: number // Timestamp to use for all variants (for frontend sync)
   ): Promise<ParallelAgentResponse> {
     const startTime = requestStartTime || Date.now();
+    // Use provided timestamp or generate one
+    const variantTimestamp = messageTimestamp || Date.now();
     console.log(
       "[Perf] Agent processRequestParallel start with %s variants, %s images [%sms]",
       variantCount,
@@ -1039,6 +1034,13 @@ export class Agent1 implements Agent {
     // Create merged stream
     const stream = new ReadableStream<Uint8Array>({
       start(controller) {
+        // Send the message timestamp first so frontend can sync
+        controller.enqueue(
+          encoder.encode(
+            JSON.stringify({ type: "message_timestamp", timestamp: variantTimestamp }) + "\n"
+          )
+        );
+
         // Start all parallel variant processing
         variantIds.forEach((variantId, variantIndex) => {
           const completionPromise = (async () => {
@@ -1076,10 +1078,11 @@ export class Agent1 implements Agent {
                   userId
                 );
 
-                // Add variantId to the result message
+                // Add variantId and createdAt to the result message
                 const messageWithVariant: Message = {
                   ...result,
                   variantId,
+                  createdAt: variantTimestamp,
                 };
 
                 variantControllers[variantIndex].done = true;
@@ -1088,7 +1091,7 @@ export class Agent1 implements Agent {
                 if (variantControllers.every((v) => v.done)) {
                   try {
                     controller.close();
-                  } catch (e) {}
+                  } catch (e) { }
                 }
 
                 return messageWithVariant;
@@ -1114,7 +1117,7 @@ export class Agent1 implements Agent {
             if (variantControllers.every((v) => v.done)) {
               try {
                 controller.close();
-              } catch (e) {}
+              } catch (e) { }
             }
 
             // Return an error message for this variant

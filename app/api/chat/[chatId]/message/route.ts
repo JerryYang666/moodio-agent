@@ -6,11 +6,7 @@ import { chats } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getChatHistory, saveChatHistory } from "@/lib/storage/s3";
 import { createLLMClient } from "@/lib/llm/client";
-import {
-  Message,
-  MessageContentPart,
-  PARALLEL_VARIANT_COUNT,
-} from "@/lib/llm/types";
+import { Message, MessageContentPart } from "@/lib/llm/types";
 import { agent1 } from "@/lib/agents/agent-1";
 import { waitUntil } from "@vercel/functions";
 import { recordEvent } from "@/lib/telemetry";
@@ -126,8 +122,8 @@ export async function POST(
         imageId: entry.imageId as string,
         source:
           entry.source === "upload" ||
-          entry.source === "asset" ||
-          entry.source === "ai_generated"
+            entry.source === "asset" ||
+            entry.source === "ai_generated"
             ? (entry.source as "upload" | "asset" | "ai_generated")
             : undefined,
         title: typeof entry.title === "string" ? entry.title : undefined,
@@ -149,6 +145,11 @@ export async function POST(
         : undefined;
     const imageModelId: string | undefined =
       typeof json.imageModelId === "string" ? json.imageModelId : undefined;
+    // Accept optional variantCount parameter, default to 1 (lazy variant generation)
+    const variantCount: number =
+      typeof json.variantCount === "number" && json.variantCount >= 1
+        ? Math.min(json.variantCount, 4) // Cap at 4 variants max
+        : 1;
 
     // Validate: must have content or images
     if (!content && imageIds.length === 0) {
@@ -244,6 +245,9 @@ export async function POST(
 
     console.log("[Perf] Calling agent", `[${Date.now() - requestStartTime}ms]`);
 
+    // Generate a timestamp for all variants - this will be synced with frontend
+    const messageTimestamp = Date.now();
+
     // Use Agent 1 with parallel variants
     // Pass all imageIds directly - the agent will use these for image generation
     const { stream: agentStream, completions } =
@@ -252,26 +256,25 @@ export async function POST(
         userMessage,
         payload.userId,
         isAdmin ?? false,
-        PARALLEL_VARIANT_COUNT,
+        variantCount, // Use dynamic variant count (default: 1)
         requestStartTime,
         precisionEditing,
         imageIds, // Pass the unified array of image IDs
         isAdmin ? systemPromptOverride : undefined,
         aspectRatioOverride,
         imageSizeOverride,
-        imageModelId
+        imageModelId,
+        messageTimestamp // Pass timestamp for frontend sync
       );
 
     // Handle background completion (saving history)
     waitUntil(
       completions
         .then(async (finalMessages) => {
-          // Create a combined message with variants for storage
-          // The first variant becomes the main message, others are stored in variants array
-          const timestamp = Date.now();
-          const messagesToSave: Message[] = finalMessages.map((msg, idx) => ({
+          // Messages already have createdAt set to messageTimestamp by the agent
+          const messagesToSave: Message[] = finalMessages.map((msg) => ({
             ...msg,
-            createdAt: msg.createdAt || timestamp,
+            createdAt: msg.createdAt || messageTimestamp,
           }));
 
           // For backward compatibility, store as array of messages with variantId
@@ -351,7 +354,7 @@ export async function POST(
           // Generate chat name if needed (check for 1 user message + N variants)
           const isFirstInteraction =
             history.length === 0 &&
-            updatedHistory.length === 1 + PARALLEL_VARIANT_COUNT;
+            updatedHistory.length === 1 + variantCount;
           if (isFirstInteraction) {
             const llmClient = createLLMClient({
               apiKey: process.env.LLM_API_KEY,
