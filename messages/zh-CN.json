@@ -28,7 +28,7 @@
   },
   "nav": {
     "browse": "浏览",
-    "agent": "助手",
+    "agent": "智能体",
     "projects": "项目",
     "storyboard": "故事板",
     "storyboardShort": "故事",
@@ -92,7 +92,7 @@
     "preview": "预览",
     "selectedAsset": "已选素材",
     "precisionEditing": "精准编辑",
-    "precisionEditingDesc": "启用后，助手会尽力只编辑您想要更改的图像部分，保持其他部分不变。",
+    "precisionEditingDesc": "启用后，智能体会尽力只编辑您想要更改的图像部分，保持其他部分不变。",
     "timeRemaining": "剩余 {seconds} 秒",
     "fileSizeTooLarge": "文件过大，最大支持 {maxSize}MB。",
     "failedToForkChat": "复制对话失败",
@@ -116,9 +116,9 @@
     "editInNewChatDescription": "这将从这里开始创建一个新对话，并保留到此为止的对话历史。",
     "editAndFork": "编辑并分支",
     "errorMessages": {
-      "overwhelmed": "哎呀！我们的助手有点忙不过来了... 请再试一次？",
-      "coffeeBreak": "抱歉！我们的助手正在休息中，请稍后再试！",
-      "tripped": "糟糕！我们的助手走神了，请再试一次？"
+      "overwhelmed": "哎呀！我们的智能体有点忙不过来了... 请再试一次？",
+      "coffeeBreak": "抱歉！我们的智能体正在休息中，请稍后再试！",
+      "tripped": "糟糕！我们的智能体走神了，请再试一次？"
     },
     "waitForUpload": "请等待图片上传完成",
     "uploadFailed": "图片上传失败",
@@ -474,7 +474,7 @@
     "roles": "角色",
     "memberSince": "注册时间",
     "testProtectedApi": "测试受保护的 API",
-    "goToAgent": "前往助手",
+    "goToAgent": "前往智能体",
     "apiResponse": "/api/test/protected 的响应："
   },
   "assetPicker": {
