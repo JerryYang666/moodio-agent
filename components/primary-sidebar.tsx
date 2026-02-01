@@ -35,6 +35,7 @@ export const PrimarySidebar = () => {
   const { balance: credits } = useCredits();
   const t = useTranslations("nav");
   const tCredits = useTranslations("credits");
+  const tLanguage = useTranslations("language");
 
   const navItems = [
     {
@@ -172,7 +173,11 @@ export const PrimarySidebar = () => {
 
       {/* User Profile */}
       <div className="mt-auto pt-4 pb-2 px-2 w-full flex flex-col items-center gap-4">
-        <LanguageSwitch />
+        <Tooltip content={tLanguage("switchLanguage")} placement="right" closeDelay={0}>
+          <div>
+            <LanguageSwitch />
+          </div>
+        </Tooltip>
         <ThemeSwitch />
 
         {user && (
