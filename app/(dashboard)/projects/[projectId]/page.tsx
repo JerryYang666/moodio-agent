@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState, use } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { Card, CardBody, CardFooter } from "@heroui/card";
 import { Button } from "@heroui/button";
 import { Input } from "@heroui/input";
@@ -59,6 +60,9 @@ export default function ProjectDetailPage({
 }) {
   const { projectId } = use(params);
   const router = useRouter();
+  const t = useTranslations("projects");
+  const tCollections = useTranslations("collections");
+  const tCommon = useTranslations("common");
   const [loading, setLoading] = useState(true);
   const [project, setProject] = useState<Project | null>(null);
   const [collections, setCollections] = useState<Collection[]>([]);
@@ -173,7 +177,7 @@ export default function ProjectDetailPage({
   if (!project) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <p className="text-default-500">Project not found</p>
+        <p className="text-default-500">{t("projectNotFound")}</p>
       </div>
     );
   }
@@ -187,7 +191,7 @@ export default function ProjectDetailPage({
           onPress={() => router.push("/projects")}
           className="mb-4"
         >
-          Back to Projects
+          {t("backToProjects")}
         </Button>
 
         <div className="flex flex-col sm:flex-row justify-between sm:items-start gap-4 sm:gap-0">
@@ -196,13 +200,13 @@ export default function ProjectDetailPage({
               <h1 className="text-3xl font-bold">{project.name}</h1>
               {project.isDefault && (
                 <Chip size="sm" variant="flat" color="primary">
-                  Default
+                  {t("default")}
                 </Chip>
               )}
             </div>
             <p className="text-default-500">
-              {collections.length} {collections.length === 1 ? "collection" : "collections"} •{" "}
-              {rootAssets.length} {rootAssets.length === 1 ? "root asset" : "root assets"}
+              {t("collectionsCount", { count: collections.length })} •{" "}
+              {t("rootAssetsCount", { count: rootAssets.length })}
             </p>
           </div>
 
@@ -216,7 +220,7 @@ export default function ProjectDetailPage({
               }}
               className="w-full sm:w-auto"
             >
-              New Collection
+              {t("newCollection")}
             </Button>
           </div>
         </div>
@@ -224,10 +228,10 @@ export default function ProjectDetailPage({
 
       {/* Root assets grid */}
       <div className="mb-10">
-        <h2 className="text-lg font-semibold mb-3">Project root assets</h2>
+        <h2 className="text-lg font-semibold mb-3">{t("projectRootAssets")}</h2>
         {rootAssets.length === 0 ? (
           <div className="text-center py-12">
-            <p className="text-default-500">No root assets yet</p>
+            <p className="text-default-500">{t("noRootAssetsYet")}</p>
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
@@ -256,10 +260,10 @@ export default function ProjectDetailPage({
 
       {/* Collections grid */}
       <div>
-        <h2 className="text-lg font-semibold mb-3">Collections</h2>
+        <h2 className="text-lg font-semibold mb-3">{tCollections("title")}</h2>
         {collections.length === 0 ? (
           <div className="text-center py-12">
-            <p className="text-default-500">No collections in this project yet</p>
+            <p className="text-default-500">{t("noCollectionsInProject")}</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -290,11 +294,11 @@ export default function ProjectDetailPage({
         <ModalContent>
           {(onClose) => (
             <>
-              <ModalHeader>Create New Collection</ModalHeader>
+              <ModalHeader>{tCollections("createNewCollection")}</ModalHeader>
               <ModalBody>
                 <Input
-                  label="Collection Name"
-                  placeholder="Enter collection name"
+                  label={tCollections("collectionName")}
+                  placeholder={tCollections("enterCollectionName")}
                   value={newCollectionName}
                   onValueChange={setNewCollectionName}
                   onKeyDown={(e) => {
@@ -305,7 +309,7 @@ export default function ProjectDetailPage({
               </ModalBody>
               <ModalFooter>
                 <Button variant="light" onPress={onClose}>
-                  Cancel
+                  {tCommon("cancel")}
                 </Button>
                 <Button
                   color="primary"
@@ -313,7 +317,7 @@ export default function ProjectDetailPage({
                   isLoading={isCreatingCollection}
                   isDisabled={!newCollectionName.trim()}
                 >
-                  Create
+                  {tCommon("create")}
                 </Button>
               </ModalFooter>
             </>

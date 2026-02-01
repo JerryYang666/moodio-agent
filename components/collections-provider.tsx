@@ -2,6 +2,7 @@
 
 import React, { createContext, useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/hooks/use-auth";
+import { addToast } from "@heroui/toast";
 
 // Custom event names for real-time sync
 export const ASSETS_UPDATED_EVENT = "moodio-assets-updated";
@@ -187,9 +188,19 @@ export function CollectionsProvider({
           col.id === collectionId ? { ...col, name: data.collection.name, updatedAt: data.collection.updatedAt } : col
         )
       );
+      addToast({
+        title: "Collection renamed",
+        description: "The collection has been renamed successfully",
+        color: "success",
+      });
       return true;
     } catch (err) {
       console.error("Error renaming collection:", err);
+      addToast({
+        title: "Error",
+        description: "Failed to rename collection",
+        color: "danger",
+      });
       return false;
     }
   }, []);

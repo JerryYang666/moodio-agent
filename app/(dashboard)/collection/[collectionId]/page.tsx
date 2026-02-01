@@ -2,6 +2,7 @@
 
 import { useState, useEffect, use, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { Card, CardBody } from "@heroui/card";
 import { Button } from "@heroui/button";
 import { Input } from "@heroui/input";
@@ -17,6 +18,7 @@ import {
   ModalFooter,
   useDisclosure,
 } from "@heroui/modal";
+import { addToast } from "@heroui/toast";
 import {
   Pencil,
   Trash2,
@@ -98,6 +100,8 @@ export default function CollectionPage({
 }) {
   const { collectionId } = use(params);
   const router = useRouter();
+  const t = useTranslations("collections");
+  const tCommon = useTranslations("common");
   const { collections, renameCollection, deleteCollection, removeImageFromCollection, refreshCollections } =
     useCollections();
   const [collectionData, setCollectionData] = useState<CollectionData | null>(
@@ -378,12 +382,24 @@ export default function CollectionPage({
             }
             : null
         );
+        addToast({
+          title: t("itemRenamed"),
+          description: itemToRename.assetType === "video" ? t("videoRenamedDesc") : t("imageRenamedDesc"),
+          color: "success",
+        });
         onRenameItemOpenChange();
         setItemToRename(null);
         setNewItemTitle("");
+      } else {
+        throw new Error("Failed to rename item");
       }
     } catch (error) {
       console.error("Error renaming item:", error);
+      addToast({
+        title: tCommon("error"),
+        description: t("failedToRenameItem"),
+        color: "danger",
+      });
     } finally {
       setIsRenamingItem(false);
     }
@@ -412,6 +428,10 @@ export default function CollectionPage({
       );
 
       if (res.ok) {
+        // Get target collection name for toast
+        const targetCollection = availableCollections.find(
+          (col) => col.id === selectedTargetCollection
+        );
         // Remove from local state
         setCollectionData((prev) =>
           prev
@@ -423,14 +443,28 @@ export default function CollectionPage({
               }
             : null
         );
+        addToast({
+          title: t("itemMoved"),
+          description: itemToMove.assetType === "video" 
+            ? t("videoMovedDesc", { collection: targetCollection?.name || "collection" })
+            : t("imageMovedDesc", { collection: targetCollection?.name || "collection" }),
+          color: "success",
+        });
         onMoveItemOpenChange();
         setItemToMove(null);
         setSelectedTargetCollection("");
         // Refresh collections to update counts
         refreshCollections();
+      } else {
+        throw new Error("Failed to move item");
       }
     } catch (error) {
       console.error("Error moving item:", error);
+      addToast({
+        title: tCommon("error"),
+        description: t("failedToMoveItem"),
+        color: "danger",
+      });
     } finally {
       setIsMovingItem(false);
     }
@@ -459,14 +493,32 @@ export default function CollectionPage({
       );
 
       if (res.ok) {
+        // Get target collection name for toast
+        const targetCollection = availableCollections.find(
+          (col) => col.id === selectedTargetCollection
+        );
+        addToast({
+          title: t("itemCopied"),
+          description: itemToCopy.assetType === "video"
+            ? t("videoCopiedDesc", { collection: targetCollection?.name || "collection" })
+            : t("imageCopiedDesc", { collection: targetCollection?.name || "collection" }),
+          color: "success",
+        });
         onCopyItemOpenChange();
         setItemToCopy(null);
         setSelectedTargetCollection("");
         // Refresh collections to update counts
         refreshCollections();
+      } else {
+        throw new Error("Failed to copy item");
       }
     } catch (error) {
       console.error("Error copying item:", error);
+      addToast({
+        title: tCommon("error"),
+        description: t("failedToCopyItem"),
+        color: "danger",
+      });
     } finally {
       setIsCopyingItem(false);
     }
@@ -558,7 +610,7 @@ export default function CollectionPage({
   if (!collectionData) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <p className="text-default-500">Collection not found</p>
+        <p className="text-default-500">{t("collectionNotFound")}</p>
       </div>
     );
   }
@@ -576,13 +628,13 @@ export default function CollectionPage({
   const getAssetCountText = () => {
     const parts = [];
     if (imageCount > 0) {
-      parts.push(`${imageCount} ${imageCount === 1 ? "image" : "images"}`);
+      parts.push(t("imageCount", { count: imageCount }));
     }
     if (videoCount > 0) {
-      parts.push(`${videoCount} ${videoCount === 1 ? "video" : "videos"}`);
+      parts.push(t("videoCount", { count: videoCount }));
     }
     if (parts.length === 0) {
-      return "No assets";
+      return t("noAssets");
     }
     return parts.join(", ");
   };
@@ -597,7 +649,7 @@ export default function CollectionPage({
           onPress={() => router.push("/collection")}
           className="mb-4"
         >
-          Back to Collections
+          {t("backToCollections")}
         </Button>
 
         <div className="flex flex-col sm:flex-row justify-between sm:items-start gap-4 sm:gap-0">
@@ -617,7 +669,7 @@ export default function CollectionPage({
                   variant="flat"
                   onPress={() => router.push(`/projects/${collection.projectId}`)}
                 >
-                  Open Project
+                  {t("openProject")}
                 </Button>
               )}
             </div>
@@ -632,7 +684,7 @@ export default function CollectionPage({
                 onPress={onRenameOpen}
                 className="w-full sm:w-auto"
               >
-                Rename
+                {tCommon("rename")}
               </Button>
               <Button
                 variant="flat"
@@ -640,7 +692,7 @@ export default function CollectionPage({
                 onPress={onShareOpen}
                 className="w-full sm:w-auto"
               >
-                Share
+                {tCommon("share") || "Share"}
               </Button>
               <Button
                 color="danger"
@@ -649,7 +701,7 @@ export default function CollectionPage({
                 onPress={onDeleteOpen}
                 className="w-full sm:w-auto"
               >
-                Delete
+                {tCommon("delete")}
               </Button>
             </div>
           )}
@@ -659,7 +711,7 @@ export default function CollectionPage({
       {/* Assets Grid */}
       {images.length === 0 ? (
         <div className="text-center py-20">
-          <p className="text-default-500">No assets in this collection yet</p>
+          <p className="text-default-500">{t("noAssetsInCollection")}</p>
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
@@ -681,7 +733,7 @@ export default function CollectionPage({
                   <div className="absolute top-2 left-2 z-10">
                     <div className="bg-black/70 text-white rounded-full p-1.5 flex items-center gap-1">
                       <Play size={12} fill="white" />
-                      <span className="text-[10px] font-medium pr-1">Video</span>
+                      <span className="text-[10px] font-medium pr-1">{t("video")}</span>
                     </div>
                   </div>
                 )}
@@ -707,14 +759,14 @@ export default function CollectionPage({
                           startContent={<Eye size={16} />}
                           onPress={() => handleAssetClick(asset)}
                         >
-                          View Details
+                          {t("viewDetails")}
                         </DropdownItem>
                         <DropdownItem
                           key="rename"
                           startContent={<Pencil size={16} />}
                           onPress={() => openRenameItemModal(asset)}
                         >
-                          Rename
+                          {tCommon("rename")}
                         </DropdownItem>
                         <DropdownItem
                           key="move"
@@ -722,7 +774,7 @@ export default function CollectionPage({
                           onPress={() => openMoveItemModal(asset)}
                           isDisabled={availableCollections.length === 0}
                         >
-                          Move to...
+                          {t("moveTo")}
                         </DropdownItem>
                         <DropdownItem
                           key="copy"
@@ -730,7 +782,7 @@ export default function CollectionPage({
                           onPress={() => openCopyItemModal(asset)}
                           isDisabled={availableCollections.length === 0}
                         >
-                          Copy to...
+                          {t("copyTo")}
                         </DropdownItem>
                         {asset.chatId && collection.isOwner ? (
                           <DropdownItem
@@ -738,7 +790,7 @@ export default function CollectionPage({
                             startContent={<MessageSquare size={16} />}
                             onPress={() => router.push(`/chat/${asset.chatId}`)}
                           >
-                            Go to Chat
+                            {t("goToChat")}
                           </DropdownItem>
                         ) : null}
                         <DropdownItem
@@ -748,7 +800,7 @@ export default function CollectionPage({
                           startContent={<Trash2 size={16} />}
                           onPress={() => confirmRemoveImage(asset.imageId)}
                         >
-                          Remove from Collection
+                          {t("removeFromCollection")}
                         </DropdownItem>
                       </DropdownMenu>
                     </Dropdown>
@@ -765,10 +817,10 @@ export default function CollectionPage({
         <ModalContent>
           {(onClose) => (
             <>
-              <ModalHeader>Rename Collection</ModalHeader>
+              <ModalHeader>{t("renameCollection")}</ModalHeader>
               <ModalBody>
                 <Input
-                  label="Collection Name"
+                  label={t("collectionName")}
                   value={newName}
                   onValueChange={setNewName}
                   onKeyDown={(e) => {
@@ -781,7 +833,7 @@ export default function CollectionPage({
               </ModalBody>
               <ModalFooter>
                 <Button variant="light" onPress={onClose}>
-                  Cancel
+                  {tCommon("cancel")}
                 </Button>
                 <Button
                   color="primary"
@@ -789,7 +841,7 @@ export default function CollectionPage({
                   isLoading={isRenaming}
                   isDisabled={!newName.trim()}
                 >
-                  Rename
+                  {tCommon("rename")}
                 </Button>
               </ModalFooter>
             </>
@@ -802,19 +854,18 @@ export default function CollectionPage({
         <ModalContent>
           {(onClose) => (
             <>
-              <ModalHeader>Delete Collection</ModalHeader>
+              <ModalHeader>{t("deleteCollection")}</ModalHeader>
               <ModalBody>
                 <p>
-                  Are you sure you want to delete this collection? This action
-                  cannot be undone.
+                  {t("deleteCollectionConfirm")}
                 </p>
               </ModalBody>
               <ModalFooter>
                 <Button variant="light" onPress={onClose}>
-                  Cancel
+                  {tCommon("cancel")}
                 </Button>
                 <Button color="danger" onPress={handleDelete}>
-                  Delete
+                  {tCommon("delete")}
                 </Button>
               </ModalFooter>
             </>
@@ -827,14 +878,14 @@ export default function CollectionPage({
         <ModalContent>
           {(onClose) => (
             <>
-              <ModalHeader>Share Collection</ModalHeader>
+              <ModalHeader>{t("shareCollection")}</ModalHeader>
               <ModalBody>
                 <div className="space-y-4">
                   <div className="flex flex-col gap-4">
                     <div className="flex gap-2">
                       <Input
-                        label="Search User"
-                        placeholder="Enter email address"
+                        label={t("searchUser")}
+                        placeholder={t("enterEmailAddress")}
                         value={searchEmail}
                         onValueChange={setSearchEmail}
                         onKeyDown={(e) => {
@@ -851,7 +902,7 @@ export default function CollectionPage({
                         isLoading={isSearching}
                         className="mt-2 h-10"
                       >
-                        Search
+                        {tCommon("search")}
                       </Button>
                     </div>
 
@@ -859,22 +910,22 @@ export default function CollectionPage({
                       <div className="flex flex-col gap-2 p-4 bg-default-50 rounded-lg border border-divider">
                         <div className="flex items-center justify-between">
                           <div>
-                            <p className="font-semibold text-sm">User Found</p>
+                            <p className="font-semibold text-sm">{t("userFound")}</p>
                             <p className="text-sm">{searchedUser.email}</p>
                           </div>
                           {collection.userId === searchedUser.id ? (
                             <Chip color="warning" variant="flat" size="sm">
-                              Owner
+                              {t("owner")}
                             </Chip>
                           ) : shares.some(
                             (s) => s.sharedWithUserId === searchedUser.id
                           ) ? (
                             <Chip color="primary" variant="flat" size="sm">
-                              Already Shared
+                              {t("alreadyShared")}
                             </Chip>
                           ) : (
                             <Chip color="success" variant="flat" size="sm">
-                              Available
+                              {t("available")}
                             </Chip>
                           )}
                         </div>
@@ -882,7 +933,7 @@ export default function CollectionPage({
                         {collection.userId !== searchedUser.id && (
                           <div className="flex gap-2 mt-2 items-end">
                             <Select
-                              label="Permission"
+                              label={t("permission")}
                               selectedKeys={[selectedPermission]}
                               onChange={(e) =>
                                 setSelectedPermission(
@@ -892,9 +943,9 @@ export default function CollectionPage({
                               className="flex-1"
                               size="sm"
                             >
-                              <SelectItem key="viewer">Viewer</SelectItem>
+                              <SelectItem key="viewer">{t("viewer")}</SelectItem>
                               <SelectItem key="collaborator">
-                                Collaborator
+                                {t("collaborator")}
                               </SelectItem>
                             </Select>
                             <Button
@@ -903,7 +954,7 @@ export default function CollectionPage({
                               isLoading={isSharing}
                               className="h-10"
                             >
-                              Share
+                              {tCommon("share")}
                             </Button>
                           </div>
                         )}
@@ -914,7 +965,7 @@ export default function CollectionPage({
                   {shares.length > 0 && (
                     <div className="mt-6">
                       <h3 className="text-sm font-semibold mb-3">
-                        Currently Shared With
+                        {t("currentlySharedWith")}
                       </h3>
                       <div className="space-y-2">
                         {shares.map((share) => {
@@ -942,7 +993,7 @@ export default function CollectionPage({
                                   handleRemoveShare(share.sharedWithUserId)
                                 }
                               >
-                                Remove
+                                {tCommon("remove")}
                               </Button>
                             </div>
                           );
@@ -954,7 +1005,7 @@ export default function CollectionPage({
               </ModalBody>
               <ModalFooter>
                 <Button variant="light" onPress={onClose}>
-                  Close
+                  {tCommon("close")}
                 </Button>
               </ModalFooter>
             </>
@@ -967,19 +1018,18 @@ export default function CollectionPage({
         <ModalContent>
           {(onClose) => (
             <>
-              <ModalHeader>Remove Image</ModalHeader>
+              <ModalHeader>{t("removeImage")}</ModalHeader>
               <ModalBody>
                 <p>
-                  Are you sure you want to remove this image from the
-                  collection?
+                  {t("removeImageConfirm")}
                 </p>
               </ModalBody>
               <ModalFooter>
                 <Button variant="light" onPress={onClose}>
-                  Cancel
+                  {tCommon("cancel")}
                 </Button>
                 <Button color="danger" onPress={handleRemoveImage}>
-                  Remove
+                  {t("remove")}
                 </Button>
               </ModalFooter>
             </>
@@ -1010,7 +1060,7 @@ export default function CollectionPage({
             <>
               <ModalHeader className="flex items-center gap-2">
                 <Video size={20} />
-                Video Details
+                {t("videoDetails")}
               </ModalHeader>
               <ModalBody>
                 {selectedVideo && (
@@ -1042,7 +1092,7 @@ export default function CollectionPage({
                     {/* Title & Prompt */}
                     <div className="bg-default-100 p-4 rounded-lg">
                       <h4 className="font-medium mb-2">
-                        {selectedVideo.generationDetails.title || "Untitled Video"}
+                        {selectedVideo.generationDetails.title || t("untitledVideo")}
                       </h4>
                       {selectedVideo.generationDetails.prompt && (
                         <p className="text-sm text-default-600 whitespace-pre-wrap">
@@ -1060,11 +1110,11 @@ export default function CollectionPage({
                     startContent={<Download size={16} />}
                     onPress={() => handleVideoDownload(selectedVideo)}
                   >
-                    Download
+                    {tCommon("download")}
                   </Button>
                 )}
                 <Button variant="light" onPress={onClose}>
-                  Close
+                  {tCommon("close")}
                 </Button>
               </ModalFooter>
             </>
@@ -1077,10 +1127,10 @@ export default function CollectionPage({
         <ModalContent>
           {(onClose) => (
             <>
-              <ModalHeader>Rename {itemToRename?.assetType === "video" ? "Video" : "Image"}</ModalHeader>
+              <ModalHeader>{itemToRename?.assetType === "video" ? t("renameVideo") : t("renameImage")}</ModalHeader>
               <ModalBody>
                 <Input
-                  label="Title"
+                  label={t("itemTitle")}
                   value={newItemTitle}
                   onValueChange={setNewItemTitle}
                   onKeyDown={(e) => {
@@ -1093,7 +1143,7 @@ export default function CollectionPage({
               </ModalBody>
               <ModalFooter>
                 <Button variant="light" onPress={onClose}>
-                  Cancel
+                  {tCommon("cancel")}
                 </Button>
                 <Button
                   color="primary"
@@ -1101,7 +1151,7 @@ export default function CollectionPage({
                   isLoading={isRenamingItem}
                   isDisabled={!newItemTitle.trim()}
                 >
-                  Rename
+                  {tCommon("rename")}
                 </Button>
               </ModalFooter>
             </>
@@ -1114,16 +1164,16 @@ export default function CollectionPage({
         <ModalContent>
           {(onClose) => (
             <>
-              <ModalHeader>Move to Collection</ModalHeader>
+              <ModalHeader>{t("moveToCollection")}</ModalHeader>
               <ModalBody>
                 {availableCollections.length === 0 ? (
                   <p className="text-default-500">
-                    No other collections available. Create a new collection first.
+                    {t("noOtherCollections")}
                   </p>
                 ) : (
                   <Select
-                    label="Select Collection"
-                    placeholder="Choose a collection"
+                    label={t("selectCollection")}
+                    placeholder={t("chooseCollection")}
                     selectedKeys={selectedTargetCollection ? [selectedTargetCollection] : []}
                     onChange={(e) => setSelectedTargetCollection(e.target.value)}
                   >
@@ -1135,7 +1185,7 @@ export default function CollectionPage({
               </ModalBody>
               <ModalFooter>
                 <Button variant="light" onPress={onClose}>
-                  Cancel
+                  {tCommon("cancel")}
                 </Button>
                 <Button
                   color="primary"
@@ -1143,7 +1193,7 @@ export default function CollectionPage({
                   isLoading={isMovingItem}
                   isDisabled={!selectedTargetCollection}
                 >
-                  Move
+                  {t("move")}
                 </Button>
               </ModalFooter>
             </>
@@ -1156,16 +1206,16 @@ export default function CollectionPage({
         <ModalContent>
           {(onClose) => (
             <>
-              <ModalHeader>Copy to Collection</ModalHeader>
+              <ModalHeader>{t("copyToCollection")}</ModalHeader>
               <ModalBody>
                 {availableCollections.length === 0 ? (
                   <p className="text-default-500">
-                    No other collections available. Create a new collection first.
+                    {t("noOtherCollections")}
                   </p>
                 ) : (
                   <Select
-                    label="Select Collection"
-                    placeholder="Choose a collection"
+                    label={t("selectCollection")}
+                    placeholder={t("chooseCollection")}
                     selectedKeys={selectedTargetCollection ? [selectedTargetCollection] : []}
                     onChange={(e) => setSelectedTargetCollection(e.target.value)}
                   >
@@ -1177,7 +1227,7 @@ export default function CollectionPage({
               </ModalBody>
               <ModalFooter>
                 <Button variant="light" onPress={onClose}>
-                  Cancel
+                  {tCommon("cancel")}
                 </Button>
                 <Button
                   color="primary"
@@ -1185,7 +1235,7 @@ export default function CollectionPage({
                   isLoading={isCopyingItem}
                   isDisabled={!selectedTargetCollection}
                 >
-                  Copy
+                  {t("copy")}
                 </Button>
               </ModalFooter>
             </>

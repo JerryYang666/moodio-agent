@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { Card, CardBody, CardFooter } from "@heroui/card";
 import { Button } from "@heroui/button";
 import { Input } from "@heroui/input";
@@ -20,6 +21,8 @@ import { useCollections } from "@/hooks/use-collections";
 
 export default function CollectionsPage() {
   const router = useRouter();
+  const t = useTranslations("collections");
+  const tCommon = useTranslations("common");
   const { collections, loading, createCollection, getDefaultCollectionName } =
     useCollections();
   const { isOpen, onOpen, onOpenChange } = useDisclosure();
@@ -61,9 +64,9 @@ export default function CollectionsPage() {
     <div className="container mx-auto px-4 py-8 max-w-7xl">
       <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 sm:gap-0 mb-8">
         <div>
-          <h1 className="text-3xl font-bold">Collections</h1>
+          <h1 className="text-3xl font-bold">{t("title")}</h1>
           <p className="text-default-500 mt-1">
-            Organize and manage your generated images
+            {t("subtitle")}
           </p>
         </div>
         <Button
@@ -72,23 +75,23 @@ export default function CollectionsPage() {
           onPress={handleOpenCreateModal}
           className="w-full sm:w-auto"
         >
-          New Collection
+          {t("newCollection")}
         </Button>
       </div>
 
       {collections.length === 0 ? (
         <div className="text-center py-20">
           <Folder size={64} className="mx-auto mb-4 text-default-300" />
-          <h2 className="text-xl font-semibold mb-2">No collections yet</h2>
+          <h2 className="text-xl font-semibold mb-2">{t("noCollectionsYet")}</h2>
           <p className="text-default-500 mb-6">
-            Create your first collection to organize your generated images
+            {t("createFirstCollection")}
           </p>
           <Button
             color="primary"
             startContent={<Plus size={20} />}
             onPress={handleOpenCreateModal}
           >
-            Create Collection
+            {t("createCollection")}
           </Button>
         </div>
       ) : (
@@ -120,7 +123,7 @@ export default function CollectionsPage() {
                   </Chip>
                   {!collection.isOwner && (
                     <Chip size="sm" variant="flat" color="secondary">
-                      Shared
+                      {t("shared")}
                     </Chip>
                   )}
                 </div>
@@ -134,11 +137,11 @@ export default function CollectionsPage() {
         <ModalContent>
           {(onClose) => (
             <>
-              <ModalHeader>Create New Collection</ModalHeader>
+              <ModalHeader>{t("createNewCollection")}</ModalHeader>
               <ModalBody>
                 <Input
-                  label="Collection Name"
-                  placeholder="Enter collection name"
+                  label={t("collectionName")}
+                  placeholder={t("enterCollectionName")}
                   value={newCollectionName}
                   onValueChange={setNewCollectionName}
                   onKeyDown={(e) => {
@@ -151,7 +154,7 @@ export default function CollectionsPage() {
               </ModalBody>
               <ModalFooter>
                 <Button variant="light" onPress={onClose}>
-                  Cancel
+                  {tCommon("cancel")}
                 </Button>
                 <Button
                   color="primary"
@@ -159,7 +162,7 @@ export default function CollectionsPage() {
                   isLoading={isCreating}
                   isDisabled={!newCollectionName.trim()}
                 >
-                  Create
+                  {tCommon("create")}
                 </Button>
               </ModalFooter>
             </>

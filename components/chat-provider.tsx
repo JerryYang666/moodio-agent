@@ -88,6 +88,11 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             chat.id === chatId ? { ...chat, name } : chat
           )
         );
+        addToast({
+          title: "Chat renamed",
+          description: "The chat has been renamed successfully",
+          color: "success",
+        });
       } else {
         throw new Error("Failed to rename chat");
       }
