@@ -1,6 +1,7 @@
 import { getRequestConfig } from "next-intl/server";
 import { cookies } from "next/headers";
 import { defaultLocale, locales, Locale } from "./config";
+import deepmerge from "deepmerge";
 
 export default getRequestConfig(async () => {
   // Get locale from cookie, default to 'en'
@@ -12,8 +13,22 @@ export default getRequestConfig(async () => {
     ? (localeCookie as Locale)
     : defaultLocale;
 
+  // Load default (English) messages as fallback
+  const defaultMessages = (await import(`../messages/${defaultLocale}.json`))
+    .default;
+
+  // Load locale-specific messages
+  const localeMessages =
+    locale !== defaultLocale
+      ? (await import(`../messages/${locale}.json`)).default
+      : defaultMessages;
+
   return {
     locale,
-    messages: (await import(`../messages/${locale}.json`)).default,
+    // Deep merge: locale messages override default messages, with fallback for missing keys
+    messages:
+      locale !== defaultLocale
+        ? deepmerge(defaultMessages, localeMessages)
+        : defaultMessages,
   };
 });
