@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAccessToken } from "@/lib/auth/cookies";
 import { verifyAccessToken } from "@/lib/auth/jwt";
-import { getImageUrl } from "@/lib/storage/s3";
+import { getSignedImageUrl } from "@/lib/storage/s3";
 
 /**
  * Proxy endpoint to fetch images and return them with proper headers.
@@ -32,8 +32,10 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // Get the CloudFront URL for the image
-    const imageUrl = getImageUrl(imageId);
+    // Get a signed CloudFront URL for the image
+    // We must use signed URLs here because server-side fetches don't have
+    // access to the user's browser cookies (which cookie-based URLs require)
+    const imageUrl = getSignedImageUrl(imageId);
 
     // Fetch the image from CloudFront
     // Note: This runs server-side, so no CORS restrictions apply
