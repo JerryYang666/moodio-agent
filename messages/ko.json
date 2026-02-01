@@ -547,6 +547,12 @@
     "english": "English",
     "chinese": "简体中文"
   },
+  "theme": {
+    "switchTheme": "테마",
+    "light": "라이트",
+    "dark": "다크",
+    "system": "시스템 설정"
+  },
   "credits": {
     "title": "크레딧",
     "name": "크레딧",

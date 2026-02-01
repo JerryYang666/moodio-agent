@@ -34,6 +34,7 @@ export function LanguageSwitch() {
           variant="light"
           aria-label={t("switchLanguage")}
           isLoading={isPending}
+          className="min-w-unit-8 w-unit-8 h-unit-8 text-default-500"
         >
           <Languages size={20} />
         </Button>

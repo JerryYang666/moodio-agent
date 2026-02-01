@@ -63,7 +63,7 @@ export default async function RootLayout({
         )}
       >
         <NextIntlClientProvider messages={messages}>
-          <Providers themeProps={{ attribute: "class", defaultTheme: "dark" }}>
+          <Providers themeProps={{ attribute: "class", defaultTheme: "dark", enableSystem: true }}>
             {children}
           </Providers>
         </NextIntlClientProvider>
