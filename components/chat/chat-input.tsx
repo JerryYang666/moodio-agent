@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useEffect, useMemo, useCallback } from "react";
+import { useRef, useState, useEffect, useMemo, useCallback, forwardRef, useImperativeHandle } from "react";
 import { useTranslations } from "next-intl";
 import { Button } from "@heroui/button";
 import { Popover, PopoverTrigger, PopoverContent } from "@heroui/popover";
@@ -28,6 +28,7 @@ import {
   MentionTextbox,
   MentionTextboxRef,
   MentionItem,
+  JSONContent,
 } from "@/components/ui/mention-textbox";
 import { ImageChipDropdownItem } from "./ImageChip";
 
@@ -68,9 +69,19 @@ interface ChatInputProps {
   menuState: MenuState;
   onMenuStateChange: (newState: MenuState) => void;
   hasUploadingImages: boolean;
+  /** Initial editor content (JSON or plain text) for restoring drafts */
+  initialEditorContent?: JSONContent | string | null;
+  /** Callback when input loses focus (for draft saving) */
+  onBlur?: () => void;
 }
 
-export default function ChatInput({
+/** Ref handle for ChatInput to allow getting editor content */
+export interface ChatInputRef {
+  /** Get the editor content as JSON (for draft saving) */
+  getEditorJSON: () => JSONContent | null;
+}
+
+const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
   input,
   onInputChange,
   onSend,
@@ -92,7 +103,9 @@ export default function ChatInput({
   menuState,
   onMenuStateChange,
   hasUploadingImages,
-}: ChatInputProps) {
+  initialEditorContent,
+  onBlur,
+}, ref) {
   const t = useTranslations();
   const containerRef = useRef<HTMLDivElement>(null);
   const mentionTextboxRef = useRef<MentionTextboxRef>(null);
@@ -103,6 +116,11 @@ export default function ChatInput({
   const [hoveredDeckId, setHoveredDeckId] = useState<string | null>(null);
   // Track click timeout for distinguishing single vs double click
   const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Expose methods via ref for draft saving
+  useImperativeHandle(ref, () => ({
+    getEditorJSON: () => mentionTextboxRef.current?.getJSON() || null,
+  }), []);
 
   // Convert pending images to mention items for the textbox
   const mentionItems: MentionItem[] = useMemo(() => {
@@ -731,7 +749,12 @@ export default function ChatInput({
               maxRows={isExpanded ? 5 : 1}
               onSubmit={onSend}
               onFocusChange={(focused) => {
-                if (focused) setIsExpanded(true);
+                if (focused) {
+                  setIsExpanded(true);
+                } else {
+                  // Trigger draft save on blur
+                  onBlur?.();
+                }
               }}
               disabled={isRecording}
               className="flex-1 min-w-0 bg-transparent"
@@ -739,6 +762,7 @@ export default function ChatInput({
                 <ImageChipDropdownItem item={item} isHighlighted={isHighlighted} />
               )}
               t={(key) => t(`mention.${key}`)}
+              initialContent={initialEditorContent}
             />
 
             <Tooltip
@@ -783,4 +807,6 @@ export default function ChatInput({
       </div>
     </div>
   );
-}
+});
+
+export default ChatInput;

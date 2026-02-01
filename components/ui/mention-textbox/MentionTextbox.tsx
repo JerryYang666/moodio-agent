@@ -50,6 +50,7 @@ export const MentionTextbox = forwardRef<MentionTextboxRef, MentionTextboxProps>
       className,
       onFocusChange,
       t = (key) => key,
+      initialContent,
     },
     ref
   ) {
@@ -245,7 +246,8 @@ export const MentionTextbox = forwardRef<MentionTextboxRef, MentionTextboxProps>
           },
         }),
       ],
-      content: "",
+      // Use initialContent if provided, otherwise empty
+      content: initialContent || "",
       editable: !disabled,
       onUpdate: ({ editor }) => {
         const text = editor.getText();
@@ -357,6 +359,14 @@ export const MentionTextbox = forwardRef<MentionTextboxRef, MentionTextboxProps>
           }
         });
         return mentions;
+      },
+      getJSON: () => {
+        return editor?.getJSON() || null;
+      },
+      setContent: (content) => {
+        if (editor) {
+          editor.commands.setContent(content);
+        }
       },
     }), [editor]);
 

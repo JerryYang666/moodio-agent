@@ -14,3 +14,6 @@ export type {
   MentionChipProps,
   InsertedMention,
 } from "./types";
+
+// Re-export JSONContent from TipTap for draft serialization
+export type { JSONContent } from "@tiptap/react";

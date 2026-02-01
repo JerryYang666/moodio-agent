@@ -1,4 +1,5 @@
 import { ReactNode } from "react";
+import type { JSONContent } from "@tiptap/react";
 
 /**
  * Represents a mentionable item that can be inserted as a chip.
@@ -57,6 +58,8 @@ export interface MentionTextboxProps {
   onFocusChange?: (focused: boolean) => void;
   /** Translation function for i18n */
   t?: (key: string) => string;
+  /** Initial editor content (JSON format or plain text string) for restoring drafts */
+  initialContent?: JSONContent | string | null;
 }
 
 /**
@@ -69,6 +72,10 @@ export interface MentionTextboxRef {
   focus: () => void;
   /** Get the current mentions in the content */
   getMentions: () => MentionItem[];
+  /** Get the editor content as JSON (for draft saving) */
+  getJSON: () => JSONContent | null;
+  /** Set the editor content from JSON (for draft loading) */
+  setContent: (content: JSONContent) => void;
 }
 
 /**

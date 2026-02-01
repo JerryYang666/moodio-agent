@@ -18,7 +18,7 @@ import { Message, MessageContentPart } from "@/lib/llm/types";
 import ImageDetailModal, { ImageInfo } from "./image-detail-modal";
 import ImageDrawingModal from "./image-drawing-modal";
 import ChatMessage from "./chat-message";
-import ChatInput from "./chat-input";
+import ChatInput, { ChatInputRef } from "./chat-input";
 import ParallelMessage from "./parallel-message";
 import AssetPickerModal, { type AssetSummary } from "./asset-picker-modal";
 import { siteConfig } from "@/config/site";
@@ -42,6 +42,14 @@ import {
   validateFile,
   getMaxFileSizeMB,
 } from "@/lib/upload/client";
+import {
+  saveChatDraft,
+  loadChatDraft,
+  clearChatDraft,
+  draftImagesToPendingImages,
+  ChatDraft,
+} from "./draft-utils";
+import type { JSONContent } from "@tiptap/react";
 
 // Helper to group consecutive assistant messages with the same timestamp as variants
 interface MessageGroup {
@@ -105,6 +113,69 @@ export default function ChatInterface({
     title?: string;
   } | null>(null);
 
+  // Ref to ChatInput for getting editor content
+  const chatInputRef = useRef<ChatInputRef>(null);
+
+  // Draft state - loaded once on mount or when chatId changes
+  const [loadedDraft, setLoadedDraft] = useState<ChatDraft | null>(null);
+  const [isDraftLoaded, setIsDraftLoaded] = useState(false);
+  const [prevChatId, setPrevChatId] = useState(chatId);
+
+  // Reset draft loaded state when chatId changes
+  if (chatId !== prevChatId) {
+    setPrevChatId(chatId);
+    setIsDraftLoaded(false);
+    setLoadedDraft(null);
+  }
+
+  // Load draft on mount or when chatId changes
+  useEffect(() => {
+    if (isDraftLoaded) return;
+    
+    const draft = loadChatDraft(chatId);
+    if (draft) {
+      setLoadedDraft(draft);
+      setInput(draft.plainText);
+      // Restore pending images from draft
+      if (draft.pendingImages.length > 0) {
+        setPendingImages(draftImagesToPendingImages(draft.pendingImages));
+      }
+    } else {
+      setInput("");
+      // Don't clear pendingImages here - they might be set from other sources
+    }
+    setIsDraftLoaded(true);
+  }, [chatId, isDraftLoaded]);
+
+  // Save draft function - called on blur and visibility change
+  const saveDraft = useCallback(() => {
+    if (!isDraftLoaded) return;
+    
+    const editorContent = chatInputRef.current?.getEditorJSON() || null;
+    saveChatDraft(chatId, editorContent, input, pendingImages);
+  }, [chatId, input, pendingImages, isDraftLoaded]);
+
+  // Save draft on visibility change (tab switch, minimize, etc.)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        saveDraft();
+      }
+    };
+
+    const handleBeforeUnload = () => {
+      saveDraft();
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, [saveDraft]);
+
   // Listen for reset-chat event (triggered when clicking New Chat button while technically already on /chat)
   useEffect(() => {
     const handleReset = () => {
@@ -118,45 +189,16 @@ export default function ChatInterface({
       setPendingImages([]);
       setPrecisionEditing(false);
       setIsSending(false);
+      setLoadedDraft(null);
+      setIsDraftLoaded(false);
 
-      // Ensure we clean up any draft that might be lingering
-      localStorage.removeItem(`${siteConfig.chatInputPrefix}new-chat`);
+      // Clear the draft for new chat
+      clearChatDraft(undefined);
     };
 
     window.addEventListener("reset-chat", handleReset);
     return () => window.removeEventListener("reset-chat", handleReset);
   }, [pendingImages]);
-
-  // Draft saving logic
-  const [prevChatId, setPrevChatId] = useState(chatId);
-  const [isDraftLoaded, setIsDraftLoaded] = useState(false);
-
-  if (chatId !== prevChatId) {
-    setPrevChatId(chatId);
-    setIsDraftLoaded(false);
-  }
-
-  useEffect(() => {
-    const key = `${siteConfig.chatInputPrefix}${chatId || "new-chat"}`;
-    const saved = localStorage.getItem(key);
-    if (saved) {
-      setInput(saved);
-    } else {
-      setInput("");
-    }
-    setIsDraftLoaded(true);
-  }, [chatId]);
-
-  useEffect(() => {
-    if (isDraftLoaded) {
-      const key = `${siteConfig.chatInputPrefix}${chatId || "new-chat"}`;
-      if (input) {
-        localStorage.setItem(key, input);
-      } else {
-        localStorage.removeItem(key);
-      }
-    }
-  }, [input, chatId, isDraftLoaded]);
 
   // Save menu state to localStorage when it changes (debounced)
   useEffect(() => {
@@ -808,6 +850,9 @@ export default function ChatInterface({
     });
     setPendingImages([]);
     setPrecisionEditing(false);
+    
+    // Clear the draft since we're sending the message
+    clearChatDraft(chatId);
 
     setIsSending(true);
 
@@ -1227,8 +1272,7 @@ export default function ChatInterface({
       const newChatId = data.chatId;
       const originalMessage = data.originalMessage;
 
-      // Save draft for new chat
-      const draftKey = `${siteConfig.chatInputPrefix}${newChatId}`;
+      // Save draft for new chat using the new draft system
       let content = "";
       if (typeof originalMessage.content === "string") {
         content = originalMessage.content;
@@ -1239,7 +1283,8 @@ export default function ChatInterface({
           .map((p: any) => p.text)
           .join("\n");
       }
-      localStorage.setItem(draftKey, content);
+      // Save as a simple text draft (no editor content or images for forked chats)
+      saveChatDraft(newChatId, null, content, []);
 
       // Trigger chat refresh
       window.dispatchEvent(new Event("refresh-chats"));
@@ -1502,6 +1547,7 @@ export default function ChatInterface({
       </div>
 
       <ChatInput
+        ref={chatInputRef}
         input={input}
         onInputChange={setInput}
         onSend={handleSend}
@@ -1522,6 +1568,8 @@ export default function ChatInterface({
         menuState={menuState}
         onMenuStateChange={handleMenuStateChange}
         hasUploadingImages={hasUploadingImages(pendingImages)}
+        initialEditorContent={loadedDraft?.editorContent || (loadedDraft?.plainText ? loadedDraft.plainText : undefined)}
+        onBlur={saveDraft}
       />
 
       <AssetPickerModal
