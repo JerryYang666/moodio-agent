@@ -9,7 +9,6 @@ import { Spinner } from "@heroui/spinner";
 import { Chip } from "@heroui/chip";
 import { Image } from "@heroui/image";
 import { Select, SelectItem } from "@heroui/select";
-import { Autocomplete, AutocompleteItem } from "@heroui/autocomplete";
 import {
   Modal,
   ModalContent,
@@ -30,6 +29,8 @@ import {
   Play,
   Video,
   Download,
+  Move,
+  Copy,
 } from "lucide-react";
 import { useCollections } from "@/hooks/use-collections";
 import ImageDetailModal, {
@@ -97,7 +98,7 @@ export default function CollectionPage({
 }) {
   const { collectionId } = use(params);
   const router = useRouter();
-  const { renameCollection, deleteCollection, removeImageFromCollection } =
+  const { collections, renameCollection, deleteCollection, removeImageFromCollection, refreshCollections } =
     useCollections();
   const [collectionData, setCollectionData] = useState<CollectionData | null>(
     null
@@ -138,12 +139,39 @@ export default function CollectionPage({
     onOpen: onVideoDetailOpen,
     onOpenChange: onVideoDetailOpenChange,
   } = useDisclosure();
+  const {
+    isOpen: isRenameItemOpen,
+    onOpen: onRenameItemOpen,
+    onOpenChange: onRenameItemOpenChange,
+  } = useDisclosure();
+  const {
+    isOpen: isMoveItemOpen,
+    onOpen: onMoveItemOpen,
+    onOpenChange: onMoveItemOpenChange,
+  } = useDisclosure();
+  const {
+    isOpen: isCopyItemOpen,
+    onOpen: onCopyItemOpen,
+    onOpenChange: onCopyItemOpenChange,
+  } = useDisclosure();
 
   const [selectedImage, setSelectedImage] = useState<ImageInfo | null>(null);
   const [allImages, setAllImages] = useState<ImageInfo[]>([]);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [imageToRemoveId, setImageToRemoveId] = useState<string | null>(null);
   const [selectedVideo, setSelectedVideo] = useState<CollectionAsset | null>(null);
+
+  // Rename item state
+  const [itemToRename, setItemToRename] = useState<CollectionAsset | null>(null);
+  const [newItemTitle, setNewItemTitle] = useState("");
+  const [isRenamingItem, setIsRenamingItem] = useState(false);
+
+  // Move/Copy item state
+  const [itemToMove, setItemToMove] = useState<CollectionAsset | null>(null);
+  const [itemToCopy, setItemToCopy] = useState<CollectionAsset | null>(null);
+  const [selectedTargetCollection, setSelectedTargetCollection] = useState<string>("");
+  const [isMovingItem, setIsMovingItem] = useState(false);
+  const [isCopyingItem, setIsCopyingItem] = useState(false);
 
   const [searchEmail, setSearchEmail] = useState("");
   const [searchedUser, setSearchedUser] = useState<User | null>(null);
@@ -316,6 +344,146 @@ export default function CollectionPage({
       console.error("Error removing share:", error);
     }
   };
+
+  const handleRenameItem = async () => {
+    if (!itemToRename || !newItemTitle.trim()) return;
+    setIsRenamingItem(true);
+    try {
+      const res = await fetch(
+        `/api/collection/${collectionId}/images/${itemToRename.imageId}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title: newItemTitle.trim() }),
+        }
+      );
+
+      if (res.ok) {
+        // Update local state
+        setCollectionData((prev) =>
+          prev
+            ? {
+              ...prev,
+              images: prev.images.map((img) =>
+                img.imageId === itemToRename.imageId
+                  ? {
+                    ...img,
+                    generationDetails: {
+                      ...img.generationDetails,
+                      title: newItemTitle.trim(),
+                    },
+                  }
+                  : img
+              ),
+            }
+            : null
+        );
+        onRenameItemOpenChange();
+        setItemToRename(null);
+        setNewItemTitle("");
+      }
+    } catch (error) {
+      console.error("Error renaming item:", error);
+    } finally {
+      setIsRenamingItem(false);
+    }
+  };
+
+  const openRenameItemModal = (asset: CollectionAsset) => {
+    setItemToRename(asset);
+    setNewItemTitle(asset.generationDetails.title);
+    onRenameItemOpen();
+  };
+
+  const handleMoveItem = async () => {
+    if (!itemToMove || !selectedTargetCollection) return;
+    setIsMovingItem(true);
+    try {
+      const res = await fetch(
+        `/api/collection/${collectionId}/images/${itemToMove.imageId}/transfer`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ 
+            targetCollectionId: selectedTargetCollection,
+            action: "move"
+          }),
+        }
+      );
+
+      if (res.ok) {
+        // Remove from local state
+        setCollectionData((prev) =>
+          prev
+            ? {
+                ...prev,
+                images: prev.images.filter(
+                  (img) => img.imageId !== itemToMove.imageId
+                ),
+              }
+            : null
+        );
+        onMoveItemOpenChange();
+        setItemToMove(null);
+        setSelectedTargetCollection("");
+        // Refresh collections to update counts
+        refreshCollections();
+      }
+    } catch (error) {
+      console.error("Error moving item:", error);
+    } finally {
+      setIsMovingItem(false);
+    }
+  };
+
+  const openMoveItemModal = (asset: CollectionAsset) => {
+    setItemToMove(asset);
+    setSelectedTargetCollection("");
+    onMoveItemOpen();
+  };
+
+  const handleCopyItem = async () => {
+    if (!itemToCopy || !selectedTargetCollection) return;
+    setIsCopyingItem(true);
+    try {
+      const res = await fetch(
+        `/api/collection/${collectionId}/images/${itemToCopy.imageId}/transfer`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ 
+            targetCollectionId: selectedTargetCollection,
+            action: "copy"
+          }),
+        }
+      );
+
+      if (res.ok) {
+        onCopyItemOpenChange();
+        setItemToCopy(null);
+        setSelectedTargetCollection("");
+        // Refresh collections to update counts
+        refreshCollections();
+      }
+    } catch (error) {
+      console.error("Error copying item:", error);
+    } finally {
+      setIsCopyingItem(false);
+    }
+  };
+
+  const openCopyItemModal = (asset: CollectionAsset) => {
+    setItemToCopy(asset);
+    setSelectedTargetCollection("");
+    onCopyItemOpen();
+  };
+
+  // Get available collections for move/copy (exclude current collection)
+  const availableCollections = collections.filter(
+    (col) =>
+      col.id !== collectionId &&
+      (col.permission === "owner" || col.permission === "collaborator")
+  );
 
   const handleAssetClick = (asset: CollectionAsset) => {
     if (asset.assetType === "video") {
@@ -540,6 +708,29 @@ export default function CollectionPage({
                           onPress={() => handleAssetClick(asset)}
                         >
                           View Details
+                        </DropdownItem>
+                        <DropdownItem
+                          key="rename"
+                          startContent={<Pencil size={16} />}
+                          onPress={() => openRenameItemModal(asset)}
+                        >
+                          Rename
+                        </DropdownItem>
+                        <DropdownItem
+                          key="move"
+                          startContent={<Move size={16} />}
+                          onPress={() => openMoveItemModal(asset)}
+                          isDisabled={availableCollections.length === 0}
+                        >
+                          Move to...
+                        </DropdownItem>
+                        <DropdownItem
+                          key="copy"
+                          startContent={<Copy size={16} />}
+                          onPress={() => openCopyItemModal(asset)}
+                          isDisabled={availableCollections.length === 0}
+                        >
+                          Copy to...
                         </DropdownItem>
                         {asset.chatId && collection.isOwner ? (
                           <DropdownItem
@@ -874,6 +1065,127 @@ export default function CollectionPage({
                 )}
                 <Button variant="light" onPress={onClose}>
                   Close
+                </Button>
+              </ModalFooter>
+            </>
+          )}
+        </ModalContent>
+      </Modal>
+
+      {/* Rename Item Modal */}
+      <Modal isOpen={isRenameItemOpen} onOpenChange={onRenameItemOpenChange}>
+        <ModalContent>
+          {(onClose) => (
+            <>
+              <ModalHeader>Rename {itemToRename?.assetType === "video" ? "Video" : "Image"}</ModalHeader>
+              <ModalBody>
+                <Input
+                  label="Title"
+                  value={newItemTitle}
+                  onValueChange={setNewItemTitle}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      handleRenameItem();
+                    }
+                  }}
+                  autoFocus
+                />
+              </ModalBody>
+              <ModalFooter>
+                <Button variant="light" onPress={onClose}>
+                  Cancel
+                </Button>
+                <Button
+                  color="primary"
+                  onPress={handleRenameItem}
+                  isLoading={isRenamingItem}
+                  isDisabled={!newItemTitle.trim()}
+                >
+                  Rename
+                </Button>
+              </ModalFooter>
+            </>
+          )}
+        </ModalContent>
+      </Modal>
+
+      {/* Move Item Modal */}
+      <Modal isOpen={isMoveItemOpen} onOpenChange={onMoveItemOpenChange}>
+        <ModalContent>
+          {(onClose) => (
+            <>
+              <ModalHeader>Move to Collection</ModalHeader>
+              <ModalBody>
+                {availableCollections.length === 0 ? (
+                  <p className="text-default-500">
+                    No other collections available. Create a new collection first.
+                  </p>
+                ) : (
+                  <Select
+                    label="Select Collection"
+                    placeholder="Choose a collection"
+                    selectedKeys={selectedTargetCollection ? [selectedTargetCollection] : []}
+                    onChange={(e) => setSelectedTargetCollection(e.target.value)}
+                  >
+                    {availableCollections.map((col) => (
+                      <SelectItem key={col.id}>{col.name}</SelectItem>
+                    ))}
+                  </Select>
+                )}
+              </ModalBody>
+              <ModalFooter>
+                <Button variant="light" onPress={onClose}>
+                  Cancel
+                </Button>
+                <Button
+                  color="primary"
+                  onPress={handleMoveItem}
+                  isLoading={isMovingItem}
+                  isDisabled={!selectedTargetCollection}
+                >
+                  Move
+                </Button>
+              </ModalFooter>
+            </>
+          )}
+        </ModalContent>
+      </Modal>
+
+      {/* Copy Item Modal */}
+      <Modal isOpen={isCopyItemOpen} onOpenChange={onCopyItemOpenChange}>
+        <ModalContent>
+          {(onClose) => (
+            <>
+              <ModalHeader>Copy to Collection</ModalHeader>
+              <ModalBody>
+                {availableCollections.length === 0 ? (
+                  <p className="text-default-500">
+                    No other collections available. Create a new collection first.
+                  </p>
+                ) : (
+                  <Select
+                    label="Select Collection"
+                    placeholder="Choose a collection"
+                    selectedKeys={selectedTargetCollection ? [selectedTargetCollection] : []}
+                    onChange={(e) => setSelectedTargetCollection(e.target.value)}
+                  >
+                    {availableCollections.map((col) => (
+                      <SelectItem key={col.id}>{col.name}</SelectItem>
+                    ))}
+                  </Select>
+                )}
+              </ModalBody>
+              <ModalFooter>
+                <Button variant="light" onPress={onClose}>
+                  Cancel
+                </Button>
+                <Button
+                  color="primary"
+                  onPress={handleCopyItem}
+                  isLoading={isCopyingItem}
+                  isDisabled={!selectedTargetCollection}
+                >
+                  Copy
                 </Button>
               </ModalFooter>
             </>
