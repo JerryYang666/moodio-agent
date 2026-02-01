@@ -550,7 +550,7 @@ export default function ChatInput({
                             {/* Marked label overlay */}
                             {!markedImage.isUploading && (
                               <div className="absolute inset-0 bg-linear-to-t from-black/70 to-transparent flex flex-col justify-end p-1">
-                                <div className="flex items-center gap-1 text-secondary">
+                                <div className="flex items-center gap-1 text-purple-300">
                                   <Pencil size={10} />
                                   <span className="text-[8px] uppercase tracking-wide">
                                     {t("chat.marked")}
