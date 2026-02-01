@@ -50,6 +50,7 @@ export function hasWritePermission(permission: CollectionPermission): boolean {
 
 /**
  * Find an image in a collection by imageId
+ * @deprecated Use findItemById instead for unique identification
  */
 export async function findImageInCollection(
   collectionId: string,
@@ -67,6 +68,27 @@ export async function findImageInCollection(
     .limit(1);
 
   return image || null;
+}
+
+/**
+ * Find an item by its unique record ID, optionally verifying it belongs to a specific collection
+ */
+export async function findItemById(
+  itemId: string,
+  collectionId?: string
+) {
+  const conditions = [eq(collectionImages.id, itemId)];
+  if (collectionId) {
+    conditions.push(eq(collectionImages.collectionId, collectionId));
+  }
+
+  const [item] = await db
+    .select()
+    .from(collectionImages)
+    .where(and(...conditions))
+    .limit(1);
+
+  return item || null;
 }
 
 /**

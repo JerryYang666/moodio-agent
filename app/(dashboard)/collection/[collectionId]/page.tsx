@@ -102,7 +102,7 @@ export default function CollectionPage({
   const router = useRouter();
   const t = useTranslations("collections");
   const tCommon = useTranslations("common");
-  const { collections, renameCollection, deleteCollection, removeImageFromCollection, refreshCollections } =
+  const { collections, renameCollection, deleteCollection, removeItemFromCollection, refreshCollections } =
     useCollections();
   const [collectionData, setCollectionData] = useState<CollectionData | null>(
     null
@@ -162,7 +162,7 @@ export default function CollectionPage({
   const [selectedImage, setSelectedImage] = useState<ImageInfo | null>(null);
   const [allImages, setAllImages] = useState<ImageInfo[]>([]);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [imageToRemoveId, setImageToRemoveId] = useState<string | null>(null);
+  const [assetToRemove, setAssetToRemove] = useState<CollectionAsset | null>(null);
   const [selectedVideo, setSelectedVideo] = useState<CollectionAsset | null>(null);
 
   // Rename item state
@@ -275,33 +275,35 @@ export default function CollectionPage({
   };
 
   const handleRemoveImage = async () => {
-    if (!imageToRemoveId) return;
+    if (!assetToRemove) return;
     try {
-      const success = await removeImageFromCollection(
+      // Use the unique record id for the API call
+      const success = await removeItemFromCollection(
         collectionId,
-        imageToRemoveId
+        assetToRemove.id
       );
       if (success) {
+        // Use the unique record id to filter, not imageId (which can be shared by multiple videos)
         setCollectionData((prev) =>
           prev
             ? {
               ...prev,
               images: prev.images.filter(
-                (img) => img.imageId !== imageToRemoveId
+                (img) => img.id !== assetToRemove.id
               ),
             }
             : null
         );
         onRemoveImageOpenChange();
-        setImageToRemoveId(null);
+        setAssetToRemove(null);
       }
     } catch (error) {
       console.error("Error removing image:", error);
     }
   };
 
-  const confirmRemoveImage = (imageId: string) => {
-    setImageToRemoveId(imageId);
+  const confirmRemoveImage = (asset: CollectionAsset) => {
+    setAssetToRemove(asset);
     onRemoveImageOpen();
   };
 
@@ -353,8 +355,9 @@ export default function CollectionPage({
     if (!itemToRename || !newItemTitle.trim()) return;
     setIsRenamingItem(true);
     try {
+      // Use the unique record id for the API call
       const res = await fetch(
-        `/api/collection/${collectionId}/images/${itemToRename.imageId}`,
+        `/api/collection/${collectionId}/images/${itemToRename.id}`,
         {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
@@ -363,13 +366,13 @@ export default function CollectionPage({
       );
 
       if (res.ok) {
-        // Update local state
+        // Update local state using unique record id, not imageId
         setCollectionData((prev) =>
           prev
             ? {
               ...prev,
               images: prev.images.map((img) =>
-                img.imageId === itemToRename.imageId
+                img.id === itemToRename.id
                   ? {
                     ...img,
                     generationDetails: {
@@ -415,8 +418,9 @@ export default function CollectionPage({
     if (!itemToMove || !selectedTargetCollection) return;
     setIsMovingItem(true);
     try {
+      // Use the unique record id for the API call
       const res = await fetch(
-        `/api/collection/${collectionId}/images/${itemToMove.imageId}/transfer`,
+        `/api/collection/${collectionId}/images/${itemToMove.id}/transfer`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -432,13 +436,13 @@ export default function CollectionPage({
         const targetCollection = availableCollections.find(
           (col) => col.id === selectedTargetCollection
         );
-        // Remove from local state
+        // Remove from local state using unique record id, not imageId
         setCollectionData((prev) =>
           prev
             ? {
                 ...prev,
                 images: prev.images.filter(
-                  (img) => img.imageId !== itemToMove.imageId
+                  (img) => img.id !== itemToMove.id
                 ),
               }
             : null
@@ -480,8 +484,9 @@ export default function CollectionPage({
     if (!itemToCopy || !selectedTargetCollection) return;
     setIsCopyingItem(true);
     try {
+      // Use the unique record id for the API call
       const res = await fetch(
-        `/api/collection/${collectionId}/images/${itemToCopy.imageId}/transfer`,
+        `/api/collection/${collectionId}/images/${itemToCopy.id}/transfer`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -798,7 +803,7 @@ export default function CollectionPage({
                           className="text-danger"
                           color="danger"
                           startContent={<Trash2 size={16} />}
-                          onPress={() => confirmRemoveImage(asset.imageId)}
+                          onPress={() => confirmRemoveImage(asset)}
                         >
                           {t("removeFromCollection")}
                         </DropdownItem>

@@ -66,9 +66,9 @@ interface CollectionsContextValue {
     videoId: string,
     generationDetails: any
   ) => Promise<boolean>;
-  removeImageFromCollection: (
+  removeItemFromCollection: (
     collectionId: string,
-    imageId: string
+    itemId: string
   ) => Promise<boolean>;
   shareCollection: (
     collectionId: string,
@@ -311,23 +311,23 @@ export function CollectionsProvider({
     []
   );
 
-  const removeImageFromCollection = useCallback(
-    async (collectionId: string, imageId: string) => {
+  const removeItemFromCollection = useCallback(
+    async (collectionId: string, itemId: string) => {
       try {
         const res = await fetch(
-          `/api/collection/${collectionId}/images/${imageId}`,
+          `/api/collection/${collectionId}/images/${itemId}`,
           {
             method: "DELETE",
           }
         );
 
         if (!res.ok) {
-          throw new Error("Failed to remove image from collection");
+          throw new Error("Failed to remove item from collection");
         }
 
         return true;
       } catch (err) {
-        console.error("Error removing image from collection:", err);
+        console.error("Error removing item from collection:", err);
         return false;
       }
     },
@@ -393,7 +393,7 @@ export function CollectionsProvider({
     deleteCollection,
     addImageToCollection,
     addVideoToCollection,
-    removeImageFromCollection,
+    removeItemFromCollection,
     shareCollection,
     removeShare,
     getDefaultCollectionName,

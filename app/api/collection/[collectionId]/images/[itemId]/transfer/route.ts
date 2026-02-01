@@ -7,7 +7,7 @@ import { eq } from "drizzle-orm";
 import {
   getUserPermission,
   hasWritePermission,
-  findImageInCollection,
+  findItemById,
   getCollection,
   touchCollection,
 } from "@/lib/collection-utils";
@@ -15,14 +15,15 @@ import {
 type TransferAction = "move" | "copy";
 
 /**
- * POST /api/collection/[collectionId]/images/[imageId]/transfer
+ * POST /api/collection/[collectionId]/images/[itemId]/transfer
  * Move or copy an image/video to a different collection
  * 
+ * itemId is the unique record ID (collection_images.id), not the imageId
  * Body: { targetCollectionId: string, action: "move" | "copy" }
  */
 export async function POST(
   req: NextRequest,
-  { params }: { params: Promise<{ collectionId: string; imageId: string }> }
+  { params }: { params: Promise<{ collectionId: string; itemId: string }> }
 ) {
   try {
     const accessToken = getAccessToken(req);
@@ -36,7 +37,7 @@ export async function POST(
     }
 
     const userId = payload.userId;
-    const { collectionId: sourceCollectionId, imageId } = await params;
+    const { collectionId: sourceCollectionId, itemId } = await params;
 
     const body = await req.json();
     const { targetCollectionId, action } = body as {
@@ -103,21 +104,12 @@ export async function POST(
       );
     }
 
-    // Find the source image
-    const sourceImage = await findImageInCollection(sourceCollectionId, imageId);
-    if (!sourceImage) {
+    // Find the source item by its unique ID
+    const sourceItem = await findItemById(itemId, sourceCollectionId);
+    if (!sourceItem) {
       return NextResponse.json(
-        { error: "Image not found in source collection" },
+        { error: "Item not found in source collection" },
         { status: 404 }
-      );
-    }
-
-    // Check if image already exists in target collection
-    const existingInTarget = await findImageInCollection(targetCollectionId, imageId);
-    if (existingInTarget) {
-      return NextResponse.json(
-        { error: "Image already exists in target collection" },
-        { status: 409 }
       );
     }
 
@@ -131,7 +123,7 @@ export async function POST(
           collectionId: targetCollectionId,
           projectId: targetCollection.projectId,
         })
-        .where(eq(collectionImages.id, sourceImage.id))
+        .where(eq(collectionImages.id, itemId))
         .returning();
 
       resultImage = movedImage;
@@ -148,11 +140,11 @@ export async function POST(
         .values({
           projectId: targetCollection.projectId,
           collectionId: targetCollectionId,
-          imageId: sourceImage.imageId,
-          assetId: sourceImage.assetId,
-          assetType: sourceImage.assetType,
-          chatId: sourceImage.chatId,
-          generationDetails: sourceImage.generationDetails,
+          imageId: sourceItem.imageId,
+          assetId: sourceItem.assetId,
+          assetType: sourceItem.assetType,
+          chatId: sourceItem.chatId,
+          generationDetails: sourceItem.generationDetails,
         })
         .returning();
 
@@ -168,9 +160,9 @@ export async function POST(
       image: resultImage,
     });
   } catch (error) {
-    console.error(`Error transferring image between collections:`, error);
+    console.error(`Error transferring item between collections:`, error);
     return NextResponse.json(
-      { error: "Failed to transfer image between collections" },
+      { error: "Failed to transfer item between collections" },
       { status: 500 }
     );
   }

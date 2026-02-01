@@ -353,10 +353,14 @@ npm run db:studio
 | GET | `/api/collection/[id]` | Get collection with assets |
 | PATCH | `/api/collection/[id]` | Rename collection |
 | DELETE | `/api/collection/[id]` | Delete collection |
-| POST | `/api/collection/[id]/images` | Add image to collection |
-| DELETE | `/api/collection/[id]/images/[imageId]` | Remove image |
+| POST | `/api/collection/[id]/images` | Add image/video to collection |
+| PATCH | `/api/collection/[id]/images/[itemId]` | Update item (rename) |
+| DELETE | `/api/collection/[id]/images/[itemId]` | Remove item from collection |
+| POST | `/api/collection/[id]/images/[itemId]/transfer` | Move/copy item to another collection |
 | POST | `/api/collection/[id]/share` | Share collection |
 | DELETE | `/api/collection/[id]/share/[userId]` | Remove share |
+
+> **Note**: `[itemId]` refers to the unique record ID (`collection_images.id`), not the `imageId`. This ensures correct identification when multiple videos share the same thumbnail image.
 
 ### Admin Endpoints
 
