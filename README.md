@@ -722,7 +722,119 @@ The application exposes a test endpoint for health checks:
 
 ## Contributing
 
-[Add contribution guidelines here]
+### Adding a New Language Translation
+
+The project uses `next-intl` for internationalization. To add support for a new language:
+
+#### 1. Update the i18n Configuration
+
+Edit `i18n/config.ts` to add your new locale:
+
+```typescript
+// Add the locale code to the locales array
+export const locales = ["en", "zh-CN", "ja", "ko", "zh-TW"] as const;
+
+// Add the display name in localeNames
+export const localeNames: Record<Locale, string> = {
+  en: "English",
+  "zh-CN": "简体中文",
+  ja: "日本語",
+  ko: "한국어",        // Korean
+  "zh-TW": "繁體中文",  // Traditional Chinese
+};
+```
+
+#### 2. Create the Translation File
+
+Create a new JSON file in the `messages/` directory named with your locale code (e.g., `messages/ko.json` for Korean).
+
+**Option A**: Copy an existing translation file as a starting point:
+```bash
+cp messages/en.json messages/ko.json
+```
+
+**Option B**: Create a minimal file with just the keys you want to override (the system will fall back to English for missing keys):
+```json
+{
+  "common": {
+    "appName": "moodio agent"
+  }
+}
+```
+
+#### 3. Translation File Structure
+
+The translation files follow a nested JSON structure organized by feature area:
+
+| Key | Description |
+|-----|-------------|
+| `common` | Common UI elements (buttons, labels) |
+| `nav` | Navigation items |
+| `auth` | Authentication screens |
+| `onboarding` | User onboarding flow |
+| `chat` | Chat interface |
+| `profile` | Profile settings |
+| `projects` | Project management |
+| `collections` | Collection management |
+| `storyboard` | Storyboard feature |
+| `browse` | Browse feature |
+| `video` | Video generation |
+| `menu` | Menu options |
+| `notifications` | Notification messages |
+| `install` | PWA install prompts |
+| `admin` | Admin dashboard |
+| `dashboard` | Dashboard elements |
+| `assetPicker` | Asset picker dialog |
+| `assetsSidebar` | Assets sidebar |
+| `imageDetail` | Image detail view |
+| `imageMenu` | Image context menu |
+| `language` | Language switcher |
+| `credits` | Credits system |
+| `mention` | Mention feature |
+
+#### 4. Pluralization and Variables
+
+The project uses ICU message format for pluralization and variables:
+
+```json
+{
+  "credits": {
+    "balance": "{count, plural, one {# Credit} other {# Credits}}"
+  },
+  "chat": {
+    "timeRemaining": "{seconds}s remaining",
+    "fileSizeTooLarge": "File size too large. Max {maxSize}MB."
+  }
+}
+```
+
+#### 5. Fallback Behavior
+
+The system uses deep merge with English as the fallback language. This means:
+- You don't need to translate every key
+- Missing translations will automatically fall back to English
+- You can incrementally add translations over time
+
+#### 6. Supported Locale Codes
+
+Use standard BCP 47 locale codes:
+- `en` - English
+- `zh-CN` - Simplified Chinese
+- `zh-TW` - Traditional Chinese
+- `ja` - Japanese
+- `ko` - Korean
+- `fr` - French
+- `de` - German
+- `es` - Spanish
+- etc.
+
+#### 7. Testing Your Translation
+
+1. Start the development server: `npm run dev`
+2. The language can be switched via the language selector in the UI
+3. The selected language is stored in a cookie (`NEXT_LOCALE`)
+
+[Add other contribution guidelines here]
 
 ## Support
 
