@@ -389,7 +389,7 @@ export default function ChatInput({
                             <PopoverTrigger>
                               <div className="absolute inset-0 pointer-events-none" />
                             </PopoverTrigger>
-                            <PopoverContent className="p-0 overflow-hidden">
+                            <PopoverContent className="p-0 overflow-hidden max-w-[calc(100vw-2rem)]">
                               <div className="relative">
                                 {/* Larger preview image */}
                                 <img
@@ -399,7 +399,7 @@ export default function ChatInput({
                                       : img.url
                                   }
                                   alt={img.title || t("chat.image")}
-                                  className="max-w-[600px] max-h-[600px] object-contain"
+                                  className="max-w-[min(600px,calc(100vw-3rem))] max-h-[600px] object-contain"
                                 />
 
                                 {/* Drawing button overlay - only show when not uploading */}
@@ -580,16 +580,16 @@ export default function ChatInput({
                             </PopoverTrigger>
 
                             {/* Hover preview popover for deck */}
-                            <PopoverContent className="p-0 overflow-hidden">
+                            <PopoverContent className="p-0 overflow-hidden max-w-[calc(100vw-2rem)]">
                               <div className="flex flex-col gap-2 p-2">
-                                {/* Show both images side by side */}
-                                <div className="flex gap-2">
+                                {/* Show both images - stacked on mobile, side by side on larger screens */}
+                                <div className="flex flex-col sm:flex-row gap-2">
                                   {/* Original image */}
                                   <div className="relative">
                                     <img
                                       src={originalImage.url}
                                       alt={originalImage.title || t("chat.image")}
-                                      className="max-w-[280px] max-h-[280px] object-contain rounded"
+                                      className="max-w-[min(280px,calc(100vw-3rem))] max-h-[280px] object-contain rounded"
                                     />
                                     <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-xs p-1 rounded-b">
                                       {t("chat.original")}
@@ -604,7 +604,7 @@ export default function ChatInput({
                                           : markedImage.url
                                       }
                                       alt={markedImage.title || t("chat.image")}
-                                      className="max-w-[280px] max-h-[280px] object-contain rounded"
+                                      className="max-w-[min(280px,calc(100vw-3rem))] max-h-[280px] object-contain rounded"
                                     />
                                     <div className="absolute bottom-0 left-0 right-0 bg-secondary/90 text-secondary-foreground text-xs p-1 rounded-b flex items-center gap-1">
                                       <Pencil size={10} />
