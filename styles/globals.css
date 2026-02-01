@@ -87,3 +87,17 @@
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
 }
+
+/* TipTap editor placeholder styles */
+.ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: hsl(var(--heroui-default-400));
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
+/* Hide overflow when editor only has empty paragraph (placeholder state) */
+.ProseMirror:has(> p.is-editor-empty:only-child) {
+  overflow: hidden !important;
+}

@@ -1,9 +1,8 @@
 "use client";
 
-import { useRef, useState, useEffect, useMemo } from "react";
+import { useRef, useState, useEffect, useMemo, useCallback } from "react";
 import { useTranslations } from "next-intl";
 import { Button } from "@heroui/button";
-import { Textarea } from "@heroui/input";
 import { Popover, PopoverTrigger, PopoverContent } from "@heroui/popover";
 import { Tooltip } from "@heroui/tooltip";
 import { Spinner } from "@heroui/spinner";
@@ -25,6 +24,12 @@ import MenuConfiguration, { MenuState } from "./menu-configuration";
 import { PendingImage, MAX_PENDING_IMAGES } from "./pending-image-types";
 import clsx from "clsx";
 import { ASSET_DRAG_MIME } from "./asset-dnd";
+import {
+  MentionTextbox,
+  MentionTextboxRef,
+  MentionItem,
+} from "@/components/ui/mention-textbox";
+import { ImageChipDropdownItem } from "./ImageChip";
 
 /**
  * Represents how to render pending images.
@@ -90,11 +95,66 @@ export default function ChatInput({
 }: ChatInputProps) {
   const t = useTranslations();
   const containerRef = useRef<HTMLDivElement>(null);
+  const mentionTextboxRef = useRef<MentionTextboxRef>(null);
   const [isExpanded, setIsExpanded] = useState(false);
   // Track which image's popover is open (by imageId)
   const [openPopoverId, setOpenPopoverId] = useState<string | null>(null);
   // Track which deck is being hovered
   const [hoveredDeckId, setHoveredDeckId] = useState<string | null>(null);
+  // Track click timeout for distinguishing single vs double click
+  const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Convert pending images to mention items for the textbox
+  const mentionItems: MentionItem[] = useMemo(() => {
+    return pendingImages
+      .filter((img) => !img.isUploading) // Only show uploaded images
+      .map((img) => ({
+        id: img.imageId,
+        type: "image",
+        label: img.title || t("chat.untitledImage"),
+        thumbnail: img.url,
+        metadata: { source: img.source },
+      }));
+  }, [pendingImages, t]);
+
+  // Handle inserting a mention chip when clicking on a pending image
+  const handleInsertImageMention = useCallback((imageId: string) => {
+    const item = mentionItems.find((m) => m.id === imageId);
+    if (item && mentionTextboxRef.current) {
+      mentionTextboxRef.current.insertMention(item);
+      // Keep the input expanded after inserting
+      setIsExpanded(true);
+    }
+  }, [mentionItems]);
+
+  // Handle single/double click on pending images
+  // Single click: insert chip, Double click: open popover
+  const handleImageClick = useCallback((imageId: string, isUploading: boolean) => {
+    if (isUploading) return;
+    
+    // If there's a pending single-click, this is a double-click
+    if (clickTimeoutRef.current) {
+      clearTimeout(clickTimeoutRef.current);
+      clickTimeoutRef.current = null;
+      // Double click: open popover
+      setOpenPopoverId(imageId);
+    } else {
+      // Set a timeout for single click
+      clickTimeoutRef.current = setTimeout(() => {
+        clickTimeoutRef.current = null;
+        // Single click: insert chip
+        handleInsertImageMention(imageId);
+      }, 200); // 200ms delay to wait for potential double-click
+    }
+  }, [handleInsertImageMention]);
+
+  // Handle mention textbox changes
+  const handleMentionChange = useCallback(
+    (text: string, _mentions: MentionItem[]) => {
+      onInputChange(text);
+    },
+    [onInputChange]
+  );
 
   // Group images into render items (singles and decks)
   // A marked image with its original forms a "deck"
@@ -164,13 +224,6 @@ export default function ChatInput({
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      onSend();
-    }
-  };
-
   // Handle click outside to collapse
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -183,7 +236,7 @@ export default function ChatInput({
         // Don't collapse if interacting with a portal (dropdown, popover, etc.)
         if (
           target.closest(
-            "[data-overlay], [data-state='open'], [role='listbox'], [role='menu']"
+            "[data-overlay], [data-state='open'], [role='listbox'], [role='menu'], [data-mention-dropdown]"
           )
         ) {
           return;
@@ -274,18 +327,71 @@ export default function ChatInput({
                     if (item.type === "single") {
                       const img = item.image;
                       return (
-                        <Popover
-                          key={img.imageId}
-                          placement="top"
-                          showArrow
-                          offset={10}
-                          isOpen={openPopoverId === img.imageId}
-                          onOpenChange={(open) => setOpenPopoverId(open ? img.imageId : null)}
-                        >
-                          <PopoverTrigger>
-                            <div className="relative w-fit group cursor-pointer">
-                              <div className="h-20 w-20 rounded-lg border border-divider overflow-hidden relative">
-                                {/* Image with loading overlay if uploading */}
+                        <div key={img.imageId} className="relative w-fit group">
+                          {/* Main image container - single click inserts chip, double click opens popover */}
+                          <div
+                            className="h-20 w-20 rounded-lg border border-divider overflow-hidden relative cursor-pointer"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleImageClick(img.imageId, img.isUploading || false);
+                            }}
+                          >
+                            {/* Image with loading overlay if uploading */}
+                            <img
+                              src={
+                                img.isUploading && img.localPreviewUrl
+                                  ? img.localPreviewUrl
+                                  : img.url
+                              }
+                              alt={img.title || t("chat.image")}
+                              className={clsx(
+                                "w-full h-full object-cover",
+                                img.isUploading && "opacity-50"
+                              )}
+                            />
+
+                            {/* Uploading spinner overlay */}
+                            {img.isUploading && (
+                              <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                                <Spinner size="sm" color="white" />
+                              </div>
+                            )}
+
+                            {/* Source indicator and title overlay */}
+                            {!img.isUploading && (
+                              <div className="absolute inset-0 bg-linear-to-t from-black/70 to-transparent flex flex-col justify-end p-1">
+                                <div className="flex items-center gap-1 text-white/80">
+                                  {getSourceIcon(img.source)}
+                                  <span className="text-[8px] uppercase tracking-wide">
+                                    {getSourceLabel(img.source)}
+                                  </span>
+                                </div>
+                                {img.title && (
+                                  <span className="text-white text-[10px] leading-tight font-medium line-clamp-2">
+                                    {img.title}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Popover for enlarge/edit - controlled programmatically */}
+                          <Popover
+                            placement="top"
+                            showArrow
+                            offset={10}
+                            isOpen={openPopoverId === img.imageId}
+                            onOpenChange={(open) => {
+                              if (!open) setOpenPopoverId(null);
+                            }}
+                          >
+                            <PopoverTrigger>
+                              <div className="absolute inset-0 pointer-events-none" />
+                            </PopoverTrigger>
+                            <PopoverContent className="p-0 overflow-hidden">
+                              <div className="relative">
+                                {/* Larger preview image */}
                                 <img
                                   src={
                                     img.isUploading && img.localPreviewUrl
@@ -293,101 +399,58 @@ export default function ChatInput({
                                       : img.url
                                   }
                                   alt={img.title || t("chat.image")}
-                                  className={clsx(
-                                    "w-full h-full object-cover",
-                                    img.isUploading && "opacity-50"
-                                  )}
+                                  className="max-w-[600px] max-h-[600px] object-contain"
                                 />
 
-                                {/* Uploading spinner overlay */}
-                                {img.isUploading && (
-                                  <div className="absolute inset-0 flex items-center justify-center bg-black/30">
-                                    <Spinner size="sm" color="white" />
+                                {/* Drawing button overlay - only show when not uploading */}
+                                {!img.isUploading && (
+                                  <div className="absolute top-2 right-2">
+                                    <Tooltip content={t("chat.markForChange")}>
+                                      <Button
+                                        isIconOnly
+                                        size="sm"
+                                        color="secondary"
+                                        variant="solid"
+                                        onPress={() => {
+                                          setOpenPopoverId(null); // Close popover first
+                                          onDrawImage(img.imageId, img.url, img.title);
+                                        }}
+                                        aria-label={t("chat.markForChange")}
+                                        className="shadow-lg"
+                                      >
+                                        <Pencil size={16} />
+                                      </Button>
+                                    </Tooltip>
                                   </div>
                                 )}
 
-                                {/* Source indicator and title overlay */}
-                                {!img.isUploading && (
-                                  <div className="absolute inset-0 bg-linear-to-t from-black/70 to-transparent flex flex-col justify-end p-1">
-                                    <div className="flex items-center gap-1 text-white/80">
-                                      {getSourceIcon(img.source)}
-                                      <span className="text-[8px] uppercase tracking-wide">
-                                        {getSourceLabel(img.source)}
-                                      </span>
-                                    </div>
-                                    {img.title && (
-                                      <span className="text-white text-[10px] leading-tight font-medium line-clamp-2">
-                                        {img.title}
-                                      </span>
-                                    )}
+                                {/* Title overlay */}
+                                {img.title && (
+                                  <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-xs p-2">
+                                    {img.title}
                                   </div>
                                 )}
                               </div>
+                            </PopoverContent>
+                          </Popover>
 
-                              {/* Remove button */}
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  onRemovePendingImage(img.imageId);
-                                }}
-                                disabled={img.isUploading}
-                                className={clsx(
-                                  "absolute -top-2 -right-2 bg-default-100 rounded-full p-1 shadow-sm border border-divider z-10",
-                                  img.isUploading
-                                    ? "opacity-50 cursor-not-allowed"
-                                    : "hover:bg-default-200"
-                                )}
-                              >
-                                <X size={14} />
-                              </button>
-                            </div>
-                          </PopoverTrigger>
-
-                          {/* Hover preview popover */}
-                          <PopoverContent className="p-0 overflow-hidden">
-                            <div className="relative">
-                              {/* Larger preview image */}
-                              <img
-                                src={
-                                  img.isUploading && img.localPreviewUrl
-                                    ? img.localPreviewUrl
-                                    : img.url
-                                }
-                                alt={img.title || t("chat.image")}
-                                className="max-w-[600px] max-h-[600px] object-contain"
-                              />
-
-                              {/* Drawing button overlay - only show when not uploading */}
-                              {!img.isUploading && (
-                                <div className="absolute top-2 right-2">
-                                  <Tooltip content={t("chat.markForChange")}>
-                                    <Button
-                                      isIconOnly
-                                      size="sm"
-                                      color="secondary"
-                                      variant="solid"
-                                      onPress={() => {
-                                        setOpenPopoverId(null); // Close popover first
-                                        onDrawImage(img.imageId, img.url, img.title);
-                                      }}
-                                      aria-label={t("chat.markForChange")}
-                                      className="shadow-lg"
-                                    >
-                                      <Pencil size={16} />
-                                    </Button>
-                                  </Tooltip>
-                                </div>
-                              )}
-
-                              {/* Title overlay */}
-                              {img.title && (
-                                <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-xs p-2">
-                                  {img.title}
-                                </div>
-                              )}
-                            </div>
-                          </PopoverContent>
-                        </Popover>
+                          {/* Remove button */}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onRemovePendingImage(img.imageId);
+                            }}
+                            disabled={img.isUploading}
+                            className={clsx(
+                              "absolute -top-2 -right-2 bg-default-100 rounded-full p-1 shadow-sm border border-divider z-10",
+                              img.isUploading
+                                ? "opacity-50 cursor-not-allowed"
+                                : "hover:bg-default-200"
+                            )}
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
                       );
                     } else {
                       // Deck: marked image on top, original on bottom
@@ -447,63 +510,73 @@ export default function ChatInput({
                             )}
                           </motion.div>
 
-                          {/* Marked image (top of deck) */}
+                          {/* Marked image (top of deck) - single click inserts chip, double click opens popover */}
+                          <motion.div
+                            className="absolute h-20 w-20 rounded-lg border-2 border-secondary overflow-hidden shadow-lg cursor-pointer"
+                            initial={false}
+                            animate={{
+                              x: isHovered ? 90 : 0,
+                              y: 0,
+                              rotate: isHovered ? 0 : 3,
+                            }}
+                            transition={{ duration: 0.2, ease: "easeOut" }}
+                            style={{ zIndex: 2 }}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleImageClick(markedImage.imageId, markedImage.isUploading || false);
+                            }}
+                          >
+                            <img
+                              src={
+                                markedImage.isUploading && markedImage.localPreviewUrl
+                                  ? markedImage.localPreviewUrl
+                                  : markedImage.url
+                              }
+                              alt={markedImage.title || t("chat.image")}
+                              className={clsx(
+                                "w-full h-full object-cover",
+                                markedImage.isUploading && "opacity-50"
+                              )}
+                            />
+
+                            {/* Uploading spinner overlay */}
+                            {markedImage.isUploading && (
+                              <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                                <Spinner size="sm" color="white" />
+                              </div>
+                            )}
+
+                            {/* Marked label overlay */}
+                            {!markedImage.isUploading && (
+                              <div className="absolute inset-0 bg-linear-to-t from-black/70 to-transparent flex flex-col justify-end p-1">
+                                <div className="flex items-center gap-1 text-secondary">
+                                  <Pencil size={10} />
+                                  <span className="text-[8px] uppercase tracking-wide">
+                                    {t("chat.marked")}
+                                  </span>
+                                </div>
+                                {isHovered && markedImage.title && (
+                                  <span className="text-white text-[10px] leading-tight font-medium line-clamp-1">
+                                    {markedImage.title}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </motion.div>
+
+                          {/* Popover for enlarge/edit - controlled programmatically */}
                           <Popover
                             placement="top"
                             showArrow
                             offset={10}
                             isOpen={openPopoverId === markedImage.imageId}
-                            onOpenChange={(open) => setOpenPopoverId(open ? markedImage.imageId : null)}
+                            onOpenChange={(open) => {
+                              if (!open) setOpenPopoverId(null);
+                            }}
                           >
                             <PopoverTrigger>
-                              <motion.div
-                                className="absolute h-20 w-20 rounded-lg border-2 border-secondary overflow-hidden shadow-lg"
-                                initial={false}
-                                animate={{
-                                  x: isHovered ? 90 : 0,
-                                  y: 0,
-                                  rotate: isHovered ? 0 : 3,
-                                }}
-                                transition={{ duration: 0.2, ease: "easeOut" }}
-                                style={{ zIndex: 2 }}
-                              >
-                                <img
-                                  src={
-                                    markedImage.isUploading && markedImage.localPreviewUrl
-                                      ? markedImage.localPreviewUrl
-                                      : markedImage.url
-                                  }
-                                  alt={markedImage.title || t("chat.image")}
-                                  className={clsx(
-                                    "w-full h-full object-cover",
-                                    markedImage.isUploading && "opacity-50"
-                                  )}
-                                />
-
-                                {/* Uploading spinner overlay */}
-                                {markedImage.isUploading && (
-                                  <div className="absolute inset-0 flex items-center justify-center bg-black/30">
-                                    <Spinner size="sm" color="white" />
-                                  </div>
-                                )}
-
-                                {/* Marked label overlay */}
-                                {!markedImage.isUploading && (
-                                  <div className="absolute inset-0 bg-linear-to-t from-black/70 to-transparent flex flex-col justify-end p-1">
-                                    <div className="flex items-center gap-1 text-secondary">
-                                      <Pencil size={10} />
-                                      <span className="text-[8px] uppercase tracking-wide">
-                                        {t("chat.marked")}
-                                      </span>
-                                    </div>
-                                    {isHovered && markedImage.title && (
-                                      <span className="text-white text-[10px] leading-tight font-medium line-clamp-1">
-                                        {markedImage.title}
-                                      </span>
-                                    )}
-                                  </div>
-                                )}
-                              </motion.div>
+                              <div className="absolute inset-0 pointer-events-none" />
                             </PopoverTrigger>
 
                             {/* Hover preview popover for deck */}
@@ -648,21 +721,24 @@ export default function ChatInput({
               </Popover>
             </div>
 
-            <Textarea
+            <MentionTextbox
+              ref={mentionTextboxRef}
+              value={input}
+              onChange={handleMentionChange}
+              mentionItems={mentionItems}
               placeholder={t("chat.typeMessage")}
               minRows={1}
               maxRows={isExpanded ? 5 : 1}
-              value={input}
-              onValueChange={onInputChange}
-              onKeyDown={handleKeyDown}
-              onFocus={() => setIsExpanded(true)}
-              className="flex-1 min-w-0"
-              classNames={{
-                input: "text-base",
-                inputWrapper:
-                  "bg-transparent shadow-none hover:bg-transparent focus-within:bg-transparent",
+              onSubmit={onSend}
+              onFocusChange={(focused) => {
+                if (focused) setIsExpanded(true);
               }}
-              isDisabled={isRecording}
+              disabled={isRecording}
+              className="flex-1 min-w-0 bg-transparent"
+              renderDropdownItem={(item, isHighlighted) => (
+                <ImageChipDropdownItem item={item} isHighlighted={isHighlighted} />
+              )}
+              t={(key) => t(`mention.${key}`)}
             />
 
             <Tooltip

@@ -134,7 +134,8 @@
     "generateAnotherOption": "New Idea",
     "generatingVariant": "Generating new idea...",
     "variantGenerated": "New idea generated!",
-    "failedToGenerateVariant": "Failed to generate new idea"
+    "failedToGenerateVariant": "Failed to generate new idea",
+    "untitledImage": "Untitled Image"
   },
   "profile": {
     "title": "Profile Settings",
@@ -495,5 +496,9 @@
     "date": "Date",
     "type": "Type",
     "insufficientCredits": "Insufficient credits"
+  },
+  "mention": {
+    "noItemsAvailable": "No images available",
+    "noMatchingItems": "No matching images"
   }
 }

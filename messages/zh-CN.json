@@ -134,7 +134,8 @@
     "generateAnotherOption": "新的灵感",
     "generatingVariant": "正在生成新灵感...",
     "variantGenerated": "新灵感已生成！",
-    "failedToGenerateVariant": "生成新灵感失败"
+    "failedToGenerateVariant": "生成新灵感失败",
+    "untitledImage": "未命名图片"
   },
   "profile": {
     "title": "个人设置",
@@ -495,5 +496,9 @@
     "date": "日期",
     "type": "类型",
     "insufficientCredits": "积分不足"
+  },
+  "mention": {
+    "noItemsAvailable": "暂无可用图片",
+    "noMatchingItems": "没有匹配的图片"
   }
 }
