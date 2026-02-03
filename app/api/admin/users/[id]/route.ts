@@ -21,7 +21,7 @@ export async function PATCH(
 
     const { id } = await params;
     const body = await request.json();
-    const { firstName, lastName, roles } = body;
+    const { firstName, lastName, roles, testingGroups } = body;
 
     // Prevent removing admin from yourself if you are the only admin (optional safeguard, skipping for now)
 
@@ -31,6 +31,7 @@ export async function PATCH(
         ...(firstName !== undefined && { firstName }),
         ...(lastName !== undefined && { lastName }),
         ...(roles !== undefined && { roles }),
+        ...(testingGroups !== undefined && { testingGroups }),
         updatedAt: new Date(),
       })
       .where(eq(users.id, id))
@@ -40,6 +41,7 @@ export async function PATCH(
         firstName: users.firstName,
         lastName: users.lastName,
         roles: users.roles,
+        testingGroups: users.testingGroups,
         updatedAt: users.updatedAt,
       });
 

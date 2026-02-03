@@ -7,6 +7,7 @@ import {
   text,
   jsonb,
   bigint,
+  unique,
 } from "drizzle-orm/pg-core";
 
 /**
@@ -23,6 +24,7 @@ export const users = pgTable("users", {
     .default("email"), // 'email', 'cwru_sso', etc.
   authProviderMetadata: jsonb("auth_provider_metadata"), // Provider-specific metadata (e.g., studentId for CWRU)
   roles: jsonb("roles").$type<string[]>().notNull().default(["new_user"]), // Array of role names
+  testingGroups: jsonb("testing_groups").$type<string[]>().notNull().default([]), // Array of testing group UUIDs
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -328,3 +330,62 @@ export type NewCreditTransaction = typeof creditTransactions.$inferInsert;
 
 export type ModelPricing = typeof modelPricing.$inferSelect;
 export type NewModelPricing = typeof modelPricing.$inferInsert;
+
+/**
+ * Testing Groups table
+ * Stores testing/experiment groups for AB testing
+ */
+export const testingGroups = pgTable("testing_groups", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: varchar("name", { length: 50 }).notNull().unique(),
+  description: text("description"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+/**
+ * Feature Flags table
+ * Stores feature flag definitions with default values
+ */
+export const featureFlags = pgTable("feature_flags", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  key: varchar("key", { length: 16 }).notNull().unique(),
+  valueType: varchar("value_type", { length: 10 }).notNull(), // 'boolean' | 'number' | 'string'
+  defaultValue: text("default_value").notNull(), // Fallback for all users
+  description: text("description"),
+  enabled: boolean("enabled").notNull().default(true), // Kill switch
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+/**
+ * Group Flag Overrides table
+ * Stores flag value overrides for specific testing groups
+ */
+export const groupFlagOverrides = pgTable(
+  "group_flag_overrides",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    flagId: uuid("flag_id")
+      .notNull()
+      .references(() => featureFlags.id, { onDelete: "cascade" }),
+    groupId: uuid("group_id")
+      .notNull()
+      .references(() => testingGroups.id, { onDelete: "cascade" }),
+    value: text("value").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    uniqueFlagGroup: unique().on(table.flagId, table.groupId),
+  })
+);
+
+export type TestingGroup = typeof testingGroups.$inferSelect;
+export type NewTestingGroup = typeof testingGroups.$inferInsert;
+
+export type FeatureFlag = typeof featureFlags.$inferSelect;
+export type NewFeatureFlag = typeof featureFlags.$inferInsert;
+
+export type GroupFlagOverride = typeof groupFlagOverrides.$inferSelect;
+export type NewGroupFlagOverride = typeof groupFlagOverrides.$inferInsert;

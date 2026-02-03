@@ -23,6 +23,7 @@ export async function GET(request: NextRequest) {
         firstName: users.firstName,
         lastName: users.lastName,
         roles: users.roles,
+        testingGroups: users.testingGroups,
         authProvider: users.authProvider,
         createdAt: users.createdAt,
         updatedAt: users.updatedAt,
