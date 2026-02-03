@@ -143,7 +143,19 @@
     "generatingVariant": "Generating new idea...",
     "variantGenerated": "New idea generated!",
     "failedToGenerateVariant": "Failed to generate new idea",
-    "untitledImage": "Untitled Image"
+    "untitledImage": "Untitled Image",
+    "referenceImages": "Reference Images",
+    "referenceImagesInfo": "Reference images persist across messages. Tag them to help the AI understand their purpose (subject, scene, item, or style).",
+    "referenceImagesCount": "{count} of {max} reference images",
+    "addReferenceImage": "Add reference image",
+    "tagNone": "No Tag",
+    "tagSubject": "Subject",
+    "tagScene": "Scene",
+    "tagItem": "Item",
+    "tagStyle": "Style",
+    "selectTag": "Select tag",
+    "collapseReferenceImages": "Collapse reference images",
+    "expandReferenceImages": "Expand reference images"
   },
   "profile": {
     "title": "Profile Settings",

@@ -23,6 +23,12 @@ type ImageSourceEntry = {
   variantId?: string;
 };
 
+type ReferenceImageEntry = {
+  imageId: string;
+  tag: "none" | "subject" | "scene" | "item" | "style";
+  title?: string;
+};
+
 const applyImageSelections = (
   history: Message[],
   imageSources: ImageSourceEntry[]
@@ -151,6 +157,25 @@ export async function POST(
         ? Math.min(json.variantCount, 4) // Cap at 4 variants max
         : 1;
 
+    // Parse reference images with their tags
+    const rawReferenceImages = Array.isArray(json.referenceImages)
+      ? json.referenceImages
+      : [];
+    const referenceImages: ReferenceImageEntry[] = rawReferenceImages
+      .filter((entry: any) => typeof entry?.imageId === "string")
+      .map((entry: any) => ({
+        imageId: entry.imageId as string,
+        tag:
+          entry.tag === "none" ||
+          entry.tag === "subject" ||
+          entry.tag === "scene" ||
+          entry.tag === "item" ||
+          entry.tag === "style"
+            ? (entry.tag as ReferenceImageEntry["tag"])
+            : "none",
+        title: typeof entry.title === "string" ? entry.title : undefined,
+      }));
+
     // Validate: must have content or images
     if (!content && imageIds.length === 0) {
       return NextResponse.json(
@@ -177,6 +202,7 @@ export async function POST(
         imageCount: imageIds.length,
         imageIds,
         imageSources,
+        referenceImages,
         precisionEditing,
         systemPromptOverride,
         aspectRatioOverride,
@@ -264,7 +290,8 @@ export async function POST(
         aspectRatioOverride,
         imageSizeOverride,
         imageModelId,
-        messageTimestamp // Pass timestamp for frontend sync
+        messageTimestamp, // Pass timestamp for frontend sync
+        referenceImages // Pass reference images with tags
       );
 
     // Handle background completion (saving history)

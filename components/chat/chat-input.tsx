@@ -19,10 +19,21 @@ import {
   Sparkles,
   Pencil,
   Layers,
+  ChevronDown,
+  ChevronUp,
+  Plus,
+  Info,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { Dropdown, DropdownTrigger, DropdownMenu, DropdownItem } from "@heroui/dropdown";
 import MenuConfiguration, { MenuState } from "./menu-configuration";
 import { PendingImage, MAX_PENDING_IMAGES } from "./pending-image-types";
+import {
+  ReferenceImage,
+  ReferenceImageTag,
+  MAX_REFERENCE_IMAGES,
+  REFERENCE_IMAGE_TAGS,
+} from "./reference-image-types";
 import clsx from "clsx";
 import { ASSET_DRAG_MIME } from "./asset-dnd";
 import {
@@ -74,6 +85,18 @@ interface ChatInputProps {
   initialEditorContent?: JSONContent | string | null;
   /** Callback when input loses focus (for draft saving) */
   onBlur?: () => void;
+  /** Reference images - persistent images that don't get cleared on send */
+  referenceImages?: ReferenceImage[];
+  /** Handler to open asset picker for adding reference images */
+  onAddReferenceImage?: () => void;
+  /** Handler to remove a reference image */
+  onRemoveReferenceImage?: (imageId: string) => void;
+  /** Handler to update a reference image's tag */
+  onUpdateReferenceImageTag?: (imageId: string, tag: ReferenceImageTag) => void;
+  /** Whether the reference images section is collapsed */
+  isReferenceImagesCollapsed?: boolean;
+  /** Handler to toggle reference images collapsed state */
+  onToggleReferenceImagesCollapsed?: () => void;
 }
 
 /** Ref handle for ChatInput to allow getting editor content */
@@ -108,6 +131,12 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
   hasUploadingImages,
   initialEditorContent,
   onBlur,
+  referenceImages = [],
+  onAddReferenceImage,
+  onRemoveReferenceImage,
+  onUpdateReferenceImageTag,
+  isReferenceImagesCollapsed = false,
+  onToggleReferenceImagesCollapsed,
 }, ref) {
   const t = useTranslations();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -313,6 +342,22 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
     }
   };
 
+  // Helper to get tag label for reference image
+  const getTagLabel = (tag: ReferenceImageTag) => {
+    switch (tag) {
+      case "none":
+        return t("chat.tagNone");
+      case "subject":
+        return t("chat.tagSubject");
+      case "scene":
+        return t("chat.tagScene");
+      case "item":
+        return t("chat.tagItem");
+      case "style":
+        return t("chat.tagStyle");
+    }
+  };
+
   return (
     <div className="absolute bottom-4 left-0 right-0 z-50 flex justify-center px-4 pointer-events-none">
       <div
@@ -326,6 +371,177 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
         className="bg-background/80 backdrop-blur-md rounded-2xl border border-divider shadow-lg pointer-events-auto overflow-hidden transition-[max-width] duration-300 ease-out"
       >
         <div className="flex flex-col">
+          {/* Reference Images Area - Persistent images that don't get cleared on send */}
+          <AnimatePresence>
+            {isExpanded && referenceImages.length > 0 && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="px-4 pt-4 overflow-hidden border-b border-divider"
+              >
+                {/* Header with collapse toggle */}
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-medium text-default-600">
+                      {t("chat.referenceImages")}
+                    </span>
+                    <Tooltip content={t("chat.referenceImagesInfo")} placement="right">
+                      <Info
+                        size={14}
+                        className="text-default-400 hover:text-default-600 cursor-help"
+                      />
+                    </Tooltip>
+                    <span className="text-xs text-default-400">
+                      ({referenceImages.length}/{MAX_REFERENCE_IMAGES})
+                    </span>
+                  </div>
+                  {onToggleReferenceImagesCollapsed && (
+                    <Button
+                      isIconOnly
+                      size="sm"
+                      variant="light"
+                      onPress={onToggleReferenceImagesCollapsed}
+                      aria-label={isReferenceImagesCollapsed ? t("chat.expandReferenceImages") : t("chat.collapseReferenceImages")}
+                    >
+                      {isReferenceImagesCollapsed ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                    </Button>
+                  )}
+                </div>
+
+                {/* Reference images grid - collapsible */}
+                <AnimatePresence>
+                  {!isReferenceImagesCollapsed && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.15 }}
+                      className="overflow-hidden"
+                    >
+                      <div className="flex gap-2 flex-wrap mb-3 pt-2">
+                        {/* Render each reference image */}
+                        {referenceImages.map((img) => (
+                          <div key={img.imageId} className="relative flex flex-col items-center">
+                            {/* Image thumbnail */}
+                            <div className="h-20 w-20 rounded-lg border border-divider overflow-hidden relative">
+                              <img
+                                src={img.url}
+                                alt={img.title || t("chat.image")}
+                                className="w-full h-full object-cover"
+                              />
+                              {/* Title overlay */}
+                              {img.title && (
+                                <div className="absolute inset-0 bg-linear-to-t from-black/70 to-transparent flex flex-col justify-end p-1">
+                                  <span className="text-white text-[10px] leading-tight font-medium line-clamp-2">
+                                    {img.title}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Tag dropdown below image */}
+                            {onUpdateReferenceImageTag && (
+                              <Dropdown>
+                                <DropdownTrigger>
+                                  <Button
+                                    size="sm"
+                                    variant="flat"
+                                    className="mt-1 h-6 min-w-0 px-2 text-[10px]"
+                                  >
+                                    {getTagLabel(img.tag)}
+                                    <ChevronDown size={12} className="ml-1" />
+                                  </Button>
+                                </DropdownTrigger>
+                                <DropdownMenu
+                                  aria-label={t("chat.selectTag")}
+                                  selectionMode="single"
+                                  selectedKeys={new Set([img.tag])}
+                                  onSelectionChange={(keys) => {
+                                    const selected = Array.from(keys)[0] as ReferenceImageTag;
+                                    if (selected) {
+                                      onUpdateReferenceImageTag(img.imageId, selected);
+                                    }
+                                  }}
+                                >
+                                  {REFERENCE_IMAGE_TAGS.map((tag) => (
+                                    <DropdownItem key={tag}>
+                                      {getTagLabel(tag)}
+                                    </DropdownItem>
+                                  ))}
+                                </DropdownMenu>
+                              </Dropdown>
+                            )}
+
+                            {/* Remove button */}
+                            {onRemoveReferenceImage && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onRemoveReferenceImage(img.imageId);
+                                }}
+                                className="absolute -top-2 -right-2 bg-default-100 rounded-full p-1 shadow-sm border border-divider z-10 hover:bg-default-200"
+                              >
+                                <X size={14} />
+                              </button>
+                            )}
+                          </div>
+                        ))}
+
+                        {/* Add button - dashed border placeholder */}
+                        {referenceImages.length < MAX_REFERENCE_IMAGES && onAddReferenceImage && (
+                          <div className="flex flex-col items-center">
+                            <button
+                              onClick={onAddReferenceImage}
+                              className="h-20 w-20 rounded-lg border-2 border-dashed border-default-300 hover:border-primary hover:bg-primary/5 flex items-center justify-center transition-colors"
+                              aria-label={t("chat.addReferenceImage")}
+                            >
+                              <Plus size={24} className="text-default-400" />
+                            </button>
+                            <div className="h-7" /> {/* Spacer to align with tag dropdown */}
+                          </div>
+                        )}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Show add button when no reference images but expanded */}
+          <AnimatePresence>
+            {isExpanded && referenceImages.length === 0 && onAddReferenceImage && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="px-4 pt-4 overflow-hidden border-b border-divider"
+              >
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-xs font-medium text-default-600">
+                    {t("chat.referenceImages")}
+                  </span>
+                  <Tooltip content={t("chat.referenceImagesInfo")} placement="right">
+                    <Info
+                      size={14}
+                      className="text-default-400 hover:text-default-600 cursor-help"
+                    />
+                  </Tooltip>
+                  <button
+                    onClick={onAddReferenceImage}
+                    className="h-12 w-12 rounded-lg border-2 border-dashed border-default-300 hover:border-primary hover:bg-primary/5 flex items-center justify-center transition-colors"
+                    aria-label={t("chat.addReferenceImage")}
+                  >
+                    <Plus size={20} className="text-default-400" />
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           {/* Previews Area - Unified pending images display */}
           <AnimatePresence>
             {isExpanded && pendingImages.length > 0 && (

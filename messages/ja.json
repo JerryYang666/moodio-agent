@@ -143,7 +143,19 @@
     "generatingVariant": "新しいアイデアを生成中...",
     "variantGenerated": "新しいアイデアが生成されました！",
     "failedToGenerateVariant": "新しいアイデアの生成に失敗しました",
-    "untitledImage": "無題の画像"
+    "untitledImage": "無題の画像",
+    "referenceImages": "参照画像",
+    "referenceImagesInfo": "参照画像はメッセージ送信後もクリアされません。タグを付けることで、AI がその用途（人物、場景、物品、スタイル）を理解しやすくなります。",
+    "referenceImagesCount": "{count}/{max} 枚の参照画像",
+    "addReferenceImage": "参照画像を追加",
+    "tagNone": "タグなし",
+    "tagSubject": "人物",
+    "tagScene": "場景",
+    "tagItem": "物品",
+    "tagStyle": "スタイル",
+    "selectTag": "タグを選択",
+    "collapseReferenceImages": "参照画像を折りたたむ",
+    "expandReferenceImages": "参照画像を展開"
   },
   "profile": {
     "title": "プロフィール設定",

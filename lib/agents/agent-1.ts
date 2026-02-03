@@ -50,6 +50,13 @@ interface AgentOutput {
   suggestions: Suggestion[];
 }
 
+/** Reference image with tag for context */
+interface ReferenceImageEntry {
+  imageId: string;
+  tag: "none" | "subject" | "scene" | "item" | "style";
+  title?: string;
+}
+
 interface PreparedMessages {
   messages: any[];
   /** All image IDs provided in the request (from user uploads, asset library, or AI-generated selections) */
@@ -202,7 +209,8 @@ export class Agent1 implements Agent {
     systemPromptOverride?: string,
     aspectRatioOverride?: AspectRatio,
     imageSizeOverride?: ImageSize,
-    imageModelId?: string
+    imageModelId?: string,
+    referenceImages?: ReferenceImageEntry[] // Reference images with tags
   ): Promise<PreparedMessages> {
     const rawSystemPrompt = systemPromptOverride || getSystemPrompt(this.id);
     const systemPrompt = rawSystemPrompt.replace(
@@ -241,16 +249,22 @@ export class Agent1 implements Agent {
 
     // Get all image IDs from the current user message (these are already in imageIds from frontend)
     // The imageIds parameter contains all images the user wants to use for this request
-    const allImageIds = imageIds || [];
+    const pendingImageIds = imageIds || [];
+    
+    // Combine pending images and reference images for image generation
+    const referenceImageIds = referenceImages?.map((ref) => ref.imageId) || [];
+    const allImageIds = [...pendingImageIds, ...referenceImageIds];
 
-    // Pre-fetch all image base64 data in parallel
+    // Pre-fetch all image base64 data in parallel (for both pending and reference images, used for image generation)
     const imageBase64Promises = allImageIds.map((id) =>
       downloadImage(id).then((buf) => buf?.toString("base64"))
     );
 
     console.log(
-      "[Perf] %s image base64 downloads started [%sms]",
+      "[Perf] %s image base64 downloads started (%s pending + %s reference) [%sms]",
       allImageIds.length,
+      pendingImageIds.length,
+      referenceImageIds.length,
       Date.now() - startTime
     );
 
@@ -273,6 +287,34 @@ export class Agent1 implements Agent {
           { type: "text", text: userMessage.content as string },
         ],
     };
+
+    // Add reference images with their tags to the user message
+    if (referenceImages && referenceImages.length > 0) {
+      // Ensure content is an array
+      if (!Array.isArray(formattedUserMessage.content)) {
+        formattedUserMessage.content = [{ type: "text", text: formattedUserMessage.content }];
+      }
+      
+      for (const ref of referenceImages) {
+        // Add the reference image
+        formattedUserMessage.content.push({
+          type: "image_url",
+          image_url: {
+            url: getSignedImageUrl(ref.imageId),
+          },
+        });
+        // Add tag context for the AI to understand the image's purpose
+        const tagLabel = ref.tag === "none" ? "general reference" : ref.tag;
+        formattedUserMessage.content.push({
+          type: "text",
+          text: `[Reference Image - ${tagLabel}${ref.title ? `: ${ref.title}` : ""}]`,
+        });
+      }
+      
+      console.log(
+        `[Agent-1] Added ${referenceImages.length} reference image(s) with tags to user message`
+      );
+    }
 
     // Add precision editing prompt if applicable
     if (precisionEditing && allImageIds.length > 0) {
@@ -308,11 +350,11 @@ export class Agent1 implements Agent {
           const newContent = m.content
             .map((c, pIdx) => {
               if (c.type === "image") {
+                // Convert history images to text placeholders instead of sending them
+                // Only pending images and reference images are sent to the LLM
                 return {
-                  type: "image_url",
-                  image_url: {
-                    url: getSignedImageUrl(c.imageId),
-                  },
+                  type: "text",
+                  text: "[User provided an image in this message]",
                 };
               }
               if (c.type === "internal_think") {
@@ -972,15 +1014,17 @@ export class Agent1 implements Agent {
     aspectRatioOverride?: string,
     imageSizeOverride?: ImageSize,
     imageModelId?: string,
-    messageTimestamp?: number // Timestamp to use for all variants (for frontend sync)
+    messageTimestamp?: number, // Timestamp to use for all variants (for frontend sync)
+    referenceImages?: ReferenceImageEntry[] // Reference images with tags
   ): Promise<ParallelAgentResponse> {
     const startTime = requestStartTime || Date.now();
     // Use provided timestamp or generate one
     const variantTimestamp = messageTimestamp || Date.now();
     console.log(
-      "[Perf] Agent processRequestParallel start with %s variants, %s images [%sms]",
+      "[Perf] Agent processRequestParallel start with %s variants, %s images, %s reference images [%sms]",
       variantCount,
       imageIds?.length || 0,
+      referenceImages?.length || 0,
       Date.now() - startTime
     );
 
@@ -1011,7 +1055,8 @@ export class Agent1 implements Agent {
       systemPromptOverride,
       validatedAspectRatio,
       validatedImageSize,
-      imageModelId
+      imageModelId,
+      referenceImages
     );
 
     const encoder = new TextEncoder();

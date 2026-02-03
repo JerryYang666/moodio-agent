@@ -49,6 +49,18 @@ import {
   draftImagesToPendingImages,
   ChatDraft,
 } from "./draft-utils";
+import {
+  ReferenceImage,
+  ReferenceImageTag,
+  MAX_REFERENCE_IMAGES,
+  canAddReferenceImage,
+} from "./reference-image-types";
+import {
+  saveReferenceImages,
+  loadReferenceImages,
+  saveReferenceImagesCollapsed,
+  loadReferenceImagesCollapsed,
+} from "./reference-image-utils";
 import type { JSONContent } from "@tiptap/react";
 
 // Helper to group consecutive assistant messages with the same timestamp as variants
@@ -97,7 +109,18 @@ export default function ChatInterface({
   // Unified pending images array - replaces selectedFile, previewUrl, selectedAsset, selectedAgentPart
   const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
   const [isAssetPickerOpen, setIsAssetPickerOpen] = useState(false);
+  // Track which picker mode is active: "pending" for regular images, "reference" for reference images
+  const [assetPickerMode, setAssetPickerMode] = useState<"pending" | "reference">("pending");
   const [precisionEditing, setPrecisionEditing] = useState(false);
+  
+  // Reference images state - persistent images that don't get cleared on send
+  const [referenceImages, setReferenceImages] = useState<ReferenceImage[]>([]);
+  const [isReferenceImagesCollapsed, setIsReferenceImagesCollapsed] = useState(() => {
+    if (typeof window !== "undefined") {
+      return loadReferenceImagesCollapsed();
+    }
+    return false;
+  });
   const [menuState, setMenuState] = useState<MenuState>(() => {
     // Load saved preferences from localStorage on mount
     if (typeof window !== "undefined") {
@@ -146,6 +169,22 @@ export default function ChatInterface({
     }
     setIsDraftLoaded(true);
   }, [chatId, isDraftLoaded]);
+
+  // Load reference images on mount or when chatId changes (separate from draft)
+  useEffect(() => {
+    const loaded = loadReferenceImages(chatId);
+    setReferenceImages(loaded);
+  }, [chatId]);
+
+  // Save reference images when they change
+  useEffect(() => {
+    saveReferenceImages(chatId, referenceImages);
+  }, [chatId, referenceImages]);
+
+  // Save collapsed state when it changes
+  useEffect(() => {
+    saveReferenceImagesCollapsed(isReferenceImagesCollapsed);
+  }, [isReferenceImagesCollapsed]);
 
   // Save draft function - called on blur and visibility change
   const saveDraft = useCallback(() => {
@@ -544,6 +583,131 @@ export default function ChatInterface({
     [pendingImages, t, removePendingImage]
   );
 
+  // Add a reference image
+  const addReferenceImage = useCallback(
+    (asset: {
+      imageId: string;
+      url: string;
+      title?: string;
+    }, tag: ReferenceImageTag = "none") => {
+      if (!canAddReferenceImage(referenceImages)) {
+        addToast({
+          title: t("chat.maxImagesReached", { max: MAX_REFERENCE_IMAGES }),
+          color: "warning",
+        });
+        return;
+      }
+
+      // Check if this image is already in the reference list
+      if (referenceImages.some((img) => img.imageId === asset.imageId)) {
+        addToast({
+          title: t("chat.imageAlreadyAdded"),
+          color: "warning",
+        });
+        return;
+      }
+
+      const newImage: ReferenceImage = {
+        imageId: asset.imageId,
+        url: asset.url,
+        title: asset.title,
+        tag,
+      };
+
+      setReferenceImages((prev) => [...prev, newImage]);
+    },
+    [referenceImages, t]
+  );
+
+  // Remove a reference image
+  const removeReferenceImage = useCallback((imageId: string) => {
+    setReferenceImages((prev) => prev.filter((img) => img.imageId !== imageId));
+  }, []);
+
+  // Update a reference image's tag
+  const updateReferenceImageTag = useCallback((imageId: string, tag: ReferenceImageTag) => {
+    setReferenceImages((prev) =>
+      prev.map((img) =>
+        img.imageId === imageId ? { ...img, tag } : img
+      )
+    );
+  }, []);
+
+  // Toggle reference images collapsed state
+  const toggleReferenceImagesCollapsed = useCallback(() => {
+    setIsReferenceImagesCollapsed((prev) => !prev);
+  }, []);
+
+  // Open asset picker for reference images
+  const openReferenceImagePicker = useCallback(() => {
+    setAssetPickerMode("reference");
+    setIsAssetPickerOpen(true);
+  }, []);
+
+  // Open asset picker for pending images
+  const openPendingImagePicker = useCallback(() => {
+    setAssetPickerMode("pending");
+    setIsAssetPickerOpen(true);
+  }, []);
+
+  // Upload a file and add to reference images
+  const uploadAndAddReferenceImage = useCallback(
+    async (file: File) => {
+      // Validate file before upload
+      const validationError = validateFile(file);
+      if (validationError) {
+        addToast({
+          title:
+            validationError.code === "FILE_TOO_LARGE"
+              ? t("chat.fileSizeTooLarge", { maxSize: getMaxFileSizeMB() })
+              : t("chat.uploadFailed"),
+          color: "danger",
+        });
+        return;
+      }
+
+      if (!canAddReferenceImage(referenceImages)) {
+        addToast({
+          title: t("chat.maxImagesReached", { max: MAX_REFERENCE_IMAGES }),
+          color: "warning",
+        });
+        return;
+      }
+
+      const result = await uploadImage(file);
+
+      if (result.success) {
+        // Add to reference images with default tag
+        const newImage: ReferenceImage = {
+          imageId: result.data.imageId,
+          url: result.data.imageUrl,
+          title: file.name,
+          tag: "subject",
+        };
+        setReferenceImages((prev) => [...prev, newImage]);
+      } else {
+        console.error("Reference image upload failed:", result.error);
+        addToast({
+          title: t("chat.uploadFailed"),
+          color: "danger",
+        });
+      }
+    },
+    [referenceImages, t]
+  );
+
+  // Get the appropriate upload handler based on asset picker mode
+  const handleAssetUpload = useCallback(
+    async (file: File) => {
+      if (assetPickerMode === "reference") {
+        await uploadAndAddReferenceImage(file);
+      } else {
+        await uploadAndAddImage(file);
+      }
+    },
+    [assetPickerMode, uploadAndAddImage, uploadAndAddReferenceImage]
+  );
+
   // Listen for asset selection events from the hover sidebar
   useEffect(() => {
     const handler = (e: Event) => {
@@ -597,14 +761,24 @@ export default function ChatInterface({
 
   const handleAssetPicked = useCallback(
     (asset: AssetSummary) => {
-      addAssetImage({
-        assetId: asset.id,
-        url: asset.imageUrl,
-        title: asset.generationDetails?.title || t("chat.selectedAsset"),
-        imageId: asset.imageId,
-      });
+      if (assetPickerMode === "reference") {
+        // Add to reference images with default tag "subject"
+        addReferenceImage({
+          imageId: asset.imageId,
+          url: asset.imageUrl,
+          title: asset.generationDetails?.title || t("chat.selectedAsset"),
+        }, "subject");
+      } else {
+        // Add to pending images
+        addAssetImage({
+          assetId: asset.id,
+          url: asset.imageUrl,
+          title: asset.generationDetails?.title || t("chat.selectedAsset"),
+          imageId: asset.imageId,
+        });
+      }
     },
-    [addAssetImage, t]
+    [addAssetImage, addReferenceImage, assetPickerMode, t]
   );
 
   // Handler to open drawing modal for an image
@@ -901,6 +1075,12 @@ export default function ChatInterface({
           messageIndex: img.messageIndex,
           partIndex: img.partIndex,
           variantId: img.variantId,
+        })),
+        // Include reference images with their tags
+        referenceImages: referenceImages.map((img) => ({
+          imageId: img.imageId,
+          tag: img.tag,
+          title: img.title,
         })),
       };
 
@@ -1564,7 +1744,7 @@ export default function ChatInterface({
         onStopRecording={stopRecording}
         pendingImages={pendingImages}
         onRemovePendingImage={removePendingImage}
-        onOpenAssetPicker={() => setIsAssetPickerOpen(true)}
+        onOpenAssetPicker={openPendingImagePicker}
         onAssetDrop={handleAssetDrop}
         showFileUpload={true}
         precisionEditing={precisionEditing}
@@ -1575,13 +1755,19 @@ export default function ChatInterface({
         hasUploadingImages={hasUploadingImages(pendingImages)}
         initialEditorContent={loadedDraft?.editorContent || (loadedDraft?.plainText ? loadedDraft.plainText : undefined)}
         onBlur={saveDraft}
+        referenceImages={referenceImages}
+        onAddReferenceImage={openReferenceImagePicker}
+        onRemoveReferenceImage={removeReferenceImage}
+        onUpdateReferenceImageTag={updateReferenceImageTag}
+        isReferenceImagesCollapsed={isReferenceImagesCollapsed}
+        onToggleReferenceImagesCollapsed={toggleReferenceImagesCollapsed}
       />
 
       <AssetPickerModal
         isOpen={isAssetPickerOpen}
         onOpenChange={() => setIsAssetPickerOpen((v) => !v)}
         onSelect={handleAssetPicked}
-        onUpload={uploadAndAddImage}
+        onUpload={handleAssetUpload}
       />
 
       <ImageDetailModal

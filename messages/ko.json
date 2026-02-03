@@ -143,7 +143,19 @@
     "generatingVariant": "새 아이디어 생성 중...",
     "variantGenerated": "새 아이디어가 생성되었습니다!",
     "failedToGenerateVariant": "새 아이디어 생성에 실패했습니다",
-    "untitledImage": "제목 없는 이미지"
+    "untitledImage": "제목 없는 이미지",
+    "referenceImages": "참조 이미지",
+    "referenceImagesInfo": "참조 이미지는 메시지 전송 후에도 유지됩니다. 태그를 추가하면 AI가 용도(인물, 장면, 물품, 스타일)를 이해하는 데 도움이 됩니다.",
+    "referenceImagesCount": "{count}/{max} 참조 이미지",
+    "addReferenceImage": "참조 이미지 추가",
+    "tagNone": "태그 없음",
+    "tagSubject": "인물",
+    "tagScene": "장면",
+    "tagItem": "물품",
+    "tagStyle": "스타일",
+    "selectTag": "태그 선택",
+    "collapseReferenceImages": "참조 이미지 접기",
+    "expandReferenceImages": "참조 이미지 펼치기"
   },
   "profile": {
     "title": "프로필 설정",

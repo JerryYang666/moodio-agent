@@ -143,7 +143,19 @@
     "generatingVariant": "正在產生新點子...",
     "variantGenerated": "新點子已產生！",
     "failedToGenerateVariant": "產生新點子失敗",
-    "untitledImage": "未命名圖片"
+    "untitledImage": "未命名圖片",
+    "referenceImages": "參考圖片",
+    "referenceImagesInfo": "參考圖片在發送訊息後不會被清除。為圖片添加標籤可以幫助 AI 理解其用途（人物、場景、物品或風格）。",
+    "referenceImagesCount": "{count}/{max} 張參考圖片",
+    "addReferenceImage": "添加參考圖片",
+    "tagNone": "無標籤",
+    "tagSubject": "人物",
+    "tagScene": "場景",
+    "tagItem": "物品",
+    "tagStyle": "風格",
+    "selectTag": "選擇標籤",
+    "collapseReferenceImages": "收起參考圖片",
+    "expandReferenceImages": "展開參考圖片"
   },
   "profile": {
     "title": "個人檔案設定",

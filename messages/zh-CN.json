@@ -143,7 +143,19 @@
     "generatingVariant": "正在生成新灵感...",
     "variantGenerated": "新灵感已生成！",
     "failedToGenerateVariant": "生成新灵感失败",
-    "untitledImage": "未命名图片"
+    "untitledImage": "未命名图片",
+    "referenceImages": "参考图片",
+    "referenceImagesInfo": "参考图片在发送消息后不会被清除。为图片添加标签可以帮助 AI 理解其用途（人物、场景、物品或风格）。",
+    "referenceImagesCount": "{count}/{max} 张参考图片",
+    "addReferenceImage": "添加参考图片",
+    "tagNone": "无标签",
+    "tagSubject": "人物",
+    "tagScene": "场景",
+    "tagItem": "物品",
+    "tagStyle": "风格",
+    "selectTag": "选择标签",
+    "collapseReferenceImages": "收起参考图片",
+    "expandReferenceImages": "展开参考图片"
   },
   "profile": {
     "title": "个人设置",
