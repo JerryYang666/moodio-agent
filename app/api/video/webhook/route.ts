@@ -70,6 +70,12 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Check if already completed (e.g., by recovery process)
+  if (generation.status === "completed" || generation.status === "failed") {
+    console.log(`[Webhook] Generation ${generation.id} already ${generation.status}, skipping`);
+    return NextResponse.json({ received: true, status: "already_processed" });
+  }
+
   // Handle error status
   if (status === "ERROR") {
     const errorMsg = error || payload_error || "Unknown error from Fal";

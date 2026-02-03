@@ -74,6 +74,22 @@ export async function recoverGeneration(generation: {
   falRequestId: string | null;
   sourceImageId: string;
 }): Promise<{ recovered: boolean; status: string; error?: string }> {
+  // Re-check current status to avoid race condition with webhook
+  const [currentGen] = await db
+    .select({ status: videoGenerations.status })
+    .from(videoGenerations)
+    .where(eq(videoGenerations.id, generation.id))
+    .limit(1);
+
+  if (!currentGen) {
+    return { recovered: false, status: "not_found", error: "Generation not found" };
+  }
+
+  if (currentGen.status === "completed" || currentGen.status === "failed") {
+    console.log(`[Recovery] Generation ${generation.id} already ${currentGen.status}, skipping`);
+    return { recovered: false, status: currentGen.status };
+  }
+
   if (!generation.falRequestId) {
     // No Fal request ID - can't recover
     await db
