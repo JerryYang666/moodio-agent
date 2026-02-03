@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, useEffect, useMemo, useCallback, forwardRef, useImperativeHandle } from "react";
+import { useFeatureFlag } from "@/lib/feature-flags";
 import { useTranslations } from "next-intl";
 import { Button } from "@heroui/button";
 import { Popover, PopoverTrigger, PopoverContent } from "@heroui/popover";
@@ -118,6 +119,9 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
   const [hoveredDeckId, setHoveredDeckId] = useState<string | null>(null);
   // Track click timeout for distinguishing single vs double click
   const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Feature flag: show circle-to-edit button (default true if flag not configured)
+  const showCircleToEdit = useFeatureFlag<boolean>("circle_to_edit") ?? true;
 
   // Expose methods via ref for draft saving
   useImperativeHandle(ref, () => ({
@@ -423,8 +427,8 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
                                   className="max-w-[min(600px,calc(100vw-3rem))] max-h-[600px] object-contain"
                                 />
 
-                                {/* Drawing button overlay - only show when not uploading */}
-                                {!img.isUploading && (
+                                {/* Drawing button overlay - only show when not uploading and feature flag enabled */}
+                                {!img.isUploading && showCircleToEdit && (
                                   <div className="absolute top-2 right-2">
                                     <Tooltip content={t("chat.markForChange")}>
                                       <Button
@@ -633,8 +637,8 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
                                     </div>
                                   </div>
                                 </div>
-                                {/* Re-draw button */}
-                                {!isUploading && (
+                                {/* Re-draw button - only show when not uploading and feature flag enabled */}
+                                {!isUploading && showCircleToEdit && (
                                   <div className="flex justify-end">
                                     <Tooltip content={t("chat.markForChange")}>
                                       <Button
