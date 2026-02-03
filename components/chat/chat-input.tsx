@@ -149,8 +149,8 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
   // Track click timeout for distinguishing single vs double click
   const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
-  // Feature flag: show circle-to-edit button (default true if flag not configured)
-  const showCircleToEdit = useFeatureFlag<boolean>("circle_to_edit") ?? true;
+  // Feature flag: show circle-to-edit button (default false if flag not configured)
+  const showCircleToEdit = useFeatureFlag<boolean>("circle_to_edit") ?? false;
   
   // Feature flag: show reference images area (default false if flag not configured)
   const showReferenceImages = useFeatureFlag<boolean>("reference_images") ?? false;
