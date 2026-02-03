@@ -2,7 +2,7 @@
  * Video Generation Recovery
  *
  * Handles recovery of stale video generations where webhooks may have failed.
- * If a generation has been processing for more than 60 minutes, we query
+ * If a generation has been processing for more than 20 minutes, we query
  * Fal's queue directly to get the result.
  */
 
@@ -16,12 +16,12 @@ import {
   generateVideoId,
 } from "@/lib/storage/s3";
 
-// Stale threshold: 60 minutes
-const STALE_THRESHOLD_MS = 60 * 60 * 1000;
+// Stale threshold: 20 minutes
+const STALE_THRESHOLD_MS = 20 * 60 * 1000;
 
 /**
  * Find all stale video generations for a user
- * Stale = status is "pending" or "processing" and created more than 60 minutes ago
+ * Stale = status is "pending" or "processing" and created more than 20 minutes ago
  */
 export async function findStaleGenerations(userId?: string) {
   const staleThreshold = new Date(Date.now() - STALE_THRESHOLD_MS);
