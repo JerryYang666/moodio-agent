@@ -325,7 +325,10 @@
     "addVideosToCollections": "将视频添加到收藏夹以在此处整理",
     "frameCapture": "截帧",
     "frameCaptureSuccess": "截帧已保存到我的截帧",
-    "frameCaptureFailed": "截帧失败"
+    "frameCaptureFailed": "截帧失败",
+    "sendingRequest": "正在发送视频生成请求...",
+    "undo": "撤销",
+    "requestCancelled": "请求已取消"
   },
   "menu": {
     "mode": "模式",

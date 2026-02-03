@@ -325,7 +325,10 @@
     "addVideosToCollections": "將影片新增至集合以在此整理",
     "frameCapture": "擷取畫面",
     "frameCaptureSuccess": "畫面已擷取並儲存至「我的畫面擷取」",
-    "frameCaptureFailed": "擷取畫面失敗"
+    "frameCaptureFailed": "擷取畫面失敗",
+    "sendingRequest": "正在傳送影片生成請求...",
+    "undo": "復原",
+    "requestCancelled": "請求已取消"
   },
   "menu": {
     "mode": "模式",

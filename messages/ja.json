@@ -325,7 +325,10 @@
     "addVideosToCollections": "動画をコレクションに追加して整理しましょう",
     "frameCapture": "フレームキャプチャ",
     "frameCaptureSuccess": "フレームをキャプチャし、マイフレームキャプチャに保存しました",
-    "frameCaptureFailed": "フレームのキャプチャに失敗しました"
+    "frameCaptureFailed": "フレームのキャプチャに失敗しました",
+    "sendingRequest": "動画生成リクエストを送信中...",
+    "undo": "取り消す",
+    "requestCancelled": "リクエストがキャンセルされました"
   },
   "menu": {
     "mode": "モード",

@@ -325,7 +325,10 @@
     "addVideosToCollections": "Add videos to collections to organize them here",
     "frameCapture": "Frame Capture",
     "frameCaptureSuccess": "Frame captured and saved to My Frame Captures",
-    "frameCaptureFailed": "Failed to capture frame"
+    "frameCaptureFailed": "Failed to capture frame",
+    "sendingRequest": "Sending video generation request...",
+    "undo": "Undo",
+    "requestCancelled": "Request cancelled"
   },
   "menu": {
     "mode": "Mode",

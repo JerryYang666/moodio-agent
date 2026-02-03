@@ -325,7 +325,10 @@
     "addVideosToCollections": "비디오를 컬렉션에 추가하여 정리하세요",
     "frameCapture": "프레임 캡처",
     "frameCaptureSuccess": "프레임이 캡처되어 내 프레임 캡처에 저장되었습니다",
-    "frameCaptureFailed": "프레임 캡처에 실패했습니다"
+    "frameCaptureFailed": "프레임 캡처에 실패했습니다",
+    "sendingRequest": "비디오 생성 요청 전송 중...",
+    "undo": "실행 취소",
+    "requestCancelled": "요청이 취소되었습니다"
   },
   "menu": {
     "mode": "모드",

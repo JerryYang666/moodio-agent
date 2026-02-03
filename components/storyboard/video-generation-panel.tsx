@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useTranslations } from "next-intl";
 import { Button } from "@heroui/button";
 import { Input, Textarea } from "@heroui/input";
@@ -16,6 +16,7 @@ import AssetPickerModal, {
 } from "@/components/chat/asset-picker-modal";
 import { useVideo } from "@/components/video-provider";
 import { uploadImage } from "@/lib/upload/client";
+import UndoSendOverlay from "./undo-send-overlay";
 
 interface VideoModelParam {
   name: string;
@@ -155,6 +156,15 @@ export default function VideoGenerationPanel({
   // Cost preview state
   const [estimatedCost, setEstimatedCost] = useState<number | null>(null);
   const [costLoading, setCostLoading] = useState(false);
+
+  // Undo send state
+  const [showUndoOverlay, setShowUndoOverlay] = useState(false);
+  const pendingGenerationRef = useRef<{
+    modelId: string;
+    sourceImageId: string;
+    endImageId: string | null;
+    params: Record<string, any>;
+  } | null>(null);
 
   // Ref to store pending restore params (used to coordinate between restore and model init effects)
   const pendingRestoreParamsRef = useRef<Record<string, any> | null>(null);
@@ -425,6 +435,32 @@ export default function VideoGenerationPanel({
     }
 
     setError(null);
+    
+    // Store the pending generation data and show undo overlay
+    pendingGenerationRef.current = {
+      modelId: selectedModelId,
+      sourceImageId,
+      endImageId,
+      params: { ...params },
+    };
+    setShowUndoOverlay(true);
+  };
+
+  // Handle undo - cancel the pending generation
+  const handleUndoGeneration = useCallback(() => {
+    pendingGenerationRef.current = null;
+    setShowUndoOverlay(false);
+  }, []);
+
+  // Handle completion of undo timer - actually send the request
+  const handleUndoComplete = useCallback(async () => {
+    const pendingData = pendingGenerationRef.current;
+    if (!pendingData) {
+      setShowUndoOverlay(false);
+      return;
+    }
+
+    setShowUndoOverlay(false);
     setSubmitting(true);
 
     try {
@@ -432,10 +468,10 @@ export default function VideoGenerationPanel({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          modelId: selectedModelId,
-          sourceImageId,
-          endImageId,
-          params,
+          modelId: pendingData.modelId,
+          sourceImageId: pendingData.sourceImageId,
+          endImageId: pendingData.endImageId,
+          params: pendingData.params,
         }),
       });
 
@@ -465,8 +501,9 @@ export default function VideoGenerationPanel({
       setError(e.message || t("failedToStartGeneration"));
     } finally {
       setSubmitting(false);
+      pendingGenerationRef.current = null;
     }
-  };
+  }, [monitorGeneration, onGenerationStarted, t, tCredits]);
 
   if (loading) {
     return (
@@ -480,7 +517,15 @@ export default function VideoGenerationPanel({
 
   return (
     <>
-      <Card className="h-full flex flex-col shadow-none">
+      <Card className="h-full flex flex-col shadow-none relative overflow-hidden">
+        {/* Undo Send Overlay */}
+        <UndoSendOverlay
+          isVisible={showUndoOverlay}
+          duration={3000}
+          onUndo={handleUndoGeneration}
+          onComplete={handleUndoComplete}
+        />
+        
         <CardHeader className="flex-col items-start gap-1 pb-2 shrink-0 px-3 sm:px-4">
           <div className="flex items-center gap-2">
             <Video size={20} className="text-primary" />
@@ -842,7 +887,7 @@ export default function VideoGenerationPanel({
               className="w-full text-sm sm:text-base"
               startContent={!submitting && <Sparkles size={18} />}
               isLoading={submitting}
-              isDisabled={!sourceImageId || !params.prompt?.trim() || isUploading}
+              isDisabled={!sourceImageId || !params.prompt?.trim() || isUploading || showUndoOverlay}
               onPress={handleGenerate}
             >
               {submitting ? (
