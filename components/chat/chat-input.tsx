@@ -151,6 +151,9 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
   
   // Feature flag: show circle-to-edit button (default true if flag not configured)
   const showCircleToEdit = useFeatureFlag<boolean>("circle_to_edit") ?? true;
+  
+  // Feature flag: show reference images area (default false if flag not configured)
+  const showReferenceImages = useFeatureFlag<boolean>("reference_images") ?? false;
 
   // Expose methods via ref for draft saving
   useImperativeHandle(ref, () => ({
@@ -373,7 +376,7 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
         <div className="flex flex-col">
           {/* Reference Images Area - Persistent images that don't get cleared on send */}
           <AnimatePresence>
-            {isExpanded && referenceImages.length > 0 && (
+            {showReferenceImages && isExpanded && referenceImages.length > 0 && (
               <motion.div
                 initial={{ height: 0, opacity: 0 }}
                 animate={{ height: "auto", opacity: 1 }}
@@ -512,7 +515,7 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
 
           {/* Show add button when no reference images but expanded */}
           <AnimatePresence>
-            {isExpanded && referenceImages.length === 0 && onAddReferenceImage && (
+            {showReferenceImages && isExpanded && referenceImages.length === 0 && onAddReferenceImage && (
               <motion.div
                 initial={{ height: 0, opacity: 0 }}
                 animate={{ height: "auto", opacity: 1 }}
