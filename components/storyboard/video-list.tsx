@@ -34,7 +34,6 @@ import {
   Loader2,
   ExternalLink,
   RotateCcw,
-  MoreVertical,
   FolderPlus,
   Plus,
   Folder,
@@ -584,11 +583,39 @@ export default function VideoList({ refreshTrigger, onRestore }: VideoListProps)
                         </div>
                       </button>
 
-                      {/* Add to Collection Menu - only for completed videos with thumbnail */}
-                      {gen.status === "completed" &&
-                        gen.videoId &&
-                        gen.thumbnailImageId && (
-                          <div className="absolute top-2 right-2 md:opacity-0 md:group-hover:opacity-100 transition-opacity z-10">
+                      {/* Quick Actions - only for completed videos */}
+                      {gen.status === "completed" && gen.videoUrl && (
+                        <div className="absolute top-2 right-2 md:opacity-0 md:group-hover:opacity-100 transition-opacity z-10 flex gap-1">
+                          {/* Download */}
+                          <Button
+                            isIconOnly
+                            size="sm"
+                            variant="solid"
+                            className="bg-background/80 backdrop-blur-sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDownload(gen.id, `video-${gen.id}`);
+                            }}
+                          >
+                            <Download size={16} />
+                          </Button>
+                          {/* Put Back */}
+                          {onRestore && (
+                            <Button
+                              isIconOnly
+                              size="sm"
+                              variant="solid"
+                              className="bg-background/80 backdrop-blur-sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleRestore(gen);
+                              }}
+                            >
+                              <RotateCcw size={16} />
+                            </Button>
+                          )}
+                          {/* Add to Collection */}
+                          {gen.videoId && gen.thumbnailImageId && (
                             <Dropdown>
                               <DropdownTrigger>
                                 <Button
@@ -598,7 +625,7 @@ export default function VideoList({ refreshTrigger, onRestore }: VideoListProps)
                                   className="bg-background/80 backdrop-blur-sm"
                                   onClick={(e) => e.stopPropagation()}
                                 >
-                                  <MoreVertical size={16} />
+                                  <FolderPlus size={16} />
                                 </Button>
                               </DropdownTrigger>
                               <DropdownMenu
@@ -659,8 +686,9 @@ export default function VideoList({ refreshTrigger, onRestore }: VideoListProps)
                                 </DropdownSection>
                               </DropdownMenu>
                             </Dropdown>
-                          </div>
-                        )}
+                          )}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

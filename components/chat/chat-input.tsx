@@ -79,6 +79,8 @@ interface ChatInputProps {
 export interface ChatInputRef {
   /** Get the editor content as JSON (for draft saving) */
   getEditorJSON: () => JSONContent | null;
+  /** Insert plain text at the current cursor position (for voice transcription) */
+  insertText: (text: string) => void;
 }
 
 const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
@@ -120,6 +122,7 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
   // Expose methods via ref for draft saving
   useImperativeHandle(ref, () => ({
     getEditorJSON: () => mentionTextboxRef.current?.getJSON() || null,
+    insertText: (text: string) => mentionTextboxRef.current?.insertText(text),
   }), []);
 
   // Convert pending images to mention items for the textbox

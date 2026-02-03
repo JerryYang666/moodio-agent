@@ -301,6 +301,11 @@ export default function ChatInterface({
 
   // Voice recorder hook
   const handleTranscriptionComplete = useCallback((text: string) => {
+    // Insert the transcribed text into the rich text editor via ref
+    if (chatInputRef.current) {
+      chatInputRef.current.insertText(text);
+    }
+    // Also update the input state for consistency
     setInput((prev) => (prev ? `${prev} ${text}` : text));
   }, []);
 

@@ -345,6 +345,23 @@ export const MentionTextbox = forwardRef<MentionTextboxRef, MentionTextboxProps>
             .run();
         }
       },
+      insertText: (text: string) => {
+        if (editor) {
+          // If there's existing content, add a space before the new text
+          const hasContent = editor.getText().trim().length > 0;
+          const textToInsert = hasContent ? ` ${text}` : text;
+          editor
+            .chain()
+            .focus()
+            .command(({ tr, state }) => {
+              // Move cursor to end of document
+              tr.setSelection(state.selection.constructor.atEnd(state.doc));
+              return true;
+            })
+            .insertContent(textToInsert)
+            .run();
+        }
+      },
       focus: () => {
         editor?.commands.focus();
       },

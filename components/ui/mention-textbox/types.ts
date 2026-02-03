@@ -68,6 +68,8 @@ export interface MentionTextboxProps {
 export interface MentionTextboxRef {
   /** Insert a mention at the current cursor position */
   insertMention: (item: MentionItem) => void;
+  /** Insert plain text at the current cursor position (or append if no cursor) */
+  insertText: (text: string) => void;
   /** Focus the input */
   focus: () => void;
   /** Get the current mentions in the content */
