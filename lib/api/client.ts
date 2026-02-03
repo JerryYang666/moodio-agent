@@ -90,6 +90,16 @@ export const api = {
       body: body ? JSON.stringify(body) : undefined,
     }),
 
-  delete: <T = any>(url: string, options?: ApiClientOptions) =>
-    apiClient<T>(url, { ...options, method: "DELETE" }),
+  delete: <T = any>(url: string, body?: any, options?: ApiClientOptions) =>
+    apiClient<T>(url, {
+      ...options,
+      method: "DELETE",
+      headers: body
+        ? {
+            "Content-Type": "application/json",
+            ...options?.headers,
+          }
+        : options?.headers,
+      body: body ? JSON.stringify(body) : undefined,
+    }),
 };

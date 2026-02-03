@@ -31,7 +31,7 @@ import { User } from "@/hooks/use-auth";
 import { Pagination } from "@heroui/pagination";
 import { SearchIcon } from "@/components/icons";
 import { addToast } from "@heroui/toast";
-import { Bean } from "lucide-react";
+import { Bean, FlaskConical } from "lucide-react";
 
 interface InvitationCode {
   code: string;
@@ -39,14 +39,23 @@ interface InvitationCode {
   createdAt: string;
 }
 
+interface TestingGroup {
+  id: string;
+  name: string;
+  description: string | null;
+  userCount: number;
+}
+
 interface UserWithCredits extends User {
   credits: number;
+  testingGroups: string[];
 }
 
 export default function AdminPage() {
   const { user, loading: authLoading } = useAuth();
   const t = useTranslations("credits");
   const [users, setUsers] = useState<UserWithCredits[]>([]);
+  const [testingGroups, setTestingGroups] = useState<TestingGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedUser, setSelectedUser] = useState<UserWithCredits | null>(null);
 
@@ -85,6 +94,7 @@ export default function AdminPage() {
     firstName: "",
     lastName: "",
     roles: [] as string[],
+    testingGroups: [] as string[],
   });
   const [savingUser, setSavingUser] = useState(false);
 
@@ -102,6 +112,7 @@ export default function AdminPage() {
   useEffect(() => {
     if (user && user.roles.includes("admin")) {
       fetchUsers();
+      fetchTestingGroups();
     }
   }, [user]);
 
@@ -113,6 +124,15 @@ export default function AdminPage() {
       console.error("Failed to fetch users:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchTestingGroups = async () => {
+    try {
+      const data = await api.get("/api/admin/testing-groups");
+      setTestingGroups(data.groups);
+    } catch (error) {
+      console.error("Failed to fetch testing groups:", error);
     }
   };
 
@@ -215,6 +235,7 @@ export default function AdminPage() {
       firstName: userToEdit.firstName || "",
       lastName: userToEdit.lastName || "",
       roles: userToEdit.roles,
+      testingGroups: userToEdit.testingGroups || [],
     });
     onEditOpen();
   };
@@ -262,6 +283,7 @@ export default function AdminPage() {
         firstName: editFormData.firstName || null,
         lastName: editFormData.lastName || null,
         roles: editFormData.roles,
+        testingGroups: editFormData.testingGroups,
       });
       await fetchUsers();
       onEditClose();
@@ -280,6 +302,12 @@ export default function AdminPage() {
     } finally {
       setSavingUser(false);
     }
+  };
+
+  // Helper to get group name by ID
+  const getGroupName = (groupId: string) => {
+    const group = testingGroups.find((g) => g.id === groupId);
+    return group?.name || groupId.slice(0, 8);
   };
 
   if (authLoading) {
@@ -351,6 +379,7 @@ export default function AdminPage() {
               <TableHeader>
                 <TableColumn>USER</TableColumn>
                 <TableColumn>ROLES</TableColumn>
+                <TableColumn>GROUPS</TableColumn>
                 <TableColumn>CREDITS</TableColumn>
                 <TableColumn>PROVIDER</TableColumn>
                 <TableColumn>JOINED</TableColumn>
@@ -396,6 +425,25 @@ export default function AdminPage() {
                             {role}
                           </Chip>
                         ))}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-1">
+                        {item.testingGroups && item.testingGroups.length > 0 ? (
+                          item.testingGroups.map((groupId) => (
+                            <Chip
+                              key={groupId}
+                              size="sm"
+                              variant="flat"
+                              color="secondary"
+                              startContent={<FlaskConical size={12} />}
+                            >
+                              {getGroupName(groupId)}
+                            </Chip>
+                          ))
+                        ) : (
+                          <span className="text-default-400 text-sm">-</span>
+                        )}
                       </div>
                     </TableCell>
                     <TableCell>
@@ -591,6 +639,46 @@ export default function AdminPage() {
                   <SelectItem key="admin">Admin</SelectItem>
                   <SelectItem key="new_user">New User</SelectItem>
                 </Select>
+                <Select
+                  label="Testing Groups"
+                  placeholder="Select testing groups"
+                  selectionMode="multiple"
+                  selectedKeys={new Set(editFormData.testingGroups)}
+                  onSelectionChange={(keys) =>
+                    setEditFormData({
+                      ...editFormData,
+                      testingGroups: Array.from(keys) as string[],
+                    })
+                  }
+                >
+                  {testingGroups.map((group) => (
+                    <SelectItem key={group.id}>
+                      {group.name}
+                    </SelectItem>
+                  ))}
+                </Select>
+                {editFormData.testingGroups.length > 0 && (
+                  <div className="flex flex-wrap gap-2 -mt-2">
+                    {editFormData.testingGroups.map((groupId) => (
+                      <Chip
+                        key={groupId}
+                        size="sm"
+                        variant="flat"
+                        color="secondary"
+                        onClose={() =>
+                          setEditFormData({
+                            ...editFormData,
+                            testingGroups: editFormData.testingGroups.filter(
+                              (id) => id !== groupId
+                            ),
+                          })
+                        }
+                      >
+                        {getGroupName(groupId)}
+                      </Chip>
+                    ))}
+                  </div>
+                )}
               </ModalBody>
               <ModalFooter>
                 <Button variant="light" onPress={onClose}>

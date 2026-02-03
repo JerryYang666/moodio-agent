@@ -20,13 +20,14 @@ import {
   ModalFooter,
   useDisclosure,
 } from "@heroui/modal";
+import { Chip } from "@heroui/chip";
 import { api } from "@/lib/api/client";
 import { useAuth } from "@/hooks/use-auth";
 import { Spinner } from "@heroui/spinner";
 import { Pagination } from "@heroui/pagination";
 import { SearchIcon } from "@/components/icons";
 import { addToast } from "@heroui/toast";
-import { Users, Trash2, Edit2, Plus } from "lucide-react";
+import { Users, Trash2, Edit2, Plus, UserPlus, X } from "lucide-react";
 
 interface TestingGroup {
   id: string;
@@ -35,6 +36,24 @@ interface TestingGroup {
   userCount: number;
   createdAt: string;
   updatedAt: string;
+}
+
+interface LookupResult {
+  email: string;
+  found: boolean;
+  user?: {
+    id: string;
+    email: string;
+    firstName: string | null;
+    lastName: string | null;
+  };
+}
+
+interface GroupUser {
+  id: string;
+  email: string;
+  firstName: string | null;
+  lastName: string | null;
 }
 
 export default function TestingGroupsPage() {
@@ -70,6 +89,29 @@ export default function TestingGroupsPage() {
     onClose: onDeleteClose,
   } = useDisclosure();
   const [deleting, setDeleting] = useState(false);
+
+  // Add Users Modal State
+  const {
+    isOpen: isAddUsersOpen,
+    onOpen: onAddUsersOpen,
+    onOpenChange: onAddUsersOpenChange,
+    onClose: onAddUsersClose,
+  } = useDisclosure();
+  const [emailInput, setEmailInput] = useState("");
+  const [lookupResults, setLookupResults] = useState<LookupResult[]>([]);
+  const [lookingUp, setLookingUp] = useState(false);
+  const [addingUsers, setAddingUsers] = useState(false);
+
+  // View/Manage Users Modal State
+  const {
+    isOpen: isViewUsersOpen,
+    onOpen: onViewUsersOpen,
+    onOpenChange: onViewUsersOpenChange,
+    onClose: onViewUsersClose,
+  } = useDisclosure();
+  const [groupUsers, setGroupUsers] = useState<GroupUser[]>([]);
+  const [loadingGroupUsers, setLoadingGroupUsers] = useState(false);
+  const [removingUsers, setRemovingUsers] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (user && user.roles.includes("admin")) {
@@ -224,6 +266,163 @@ export default function TestingGroupsPage() {
     }
   };
 
+  // Add Users handlers
+  const handleOpenAddUsers = (group: TestingGroup) => {
+    setSelectedGroup(group);
+    setEmailInput("");
+    setLookupResults([]);
+    onAddUsersOpen();
+  };
+
+  const handleLookupEmails = async () => {
+    if (!emailInput.trim()) return;
+
+    // Parse emails from input (support newlines, commas, spaces)
+    const emails = emailInput
+      .split(/[\n,\s]+/)
+      .map((e) => e.trim().toLowerCase())
+      .filter((e) => e.length > 0 && e.includes("@"));
+
+    if (emails.length === 0) {
+      addToast({
+        title: "Error",
+        description: "No valid email addresses found",
+        color: "danger",
+      });
+      return;
+    }
+
+    setLookingUp(true);
+    try {
+      const data = await api.post("/api/admin/users/lookup", { emails });
+      setLookupResults(data.results);
+      
+      if (data.summary.notFound > 0) {
+        addToast({
+          title: "Some emails not found",
+          description: `${data.summary.found} found, ${data.summary.notFound} not found`,
+          color: "warning",
+        });
+      }
+    } catch (error) {
+      console.error("Failed to lookup emails:", error);
+      addToast({
+        title: "Error",
+        description: "Failed to lookup emails",
+        color: "danger",
+      });
+    } finally {
+      setLookingUp(false);
+    }
+  };
+
+  const handleRemoveLookupResult = (email: string) => {
+    setLookupResults((prev) => prev.filter((r) => r.email !== email));
+  };
+
+  const handleAddUsersToGroup = async () => {
+    if (!selectedGroup) return;
+
+    const userIds = lookupResults
+      .filter((r) => r.found && r.user)
+      .map((r) => r.user!.id);
+
+    if (userIds.length === 0) {
+      addToast({
+        title: "Error",
+        description: "No valid users to add",
+        color: "danger",
+      });
+      return;
+    }
+
+    setAddingUsers(true);
+    try {
+      const result = await api.post(
+        `/api/admin/testing-groups/${selectedGroup.id}/users`,
+        { userIds }
+      );
+      addToast({
+        title: "Success",
+        description: `Added ${result.addedCount} user(s)${result.alreadyInGroupCount > 0 ? `, ${result.alreadyInGroupCount} already in group` : ""}`,
+        color: "success",
+      });
+      await fetchGroups();
+      onAddUsersClose();
+    } catch (error) {
+      console.error("Failed to add users to group:", error);
+      addToast({
+        title: "Error",
+        description: "Failed to add users to group",
+        color: "danger",
+      });
+    } finally {
+      setAddingUsers(false);
+    }
+  };
+
+  // View/Manage Users handlers
+  const handleViewUsers = async (group: TestingGroup) => {
+    setSelectedGroup(group);
+    setGroupUsers([]);
+    setLoadingGroupUsers(true);
+    onViewUsersOpen();
+
+    try {
+      const data = await api.get(`/api/admin/testing-groups/${group.id}/users`);
+      setGroupUsers(data.users);
+    } catch (error) {
+      console.error("Failed to fetch group users:", error);
+      addToast({
+        title: "Error",
+        description: "Failed to fetch group users",
+        color: "danger",
+      });
+    } finally {
+      setLoadingGroupUsers(false);
+    }
+  };
+
+  const handleRemoveUserFromGroup = async (userId: string) => {
+    if (!selectedGroup) return;
+
+    setRemovingUsers((prev) => new Set(prev).add(userId));
+    try {
+      await api.delete(`/api/admin/testing-groups/${selectedGroup.id}/users`, {
+        userIds: [userId],
+      });
+      setGroupUsers((prev) => prev.filter((u) => u.id !== userId));
+      await fetchGroups();
+      addToast({
+        title: "Success",
+        description: "User removed from group",
+        color: "success",
+      });
+    } catch (error) {
+      console.error("Failed to remove user from group:", error);
+      addToast({
+        title: "Error",
+        description: "Failed to remove user from group",
+        color: "danger",
+      });
+    } finally {
+      setRemovingUsers((prev) => {
+        const next = new Set(prev);
+        next.delete(userId);
+        return next;
+      });
+    }
+  };
+
+  // Helper to get user display name
+  const getUserDisplayName = (user: GroupUser | LookupResult["user"]) => {
+    if (!user) return "Unknown";
+    if (user.firstName && user.lastName) {
+      return `${user.firstName} ${user.lastName}`;
+    }
+    return user.firstName || user.email;
+  };
+
   if (authLoading) {
     return <Spinner size="lg" className="flex justify-center mt-10" />;
   }
@@ -302,10 +501,15 @@ export default function TestingGroupsPage() {
                       </span>
                     </TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-1">
+                      <Button
+                        size="sm"
+                        variant="light"
+                        className="gap-1"
+                        onPress={() => handleViewUsers(item)}
+                      >
                         <Users size={16} className="text-default-400" />
                         <span>{item.userCount}</span>
-                      </div>
+                      </Button>
                     </TableCell>
                     <TableCell>
                       {new Date(item.createdAt).toLocaleDateString()}
@@ -315,8 +519,19 @@ export default function TestingGroupsPage() {
                         <Button
                           size="sm"
                           variant="flat"
+                          color="primary"
+                          isIconOnly
+                          onPress={() => handleOpenAddUsers(item)}
+                          title="Add users"
+                        >
+                          <UserPlus size={16} />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="flat"
                           isIconOnly
                           onPress={() => handleEdit(item)}
+                          title="Edit group"
                         >
                           <Edit2 size={16} />
                         </Button>
@@ -326,6 +541,7 @@ export default function TestingGroupsPage() {
                           color="danger"
                           isIconOnly
                           onPress={() => handleDeleteClick(item)}
+                          title="Delete group"
                         >
                           <Trash2 size={16} />
                         </Button>
@@ -416,6 +632,160 @@ export default function TestingGroupsPage() {
                   isLoading={deleting}
                 >
                   Delete
+                </Button>
+              </ModalFooter>
+            </>
+          )}
+        </ModalContent>
+      </Modal>
+
+      {/* Add Users Modal */}
+      <Modal
+        isOpen={isAddUsersOpen}
+        onOpenChange={onAddUsersOpenChange}
+        size="lg"
+        scrollBehavior="inside"
+      >
+        <ModalContent>
+          {(onClose) => (
+            <>
+              <ModalHeader>
+                Add Users to {selectedGroup?.name}
+              </ModalHeader>
+              <ModalBody>
+                <p className="text-sm text-default-500 mb-2">
+                  Paste email addresses separated by newlines, commas, or spaces.
+                </p>
+                <Textarea
+                  label="Email addresses"
+                  placeholder="user1@example.com, user2@example.com&#10;user3@example.com"
+                  value={emailInput}
+                  onValueChange={setEmailInput}
+                  minRows={3}
+                  maxRows={6}
+                />
+                <Button
+                  color="primary"
+                  variant="flat"
+                  onPress={handleLookupEmails}
+                  isLoading={lookingUp}
+                  isDisabled={!emailInput.trim()}
+                >
+                  Lookup Users
+                </Button>
+
+                {lookupResults.length > 0 && (
+                  <div className="mt-4">
+                    <p className="text-sm font-medium mb-2">
+                      Found Users ({lookupResults.filter((r) => r.found).length} of{" "}
+                      {lookupResults.length})
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {lookupResults.map((result) => (
+                        <Chip
+                          key={result.email}
+                          size="sm"
+                          variant="flat"
+                          color={result.found ? "success" : "danger"}
+                          onClose={() => handleRemoveLookupResult(result.email)}
+                        >
+                          {result.found && result.user
+                            ? getUserDisplayName(result.user)
+                            : result.email}
+                          {!result.found && " (not found)"}
+                        </Chip>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </ModalBody>
+              <ModalFooter>
+                <Button variant="light" onPress={onClose}>
+                  Cancel
+                </Button>
+                <Button
+                  color="primary"
+                  onPress={handleAddUsersToGroup}
+                  isLoading={addingUsers}
+                  isDisabled={
+                    lookupResults.filter((r) => r.found).length === 0
+                  }
+                >
+                  Add {lookupResults.filter((r) => r.found).length} User(s)
+                </Button>
+              </ModalFooter>
+            </>
+          )}
+        </ModalContent>
+      </Modal>
+
+      {/* View/Manage Users Modal */}
+      <Modal
+        isOpen={isViewUsersOpen}
+        onOpenChange={onViewUsersOpenChange}
+        size="lg"
+        scrollBehavior="inside"
+      >
+        <ModalContent>
+          {(onClose) => (
+            <>
+              <ModalHeader className="flex justify-between items-center">
+                <span>Users in {selectedGroup?.name}</span>
+                <Button
+                  size="sm"
+                  color="primary"
+                  variant="flat"
+                  startContent={<UserPlus size={14} />}
+                  onPress={() => {
+                    onViewUsersClose();
+                    if (selectedGroup) handleOpenAddUsers(selectedGroup);
+                  }}
+                >
+                  Add Users
+                </Button>
+              </ModalHeader>
+              <ModalBody>
+                {loadingGroupUsers ? (
+                  <div className="flex justify-center py-8">
+                    <Spinner />
+                  </div>
+                ) : groupUsers.length === 0 ? (
+                  <p className="text-center text-default-500 py-8">
+                    No users in this group yet.
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {groupUsers.map((groupUser) => (
+                      <div
+                        key={groupUser.id}
+                        className="flex items-center justify-between p-3 bg-default-100 rounded-lg"
+                      >
+                        <div>
+                          <p className="font-medium">
+                            {getUserDisplayName(groupUser)}
+                          </p>
+                          <p className="text-sm text-default-500">
+                            {groupUser.email}
+                          </p>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="light"
+                          color="danger"
+                          isIconOnly
+                          isLoading={removingUsers.has(groupUser.id)}
+                          onPress={() => handleRemoveUserFromGroup(groupUser.id)}
+                        >
+                          <X size={16} />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </ModalBody>
+              <ModalFooter>
+                <Button variant="light" onPress={onClose}>
+                  Close
                 </Button>
               </ModalFooter>
             </>
