@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useTranslations } from "next-intl";
 import { Card, CardBody, CardHeader } from "@heroui/card";
 import { Spinner } from "@heroui/spinner";
@@ -46,6 +46,69 @@ import { getVideoModel } from "@/lib/video/models";
 import { useCollections } from "@/hooks/use-collections";
 import type { Collection } from "@/components/collections-provider";
 import VideoPlayer from "./video-player";
+
+// Fake progress bar component for video generation
+// Animates to 97% over ~200 seconds at even speed, never reaches 100% until completed
+interface FakeProgressBarProps {
+  status: "pending" | "processing" | "completed" | "failed";
+  createdAt: string;
+}
+
+const PROGRESS_DURATION_MS = 200000; // 200 seconds to reach 97%
+const MAX_PROGRESS = 97; // Never exceed 97% until completed
+
+function FakeProgressBar({ status, createdAt }: FakeProgressBarProps) {
+  const [progress, setProgress] = useState(0);
+
+  // Calculate initial progress based on how long ago the generation started
+  const initialProgress = useMemo(() => {
+    if (status === "completed") return 100;
+    if (status === "failed") return 0;
+    
+    const elapsed = Date.now() - new Date(createdAt).getTime();
+    // Linear progress: elapsed / duration * max
+    const rawProgress = (elapsed / PROGRESS_DURATION_MS) * MAX_PROGRESS;
+    return Math.min(rawProgress, MAX_PROGRESS);
+  }, [status, createdAt]);
+
+  useEffect(() => {
+    // Set initial progress
+    setProgress(initialProgress);
+
+    // If completed or failed, no need to animate
+    if (status === "completed" || status === "failed") {
+      return;
+    }
+
+    // Animate progress over time with even/linear speed
+    const animate = () => {
+      const totalElapsed = Date.now() - new Date(createdAt).getTime();
+      
+      // Linear progress: elapsed / duration * max
+      const newProgress = (totalElapsed / PROGRESS_DURATION_MS) * MAX_PROGRESS;
+      setProgress(Math.min(newProgress, MAX_PROGRESS));
+    };
+
+    const interval = setInterval(animate, 500); // Update every 500ms
+    return () => clearInterval(interval);
+  }, [status, createdAt, initialProgress]);
+
+  // Don't show progress bar for completed or failed videos
+  if (status === "completed" || status === "failed") {
+    return null;
+  }
+
+  return (
+    <div className="h-1 w-full bg-default-200 overflow-hidden">
+      <motion.div
+        className="h-full bg-primary"
+        initial={{ width: `${initialProgress}%` }}
+        animate={{ width: `${progress}%` }}
+        transition={{ duration: 0.5, ease: "easeOut" }}
+      />
+    </div>
+  );
+}
 
 interface VideoGeneration {
   id: string;
@@ -565,6 +628,9 @@ export default function VideoList({ refreshTrigger, onRestore }: VideoListProps)
                             )}
                           </div>
 
+                          {/* Progress Bar - between thumbnail and info */}
+                          <FakeProgressBar status={gen.status} createdAt={gen.createdAt} />
+
                           {/* Info */}
                           <div className="p-2 sm:p-3">
                             <div className="flex items-center justify-between mb-1 gap-1">
@@ -856,6 +922,9 @@ export default function VideoList({ refreshTrigger, onRestore }: VideoListProps)
                         </div>
                       )}
                     </div>
+
+                    {/* Progress Bar - between thumbnail and info */}
+                    <FakeProgressBar status={video.status} createdAt={video.createdAt} />
 
                     {/* Info */}
                     <div className="p-2 sm:p-3">
