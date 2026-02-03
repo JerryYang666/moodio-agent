@@ -9,6 +9,7 @@ import {
   useState,
 } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
+import { Selection } from "@tiptap/pm/state";
 import StarterKit from "@tiptap/starter-kit";
 import Mention from "@tiptap/extension-mention";
 import Placeholder from "@tiptap/extension-placeholder";
@@ -355,7 +356,7 @@ export const MentionTextbox = forwardRef<MentionTextboxRef, MentionTextboxProps>
             .focus()
             .command(({ tr, state }) => {
               // Move cursor to end of document
-              tr.setSelection(state.selection.constructor.atEnd(state.doc));
+              tr.setSelection(Selection.atEnd(state.doc));
               return true;
             })
             .insertContent(textToInsert)
