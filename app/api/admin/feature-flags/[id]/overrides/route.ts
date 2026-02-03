@@ -3,7 +3,7 @@ import { getAccessToken } from "@/lib/auth/cookies";
 import { verifyAccessToken } from "@/lib/auth/jwt";
 import { db } from "@/lib/db";
 import { featureFlags, groupFlagOverrides, testingGroups } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 
 export async function GET(
   request: NextRequest,
@@ -72,11 +72,17 @@ export async function POST(
 
     const { id: flagId } = await params;
     const body = await request.json();
-    const { groupId, value } = body;
+    const { groupId, groupIds, value } = body;
+
+    // Support both single groupId and batch groupIds
+    const targetGroupIds: string[] = groupIds || (groupId ? [groupId] : []);
 
     // Validate inputs
-    if (!groupId) {
-      return NextResponse.json({ error: "groupId is required" }, { status: 400 });
+    if (targetGroupIds.length === 0) {
+      return NextResponse.json(
+        { error: "groupId or groupIds is required" },
+        { status: 400 }
+      );
     }
     if (value === undefined || value === null) {
       return NextResponse.json({ error: "value is required" }, { status: 400 });
@@ -92,14 +98,19 @@ export async function POST(
       return NextResponse.json({ error: "Flag not found" }, { status: 404 });
     }
 
-    // Verify group exists
-    const [group] = await db
-      .select()
+    // Verify all groups exist
+    const existingGroups = await db
+      .select({ id: testingGroups.id, name: testingGroups.name })
       .from(testingGroups)
-      .where(eq(testingGroups.id, groupId));
+      .where(inArray(testingGroups.id, targetGroupIds));
 
-    if (!group) {
-      return NextResponse.json({ error: "Group not found" }, { status: 404 });
+    if (existingGroups.length !== targetGroupIds.length) {
+      const foundIds = new Set(existingGroups.map((g) => g.id));
+      const missingIds = targetGroupIds.filter((id) => !foundIds.has(id));
+      return NextResponse.json(
+        { error: `Groups not found: ${missingIds.join(", ")}` },
+        { status: 404 }
+      );
     }
 
     // Validate value matches flag type
@@ -117,21 +128,33 @@ export async function POST(
       );
     }
 
-    const [newOverride] = await db
+    // Create group name lookup
+    const groupNameMap = new Map(existingGroups.map((g) => [g.id, g.name]));
+
+    // Insert all overrides in a single transaction
+    const newOverrides = await db
       .insert(groupFlagOverrides)
-      .values({
-        flagId,
-        groupId,
-        value: stringValue,
-      })
+      .values(
+        targetGroupIds.map((gid) => ({
+          flagId,
+          groupId: gid,
+          value: stringValue,
+        }))
+      )
       .returning();
 
-    return NextResponse.json({
-      override: {
-        ...newOverride,
-        groupName: group.name,
-      },
-    });
+    // Return with group names
+    const overridesWithNames = newOverrides.map((override) => ({
+      ...override,
+      groupName: groupNameMap.get(override.groupId) || "Unknown",
+    }));
+
+    // Return single override for backward compatibility, or array for batch
+    if (groupIds) {
+      return NextResponse.json({ overrides: overridesWithNames });
+    } else {
+      return NextResponse.json({ override: overridesWithNames[0] });
+    }
   } catch (error: unknown) {
     console.error("Error creating flag override:", error);
     if (
@@ -139,7 +162,7 @@ export async function POST(
       error.message.includes("unique constraint")
     ) {
       return NextResponse.json(
-        { error: "An override for this group already exists" },
+        { error: "An override for one or more groups already exists" },
         { status: 409 }
       );
     }

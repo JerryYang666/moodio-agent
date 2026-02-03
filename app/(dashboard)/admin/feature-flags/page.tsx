@@ -109,7 +109,7 @@ export default function FeatureFlagsPage() {
     onClose: onOverrideClose,
   } = useDisclosure();
   const [overrideFormData, setOverrideFormData] = useState({
-    groupId: "",
+    groupIds: [] as string[],
     value: "",
   });
   const [savingOverride, setSavingOverride] = useState(false);
@@ -315,7 +315,7 @@ export default function FeatureFlagsPage() {
     setSelectedFlag(flag);
     setSelectedOverride(null);
     setOverrideFormData({
-      groupId: "",
+      groupIds: [],
       value: flag.valueType === "boolean" ? "true" : "",
     });
     onOverrideOpen();
@@ -325,17 +325,17 @@ export default function FeatureFlagsPage() {
     setSelectedFlag(flag);
     setSelectedOverride(override);
     setOverrideFormData({
-      groupId: override.groupId,
+      groupIds: [override.groupId],
       value: override.value,
     });
     onOverrideOpen();
   };
 
   const handleSaveOverride = async () => {
-    if (!selectedFlag || !overrideFormData.groupId) {
+    if (!selectedFlag || overrideFormData.groupIds.length === 0) {
       addToast({
         title: "Error",
-        description: "Please select a group",
+        description: "Please select at least one group",
         color: "danger",
       });
       return;
@@ -344,6 +344,7 @@ export default function FeatureFlagsPage() {
     setSavingOverride(true);
     try {
       if (selectedOverride) {
+        // Edit mode - single group
         await api.patch(
           `/api/admin/feature-flags/${selectedFlag.id}/overrides/${selectedOverride.id}`,
           { value: overrideFormData.value }
@@ -354,13 +355,14 @@ export default function FeatureFlagsPage() {
           color: "success",
         });
       } else {
+        // Create mode - supports multiple groups
         await api.post(`/api/admin/feature-flags/${selectedFlag.id}/overrides`, {
-          groupId: overrideFormData.groupId,
+          groupIds: overrideFormData.groupIds,
           value: overrideFormData.value,
         });
         addToast({
           title: "Success",
-          description: "Override created successfully",
+          description: `Override${overrideFormData.groupIds.length > 1 ? "s" : ""} created successfully`,
           color: "success",
         });
       }
@@ -780,12 +782,14 @@ export default function FeatureFlagsPage() {
                   </div>
                 )}
                 <Select
-                  label="Testing Group"
-                  selectedKeys={overrideFormData.groupId ? [overrideFormData.groupId] : []}
+                  label={selectedOverride ? "Testing Group" : "Testing Groups"}
+                  placeholder={selectedOverride ? "Select a group" : "Select one or more groups"}
+                  selectionMode={selectedOverride ? "single" : "multiple"}
+                  selectedKeys={new Set(overrideFormData.groupIds)}
                   onSelectionChange={(keys) =>
                     setOverrideFormData({
                       ...overrideFormData,
-                      groupId: Array.from(keys)[0] as string,
+                      groupIds: Array.from(keys) as string[],
                     })
                   }
                   isDisabled={!!selectedOverride}
@@ -796,6 +800,26 @@ export default function FeatureFlagsPage() {
                     </SelectItem>
                   ))}
                 </Select>
+                {overrideFormData.groupIds.length > 0 && (
+                  <div className="flex flex-wrap gap-2 -mt-2">
+                    {overrideFormData.groupIds.map((groupId) => (
+                      <Chip
+                        key={groupId}
+                        size="sm"
+                        variant="flat"
+                        color="primary"
+                        onClose={selectedOverride ? undefined : () =>
+                          setOverrideFormData({
+                            ...overrideFormData,
+                            groupIds: overrideFormData.groupIds.filter((id) => id !== groupId),
+                          })
+                        }
+                      >
+                        {groups.find((g) => g.id === groupId)?.name || "Unknown group"}
+                      </Chip>
+                    ))}
+                  </div>
+                )}
                 {selectedFlag?.valueType === "boolean" ? (
                   <Select
                     label="Override Value"
@@ -833,9 +857,9 @@ export default function FeatureFlagsPage() {
                   color="primary"
                   onPress={handleSaveOverride}
                   isLoading={savingOverride}
-                  isDisabled={!overrideFormData.groupId || !overrideFormData.value}
+                  isDisabled={overrideFormData.groupIds.length === 0 || !overrideFormData.value}
                 >
-                  {selectedOverride ? "Save" : "Add Override"}
+                  {selectedOverride ? "Save" : `Add Override${overrideFormData.groupIds.length > 1 ? "s" : ""}`}
                 </Button>
               </ModalFooter>
             </>
