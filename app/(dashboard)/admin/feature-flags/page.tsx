@@ -33,7 +33,8 @@ import { Spinner } from "@heroui/spinner";
 import { Pagination } from "@heroui/pagination";
 import { SearchIcon } from "@/components/icons";
 import { addToast } from "@heroui/toast";
-import { Trash2, Edit2, Plus, Settings2 } from "lucide-react";
+import { Trash2, Edit2, Plus, Settings2, Info } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 interface FlagOverride {
   id: string;
@@ -66,6 +67,8 @@ interface TestingGroup {
 
 export default function FeatureFlagsPage() {
   const { user, loading: authLoading } = useAuth();
+  const t = useTranslations("admin.featureFlags");
+  const tCommon = useTranslations("common");
   const [flags, setFlags] = useState<FeatureFlag[]>([]);
   const [groups, setGroups] = useState<TestingGroup[]>([]);
   const [loading, setLoading] = useState(true);
@@ -129,8 +132,8 @@ export default function FeatureFlagsPage() {
     } catch (error) {
       console.error("Failed to fetch feature flags:", error);
       addToast({
-        title: "Error",
-        description: "Failed to fetch feature flags",
+        title: t("toastError"),
+        description: t("fetchError"),
         color: "danger",
       });
     } finally {
@@ -210,8 +213,8 @@ export default function FeatureFlagsPage() {
   const handleSave = async () => {
     if (!flagFormData.key.trim()) {
       addToast({
-        title: "Error",
-        description: "Key is required",
+        title: t("toastError"),
+        description: t("keyRequired"),
         color: "danger",
       });
       return;
@@ -227,8 +230,8 @@ export default function FeatureFlagsPage() {
           description: flagFormData.description.trim() || null,
         });
         addToast({
-          title: "Success",
-          description: "Feature flag created successfully",
+          title: t("toastSuccess"),
+          description: t("createSuccess"),
           color: "success",
         });
       } else if (selectedFlag) {
@@ -239,8 +242,8 @@ export default function FeatureFlagsPage() {
           description: flagFormData.description.trim() || null,
         });
         addToast({
-          title: "Success",
-          description: "Feature flag updated successfully",
+          title: t("toastSuccess"),
+          description: t("updateSuccess"),
           color: "success",
         });
       }
@@ -249,9 +252,9 @@ export default function FeatureFlagsPage() {
     } catch (error) {
       console.error("Failed to save feature flag:", error);
       addToast({
-        title: "Error",
+        title: t("toastError"),
         description:
-          error instanceof Error ? error.message : "Failed to save feature flag",
+          error instanceof Error ? error.message : t("saveError"),
         color: "danger",
       });
     } finally {
@@ -266,15 +269,15 @@ export default function FeatureFlagsPage() {
       });
       await fetchFlags();
       addToast({
-        title: "Success",
-        description: `Flag ${flag.enabled ? "disabled" : "enabled"} successfully`,
+        title: t("toastSuccess"),
+        description: flag.enabled ? t("flagDisabled") : t("flagEnabled"),
         color: "success",
       });
     } catch (error) {
       console.error("Failed to toggle flag:", error);
       addToast({
-        title: "Error",
-        description: "Failed to toggle flag",
+        title: t("toastError"),
+        description: t("toggleError"),
         color: "danger",
       });
     }
@@ -292,8 +295,8 @@ export default function FeatureFlagsPage() {
     try {
       await api.delete(`/api/admin/feature-flags/${selectedFlag.id}`);
       addToast({
-        title: "Success",
-        description: "Feature flag deleted successfully",
+        title: t("toastSuccess"),
+        description: t("deleteSuccess"),
         color: "success",
       });
       await fetchFlags();
@@ -301,8 +304,8 @@ export default function FeatureFlagsPage() {
     } catch (error) {
       console.error("Failed to delete feature flag:", error);
       addToast({
-        title: "Error",
-        description: "Failed to delete feature flag",
+        title: t("toastError"),
+        description: t("deleteError"),
         color: "danger",
       });
     } finally {
@@ -334,8 +337,8 @@ export default function FeatureFlagsPage() {
   const handleSaveOverride = async () => {
     if (!selectedFlag || overrideFormData.groupIds.length === 0) {
       addToast({
-        title: "Error",
-        description: "Please select at least one group",
+        title: t("toastError"),
+        description: t("selectGroupError"),
         color: "danger",
       });
       return;
@@ -350,8 +353,8 @@ export default function FeatureFlagsPage() {
           { value: overrideFormData.value }
         );
         addToast({
-          title: "Success",
-          description: "Override updated successfully",
+          title: t("toastSuccess"),
+          description: t("overrideUpdateSuccess"),
           color: "success",
         });
       } else {
@@ -361,8 +364,8 @@ export default function FeatureFlagsPage() {
           value: overrideFormData.value,
         });
         addToast({
-          title: "Success",
-          description: `Override${overrideFormData.groupIds.length > 1 ? "s" : ""} created successfully`,
+          title: t("toastSuccess"),
+          description: overrideFormData.groupIds.length > 1 ? t("overridesCreateSuccess") : t("overrideCreateSuccess"),
           color: "success",
         });
       }
@@ -371,9 +374,9 @@ export default function FeatureFlagsPage() {
     } catch (error) {
       console.error("Failed to save override:", error);
       addToast({
-        title: "Error",
+        title: t("toastError"),
         description:
-          error instanceof Error ? error.message : "Failed to save override",
+          error instanceof Error ? error.message : t("overrideSaveError"),
         color: "danger",
       });
     } finally {
@@ -387,16 +390,16 @@ export default function FeatureFlagsPage() {
         `/api/admin/feature-flags/${flag.id}/overrides/${override.id}`
       );
       addToast({
-        title: "Success",
-        description: "Override deleted successfully",
+        title: t("toastSuccess"),
+        description: t("overrideDeleteSuccess"),
         color: "success",
       });
       await fetchFlags();
     } catch (error) {
       console.error("Failed to delete override:", error);
       addToast({
-        title: "Error",
-        description: "Failed to delete override",
+        title: t("toastError"),
+        description: t("overrideDeleteError"),
         color: "danger",
       });
     }
@@ -442,19 +445,53 @@ export default function FeatureFlagsPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 sm:gap-0">
-        <h1 className="text-2xl font-bold">Feature Flags</h1>
+        <h1 className="text-2xl font-bold">{t("pageTitle")}</h1>
         <Button
           color="primary"
           startContent={<Plus size={16} />}
           onPress={handleCreate}
         >
-          Create Flag
+          {t("createFlag")}
         </Button>
       </div>
 
+      {/* Important Note Card */}
+      <Card className="bg-warning-50 dark:bg-warning-900/20 border border-warning-200 dark:border-warning-800">
+        <CardBody className="gap-3">
+          <div className="flex items-center gap-2 text-warning-700 dark:text-warning-400">
+            <Info size={20} />
+            <span className="font-semibold">{t("importantNote")}</span>
+          </div>
+          <p className="text-sm text-warning-700 dark:text-warning-300">
+            {t("noteExplanation")}
+          </p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="p-3 bg-white/50 dark:bg-black/20 rounded-lg">
+              <p className="font-medium text-sm text-warning-800 dark:text-warning-200 mb-1">
+                {t("noteValueTitle")}
+              </p>
+              <p className="text-xs text-warning-700 dark:text-warning-300">
+                {t("noteValueDesc")}
+              </p>
+            </div>
+            <div className="p-3 bg-white/50 dark:bg-black/20 rounded-lg">
+              <p className="font-medium text-sm text-warning-800 dark:text-warning-200 mb-1">
+                {t("noteEnabledTitle")}
+              </p>
+              <p className="text-xs text-warning-700 dark:text-warning-300">
+                {t("noteEnabledDesc")}
+              </p>
+            </div>
+          </div>
+          <p className="text-xs text-warning-600 dark:text-warning-400 italic">
+            {t("noteSummary")}
+          </p>
+        </CardBody>
+      </Card>
+
       <Card>
         <CardHeader>
-          <h2 className="text-lg font-semibold">Manage Feature Flags</h2>
+          <h2 className="text-lg font-semibold">{t("manageFlags")}</h2>
         </CardHeader>
         <CardBody>
           <div className="flex flex-col gap-4">
@@ -462,7 +499,7 @@ export default function FeatureFlagsPage() {
               <Input
                 isClearable
                 className="w-full sm:max-w-[44%]"
-                placeholder="Search by key or description..."
+                placeholder={t("searchPlaceholder")}
                 startContent={<SearchIcon />}
                 value={filterValue}
                 onClear={() => onClear()}
@@ -470,7 +507,7 @@ export default function FeatureFlagsPage() {
               />
             </div>
             <Table
-              aria-label="Feature flags table"
+              aria-label={t("tableAriaLabel")}
               bottomContent={
                 pages > 0 ? (
                   <div className="flex w-full justify-center">
@@ -488,15 +525,15 @@ export default function FeatureFlagsPage() {
               }
             >
               <TableHeader>
-                <TableColumn>KEY</TableColumn>
-                <TableColumn>TYPE</TableColumn>
-                <TableColumn>DEFAULT</TableColumn>
-                <TableColumn>ENABLED</TableColumn>
-                <TableColumn>OVERRIDES</TableColumn>
-                <TableColumn>ACTIONS</TableColumn>
+                <TableColumn>{t("columnKey")}</TableColumn>
+                <TableColumn>{t("columnType")}</TableColumn>
+                <TableColumn>{t("columnDefault")}</TableColumn>
+                <TableColumn>{t("columnEnabled")}</TableColumn>
+                <TableColumn>{t("columnOverrides")}</TableColumn>
+                <TableColumn>{t("columnActions")}</TableColumn>
               </TableHeader>
               <TableBody
-                emptyContent={loading ? <Spinner /> : "No feature flags found"}
+                emptyContent={loading ? <Spinner /> : t("noFlagsFound")}
                 items={items}
               >
                 {(item) => (
@@ -540,7 +577,7 @@ export default function FeatureFlagsPage() {
                             aria-label="Overrides"
                             title={
                               <span className="text-sm">
-                                {item.overrides.length} override(s)
+                                {t("overridesCount", { count: item.overrides.length })}
                               </span>
                             }
                           >
@@ -587,7 +624,7 @@ export default function FeatureFlagsPage() {
                                 onPress={() => handleAddOverride(item)}
                                 className="w-full"
                               >
-                                Add Override
+                                {t("addOverride")}
                               </Button>
                             </div>
                           </AccordionItem>
@@ -599,7 +636,7 @@ export default function FeatureFlagsPage() {
                           startContent={<Settings2 size={14} />}
                           onPress={() => handleAddOverride(item)}
                         >
-                          Add Override
+                          {t("addOverride")}
                         </Button>
                       )}
                     </TableCell>
@@ -638,22 +675,22 @@ export default function FeatureFlagsPage() {
           {(onClose) => (
             <>
               <ModalHeader>
-                {isCreating ? "Create Feature Flag" : "Edit Feature Flag"}
+                {isCreating ? t("createFlagModal") : t("editFlagModal")}
               </ModalHeader>
               <ModalBody>
                 <Input
-                  label="Key"
-                  placeholder="e.g., dark_mode"
+                  label={t("keyLabel")}
+                  placeholder={t("keyPlaceholder")}
                   value={flagFormData.key}
                   onValueChange={(v) =>
                     setFlagFormData({ ...flagFormData, key: v.toLowerCase() })
                   }
                   maxLength={16}
                   isRequired
-                  description="Lowercase letters, numbers, and underscores only (max 16 chars)"
+                  description={t("keyDescription")}
                 />
                 <Select
-                  label="Value Type"
+                  label={t("valueTypeLabel")}
                   selectedKeys={[flagFormData.valueType]}
                   onSelectionChange={(keys) => {
                     const type = Array.from(keys)[0] as "boolean" | "number" | "string";
@@ -664,13 +701,13 @@ export default function FeatureFlagsPage() {
                     });
                   }}
                 >
-                  <SelectItem key="boolean">Boolean</SelectItem>
-                  <SelectItem key="number">Number</SelectItem>
-                  <SelectItem key="string">String</SelectItem>
+                  <SelectItem key="boolean">{t("valueTypeBoolean")}</SelectItem>
+                  <SelectItem key="number">{t("valueTypeNumber")}</SelectItem>
+                  <SelectItem key="string">{t("valueTypeString")}</SelectItem>
                 </Select>
                 {flagFormData.valueType === "boolean" ? (
                   <Select
-                    label="Default Value"
+                    label={t("defaultValueLabel")}
                     selectedKeys={[flagFormData.defaultValue]}
                     onSelectionChange={(keys) =>
                       setFlagFormData({
@@ -684,9 +721,9 @@ export default function FeatureFlagsPage() {
                   </Select>
                 ) : (
                   <Input
-                    label="Default Value"
+                    label={t("defaultValueLabel")}
                     placeholder={
-                      flagFormData.valueType === "number" ? "e.g., 100" : "e.g., light"
+                      flagFormData.valueType === "number" ? t("defaultValueNumberPlaceholder") : t("defaultValueStringPlaceholder")
                     }
                     type={flagFormData.valueType === "number" ? "number" : "text"}
                     value={flagFormData.defaultValue}
@@ -697,8 +734,8 @@ export default function FeatureFlagsPage() {
                   />
                 )}
                 <Textarea
-                  label="Description"
-                  placeholder="Describe what this flag controls..."
+                  label={t("descriptionLabel")}
+                  placeholder={t("descriptionPlaceholder")}
                   value={flagFormData.description}
                   onValueChange={(v) =>
                     setFlagFormData({ ...flagFormData, description: v })
@@ -708,7 +745,7 @@ export default function FeatureFlagsPage() {
               </ModalBody>
               <ModalFooter>
                 <Button variant="light" onPress={onClose}>
-                  Cancel
+                  {tCommon("cancel")}
                 </Button>
                 <Button
                   color="primary"
@@ -716,7 +753,7 @@ export default function FeatureFlagsPage() {
                   isLoading={saving}
                   isDisabled={!flagFormData.key.trim() || !flagFormData.defaultValue}
                 >
-                  {isCreating ? "Create" : "Save Changes"}
+                  {isCreating ? tCommon("create") : tCommon("save")}
                 </Button>
               </ModalFooter>
             </>
@@ -729,32 +766,31 @@ export default function FeatureFlagsPage() {
         <ModalContent>
           {(onClose) => (
             <>
-              <ModalHeader>Delete Feature Flag</ModalHeader>
+              <ModalHeader>{t("deleteFlagModal")}</ModalHeader>
               <ModalBody>
                 <p>
-                  Are you sure you want to delete the feature flag{" "}
+                  {t("deleteConfirm")}{" "}
                   <strong className="font-mono">{selectedFlag?.key}</strong>?
                 </p>
                 {selectedFlag && selectedFlag.overrides.length > 0 && (
                   <p className="text-warning text-sm mt-2">
-                    This flag has {selectedFlag.overrides.length} override(s) that
-                    will also be deleted.
+                    {t("deleteOverridesWarning", { count: selectedFlag.overrides.length })}
                   </p>
                 )}
                 <p className="text-danger text-sm mt-2">
-                  This action cannot be undone.
+                  {t("deleteCannotUndo")}
                 </p>
               </ModalBody>
               <ModalFooter>
                 <Button variant="light" onPress={onClose}>
-                  Cancel
+                  {tCommon("cancel")}
                 </Button>
                 <Button
                   color="danger"
                   onPress={handleDelete}
                   isLoading={deleting}
                 >
-                  Delete
+                  {tCommon("delete")}
                 </Button>
               </ModalFooter>
             </>
@@ -768,22 +804,21 @@ export default function FeatureFlagsPage() {
           {(onClose) => (
             <>
               <ModalHeader>
-                {selectedOverride ? "Edit Override" : "Add Override"}
+                {selectedOverride ? t("editOverrideModal") : t("addOverrideModal")}
               </ModalHeader>
               <ModalBody>
                 {selectedFlag && (
                   <div className="mb-4 p-3 bg-default-100 rounded-lg">
-                    <p className="text-sm text-default-500">Flag</p>
+                    <p className="text-sm text-default-500">{t("flagLabel")}</p>
                     <p className="font-mono font-medium">{selectedFlag.key}</p>
                     <p className="text-xs text-default-400 mt-1">
-                      Type: {selectedFlag.valueType} | Default:{" "}
-                      {formatValue(selectedFlag.defaultValue, selectedFlag.valueType)}
+                      {t("typeAndDefault", { type: selectedFlag.valueType, default: formatValue(selectedFlag.defaultValue, selectedFlag.valueType) })}
                     </p>
                   </div>
                 )}
                 <Select
-                  label={selectedOverride ? "Testing Group" : "Testing Groups"}
-                  placeholder={selectedOverride ? "Select a group" : "Select one or more groups"}
+                  label={selectedOverride ? t("testingGroupLabel") : t("testingGroupsLabel")}
+                  placeholder={selectedOverride ? t("selectGroupPlaceholder") : t("selectGroupsPlaceholder")}
                   selectionMode={selectedOverride ? "single" : "multiple"}
                   selectedKeys={new Set(overrideFormData.groupIds)}
                   onSelectionChange={(keys) =>
@@ -796,7 +831,7 @@ export default function FeatureFlagsPage() {
                 >
                   {availableGroups.map((group) => (
                     <SelectItem key={group.id}>
-                      {group.name} ({group.userCount} users)
+                      {group.name} ({t("usersCount", { count: group.userCount })})
                     </SelectItem>
                   ))}
                 </Select>
@@ -815,14 +850,14 @@ export default function FeatureFlagsPage() {
                           })
                         }
                       >
-                        {groups.find((g) => g.id === groupId)?.name || "Unknown group"}
+                        {groups.find((g) => g.id === groupId)?.name || t("unknownGroup")}
                       </Chip>
                     ))}
                   </div>
                 )}
                 {selectedFlag?.valueType === "boolean" ? (
                   <Select
-                    label="Override Value"
+                    label={t("overrideValueLabel")}
                     selectedKeys={[overrideFormData.value]}
                     onSelectionChange={(keys) =>
                       setOverrideFormData({
@@ -836,9 +871,9 @@ export default function FeatureFlagsPage() {
                   </Select>
                 ) : (
                   <Input
-                    label="Override Value"
+                    label={t("overrideValueLabel")}
                     placeholder={
-                      selectedFlag?.valueType === "number" ? "e.g., 200" : "e.g., dark"
+                      selectedFlag?.valueType === "number" ? t("overrideValueNumberPlaceholder") : t("overrideValueStringPlaceholder")
                     }
                     type={selectedFlag?.valueType === "number" ? "number" : "text"}
                     value={overrideFormData.value}
@@ -851,7 +886,7 @@ export default function FeatureFlagsPage() {
               </ModalBody>
               <ModalFooter>
                 <Button variant="light" onPress={onClose}>
-                  Cancel
+                  {tCommon("cancel")}
                 </Button>
                 <Button
                   color="primary"
@@ -859,7 +894,7 @@ export default function FeatureFlagsPage() {
                   isLoading={savingOverride}
                   isDisabled={overrideFormData.groupIds.length === 0 || !overrideFormData.value}
                 >
-                  {selectedOverride ? "Save" : `Add Override${overrideFormData.groupIds.length > 1 ? "s" : ""}`}
+                  {selectedOverride ? t("saveButton") : (overrideFormData.groupIds.length > 1 ? t("addOverridesPluralButton") : t("addOverridesButton"))}
                 </Button>
               </ModalFooter>
             </>

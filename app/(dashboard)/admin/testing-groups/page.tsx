@@ -28,6 +28,7 @@ import { Pagination } from "@heroui/pagination";
 import { SearchIcon } from "@/components/icons";
 import { addToast } from "@heroui/toast";
 import { Users, Trash2, Edit2, Plus, UserPlus, X } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 interface TestingGroup {
   id: string;
@@ -58,6 +59,8 @@ interface GroupUser {
 
 export default function TestingGroupsPage() {
   const { user, loading: authLoading } = useAuth();
+  const t = useTranslations("admin.testingGroups");
+  const tCommon = useTranslations("common");
   const [groups, setGroups] = useState<TestingGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedGroup, setSelectedGroup] = useState<TestingGroup | null>(null);
@@ -126,8 +129,8 @@ export default function TestingGroupsPage() {
     } catch (error) {
       console.error("Failed to fetch testing groups:", error);
       addToast({
-        title: "Error",
-        description: "Failed to fetch testing groups",
+        title: t("toastError"),
+        description: t("fetchError"),
         color: "danger",
       });
     } finally {
@@ -191,8 +194,8 @@ export default function TestingGroupsPage() {
   const handleSave = async () => {
     if (!formData.name.trim()) {
       addToast({
-        title: "Error",
-        description: "Name is required",
+        title: t("toastError"),
+        description: t("nameRequired"),
         color: "danger",
       });
       return;
@@ -206,8 +209,8 @@ export default function TestingGroupsPage() {
           description: formData.description.trim() || null,
         });
         addToast({
-          title: "Success",
-          description: "Testing group created successfully",
+          title: t("toastSuccess"),
+          description: t("createSuccess"),
           color: "success",
         });
       } else if (selectedGroup) {
@@ -216,8 +219,8 @@ export default function TestingGroupsPage() {
           description: formData.description.trim() || null,
         });
         addToast({
-          title: "Success",
-          description: "Testing group updated successfully",
+          title: t("toastSuccess"),
+          description: t("updateSuccess"),
           color: "success",
         });
       }
@@ -226,9 +229,9 @@ export default function TestingGroupsPage() {
     } catch (error) {
       console.error("Failed to save testing group:", error);
       addToast({
-        title: "Error",
+        title: t("toastError"),
         description:
-          error instanceof Error ? error.message : "Failed to save testing group",
+          error instanceof Error ? error.message : t("saveError"),
         color: "danger",
       });
     } finally {
@@ -248,8 +251,8 @@ export default function TestingGroupsPage() {
     try {
       await api.delete(`/api/admin/testing-groups/${selectedGroup.id}`);
       addToast({
-        title: "Success",
-        description: "Testing group deleted successfully",
+        title: t("toastSuccess"),
+        description: t("deleteSuccess"),
         color: "success",
       });
       await fetchGroups();
@@ -257,8 +260,8 @@ export default function TestingGroupsPage() {
     } catch (error) {
       console.error("Failed to delete testing group:", error);
       addToast({
-        title: "Error",
-        description: "Failed to delete testing group",
+        title: t("toastError"),
+        description: t("deleteError"),
         color: "danger",
       });
     } finally {
@@ -285,8 +288,8 @@ export default function TestingGroupsPage() {
 
     if (emails.length === 0) {
       addToast({
-        title: "Error",
-        description: "No valid email addresses found",
+        title: t("toastError"),
+        description: t("noValidEmails"),
         color: "danger",
       });
       return;
@@ -299,16 +302,16 @@ export default function TestingGroupsPage() {
       
       if (data.summary.notFound > 0) {
         addToast({
-          title: "Some emails not found",
-          description: `${data.summary.found} found, ${data.summary.notFound} not found`,
+          title: t("lookupPartialSuccess"),
+          description: t("lookupSummary", { found: data.summary.found, notFound: data.summary.notFound }),
           color: "warning",
         });
       }
     } catch (error) {
       console.error("Failed to lookup emails:", error);
       addToast({
-        title: "Error",
-        description: "Failed to lookup emails",
+        title: t("toastError"),
+        description: t("lookupError"),
         color: "danger",
       });
     } finally {
@@ -329,8 +332,8 @@ export default function TestingGroupsPage() {
 
     if (userIds.length === 0) {
       addToast({
-        title: "Error",
-        description: "No valid users to add",
+        title: t("toastError"),
+        description: t("noValidUsers"),
         color: "danger",
       });
       return;
@@ -343,8 +346,8 @@ export default function TestingGroupsPage() {
         { userIds }
       );
       addToast({
-        title: "Success",
-        description: `Added ${result.addedCount} user(s)${result.alreadyInGroupCount > 0 ? `, ${result.alreadyInGroupCount} already in group` : ""}`,
+        title: t("toastSuccess"),
+        description: t("addUsersSuccess", { added: result.addedCount }) + (result.alreadyInGroupCount > 0 ? t("addUsersAlreadyInGroup", { count: result.alreadyInGroupCount }) : ""),
         color: "success",
       });
       await fetchGroups();
@@ -352,8 +355,8 @@ export default function TestingGroupsPage() {
     } catch (error) {
       console.error("Failed to add users to group:", error);
       addToast({
-        title: "Error",
-        description: "Failed to add users to group",
+        title: t("toastError"),
+        description: t("addUsersError"),
         color: "danger",
       });
     } finally {
@@ -374,8 +377,8 @@ export default function TestingGroupsPage() {
     } catch (error) {
       console.error("Failed to fetch group users:", error);
       addToast({
-        title: "Error",
-        description: "Failed to fetch group users",
+        title: t("toastError"),
+        description: t("fetchUsersError"),
         color: "danger",
       });
     } finally {
@@ -394,15 +397,15 @@ export default function TestingGroupsPage() {
       setGroupUsers((prev) => prev.filter((u) => u.id !== userId));
       await fetchGroups();
       addToast({
-        title: "Success",
-        description: "User removed from group",
+        title: t("toastSuccess"),
+        description: t("removeUserSuccess"),
         color: "success",
       });
     } catch (error) {
       console.error("Failed to remove user from group:", error);
       addToast({
-        title: "Error",
-        description: "Failed to remove user from group",
+        title: t("toastError"),
+        description: t("removeUserError"),
         color: "danger",
       });
     } finally {
@@ -434,19 +437,19 @@ export default function TestingGroupsPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 sm:gap-0">
-        <h1 className="text-2xl font-bold">Testing Groups</h1>
+        <h1 className="text-2xl font-bold">{t("pageTitle")}</h1>
         <Button
           color="primary"
           startContent={<Plus size={16} />}
           onPress={handleCreate}
         >
-          Create Group
+          {t("createGroup")}
         </Button>
       </div>
 
       <Card>
         <CardHeader>
-          <h2 className="text-lg font-semibold">Manage Testing Groups</h2>
+          <h2 className="text-lg font-semibold">{t("manageGroups")}</h2>
         </CardHeader>
         <CardBody>
           <div className="flex flex-col gap-4">
@@ -454,7 +457,7 @@ export default function TestingGroupsPage() {
               <Input
                 isClearable
                 className="w-full sm:max-w-[44%]"
-                placeholder="Search by name or description..."
+                placeholder={t("searchPlaceholder")}
                 startContent={<SearchIcon />}
                 value={filterValue}
                 onClear={() => onClear()}
@@ -462,7 +465,7 @@ export default function TestingGroupsPage() {
               />
             </div>
             <Table
-              aria-label="Testing groups table"
+              aria-label={t("tableAriaLabel")}
               bottomContent={
                 pages > 0 ? (
                   <div className="flex w-full justify-center">
@@ -480,14 +483,14 @@ export default function TestingGroupsPage() {
               }
             >
               <TableHeader>
-                <TableColumn>NAME</TableColumn>
-                <TableColumn>DESCRIPTION</TableColumn>
-                <TableColumn>USERS</TableColumn>
-                <TableColumn>CREATED</TableColumn>
-                <TableColumn>ACTIONS</TableColumn>
+                <TableColumn>{t("columnName")}</TableColumn>
+                <TableColumn>{t("columnDescription")}</TableColumn>
+                <TableColumn>{t("columnUsers")}</TableColumn>
+                <TableColumn>{t("columnCreated")}</TableColumn>
+                <TableColumn>{t("columnActions")}</TableColumn>
               </TableHeader>
               <TableBody
-                emptyContent={loading ? <Spinner /> : "No testing groups found"}
+                emptyContent={loading ? <Spinner /> : t("noGroupsFound")}
                 items={items}
               >
                 {(item) => (
@@ -522,7 +525,7 @@ export default function TestingGroupsPage() {
                           color="primary"
                           isIconOnly
                           onPress={() => handleOpenAddUsers(item)}
-                          title="Add users"
+                          title={t("addUsersTitle")}
                         >
                           <UserPlus size={16} />
                         </Button>
@@ -531,7 +534,7 @@ export default function TestingGroupsPage() {
                           variant="flat"
                           isIconOnly
                           onPress={() => handleEdit(item)}
-                          title="Edit group"
+                          title={t("editGroupTitle")}
                         >
                           <Edit2 size={16} />
                         </Button>
@@ -541,7 +544,7 @@ export default function TestingGroupsPage() {
                           color="danger"
                           isIconOnly
                           onPress={() => handleDeleteClick(item)}
-                          title="Delete group"
+                          title={t("deleteGroupTitle")}
                         >
                           <Trash2 size={16} />
                         </Button>
@@ -561,20 +564,20 @@ export default function TestingGroupsPage() {
           {(onClose) => (
             <>
               <ModalHeader>
-                {isCreating ? "Create Testing Group" : "Edit Testing Group"}
+                {isCreating ? t("createGroupModal") : t("editGroupModal")}
               </ModalHeader>
               <ModalBody>
                 <Input
-                  label="Name"
-                  placeholder="e.g., beta_testers"
+                  label={t("nameLabel")}
+                  placeholder={t("namePlaceholder")}
                   value={formData.name}
                   onValueChange={(v) => setFormData({ ...formData, name: v })}
                   maxLength={50}
                   isRequired
                 />
                 <Textarea
-                  label="Description"
-                  placeholder="Describe the purpose of this group..."
+                  label={t("descriptionLabel")}
+                  placeholder={t("descriptionPlaceholder")}
                   value={formData.description}
                   onValueChange={(v) =>
                     setFormData({ ...formData, description: v })
@@ -584,7 +587,7 @@ export default function TestingGroupsPage() {
               </ModalBody>
               <ModalFooter>
                 <Button variant="light" onPress={onClose}>
-                  Cancel
+                  {tCommon("cancel")}
                 </Button>
                 <Button
                   color="primary"
@@ -592,7 +595,7 @@ export default function TestingGroupsPage() {
                   isLoading={saving}
                   isDisabled={!formData.name.trim()}
                 >
-                  {isCreating ? "Create" : "Save Changes"}
+                  {isCreating ? tCommon("create") : tCommon("save")}
                 </Button>
               </ModalFooter>
             </>
@@ -605,33 +608,31 @@ export default function TestingGroupsPage() {
         <ModalContent>
           {(onClose) => (
             <>
-              <ModalHeader>Delete Testing Group</ModalHeader>
+              <ModalHeader>{t("deleteGroupModal")}</ModalHeader>
               <ModalBody>
                 <p>
-                  Are you sure you want to delete the testing group{" "}
+                  {t("deleteConfirm")}{" "}
                   <strong>{selectedGroup?.name}</strong>?
                 </p>
                 {selectedGroup && selectedGroup.userCount > 0 && (
                   <p className="text-warning text-sm mt-2">
-                    This group has {selectedGroup.userCount} user(s) assigned.
-                    They will be removed from this group.
+                    {t("deleteUserWarning", { count: selectedGroup.userCount })}
                   </p>
                 )}
                 <p className="text-danger text-sm mt-2">
-                  This action cannot be undone. All flag overrides for this
-                  group will also be deleted.
+                  {t("deleteCannotUndo")}
                 </p>
               </ModalBody>
               <ModalFooter>
                 <Button variant="light" onPress={onClose}>
-                  Cancel
+                  {tCommon("cancel")}
                 </Button>
                 <Button
                   color="danger"
                   onPress={handleDelete}
                   isLoading={deleting}
                 >
-                  Delete
+                  {tCommon("delete")}
                 </Button>
               </ModalFooter>
             </>
@@ -650,15 +651,15 @@ export default function TestingGroupsPage() {
           {(onClose) => (
             <>
               <ModalHeader>
-                Add Users to {selectedGroup?.name}
+                {t("addUsersModal", { groupName: selectedGroup?.name ?? "" })}
               </ModalHeader>
               <ModalBody>
                 <p className="text-sm text-default-500 mb-2">
-                  Paste email addresses separated by newlines, commas, or spaces.
+                  {t("emailInstructions")}
                 </p>
                 <Textarea
-                  label="Email addresses"
-                  placeholder="user1@example.com, user2@example.com&#10;user3@example.com"
+                  label={t("emailLabel")}
+                  placeholder={t("emailPlaceholder")}
                   value={emailInput}
                   onValueChange={setEmailInput}
                   minRows={3}
@@ -671,14 +672,13 @@ export default function TestingGroupsPage() {
                   isLoading={lookingUp}
                   isDisabled={!emailInput.trim()}
                 >
-                  Lookup Users
+                  {t("lookupUsers")}
                 </Button>
 
                 {lookupResults.length > 0 && (
                   <div className="mt-4">
                     <p className="text-sm font-medium mb-2">
-                      Found Users ({lookupResults.filter((r) => r.found).length} of{" "}
-                      {lookupResults.length})
+                      {t("foundUsers", { found: lookupResults.filter((r) => r.found).length, total: lookupResults.length })}
                     </p>
                     <div className="flex flex-wrap gap-2">
                       {lookupResults.map((result) => (
@@ -692,7 +692,7 @@ export default function TestingGroupsPage() {
                           {result.found && result.user
                             ? getUserDisplayName(result.user)
                             : result.email}
-                          {!result.found && " (not found)"}
+                          {!result.found && ` (${t("notFound")})`}
                         </Chip>
                       ))}
                     </div>
@@ -701,7 +701,7 @@ export default function TestingGroupsPage() {
               </ModalBody>
               <ModalFooter>
                 <Button variant="light" onPress={onClose}>
-                  Cancel
+                  {tCommon("cancel")}
                 </Button>
                 <Button
                   color="primary"
@@ -711,7 +711,7 @@ export default function TestingGroupsPage() {
                     lookupResults.filter((r) => r.found).length === 0
                   }
                 >
-                  Add {lookupResults.filter((r) => r.found).length} User(s)
+                  {t("addUsersButton", { count: lookupResults.filter((r) => r.found).length })}
                 </Button>
               </ModalFooter>
             </>
@@ -730,7 +730,7 @@ export default function TestingGroupsPage() {
           {(onClose) => (
             <>
               <ModalHeader className="flex justify-between items-center">
-                <span>Users in {selectedGroup?.name}</span>
+                <span>{t("viewUsersModal", { groupName: selectedGroup?.name ?? "" })}</span>
                 <Button
                   size="sm"
                   color="primary"
@@ -741,7 +741,7 @@ export default function TestingGroupsPage() {
                     if (selectedGroup) handleOpenAddUsers(selectedGroup);
                   }}
                 >
-                  Add Users
+                  {t("addUsers")}
                 </Button>
               </ModalHeader>
               <ModalBody>
@@ -751,7 +751,7 @@ export default function TestingGroupsPage() {
                   </div>
                 ) : groupUsers.length === 0 ? (
                   <p className="text-center text-default-500 py-8">
-                    No users in this group yet.
+                    {t("noUsersInGroup")}
                   </p>
                 ) : (
                   <div className="space-y-2">
@@ -785,7 +785,7 @@ export default function TestingGroupsPage() {
               </ModalBody>
               <ModalFooter>
                 <Button variant="light" onPress={onClose}>
-                  Close
+                  {tCommon("close")}
                 </Button>
               </ModalFooter>
             </>
