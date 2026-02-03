@@ -469,6 +469,18 @@
       "exampleAspectRatioDesc": "21:9は21として抽出（最初の非数字文字より前の数字）。ウルトラワイドは1.5倍のコスト",
       "exampleMinMax": "最低料金",
       "exampleMinMaxDesc": "最低50クレジット、または時間×15のいずれか高い方"
+    },
+    "testingGroups": {
+      "title": "テストグループ",
+      "subtitle": "ABテスト",
+      "description": "ABテストと機能ロールアウト用のテストグループを管理します。",
+      "goTo": "グループ管理"
+    },
+    "featureFlags": {
+      "title": "機能フラグ",
+      "subtitle": "ABテスト",
+      "description": "グループ別のオーバーライドを持つ機能フラグを作成・管理します。",
+      "goTo": "フラグ管理"
     }
   },
   "dashboard": {

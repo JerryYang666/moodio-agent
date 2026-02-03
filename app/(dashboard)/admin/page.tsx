@@ -258,14 +258,14 @@ export default function AdminPage() {
           <CardHeader className="pb-0 pt-2 px-4 flex-row gap-2 items-center">
             <FlaskConical className="w-6 h-6 text-primary" />
             <div className="flex flex-col">
-              <p className="text-tiny uppercase font-bold">AB Testing</p>
-              <h4 className="font-bold text-large">Testing Groups</h4>
+              <p className="text-tiny uppercase font-bold">
+                {t("testingGroups.subtitle")}
+              </p>
+              <h4 className="font-bold text-large">{t("testingGroups.title")}</h4>
             </div>
           </CardHeader>
           <CardBody className="overflow-visible py-2">
-            <p className="text-default-500">
-              Manage testing groups for AB testing and feature rollouts
-            </p>
+            <p className="text-default-500">{t("testingGroups.description")}</p>
           </CardBody>
           <CardFooter>
             <Button
@@ -273,7 +273,7 @@ export default function AdminPage() {
               variant="flat"
               onPress={() => router.push("/admin/testing-groups")}
             >
-              Manage Groups
+              {t("testingGroups.goTo")}
             </Button>
           </CardFooter>
         </Card>
@@ -286,14 +286,14 @@ export default function AdminPage() {
           <CardHeader className="pb-0 pt-2 px-4 flex-row gap-2 items-center">
             <Flag className="w-6 h-6 text-primary" />
             <div className="flex flex-col">
-              <p className="text-tiny uppercase font-bold">AB Testing</p>
-              <h4 className="font-bold text-large">Feature Flags</h4>
+              <p className="text-tiny uppercase font-bold">
+                {t("featureFlags.subtitle")}
+              </p>
+              <h4 className="font-bold text-large">{t("featureFlags.title")}</h4>
             </div>
           </CardHeader>
           <CardBody className="overflow-visible py-2">
-            <p className="text-default-500">
-              Create and manage feature flags with group-specific overrides
-            </p>
+            <p className="text-default-500">{t("featureFlags.description")}</p>
           </CardBody>
           <CardFooter>
             <Button
@@ -301,7 +301,7 @@ export default function AdminPage() {
               variant="flat"
               onPress={() => router.push("/admin/feature-flags")}
             >
-              Manage Flags
+              {t("featureFlags.goTo")}
             </Button>
           </CardFooter>
         </Card>

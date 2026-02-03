@@ -469,6 +469,18 @@
       "exampleAspectRatioDesc": "21:9 提取为 21（取第一个非数字字符之前的数字）。超宽屏费用增加 1.5 倍",
       "exampleMinMax": "最低收费",
       "exampleMinMaxDesc": "至少 50 积分，或时长 × 15（取较高者）"
+    },
+    "testingGroups": {
+      "title": "测试组",
+      "subtitle": "AB 测试",
+      "description": "管理 AB 测试和功能发布的测试组。",
+      "goTo": "管理测试组"
+    },
+    "featureFlags": {
+      "title": "功能开关",
+      "subtitle": "AB 测试",
+      "description": "创建和管理功能开关，支持按组设置不同值。",
+      "goTo": "管理功能开关"
     }
   },
   "dashboard": {

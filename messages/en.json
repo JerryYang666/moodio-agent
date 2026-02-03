@@ -469,6 +469,18 @@
       "exampleAspectRatioDesc": "21:9 extracts as 21 (numbers before the first non-digit character). Ultra-wide costs 1.5× more",
       "exampleMinMax": "Minimum charge",
       "exampleMinMaxDesc": "At least 50 credits, or duration × 15 if higher"
+    },
+    "testingGroups": {
+      "title": "Testing Groups",
+      "subtitle": "AB Testing",
+      "description": "Manage testing groups for AB testing and feature rollouts.",
+      "goTo": "Manage Groups"
+    },
+    "featureFlags": {
+      "title": "Feature Flags",
+      "subtitle": "AB Testing",
+      "description": "Create and manage feature flags with group-specific overrides.",
+      "goTo": "Manage Flags"
     }
   },
   "dashboard": {

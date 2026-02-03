@@ -469,6 +469,18 @@
       "exampleAspectRatioDesc": "21:9는 21로 추출 (첫 번째 비숫자 문자 앞의 숫자). 울트라와이드는 1.5배 비용",
       "exampleMinMax": "최소 요금",
       "exampleMinMaxDesc": "최소 50 크레딧, 또는 시간 × 15 중 더 높은 값"
+    },
+    "testingGroups": {
+      "title": "테스트 그룹",
+      "subtitle": "AB 테스트",
+      "description": "AB 테스트 및 기능 출시를 위한 테스트 그룹을 관리합니다.",
+      "goTo": "그룹 관리"
+    },
+    "featureFlags": {
+      "title": "기능 플래그",
+      "subtitle": "AB 테스트",
+      "description": "그룹별 오버라이드가 있는 기능 플래그를 생성하고 관리합니다.",
+      "goTo": "플래그 관리"
     }
   },
   "dashboard": {

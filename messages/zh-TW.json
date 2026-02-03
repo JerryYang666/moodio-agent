@@ -469,6 +469,18 @@
       "exampleAspectRatioDesc": "21:9 擷取為 21（第一個非數字字元前的數字）。超寬螢幕費用 1.5 倍",
       "exampleMinMax": "最低收費",
       "exampleMinMaxDesc": "至少 50 點數，或時長 × 15 取較高者"
+    },
+    "testingGroups": {
+      "title": "測試群組",
+      "subtitle": "AB 測試",
+      "description": "管理 AB 測試和功能發布的測試群組。",
+      "goTo": "管理群組"
+    },
+    "featureFlags": {
+      "title": "功能開關",
+      "subtitle": "AB 測試",
+      "description": "建立和管理功能開關，支援按群組設定不同值。",
+      "goTo": "管理開關"
     }
   },
   "dashboard": {
