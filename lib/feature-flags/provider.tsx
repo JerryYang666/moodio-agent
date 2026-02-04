@@ -2,6 +2,7 @@
 
 import React, { createContext, useMemo } from "react";
 import { useGetFeatureFlagsQuery } from "@/lib/redux/services/next-api";
+import { useAuth } from "@/hooks/use-auth";
 import type { FeatureFlagContextValue, FlagValue } from "./types";
 
 /**
@@ -33,9 +34,17 @@ interface FeatureFlagProviderProps {
  * 4. Zero changes needed in components using useFeatureFlag
  */
 export function FeatureFlagProvider({ children }: FeatureFlagProviderProps) {
+  const { user, loading: authLoading } = useAuth();
+  
+  // Skip fetching feature flags if user is not authenticated
+  // This prevents 401 errors and redirect loops for unauthenticated users
+  const isAuthenticated = !!user;
+  
   const { data, isLoading, error, isSuccess } = useGetFeatureFlagsQuery(
     undefined,
     {
+      // Skip the query if user is not authenticated or auth is still loading
+      skip: authLoading || !isAuthenticated,
       // Refetch when window regains focus
       refetchOnFocus: true,
       // Poll every 5 minutes for updates
@@ -49,11 +58,12 @@ export function FeatureFlagProvider({ children }: FeatureFlagProviderProps) {
         return data?.flags[key] as T | undefined;
       },
       getAllFlags: () => data?.flags ?? {},
-      isLoaded: isSuccess,
-      isLoading,
+      // Consider loaded if: auth finished and either we have flags OR user is not authenticated
+      isLoaded: !authLoading && (isSuccess || !isAuthenticated),
+      isLoading: authLoading || isLoading,
       error: error ? "Failed to load feature flags" : undefined,
     }),
-    [data, isLoading, isSuccess, error]
+    [data, isLoading, isSuccess, error, authLoading, isAuthenticated]
   );
 
   return (
