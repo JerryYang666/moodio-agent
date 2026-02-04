@@ -527,8 +527,8 @@ export default function FeatureFlagsPage() {
               <TableHeader>
                 <TableColumn>{t("columnKey")}</TableColumn>
                 <TableColumn>{t("columnType")}</TableColumn>
-                <TableColumn>{t("columnDefault")}</TableColumn>
                 <TableColumn>{t("columnEnabled")}</TableColumn>
+                <TableColumn>{t("columnDefault")}</TableColumn>
                 <TableColumn>{t("columnOverrides")}</TableColumn>
                 <TableColumn>{t("columnActions")}</TableColumn>
               </TableHeader>
@@ -558,16 +558,16 @@ export default function FeatureFlagsPage() {
                       </Chip>
                     </TableCell>
                     <TableCell>
-                      <span className="font-mono text-sm">
-                        {formatValue(item.defaultValue, item.valueType)}
-                      </span>
-                    </TableCell>
-                    <TableCell>
                       <Switch
                         size="sm"
                         isSelected={item.enabled}
                         onValueChange={() => handleToggleEnabled(item)}
                       />
+                    </TableCell>
+                    <TableCell>
+                      <span className="font-mono text-sm">
+                        {formatValue(item.defaultValue, item.valueType)}
+                      </span>
                     </TableCell>
                     <TableCell>
                       {item.overrides.length > 0 ? (
