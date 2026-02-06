@@ -251,13 +251,14 @@ export async function POST(
       if (content) {
         parts.push({ type: "text", text: content });
       }
-      // Add all images to the message
+      // Add all images to the message (including title for pre-select feature)
       for (const imgId of imageIds) {
         const sourceEntry = sourceById.get(imgId);
         parts.push({
           type: "image",
           imageId: imgId,
           source: sourceEntry?.source,
+          title: sourceEntry?.title,
         });
       }
       userMessage = {

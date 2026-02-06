@@ -14,6 +14,11 @@ export type UploadOutcome =
   | { success: true; data: UploadResult }
   | { success: false; error: UploadError };
 
+export interface UploadOptions {
+  /** If true, skip saving the image to a collection (e.g., for marked/annotated images) */
+  skipCollection?: boolean;
+}
+
 /**
  * Get the maximum file size in bytes
  */
@@ -63,9 +68,10 @@ export function validateFile(file: File): UploadError | null {
  * 3. Confirm upload with server (creates DB records)
  *
  * @param file The file to upload
+ * @param options Optional upload options
  * @returns UploadOutcome with either success data or error details
  */
-export async function uploadImage(file: File): Promise<UploadOutcome> {
+export async function uploadImage(file: File, options?: UploadOptions): Promise<UploadOutcome> {
   // Validate file first
   const validationError = validateFile(file);
   if (validationError) {
@@ -124,6 +130,7 @@ export async function uploadImage(file: File): Promise<UploadOutcome> {
       body: JSON.stringify({
         imageId,
         filename: file.name,
+        skipCollection: options?.skipCollection,
       }),
     });
 

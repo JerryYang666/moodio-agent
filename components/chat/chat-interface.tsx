@@ -61,6 +61,7 @@ import {
   saveReferenceImagesCollapsed,
   loadReferenceImagesCollapsed,
 } from "./reference-image-utils";
+import { getPreselectImages } from "./preselect-images-utils";
 import type { JSONContent } from "@tiptap/react";
 
 // Helper to group consecutive assistant messages with the same timestamp as variants
@@ -143,12 +144,15 @@ export default function ChatInterface({
   const [loadedDraft, setLoadedDraft] = useState<ChatDraft | null>(null);
   const [isDraftLoaded, setIsDraftLoaded] = useState(false);
   const [prevChatId, setPrevChatId] = useState(chatId);
+  // Track if draft had images - used to skip pre-select when draft takes priority
+  const [draftHadImages, setDraftHadImages] = useState(false);
 
   // Reset draft loaded state when chatId changes
   if (chatId !== prevChatId) {
     setPrevChatId(chatId);
     setIsDraftLoaded(false);
     setLoadedDraft(null);
+    setDraftHadImages(false);
   }
 
   // Load draft on mount or when chatId changes
@@ -162,6 +166,7 @@ export default function ChatInterface({
       // Restore pending images from draft
       if (draft.pendingImages.length > 0) {
         setPendingImages(draftImagesToPendingImages(draft.pendingImages));
+        setDraftHadImages(true); // Mark that draft had images (skip pre-select)
       }
     } else {
       setInput("");
@@ -185,6 +190,12 @@ export default function ChatInterface({
   useEffect(() => {
     saveReferenceImagesCollapsed(isReferenceImagesCollapsed);
   }, [isReferenceImagesCollapsed]);
+
+  // Track previous isSending state to detect when AI response completes
+  const prevIsSendingRef = useRef(isSending);
+  
+  // Pre-select images refs (useEffects are defined after applyPreselectImages)
+  const hasAppliedInitialPreselect = useRef(false);
 
   // Save draft function - called on blur and visibility change
   const saveDraft = useCallback(() => {
@@ -230,6 +241,7 @@ export default function ChatInterface({
       setIsSending(false);
       setLoadedDraft(null);
       setIsDraftLoaded(false);
+      setDraftHadImages(false);
 
       // Clear the draft for new chat
       clearChatDraft(undefined);
@@ -341,11 +353,10 @@ export default function ChatInterface({
   // Voice recorder hook
   const handleTranscriptionComplete = useCallback((text: string) => {
     // Insert the transcribed text into the rich text editor via ref
+    // The editor's onUpdate callback will automatically sync the input state
     if (chatInputRef.current) {
       chatInputRef.current.insertText(text);
     }
-    // Also update the input state for consistency
-    setInput((prev) => (prev ? `${prev} ${text}` : text));
   }, []);
 
   const {
@@ -380,6 +391,8 @@ export default function ChatInterface({
         if (res.ok) {
           const data = await res.json();
           setMessages(data.messages);
+          // Pre-select images from the last user message on page load
+          applyPreselectImages(data.messages);
         }
       } catch (error) {
         console.error("Failed to fetch chat", error);
@@ -638,6 +651,39 @@ export default function ChatInterface({
     setIsReferenceImagesCollapsed((prev) => !prev);
   }, []);
 
+  // Pre-select images from the last user message with images
+  // This helps users who want to continue editing the same images
+  // Skip if draft had images (draft takes priority over system pre-select)
+  const applyPreselectImages = useCallback((msgs: Message[]) => {
+    // Skip pre-select if draft had images (draft takes priority)
+    if (draftHadImages) {
+      return;
+    }
+    
+    const preselectedImages = getPreselectImages(msgs);
+    if (preselectedImages.length > 0) {
+      setPendingImages(preselectedImages);
+    }
+  }, [draftHadImages]);
+
+  // Pre-select images after AI response completes
+  useEffect(() => {
+    // Detect transition from sending (true) to not sending (false)
+    if (prevIsSendingRef.current && !isSending) {
+      // AI response just completed, pre-select images from the last user message
+      applyPreselectImages(messages);
+    }
+    prevIsSendingRef.current = isSending;
+  }, [isSending, messages, applyPreselectImages]);
+
+  // Pre-select images when initialMessages are provided (component mount with pre-loaded messages)
+  useEffect(() => {
+    if (!hasAppliedInitialPreselect.current && initialMessages.length > 0 && !isLoading) {
+      applyPreselectImages(initialMessages);
+      hasAppliedInitialPreselect.current = true;
+    }
+  }, [initialMessages, isLoading, applyPreselectImages]);
+
   // Open asset picker for reference images
   const openReferenceImagePicker = useCallback(() => {
     setAssetPickerMode("reference");
@@ -862,7 +908,7 @@ export default function ChatInterface({
         return [...newImages, uploadingImage];
       });
 
-      const result = await uploadImage(file);
+      const result = await uploadImage(file, { skipCollection: true });
 
       if (result.success) {
         // Update the pending image with the real ID and URL
@@ -946,7 +992,7 @@ export default function ChatInterface({
     // Capture current pending images before clearing
     const currentPendingImages = [...pendingImages];
 
-    // Build optimistic message content with image URLs for display
+    // Build optimistic message content with image metadata for display and pre-select
     const optimisticContent: Message["content"] =
       currentPendingImages.length > 0
         ? (() => {
@@ -954,9 +1000,16 @@ export default function ChatInterface({
           if (currentInput) {
             parts.push({ type: "text", text: currentInput });
           }
-          // Add images to the optimistic content
+          // Add images to the optimistic content with full metadata
+          // This ensures pre-select works correctly after AI response
           for (const img of currentPendingImages) {
-            parts.push({ type: "image_url", image_url: { url: img.url } });
+            parts.push({
+              type: "image",
+              imageId: img.imageId,
+              imageUrl: img.url,
+              source: img.source,
+              title: img.title,
+            });
           }
           return parts;
         })()
@@ -1032,6 +1085,8 @@ export default function ChatInterface({
     
     // Clear the draft since we're sending the message
     clearChatDraft(chatId);
+    // Reset draftHadImages so pre-select can work after AI response
+    setDraftHadImages(false);
 
     setIsSending(true);
 

@@ -24,7 +24,8 @@ type UploadSource = keyof typeof COLLECTION_NAMES;
  *   imageId: string, 
  *   filename?: string, 
  *   source?: "upload" | "frame-capture",  // defaults to "upload"
- *   sourceVideoId?: string  // only for frame-capture source
+ *   sourceVideoId?: string,  // only for frame-capture source
+ *   skipCollection?: boolean  // if true, skip saving to collection (e.g., for marked images)
  * }
  * Response: { imageId: string, imageUrl: string }
  */
@@ -42,7 +43,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { imageId, filename, source = "upload", sourceVideoId } = body;
+    const { imageId, filename, source = "upload", sourceVideoId, skipCollection } = body;
 
     // Validate required fields
     if (!imageId || typeof imageId !== "string") {
@@ -52,10 +53,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate source parameter
-    const uploadSource: UploadSource = source in COLLECTION_NAMES ? source : "upload";
-    const collectionName = COLLECTION_NAMES[uploadSource];
-
     // Verify the image exists in S3
     const imageCheck = await checkImageExists(imageId);
     if (!imageCheck.exists) {
@@ -64,6 +61,19 @@ export async function POST(request: NextRequest) {
         { status: 404 }
       );
     }
+
+    // If skipCollection is true, just return the signed URL without saving to collection
+    if (skipCollection) {
+      const imageUrl = getSignedImageUrl(imageId);
+      return NextResponse.json({
+        imageId,
+        imageUrl,
+      });
+    }
+
+    // Validate source parameter
+    const uploadSource: UploadSource = source in COLLECTION_NAMES ? source : "upload";
+    const collectionName = COLLECTION_NAMES[uploadSource];
 
     const defaultProject = await ensureDefaultProject(payload.userId);
 

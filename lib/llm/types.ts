@@ -9,6 +9,7 @@ export type MessageContentPart =
       imageId: string;
       imageUrl?: string; // CloudFront URL from API (access via signed cookies)
       source?: "upload" | "asset" | "ai_generated";
+      title?: string; // Display title for the image
     }
   | {
       type: "agent_image";
