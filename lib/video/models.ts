@@ -489,6 +489,177 @@ const klingO1Pro: VideoModelConfig = {
 };
 
 /**
+ * Kling O3 Pro - Image to Video
+ * Generate a video by taking a start frame and an end frame, animating the transition
+ * between them while following text-driven style and scene guidance.
+ */
+const klingO3Pro: VideoModelConfig = {
+  id: "fal-ai/kling-video/o3/pro/image-to-video",
+  name: "Kling O3 Pro",
+  description:
+    "Generate a video by animating the transition between start and end frames with text-driven style and scene guidance",
+  imageParams: {
+    sourceImage: "image_url",
+    endImage: "end_image_url",
+  },
+  params: [
+    {
+      name: "prompt",
+      label: "Prompt",
+      type: "string",
+      required: false,
+      description:
+        "Text prompt for video generation describing the desired motion and style",
+    },
+    {
+      name: "image_url",
+      label: "Start Image",
+      type: "string",
+      required: true,
+      description: "URL of the start frame image",
+    },
+    {
+      name: "end_image_url",
+      label: "End Image",
+      type: "string",
+      required: false,
+      description: "URL of the end frame image (optional)",
+    },
+    {
+      name: "duration",
+      label: "Duration (seconds)",
+      type: "enum",
+      required: false,
+      default: "5",
+      options: [
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "10",
+        "11",
+        "12",
+        "13",
+        "14",
+        "15",
+      ],
+      description: "Video duration in seconds (3-15s)",
+    },
+    {
+      name: "generate_audio",
+      label: "Generate Audio",
+      type: "boolean",
+      required: false,
+      default: false,
+      description: "Whether to generate native audio for the video",
+    },
+  ],
+};
+
+/**
+ * Kling Video v3 Pro - Image to Video
+ * Top-tier image-to-video with cinematic visuals, fluid motion, and native audio generation,
+ * with custom element support.
+ */
+const klingV3Pro: VideoModelConfig = {
+  id: "fal-ai/kling-video/v3/pro/image-to-video",
+  name: "Kling Video v3 Pro",
+  description:
+    "Top-tier image-to-video with cinematic visuals, fluid motion, native audio generation, and custom element support",
+  imageParams: {
+    sourceImage: "start_image_url",
+    endImage: "end_image_url",
+  },
+  params: [
+    {
+      name: "prompt",
+      label: "Prompt",
+      type: "string",
+      required: false,
+      description:
+        "Text prompt for video generation. Supports speech in quotes for audio generation.",
+    },
+    {
+      name: "start_image_url",
+      label: "Source Image",
+      type: "string",
+      required: true,
+      description: "URL of the image to be used for the video (first frame)",
+    },
+    {
+      name: "end_image_url",
+      label: "End Image",
+      type: "string",
+      required: false,
+      description: "URL of the image to be used for the end of the video",
+    },
+    {
+      name: "duration",
+      label: "Duration (seconds)",
+      type: "enum",
+      required: false,
+      default: "5",
+      options: [
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "10",
+        "11",
+        "12",
+        "13",
+        "14",
+        "15",
+      ],
+      description: "The duration of the generated video in seconds (3-15s)",
+    },
+    {
+      name: "aspect_ratio",
+      label: "Aspect Ratio",
+      type: "enum",
+      required: false,
+      default: "16:9",
+      options: ["16:9", "9:16", "1:1"],
+      description: "The aspect ratio of the generated video frame",
+    },
+    {
+      name: "negative_prompt",
+      label: "Negative Prompt",
+      type: "string",
+      required: false,
+      default: "blur, distort, and low quality",
+      description: "Text prompt describing what to avoid in the video",
+    },
+    {
+      name: "cfg_scale",
+      label: "CFG Scale",
+      type: "number",
+      required: false,
+      default: 0.5,
+      min: 0,
+      max: 1,
+      description:
+        "Classifier Free Guidance scale - how closely to follow the prompt (0-1)",
+    },
+    {
+      name: "generate_audio",
+      label: "Generate Audio",
+      type: "boolean",
+      required: false,
+      default: true,
+      description:
+        "Generate native audio for the video. Supports Chinese and English voice output.",
+    },
+  ],
+};
+
+/**
  * Veo 3.1 - Image to Video
  * Google's state-of-the-art image-to-video generation model
  */
@@ -751,6 +922,8 @@ export const VIDEO_MODELS: VideoModelConfig[] = [
   wanV26ImageToVideo,
   klingV26Pro,
   klingO1Pro,
+  klingO3Pro,
+  klingV3Pro,
   veo31,
   veo31FirstLastFrame,
   sora2Pro,
