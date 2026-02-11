@@ -10,6 +10,7 @@ import ReactMarkdown from "react-markdown";
 import { Message, MessageContentPart } from "@/lib/llm/types";
 import ImageWithMenu from "@/components/collection/image-with-menu";
 import { ImageInfo } from "./image-detail-modal";
+import ImageHoverPreview from "./image-hover-preview";
 import { formatTime } from "./utils";
 import { Button } from "@heroui/button";
 import { Popover, PopoverTrigger, PopoverContent } from "@heroui/popover";
@@ -183,20 +184,21 @@ export default function ChatMessage({
                     : part.image_url.url;
                 if (!url) return null;
                 return (
-                  <button
-                    key={`img-${i}`}
-                    type="button"
-                    onClick={() =>
-                      onUserImageClick && onUserImageClick(images, i)
-                    }
-                    className="h-20 w-20 rounded-lg border border-divider overflow-hidden shrink-0 focus:outline-none focus:ring-2 focus:ring-primary"
-                  >
-                    <img
-                      src={url}
-                      alt={t("chat.userUpload")}
-                      className="h-full w-full object-cover"
-                    />
-                  </button>
+                  <ImageHoverPreview key={`img-${i}`} src={url} alt={t("chat.userUpload")}>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        onUserImageClick && onUserImageClick(images, i)
+                      }
+                      className="h-20 w-20 rounded-lg border border-divider overflow-hidden shrink-0 focus:outline-none focus:ring-2 focus:ring-primary"
+                    >
+                      <img
+                        src={url}
+                        alt={t("chat.userUpload")}
+                        className="h-full w-full object-cover"
+                      />
+                    </button>
+                  </ImageHoverPreview>
                 );
               });
             })()}
@@ -236,65 +238,72 @@ export default function ChatMessage({
                   }}
                   onViewDetails={() => onAgentTitleClick(part)}
                 >
-                  <Card
-                    className={clsx(
-                      "w-full",
-                      isSelected && "border-4 border-primary"
-                    )}
+                  <ImageHoverPreview
+                    src={url}
+                    alt={part.title}
+                    maxPreviewWidth={600}
+                    maxPreviewHeight={600}
                   >
-                    <CardBody
-                      className="p-0 overflow-hidden relative aspect-square cursor-pointer group/image rounded-lg"
-                      draggable={effectiveStatus === "generated"}
-                      onClick={() =>
-                        effectiveStatus === "generated" &&
-                        msgIndex !== undefined &&
-                        onAgentImageSelect(
-                          part,
-                          msgIndex,
-                          realPartIndex,
-                          message.variantId
-                        )
-                      }
-                      onDragStart={(e) => handleAgentDragStart(e, part)}
-                      onDoubleClick={(e) => {
-                        e.preventDefault();
-                        if (
-                          effectiveStatus === "generated" ||
-                          effectiveStatus === "error"
-                        ) {
-                          onAgentTitleClick(part);
-                        }
-                      }}
+                    <Card
+                      className={clsx(
+                        "w-full",
+                        isSelected && "border-4 border-primary"
+                      )}
                     >
-                      {effectiveStatus === "loading" && (
-                        <div className="w-full h-full flex items-center justify-center bg-default-100">
-                          <Spinner />
-                        </div>
-                      )}
-                      {effectiveStatus === "error" && (
-                        <div className="w-full h-full flex items-center justify-center bg-danger-50 text-danger">
-                          <X />
-                        </div>
-                      )}
-                      {effectiveStatus === "generated" && (
-                        <Image
-                          src={url}
-                          alt={part.title}
-                          radius="none"
-                          classNames={{
-                            wrapper: "w-full h-full !max-w-full",
-                            img: "w-full h-full object-contain bg-default-100 dark:bg-black",
-                          }}
-                        />
-                      )}
-                      {(effectiveStatus === "generated" ||
-                        effectiveStatus === "error") && (
-                        <div className="absolute bottom-0 left-0 right-0 bg-white/90 dark:bg-black/60 text-black dark:text-white p-2 text-xs truncate md:opacity-0 md:group-hover/image:opacity-100 transition-opacity z-10 pointer-events-none">
-                          {part.title}
-                        </div>
-                      )}
-                    </CardBody>
-                  </Card>
+                      <CardBody
+                        className="p-0 overflow-hidden relative aspect-square cursor-pointer group/image rounded-lg"
+                        draggable={effectiveStatus === "generated"}
+                        onClick={() =>
+                          effectiveStatus === "generated" &&
+                          msgIndex !== undefined &&
+                          onAgentImageSelect(
+                            part,
+                            msgIndex,
+                            realPartIndex,
+                            message.variantId
+                          )
+                        }
+                        onDragStart={(e) => handleAgentDragStart(e, part)}
+                        onDoubleClick={(e) => {
+                          e.preventDefault();
+                          if (
+                            effectiveStatus === "generated" ||
+                            effectiveStatus === "error"
+                          ) {
+                            onAgentTitleClick(part);
+                          }
+                        }}
+                      >
+                        {effectiveStatus === "loading" && (
+                          <div className="w-full h-full flex items-center justify-center bg-default-100">
+                            <Spinner />
+                          </div>
+                        )}
+                        {effectiveStatus === "error" && (
+                          <div className="w-full h-full flex items-center justify-center bg-danger-50 text-danger">
+                            <X />
+                          </div>
+                        )}
+                        {effectiveStatus === "generated" && (
+                          <Image
+                            src={url}
+                            alt={part.title}
+                            radius="none"
+                            classNames={{
+                              wrapper: "w-full h-full !max-w-full",
+                              img: "w-full h-full object-contain bg-default-100 dark:bg-black",
+                            }}
+                          />
+                        )}
+                        {(effectiveStatus === "generated" ||
+                          effectiveStatus === "error") && (
+                          <div className="absolute bottom-0 left-0 right-0 bg-white/90 dark:bg-black/60 text-black dark:text-white p-2 text-xs truncate md:opacity-0 md:group-hover/image:opacity-100 transition-opacity z-10 pointer-events-none">
+                            {part.title}
+                          </div>
+                        )}
+                      </CardBody>
+                    </Card>
+                  </ImageHoverPreview>
                 </ImageWithMenu>
               );
             })}
