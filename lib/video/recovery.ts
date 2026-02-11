@@ -15,6 +15,7 @@ import {
   downloadFromUrl,
   generateVideoId,
 } from "@/lib/storage/s3";
+import { recordEvent } from "@/lib/telemetry";
 
 // Stale threshold: 20 minutes
 const STALE_THRESHOLD_MS = 20 * 60 * 1000;
@@ -70,6 +71,7 @@ async function processVideoResult(
  */
 export async function recoverGeneration(generation: {
   id: string;
+  userId: string;
   modelId: string;
   falRequestId: string | null;
   sourceImageId: string;
@@ -101,6 +103,13 @@ export async function recoverGeneration(generation: {
       })
       .where(eq(videoGenerations.id, generation.id));
 
+    await recordEvent("video_generation_recovery", generation.userId, {
+      status: "failed",
+      generationId: generation.id,
+      modelId: generation.modelId,
+      error: "No Fal request ID",
+    });
+
     return { recovered: false, status: "failed", error: "No Fal request ID" };
   }
 
@@ -128,6 +137,13 @@ export async function recoverGeneration(generation: {
         })
         .where(eq(videoGenerations.id, generation.id));
 
+      await recordEvent("video_generation_recovery", generation.userId, {
+        status: "failed",
+        generationId: generation.id,
+        modelId: generation.modelId,
+        error: recoveryResult.error || "Failed during recovery check",
+      });
+
       console.log(`[Recovery] Generation ${generation.id} failed: ${recoveryResult.error}`);
       return { recovered: true, status: "failed", error: recoveryResult.error };
     }
@@ -147,6 +163,12 @@ export async function recoverGeneration(generation: {
         })
         .where(eq(videoGenerations.id, generation.id));
 
+      await recordEvent("video_generation_recovery", generation.userId, {
+        status: "completed",
+        generationId: generation.id,
+        modelId: generation.modelId,
+      });
+
       console.log(`[Recovery] Successfully recovered generation ${generation.id}`);
       return { recovered: true, status: "completed" };
     }
@@ -163,6 +185,13 @@ export async function recoverGeneration(generation: {
         completedAt: new Date(),
       })
       .where(eq(videoGenerations.id, generation.id));
+
+    await recordEvent("video_generation_recovery", generation.userId, {
+      status: "failed",
+      generationId: generation.id,
+      modelId: generation.modelId,
+      error: error.message || "Unknown error",
+    });
 
     return { recovered: true, status: "failed", error: error.message };
   }

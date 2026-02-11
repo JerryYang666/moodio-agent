@@ -13,6 +13,7 @@ import { deductCredits, refundCharge, InsufficientCreditsError } from "@/lib/cre
 import { calculateCost } from "@/lib/pricing";
 import { submitVideoGeneration } from "@/lib/video/fal-client";
 import { getSignedImageUrl } from "@/lib/storage/s3";
+import { recordEvent } from "@/lib/telemetry";
 
 /**
  * POST /api/video/generate
@@ -35,6 +36,11 @@ export async function POST(request: NextRequest) {
   if (!payload) {
     return NextResponse.json({ error: "Invalid token" }, { status: 401 });
   }
+
+  const ipAddress =
+    request.headers.get("x-forwarded-for") ||
+    request.headers.get("x-real-ip") ||
+    undefined;
 
   try {
     const body = await request.json();
@@ -121,6 +127,12 @@ export async function POST(request: NextRequest) {
         error.message === "INSUFFICIENT_CREDITS" ||
         error instanceof InsufficientCreditsError
       ) {
+        await recordEvent(
+          "video_generation",
+          payload.userId,
+          { status: "insufficient_credits", modelId, cost },
+          ipAddress
+        );
         return NextResponse.json(
           { error: "INSUFFICIENT_CREDITS", cost },
           { status: 402 }
@@ -151,6 +163,18 @@ export async function POST(request: NextRequest) {
           .where(eq(videoGenerations.id, generation.id));
       });
 
+      await recordEvent(
+        "video_generation_refund",
+        payload.userId,
+        {
+          status: "refunded",
+          generationId: generation.id,
+          modelId,
+          reason: "config_error",
+        },
+        ipAddress
+      );
+
       return NextResponse.json(
         { error: "Server configuration error" },
         { status: 500 }
@@ -175,6 +199,22 @@ export async function POST(request: NextRequest) {
           status: "processing",
         })
         .where(eq(videoGenerations.id, generation.id));
+
+      await recordEvent(
+        "video_generation",
+        payload.userId,
+        {
+          status: "submitted",
+          generationId: generation.id,
+          falRequestId: requestId,
+          modelId,
+          sourceImageId,
+          endImageId: endImageId || null,
+          params: mergedParams,
+          cost,
+        },
+        ipAddress
+      );
 
       return NextResponse.json({
         success: true,
@@ -203,6 +243,19 @@ export async function POST(request: NextRequest) {
           })
           .where(eq(videoGenerations.id, generation.id));
       });
+
+      await recordEvent(
+        "video_generation_refund",
+        payload.userId,
+        {
+          status: "refunded",
+          generationId: generation.id,
+          modelId,
+          reason: "fal_submission_error",
+          error: falError.message || "Failed to submit to Fal",
+        },
+        ipAddress
+      );
 
       return NextResponse.json(
         { error: "Failed to start video generation" },

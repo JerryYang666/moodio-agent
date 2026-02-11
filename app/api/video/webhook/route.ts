@@ -17,6 +17,7 @@ import {
 } from "@/lib/storage/s3";
 import { FalWebhookPayload, SeedanceVideoResult } from "@/lib/video/fal-client";
 import { waitUntil } from "@vercel/functions";
+import { recordEvent } from "@/lib/telemetry";
 
 /**
  * POST /api/video/webhook
@@ -81,7 +82,14 @@ export async function POST(request: NextRequest) {
     const errorMsg = error || payload_error || "Unknown error from Fal";
     
     // Refund user by looking up original charge
-    await refundGeneration(generation.id, errorMsg);
+    await refundGeneration(generation.id, generation.userId, errorMsg);
+
+    await recordEvent("video_generation", generation.userId, {
+      status: "failed",
+      generationId: generation.id,
+      modelId: generation.modelId,
+      error: errorMsg,
+    });
 
     console.error(`[Webhook] Generation ${generation.id} failed:`, errorMsg);
     return NextResponse.json({ received: true, status: "failed" });
@@ -92,7 +100,14 @@ export async function POST(request: NextRequest) {
     const errorMsg = payload_error || "No result payload received";
     
     // Refund user by looking up original charge
-    await refundGeneration(generation.id, errorMsg);
+    await refundGeneration(generation.id, generation.userId, errorMsg);
+
+    await recordEvent("video_generation", generation.userId, {
+      status: "failed",
+      generationId: generation.id,
+      modelId: generation.modelId,
+      error: errorMsg,
+    });
 
     console.error(`[Webhook] Generation ${generation.id} payload error:`, errorMsg);
     return NextResponse.json({ received: true, status: "failed" });
@@ -152,22 +167,43 @@ async function processVideoResult(
       })
       .where(eq(videoGenerations.id, generationId));
 
+    await recordEvent("video_generation", generation?.userId, {
+      status: "completed",
+      generationId,
+      modelId: generation?.modelId,
+      videoId,
+      seed: result.seed,
+    });
+
     console.log(`[Webhook] Generation ${generationId} completed successfully`);
   } catch (error) {
     console.error(`[Webhook] Error processing video for ${generationId}:`, error);
 
+    // Look up userId for telemetry
+    const [gen] = await db
+      .select({ userId: videoGenerations.userId, modelId: videoGenerations.modelId })
+      .from(videoGenerations)
+      .where(eq(videoGenerations.id, generationId))
+      .limit(1);
+
+    const errorMsg = error instanceof Error ? error.message : "Failed to process video";
+
     // Refund by looking up original charge
-    await refundGeneration(
+    await refundGeneration(generationId, gen?.userId, errorMsg);
+
+    await recordEvent("video_generation", gen?.userId, {
+      status: "failed",
       generationId,
-      error instanceof Error ? error.message : "Failed to process video"
-    );
+      modelId: gen?.modelId,
+      error: errorMsg,
+    });
   }
 }
 
 /**
  * Refund credits to user on failure by looking up the original charge
  */
-async function refundGeneration(generationId: string, reason: string) {
+async function refundGeneration(generationId: string, userId: string | undefined, reason: string) {
   try {
     const refundedAmount = await db.transaction(async (tx) => {
       // Refund by looking up the original charge
@@ -192,11 +228,25 @@ async function refundGeneration(generationId: string, reason: string) {
 
     if (refundedAmount) {
       console.log(`[Refund] Refunded ${refundedAmount} credits for generation ${generationId}`);
+      await recordEvent("video_generation_refund", userId, {
+        status: "refunded",
+        generationId,
+        reason,
+        refundedAmount,
+      });
     } else {
       console.warn(`[Refund] No charge found to refund for generation ${generationId}`);
     }
   } catch (error) {
     console.error(`[Refund] Failed to refund generation ${generationId}:`, error);
+
+    await recordEvent("video_generation_refund", userId, {
+      status: "refund_failed",
+      generationId,
+      reason,
+      error: error instanceof Error ? error.message : "Unknown refund error",
+    });
+
     // Ensure generation is marked as failed even if refund fails
     try {
       await db
