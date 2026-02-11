@@ -183,6 +183,7 @@
     "createFirstProject": "最初のプロジェクトを作成してアセットの整理を始めましょう",
     "createProject": "プロジェクトを作成",
     "createNewProject": "新規プロジェクトを作成",
+    "renameProject": "プロジェクト名を変更",
     "projectName": "プロジェクト名",
     "enterProjectName": "プロジェクト名を入力",
     "sharedCollections": "共有コレクション",

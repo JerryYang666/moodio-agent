@@ -183,6 +183,7 @@
     "createFirstProject": "Create your first project to start organizing assets",
     "createProject": "Create Project",
     "createNewProject": "Create New Project",
+    "renameProject": "Rename Project",
     "projectName": "Project Name",
     "enterProjectName": "Enter project name",
     "sharedCollections": "Shared collections",

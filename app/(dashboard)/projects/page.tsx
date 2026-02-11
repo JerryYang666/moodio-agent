@@ -8,6 +8,7 @@ import { Button } from "@heroui/button";
 import { Input } from "@heroui/input";
 import { Spinner } from "@heroui/spinner";
 import { Chip } from "@heroui/chip";
+import { Image } from "@heroui/image";
 import {
   Modal,
   ModalContent,
@@ -16,7 +17,13 @@ import {
   ModalFooter,
   useDisclosure,
 } from "@heroui/modal";
-import { Folder, Plus, Share2, FolderOpen } from "lucide-react";
+import {
+  Dropdown,
+  DropdownTrigger,
+  DropdownMenu,
+  DropdownItem,
+} from "@heroui/dropdown";
+import { Folder, Plus, Share2, FolderOpen, MoreVertical, Pencil } from "lucide-react";
 
 type Project = {
   id: string;
@@ -25,6 +32,7 @@ type Project = {
   isDefault: boolean;
   createdAt: Date;
   updatedAt: Date;
+  coverImageUrl: string | null;
 };
 
 type Collection = {
@@ -37,17 +45,26 @@ type Collection = {
   permission: "owner" | "collaborator" | "viewer";
   isOwner: boolean;
   sharedAt?: Date;
+  coverImageUrl: string | null;
 };
 
 export default function ProjectsPage() {
   const router = useRouter();
   const t = useTranslations();
   const { isOpen, onOpen, onOpenChange } = useDisclosure();
+  const {
+    isOpen: isRenameOpen,
+    onOpen: onRenameOpen,
+    onOpenChange: onRenameOpenChange,
+  } = useDisclosure();
   const [loading, setLoading] = useState(true);
   const [projects, setProjects] = useState<Project[]>([]);
   const [collections, setCollections] = useState<Collection[]>([]);
   const [newProjectName, setNewProjectName] = useState("");
   const [isCreating, setIsCreating] = useState(false);
+  const [projectToRename, setProjectToRename] = useState<Project | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const [isRenaming, setIsRenaming] = useState(false);
 
   const sharedCollections = useMemo(
     () => collections.filter((c) => !c.isOwner),
@@ -101,6 +118,34 @@ export default function ProjectsPage() {
       console.error("Error creating project", e);
     } finally {
       setIsCreating(false);
+    }
+  };
+
+  const handleRenameProject = async () => {
+    if (!projectToRename || !renameValue.trim()) return;
+    setIsRenaming(true);
+    try {
+      const res = await fetch(`/api/projects/${projectToRename.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: renameValue.trim() }),
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.project) {
+        setProjects((prev) =>
+          prev.map((p) =>
+            p.id === projectToRename.id ? { ...p, name: data.project.name } : p
+          )
+        );
+        onRenameOpenChange();
+        setProjectToRename(null);
+        setRenameValue("");
+      }
+    } catch (e) {
+      console.error("Error renaming project", e);
+    } finally {
+      setIsRenaming(false);
     }
   };
 
@@ -159,14 +204,55 @@ export default function ProjectsPage() {
               key={project.id}
               isPressable
               onPress={() => router.push(`/projects/${project.id}`)}
-              className="hover:scale-105 transition-transform"
+              className="hover:scale-105 transition-transform group"
             >
-              <CardBody className="p-4">
-                <div className="flex items-center justify-center w-full h-32 bg-default-100 rounded-lg mb-0">
-                  <Folder size={48} className="text-default-400" />
+              <CardBody className="p-3 pb-1 relative">
+                <div className="w-full h-40 bg-default-100 rounded-lg overflow-hidden">
+                  {project.coverImageUrl ? (
+                    <Image
+                      src={project.coverImageUrl}
+                      alt={project.name}
+                      radius="none"
+                      classNames={{
+                        wrapper: "w-full h-full !max-w-full",
+                        img: "w-full h-full object-cover",
+                      }}
+                    />
+                  ) : (
+                    <div className="flex items-center justify-center w-full h-full">
+                      <Folder size={48} className="text-default-400" />
+                    </div>
+                  )}
+                </div>
+                <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity z-10" onClick={(e) => e.stopPropagation()}>
+                  <Dropdown>
+                    <DropdownTrigger>
+                      <Button
+                        isIconOnly
+                        size="sm"
+                        variant="solid"
+                        className="bg-background/80 backdrop-blur-sm"
+                      >
+                        <MoreVertical size={16} />
+                      </Button>
+                    </DropdownTrigger>
+                    <DropdownMenu aria-label="Project actions">
+                      <DropdownItem
+                        key="rename"
+                        startContent={<Pencil size={16} />}
+                        onPress={() => {
+                          setProjectToRename(project);
+                          setRenameValue(project.name);
+                          onRenameOpen();
+                        }}
+                      >
+                        {t("common.rename")}
+                      </DropdownItem>
+                    </DropdownMenu>
+                  </Dropdown>
                 </div>
               </CardBody>
-              <CardFooter className="flex flex-col items-start gap-1 px-4 pb-4">
+              <CardFooter className="flex flex-col items-start gap-1 px-3 pt-1 pb-3">
                 <h3 className="font-semibold text-base truncate w-full">
                   {project.name}
                 </h3>
@@ -196,12 +282,26 @@ export default function ProjectsPage() {
                 isPressable
                 onPress={() => router.push(`/collection/${c.id}`)}
               >
-                <CardBody className="p-4">
-                  <div className="flex items-center justify-center w-full h-28 bg-default-100 rounded-lg mb-0">
-                    <Folder size={40} className="text-default-400" />
+                <CardBody className="p-3 pb-1">
+                  <div className="w-full h-36 bg-default-100 rounded-lg overflow-hidden">
+                    {c.coverImageUrl ? (
+                      <Image
+                        src={c.coverImageUrl}
+                        alt={c.name}
+                        radius="none"
+                        classNames={{
+                          wrapper: "w-full h-full !max-w-full",
+                          img: "w-full h-full object-cover",
+                        }}
+                      />
+                    ) : (
+                      <div className="flex items-center justify-center w-full h-full">
+                        <Folder size={40} className="text-default-400" />
+                      </div>
+                    )}
                   </div>
                 </CardBody>
-                <CardFooter className="flex flex-col items-start gap-1 px-4 pb-4">
+                <CardFooter className="flex flex-col items-start gap-1 px-3 pt-1 pb-3">
                   <h3 className="font-semibold text-base truncate w-full">
                     {c.name}
                   </h3>
@@ -243,6 +343,41 @@ export default function ProjectsPage() {
                   isDisabled={!newProjectName.trim()}
                 >
                   {t("common.create")}
+                </Button>
+              </ModalFooter>
+            </>
+          )}
+        </ModalContent>
+      </Modal>
+
+      <Modal isOpen={isRenameOpen} onOpenChange={onRenameOpenChange}>
+        <ModalContent>
+          {(onClose) => (
+            <>
+              <ModalHeader>{t("projects.renameProject")}</ModalHeader>
+              <ModalBody>
+                <Input
+                  label={t("projects.projectName")}
+                  placeholder={t("projects.enterProjectName")}
+                  value={renameValue}
+                  onValueChange={setRenameValue}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleRenameProject();
+                  }}
+                  autoFocus
+                />
+              </ModalBody>
+              <ModalFooter>
+                <Button variant="light" onPress={onClose}>
+                  {t("common.cancel")}
+                </Button>
+                <Button
+                  color="primary"
+                  onPress={handleRenameProject}
+                  isLoading={isRenaming}
+                  isDisabled={!renameValue.trim()}
+                >
+                  {t("common.rename")}
                 </Button>
               </ModalFooter>
             </>

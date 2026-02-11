@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { collections, collectionShares } from "@/lib/db/schema";
+import { collections, collectionShares, collectionImages } from "@/lib/db/schema";
 import { getAccessToken } from "@/lib/auth/cookies";
 import { verifyAccessToken } from "@/lib/auth/jwt";
-import { eq, or, and, desc } from "drizzle-orm";
+import { eq, or, and, desc, sql } from "drizzle-orm";
 import { ensureDefaultProject } from "@/lib/db/projects";
 import { projects } from "@/lib/db/schema";
+import { getImageUrl } from "@/lib/storage/s3";
 
 /**
  * GET /api/collection
@@ -45,11 +46,38 @@ export async function GET(req: NextRequest) {
       .where(eq(collectionShares.sharedWithUserId, userId))
       .orderBy(desc(collectionShares.sharedAt));
 
+    // Get all collection IDs
+    const allCollectionIds = [
+      ...ownedCollections.map((c) => c.id),
+      ...sharedCollectionsData.map((s) => s.collection.id),
+    ];
+
+    // Get cover images for each collection (most recently added asset)
+    const coverImages = allCollectionIds.length > 0
+      ? await db
+          .select({
+            collectionId: collectionImages.collectionId,
+            imageId: collectionImages.imageId,
+          })
+          .from(collectionImages)
+          .where(sql`${collectionImages.collectionId} IN ${allCollectionIds}`)
+          .orderBy(desc(collectionImages.addedAt))
+      : [];
+
+    // Create a map of collectionId -> coverImageUrl (first/most recent for each collection)
+    const coverMap = new Map<string, string>();
+    for (const cover of coverImages) {
+      if (cover.collectionId && !coverMap.has(cover.collectionId)) {
+        coverMap.set(cover.collectionId, getImageUrl(cover.imageId));
+      }
+    }
+
     // Format response
     const owned = ownedCollections.map((col) => ({
       ...col,
       permission: "owner" as const,
       isOwner: true,
+      coverImageUrl: coverMap.get(col.id) || null,
     }));
 
     const shared = sharedCollectionsData.map((item) => ({
@@ -57,6 +85,7 @@ export async function GET(req: NextRequest) {
       permission: item.permission,
       isOwner: false,
       sharedAt: item.sharedAt,
+      coverImageUrl: coverMap.get(item.collection.id) || null,
     }));
 
     return NextResponse.json({

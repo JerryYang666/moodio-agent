@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { projects } from "@/lib/db/schema";
+import { projects, collectionImages } from "@/lib/db/schema";
 import { getAccessToken } from "@/lib/auth/cookies";
 import { verifyAccessToken } from "@/lib/auth/jwt";
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, sql } from "drizzle-orm";
 import { ensureDefaultProject } from "@/lib/db/projects";
+import { getImageUrl } from "@/lib/storage/s3";
 
 /**
  * GET /api/projects
@@ -31,7 +32,36 @@ export async function GET(req: NextRequest) {
       .where(eq(projects.userId, userId))
       .orderBy(desc(projects.updatedAt));
 
-    return NextResponse.json({ projects: rows });
+    // Get cover images for each project (most recently added asset)
+    const projectIds = rows.map((p) => p.id);
+    
+    // Get the most recent asset for each project
+    const coverImages = projectIds.length > 0 
+      ? await db
+          .select({
+            projectId: collectionImages.projectId,
+            imageId: collectionImages.imageId,
+          })
+          .from(collectionImages)
+          .where(sql`${collectionImages.projectId} IN ${projectIds}`)
+          .orderBy(desc(collectionImages.addedAt))
+      : [];
+
+    // Create a map of projectId -> coverImageUrl (first/most recent for each project)
+    const coverMap = new Map<string, string>();
+    for (const cover of coverImages) {
+      if (!coverMap.has(cover.projectId)) {
+        coverMap.set(cover.projectId, getImageUrl(cover.imageId));
+      }
+    }
+
+    // Add cover image URL to each project
+    const projectsWithCovers = rows.map((project) => ({
+      ...project,
+      coverImageUrl: coverMap.get(project.id) || null,
+    }));
+
+    return NextResponse.json({ projects: projectsWithCovers });
   } catch (error) {
     console.error("Error fetching projects:", error);
     return NextResponse.json(

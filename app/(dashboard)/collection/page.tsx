@@ -8,6 +8,7 @@ import { Button } from "@heroui/button";
 import { Input } from "@heroui/input";
 import { Spinner } from "@heroui/spinner";
 import { Chip } from "@heroui/chip";
+import { Image } from "@heroui/image";
 import {
   Modal,
   ModalContent,
@@ -16,18 +17,32 @@ import {
   ModalFooter,
   useDisclosure,
 } from "@heroui/modal";
-import { Folder, Plus } from "lucide-react";
+import {
+  Dropdown,
+  DropdownTrigger,
+  DropdownMenu,
+  DropdownItem,
+} from "@heroui/dropdown";
+import { Folder, Plus, MoreVertical, Pencil } from "lucide-react";
 import { useCollections } from "@/hooks/use-collections";
 
 export default function CollectionsPage() {
   const router = useRouter();
   const t = useTranslations("collections");
   const tCommon = useTranslations("common");
-  const { collections, loading, createCollection, getDefaultCollectionName } =
+  const { collections, loading, createCollection, renameCollection, getDefaultCollectionName } =
     useCollections();
   const { isOpen, onOpen, onOpenChange } = useDisclosure();
+  const {
+    isOpen: isRenameOpen,
+    onOpen: onRenameOpen,
+    onOpenChange: onRenameOpenChange,
+  } = useDisclosure();
   const [newCollectionName, setNewCollectionName] = useState("");
   const [isCreating, setIsCreating] = useState(false);
+  const [collectionToRename, setCollectionToRename] = useState<{ id: string; name: string } | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const [isRenaming, setIsRenaming] = useState(false);
 
   const handleCreateCollection = async () => {
     if (!newCollectionName.trim()) return;
@@ -50,6 +65,23 @@ export default function CollectionsPage() {
   const handleOpenCreateModal = () => {
     setNewCollectionName(getDefaultCollectionName());
     onOpen();
+  };
+
+  const handleRenameCollection = async () => {
+    if (!collectionToRename || !renameValue.trim()) return;
+    setIsRenaming(true);
+    try {
+      const success = await renameCollection(collectionToRename.id, renameValue.trim());
+      if (success) {
+        onRenameOpenChange();
+        setCollectionToRename(null);
+        setRenameValue("");
+      }
+    } catch (error) {
+      console.error("Error renaming collection:", error);
+    } finally {
+      setIsRenaming(false);
+    }
   };
 
   if (loading) {
@@ -101,14 +133,57 @@ export default function CollectionsPage() {
               key={collection.id}
               isPressable
               onPress={() => router.push(`/collection/${collection.id}`)}
-              className="hover:scale-105 transition-transform"
+              className="hover:scale-105 transition-transform group"
             >
-              <CardBody className="p-4">
-                <div className="flex items-center justify-center w-full h-32 bg-default-100 rounded-lg mb-0">
-                  <Folder size={48} className="text-default-400" />
+              <CardBody className="p-3 pb-1 relative">
+                <div className="w-full h-40 bg-default-100 rounded-lg overflow-hidden">
+                  {collection.coverImageUrl ? (
+                    <Image
+                      src={collection.coverImageUrl}
+                      alt={collection.name}
+                      radius="none"
+                      classNames={{
+                        wrapper: "w-full h-full !max-w-full",
+                        img: "w-full h-full object-cover",
+                      }}
+                    />
+                  ) : (
+                    <div className="flex items-center justify-center w-full h-full">
+                      <Folder size={48} className="text-default-400" />
+                    </div>
+                  )}
                 </div>
+                {(collection.isOwner || collection.permission === "collaborator") && (
+                  <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity z-10" onClick={(e) => e.stopPropagation()}>
+                    <Dropdown>
+                      <DropdownTrigger>
+                        <Button
+                          isIconOnly
+                          size="sm"
+                          variant="solid"
+                          className="bg-background/80 backdrop-blur-sm"
+                        >
+                          <MoreVertical size={16} />
+                        </Button>
+                      </DropdownTrigger>
+                      <DropdownMenu aria-label="Collection actions">
+                        <DropdownItem
+                          key="rename"
+                          startContent={<Pencil size={16} />}
+                          onPress={() => {
+                            setCollectionToRename(collection);
+                            setRenameValue(collection.name);
+                            onRenameOpen();
+                          }}
+                        >
+                          {tCommon("rename")}
+                        </DropdownItem>
+                      </DropdownMenu>
+                    </Dropdown>
+                  </div>
+                )}
               </CardBody>
-              <CardFooter className="flex flex-col items-start gap-1 px-4 pb-4">
+              <CardFooter className="flex flex-col items-start gap-1 px-3 pt-1 pb-3">
                 <h3 className="font-semibold text-base truncate w-full">
                   {collection.name}
                 </h3>
@@ -163,6 +238,43 @@ export default function CollectionsPage() {
                   isDisabled={!newCollectionName.trim()}
                 >
                   {tCommon("create")}
+                </Button>
+              </ModalFooter>
+            </>
+          )}
+        </ModalContent>
+      </Modal>
+
+      <Modal isOpen={isRenameOpen} onOpenChange={onRenameOpenChange}>
+        <ModalContent>
+          {(onClose) => (
+            <>
+              <ModalHeader>{t("renameCollection")}</ModalHeader>
+              <ModalBody>
+                <Input
+                  label={t("collectionName")}
+                  placeholder={t("enterCollectionName")}
+                  value={renameValue}
+                  onValueChange={setRenameValue}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      handleRenameCollection();
+                    }
+                  }}
+                  autoFocus
+                />
+              </ModalBody>
+              <ModalFooter>
+                <Button variant="light" onPress={onClose}>
+                  {tCommon("cancel")}
+                </Button>
+                <Button
+                  color="primary"
+                  onPress={handleRenameCollection}
+                  isLoading={isRenaming}
+                  isDisabled={!renameValue.trim()}
+                >
+                  {tCommon("rename")}
                 </Button>
               </ModalFooter>
             </>

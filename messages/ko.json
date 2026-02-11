@@ -183,6 +183,7 @@
     "createFirstProject": "첫 번째 프로젝트를 만들어 애셋 정리를 시작하세요",
     "createProject": "프로젝트 만들기",
     "createNewProject": "새 프로젝트 만들기",
+    "renameProject": "프로젝트 이름 변경",
     "projectName": "프로젝트 이름",
     "enterProjectName": "프로젝트 이름 입력",
     "sharedCollections": "공유된 컬렉션",

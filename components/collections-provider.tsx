@@ -18,6 +18,7 @@ export interface Collection {
   permission: "owner" | "collaborator" | "viewer";
   isOwner: boolean;
   sharedAt?: Date;
+  coverImageUrl?: string | null;
 }
 
 export interface CollectionImage {

@@ -17,7 +17,13 @@ import {
   ModalFooter,
   useDisclosure,
 } from "@heroui/modal";
-import { ArrowLeft, Folder, Plus } from "lucide-react";
+import {
+  Dropdown,
+  DropdownTrigger,
+  DropdownMenu,
+  DropdownItem,
+} from "@heroui/dropdown";
+import { ArrowLeft, Folder, Plus, MoreVertical, Pencil } from "lucide-react";
 import ImageDetailModal, { ImageInfo } from "@/components/chat/image-detail-modal";
 
 type Project = {
@@ -36,6 +42,7 @@ type Collection = {
   name: string;
   createdAt: Date;
   updatedAt: Date;
+  coverImageUrl?: string | null;
 };
 
 type Asset = {
@@ -75,6 +82,12 @@ export default function ProjectDetailPage({
   } = useDisclosure();
 
   const {
+    isOpen: isRenameCollectionOpen,
+    onOpen: onRenameCollectionOpen,
+    onOpenChange: onRenameCollectionOpenChange,
+  } = useDisclosure();
+
+  const {
     isOpen: isImageDetailOpen,
     onOpen: onImageDetailOpen,
     onOpenChange: onImageDetailOpenChange,
@@ -83,6 +96,9 @@ export default function ProjectDetailPage({
 
   const [newCollectionName, setNewCollectionName] = useState("");
   const [isCreatingCollection, setIsCreatingCollection] = useState(false);
+  const [collectionToRename, setCollectionToRename] = useState<Collection | null>(null);
+  const [renameCollectionValue, setRenameCollectionValue] = useState("");
+  const [isRenamingCollection, setIsRenamingCollection] = useState(false);
 
   const [selectedImage, setSelectedImage] = useState<ImageInfo | null>(null);
   const [allImages, setAllImages] = useState<ImageInfo[]>([]);
@@ -132,6 +148,34 @@ export default function ProjectDetailPage({
       console.error("Error creating collection", e);
     } finally {
       setIsCreatingCollection(false);
+    }
+  };
+
+  const handleRenameCollection = async () => {
+    if (!collectionToRename || !renameCollectionValue.trim()) return;
+    setIsRenamingCollection(true);
+    try {
+      const res = await fetch(`/api/collection/${collectionToRename.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: renameCollectionValue.trim() }),
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.collection) {
+        setCollections((prev) =>
+          prev.map((c) =>
+            c.id === collectionToRename.id ? { ...c, name: data.collection.name } : c
+          )
+        );
+        onRenameCollectionOpenChange();
+        setCollectionToRename(null);
+        setRenameCollectionValue("");
+      }
+    } catch (e) {
+      console.error("Error renaming collection", e);
+    } finally {
+      setIsRenamingCollection(false);
     }
   };
 
@@ -272,13 +316,55 @@ export default function ProjectDetailPage({
                 key={collection.id}
                 isPressable
                 onPress={() => router.push(`/collection/${collection.id}`)}
+                className="group"
               >
-                <CardBody className="p-4">
-                  <div className="flex items-center justify-center w-full h-28 bg-default-100 rounded-lg mb-0">
-                    <Folder size={40} className="text-default-400" />
+                <CardBody className="p-3 pb-1 relative">
+                  <div className="w-full h-36 bg-default-100 rounded-lg overflow-hidden">
+                    {collection.coverImageUrl ? (
+                      <Image
+                        src={collection.coverImageUrl}
+                        alt={collection.name}
+                        radius="none"
+                        classNames={{
+                          wrapper: "w-full h-full !max-w-full",
+                          img: "w-full h-full object-cover",
+                        }}
+                      />
+                    ) : (
+                      <div className="flex items-center justify-center w-full h-full">
+                        <Folder size={40} className="text-default-400" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity z-10" onClick={(e) => e.stopPropagation()}>
+                    <Dropdown>
+                      <DropdownTrigger>
+                        <Button
+                          isIconOnly
+                          size="sm"
+                          variant="solid"
+                          className="bg-background/80 backdrop-blur-sm"
+                        >
+                          <MoreVertical size={16} />
+                        </Button>
+                      </DropdownTrigger>
+                      <DropdownMenu aria-label="Collection actions">
+                        <DropdownItem
+                          key="rename"
+                          startContent={<Pencil size={16} />}
+                          onPress={() => {
+                            setCollectionToRename(collection);
+                            setRenameCollectionValue(collection.name);
+                            onRenameCollectionOpen();
+                          }}
+                        >
+                          {tCommon("rename")}
+                        </DropdownItem>
+                      </DropdownMenu>
+                    </Dropdown>
                   </div>
                 </CardBody>
-                <CardFooter className="flex flex-col items-start gap-1 px-4 pb-4">
+                <CardFooter className="flex flex-col items-start gap-1 px-3 pt-1 pb-3">
                   <h3 className="font-semibold text-base truncate w-full">
                     {collection.name}
                   </h3>
@@ -318,6 +404,42 @@ export default function ProjectDetailPage({
                   isDisabled={!newCollectionName.trim()}
                 >
                   {tCommon("create")}
+                </Button>
+              </ModalFooter>
+            </>
+          )}
+        </ModalContent>
+      </Modal>
+
+      {/* Rename Collection Modal */}
+      <Modal isOpen={isRenameCollectionOpen} onOpenChange={onRenameCollectionOpenChange}>
+        <ModalContent>
+          {(onClose) => (
+            <>
+              <ModalHeader>{tCollections("renameCollection")}</ModalHeader>
+              <ModalBody>
+                <Input
+                  label={tCollections("collectionName")}
+                  placeholder={tCollections("enterCollectionName")}
+                  value={renameCollectionValue}
+                  onValueChange={setRenameCollectionValue}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleRenameCollection();
+                  }}
+                  autoFocus
+                />
+              </ModalBody>
+              <ModalFooter>
+                <Button variant="light" onPress={onClose}>
+                  {tCommon("cancel")}
+                </Button>
+                <Button
+                  color="primary"
+                  onPress={handleRenameCollection}
+                  isLoading={isRenamingCollection}
+                  isDisabled={!renameCollectionValue.trim()}
+                >
+                  {tCommon("rename")}
                 </Button>
               </ModalFooter>
             </>
