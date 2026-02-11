@@ -1,71 +1,49 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect, useCallback } from "react";
+import { useCallback } from "react";
 import { useAuth } from "@/hooks/use-auth";
-import { api } from "@/lib/api/client";
+import { useGetCreditsBalanceQuery } from "@/lib/redux/services/next-api";
 
-interface CreditsContextType {
+interface UseCreditsReturn {
   balance: number | null;
   loading: boolean;
   error: string | null;
-  refreshBalance: () => Promise<void>;
+  refreshBalance: () => void;
 }
 
-const CreditsContext = createContext<CreditsContextType | undefined>(undefined);
-
-export function CreditsProvider({ children }: { children: React.ReactNode }) {
+/**
+ * Hook to access user's credit balance using RTK Query.
+ *
+ * Benefits over the previous Context-based approach:
+ * - Automatic cache invalidation when video generation succeeds
+ * - No need for manual refreshBalance() calls in most cases
+ * - Shared cache across all components using this hook
+ * - Built-in loading and error states
+ *
+ * The balance automatically updates when:
+ * - User logs in/out
+ * - Video generation completes (via cache tag invalidation)
+ * - refreshBalance() is called manually
+ */
+export function useCredits(): UseCreditsReturn {
   const { user } = useAuth();
-  const [balance, setBalance] = useState<number | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  const fetchBalance = useCallback(async () => {
-    if (!user) {
-      setBalance(null);
-      return;
+  // Skip the query if user is not logged in
+  const { data, isLoading, error, refetch } = useGetCreditsBalanceQuery(undefined, {
+    skip: !user,
+  });
+
+  // Provide a manual refresh function for edge cases
+  const refreshBalance = useCallback(() => {
+    if (user) {
+      refetch();
     }
+  }, [user, refetch]);
 
-    setLoading(true);
-    setError(null);
-
-    try {
-      const data = await api.get("/api/users/credits/balance");
-      setBalance(data.balance);
-    } catch (err) {
-      console.error("Failed to fetch credits balance:", err);
-      setError(err instanceof Error ? err.message : "Failed to fetch balance");
-    } finally {
-      setLoading(false);
-    }
-  }, [user]);
-
-  // Fetch balance when user changes
-  useEffect(() => {
-    fetchBalance();
-  }, [fetchBalance]);
-
-  const refreshBalance = useCallback(async () => {
-    await fetchBalance();
-  }, [fetchBalance]);
-
-  return (
-    <CreditsContext.Provider
-      value={{
-        balance,
-        loading,
-        error,
-        refreshBalance,
-      }}
-    >
-      {children}
-    </CreditsContext.Provider>
-  );
-}
-
-export function useCredits() {
-  const context = useContext(CreditsContext);
-  if (context === undefined) {
-    throw new Error("useCredits must be used within a CreditsProvider");
-  }
-  return context;
+  return {
+    balance: user ? (data?.balance ?? null) : null,
+    loading: isLoading,
+    error: error ? "Failed to fetch balance" : null,
+    refreshBalance,
+  };
 }

@@ -17,6 +17,7 @@ import AssetPickerModal, {
 import { useVideo } from "@/components/video-provider";
 import { uploadImage } from "@/lib/upload/client";
 import UndoSendOverlay from "./undo-send-overlay";
+import { useGenerateVideoMutation } from "@/lib/redux/services/next-api";
 
 interface VideoModelParam {
   name: string;
@@ -121,6 +122,7 @@ export default function VideoGenerationPanel({
   const tChat = useTranslations("chat");
   const tCredits = useTranslations("credits");
   const { monitorGeneration } = useVideo();
+  const [generateVideo] = useGenerateVideoMutation();
   const [models, setModels] = useState<VideoModelConfig[]>([]);
   const [defaultModelId, setDefaultModelId] = useState<string>("");
   const [selectedModelId, setSelectedModelId] = useState<string>("");
@@ -464,32 +466,19 @@ export default function VideoGenerationPanel({
     setSubmitting(true);
 
     try {
-      const res = await fetch("/api/video/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          modelId: pendingData.modelId,
-          sourceImageId: pendingData.sourceImageId,
-          endImageId: pendingData.endImageId,
-          params: pendingData.params,
-        }),
-      });
-
-      if (!res.ok) {
-        const data = await res.json();
-        const errorMessage =
-          data.error === "INSUFFICIENT_CREDITS"
-            ? tCredits("insufficientCredits")
-            : data.error || t("failedToStartGeneration");
-        throw new Error(errorMessage);
-      }
-
-      const data = await res.json();
+      // Use RTK Query mutation - this automatically invalidates the Credits cache
+      // causing the balance to refresh in navbar/sidebar without manual refresh
+      const result = await generateVideo({
+        modelId: pendingData.modelId,
+        sourceImageId: pendingData.sourceImageId,
+        endImageId: pendingData.endImageId,
+        params: pendingData.params,
+      }).unwrap();
 
       // Start monitoring for notifications
-      monitorGeneration(data.generationId);
+      monitorGeneration(result.generationId);
 
-      onGenerationStarted?.(data.generationId);
+      onGenerationStarted?.(result.generationId);
 
       // Reset form
       setSourceImageId(null);
@@ -498,12 +487,18 @@ export default function VideoGenerationPanel({
       setEndImageUrl(null);
       setParams((prev) => ({ ...prev, prompt: "" }));
     } catch (e: any) {
-      setError(e.message || t("failedToStartGeneration"));
+      // Handle RTK Query error format
+      const errorData = e?.data || e;
+      const errorMessage =
+        errorData?.error === "INSUFFICIENT_CREDITS"
+          ? tCredits("insufficientCredits")
+          : errorData?.error || e?.message || t("failedToStartGeneration");
+      setError(errorMessage);
     } finally {
       setSubmitting(false);
       pendingGenerationRef.current = null;
     }
-  }, [monitorGeneration, onGenerationStarted, t, tCredits]);
+  }, [generateVideo, monitorGeneration, onGenerationStarted, t, tCredits]);
 
   if (loading) {
     return (
