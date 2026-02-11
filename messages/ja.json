@@ -228,6 +228,8 @@
     "videoCopiedDesc": "動画が「{collection}」にコピーされました",
     "failedToCopyItem": "アイテムのコピーに失敗しました",
     "backToCollections": "コレクションに戻る",
+    "backToProject": "プロジェクトに戻る",
+    "seeAllCollections": "すべてのコレクションを見る",
     "collectionNotFound": "コレクションが見つかりません",
     "openProject": "プロジェクトを開く",
     "noAssets": "アセットなし",

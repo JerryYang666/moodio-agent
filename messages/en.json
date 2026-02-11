@@ -228,6 +228,8 @@
     "videoCopiedDesc": "Video has been copied to \"{collection}\"",
     "failedToCopyItem": "Failed to copy item",
     "backToCollections": "Back to Collections",
+    "backToProject": "Back to Project",
+    "seeAllCollections": "See All Collections",
     "collectionNotFound": "Collection not found",
     "openProject": "Open Project",
     "noAssets": "No assets",

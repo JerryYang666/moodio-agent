@@ -228,6 +228,8 @@
     "videoCopiedDesc": "비디오가 \"{collection}\"(으)로 복사되었습니다",
     "failedToCopyItem": "항목 복사에 실패했습니다",
     "backToCollections": "컬렉션으로 돌아가기",
+    "backToProject": "프로젝트로 돌아가기",
+    "seeAllCollections": "모든 컬렉션 보기",
     "collectionNotFound": "컬렉션을 찾을 수 없습니다",
     "openProject": "프로젝트 열기",
     "noAssets": "애셋 없음",

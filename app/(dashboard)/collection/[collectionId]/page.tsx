@@ -648,14 +648,16 @@ export default function CollectionPage({
     <div className="container mx-auto px-4 py-8 max-w-7xl">
       {/* Header */}
       <div className="mb-8">
-        <Button
-          variant="light"
-          startContent={<ArrowLeft size={20} />}
-          onPress={() => router.push("/collection")}
-          className="mb-4"
-        >
-          {t("backToCollections")}
-        </Button>
+        {collection.projectId && (
+          <Button
+            variant="light"
+            startContent={<ArrowLeft size={20} />}
+            onPress={() => router.push(`/projects/${collection.projectId}`)}
+            className="mb-4"
+          >
+            {t("backToProject")}
+          </Button>
+        )}
 
         <div className="flex flex-col sm:flex-row justify-between sm:items-start gap-4 sm:gap-0">
           <div className="flex-1">
@@ -668,15 +670,13 @@ export default function CollectionPage({
               >
                 {collection.permission}
               </Chip>
-              {collection.isOwner && collection.projectId && (
-                <Button
-                  size="sm"
-                  variant="flat"
-                  onPress={() => router.push(`/projects/${collection.projectId}`)}
-                >
-                  {t("openProject")}
-                </Button>
-              )}
+              <Button
+                size="sm"
+                variant="flat"
+                onPress={() => router.push("/collection")}
+              >
+                {t("seeAllCollections")}
+              </Button>
             </div>
             <p className="text-default-500">{getAssetCountText()}</p>
           </div>

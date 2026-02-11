@@ -228,6 +228,8 @@
     "videoCopiedDesc": "影片已複製至「{collection}」",
     "failedToCopyItem": "複製項目失敗",
     "backToCollections": "返回集合",
+    "backToProject": "返回專案",
+    "seeAllCollections": "查看所有集合",
     "collectionNotFound": "找不到集合",
     "openProject": "開啟專案",
     "noAssets": "沒有素材",
