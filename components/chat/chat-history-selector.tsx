@@ -336,7 +336,7 @@ export const ChatHistorySelector = ({
   const t = useTranslations("chat");
   const tNav = useTranslations("nav");
   const { chats } = useChat();
-  const [viewMode, setViewMode] = useState<"list" | "grid">("list");
+  const [viewMode, setViewMode] = useState<"list" | "grid">("grid");
 
   const handleNewChat = () => {
     if (onNewChat) {

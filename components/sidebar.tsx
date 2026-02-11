@@ -342,7 +342,7 @@ export const Sidebar = () => {
   const t = useTranslations();
   const { chats, refreshChats } = useChat();
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const [viewMode, setViewMode] = useState<"list" | "grid">("list");
+  const [viewMode, setViewMode] = useState<"list" | "grid">("grid");
 
   useEffect(() => {
     const handleRefreshChats = () => {
