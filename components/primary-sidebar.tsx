@@ -14,6 +14,7 @@ import {
   User as UserIcon,
   BookOpen,
   Bean,
+  PencilRuler,
 } from "lucide-react";
 import { Avatar } from "@heroui/avatar";
 import { Tooltip } from "@heroui/tooltip";
@@ -113,31 +114,52 @@ export const PrimarySidebar = () => {
           );
         })}
 
-        {/* Admin Link */}
-        {user && user.roles.includes("admin") && (
-          <Tooltip content={t("admin")} placement="right" closeDelay={0}>
-            <NextLink
-              href="/admin"
-              className={clsx(
-                "p-2 rounded-xl transition-all duration-300 group relative mt-auto z-0 flex items-center justify-center",
-                pathname?.startsWith("/admin")
-                  ? "text-primary"
-                  : "text-default-500 hover:bg-default-100 hover:text-default-900"
-              )}
-            >
-              <Shield size={20} />
-              {pathname?.startsWith("/admin") && (
-                <motion.div
-                  layoutId="active-indicator"
-                  className="absolute inset-0 bg-primary/10 rounded-xl -z-10 shadow-sm"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                />
-              )}
-            </NextLink>
-          </Tooltip>
-        )}
+        {/* Annotation Platform & Admin Links */}
+        <div className="mt-auto flex flex-col gap-2 items-center">
+          {/* Annotation Platform Link */}
+          {user &&
+            (user.roles.includes("admin") ||
+              user.roles.includes("annotator")) && (
+              <Tooltip
+                content={t("annotationPlatform")}
+                placement="right"
+                closeDelay={0}
+              >
+                <NextLink
+                  href="/api/auth/annotation-redirect"
+                  className="p-2 rounded-xl transition-all duration-300 group relative z-0 flex items-center justify-center text-default-500 hover:bg-default-100 hover:text-default-900"
+                >
+                  <PencilRuler size={20} />
+                </NextLink>
+              </Tooltip>
+            )}
+
+          {/* Admin Link */}
+          {user && user.roles.includes("admin") && (
+            <Tooltip content={t("admin")} placement="right" closeDelay={0}>
+              <NextLink
+                href="/admin"
+                className={clsx(
+                  "p-2 rounded-xl transition-all duration-300 group relative z-0 flex items-center justify-center",
+                  pathname?.startsWith("/admin")
+                    ? "text-primary"
+                    : "text-default-500 hover:bg-default-100 hover:text-default-900"
+                )}
+              >
+                <Shield size={20} />
+                {pathname?.startsWith("/admin") && (
+                  <motion.div
+                    layoutId="active-indicator"
+                    className="absolute inset-0 bg-primary/10 rounded-xl -z-10 shadow-sm"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                  />
+                )}
+              </NextLink>
+            </Tooltip>
+          )}
+        </div>
       </div>
 
       {/* Credits Display */}

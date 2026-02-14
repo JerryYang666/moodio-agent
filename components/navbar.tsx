@@ -26,6 +26,7 @@ import {
   MoreHorizontal,
   Bean,
   User as UserIcon,
+  PencilRuler,
 } from "lucide-react";
 import { Avatar } from "@heroui/avatar";
 import { Popover, PopoverTrigger, PopoverContent } from "@heroui/popover";
@@ -229,6 +230,17 @@ export const Navbar = () => {
           <div className="mt-auto pt-2 px-4 pb-16 shrink-0 border-t border-divider/50">
             {user && (
               <div className="flex flex-col gap-2">
+                {(user.roles.includes("admin") ||
+                  user.roles.includes("annotator")) && (
+                  <NextLink
+                    href="/api/auth/annotation-redirect"
+                    onClick={() => setIsMenuOpen(false)}
+                    className="flex items-center gap-2 px-3 py-2 rounded-xl transition-colors text-default-500 hover:bg-default-100"
+                  >
+                    <PencilRuler size={20} />
+                    <span>{t("nav.annotationPlatform")}</span>
+                  </NextLink>
+                )}
                 {user.roles.includes("admin") && (
                   <NextLink
                     href="/admin"
