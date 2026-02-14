@@ -2,6 +2,7 @@ import { createApi } from "@reduxjs/toolkit/query/react";
 import type { QueryState } from "../types";
 import { buildApiQueryParams } from "../utils";
 import { createBaseQueryWithReauth } from "./base-query";
+import type { TaxonomyPropertyNode } from "@/lib/filterGrouping";
 
 // Constants
 const API_BASE_URL = `${process.env.NEXT_PUBLIC_FLASK_URL}/api`;
@@ -60,7 +61,10 @@ export interface VideosResponse {
 export interface PropertyValue {
   id: number;
   value: string;
-  display_order?: number;
+  property_id: number | null;
+  display_order?: number | null;
+  hidden?: boolean; // Direct hidden flag
+  effective_hidden?: boolean; // Inherited hidden (via parent property)
 }
 
 // Property can also represent a root-level PropertyValue (when 'value' is present and 'name' is not)
@@ -68,7 +72,10 @@ export interface Property {
   id: number;
   name?: string;  // Optional for root-level PropertyValues
   value?: string;  // Only present for root-level PropertyValues
-  display_order?: number;
+  property_id?: number | null;
+  display_order?: number | null;
+  hidden?: boolean; // Direct hidden flag (admin-set)
+  effective_hidden?: boolean; // Inherited hidden (hidden via parent property)
   values: PropertyValue[];
   children: Property[]; // Recursive reference for unlimited nesting
 }
@@ -79,9 +86,9 @@ export const api = createApi({
   tagTypes: ["Videos", "Properties"],
 
   endpoints: (builder) => ({
-    getVideos: builder.query<VideosResponse, QueryState>({
-      query: (queryState) => {
-        const params = buildApiQueryParams(queryState);
+    getVideos: builder.query<VideosResponse, { queryState: QueryState; properties: TaxonomyPropertyNode[] }>({
+      query: ({ queryState, properties }) => {
+        const params = buildApiQueryParams(queryState, properties);
         return `/content?${params.toString()}`;
       },
 
@@ -111,7 +118,8 @@ export const api = createApi({
       // Cache based on intent (search+filters), NOT cursor/searchId
       // This ensures same intent = same cache entry, regardless of pagination state
       serializeQueryArgs: ({ queryArgs }) => {
-        const { textSearch, selectedFolders, selectedFilters, contentTypes, isAigc } = queryArgs;
+        const { queryState } = queryArgs;
+        const { textSearch, selectedFolders, selectedFilters, contentTypes, isAigc } = queryState;
         // Include contentTypes and isAigc in cache key since they affect results
         // Sort contentTypes array for consistent cache key regardless of selection order
         const sortedContentTypes = [...contentTypes].sort().join(",");
@@ -124,7 +132,7 @@ export const api = createApi({
         if (!newData?.content) return currentCache;
 
         // If this is a new search (no cursor), replace cache entirely
-        if (!arg.cursor) {
+        if (!arg.queryState.cursor) {
           return newData;
         }
 
@@ -151,19 +159,21 @@ export const api = createApi({
       // Intent changes: search/filters/contentTypes/isAigc
       // Cursor changes: user scrolled to next page
       forceRefetch({ currentArg, previousArg }) {
+        const cur = currentArg?.queryState;
+        const prev = previousArg?.queryState;
         // Intent changed
         if (
-          currentArg?.textSearch !== previousArg?.textSearch ||
-          JSON.stringify(currentArg?.selectedFolders) !== JSON.stringify(previousArg?.selectedFolders) ||
-          JSON.stringify(currentArg?.selectedFilters) !== JSON.stringify(previousArg?.selectedFilters) ||
-          JSON.stringify([...(currentArg?.contentTypes || [])].sort()) !== JSON.stringify([...(previousArg?.contentTypes || [])].sort()) ||
-          currentArg?.isAigc !== previousArg?.isAigc
+          cur?.textSearch !== prev?.textSearch ||
+          JSON.stringify(cur?.selectedFolders) !== JSON.stringify(prev?.selectedFolders) ||
+          JSON.stringify(cur?.selectedFilters) !== JSON.stringify(prev?.selectedFilters) ||
+          JSON.stringify([...(cur?.contentTypes || [])].sort()) !== JSON.stringify([...(prev?.contentTypes || [])].sort()) ||
+          cur?.isAigc !== prev?.isAigc
         ) {
           return true;
         }
 
         // Cursor changed (pagination)
-        if (currentArg?.cursor !== previousArg?.cursor) {
+        if (cur?.cursor !== prev?.cursor) {
           return true;
         }
 

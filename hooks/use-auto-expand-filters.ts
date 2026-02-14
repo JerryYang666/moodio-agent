@@ -1,11 +1,11 @@
 import { useEffect, useRef } from 'react';
-import type { Property } from '@/lib/redux/services/api';
+import type { TaxonomyPropertyNode } from '@/lib/filterGrouping';
 
-function findPropertyPaths(properties: Property[], targetIds: number[]): Set<number> {
+function findPropertyPaths(properties: TaxonomyPropertyNode[], targetIds: number[]): Set<number> {
     const pathsToExpand = new Set<number>();
 
     const findPropertyValuePath = (
-        property: Property,
+        property: TaxonomyPropertyNode,
         targetValueId: number,
         currentPath: number[] = []
     ): number[] | null => {
@@ -43,7 +43,7 @@ function findPropertyPaths(properties: Property[], targetIds: number[]): Set<num
 }
 
 export function useAutoExpandFilters(
-    properties: Property[] | undefined,
+    properties: TaxonomyPropertyNode[] | undefined,
     selectedFilters: number[],
     setExpandedState: React.Dispatch<React.SetStateAction<Record<number, boolean>>>
 ) {

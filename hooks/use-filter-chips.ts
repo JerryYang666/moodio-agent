@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import type { Property } from '@/lib/redux/services/api';
+import type { TaxonomyPropertyNode } from '@/lib/filterGrouping';
 
 export interface FilterChip {
     id: number;
@@ -7,7 +7,7 @@ export interface FilterChip {
 }
 
 export function useFilterChips(
-    properties: Property[] | undefined,
+    properties: TaxonomyPropertyNode[] | undefined,
     selectedFilters: number[]
 ): FilterChip[] {
     return useMemo(() => {
@@ -15,7 +15,7 @@ export function useFilterChips(
 
         const map = new Map<number, string>();
 
-        const buildMap = (propertyList: Property[], parentName?: string) => {
+        const buildMap = (propertyList: TaxonomyPropertyNode[], parentName?: string) => {
             for (const prop of propertyList) {
                 // Handle root-level PropertyValues (has 'value' but no 'name')
                 if ('value' in prop && prop.value && !prop.name) {

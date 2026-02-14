@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '@/lib/redux/store';
 import {
@@ -13,6 +13,8 @@ import { PropertyFilterTree } from '@/components/browse/PropertyFilterTree';
 import { ContentTypeFilter } from './ContentTypeFilter';
 import { AiGeneratedFilter, type SourceFilterValue } from './AiGeneratedFilter';
 import { useAutoExpandFilters } from '@/hooks/use-auto-expand-filters';
+import { buildPropertyValueLookup } from '@/lib/filterGrouping';
+import { addToast } from '@heroui/toast';
 
 const FilterMenu: React.FC = () => {
   const dispatch = useDispatch();
@@ -23,8 +25,38 @@ const FilterMenu: React.FC = () => {
   const { data: properties, isLoading, error } = useGetPropertiesQuery();
   const [expandedState, setExpandedState] = useState<Record<number, boolean>>({});
 
+  // Track previous selected filters to avoid redundant sanitization dispatches
+  const prevSanitizedRef = useRef<string>("");
+
   // Auto-expand logic
   useAutoExpandFilters(properties, selectedFilters, setExpandedState);
+
+  // Sanitize selected filters when taxonomy data refreshes/changes.
+  // Drop any selected IDs that no longer exist in the current taxonomy.
+  useEffect(() => {
+    if (!properties || properties.length === 0 || selectedFilters.length === 0) {
+      return;
+    }
+
+    const lookup = buildPropertyValueLookup(properties);
+    const valid = selectedFilters.filter((id) => lookup.has(id));
+    const removedCount = selectedFilters.length - valid.length;
+
+    if (removedCount === 0) return;
+
+    // Build a key so we don't dispatch the same sanitization twice
+    const key = valid.join(",");
+    if (prevSanitizedRef.current === key) return;
+    prevSanitizedRef.current = key;
+
+    dispatch(setQuerySelectedFilters(valid));
+
+    addToast({
+      title: "Filters updated",
+      description: `${removedCount} unavailable filter(s) removed`,
+      color: "warning",
+    });
+  }, [properties, selectedFilters, dispatch]);
 
   const handleFilterToggle = (filterId: number) => {
     const newSelectedFilters = selectedFilters.includes(filterId)

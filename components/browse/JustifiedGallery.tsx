@@ -12,11 +12,14 @@ export interface Photo {
   id: number;
   videoName: string;
   dimensionsLoaded?: boolean; // Optional: true if actual dimensions loaded
+  footer?: React.ReactNode; // Optional footer rendered below the video
+  footerHeight?: number; // Height of the footer in pixels (default 0)
 }
 
 interface RowData {
   photos: Photo[];
-  rowHeight: number;
+  rowHeight: number; // Media-only height
+  footerHeight: number; // Max footer height across photos in this row
 }
 
 interface AnchorInfo {
@@ -51,7 +54,7 @@ const getAnchorAtScroll = (
 
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
-    const rowHeight = row.rowHeight + spacing;
+    const rowHeight = row.rowHeight + row.footerHeight + spacing;
     const rowTop = cumulativeHeight;
     const rowBottom = cumulativeHeight + rowHeight;
 
@@ -95,7 +98,7 @@ const getScrollForAnchor = (
       // Target video is in this row - scroll to row top
       return cumulativeHeight;
     }
-    cumulativeHeight += row.rowHeight + spacing;
+    cumulativeHeight += row.rowHeight + row.footerHeight + spacing;
     videoIndex += row.photos.length;
   }
 
@@ -139,10 +142,12 @@ const calculateJustifiedLayout = (
         0
       );
       const rowHeight = (containerWidth - totalSpacing) / totalAspectRatio;
+      const maxFooter = Math.max(0, ...currentRow.map((p) => p.footerHeight ?? 0));
 
       rows.push({
         photos: [...currentRow],
         rowHeight: rowHeight,
+        footerHeight: maxFooter,
       });
 
       // Start new row with current photo
@@ -171,10 +176,12 @@ const calculateJustifiedLayout = (
       const rowHeight = isRowComplete
         ? (containerWidth - totalSpacing) / totalAspectRatio
         : targetRowHeight;
+      const maxFooter = Math.max(0, ...currentRow.map((p) => p.footerHeight ?? 0));
 
       rows.push({
         photos: [...currentRow],
         rowHeight: rowHeight,
+        footerHeight: maxFooter,
       });
     }
   });
@@ -326,13 +333,19 @@ export const JustifiedGallery: React.FC<JustifiedGalleryProps> = ({
             const photoWidth = row.rowHeight * aspectRatio;
 
             return (
-              <LazyVideo
-                key={photo.key}
-                src={photo.src}
-                width={photoWidth}
-                height={row.rowHeight}
-                onClick={() => onClick?.(photo)}
-              />
+              <div key={photo.key} className="flex flex-col" style={{ width: photoWidth }}>
+                <LazyVideo
+                  src={photo.src}
+                  width={photoWidth}
+                  height={row.rowHeight}
+                  onClick={() => onClick?.(photo)}
+                />
+                {photo.footer && (
+                  <div style={{ height: photo.footerHeight ?? "auto" }}>
+                    {photo.footer}
+                  </div>
+                )}
+              </div>
             );
           })}
         </div>

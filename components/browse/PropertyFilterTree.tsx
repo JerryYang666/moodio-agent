@@ -4,6 +4,7 @@ import React from 'react';
 import { Accordion, AccordionItem } from '@heroui/accordion';
 import { Checkbox } from '@heroui/checkbox';
 import { Spinner } from '@heroui/spinner';
+import { Chip } from '@heroui/chip';
 import type { Property, PropertyValue } from '@/lib/redux/services/api';
 
 interface ExpandedState {
@@ -68,6 +69,12 @@ const PropertyItem: React.FC<PropertyItemProps> = ({
                     `}>
                         {property.name}
                     </p>
+                    {property.hidden && (
+                        <Chip size="sm" variant="flat" color="warning" className="h-4 text-[10px]">Hidden</Chip>
+                    )}
+                    {!property.hidden && property.effective_hidden && (
+                        <Chip size="sm" variant="flat" color="default" className="h-4 text-[10px]">Inherited Hidden</Chip>
+                    )}
                 </div>
             </button>
 
@@ -99,6 +106,12 @@ const PropertyItem: React.FC<PropertyItemProps> = ({
                                 `}>
                                     {value.value}
                                 </span>
+                                {value.hidden && (
+                                    <Chip size="sm" variant="flat" color="warning" className="h-4 text-[10px] ml-auto">Hidden</Chip>
+                                )}
+                                {!value.hidden && value.effective_hidden && (
+                                    <Chip size="sm" variant="flat" color="default" className="h-4 text-[10px] ml-auto">Inherited</Chip>
+                                )}
                             </div>
                         );
                     })}
