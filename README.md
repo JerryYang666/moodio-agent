@@ -65,7 +65,7 @@ Moodio Agent is a comprehensive creative AI platform that combines conversationa
 - Email OTP (one-time password) authentication
 - WebAuthn/Passkey support for passwordless login
 - JWT-based session management with refresh tokens
-- Role-based access control (user, admin, new_user)
+- Role-based access control (user, annotator, admin, new_user)
 
 ### Admin Dashboard
 - User management with credit grants
@@ -546,6 +546,7 @@ await refundCharge(relatedEntity, reason);
 |------|-------------|
 | `new_user` | Default role, limited access |
 | `user` | Full platform access |
+| `annotator` | Annotation and labeling access |
 | `admin` | Admin panel access |
 
 ## Admin Panel

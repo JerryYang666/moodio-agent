@@ -419,7 +419,9 @@ export default function AdminPage() {
                                 ? "danger"
                                 : role === "new_user"
                                   ? "warning"
-                                  : "primary"
+                                  : role === "annotator"
+                                    ? "secondary"
+                                    : "primary"
                             }
                           >
                             {role}
@@ -638,6 +640,7 @@ export default function AdminPage() {
                   <SelectItem key="user">User</SelectItem>
                   <SelectItem key="admin">Admin</SelectItem>
                   <SelectItem key="new_user">New User</SelectItem>
+                  <SelectItem key="annotator">Annotator</SelectItem>
                 </Select>
                 <Select
                   label="Testing Groups"
