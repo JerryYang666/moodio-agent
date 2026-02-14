@@ -35,6 +35,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useChat } from "@/hooks/use-chat";
 import { useCredits } from "@/hooks/use-credits";
 import { ChatHistorySelector } from "@/components/chat/chat-history-selector";
+import { siteConfig } from "@/config/site";
 
 export const Navbar = () => {
   const pathname = usePathname();
@@ -232,14 +233,14 @@ export const Navbar = () => {
               <div className="flex flex-col gap-2">
                 {(user.roles.includes("admin") ||
                   user.roles.includes("annotator")) && (
-                  <NextLink
-                    href="/api/auth/annotation-redirect"
+                  <a
+                    href={siteConfig.annotationPlatformUrl}
                     onClick={() => setIsMenuOpen(false)}
                     className="flex items-center gap-2 px-3 py-2 rounded-xl transition-colors text-default-500 hover:bg-default-100"
                   >
                     <PencilRuler size={20} />
                     <span>{t("nav.annotationPlatform")}</span>
-                  </NextLink>
+                  </a>
                 )}
                 {user.roles.includes("admin") && (
                   <NextLink

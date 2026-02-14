@@ -59,8 +59,17 @@ export function setAccessTokenCookie(
  * Clear authentication cookies
  */
 export function clearAuthCookies(response: NextResponse): NextResponse {
-  response.cookies.delete(siteConfig.auth.accessToken.cookieName);
-  response.cookies.delete(siteConfig.auth.refreshToken.cookieName);
+  const { httpOnly: _h, secure: _s, sameSite: _ss, ...deleteOptions } =
+    siteConfig.auth.cookie;
+
+  response.cookies.delete({
+    name: siteConfig.auth.accessToken.cookieName,
+    ...deleteOptions,
+  });
+  response.cookies.delete({
+    name: siteConfig.auth.refreshToken.cookieName,
+    ...deleteOptions,
+  });
 
   return response;
 }

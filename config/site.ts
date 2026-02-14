@@ -57,9 +57,18 @@ export const siteConfig = {
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax" as const,
       path: "/",
+      // In production set AUTH_COOKIE_DOMAIN=.moodio.art to scope cookies across subdomains
+      ...(process.env.AUTH_COOKIE_DOMAIN
+        ? { domain: process.env.AUTH_COOKIE_DOMAIN }
+        : {}),
     },
   },
   
+  // Annotation Platform
+  annotationPlatformUrl:
+    process.env.NEXT_PUBLIC_ANNOTATION_PLATFORM_URL ||
+    "https://admin.moodio.art/admin/browse-shots-admin",
+
   // Audio Recording Configuration
   audioRecording: {
     maxDuration: 120, // 2 minutes in seconds

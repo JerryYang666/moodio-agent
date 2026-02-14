@@ -29,6 +29,7 @@ import {
   PopoverTrigger,
   PopoverContent,
 } from "@heroui/popover";
+import { siteConfig } from "@/config/site";
 
 export const PrimarySidebar = () => {
   const pathname = usePathname();
@@ -125,12 +126,12 @@ export const PrimarySidebar = () => {
                 placement="right"
                 closeDelay={0}
               >
-                <NextLink
-                  href="/api/auth/annotation-redirect"
+                <a
+                  href={siteConfig.annotationPlatformUrl}
                   className="p-2 rounded-xl transition-all duration-300 group relative z-0 flex items-center justify-center text-default-500 hover:bg-default-100 hover:text-default-900"
                 >
                   <PencilRuler size={20} />
-                </NextLink>
+                </a>
               </Tooltip>
             )}
 

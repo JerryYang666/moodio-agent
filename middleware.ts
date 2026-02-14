@@ -256,9 +256,10 @@ export async function middleware(request: NextRequest) {
     response = NextResponse.redirect(loginUrl);
   }
 
-  // Delete cookies to clean up
-  response.cookies.delete(siteConfig.auth.accessToken.cookieName);
-  response.cookies.delete(siteConfig.auth.refreshToken.cookieName);
+  // Delete cookies to clean up (must include domain/path to match domain-scoped cookies)
+  const cookieDeleteOpts = { path: siteConfig.auth.cookie.path, ...(siteConfig.auth.cookie.domain ? { domain: siteConfig.auth.cookie.domain } : {}) };
+  response.cookies.delete({ name: siteConfig.auth.accessToken.cookieName, ...cookieDeleteOpts });
+  response.cookies.delete({ name: siteConfig.auth.refreshToken.cookieName, ...cookieDeleteOpts });
   clearCloudFrontCookies(response);
 
   return response;
