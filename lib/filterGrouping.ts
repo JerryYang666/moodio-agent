@@ -22,6 +22,7 @@ export interface TaxonomyPropertyNode {
   id: number;
   name?: string;            // present for property nodes
   value?: string;           // present for root-level value nodes
+  description?: string | null; // present for root-level value nodes
   property_id?: number | null;
   display_order?: number | null;
   values: TaxonomyPropertyValue[];

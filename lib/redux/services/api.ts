@@ -61,6 +61,7 @@ export interface VideosResponse {
 export interface PropertyValue {
   id: number;
   value: string;
+  description?: string | null;
   property_id: number | null;
   display_order?: number | null;
   hidden?: boolean; // Direct hidden flag
