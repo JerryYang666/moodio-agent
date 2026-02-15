@@ -82,7 +82,7 @@ const FilterMenu: React.FC = () => {
   return (
     <div className="w-full flex flex-col h-full">
       {/* Fixed filters at top */}
-      <div className="shrink-0 flex flex-col gap-2 mb-3">
+      <div className="shrink-0 flex flex-col gap-4 pb-4 border-b border-divider">
         <ContentTypeFilter
           selectedTypes={contentTypes}
           onChange={(types) => dispatch(setQueryContentTypes(types))}
@@ -94,8 +94,15 @@ const FilterMenu: React.FC = () => {
         />
       </div>
 
+      {/* Taxonomy section header */}
+      <div className="shrink-0 pt-4 pb-2">
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-default-400">
+          {t("taxonomy")}
+        </p>
+      </div>
+
       {/* Scrollable property tree */}
-      <div className="flex-1 min-h-0 overflow-y-auto">
+      <div className="flex-1 min-h-0 overflow-y-auto -mx-1 px-1">
         <PropertyFilterTree
           properties={properties || []}
           selectedFilters={selectedFilters}

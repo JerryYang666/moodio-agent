@@ -305,7 +305,8 @@
     "noFiltersAvailable": "No filters available",
     "hidden": "Hidden",
     "inheritedHidden": "Inherited Hidden",
-    "inherited": "Inherited"
+    "inherited": "Inherited",
+    "taxonomy": "Taxonomy"
   },
   "video": {
     "generateVideo": "Generate Video",

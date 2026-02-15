@@ -2,10 +2,16 @@
 
 import React from 'react';
 import { useTranslations } from 'next-intl';
-import { Chip } from '@heroui/chip';
+import { Film, Image, Layers } from 'lucide-react';
 
 // Content types are intentionally hardcoded to match server enum.
 const CONTENT_TYPES = ['shot', 'image', 'multishot'] as const;
+
+const CONTENT_TYPE_ICONS: Record<string, React.ReactNode> = {
+  shot: <Film size={13} />,
+  image: <Image size={13} />,
+  multishot: <Layers size={13} />,
+};
 
 interface ContentTypeFilterProps {
   selectedTypes: string[];
@@ -20,35 +26,36 @@ export const ContentTypeFilter: React.FC<ContentTypeFilterProps> = ({
 
   const handleToggle = (type: string) => {
     if (selectedTypes.includes(type)) {
-      // Remove from selection
       onChange(selectedTypes.filter(t => t !== type));
     } else {
-      // Add to selection
       onChange([...selectedTypes, type]);
     }
   };
 
   return (
-    <div className="mb-2 pb-2 border-b border-divider">
-      <label className="block mb-1.5">
-        <p className="font-medium text-xs leading-4 tracking-wide uppercase text-default-600">
-          {t("contentType")}
-        </p>
-      </label>
-      <div className="flex flex-wrap gap-1">
+    <div>
+      <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-default-400">
+        {t("contentType")}
+      </p>
+      <div className="flex flex-wrap gap-1.5">
         {CONTENT_TYPES.map((type) => {
           const isSelected = selectedTypes.includes(type);
           return (
-            <Chip
+            <button
               key={type}
-              variant={isSelected ? "solid" : "flat"}
-              color={isSelected ? "primary" : "default"}
-              size="sm"
-              className="cursor-pointer"
               onClick={() => handleToggle(type)}
+              className={`
+                inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium
+                transition-all duration-200 ease-out select-none
+                ${isSelected
+                  ? 'bg-primary text-primary-foreground shadow-sm shadow-primary/25'
+                  : 'bg-default-100 text-default-600 hover:bg-default-200 hover:text-default-700'
+                }
+              `}
             >
+              {CONTENT_TYPE_ICONS[type]}
               {type.charAt(0).toUpperCase() + type.slice(1)}
-            </Chip>
+            </button>
           );
         })}
       </div>

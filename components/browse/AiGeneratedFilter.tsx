@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { useTranslations } from 'next-intl';
-import { Chip } from '@heroui/chip';
+import { Sparkles, Camera } from 'lucide-react';
 
 // Source filter values: 'ai' or 'non_ai', or undefined when neither selected (no filter)
 export type SourceFilterValue = 'ai' | 'non_ai' | undefined;
@@ -20,40 +20,46 @@ export const AiGeneratedFilter: React.FC<AiGeneratedFilterProps> = ({
 
   const handleToggle = (type: 'ai' | 'non_ai') => {
     if (value === type) {
-      // Deselect: set to undefined (no filter)
       onChange(undefined);
     } else {
-      // Select this type
       onChange(type);
     }
   };
 
   return (
-    <div className="mb-2 pb-2 border-b border-divider">
-      <label className="block mb-1.5">
-        <p className="font-medium text-xs leading-4 tracking-wide uppercase text-default-600">
-          {t("source")}
-        </p>
-      </label>
-      <div className="flex flex-wrap gap-1">
-        <Chip
-          variant={value === 'ai' ? "solid" : "flat"}
-          color={value === 'ai' ? "primary" : "default"}
-          size="sm"
-          className="cursor-pointer"
+    <div>
+      <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-default-400">
+        {t("source")}
+      </p>
+      <div className="flex flex-wrap gap-1.5">
+        <button
           onClick={() => handleToggle('ai')}
+          className={`
+            inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium
+            transition-all duration-200 ease-out select-none
+            ${value === 'ai'
+              ? 'bg-primary text-primary-foreground shadow-sm shadow-primary/25'
+              : 'bg-default-100 text-default-600 hover:bg-default-200 hover:text-default-700'
+            }
+          `}
         >
+          <Sparkles size={13} />
           {t("sourceAi")}
-        </Chip>
-        <Chip
-          variant={value === 'non_ai' ? "solid" : "flat"}
-          color={value === 'non_ai' ? "primary" : "default"}
-          size="sm"
-          className="cursor-pointer"
+        </button>
+        <button
           onClick={() => handleToggle('non_ai')}
+          className={`
+            inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium
+            transition-all duration-200 ease-out select-none
+            ${value === 'non_ai'
+              ? 'bg-primary text-primary-foreground shadow-sm shadow-primary/25'
+              : 'bg-default-100 text-default-600 hover:bg-default-200 hover:text-default-700'
+            }
+          `}
         >
+          <Camera size={13} />
           {t("sourceNonAi")}
-        </Chip>
+        </button>
       </div>
     </div>
   );

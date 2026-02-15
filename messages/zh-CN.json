@@ -305,7 +305,8 @@
     "noFiltersAvailable": "暂无可用筛选条件",
     "hidden": "已隐藏",
     "inheritedHidden": "继承隐藏",
-    "inherited": "已继承"
+    "inherited": "已继承",
+    "taxonomy": "分类"
   },
   "video": {
     "generateVideo": "生成视频",

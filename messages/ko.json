@@ -305,7 +305,8 @@
     "noFiltersAvailable": "사용 가능한 필터가 없습니다",
     "hidden": "숨김",
     "inheritedHidden": "상속된 숨김",
-    "inherited": "상속됨"
+    "inherited": "상속됨",
+    "taxonomy": "분류"
   },
   "video": {
     "generateVideo": "비디오 생성",

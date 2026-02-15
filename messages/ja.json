@@ -305,7 +305,8 @@
     "noFiltersAvailable": "利用可能なフィルターがありません",
     "hidden": "非表示",
     "inheritedHidden": "継承非表示",
-    "inherited": "継承済み"
+    "inherited": "継承済み",
+    "taxonomy": "タクソノミー"
   },
   "video": {
     "generateVideo": "動画を生成",

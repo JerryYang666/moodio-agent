@@ -305,7 +305,8 @@
     "noFiltersAvailable": "暫無可用篩選條件",
     "hidden": "已隱藏",
     "inheritedHidden": "繼承隱藏",
-    "inherited": "已繼承"
+    "inherited": "已繼承",
+    "taxonomy": "分類"
   },
   "video": {
     "generateVideo": "產生影片",
