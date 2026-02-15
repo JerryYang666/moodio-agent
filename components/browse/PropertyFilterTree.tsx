@@ -88,7 +88,7 @@ const PropertyItem: React.FC<PropertyItemProps> = ({
         : 0;
 
     return (
-        <div className="w-full" style={{ paddingLeft: level > 0 ? `${level * 14}px` : undefined }}>
+        <div className="w-full">
             {/* Property Category Header */}
             <button
                 onClick={() => isExpandable && onToggleExpanded(property.id)}
