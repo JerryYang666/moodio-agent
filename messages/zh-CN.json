@@ -308,7 +308,8 @@
     "inherited": "已继承",
     "taxonomy": "分类",
     "filters": "筛选",
-    "activeFiltersCount": "{count} 个已选"
+    "activeFiltersCount": "{count} 个已选",
+    "clearAll": "清除全部"
   },
   "video": {
     "generateVideo": "生成视频",

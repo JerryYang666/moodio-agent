@@ -308,7 +308,8 @@
     "inherited": "상속됨",
     "taxonomy": "분류",
     "filters": "필터",
-    "activeFiltersCount": "{count}개 선택됨"
+    "activeFiltersCount": "{count}개 선택됨",
+    "clearAll": "모두 지우기"
   },
   "video": {
     "generateVideo": "비디오 생성",

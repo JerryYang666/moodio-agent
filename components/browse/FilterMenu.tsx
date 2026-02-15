@@ -7,7 +7,8 @@ import type { RootState } from '@/lib/redux/store';
 import {
   setSelectedFilters as setQuerySelectedFilters,
   setContentTypes as setQueryContentTypes,
-  setIsAigc as setQueryIsAigc
+  setIsAigc as setQueryIsAigc,
+  clearFilters,
 } from '@/lib/redux/slices/querySlice';
 import { useGetPropertiesQuery } from '@/lib/redux/services/api';
 import { PropertyFilterTree } from '@/components/browse/PropertyFilterTree';
@@ -16,6 +17,7 @@ import { AiGeneratedFilter, type SourceFilterValue } from './AiGeneratedFilter';
 import { useAutoExpandFilters } from '@/hooks/use-auto-expand-filters';
 import { buildPropertyValueLookup } from '@/lib/filterGrouping';
 import { addToast } from '@heroui/toast';
+import { Button } from '@heroui/button';
 
 const FilterMenu: React.FC = () => {
   const t = useTranslations("browse");
@@ -95,8 +97,33 @@ const FilterMenu: React.FC = () => {
     dispatch(setQueryIsAigc(newIsAigc));
   };
 
+  // Count all active filters for showing/hiding the clear button
+  const activeFilterCount =
+    selectedFilters.length +
+    contentTypes.length +
+    (isAigc !== undefined ? 1 : 0);
+
+  const handleClearAll = () => {
+    dispatch(clearFilters());
+  };
+
   return (
     <div className="w-full flex flex-col h-full">
+      {/* Clear all button — only visible when filters are active */}
+      {activeFilterCount > 0 && (
+        <div className="shrink-0 pb-3">
+          <Button
+            variant="light"
+            color="danger"
+            size="sm"
+            className="px-0 min-w-0 h-auto font-medium"
+            onPress={handleClearAll}
+          >
+            {t("clearAll")} ({activeFilterCount})
+          </Button>
+        </div>
+      )}
+
       {/* Fixed filters at top */}
       <div className="shrink-0 flex flex-col gap-4 pb-4 border-b border-divider">
         <ContentTypeFilter

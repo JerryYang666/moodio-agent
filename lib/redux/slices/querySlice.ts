@@ -78,6 +78,15 @@ const querySlice = createSlice({
       state.cursor = action.payload.cursor;
       state.searchId = action.payload.searchId;
     },
+    clearFilters: (state) => {
+      state.selectedFolders = [];
+      state.selectedFilters = [];
+      state.contentTypes = [];
+      state.isAigc = undefined;
+      // Reset pagination when filters change
+      state.cursor = null;
+      state.searchId = null;
+    },
     resetQuery: (state) => {
       state.textSearch = "";
       state.selectedFolders = [];
@@ -100,6 +109,7 @@ export const {
   setCursor,
   setSearchId,
   setPagination,
+  clearFilters,
   resetQuery,
 } = querySlice.actions;
 

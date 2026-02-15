@@ -308,7 +308,8 @@
     "inherited": "Inherited",
     "taxonomy": "Taxonomy",
     "filters": "Filters",
-    "activeFiltersCount": "{count} active"
+    "activeFiltersCount": "{count} active",
+    "clearAll": "Clear all"
   },
   "video": {
     "generateVideo": "Generate Video",

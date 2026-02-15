@@ -308,7 +308,8 @@
     "inherited": "継承済み",
     "taxonomy": "タクソノミー",
     "filters": "フィルター",
-    "activeFiltersCount": "{count} 件選択中"
+    "activeFiltersCount": "{count} 件選択中",
+    "clearAll": "すべてクリア"
   },
   "video": {
     "generateVideo": "動画を生成",
