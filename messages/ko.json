@@ -306,7 +306,9 @@
     "hidden": "숨김",
     "inheritedHidden": "상속된 숨김",
     "inherited": "상속됨",
-    "taxonomy": "분류"
+    "taxonomy": "분류",
+    "filters": "필터",
+    "activeFiltersCount": "{count}개 선택됨"
   },
   "video": {
     "generateVideo": "비디오 생성",

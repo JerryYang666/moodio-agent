@@ -306,7 +306,9 @@
     "hidden": "非表示",
     "inheritedHidden": "継承非表示",
     "inherited": "継承済み",
-    "taxonomy": "タクソノミー"
+    "taxonomy": "タクソノミー",
+    "filters": "フィルター",
+    "activeFiltersCount": "{count} 件選択中"
   },
   "video": {
     "generateVideo": "動画を生成",

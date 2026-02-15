@@ -306,7 +306,9 @@
     "hidden": "Hidden",
     "inheritedHidden": "Inherited Hidden",
     "inherited": "Inherited",
-    "taxonomy": "Taxonomy"
+    "taxonomy": "Taxonomy",
+    "filters": "Filters",
+    "activeFiltersCount": "{count} active"
   },
   "video": {
     "generateVideo": "Generate Video",
