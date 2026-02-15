@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { useTranslations } from 'next-intl';
 import { Chip } from '@heroui/chip';
 
 // Source filter values: 'ai' or 'non_ai', or undefined when neither selected (no filter)
@@ -15,6 +16,8 @@ export const AiGeneratedFilter: React.FC<AiGeneratedFilterProps> = ({
   value,
   onChange,
 }) => {
+  const t = useTranslations("browse");
+
   const handleToggle = (type: 'ai' | 'non_ai') => {
     if (value === type) {
       // Deselect: set to undefined (no filter)
@@ -29,7 +32,7 @@ export const AiGeneratedFilter: React.FC<AiGeneratedFilterProps> = ({
     <div className="mb-2 pb-2 border-b border-divider">
       <label className="block mb-1.5">
         <p className="font-medium text-xs leading-4 tracking-wide uppercase text-default-600">
-          Source
+          {t("source")}
         </p>
       </label>
       <div className="flex flex-wrap gap-1">
@@ -40,7 +43,7 @@ export const AiGeneratedFilter: React.FC<AiGeneratedFilterProps> = ({
           className="cursor-pointer"
           onClick={() => handleToggle('ai')}
         >
-          AI
+          {t("sourceAi")}
         </Chip>
         <Chip
           variant={value === 'non_ai' ? "solid" : "flat"}
@@ -49,7 +52,7 @@ export const AiGeneratedFilter: React.FC<AiGeneratedFilterProps> = ({
           className="cursor-pointer"
           onClick={() => handleToggle('non_ai')}
         >
-          Non-AI
+          {t("sourceNonAi")}
         </Chip>
       </div>
     </div>

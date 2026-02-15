@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect } from "react";
+import { useTranslations } from "next-intl";
 import { useFeatureFlag } from "@/lib/feature-flags";
 import FilterMenu from "@/components/browse/FilterMenu";
 import SearchBar from "@/components/browse/SearchBar";
@@ -23,6 +24,7 @@ const useDisableBodyScroll = (enabled: boolean) => {
 };
 
 export default function BrowsePage() {
+  const t = useTranslations("browse");
   const showBrowse = useFeatureFlag<boolean>("user_retrieval") ?? false;
 
   // Only disable body scroll when the full browse UI is active
@@ -31,8 +33,8 @@ export default function BrowsePage() {
   if (!showBrowse) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-default-500">
-        <h1 className="text-2xl font-bold">Browse</h1>
-        <p>Coming soon...</p>
+        <h1 className="text-2xl font-bold">{t("title")}</h1>
+        <p>{t("comingSoon")}</p>
       </div>
     );
   }
@@ -41,7 +43,7 @@ export default function BrowsePage() {
     <div className="flex h-screen bg-background overflow-hidden">
       <main className="flex-1 h-screen px-4 py-6 min-w-0 flex flex-col">
         <div className="mb-6 shrink-0">
-          <SearchBar placeholder="Search videos..." />
+          <SearchBar placeholder={t("searchPlaceholder")} />
         </div>
 
         <div className="flex flex-1 min-h-0">

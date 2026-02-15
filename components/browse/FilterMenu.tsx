@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
+import { useTranslations } from 'next-intl';
 import type { RootState } from '@/lib/redux/store';
 import {
   setSelectedFilters as setQuerySelectedFilters,
@@ -17,6 +18,7 @@ import { buildPropertyValueLookup } from '@/lib/filterGrouping';
 import { addToast } from '@heroui/toast';
 
 const FilterMenu: React.FC = () => {
+  const t = useTranslations("browse");
   const dispatch = useDispatch();
   const selectedFilters = useSelector((state: RootState) => state.query.selectedFilters);
   const contentTypes = useSelector((state: RootState) => state.query.contentTypes);
@@ -52,8 +54,8 @@ const FilterMenu: React.FC = () => {
     dispatch(setQuerySelectedFilters(valid));
 
     addToast({
-      title: "Filters updated",
-      description: `${removedCount} unavailable filter(s) removed`,
+      title: t("filtersUpdated"),
+      description: t("filtersRemovedCount", { count: removedCount }),
       color: "warning",
     });
   }, [properties, selectedFilters, dispatch]);

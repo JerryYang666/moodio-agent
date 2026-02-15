@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { useTranslations } from 'next-intl';
 import { Chip } from '@heroui/chip';
 
 // Content types are intentionally hardcoded to match server enum.
@@ -15,6 +16,8 @@ export const ContentTypeFilter: React.FC<ContentTypeFilterProps> = ({
   selectedTypes,
   onChange,
 }) => {
+  const t = useTranslations("browse");
+
   const handleToggle = (type: string) => {
     if (selectedTypes.includes(type)) {
       // Remove from selection
@@ -29,7 +32,7 @@ export const ContentTypeFilter: React.FC<ContentTypeFilterProps> = ({
     <div className="mb-2 pb-2 border-b border-divider">
       <label className="block mb-1.5">
         <p className="font-medium text-xs leading-4 tracking-wide uppercase text-default-600">
-          Content Type
+          {t("contentType")}
         </p>
       </label>
       <div className="flex flex-wrap gap-1">

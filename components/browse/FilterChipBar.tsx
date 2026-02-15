@@ -23,7 +23,7 @@ export interface FilterChipBarProps {
 }
 
 export function FilterChipBar({
-    contextText = "Browse all shots:",
+    contextText,
     filterChips,
     onRemoveFilter,
     searchTerm,

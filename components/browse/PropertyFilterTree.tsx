@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { useTranslations } from 'next-intl';
 import { Accordion, AccordionItem } from '@heroui/accordion';
 import { Checkbox } from '@heroui/checkbox';
 import { Spinner } from '@heroui/spinner';
@@ -28,6 +29,7 @@ const PropertyItem: React.FC<PropertyItemProps> = ({
     selectedFilters,
     onFilterToggle,
 }) => {
+    const t = useTranslations("browse");
     const isExpanded = expandedState[property.id] || false;
     const hasChildren = property.children && property.children.length > 0;
     const hasValues = property.values && property.values.length > 0;
@@ -70,10 +72,10 @@ const PropertyItem: React.FC<PropertyItemProps> = ({
                         {property.name}
                     </p>
                     {property.hidden && (
-                        <Chip size="sm" variant="flat" color="warning" className="h-4 text-[10px]">Hidden</Chip>
+                        <Chip size="sm" variant="flat" color="warning" className="h-4 text-[10px]">{t("hidden")}</Chip>
                     )}
                     {!property.hidden && property.effective_hidden && (
-                        <Chip size="sm" variant="flat" color="default" className="h-4 text-[10px]">Inherited Hidden</Chip>
+                        <Chip size="sm" variant="flat" color="default" className="h-4 text-[10px]">{t("inheritedHidden")}</Chip>
                     )}
                 </div>
             </button>
@@ -107,10 +109,10 @@ const PropertyItem: React.FC<PropertyItemProps> = ({
                                     {value.value}
                                 </span>
                                 {value.hidden && (
-                                    <Chip size="sm" variant="flat" color="warning" className="h-4 text-[10px] ml-auto">Hidden</Chip>
+                                    <Chip size="sm" variant="flat" color="warning" className="h-4 text-[10px] ml-auto">{t("hidden")}</Chip>
                                 )}
                                 {!value.hidden && value.effective_hidden && (
-                                    <Chip size="sm" variant="flat" color="default" className="h-4 text-[10px] ml-auto">Inherited</Chip>
+                                    <Chip size="sm" variant="flat" color="default" className="h-4 text-[10px] ml-auto">{t("inherited")}</Chip>
                                 )}
                             </div>
                         );
@@ -157,11 +159,13 @@ export function PropertyFilterTree({
     isLoading,
     error,
 }: PropertyFilterTreeProps) {
+    const t = useTranslations("browse");
+
     if (isLoading) {
         return (
             <div className="flex items-center justify-center p-4">
                 <Spinner size="sm" />
-                <span className="ml-2 text-default-500 text-xs">Loading filters...</span>
+                <span className="ml-2 text-default-500 text-xs">{t("loadingFilters")}</span>
             </div>
         );
     }
@@ -169,7 +173,7 @@ export function PropertyFilterTree({
     if (error) {
         return (
             <div className="p-4">
-                <p className="text-danger text-xs">Error loading filters</p>
+                <p className="text-danger text-xs">{t("errorLoadingFilters")}</p>
             </div>
         );
     }
@@ -177,7 +181,7 @@ export function PropertyFilterTree({
     if (!properties || properties.length === 0) {
         return (
             <div className="p-4">
-                <p className="text-default-500 text-xs">No filters available</p>
+                <p className="text-default-500 text-xs">{t("noFiltersAvailable")}</p>
             </div>
         );
     }

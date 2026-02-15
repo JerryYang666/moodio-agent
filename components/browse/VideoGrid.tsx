@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef } from "react";
 import { useSelector, useDispatch } from "react-redux";
+import { useTranslations } from "next-intl";
 import type { RootState } from "@/lib/redux/store";
 import type { QueryState } from "@/lib/redux/types";
 import { useGetVideosQuery, useGetPropertiesQuery, type Video } from "@/lib/redux/services/api";
@@ -29,6 +30,7 @@ const videoToPhoto = (video: Video): Photo => ({
 });
 
 const VideoGrid: React.FC = () => {
+  const t = useTranslations("browse");
   const dispatch = useDispatch();
   const queryState = useSelector((state: RootState) => state.query);
 
@@ -109,8 +111,8 @@ const VideoGrid: React.FC = () => {
       dispatch(setSelectedFilters(sanitized));
 
       addToast({
-        title: "Filters updated",
-        description: `${removedCount} unavailable filter(s) removed. Refreshing results.`,
+        title: t("filtersUpdated"),
+        description: t("filtersRemovedRefreshing", { count: removedCount }),
         color: "warning",
       });
     }
@@ -153,15 +155,15 @@ const VideoGrid: React.FC = () => {
 
     return (
       <div className="text-center py-12">
-        <div className="text-danger text-lg mb-2">Error loading videos</div>
+        <div className="text-danger text-lg mb-2">{t("errorLoadingVideos")}</div>
         <p className="text-default-500 text-sm mb-4">
-          There was a problem fetching the video results.
+          {t("errorLoadingVideosDesc")}
         </p>
         <button
           onClick={() => refetch()}
           className="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary-600"
         >
-          Try Again
+          {t("tryAgain")}
         </button>
       </div>
     );
@@ -180,9 +182,9 @@ const VideoGrid: React.FC = () => {
   if (videos.length === 0) {
     return (
       <div className="text-center py-12">
-        <div className="text-default-500 text-lg mb-2">No videos found</div>
+        <div className="text-default-500 text-lg mb-2">{t("noVideosFound")}</div>
         <p className="text-default-400 text-sm">
-          Try adjusting your search terms or filters.
+          {t("noVideosFoundDesc")}
         </p>
       </div>
     );
@@ -192,10 +194,9 @@ const VideoGrid: React.FC = () => {
     <div className="w-full flex flex-col h-full">
       {/* Results summary */}
       <div className="mb-1 text-sm text-default-500 shrink-0">
-        Showing {videos.length}
-        {hasMore ? "+" : ""} of {totalItems} videos
+        {t("showingCount", { current: videos.length, more: hasMore ? "+" : "", total: totalItems })}
         {queryState.textSearch.trim() && queryState.selectedFilters.length > 0 && (
-          <span className="text-default-400"> · matching any selected filter</span>
+          <span className="text-default-400"> · {t("matchingAnyFilter")}</span>
         )}
       </div>
 
