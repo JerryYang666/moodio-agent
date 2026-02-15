@@ -193,7 +193,7 @@ const VideoGrid: React.FC = () => {
   return (
     <div className="w-full flex flex-col h-full">
       {/* Results summary */}
-      <div className="mb-1 text-sm text-default-500 shrink-0">
+      <div className="mb-1 text-xs text-default-500 shrink-0">
         {t("showingCount", { current: videos.length, more: hasMore ? "+" : "", total: totalItems })}
         {queryState.textSearch.trim() && queryState.selectedFilters.length > 0 && (
           <span className="text-default-400"> · {t("matchingAnyFilter")}</span>
