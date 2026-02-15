@@ -30,8 +30,24 @@ const FilterMenu: React.FC = () => {
   // Track previous selected filters to avoid redundant sanitization dispatches
   const prevSanitizedRef = useRef<string>("");
 
-  // Auto-expand logic
+  // Auto-expand logic for selected filters
   useAutoExpandFilters(properties, selectedFilters, setExpandedState);
+
+  // Auto-expand all top-level categories on initial load
+  const hasInitExpandedRef = useRef(false);
+  useEffect(() => {
+    if (!properties || properties.length === 0 || hasInitExpandedRef.current) return;
+    hasInitExpandedRef.current = true;
+    setExpandedState(prev => {
+      const next = { ...prev };
+      for (const prop of properties) {
+        if (next[prop.id] === undefined) {
+          next[prop.id] = true;
+        }
+      }
+      return next;
+    });
+  }, [properties]);
 
   // Sanitize selected filters when taxonomy data refreshes/changes.
   // Drop any selected IDs that no longer exist in the current taxonomy.
@@ -102,7 +118,7 @@ const FilterMenu: React.FC = () => {
       </div>
 
       {/* Scrollable property tree */}
-      <div className="flex-1 min-h-0 overflow-y-auto -mx-1 px-1">
+      <div className="flex-1 min-h-0 overflow-y-auto -mx-1 px-1 sidebar-scrollbar">
         <PropertyFilterTree
           properties={properties || []}
           selectedFilters={selectedFilters}
