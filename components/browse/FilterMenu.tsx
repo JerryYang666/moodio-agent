@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { useTranslations } from 'next-intl';
+import { useTranslations, useLocale } from 'next-intl';
 import type { RootState } from '@/lib/redux/store';
 import {
   setSelectedFilters as setQuerySelectedFilters,
@@ -21,12 +21,13 @@ import { Button } from '@heroui/button';
 
 const FilterMenu: React.FC = () => {
   const t = useTranslations("browse");
+  const locale = useLocale();
   const dispatch = useDispatch();
   const selectedFilters = useSelector((state: RootState) => state.query.selectedFilters);
   const contentTypes = useSelector((state: RootState) => state.query.contentTypes);
   const isAigc = useSelector((state: RootState) => state.query.isAigc);
 
-  const { data: properties, isLoading, error } = useGetPropertiesQuery();
+  const { data: properties, isLoading, error } = useGetPropertiesQuery(locale);
   const [expandedState, setExpandedState] = useState<Record<number, boolean>>({});
 
   // Track previous selected filters to avoid redundant sanitization dispatches

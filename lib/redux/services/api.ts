@@ -182,8 +182,8 @@ export const api = createApi({
       },
     }),
 
-    getProperties: builder.query<Property[], void>({
-      query: () => "/properties",
+    getProperties: builder.query<Property[], string>({
+      query: (lang) => `/properties?lang=${encodeURIComponent(lang)}`,
       // Cache properties aggressively since they rarely change
       keepUnusedDataFor: 1800,
     }),

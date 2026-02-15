@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { useTranslations } from 'next-intl';
+import { useTranslations, useLocale } from 'next-intl';
 import type { RootState } from '@/lib/redux/store';
 import { setSelectedFilters, setTextSearch } from '@/lib/redux/slices/querySlice';
 import { useGetPropertiesQuery } from '@/lib/redux/services/api';
@@ -11,9 +11,10 @@ import { useFilterChips } from '@/hooks/use-filter-chips';
 
 const Breadcrumb: React.FC = () => {
   const t = useTranslations("browse");
+  const locale = useLocale();
   const dispatch = useDispatch();
   const { textSearch, selectedFilters } = useSelector((state: RootState) => state.query);
-  const { data: properties } = useGetPropertiesQuery();
+  const { data: properties } = useGetPropertiesQuery(locale);
 
   // Build filter name lookup
   const filterChips = useFilterChips(properties, selectedFilters);

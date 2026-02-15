@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef } from "react";
 import { useSelector, useDispatch } from "react-redux";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
 import type { RootState } from "@/lib/redux/store";
 import type { QueryState } from "@/lib/redux/types";
 import { useGetVideosQuery, useGetPropertiesQuery, type Video } from "@/lib/redux/services/api";
@@ -31,11 +31,12 @@ const videoToPhoto = (video: Video): Photo => ({
 
 const VideoGrid: React.FC = () => {
   const t = useTranslations("browse");
+  const locale = useLocale();
   const dispatch = useDispatch();
   const queryState = useSelector((state: RootState) => state.query);
 
   // Fetch taxonomy properties for grouped filter contract
-  const { data: properties = [] } = useGetPropertiesQuery();
+  const { data: properties = [] } = useGetPropertiesQuery(locale);
 
   // Track stale-filter recovery to prevent repeated loops
   const recoveryKeyRef = useRef<string>("");
