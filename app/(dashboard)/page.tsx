@@ -1,41 +1,18 @@
 "use client";
 
-import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Button } from "@heroui/button";
-import { Card } from "@heroui/card";
 import { Spinner } from "@heroui/spinner";
-import { Chip } from "@heroui/chip";
 import { useAuth } from "@/hooks/use-auth";
+import { Sparkles, ArrowRight } from "lucide-react";
+import { RecentActivity } from "@/components/dashboard/RecentActivity";
+import { InspirationSection } from "@/components/dashboard/InspirationSection";
 
 export default function Home() {
   const router = useRouter();
   const t = useTranslations();
-  const { user, loading, error, logout, loggingOut } = useAuth();
-  const [testResult, setTestResult] = useState<any>(null);
-  const [testLoading, setTestLoading] = useState(false);
-
-  const handleTestProtectedAPI = async () => {
-    setTestLoading(true);
-    setTestResult(null);
-
-    try {
-      const data = await fetch("/api/test/protected", {
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
-      setTestResult(await data.json());
-    } catch (err) {
-      setTestResult({
-        error:
-          err instanceof Error ? err.message : "Failed to fetch protected data",
-      });
-    } finally {
-      setTestLoading(false);
-    }
-  };
+  const { user, loading, error } = useAuth();
 
   if (loading) {
     return (
@@ -45,145 +22,65 @@ export default function Home() {
     );
   }
 
-  if (error) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <Card className="p-6 max-w-md">
-          <p className="text-red-600 dark:text-red-400">{error}</p>
-        </Card>
-      </div>
-    );
-  }
-
-  if (!user) {
+  if (error || !user) {
+    // If not authenticated, layout usually handles redirect, but return null just in case
     return null;
   }
 
-  const displayName =
-    user.firstName && user.lastName
-      ? `${user.firstName} ${user.lastName}`
-      : user.firstName || user.email.split("@")[0];
+  const displayName = user.firstName || user.email.split("@")[0];
 
   return (
-    <div className="flex items-center justify-center min-h-[60vh] pt-20">
-      <Card className="w-full max-w-2xl p-8">
-        <div className="space-y-6">
-          <div className="text-center">
-            <h1 className="text-4xl font-bold mb-2">{t("dashboard.welcomeBack")}</h1>
-            <p className="text-xl text-gray-600 dark:text-gray-400">
-              {displayName}
+    <div className="flex flex-col min-h-screen pb-12">
+      {/* Elegant Top Bar */}
+      <section className="relative overflow-hidden border-b border-default-100 bg-linear-to-r from-default-50 via-primary-50/30 to-default-50 dark:from-background dark:via-primary-900/10 dark:to-background mb-4">
+        <div className="relative z-10 max-w-[1600px] mx-auto px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <h1 className="text-xl font-bold tracking-tight text-default-800">
+              Moodio
+            </h1>
+            <span className="text-default-300">|</span>
+            <p className="text-sm text-default-500 font-medium">
+              All-in-one creation platform
             </p>
           </div>
 
-          <div className="space-y-4 p-6 bg-gray-50 dark:bg-gray-900 rounded-lg">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                  {t("profile.email")}
-                </p>
-                <p className="font-medium">{user.email}</p>
-              </div>
-
-              {user.firstName && (
-                <div>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
-                    {t("profile.firstName")}
-                  </p>
-                  <p className="font-medium">{user.firstName}</p>
-                </div>
-              )}
-
-              {user.lastName && (
-                <div>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
-                    {t("profile.lastName")}
-                  </p>
-                  <p className="font-medium">{user.lastName}</p>
-                </div>
-              )}
-
-              <div>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                  {t("dashboard.authProvider")}
-                </p>
-                <p className="font-medium capitalize">{user.authProvider}</p>
-              </div>
-
-              <div>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                  {t("dashboard.roles")}
-                </p>
-                <div className="flex gap-2 flex-wrap">
-                  {user.roles.map((role) => (
-                    <Chip
-                      key={role}
-                      color="primary"
-                      size="sm"
-                      variant="flat"
-                    >
-                      {role}
-                    </Chip>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                  {t("dashboard.memberSince")}
-                </p>
-                <p className="font-medium">
-                  {new Date(user.createdAt).toLocaleDateString()}
-                </p>
-              </div>
+          <div className="flex items-center gap-4">
+            <div className="hidden md:flex items-center gap-2 px-3 py-1 rounded-full bg-default-100/50 text-xs font-medium text-default-600 border border-default-200">
+              <Sparkles size={14} className="text-default-500" />
+              <span>Welcome back, {displayName}</span>
             </div>
-          </div>
-
-          <div className="space-y-4">
-            <div className="flex justify-center gap-4 pt-4">
-              <Button
-                color="primary"
-                variant="flat"
-                size="lg"
-                onPress={handleTestProtectedAPI}
-                isLoading={testLoading}
-              >
-                {t("dashboard.testProtectedApi")}
-              </Button>
-              <Button
-                color="secondary"
-                variant="flat"
-                size="lg"
-                onPress={() => router.push("/chat")}
-              >
-                {t("dashboard.goToAgent")}
-              </Button>
-            </div>
-
-            {testResult && (
-              <div className="p-4 rounded-lg bg-gray-100 dark:bg-gray-800">
-                <p className="text-xs text-gray-500 dark:text-gray-400 mb-2 font-mono">
-                  {t("dashboard.apiResponse")}
-                </p>
-                <pre className="text-sm overflow-x-auto">
-                  {JSON.stringify(testResult, null, 2)}
-                </pre>
-              </div>
-            )}
-          </div>
-
-          <div className="flex justify-center pt-4 border-t border-gray-200 dark:border-gray-700 mt-6">
             <Button
-              color="danger"
-              variant="flat"
-              size="lg"
-              onPress={logout}
-              isLoading={loggingOut}
+              color="primary"
+              variant="shadow"
+              size="sm"
+              className="font-medium rounded-full px-6"
+              endContent={<ArrowRight size={16} />}
+              onPress={() => router.push("/chat")}
             >
-              {t("nav.logout")}
+              {t("dashboard.goToAgent")}
             </Button>
           </div>
         </div>
-      </Card>
+      </section>
+
+      {/* Main Content Layout */}
+      <main className="max-w-[1600px] mx-auto w-full px-6 flex flex-col lg:flex-row gap-8">
+        {/* Left Column: Recent Activity */}
+        <div className="w-full lg:w-1/3 flex flex-col space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-2xl font-bold tracking-tight text-default-800">Recent Activity</h2>
+          </div>
+          <RecentActivity />
+        </div>
+
+        {/* Right Column: Inspiration Gallery */}
+        <div className="w-full lg:w-2/3 flex flex-col space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-2xl font-bold tracking-tight text-default-800">Today&apos;s Inspiration</h2>
+          </div>
+          <InspirationSection />
+        </div>
+      </main>
     </div>
   );
 }

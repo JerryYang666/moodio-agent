@@ -187,10 +187,49 @@ export const api = createApi({
       // Cache properties aggressively since they rarely change
       keepUnusedDataFor: 1800,
     }),
+
+    getInspiration: builder.query<{ term: string }, void>({
+      queryFn: async () => {
+        try {
+          if (typeof window !== "undefined") {
+            const cached = localStorage.getItem("moodio_inspiration");
+            if (cached) {
+              try {
+                const { term, timestamp } = JSON.parse(cached);
+                // If generated less than 5 minutes ago, use the cached version
+                if (Date.now() - timestamp < 5 * 60 * 1000) {
+                  return { data: { term } };
+                }
+              } catch (e) {
+                // Ignore parse errors and fetch fresh
+              }
+            }
+          }
+
+          const res = await fetch("/api/inspiration");
+          if (!res.ok) throw new Error("Failed to fetch inspiration");
+          const data = await res.json();
+
+          if (typeof window !== "undefined" && data.term) {
+            localStorage.setItem("moodio_inspiration", JSON.stringify({
+              term: data.term,
+              timestamp: Date.now()
+            }));
+          }
+
+          return { data };
+        } catch (error: any) {
+          return { error: { status: 500, data: error.message } };
+        }
+      },
+      // Cache the inspiration term in Redux memory for client-side navigation
+      keepUnusedDataFor: 300,
+    }),
   }),
 });
 
 export const {
   useGetVideosQuery,
   useGetPropertiesQuery,
+  useGetInspirationQuery,
 } = api;
