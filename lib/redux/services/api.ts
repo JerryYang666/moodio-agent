@@ -198,7 +198,7 @@ export const api = createApi({
               try {
                 const { term, timestamp } = JSON.parse(cached);
                 // If generated less than 5 minutes ago, use the cached version
-                if (Date.now() - timestamp < 5 * 60 * 1000) {
+                if (Date.now() - timestamp < 12 * 60 * 60 * 1000) {
                   return { data: { term } };
                 }
               } catch (e) {
@@ -225,7 +225,7 @@ export const api = createApi({
         }
       },
       // Cache the inspiration term in Redux memory for client-side navigation
-      keepUnusedDataFor: 300,
+      keepUnusedDataFor: 43200,
     }),
   }),
 });
