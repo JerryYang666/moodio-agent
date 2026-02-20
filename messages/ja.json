@@ -663,7 +663,14 @@
     "memberSince": "メンバー登録日",
     "testProtectedApi": "保護されたAPIをテスト",
     "goToAgent": "エージェントへ移動",
-    "apiResponse": "/api/test/protectedからの応答："
+    "apiResponse": "/api/test/protectedからの応答：",
+    "subtitle": "オールインワンクリエイティブプラットフォーム",
+    "welcomeBackName": "おかえりなさい、{name}さん",
+    "recentActivity": "最近のアクティビティ",
+    "todaysInspiration": "今日のインスピレーション",
+    "generatingInspiration": "インスピレーションを生成中...",
+    "noRecentActivity": "最近のアクティビティはありません",
+    "failedToLoadRecentActivity": "最近のアクティビティの読み込みに失敗しました"
   },
   "assetPicker": {
     "title": "画像を選択",

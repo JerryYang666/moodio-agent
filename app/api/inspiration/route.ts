@@ -15,9 +15,20 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Invalid token" }, { status: 401 });
     }
 
+    const locale = new URL(req.url).searchParams.get("locale") || "en";
+
+    const localeNames: Record<string, string> = {
+      en: "English",
+      "zh-CN": "Simplified Chinese",
+      "zh-TW": "Traditional Chinese",
+      ja: "Japanese",
+      ko: "Korean",
+    };
+    const languageName = localeNames[locale] || "English";
+
     const client = createLLMClient({ model: "gpt-4o" });
     const prompt =
-      "Generate a short 1-3 word highly artistic, beautiful, and visually striking search term for an inspiration gallery (e.g., 'cinematic glowing landscapes', 'abstract fluid gradients', 'ethereal lighting'). Do not use mundane or basic terms. Output only the term, no quotes, no extra text.";
+      `Generate a short 1-3 word highly artistic, beautiful, and visually striking search term for an inspiration gallery (e.g., 'cinematic glowing landscapes', 'abstract fluid gradients', 'ethereal lighting'). Do not use mundane or basic terms. Reply in ${languageName}. Output only the term, no quotes, no extra text.`;
 
     const response = await client.chatComplete([
       { role: "user", content: prompt },

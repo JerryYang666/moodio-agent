@@ -77,7 +77,7 @@ export function RecentActivity() {
         setItems(deduplicated.slice(0, 6));
       } catch (err) {
         console.error("Error fetching recent activity:", err);
-        setError("Failed to load recent activity");
+        setError(t("dashboard.failedToLoadRecentActivity"));
       } finally {
         setLoading(false);
       }
@@ -105,7 +105,7 @@ export function RecentActivity() {
   if (items.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-64 bg-gray-50 dark:bg-gray-900 rounded-xl text-gray-500">
-        <p>No recent activity</p>
+        <p>{t("dashboard.noRecentActivity")}</p>
       </div>
     );
   }

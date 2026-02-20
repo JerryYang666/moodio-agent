@@ -663,7 +663,14 @@
     "memberSince": "Member Since",
     "testProtectedApi": "Test Protected API",
     "goToAgent": "Go to agent",
-    "apiResponse": "Response from /api/test/protected:"
+    "apiResponse": "Response from /api/test/protected:",
+    "subtitle": "All-in-one creation platform",
+    "welcomeBackName": "Welcome back, {name}",
+    "recentActivity": "Recent Activity",
+    "todaysInspiration": "Today's Inspiration",
+    "generatingInspiration": "Generating inspiration...",
+    "noRecentActivity": "No recent activity",
+    "failedToLoadRecentActivity": "Failed to load recent activity"
   },
   "assetPicker": {
     "title": "Select an image",

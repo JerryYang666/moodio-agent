@@ -2,26 +2,25 @@
 
 import React, { useEffect, useRef } from "react";
 import { useDispatch } from "react-redux";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
 import { setTextSearch, clearFilters } from "@/lib/redux/slices/querySlice";
 import { useGetInspirationQuery } from "@/lib/redux/services/api";
 import VideoGrid from "@/components/browse/VideoGrid";
-import { Spinner } from "@heroui/spinner";
 import { Sparkles } from "lucide-react";
 
 export function InspirationSection() {
-  const t = useTranslations();
+  const t = useTranslations("dashboard");
+  const locale = useLocale();
   const dispatch = useDispatch();
   const containerRef = useRef<HTMLDivElement>(null);
-
-  const { data: inspirationData, isLoading, isError } = useGetInspirationQuery();
+  
+  const { data: inspirationData, isLoading, isError } = useGetInspirationQuery(locale);
 
   useEffect(() => {
     if (inspirationData?.term) {
       dispatch(clearFilters());
       dispatch(setTextSearch(inspirationData.term));
     } else if (isError) {
-      // Fallback
       dispatch(clearFilters());
       dispatch(setTextSearch("beautiful cinematic"));
     }
@@ -100,7 +99,7 @@ export function InspirationSection() {
     return (
       <div className="flex flex-col items-center justify-center h-[600px] bg-gray-50 dark:bg-gray-900 rounded-xl">
         <Sparkles className="animate-pulse text-primary mb-4" size={32} />
-        <p className="text-default-500 font-medium">Generating inspiration...</p>
+        <p className="text-default-500 font-medium">{t("generatingInspiration")}</p>
       </div>
     );
   }

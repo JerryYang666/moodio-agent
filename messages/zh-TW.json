@@ -663,7 +663,14 @@
     "memberSince": "加入時間",
     "testProtectedApi": "測試受保護的 API",
     "goToAgent": "前往代理程式",
-    "apiResponse": "來自 /api/test/protected 的回應："
+    "apiResponse": "來自 /api/test/protected 的回應：",
+    "subtitle": "一站式創作平台",
+    "welcomeBackName": "歡迎回來，{name}",
+    "recentActivity": "最近動態",
+    "todaysInspiration": "今日靈感",
+    "generatingInspiration": "正在生成靈感...",
+    "noRecentActivity": "暫無最近動態",
+    "failedToLoadRecentActivity": "載入最近動態失敗"
   },
   "assetPicker": {
     "title": "選擇圖片",

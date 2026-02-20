@@ -188,11 +188,12 @@ export const api = createApi({
       keepUnusedDataFor: 1800,
     }),
 
-    getInspiration: builder.query<{ term: string }, void>({
-      queryFn: async () => {
+    getInspiration: builder.query<{ term: string }, string>({
+      queryFn: async (locale) => {
         try {
           if (typeof window !== "undefined") {
-            const cached = localStorage.getItem("moodio_inspiration");
+            const cacheKey = `moodio_inspiration_${locale}`;
+            const cached = localStorage.getItem(cacheKey);
             if (cached) {
               try {
                 const { term, timestamp } = JSON.parse(cached);
@@ -206,12 +207,13 @@ export const api = createApi({
             }
           }
 
-          const res = await fetch("/api/inspiration");
+          const res = await fetch(`/api/inspiration?locale=${encodeURIComponent(locale)}`);
           if (!res.ok) throw new Error("Failed to fetch inspiration");
           const data = await res.json();
 
           if (typeof window !== "undefined" && data.term) {
-            localStorage.setItem("moodio_inspiration", JSON.stringify({
+            const cacheKey = `moodio_inspiration_${locale}`;
+            localStorage.setItem(cacheKey, JSON.stringify({
               term: data.term,
               timestamp: Date.now()
             }));

@@ -663,7 +663,14 @@
     "memberSince": "注册时间",
     "testProtectedApi": "测试受保护的 API",
     "goToAgent": "前往智能体",
-    "apiResponse": "/api/test/protected 的响应："
+    "apiResponse": "/api/test/protected 的响应：",
+    "subtitle": "一站式创作平台",
+    "welcomeBackName": "欢迎回来，{name}",
+    "recentActivity": "最近动态",
+    "todaysInspiration": "今日灵感",
+    "generatingInspiration": "正在生成灵感...",
+    "noRecentActivity": "暂无最近动态",
+    "failedToLoadRecentActivity": "加载最近动态失败"
   },
   "assetPicker": {
     "title": "选择图片",

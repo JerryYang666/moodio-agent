@@ -11,7 +11,7 @@ import { InspirationSection } from "@/components/dashboard/InspirationSection";
 
 export default function Home() {
   const router = useRouter();
-  const t = useTranslations();
+  const t = useTranslations("dashboard");
   const { user, loading, error } = useAuth();
 
   if (loading) {
@@ -40,14 +40,14 @@ export default function Home() {
             </h1>
             <span className="text-default-300">|</span>
             <p className="text-sm text-default-500 font-medium">
-              All-in-one creation platform
+              {t("subtitle")}
             </p>
           </div>
 
           <div className="flex items-center gap-4">
             <div className="hidden md:flex items-center gap-2 px-3 py-1 rounded-full bg-default-100/50 text-xs font-medium text-default-600 border border-default-200">
               <Sparkles size={14} className="text-default-500" />
-              <span>Welcome back, {displayName}</span>
+              <span>{t("welcomeBackName", { name: displayName })}</span>
             </div>
             <Button
               color="primary"
@@ -57,7 +57,7 @@ export default function Home() {
               endContent={<ArrowRight size={16} />}
               onPress={() => router.push("/chat")}
             >
-              {t("dashboard.goToAgent")}
+              {t("goToAgent")}
             </Button>
           </div>
         </div>
@@ -68,7 +68,7 @@ export default function Home() {
         {/* Left Column: Recent Activity */}
         <div className="w-full lg:w-1/3 flex flex-col space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-bold tracking-tight text-default-800">Recent Activity</h2>
+            <h2 className="text-2xl font-bold tracking-tight text-default-800">{t("recentActivity")}</h2>
           </div>
           <RecentActivity />
         </div>
@@ -76,7 +76,7 @@ export default function Home() {
         {/* Right Column: Inspiration Gallery */}
         <div className="w-full lg:w-2/3 flex flex-col space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-bold tracking-tight text-default-800">Today&apos;s Inspiration</h2>
+            <h2 className="text-2xl font-bold tracking-tight text-default-800">{t("todaysInspiration")}</h2>
           </div>
           <InspirationSection />
         </div>

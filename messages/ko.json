@@ -663,7 +663,14 @@
     "memberSince": "가입일",
     "testProtectedApi": "보호된 API 테스트",
     "goToAgent": "에이전트로 이동",
-    "apiResponse": "/api/test/protected 응답:"
+    "apiResponse": "/api/test/protected 응답:",
+    "subtitle": "올인원 크리에이티브 플랫폼",
+    "welcomeBackName": "{name}님, 환영합니다",
+    "recentActivity": "최근 활동",
+    "todaysInspiration": "오늘의 영감",
+    "generatingInspiration": "영감을 생성하는 중...",
+    "noRecentActivity": "최근 활동 없음",
+    "failedToLoadRecentActivity": "최근 활동을 불러오지 못했습니다"
   },
   "assetPicker": {
     "title": "이미지 선택",
