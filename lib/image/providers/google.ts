@@ -32,7 +32,14 @@ export async function generateWithGemini(
         aspectRatio: resolveAspectRatio(input.aspectRatio),
         imageSize: resolveImageSize(input.imageSize),
       },
-      tools: [{ googleSearch: {} }],
+      tools: [{
+        googleSearch: {
+          searchTypes: {
+            webSearch: {},
+            imageSearch: {}
+          }
+        }
+      }],
     },
   });
 
@@ -106,7 +113,14 @@ export async function editWithGemini(
         aspectRatio: resolveAspectRatio(input.aspectRatio),
         imageSize: resolveImageSize(input.imageSize),
       },
-      tools: [{ googleSearch: {} }],
+      tools: [{
+        googleSearch: {
+          searchTypes: {
+            webSearch: {},
+            imageSearch: {}
+          }
+        }
+      }],
     },
   });
 

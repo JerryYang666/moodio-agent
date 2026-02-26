@@ -28,8 +28,8 @@ const nanoBananaPro: ImageModelConfig = {
     edit: true,
   },
   providerModelIds: {
-    generate: "gemini-3-pro-image-preview",
-    edit: "gemini-3-pro-image-preview",
+    generate: "gemini-3.1-flash-image-preview",
+    edit: "gemini-3.1-flash-image-preview",
   },
 };
 
