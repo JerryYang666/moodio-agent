@@ -137,7 +137,7 @@ export default function ChatManagementPage() {
               aria-label="Chat table"
               selectionMode="single"
               color="primary"
-              onRowAction={(key) => router.push(`/chat/${key}`)}
+              onRowAction={(key) => router.push(`/chat/${String(key)}`)}
               bottomContent={
                 pages > 0 ? (
                   <div className="flex w-full justify-center">
