@@ -47,9 +47,7 @@ export class Agent0 implements Agent {
     });
 
     // 1. Prepare messages for the LLM to generate JSON
-    const rawSystemPrompt = systemPromptOverride || getSystemPrompt(this.id);
-    const systemPrompt = rawSystemPrompt
-      .replace("{{CURRENT_DATE}}", new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" }));
+    const systemPrompt = systemPromptOverride || getSystemPrompt(this.id);
 
     // Convert previous agent_image parts to text in history
     const cleanHistory = history.map((m) => {

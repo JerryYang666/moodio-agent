@@ -213,9 +213,10 @@ export class Agent1 implements Agent {
     referenceImages?: ReferenceImageEntry[] // Reference images with tags
   ): Promise<PreparedMessages> {
     const rawSystemPrompt = systemPromptOverride || getSystemPrompt(this.id);
-    const systemPrompt = rawSystemPrompt
-      .replace("{{CURRENT_DATE}}", new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" }))
-      .replace("{{SUPPORTED_ASPECT_RATIOS}}", SUPPORTED_ASPECT_RATIOS.join(", "));
+    const systemPrompt = rawSystemPrompt.replace(
+      "{{SUPPORTED_ASPECT_RATIOS}}",
+      SUPPORTED_ASPECT_RATIOS.join(", ")
+    );
 
     // Convert previous agent_image parts to text in history
     const cleanHistory = history.map((m) => {
