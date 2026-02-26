@@ -152,7 +152,7 @@ async function refreshSession(request: NextRequest): Promise<{ setCookie: string
 export async function middleware(request: NextRequest) {
   const response = await _middleware(request);
   // TEMP FIX: expire stale moodio_refresh_token left on old app.moodio.art domain
-  response.cookies.set("moodio_refresh_token", "", { domain: "app.moodio.art", path: "/", maxAge: 0 });
+  response.cookies.set("moodio_refresh_token", "", { path: "/", maxAge: 0 });
   return response;
 }
 
