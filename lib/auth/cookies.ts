@@ -56,20 +56,22 @@ export function setAccessTokenCookie(
 }
 
 /**
- * Clear authentication cookies
+ * Clear authentication cookies.
+ * Deletes both with and without domain to handle duplicate cookies
+ * that may exist under different scopes.
  */
 export function clearAuthCookies(response: NextResponse): NextResponse {
   const { httpOnly: _h, secure: _s, sameSite: _ss, ...deleteOptions } =
     siteConfig.auth.cookie;
+  const { domain: cookieDomain, ...deleteOptionsWithoutDomain } = deleteOptions as Record<string, unknown> & { domain?: string };
+  const cookieNames = [siteConfig.auth.accessToken.cookieName, siteConfig.auth.refreshToken.cookieName];
 
-  response.cookies.delete({
-    name: siteConfig.auth.accessToken.cookieName,
-    ...deleteOptions,
-  });
-  response.cookies.delete({
-    name: siteConfig.auth.refreshToken.cookieName,
-    ...deleteOptions,
-  });
+  for (const name of cookieNames) {
+    response.cookies.delete({ name, ...deleteOptionsWithoutDomain });
+    if (cookieDomain) {
+      response.cookies.delete({ name, ...deleteOptions });
+    }
+  }
 
   return response;
 }
