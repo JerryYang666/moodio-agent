@@ -8,6 +8,8 @@ import {
   jsonb,
   bigint,
   unique,
+  doublePrecision,
+  integer,
 } from "drizzle-orm/pg-core";
 
 /**
@@ -389,3 +391,69 @@ export type NewFeatureFlag = typeof featureFlags.$inferInsert;
 
 export type GroupFlagOverride = typeof groupFlagOverrides.$inferSelect;
 export type NewGroupFlagOverride = typeof groupFlagOverrides.$inferInsert;
+
+/**
+ * Desktops table
+ * Standalone infinite canvases where users arrange generated assets spatially
+ */
+export const desktops = pgTable("desktops", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 255 }).notNull(),
+  viewportState: jsonb("viewport_state").$type<{
+    x: number;
+    y: number;
+    zoom: number;
+  }>(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+/**
+ * Desktop Shares table
+ * Manages sharing permissions for desktops (mirrors collectionShares pattern)
+ */
+export const desktopShares = pgTable("desktop_shares", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  desktopId: uuid("desktop_id")
+    .notNull()
+    .references(() => desktops.id, { onDelete: "cascade" }),
+  sharedWithUserId: uuid("shared_with_user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  permission: varchar("permission", { length: 20 }).notNull(), // 'viewer' or 'collaborator'
+  sharedAt: timestamp("shared_at").defaultNow().notNull(),
+});
+
+/**
+ * Desktop Assets table
+ * Assets placed on a desktop canvas with spatial coordinates.
+ * All asset-type-specific data lives in the polymorphic `metadata` JSONB column,
+ * discriminated by `assetType`.
+ */
+export const desktopAssets = pgTable("desktop_assets", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  desktopId: uuid("desktop_id")
+    .notNull()
+    .references(() => desktops.id, { onDelete: "cascade" }),
+  assetType: varchar("asset_type", { length: 50 }).notNull(),
+  metadata: jsonb("metadata").notNull(),
+  posX: doublePrecision("pos_x").notNull(),
+  posY: doublePrecision("pos_y").notNull(),
+  width: doublePrecision("width"),
+  height: doublePrecision("height"),
+  rotation: doublePrecision("rotation").notNull().default(0),
+  zIndex: integer("z_index").notNull().default(0),
+  addedAt: timestamp("added_at").defaultNow().notNull(),
+});
+
+export type Desktop = typeof desktops.$inferSelect;
+export type NewDesktop = typeof desktops.$inferInsert;
+
+export type DesktopShare = typeof desktopShares.$inferSelect;
+export type NewDesktopShare = typeof desktopShares.$inferInsert;
+
+export type DesktopAsset = typeof desktopAssets.$inferSelect;
+export type NewDesktopAsset = typeof desktopAssets.$inferInsert;

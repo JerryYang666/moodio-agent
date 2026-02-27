@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAccessToken } from "@/lib/auth/cookies";
 import { verifyAccessToken } from "@/lib/auth/jwt";
 import { db } from "@/lib/db";
-import { chats } from "@/lib/db/schema";
+import { chats, desktops, desktopAssets } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getChatHistory, saveChatHistory } from "@/lib/storage/s3";
 import { createLLMClient } from "@/lib/llm/client";
@@ -156,6 +156,8 @@ export async function POST(
       typeof json.variantCount === "number" && json.variantCount >= 1
         ? Math.min(json.variantCount, 4) // Cap at 4 variants max
         : 1;
+    const activeDesktopId: string | undefined =
+      typeof json.activeDesktopId === "string" ? json.activeDesktopId : undefined;
 
     // Parse reference images with their tags
     const rawReferenceImages = Array.isArray(json.referenceImages)
@@ -460,6 +462,87 @@ export async function POST(
                 thumbnailImageId,
               })
               .where(eq(chats.id, chatId));
+          }
+
+          // Auto-place generated images on the active desktop
+          if (activeDesktopId) {
+            try {
+              const [desktop] = await db
+                .select()
+                .from(desktops)
+                .where(
+                  and(
+                    eq(desktops.id, activeDesktopId),
+                    eq(desktops.userId, payload.userId)
+                  )
+                )
+                .limit(1);
+
+              if (desktop) {
+                const generatedImages: Array<{
+                  imageId: string;
+                  title?: string;
+                  prompt?: string;
+                }> = [];
+
+                for (const msg of messagesToSave) {
+                  if (!Array.isArray(msg.content)) continue;
+                  for (const part of msg.content) {
+                    if (
+                      part.type === "agent_image" &&
+                      part.imageId &&
+                      part.status === "generated"
+                    ) {
+                      generatedImages.push({
+                        imageId: part.imageId,
+                        title: part.title,
+                        prompt: part.prompt,
+                      });
+                    }
+                  }
+                }
+
+                if (generatedImages.length > 0) {
+                  const vp = desktop.viewportState as {
+                    x: number;
+                    y: number;
+                    zoom: number;
+                  } | null;
+                  const zoom = vp?.zoom ?? 1;
+                  const centerX = vp ? -vp.x / zoom + 400 / zoom : 0;
+                  const centerY = vp ? -vp.y / zoom + 300 / zoom : 0;
+
+                  const cols = Math.min(generatedImages.length, 2);
+                  const size = 256;
+                  const gap = 20;
+                  const totalW = cols * size + (cols - 1) * gap;
+                  const rows = Math.ceil(generatedImages.length / cols);
+                  const totalH = rows * size + (rows - 1) * gap;
+                  const startX = centerX - totalW / 2;
+                  const startY = centerY - totalH / 2;
+
+                  const assetsToInsert = generatedImages.map((img, i) => ({
+                    desktopId: activeDesktopId,
+                    assetType: "image" as const,
+                    metadata: {
+                      imageId: img.imageId,
+                      chatId,
+                      title: img.title,
+                      prompt: img.prompt,
+                      status: "generated",
+                    },
+                    posX: startX + (i % cols) * (size + gap),
+                    posY: startY + Math.floor(i / cols) * (size + gap),
+                    width: size,
+                    height: size,
+                  }));
+
+                  await db.insert(desktopAssets).values(assetsToInsert);
+                }
+              }
+            } catch (err) {
+              console.error("Failed to auto-place images on desktop:", err);
+            }
           }
         })
         .catch((err) => {
