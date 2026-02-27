@@ -150,13 +150,6 @@ async function refreshSession(request: NextRequest): Promise<{ setCookie: string
 }
 
 export async function middleware(request: NextRequest) {
-  const response = await _middleware(request);
-  // TEMP FIX: expire stale moodio_refresh_token left on old app.moodio.art domain
-  response.cookies.set("moodio_refresh_token", "", { path: "/", maxAge: 0 });
-  return response;
-}
-
-async function _middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Check for maintenance mode
