@@ -33,6 +33,7 @@ import {
   Download,
   Move,
   Copy,
+  LayoutDashboard,
 } from "lucide-react";
 import { useCollections } from "@/hooks/use-collections";
 import ImageDetailModal, {
@@ -44,6 +45,7 @@ import {
   DropdownMenu,
   DropdownItem,
 } from "@heroui/dropdown";
+import SendToDesktopModal from "@/components/desktop/SendToDesktopModal";
 
 interface CollectionAsset {
   id: string;
@@ -158,6 +160,12 @@ export default function CollectionPage({
     onOpen: onCopyItemOpen,
     onOpenChange: onCopyItemOpenChange,
   } = useDisclosure();
+  const {
+    isOpen: isSendToDesktopOpen,
+    onOpen: onSendToDesktopOpen,
+    onOpenChange: onSendToDesktopOpenChange,
+  } = useDisclosure();
+  const [desktopSendAsset, setDesktopSendAsset] = useState<CollectionAsset | null>(null);
 
   const [selectedImage, setSelectedImage] = useState<ImageInfo | null>(null);
   const [allImages, setAllImages] = useState<ImageInfo[]>([]);
@@ -789,6 +797,16 @@ export default function CollectionPage({
                         >
                           {t("copyTo")}
                         </DropdownItem>
+                        <DropdownItem
+                          key="desktop"
+                          startContent={<LayoutDashboard size={16} />}
+                          onPress={() => {
+                            setDesktopSendAsset(asset);
+                            onSendToDesktopOpen();
+                          }}
+                        >
+                          Send to Desktop
+                        </DropdownItem>
                         {asset.chatId && collection.isOwner ? (
                           <DropdownItem
                             key="chat"
@@ -1247,6 +1265,38 @@ export default function CollectionPage({
           )}
         </ModalContent>
       </Modal>
+
+      {/* Send to Desktop Modal */}
+      <SendToDesktopModal
+        isOpen={isSendToDesktopOpen}
+        onOpenChange={onSendToDesktopOpenChange}
+        assets={
+          desktopSendAsset
+            ? [
+                {
+                  assetType: desktopSendAsset.assetType,
+                  metadata:
+                    desktopSendAsset.assetType === "video"
+                      ? {
+                          imageId: desktopSendAsset.imageId,
+                          videoId: desktopSendAsset.assetId,
+                          chatId: desktopSendAsset.chatId,
+                          title: desktopSendAsset.generationDetails.title,
+                          prompt: desktopSendAsset.generationDetails.prompt,
+                          status: desktopSendAsset.generationDetails.status,
+                        }
+                      : {
+                          imageId: desktopSendAsset.imageId,
+                          chatId: desktopSendAsset.chatId,
+                          title: desktopSendAsset.generationDetails.title,
+                          prompt: desktopSendAsset.generationDetails.prompt,
+                          status: desktopSendAsset.generationDetails.status,
+                        },
+                },
+              ]
+            : []
+        }
+      />
     </div>
   );
 }

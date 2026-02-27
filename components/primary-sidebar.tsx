@@ -15,6 +15,7 @@ import {
   BookOpen,
   Bean,
   PencilRuler,
+  LayoutDashboard,
 } from "lucide-react";
 import { Avatar } from "@heroui/avatar";
 import { Tooltip } from "@heroui/tooltip";
@@ -62,6 +63,12 @@ export const PrimarySidebar = () => {
       label: t("storyboard"),
       href: "/storyboard",
       icon: <Clapperboard size={20} />,
+    },
+    {
+      label: t("desktop"),
+      href: "/desktop",
+      icon: <LayoutDashboard size={20} />,
+      isActive: (path: string) => path.startsWith("/desktop"),
     },
   ];
 

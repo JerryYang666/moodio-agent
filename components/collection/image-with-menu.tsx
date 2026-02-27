@@ -26,10 +26,12 @@ import {
   Plus,
   Folder,
   Video,
+  LayoutDashboard,
 } from "lucide-react";
 import { useCollections } from "@/hooks/use-collections";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
+import SendToDesktopModal from "@/components/desktop/SendToDesktopModal";
 
 interface ImageWithMenuProps {
   imageId: string;
@@ -127,6 +129,11 @@ export default function ImageWithMenu({
 
   const [newCollectionName, setNewCollectionName] = useState("");
   const [isCreating, setIsCreating] = useState(false);
+  const {
+    isOpen: isDesktopOpen,
+    onOpen: onDesktopOpen,
+    onOpenChange: onDesktopOpenChange,
+  } = useDisclosure();
 
   // End position: right side of screen (aligned with assets sidebar)
   const getEndPosition = () => {
@@ -246,6 +253,8 @@ export default function ImageWithMenu({
                   handleSaveToProject();
                 } else if (key === "create-new") {
                   handleCreateNewCollection();
+                } else if (key === "send-to-desktop") {
+                  onDesktopOpen();
                 }
               }}
             >
@@ -258,6 +267,12 @@ export default function ImageWithMenu({
                 className="text-primary"
               >
                 {tVideo("generateVideo")}
+              </DropdownItem>
+              <DropdownItem
+                key="send-to-desktop"
+                startContent={<LayoutDashboard size={16} />}
+              >
+                Send to Desktop
               </DropdownItem>
               <DropdownSection title={tMenu("addToCollection")} showDivider>
                 <DropdownItem
@@ -353,6 +368,24 @@ export default function ImageWithMenu({
           )}
         </ModalContent>
       </Modal>
+
+      {/* Send to Desktop Modal */}
+      <SendToDesktopModal
+        isOpen={isDesktopOpen}
+        onOpenChange={onDesktopOpenChange}
+        assets={[
+          {
+            assetType: "image",
+            metadata: {
+              imageId,
+              chatId: chatId || undefined,
+              title: generationDetails.title,
+              prompt: generationDetails.prompt,
+              status: generationDetails.status,
+            },
+          },
+        ]}
+      />
     </>
   );
 }
