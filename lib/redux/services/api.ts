@@ -180,6 +180,32 @@ export const api = createApi({
 
         return false;
       },
+
+      async onQueryStarted({ queryState }, { queryFulfilled }) {
+        const metadata: Record<string, unknown> = {
+          query: queryState.textSearch.trim() || null,
+          selectedFilters: queryState.selectedFilters,
+          contentTypes: queryState.contentTypes,
+          isPagination: !!queryState.cursor,
+        };
+        if (queryState.isAigc !== undefined) {
+          metadata.isAigc = queryState.isAigc;
+        }
+
+        try {
+          const { data } = await queryFulfilled;
+          metadata.totalResults = data.total_content;
+          metadata.strategyName = data.strategy_name ?? null;
+        } catch {
+          metadata.failed = true;
+        }
+
+        fetch("/api/telemetry", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ eventType: "retrieval_search", metadata }),
+        }).catch(() => {});
+      },
     }),
 
     getProperties: builder.query<Property[], string>({
