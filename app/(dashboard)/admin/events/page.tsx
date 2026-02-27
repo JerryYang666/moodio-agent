@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import {
   Table,
   TableHeader,
@@ -10,7 +10,8 @@ import {
   TableCell,
 } from "@heroui/table";
 import { Button } from "@heroui/button";
-import { Card, CardBody, CardHeader } from "@heroui/card";
+import { Input } from "@heroui/input";
+import { Card, CardBody } from "@heroui/card";
 import { Chip } from "@heroui/chip";
 import {
   Modal,
@@ -20,11 +21,13 @@ import {
   ModalFooter,
   useDisclosure,
 } from "@heroui/modal";
+import { Select, SelectItem } from "@heroui/select";
 import { api } from "@/lib/api/client";
 import { useAuth } from "@/hooks/use-auth";
 import { Spinner } from "@heroui/spinner";
 import { Pagination } from "@heroui/pagination";
 import dynamic from "next/dynamic";
+import { Search, X } from "lucide-react";
 
 const JsonEditor = dynamic(() => import("@/components/JsonEditor"), {
   ssr: false,
@@ -50,18 +53,38 @@ export default function EventsPage() {
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const { isOpen, onOpen, onOpenChange } = useDisclosure();
 
+  // Filter state
+  const [filterEventType, setFilterEventType] = useState("");
+  const [filterUserId, setFilterUserId] = useState("");
+
+  // The committed filter value that triggers API calls (only updated on Enter / clear)
+  const [activeUserId, setActiveUserId] = useState("");
+
+  const EVENT_TYPES = [
+    "retrieval_search",
+    "user_sent_message",
+    "image_generation",
+    "video_generation",
+    "video_generation_refund",
+    "video_generation_recovery",
+  ];
+
   useEffect(() => {
     if (user && user.roles.includes("admin")) {
       fetchEvents();
     }
-  }, [user, page]);
+  }, [user, page, filterEventType, activeUserId]);
 
   const fetchEvents = async () => {
     setLoading(true);
     try {
-      const response = await api.get(
-        `/api/admin/events?page=${page}&limit=${limit}`
-      );
+      const params = new URLSearchParams();
+      params.set("page", String(page));
+      params.set("limit", String(limit));
+      if (filterEventType) params.set("type", filterEventType);
+      if (activeUserId.trim()) params.set("userId", activeUserId.trim());
+
+      const response = await api.get(`/api/admin/events?${params.toString()}`);
       setEvents(response.data);
       setTotal(response.pagination.total);
       setTotalPages(response.pagination.totalPages);
@@ -71,6 +94,20 @@ export default function EventsPage() {
       setLoading(false);
     }
   };
+
+  const handleCommitUserId = () => {
+    setActiveUserId(filterUserId.trim());
+    setPage(1);
+  };
+
+  const handleClearFilters = () => {
+    setFilterEventType("");
+    setFilterUserId("");
+    setActiveUserId("");
+    setPage(1);
+  };
+
+  const hasActiveFilters = filterEventType || activeUserId;
 
   const handleViewDetails = (event: Event) => {
     setSelectedEvent(event);
@@ -93,6 +130,57 @@ export default function EventsPage() {
           Refresh
         </Button>
       </div>
+
+      {/* Filters */}
+      <Card>
+        <CardBody>
+          <div className="flex flex-col sm:flex-row gap-3 items-end">
+            <Select
+              label="Event Type"
+              placeholder="All event types"
+              className="sm:max-w-[220px]"
+              selectedKeys={filterEventType ? new Set([filterEventType]) : new Set()}
+              onSelectionChange={(keys) => {
+                const selected = Array.from(keys)[0] as string | undefined;
+                setFilterEventType(selected ?? "");
+                setPage(1);
+              }}
+            >
+              {EVENT_TYPES.map((type) => (
+                <SelectItem key={type}>{type}</SelectItem>
+              ))}
+            </Select>
+            <Input
+              label="User ID"
+              placeholder="Paste a user ID..."
+              className="sm:max-w-[320px]"
+              value={filterUserId}
+              onValueChange={setFilterUserId}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleCommitUserId();
+              }}
+              startContent={<Search size={16} className="text-default-400" />}
+              isClearable
+              onClear={() => { setFilterUserId(""); setActiveUserId(""); setPage(1); }}
+            />
+            {hasActiveFilters && (
+              <Button
+                size="sm"
+                variant="flat"
+                startContent={<X size={14} />}
+                onPress={handleClearFilters}
+              >
+                Clear filters
+              </Button>
+            )}
+            {total > 0 && (
+              <span className="text-sm text-default-500 ml-auto whitespace-nowrap">
+                {total.toLocaleString()} event{total !== 1 ? "s" : ""}
+              </span>
+            )}
+          </div>
+        </CardBody>
+      </Card>
 
       <Card>
         <CardBody>

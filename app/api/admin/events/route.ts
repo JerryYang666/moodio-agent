@@ -3,7 +3,7 @@ import { getAccessToken } from "@/lib/auth/cookies";
 import { verifyAccessToken } from "@/lib/auth/jwt";
 import { db } from "@/lib/db";
 import { events } from "@/lib/db/schema";
-import { desc, eq, count } from "drizzle-orm";
+import { desc, eq, and, count } from "drizzle-orm";
 
 export async function GET(request: NextRequest) {
   try {
@@ -21,14 +21,21 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get("page") || "1");
     const limit = Math.min(parseInt(searchParams.get("limit") || "20"), 100);
     const eventType = searchParams.get("type");
+    const userId = searchParams.get("userId");
 
     const offset = (page - 1) * limit;
 
-    const dataPromise = eventType
+    const conditions = [];
+    if (eventType) conditions.push(eq(events.eventType, eventType));
+    if (userId) conditions.push(eq(events.userId, userId));
+
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+    const dataPromise = whereClause
       ? db
           .select()
           .from(events)
-          .where(eq(events.eventType, eventType))
+          .where(whereClause)
           .orderBy(desc(events.timestamp))
           .limit(limit)
           .offset(offset)
@@ -39,11 +46,11 @@ export async function GET(request: NextRequest) {
           .limit(limit)
           .offset(offset);
 
-    const countPromise = eventType
+    const countPromise = whereClause
       ? db
           .select({ count: count() })
           .from(events)
-          .where(eq(events.eventType, eventType))
+          .where(whereClause)
       : db.select({ count: count() }).from(events);
 
     const [data, totalResult] = await Promise.all([dataPromise, countPromise]);

@@ -31,7 +31,7 @@ import { User } from "@/hooks/use-auth";
 import { Pagination } from "@heroui/pagination";
 import { SearchIcon } from "@/components/icons";
 import { addToast } from "@heroui/toast";
-import { Bean, FlaskConical } from "lucide-react";
+import { Bean, FlaskConical, Copy } from "lucide-react";
 
 interface InvitationCode {
   code: string;
@@ -464,6 +464,22 @@ export default function AdminPage() {
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="flat"
+                          isIconOnly
+                          aria-label="Copy user ID"
+                          onPress={() => {
+                            navigator.clipboard.writeText(item.id);
+                            addToast({
+                              title: "Copied",
+                              description: "User ID copied to clipboard",
+                              color: "default",
+                            });
+                          }}
+                        >
+                          <Copy size={14} />
+                        </Button>
                         <Button
                           size="sm"
                           variant="flat"
