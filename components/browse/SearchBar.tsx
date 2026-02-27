@@ -25,8 +25,10 @@ const SearchBar: React.FC<SearchBarProps> = ({
   const router = useRouter();
   const pathname = usePathname();
 
-  // Get current search text from Redux
   const searchText = useSelector((state: RootState) => state.query.textSearch);
+  const selectedFilters = useSelector((state: RootState) => state.query.selectedFilters);
+  const contentTypes = useSelector((state: RootState) => state.query.contentTypes);
+  const isAigc = useSelector((state: RootState) => state.query.isAigc);
 
   // Local state for input field (for continuous re-renders)
   // Use initialDisplayValue if provided (for HomePage), otherwise use Redux state
@@ -47,15 +49,29 @@ const SearchBar: React.FC<SearchBarProps> = ({
   };
 
   const handleSearch = () => {
-    // Clear filters if searching from homepage (fresh start)
     if (clearFiltersOnSearch) {
       dispatch(setSelectedFilters([]));
     }
 
-    // Update Redux state with the new search text
     dispatch(setTextSearch(localSearchText));
 
-    // Navigate to browse if currently on a different page
+    if (localSearchText.trim()) {
+      const metadata: Record<string, unknown> = {
+        query: localSearchText.trim(),
+        selectedFilters: clearFiltersOnSearch ? [] : selectedFilters,
+        contentTypes,
+      };
+      if (isAigc !== undefined) {
+        metadata.isAigc = isAigc;
+      }
+
+      fetch("/api/telemetry", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ eventType: "retrieval_search", metadata }),
+      }).catch(() => {});
+    }
+
     if (pathname !== '/browse') {
       router.push('/browse');
     }
