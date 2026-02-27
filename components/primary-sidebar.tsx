@@ -21,6 +21,7 @@ import { Avatar } from "@heroui/avatar";
 import { Tooltip } from "@heroui/tooltip";
 import { useAuth } from "@/hooks/use-auth";
 import { useCredits } from "@/hooks/use-credits";
+import { useFeatureFlag } from "@/lib/feature-flags";
 import { motion } from "framer-motion";
 import { Button } from "@heroui/button";
 import { ThemeSwitch } from "@/components/theme-switch";
@@ -39,6 +40,7 @@ export const PrimarySidebar = () => {
   const t = useTranslations("nav");
   const tCredits = useTranslations("credits");
   const tLanguage = useTranslations("language");
+  const showDesktop = useFeatureFlag<boolean>("user_desktop") ?? false;
 
   const navItems = [
     {
@@ -64,12 +66,16 @@ export const PrimarySidebar = () => {
       href: "/storyboard",
       icon: <Clapperboard size={20} />,
     },
-    {
-      label: t("desktop"),
-      href: "/desktop",
-      icon: <LayoutDashboard size={20} />,
-      isActive: (path: string) => path.startsWith("/desktop"),
-    },
+    ...(showDesktop
+      ? [
+          {
+            label: t("desktop"),
+            href: "/desktop",
+            icon: <LayoutDashboard size={20} />,
+            isActive: (path: string) => path.startsWith("/desktop"),
+          },
+        ]
+      : []),
   ];
 
   return (
