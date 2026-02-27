@@ -16,16 +16,31 @@ import {
 } from "@heroui/modal";
 import { Select, SelectItem } from "@heroui/select";
 import { addToast } from "@heroui/toast";
-import { ArrowLeft, Share2, Pencil, X } from "lucide-react";
+import { Tooltip } from "@heroui/tooltip";
+import { ArrowLeft, Share2, Pencil, X, Wifi, WifiOff } from "lucide-react";
 import DesktopCanvas from "@/components/desktop/DesktopCanvas";
 import DesktopToolbar from "@/components/desktop/DesktopToolbar";
 import {
   useDesktopDetail,
   type CameraState,
 } from "@/hooks/use-desktop";
+import {
+  useDesktopWebSocket,
+  type ConnectedUser,
+  type RemoteEvent,
+} from "@/hooks/use-desktop-ws";
 
 const DEFAULT_CAMERA: CameraState = { x: 0, y: 0, zoom: 1 };
 const VIEWPORT_SAVE_DEBOUNCE = 2000;
+
+function userIdToHslColor(userId: string): string {
+  let hash = 0;
+  for (let i = 0; i < userId.length; i++) {
+    hash = userId.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const hue = Math.abs(hash) % 360;
+  return `hsl(${hue}, 70%, 50%)`;
+}
 
 interface User {
   id: string;
@@ -49,7 +64,28 @@ export default function DesktopDetailPage({
     removeAsset,
     batchUpdateAssets,
     saveViewport,
+    applyRemoteEvent,
   } = useDesktopDetail(desktopId);
+
+  const handleRemoteEvent = useCallback(
+    (event: RemoteEvent) => {
+      applyRemoteEvent(event);
+    },
+    [applyRemoteEvent]
+  );
+
+  const {
+    connectionState,
+    sendEvent,
+    connectedUsers,
+    remoteCursors,
+    remoteSelections,
+  } = useDesktopWebSocket({
+    desktopId,
+    enabled: !!detail,
+    onRemoteEvent: handleRemoteEvent,
+    fetchDetail,
+  });
 
   const [camera, setCamera] = useState<CameraState>(DEFAULT_CAMERA);
   const viewportSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -102,31 +138,37 @@ export default function DesktopDetailPage({
   const handleAssetMove = useCallback(
     (assetId: string, posX: number, posY: number) => {
       updateAsset(assetId, { posX, posY });
+      sendEvent("asset_moved", { assetId, posX, posY });
     },
-    [updateAsset]
+    [updateAsset, sendEvent]
   );
 
   const handleAssetDelete = useCallback(
     (assetId: string) => {
       removeAsset(assetId);
+      sendEvent("asset_removed", { assetId });
     },
-    [removeAsset]
+    [removeAsset, sendEvent]
   );
 
   const handleAssetBatchMove = useCallback(
     (moves: Array<{ id: string; posX: number; posY: number }>) => {
       batchUpdateAssets(moves);
+      for (const m of moves) {
+        sendEvent("asset_moved", { assetId: m.id, posX: m.posX, posY: m.posY });
+      }
     },
-    [batchUpdateAssets]
+    [batchUpdateAssets, sendEvent]
   );
 
   const handleAssetBatchDelete = useCallback(
     (assetIds: string[]) => {
       for (const id of assetIds) {
         removeAsset(id);
+        sendEvent("asset_removed", { assetId: id });
       }
     },
-    [removeAsset]
+    [removeAsset, sendEvent]
   );
 
   const handleOpenChat = useCallback(
@@ -241,6 +283,47 @@ export default function DesktopDetailPage({
           <ArrowLeft size={18} />
         </Button>
         <h2 className="font-semibold truncate flex-1">{desktop.name}</h2>
+
+        {/* Presence avatars */}
+        {connectedUsers.length > 0 && (
+          <div className="flex items-center -space-x-1.5">
+            {connectedUsers.map((user) => (
+              <Tooltip
+                key={user.userId}
+                content={
+                  <div className="text-xs py-1 px-0.5">
+                    {user.firstName && <div className="font-semibold">{user.firstName}</div>}
+                    <div className="text-default-400">{user.email}</div>
+                    {user.sessionCount > 1 && (
+                      <div className="text-default-500 mt-0.5">{user.sessionCount} tabs open</div>
+                    )}
+                  </div>
+                }
+                placement="bottom"
+              >
+                <div
+                  className="relative w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold text-white border-2 border-background cursor-default"
+                  style={{ backgroundColor: userIdToHslColor(user.userId) }}
+                >
+                  {user.initial}
+                  {user.sessionCount > 1 && (
+                    <span className="absolute -top-1 -right-1 text-[8px] bg-default-800 text-white rounded-full w-3.5 h-3.5 flex items-center justify-center">
+                      {user.sessionCount}
+                    </span>
+                  )}
+                </div>
+              </Tooltip>
+            ))}
+          </div>
+        )}
+
+        {/* Connection state indicator */}
+        {connectionState === "connected" && (
+          <div className="text-success" title="Live sync active">
+            <Wifi size={16} />
+          </div>
+        )}
+
         <Chip size="sm" variant="flat" color={desktop.isOwner ? "primary" : "default"}>
           {desktop.permission}
         </Chip>
@@ -256,6 +339,16 @@ export default function DesktopDetailPage({
         )}
       </div>
 
+      {/* Degraded-mode banner */}
+      {(connectionState === "polling" || connectionState === "reconnecting") && (
+        <div className="flex items-center gap-2 px-4 py-1.5 bg-warning-50 border-b border-warning-200 text-warning-700 text-xs z-20 shrink-0">
+          <WifiOff size={14} />
+          {connectionState === "polling"
+            ? "Live sync unavailable \u2014 updates every 10s"
+            : "Reconnecting to live sync\u2026"}
+        </div>
+      )}
+
       {/* Canvas */}
       <div className="flex-1 relative">
         <DesktopCanvas
@@ -268,6 +361,9 @@ export default function DesktopDetailPage({
           onAssetDelete={canEdit ? handleAssetDelete : undefined}
           onAssetBatchDelete={canEdit ? handleAssetBatchDelete : undefined}
           onOpenChat={handleOpenChat}
+          sendEvent={sendEvent}
+          remoteCursors={remoteCursors}
+          remoteSelections={remoteSelections}
         />
         <DesktopToolbar
           camera={camera}

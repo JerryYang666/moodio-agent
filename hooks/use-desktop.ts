@@ -246,6 +246,91 @@ export function useDesktopDetail(desktopId: string) {
     [desktopId]
   );
 
+  const applyRemoteEvent = useCallback(
+    (event: { type: string; payload: any }) => {
+      switch (event.type) {
+        case "asset_moved":
+        case "asset_dragging": {
+          const { assetId, posX, posY } = event.payload || {};
+          if (!assetId) return;
+          setDetail((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  assets: prev.assets.map((a) =>
+                    a.id === assetId ? { ...a, posX, posY } : a
+                  ),
+                }
+              : null
+          );
+          break;
+        }
+        case "asset_resized": {
+          const { assetId, width, height } = event.payload || {};
+          if (!assetId) return;
+          setDetail((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  assets: prev.assets.map((a) =>
+                    a.id === assetId ? { ...a, width, height } : a
+                  ),
+                }
+              : null
+          );
+          break;
+        }
+        case "asset_added": {
+          const asset = event.payload?.asset;
+          if (!asset) return;
+          setDetail((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  assets: [asset, ...prev.assets.filter((a) => a.id !== asset.id)],
+                }
+              : null
+          );
+          break;
+        }
+        case "asset_removed": {
+          const { assetId } = event.payload || {};
+          if (!assetId) return;
+          setDetail((prev) =>
+            prev
+              ? { ...prev, assets: prev.assets.filter((a) => a.id !== assetId) }
+              : null
+          );
+          break;
+        }
+      }
+    },
+    []
+  );
+
+  const mergeRemoteState = useCallback(
+    (serverDetail: DesktopDetail, draggingAssetIds?: Set<string>) => {
+      setDetail((prev) => {
+        if (!prev) return serverDetail;
+        const serverMap = new Map(
+          serverDetail.assets.map((a) => [a.id, a])
+        );
+        const mergedAssets = serverDetail.assets.map((serverAsset) => {
+          if (draggingAssetIds?.has(serverAsset.id)) {
+            const local = prev.assets.find((a) => a.id === serverAsset.id);
+            return local || serverAsset;
+          }
+          return serverAsset;
+        });
+        return {
+          ...serverDetail,
+          assets: mergedAssets,
+        };
+      });
+    },
+    []
+  );
+
   return {
     detail,
     setDetail,
@@ -256,6 +341,8 @@ export function useDesktopDetail(desktopId: string) {
     removeAsset,
     batchUpdateAssets,
     saveViewport,
+    applyRemoteEvent,
+    mergeRemoteState,
   };
 }
 
