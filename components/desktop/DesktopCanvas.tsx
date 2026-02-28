@@ -3,6 +3,7 @@
 import { useRef, useState, useCallback, useMemo } from "react";
 import type { DesktopAsset } from "@/lib/db/schema";
 import type { CameraState } from "@/hooks/use-desktop";
+import type { RemoteCursor } from "@/hooks/use-desktop-ws";
 import type { ImageAssetMeta, VideoAssetMeta } from "@/lib/desktop/types";
 import {
   Trash2,
@@ -10,6 +11,7 @@ import {
   MessageSquare,
   FolderPlus,
   Copy,
+  MousePointer2,
 } from "lucide-react";
 
 const MIN_ZOOM = 0.1;
@@ -17,6 +19,7 @@ const MAX_ZOOM = 5;
 const ZOOM_SENSITIVITY = 0.001;
 const DEFAULT_ASSET_WIDTH = 300;
 const CULL_PADDING = 200;
+const CURSOR_THROTTLE_MS = 40;
 
 interface EnrichedDesktopAsset extends DesktopAsset {
   imageUrl?: string | null;
@@ -34,12 +37,24 @@ interface DesktopCanvasProps {
   onAssetBatchDelete?: (assetIds: string[]) => void;
   onOpenChat?: (chatId: string) => void;
   onCopyToCollection?: (asset: EnrichedDesktopAsset) => void;
+  sendEvent?: (type: string, payload: Record<string, unknown>) => void;
+  remoteCursors?: RemoteCursor[];
+  remoteSelections?: Map<string, { sessionId: string; userId: string; firstName: string }[]>;
 }
 
 interface ContextMenuState {
   x: number;
   y: number;
   assetId: string | null;
+}
+
+function userIdToColor(userId: string): string {
+  let hash = 0;
+  for (let i = 0; i < userId.length; i++) {
+    hash = userId.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const hue = Math.abs(hash) % 360;
+  return `hsl(${hue}, 70%, 50%)`;
 }
 
 function getAssetDimensions(
@@ -67,6 +82,9 @@ export default function DesktopCanvas({
   onAssetBatchDelete,
   onOpenChat,
   onCopyToCollection,
+  sendEvent,
+  remoteCursors,
+  remoteSelections,
 }: DesktopCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const isPanning = useRef(false);
@@ -81,6 +99,10 @@ export default function DesktopCanvas({
   const [naturalDims, setNaturalDims] = useState<Map<string, { w: number; h: number }>>(
     () => new Map()
   );
+
+  // Throttle ref for cursor and drag events
+  const lastCursorSend = useRef(0);
+  const lastDragSend = useRef(0);
 
   const handleImageLoad = useCallback(
     (assetId: string, naturalWidth: number, naturalHeight: number) => {
@@ -185,6 +207,9 @@ export default function DesktopCanvas({
       }
 
       // Click on background clears selection
+      Array.from(selectedIds).forEach((id) => {
+        sendEvent?.("asset_deselected", { assetId: id });
+      });
       setSelectedIds(new Set());
 
       isPanning.current = true;
@@ -192,7 +217,7 @@ export default function DesktopCanvas({
       cameraAtPanStart.current = { x: camera.x, y: camera.y };
       (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     },
-    [camera, screenToWorld]
+    [camera, screenToWorld, selectedIds, sendEvent]
   );
 
   const handlePointerMove = useCallback(
@@ -213,10 +238,24 @@ export default function DesktopCanvas({
         const worldX = (e.clientX - rect.left - camera.x) / camera.zoom - dragOffset.current.x;
         const worldY = (e.clientY - rect.top - camera.y) / camera.zoom - dragOffset.current.y;
         setDragPos({ x: worldX, y: worldY });
+
+        const now = Date.now();
+        if (sendEvent && now - lastDragSend.current >= CURSOR_THROTTLE_MS) {
+          lastDragSend.current = now;
+          sendEvent("asset_dragging", { assetId: draggingAssetId, posX: worldX, posY: worldY });
+        }
         return;
       }
 
-      if (!isPanning.current) return;
+      if (!isPanning.current) {
+        const now = Date.now();
+        if (sendEvent && now - lastCursorSend.current >= CURSOR_THROTTLE_MS) {
+          lastCursorSend.current = now;
+          const world = screenToWorld(e.clientX, e.clientY);
+          sendEvent("cursor_move", { x: world.x, y: world.y });
+        }
+        return;
+      }
       const dx = e.clientX - panStart.current.x;
       const dy = e.clientY - panStart.current.y;
       onCameraChange({
@@ -225,7 +264,7 @@ export default function DesktopCanvas({
         y: cameraAtPanStart.current.y + dy,
       });
     },
-    [camera, onCameraChange, draggingAssetId, marquee, screenToWorld]
+    [camera, onCameraChange, draggingAssetId, marquee, screenToWorld, sendEvent]
   );
 
   const handlePointerUp = useCallback(
@@ -249,6 +288,18 @@ export default function DesktopCanvas({
             selected.add(a.id);
           }
         }
+
+        selectedIds.forEach((id) => {
+          if (!selected.has(id)) {
+            sendEvent?.("asset_deselected", { assetId: id });
+          }
+        });
+        selected.forEach((id) => {
+          if (!selectedIds.has(id)) {
+            sendEvent?.("asset_selected", { assetId: id });
+          }
+        });
+
         setSelectedIds(selected);
         marqueeStart.current = null;
         setMarquee(null);
@@ -283,7 +334,7 @@ export default function DesktopCanvas({
       isPanning.current = false;
       (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
     },
-    [draggingAssetId, dragPos, onAssetMove, onAssetBatchMove, assets, selectedIds, marquee]
+    [draggingAssetId, dragPos, onAssetMove, onAssetBatchMove, assets, selectedIds, marquee, sendEvent]
   );
 
   const handleAssetPointerDown = useCallback(
@@ -300,8 +351,10 @@ export default function DesktopCanvas({
           const next = new Set(prev);
           if (next.has(asset.id)) {
             next.delete(asset.id);
+            sendEvent?.("asset_deselected", { assetId: asset.id });
           } else {
             next.add(asset.id);
+            sendEvent?.("asset_selected", { assetId: asset.id });
           }
           return next;
         });
@@ -310,7 +363,12 @@ export default function DesktopCanvas({
 
       // If clicking unselected asset, replace selection
       if (!selectedIds.has(asset.id)) {
+        // Deselect old ones
+        Array.from(selectedIds).forEach((id) => {
+          sendEvent?.("asset_deselected", { assetId: id });
+        });
         setSelectedIds(new Set([asset.id]));
+        sendEvent?.("asset_selected", { assetId: asset.id });
       }
 
       const rect = containerRef.current?.getBoundingClientRect();
@@ -326,7 +384,7 @@ export default function DesktopCanvas({
       // the cursor moves outside the asset card during the drag.
       containerRef.current?.setPointerCapture(e.pointerId);
     },
-    [canEdit, camera, selectedIds]
+    [canEdit, camera, selectedIds, sendEvent]
   );
 
   const handleContextMenu = useCallback(
@@ -397,6 +455,7 @@ export default function DesktopCanvas({
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
+      onPointerLeave={() => sendEvent?.("cursor_leave", {})}
       onContextMenu={handleBackgroundContextMenu}
     >
       {/* Dot grid pattern */}
@@ -415,6 +474,7 @@ export default function DesktopCanvas({
           const { w, h } = getAssetDimensions(asset, naturalDims.get(asset.id));
           const isDragging = draggingAssetId === asset.id;
           const isSelected = selectedIds.has(asset.id);
+          const remoteSelectorsForAsset = remoteSelections?.get(asset.id);
 
           let posX: number, posY: number;
           if (isDragging && dragPos) {
@@ -449,7 +509,9 @@ export default function DesktopCanvas({
               className={`absolute group transition-shadow duration-150 rounded-xl overflow-hidden bg-background shadow-md hover:shadow-lg ${
                 isSelected
                   ? "ring-2 ring-primary ring-offset-2 ring-offset-background"
-                  : "border border-divider"
+                  : remoteSelectorsForAsset?.length
+                    ? "ring-offset-2 ring-offset-background"
+                    : "border border-divider"
               } ${isDragging ? "opacity-80 shadow-xl" : ""}`}
               style={{
                 left: posX,
@@ -458,6 +520,11 @@ export default function DesktopCanvas({
                 height: h,
                 zIndex: isDragging ? 9999 : asset.zIndex,
                 cursor: canEdit ? "move" : "default",
+                ...(remoteSelectorsForAsset?.length && !isSelected
+                  ? {
+                      boxShadow: `0 0 0 2px ${userIdToColor(remoteSelectorsForAsset[0].userId)}`,
+                    }
+                  : {}),
               }}
               onPointerDown={(e) => handleAssetPointerDown(e, asset)}
               onContextMenu={(e) => handleContextMenu(e, asset)}
@@ -465,6 +532,37 @@ export default function DesktopCanvas({
               <AssetCardContent
                 asset={asset}
                 onImageLoad={handleImageLoad}
+              />
+              {remoteSelectorsForAsset?.length && !isSelected ? (
+                <div
+                  className="absolute -top-5 left-1 text-[10px] font-medium px-1 rounded text-white whitespace-nowrap"
+                  style={{ backgroundColor: userIdToColor(remoteSelectorsForAsset[0].userId) }}
+                >
+                  {remoteSelectorsForAsset.map((s) => s.firstName).join(", ")}
+                </div>
+              ) : null}
+            </div>
+          );
+        })}
+
+        {/* Remote cursors in world space */}
+        {remoteCursors?.map((cursor) => {
+          const color = userIdToColor(cursor.userId);
+          return (
+            <div
+              key={cursor.sessionId}
+              className="absolute pointer-events-none z-10000 transition-all duration-75"
+              style={{
+                left: cursor.x,
+                top: cursor.y,
+                transform: `translate(-1px, -1px) scale(${1 / camera.zoom})`,
+              }}
+            >
+              <MousePointer2
+                size={20}
+                fill={color}
+                color={color}
+                strokeWidth={1.5}
               />
             </div>
           );
