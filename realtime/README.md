@@ -1,6 +1,6 @@
 # moodio-realtime
 
-WebSocket server for real-time collaboration on Moodio desktops. Handles room-based presence, event broadcasting, and permission enforcement. Sits behind Nginx alongside the main Next.js app.
+WebSocket server for real-time collaboration on Moodio desktops. Handles room-based presence, event broadcasting, and permission enforcement. Sits behind Nginx alongside the main Next.js app
 
 ## Architecture
 
