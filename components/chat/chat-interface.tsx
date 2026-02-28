@@ -102,6 +102,48 @@ export default function ChatInterface({
   const [isLoading, setIsLoading] = useState(
     !!initialChatId && initialMessages.length === 0
   );
+
+  // Extract chatId from the URL pathname. This is the source of truth because
+  // replaceState (used after creating a new chat) bypasses Next.js routing, so
+  // the prop may be stale after back/forward navigation.
+  const getChatIdFromUrl = useCallback(() => {
+    const match = window.location.pathname.match(/^\/chat\/(.+)$/);
+    return match ? match[1] : undefined;
+  }, []);
+
+  // On mount + popstate (browser back/forward): reconcile internal chatId with URL.
+  useEffect(() => {
+    const syncWithUrl = () => {
+      const urlChatId = getChatIdFromUrl();
+      console.log(
+        `[ChatInterface] URL sync — url: ${window.location.pathname}, urlChatId: ${urlChatId ?? "none"}, current chatId: ${chatId ?? "none"}`
+      );
+      if (urlChatId && urlChatId !== chatId) {
+        console.log(`[ChatInterface] Syncing chatId to "${urlChatId}" from URL`);
+        setChatId(urlChatId);
+        setMessages([]);
+        setIsLoading(true);
+      }
+    };
+
+    syncWithUrl();
+
+    window.addEventListener("popstate", syncWithUrl);
+    return () => window.removeEventListener("popstate", syncWithUrl);
+  }, [chatId, getChatIdFromUrl]);
+
+  // Keep internal chatId in sync with the URL-derived prop (covers normal
+  // Next.js navigations where the prop updates correctly).
+  useEffect(() => {
+    if (initialChatId !== chatId) {
+      console.log(
+        `[ChatInterface] Prop sync — initialChatId: ${initialChatId ?? "none"}, current chatId: ${chatId ?? "none"}`
+      );
+      setChatId(initialChatId);
+      setMessages(initialMessages);
+      setIsLoading(!!initialChatId && initialMessages.length === 0);
+    }
+  }, [initialChatId]);
   const [isSending, setIsSending] = useState(false);
   // Track which message timestamp is currently generating an additional variant
   const [generatingVariantTimestamp, setGeneratingVariantTimestamp] = useState<
