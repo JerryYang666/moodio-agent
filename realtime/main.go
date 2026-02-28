@@ -28,7 +28,7 @@ func main() {
 	m.Config.MaxMessageSize = 4096
 
 	auth := &Auth{jwtSecret: []byte(jwtSecret)}
-	rooms := &RoomManager{melody: m}
+	rooms := NewRoomManager(m)
 
 	http.HandleFunc("/ws/desktop/{desktopId}", func(w http.ResponseWriter, r *http.Request) {
 		claims, err := auth.ValidateFromCookie(r)

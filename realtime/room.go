@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"log"
+	"sync"
 	"time"
 
 	"github.com/olahol/melody"
@@ -37,22 +38,92 @@ type RoomJoinedEvent struct {
 	Sessions  []SessionInfo `json:"sessions"`
 }
 
+// SessionKeys caches all session metadata at connect time so we never
+// need to call Session.Get (which acquires a per-session RWMutex) on the
+// hot path.
+type SessionKeys struct {
+	SessionID  string
+	UserID     string
+	FirstName  string
+	Email      string
+	Permission string
+	RoomID     string
+}
+
+const sessionKeysKey = "__keys"
+
+func cacheSessionKeys(s *melody.Session) *SessionKeys {
+	keys := &SessionKeys{
+		SessionID:  mustGetString(s, "sessionId"),
+		UserID:     mustGetString(s, "userId"),
+		FirstName:  mustGetString(s, "firstName"),
+		Email:      mustGetString(s, "email"),
+		Permission: mustGetString(s, "permission"),
+		RoomID:     mustGetString(s, "roomId"),
+	}
+	s.Set(sessionKeysKey, keys)
+	return keys
+}
+
+func getSessionKeys(s *melody.Session) *SessionKeys {
+	v, ok := s.Get(sessionKeysKey)
+	if !ok {
+		return cacheSessionKeys(s)
+	}
+	keys, ok := v.(*SessionKeys)
+	if !ok {
+		return cacheSessionKeys(s)
+	}
+	return keys
+}
+
 type RoomManager struct {
 	melody *melody.Melody
+	mu     sync.RWMutex
+	rooms  map[string]map[*melody.Session]struct{}
+}
+
+func NewRoomManager(m *melody.Melody) *RoomManager {
+	return &RoomManager{
+		melody: m,
+		rooms:  make(map[string]map[*melody.Session]struct{}),
+	}
+}
+
+func (rm *RoomManager) addToRoom(roomId string, s *melody.Session) {
+	rm.mu.Lock()
+	defer rm.mu.Unlock()
+	if rm.rooms[roomId] == nil {
+		rm.rooms[roomId] = make(map[*melody.Session]struct{})
+	}
+	rm.rooms[roomId][s] = struct{}{}
+}
+
+func (rm *RoomManager) removeFromRoom(roomId string, s *melody.Session) {
+	rm.mu.Lock()
+	defer rm.mu.Unlock()
+	members := rm.rooms[roomId]
+	if members == nil {
+		return
+	}
+	delete(members, s)
+	if len(members) == 0 {
+		delete(rm.rooms, roomId)
+	}
 }
 
 func (rm *RoomManager) HandleConnect(s *melody.Session) {
-	roomId := mustGetString(s, "roomId")
-	sessionId := mustGetString(s, "sessionId")
-	firstName := mustGetString(s, "firstName")
+	keys := cacheSessionKeys(s)
 
-	sessions := rm.getSessionsInRoom(roomId, sessionId)
+	rm.addToRoom(keys.RoomID, s)
 
-	log.Printf("[room] %s joined room=%s (%d other sessions present)", firstName, roomId[:8], len(sessions))
+	sessions := rm.getSessionsInRoom(keys.RoomID, keys.SessionID)
+
+	log.Printf("[room] %s joined room=%s (%d other sessions present)", keys.FirstName, keys.RoomID[:8], len(sessions))
 
 	joined := RoomJoinedEvent{
 		Type:      "room_joined",
-		SessionID: sessionId,
+		SessionID: keys.SessionID,
 		Sessions:  sessions,
 	}
 	data, err := json.Marshal(joined)
@@ -62,12 +133,11 @@ func (rm *RoomManager) HandleConnect(s *melody.Session) {
 	}
 	s.Write(data)
 
-	rm.broadcastToRoom(roomId, s, buildSessionEvent("session_joined", s))
+	rm.broadcastToRoom(keys.RoomID, s, buildSessionEvent("session_joined", s))
 }
 
 func (rm *RoomManager) HandleMessage(s *melody.Session, msg []byte) {
-	roomId := mustGetString(s, "roomId")
-	permission := mustGetString(s, "permission")
+	keys := getSessionKeys(s)
 
 	var incoming IncomingEvent
 	if err := json.Unmarshal(msg, &incoming); err != nil {
@@ -75,97 +145,102 @@ func (rm *RoomManager) HandleMessage(s *melody.Session, msg []byte) {
 		return
 	}
 
-	if permission == "viewer" && isMutationEvent(incoming.Type) {
-		log.Printf("[room] blocked mutation %s from viewer session=%s", incoming.Type, mustGetString(s, "sessionId"))
+	if keys.Permission == "viewer" && isMutationEvent(incoming.Type) {
+		log.Printf("[room] blocked mutation %s from viewer session=%s", incoming.Type, keys.SessionID)
 		return
 	}
 
 	if isStateEvent(incoming.Type) {
 		log.Printf("[event] %s %s in room=%s by %s",
-			incoming.Type, truncatePayloadForLog(incoming.Payload), roomId[:8], mustGetString(s, "firstName"))
+			incoming.Type, truncatePayloadForLog(incoming.Payload), keys.RoomID[:8], keys.FirstName)
 	}
 
-	stamped := rm.stampIdentity(s, &incoming)
+	stamped := stampIdentity(keys, &incoming)
 	data, err := json.Marshal(stamped)
 	if err != nil {
 		log.Printf("Error marshalling stamped event: %v", err)
 		return
 	}
 
-	rm.broadcastToRoom(roomId, s, data)
+	rm.broadcastToRoom(keys.RoomID, s, data)
 }
 
 func (rm *RoomManager) HandleDisconnect(s *melody.Session) {
-	roomId := mustGetString(s, "roomId")
-	firstName := mustGetString(s, "firstName")
-	sessionId := mustGetString(s, "sessionId")
+	keys := getSessionKeys(s)
 
-	remaining := rm.getSessionsInRoom(roomId, sessionId)
-	log.Printf("[room] %s left room=%s (%d sessions remaining)", firstName, roomId[:8], len(remaining))
+	rm.removeFromRoom(keys.RoomID, s)
 
-	rm.broadcastToRoom(roomId, s, buildSessionEvent("session_left", s))
+	remaining := rm.getSessionsInRoom(keys.RoomID, keys.SessionID)
+	log.Printf("[room] %s left room=%s (%d sessions remaining)", keys.FirstName, keys.RoomID[:8], len(remaining))
+
+	rm.broadcastToRoom(keys.RoomID, s, buildSessionEvent("session_left", s))
 }
 
+// broadcastToRoom writes directly to room members, bypassing Melody's
+// global BroadcastFilter which iterates over every session on the server.
 func (rm *RoomManager) broadcastToRoom(roomId string, sender *melody.Session, msg []byte) {
-	rm.melody.BroadcastFilter(msg, func(q *melody.Session) bool {
-		qRoom, ok := q.Get("roomId")
-		return ok && qRoom == roomId && q != sender
-	})
+	rm.mu.RLock()
+	members := rm.rooms[roomId]
+	for s := range members {
+		if s != sender {
+			s.Write(msg)
+		}
+	}
+	rm.mu.RUnlock()
 }
 
 func (rm *RoomManager) getSessionsInRoom(roomId string, excludeSessionId string) []SessionInfo {
-	allSessions, err := rm.melody.Sessions()
-	if err != nil {
+	rm.mu.RLock()
+	members := rm.rooms[roomId]
+	if len(members) == 0 {
+		rm.mu.RUnlock()
 		return nil
 	}
-
-	var result []SessionInfo
-	for _, s := range allSessions {
-		r, ok := s.Get("roomId")
-		if !ok || r != roomId {
-			continue
-		}
-		sid := mustGetString(s, "sessionId")
-		if sid == excludeSessionId {
+	result := make([]SessionInfo, 0, len(members))
+	for s := range members {
+		k := getSessionKeys(s)
+		if k.SessionID == excludeSessionId {
 			continue
 		}
 		result = append(result, SessionInfo{
-			SessionID:  sid,
-			UserID:     mustGetString(s, "userId"),
-			FirstName:  mustGetString(s, "firstName"),
-			Email:      mustGetString(s, "email"),
-			Permission: mustGetString(s, "permission"),
+			SessionID:  k.SessionID,
+			UserID:     k.UserID,
+			FirstName:  k.FirstName,
+			Email:      k.Email,
+			Permission: k.Permission,
 		})
 	}
+	rm.mu.RUnlock()
 	return result
 }
 
-func (rm *RoomManager) stampIdentity(s *melody.Session, event *IncomingEvent) *OutgoingEvent {
+func stampIdentity(keys *SessionKeys, event *IncomingEvent) *OutgoingEvent {
 	return &OutgoingEvent{
 		Type:      event.Type,
-		SessionID: mustGetString(s, "sessionId"),
-		UserID:    mustGetString(s, "userId"),
-		FirstName: mustGetString(s, "firstName"),
-		Email:     mustGetString(s, "email"),
+		SessionID: keys.SessionID,
+		UserID:    keys.UserID,
+		FirstName: keys.FirstName,
+		Email:     keys.Email,
 		Timestamp: time.Now().UnixMilli(),
 		Payload:   event.Payload,
 	}
 }
 
 func buildSessionEvent(eventType string, s *melody.Session) []byte {
+	k := getSessionKeys(s)
 	event := OutgoingEvent{
 		Type:      eventType,
-		SessionID: mustGetString(s, "sessionId"),
-		UserID:    mustGetString(s, "userId"),
-		FirstName: mustGetString(s, "firstName"),
-		Email:     mustGetString(s, "email"),
+		SessionID: k.SessionID,
+		UserID:    k.UserID,
+		FirstName: k.FirstName,
+		Email:     k.Email,
 		Timestamp: time.Now().UnixMilli(),
 		Payload: SessionInfo{
-			SessionID:  mustGetString(s, "sessionId"),
-			UserID:     mustGetString(s, "userId"),
-			FirstName:  mustGetString(s, "firstName"),
-			Email:      mustGetString(s, "email"),
-			Permission: mustGetString(s, "permission"),
+			SessionID:  k.SessionID,
+			UserID:     k.UserID,
+			FirstName:  k.FirstName,
+			Email:      k.Email,
+			Permission: k.Permission,
 		},
 	}
 	data, err := json.Marshal(event)
