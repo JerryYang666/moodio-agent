@@ -184,6 +184,23 @@ go test -bench=. -benchmem -benchtime=3s -run='^$'
 
 The room index makes multi-room broadcast **7.2x faster** than the naive global-scan approach, and room member lookups are effectively free at **14 ns** with zero allocations.
 
+### Latency Under Pressure
+
+`TestLatencyUnderPressure` measures end-to-end event delivery latency in a target room while all other rooms send concurrent traffic. Each room has 20 users; 200 messages are measured per level.
+
+```bash
+go test -v -run TestLatencyUnderPressure -timeout 300s
+```
+
+| Level | Sessions | Rooms | p50 | p95 | p99 | max |
+|---|---|---|---|---|---|---|
+| light | 50 | 5 | 27 us | 44 us | 880 us | 2.0 ms |
+| medium | 400 | 20 | 80 us | 215 us | 270 us | 445 us |
+| heavy | 1,000 | 50 | 69 us | 202 us | 339 us | 1.6 ms |
+| extreme | 2,000 | 100 | 49 us | 65 us | 102 us | 226 us |
+
+No latency decay as session count grows. Because broadcasts only touch the target room's members, cross-room pressure has negligible impact on delivery time.
+
 ## Dependencies
 
 | Package | Version | Purpose |

@@ -3,8 +3,13 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io"
+	"log"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"runtime"
+	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -682,5 +687,287 @@ func BenchmarkGetSessionsInRoom(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		rooms.getSessionsInRoom("room-0000", "")
+	}
+}
+
+// ---------- latency under pressure ----------
+
+func percentile(sorted []time.Duration, pct float64) time.Duration {
+	if len(sorted) == 0 {
+		return 0
+	}
+	idx := int(float64(len(sorted)-1) * pct)
+	return sorted[idx]
+}
+
+func TestLatencyUnderPressure(t *testing.T) {
+	log.SetOutput(io.Discard)
+	defer log.SetOutput(os.Stderr)
+	levels := []struct {
+		label        string
+		numRooms     int
+		usersPerRoom int
+	}{
+		{"light", 5, 10},
+		{"medium", 20, 10},
+		{"heavy", 50, 10},
+		{"extreme", 100, 10},
+	}
+
+	const (
+		messagesPerLevel  = 300
+		pressureInterval  = 2 * time.Millisecond // each pressure sender fires every 2ms
+		measureInterval   = 10 * time.Millisecond
+	)
+
+	t.Logf("GOMAXPROCS=%d  NumCPU=%d", runtime.GOMAXPROCS(0), runtime.NumCPU())
+
+	for _, level := range levels {
+		t.Run(level.label, func(t *testing.T) {
+			m := melody.New()
+			m.Config.MaxMessageSize = 4096
+			rooms := NewRoomManager(m)
+
+			m.HandleConnect(func(s *melody.Session) { rooms.HandleConnect(s) })
+			m.HandleMessage(func(s *melody.Session, msg []byte) { rooms.HandleMessage(s, msg) })
+			m.HandleDisconnect(func(s *melody.Session) { rooms.HandleDisconnect(s) })
+
+			mux := http.NewServeMux()
+			mux.HandleFunc("/ws/desktop/{desktopId}", func(w http.ResponseWriter, r *http.Request) {
+				desktopId := r.PathValue("desktopId")
+				m.HandleRequestWithKeys(w, r, map[string]any{
+					"sessionId":  generateSessionId(),
+					"userId":     r.Header.Get("X-User-Id"),
+					"firstName":  r.Header.Get("X-First-Name"),
+					"email":      r.Header.Get("X-Email"),
+					"permission": "editor",
+					"roomId":     desktopId,
+				})
+			})
+			server := httptest.NewServer(mux)
+			defer server.Close()
+
+			type roomClients struct {
+				sender    *websocket.Conn
+				receivers []*websocket.Conn
+			}
+
+			// measuredReceiver continuously reads from a websocket and
+			// exposes received messages via a channel, avoiding the
+			// ReadDeadline issues that break gorilla/websocket state.
+			type measuredReceiver struct {
+				conn *websocket.Conn
+				ch   chan json.RawMessage
+				done chan struct{}
+			}
+
+			newMeasuredReceiver := func(c *websocket.Conn) *measuredReceiver {
+				mr := &measuredReceiver{
+					conn: c,
+					ch:   make(chan json.RawMessage, 512),
+					done: make(chan struct{}),
+				}
+				go func() {
+					defer close(mr.done)
+					for {
+						_, raw, err := c.ReadMessage()
+						if err != nil {
+							return
+						}
+						select {
+						case mr.ch <- json.RawMessage(raw):
+						default:
+						}
+					}
+				}()
+				return mr
+			}
+
+			allRooms := make([]roomClients, level.numRooms)
+			var allConns []*websocket.Conn
+
+			// Target room (room 0) receivers get background reader goroutines
+			var targetReceivers []*measuredReceiver
+
+			for r := 0; r < level.numRooms; r++ {
+				roomId := fmt.Sprintf("room-%04d", r)
+				rc := roomClients{}
+				for u := 0; u < level.usersPerRoom; u++ {
+					wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws/desktop/" + roomId
+					header := http.Header{}
+					header.Set("X-User-Id", fmt.Sprintf("u%d-%d", r, u))
+					header.Set("X-First-Name", fmt.Sprintf("U%d_%d", r, u))
+					header.Set("X-Email", fmt.Sprintf("u%d_%d@test.com", r, u))
+					conn, _, err := websocket.DefaultDialer.Dial(wsURL, header)
+					if err != nil {
+						t.Fatalf("dial error room %d user %d: %v", r, u, err)
+					}
+					allConns = append(allConns, conn)
+					if u == 0 {
+						rc.sender = conn
+					} else {
+						rc.receivers = append(rc.receivers, conn)
+						if r == 0 {
+							targetReceivers = append(targetReceivers, newMeasuredReceiver(conn))
+						}
+					}
+				}
+				allRooms[r] = rc
+			}
+
+			// Wait for join/session messages to arrive, then drain them
+			time.Sleep(500 * time.Millisecond)
+			for _, mr := range targetReceivers {
+				for {
+					select {
+					case <-mr.ch:
+					default:
+						goto drained
+					}
+				}
+			drained:
+			}
+			// Drain non-target receivers via deadline (these won't be read again)
+			for r := 1; r < level.numRooms; r++ {
+				for _, recv := range allRooms[r].receivers {
+					recv.SetReadDeadline(time.Now().Add(200 * time.Millisecond))
+					for {
+						if _, _, err := recv.ReadMessage(); err != nil {
+							break
+						}
+					}
+					recv.SetReadDeadline(time.Time{})
+				}
+			}
+
+			// --- Continuous pressure: every pressure room sender blasts messages ---
+			stopPressure := make(chan struct{})
+			var pressureSent atomic.Int64
+			var pressureWg sync.WaitGroup
+
+			pressureMsg, _ := json.Marshal(map[string]any{
+				"type": "asset_dragging", "payload": map[string]any{"x": 1, "y": 2},
+			})
+
+			for r := 1; r < level.numRooms; r++ {
+				pressureWg.Add(1)
+				go func(sender *websocket.Conn) {
+					defer pressureWg.Done()
+					defer func() { recover() }()
+					for {
+						select {
+						case <-stopPressure:
+							return
+						default:
+						}
+						if err := sender.WriteMessage(websocket.TextMessage, pressureMsg); err != nil {
+							return
+						}
+						pressureSent.Add(1)
+						time.Sleep(pressureInterval)
+					}
+				}(allRooms[r].sender)
+			}
+
+			// --- Continuous drain: background goroutines consume pressure receivers ---
+			for r := 1; r < level.numRooms; r++ {
+				for _, recv := range allRooms[r].receivers {
+					pressureWg.Add(1)
+					go func(c *websocket.Conn) {
+						defer pressureWg.Done()
+						defer func() { recover() }()
+						for {
+							c.SetReadDeadline(time.Now().Add(3 * time.Second))
+							if _, _, err := c.ReadMessage(); err != nil {
+								select {
+								case <-stopPressure:
+									return
+								default:
+								}
+								return
+							}
+						}
+					}(recv)
+				}
+			}
+
+			// Let pressure build up for a moment
+			time.Sleep(200 * time.Millisecond)
+
+			// --- Measure target room latency under sustained pressure ---
+			numReceivers := len(targetReceivers)
+			latencies := make([]time.Duration, 0, messagesPerLevel)
+			var delivered atomic.Int64
+			var failed atomic.Int64
+			expectedTotal := int64(messagesPerLevel) * int64(numReceivers)
+
+			for i := 0; i < messagesPerLevel; i++ {
+				msg, _ := json.Marshal(map[string]any{
+					"type": "asset_moved", "payload": map[string]any{"seq": i},
+				})
+
+				start := time.Now()
+				allRooms[0].sender.WriteMessage(websocket.TextMessage, msg)
+
+				var recvWg sync.WaitGroup
+				for _, mr := range targetReceivers {
+					recvWg.Add(1)
+					go func(mr *measuredReceiver) {
+						defer recvWg.Done()
+						timeout := time.After(5 * time.Second)
+						for {
+							select {
+							case raw := <-mr.ch:
+								var evt struct{ Type string }
+								json.Unmarshal(raw, &evt)
+								if evt.Type == "asset_moved" {
+									delivered.Add(1)
+									return
+								}
+							case <-timeout:
+								failed.Add(1)
+								return
+							}
+						}
+					}(mr)
+				}
+				recvWg.Wait()
+				elapsed := time.Since(start)
+				latencies = append(latencies, elapsed)
+
+				time.Sleep(measureInterval)
+			}
+
+			// Stop pressure and wait for goroutines
+			close(stopPressure)
+			pressureWg.Wait()
+
+			// Close all connections
+			for _, c := range allConns {
+				c.Close()
+			}
+			for _, mr := range targetReceivers {
+				<-mr.done
+			}
+
+			sort.Slice(latencies, func(i, j int) bool { return latencies[i] < latencies[j] })
+
+			successRate := float64(delivered.Load()) / float64(expectedTotal) * 100
+			pressureRate := float64(pressureSent.Load()) / latencies[len(latencies)-1].Seconds()
+
+			t.Logf("=== %s: %d sessions across %d rooms ===", level.label, level.numRooms*level.usersPerRoom, level.numRooms)
+			t.Logf("  GOMAXPROCS:     %d", runtime.GOMAXPROCS(0))
+			t.Logf("  receivers/room: %d", numReceivers)
+			t.Logf("  messages sent:  %d", messagesPerLevel)
+			t.Logf("  expected:       %d deliveries", expectedTotal)
+			t.Logf("  delivered:      %d", delivered.Load())
+			t.Logf("  failed:         %d", failed.Load())
+			t.Logf("  success rate:   %.2f%%", successRate)
+			t.Logf("  pressure msgs:  %d (~%.0f msg/s across %d senders)", pressureSent.Load(), pressureRate, level.numRooms-1)
+			t.Logf("  p50 latency:    %v", percentile(latencies, 0.50))
+			t.Logf("  p95 latency:    %v", percentile(latencies, 0.95))
+			t.Logf("  p99 latency:    %v", percentile(latencies, 0.99))
+			t.Logf("  max latency:    %v", percentile(latencies, 1.0))
+		})
 	}
 }
