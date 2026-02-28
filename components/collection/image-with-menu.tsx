@@ -32,6 +32,7 @@ import { useCollections } from "@/hooks/use-collections";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
 import SendToDesktopModal from "@/components/desktop/SendToDesktopModal";
+import { useFeatureFlag } from "@/lib/feature-flags";
 
 interface ImageWithMenuProps {
   imageId: string;
@@ -108,6 +109,7 @@ export default function ImageWithMenu({
   const tCommon = useTranslations("common");
   const tVideo = useTranslations("video");
   const router = useRouter();
+  const showDesktop = useFeatureFlag<boolean>("user_desktop") ?? false;
   const {
     collections,
     createCollection,
@@ -271,6 +273,7 @@ export default function ImageWithMenu({
               <DropdownItem
                 key="send-to-desktop"
                 startContent={<LayoutDashboard size={16} />}
+                className={showDesktop ? "" : "hidden"}
               >
                 Send to Desktop
               </DropdownItem>

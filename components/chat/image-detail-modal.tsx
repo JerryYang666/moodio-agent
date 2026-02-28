@@ -32,6 +32,7 @@ import {
   FolderPlus,
   Plus,
   Video,
+  LayoutDashboard,
 } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 import { useTranslations } from "next-intl";
@@ -40,6 +41,8 @@ import { useRouter } from "next/navigation";
 import { useCollections } from "@/hooks/use-collections";
 import { motion, AnimatePresence } from "framer-motion";
 import { downloadImage } from "./utils";
+import { useFeatureFlag } from "@/lib/feature-flags";
+import SendToDesktopModal from "@/components/desktop/SendToDesktopModal";
 
 export interface ImageInfo {
   url: string;
@@ -126,6 +129,7 @@ export default function ImageDetailModal({
   const tCommon = useTranslations("common");
   const tVideo = useTranslations("video");
   const router = useRouter();
+  const showDesktop = useFeatureFlag<boolean>("user_desktop") ?? false;
   const {
     collections,
     createCollection,
@@ -147,6 +151,12 @@ export default function ImageDetailModal({
   } = useDisclosure();
   const [newCollectionName, setNewCollectionName] = useState("");
   const [isCreating, setIsCreating] = useState(false);
+
+  const {
+    isOpen: isDesktopOpen,
+    onOpen: onDesktopOpen,
+    onOpenChange: onDesktopOpenChange,
+  } = useDisclosure();
 
   const canNavigatePrev = currentIndex > 0;
   const canNavigateNext = currentIndex < allImages.length - 1;
@@ -389,6 +399,8 @@ export default function ImageDetailModal({
                                     onAction={(key) => {
                                       if (key === "generate-video") {
                                         handleGenerateVideo();
+                                      } else if (key === "send-to-desktop") {
+                                        onDesktopOpen();
                                       } else if (key === "create-new") {
                                         handleCreateNewCollection();
                                       }
@@ -400,6 +412,13 @@ export default function ImageDetailModal({
                                       className="text-primary"
                                     >
                                       {tVideo("generateVideo")}
+                                    </DropdownItem>
+                                    <DropdownItem
+                                      key="send-to-desktop"
+                                      startContent={<LayoutDashboard size={16} />}
+                                      className={showDesktop ? "" : "hidden"}
+                                    >
+                                      Send to Desktop
                                     </DropdownItem>
                                     <DropdownSection
                                       title={tMenu("addToCollection")}
@@ -619,6 +638,8 @@ export default function ImageDetailModal({
                                     onAction={(key) => {
                                       if (key === "generate-video") {
                                         handleGenerateVideo();
+                                      } else if (key === "send-to-desktop") {
+                                        onDesktopOpen();
                                       } else if (key === "create-new") {
                                         handleCreateNewCollection();
                                       }
@@ -630,6 +651,13 @@ export default function ImageDetailModal({
                                       className="text-primary"
                                     >
                                       {tVideo("generateVideo")}
+                                    </DropdownItem>
+                                    <DropdownItem
+                                      key="send-to-desktop"
+                                      startContent={<LayoutDashboard size={16} />}
+                                      className={showDesktop ? "" : "hidden"}
+                                    >
+                                      Send to Desktop
                                     </DropdownItem>
                                     <DropdownSection
                                       title={tMenu("addToCollection")}
@@ -770,6 +798,26 @@ export default function ImageDetailModal({
           )}
         </ModalContent>
       </Modal>
+
+      {/* Send to Desktop Modal */}
+      {showDesktop && selectedImage?.imageId && (
+        <SendToDesktopModal
+          isOpen={isDesktopOpen}
+          onOpenChange={onDesktopOpenChange}
+          assets={[
+            {
+              assetType: "image",
+              metadata: {
+                imageId: selectedImage.imageId,
+                chatId: chatId || undefined,
+                title: selectedImage.title,
+                prompt: selectedImage.prompt,
+                status: selectedImage.status || "generated",
+              },
+            },
+          ]}
+        />
+      )}
     </Modal>
   );
 }
