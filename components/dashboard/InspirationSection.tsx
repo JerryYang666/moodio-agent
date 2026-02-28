@@ -97,7 +97,7 @@ export function InspirationSection() {
 
   if (isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center flex-1 min-h-[400px] bg-gray-50 dark:bg-gray-900 rounded-xl">
+      <div className="flex flex-col items-center justify-center flex-1 overflow-hidden bg-gray-50 dark:bg-gray-900 rounded-xl">
         <Sparkles className="animate-pulse text-primary mb-4" size={32} />
         <p className="text-default-500 font-medium">{t("generatingInspiration")}</p>
       </div>
@@ -105,7 +105,7 @@ export function InspirationSection() {
   }
 
   return (
-    <div className="flex flex-col flex-1 min-h-[400px] bg-gray-50 dark:bg-gray-900 rounded-xl overflow-hidden p-4 relative border border-default-200 dark:border-default-100">
+    <div className="flex flex-col flex-1 overflow-hidden bg-gray-50 dark:bg-gray-900 rounded-xl p-4 relative border border-default-200 dark:border-default-100">
       <div className="flex items-center gap-2 mb-4 shrink-0">
         <Sparkles className="text-primary" size={20} />
         <h3 className="text-lg font-semibold bg-linear-to-r from-primary to-secondary bg-clip-text text-transparent">
