@@ -1,0 +1,9 @@
+services:
+  realtime:
+    image: ghcr.io/jerryyang666/moodio-agent/realtime:latest
+    ports:
+      - "1005:8081"
+    environment:
+      - JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET}
+      - PERMISSION_API_BASE=${PERMISSION_API_BASE:-http://host.docker.internal:3000}
+    restart: unless-stopped
