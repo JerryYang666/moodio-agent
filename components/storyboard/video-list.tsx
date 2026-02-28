@@ -1048,7 +1048,8 @@ export default function VideoList({ refreshTrigger, onRestore }: VideoListProps)
                   </div>
                 )}
               </ModalBody>
-              <ModalFooter className="flex-wrap gap-2 px-3 sm:px-6 safe-area-bottom">
+              <ModalFooter className="px-0 py-0 safe-area-bottom">
+                <div className="flex flex-wrap gap-2 px-3 sm:px-6 pt-3 pb-3 w-full justify-end">
                 {/* Put Back button - restore generation parameters */}
                 {selectedVideo && onRestore && (
                   <Button
@@ -1183,6 +1184,7 @@ export default function VideoList({ refreshTrigger, onRestore }: VideoListProps)
                 >
                   {tCommon("close")}
                 </Button>
+                </div>
               </ModalFooter>
             </>
           )}
