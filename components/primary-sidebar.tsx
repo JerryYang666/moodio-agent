@@ -84,11 +84,11 @@ export const PrimarySidebar = () => {
       className="hidden md:flex flex-col h-screen sticky top-0 border-r border-divider bg-background z-50 w-16 items-center py-6"
     >
       {/* Logo */}
-      <div className="mb-8">
-        <div className="bg-primary/10 p-2 rounded-xl">
+      <NextLink href="/" className="mb-8">
+        <div className="bg-primary/10 p-2 rounded-xl transition-transform hover:scale-110">
           <BotMessageSquare className="text-primary" size={24} />
         </div>
-      </div>
+      </NextLink>
 
       {/* Navigation Items */}
       <div className="flex flex-col gap-4 w-full px-2 items-center flex-1">

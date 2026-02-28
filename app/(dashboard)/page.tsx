@@ -64,7 +64,7 @@ export default function Home() {
       </section>
 
       {/* Main Content Layout */}
-      <main className="max-w-[1600px] mx-auto w-full px-6 flex flex-col lg:flex-row gap-8">
+      <main className="max-w-[1600px] mx-auto w-full px-6 flex flex-col lg:flex-row gap-8 flex-1 min-h-0">
         {/* Left Column: Recent Activity */}
         <div className="w-full lg:w-1/3 flex flex-col space-y-4">
           <div className="flex items-center justify-between">
@@ -74,8 +74,8 @@ export default function Home() {
         </div>
 
         {/* Right Column: Inspiration Gallery */}
-        <div className="w-full lg:w-2/3 flex flex-col space-y-4">
-          <div className="flex items-center justify-between">
+        <div className="w-full lg:w-2/3 flex flex-col space-y-4 min-h-0">
+          <div className="flex items-center justify-between shrink-0">
             <h2 className="text-2xl font-bold tracking-tight text-default-800">{t("todaysInspiration")}</h2>
           </div>
           <InspirationSection />
