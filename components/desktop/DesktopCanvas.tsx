@@ -19,7 +19,7 @@ const MAX_ZOOM = 5;
 const ZOOM_SENSITIVITY = 0.001;
 const DEFAULT_ASSET_WIDTH = 300;
 const CULL_PADDING = 200;
-const CURSOR_THROTTLE_MS = 50;
+const CURSOR_THROTTLE_MS = 40;
 
 interface EnrichedDesktopAsset extends DesktopAsset {
   imageUrl?: string | null;
