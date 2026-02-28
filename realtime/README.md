@@ -143,10 +143,10 @@ See `nginx.example.conf` for routing `/ws/*` to this server and everything else 
 
 ## Tests
 
-### Run All Tests
+### Run Functional Tests
 
 ```bash
-go test -v ./...
+go test -v -run '^Test(RoomIsolation|JoinEvents|Disconnect|Viewer|Editor|Stamped|ManyRooms)' ./...
 ```
 
 ### Functional Tests
