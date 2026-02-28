@@ -655,6 +655,12 @@
       "overrideSaveError": "儲存覆寫失敗",
       "overrideDeleteSuccess": "覆寫刪除成功",
       "overrideDeleteError": "刪除覆寫失敗"
+    },
+    "wsLatency": {
+      "title": "WS 延遲",
+      "subtitle": "即時服務",
+      "description": "測試 WebSocket 到即時中繼伺服器的往返延遲。",
+      "goTo": "執行延遲測試"
     }
   },
   "dashboard": {

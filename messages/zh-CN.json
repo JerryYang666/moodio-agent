@@ -655,6 +655,12 @@
       "overrideSaveError": "保存覆盖失败",
       "overrideDeleteSuccess": "覆盖删除成功",
       "overrideDeleteError": "删除覆盖失败"
+    },
+    "wsLatency": {
+      "title": "WS 延迟",
+      "subtitle": "实时服务",
+      "description": "测试 WebSocket 到实时中继服务器的往返延迟。",
+      "goTo": "运行延迟测试"
     }
   },
   "dashboard": {

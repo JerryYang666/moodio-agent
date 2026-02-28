@@ -702,6 +702,12 @@
       "overrideSaveError": "Failed to save override",
       "overrideDeleteSuccess": "Override deleted successfully",
       "overrideDeleteError": "Failed to delete override"
+    },
+    "wsLatency": {
+      "title": "WS Latency",
+      "subtitle": "Realtime",
+      "description": "Test WebSocket round-trip latency to the realtime relay server.",
+      "goTo": "Run Latency Test"
     }
   },
   "dashboard": {

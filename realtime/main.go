@@ -80,6 +80,18 @@ func main() {
 		rooms.HandleDisconnect(s)
 	})
 
+	pingMelody := melody.New()
+	pingMelody.Config.MaxMessageSize = 512
+	pingMelody.HandleMessage(func(s *melody.Session, msg []byte) {
+		s.Write(msg)
+	})
+
+	http.HandleFunc("/ws/ping", func(w http.ResponseWriter, r *http.Request) {
+		if err := pingMelody.HandleRequest(w, r); err != nil {
+			log.Printf("Ping WebSocket upgrade error: %v", err)
+		}
+	})
+
 	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("ok"))

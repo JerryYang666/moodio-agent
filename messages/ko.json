@@ -655,6 +655,12 @@
       "overrideSaveError": "오버라이드 저장에 실패했습니다",
       "overrideDeleteSuccess": "오버라이드가 성공적으로 삭제되었습니다",
       "overrideDeleteError": "오버라이드 삭제에 실패했습니다"
+    },
+    "wsLatency": {
+      "title": "WS 지연 시간",
+      "subtitle": "실시간",
+      "description": "실시간 릴레이 서버로의 WebSocket 왕복 지연 시간을 테스트합니다.",
+      "goTo": "지연 시간 테스트"
     }
   },
   "dashboard": {

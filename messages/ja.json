@@ -655,6 +655,12 @@
       "overrideSaveError": "オーバーライドの保存に失敗しました",
       "overrideDeleteSuccess": "オーバーライドが正常に削除されました",
       "overrideDeleteError": "オーバーライドの削除に失敗しました"
+    },
+    "wsLatency": {
+      "title": "WS レイテンシ",
+      "subtitle": "リアルタイム",
+      "description": "リアルタイムリレーサーバーへのWebSocket往復レイテンシをテストします。",
+      "goTo": "レイテンシテスト実行"
     }
   },
   "dashboard": {
