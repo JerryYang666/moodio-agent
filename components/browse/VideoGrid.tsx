@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useEffect, useRef } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { useTranslations, useLocale } from "next-intl";
+import { AnimatePresence } from "framer-motion";
 import type { RootState } from "@/lib/redux/store";
 import type { QueryState } from "@/lib/redux/types";
 import { useGetVideosQuery, useGetPropertiesQuery, type Video } from "@/lib/redux/services/api";
@@ -12,6 +13,7 @@ import {
   type Photo,
 } from "@/components/browse/JustifiedGallery";
 import { VirtualInfiniteScroll } from "@/components/browse/VirtualInfiniteScroll";
+import { VideoDetailOverlay } from "@/components/browse/VideoDetailOverlay";
 import { getVideoUrl } from "@/lib/config/video.config";
 import { useInfiniteContent } from "@/lib/redux/hooks/useInfiniteContent";
 import { VideoVisibilityProvider } from "@/hooks/use-video-visibility";
@@ -38,6 +40,11 @@ const VideoGrid: React.FC<VideoGridProps> = ({ hideSummary = false }) => {
   const locale = useLocale();
   const dispatch = useDispatch();
   const queryState = useSelector((state: RootState) => state.query);
+
+  // Video detail overlay state
+  const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null);
+  const [originRect, setOriginRect] = useState<DOMRect | null>(null);
+  const galleryRef = useRef<HTMLDivElement>(null);
 
   // Fetch taxonomy properties for grouped filter contract
   const { data: properties = [] } = useGetPropertiesQuery(locale);
@@ -126,10 +133,29 @@ const VideoGrid: React.FC<VideoGridProps> = ({ hideSummary = false }) => {
   // Direct mapping - dimensions come from API, no loading phase needed
   const photos = videos.map(videoToPhoto);
 
-  // Handle photo click
-  const handleClickPhoto = (photo: Photo) => {
-    console.log("Photo clicked:", photo);
-  };
+  // Handle photo click — capture the clicked element's bounding rect for the fly animation
+  const handleClickPhoto = useCallback((photo: Photo) => {
+    // Find the video element that was clicked by matching the data key within the gallery
+    const videoEl = galleryRef.current?.querySelector(
+      `[data-photo-key="${photo.key}"]`
+    );
+    if (videoEl) {
+      setOriginRect(videoEl.getBoundingClientRect());
+    } else {
+      setOriginRect(null);
+    }
+    setSelectedPhoto(photo);
+  }, []);
+
+  const handleCloseDetail = useCallback(() => {
+    setSelectedPhoto(null);
+    setOriginRect(null);
+  }, []);
+
+  // Build "similar shots" — all photos except the selected one
+  const similarPhotos = selectedPhoto
+    ? photos.filter((p) => p.key !== selectedPhoto.key)
+    : [];
 
   // During stale-filter recovery, show spinner instead of generic error
   if (isRecoveringRef.current && (isFetching || isInitialLoading)) {
@@ -216,15 +242,29 @@ const VideoGrid: React.FC<VideoGridProps> = ({ hideSummary = false }) => {
         resetKey={searchKey}
       >
         <VideoVisibilityProvider>
-          <JustifiedGallery
-            photos={photos}
-            targetRowHeight={180}
-            spacing={3}
-            onClick={handleClickPhoto}
-            hasMore={hasMore}
-          />
+          <div ref={galleryRef}>
+            <JustifiedGallery
+              photos={photos}
+              targetRowHeight={180}
+              spacing={3}
+              onClick={handleClickPhoto}
+              hasMore={hasMore}
+            />
+          </div>
         </VideoVisibilityProvider>
       </VirtualInfiniteScroll>
+
+      {/* Video Detail Overlay */}
+      <AnimatePresence>
+        {selectedPhoto && (
+          <VideoDetailOverlay
+            selectedPhoto={selectedPhoto}
+            similarPhotos={similarPhotos}
+            onClose={handleCloseDetail}
+            originRect={originRect}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 };

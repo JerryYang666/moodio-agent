@@ -333,7 +333,7 @@ export const JustifiedGallery: React.FC<JustifiedGalleryProps> = ({
             const photoWidth = row.rowHeight * aspectRatio;
 
             return (
-              <div key={photo.key} className="flex flex-col" style={{ width: photoWidth }}>
+              <div key={photo.key} className="flex flex-col" style={{ width: photoWidth }} data-photo-key={photo.key}>
                 <LazyVideo
                   src={photo.src}
                   width={photoWidth}
