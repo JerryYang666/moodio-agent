@@ -217,7 +217,7 @@ export default function DesktopCanvas({
       cameraAtPanStart.current = { x: camera.x, y: camera.y };
       (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     },
-    [camera, screenToWorld]
+    [camera, screenToWorld, selectedIds, sendEvent]
   );
 
   const handlePointerMove = useCallback(
@@ -288,6 +288,18 @@ export default function DesktopCanvas({
             selected.add(a.id);
           }
         }
+
+        selectedIds.forEach((id) => {
+          if (!selected.has(id)) {
+            sendEvent?.("asset_deselected", { assetId: id });
+          }
+        });
+        selected.forEach((id) => {
+          if (!selectedIds.has(id)) {
+            sendEvent?.("asset_selected", { assetId: id });
+          }
+        });
+
         setSelectedIds(selected);
         marqueeStart.current = null;
         setMarquee(null);
@@ -322,7 +334,7 @@ export default function DesktopCanvas({
       isPanning.current = false;
       (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
     },
-    [draggingAssetId, dragPos, onAssetMove, onAssetBatchMove, assets, selectedIds, marquee]
+    [draggingAssetId, dragPos, onAssetMove, onAssetBatchMove, assets, selectedIds, marquee, sendEvent]
   );
 
   const handleAssetPointerDown = useCallback(
@@ -372,7 +384,7 @@ export default function DesktopCanvas({
       // the cursor moves outside the asset card during the drag.
       containerRef.current?.setPointerCapture(e.pointerId);
     },
-    [canEdit, camera, selectedIds]
+    [canEdit, camera, selectedIds, sendEvent]
   );
 
   const handleContextMenu = useCallback(
