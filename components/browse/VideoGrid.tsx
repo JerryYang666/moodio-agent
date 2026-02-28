@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { useTranslations, useLocale } from "next-intl";
-import { AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import type { RootState } from "@/lib/redux/store";
 import type { QueryState } from "@/lib/redux/types";
 import { useGetVideosQuery, useGetPropertiesQuery, type Video } from "@/lib/redux/services/api";
@@ -13,7 +13,7 @@ import {
   type Photo,
 } from "@/components/browse/JustifiedGallery";
 import { VirtualInfiniteScroll } from "@/components/browse/VirtualInfiniteScroll";
-import { VideoDetailOverlay } from "@/components/browse/VideoDetailOverlay";
+import { VideoDetailView } from "@/components/browse/VideoDetailView";
 import { getVideoUrl } from "@/lib/config/video.config";
 import { useInfiniteContent } from "@/lib/redux/hooks/useInfiniteContent";
 import { VideoVisibilityProvider } from "@/hooks/use-video-visibility";
@@ -33,18 +33,19 @@ const videoToPhoto = (video: Video): Photo => ({
 
 interface VideoGridProps {
   hideSummary?: boolean;
-  chatPanelWidth?: number;
 }
 
-const VideoGrid: React.FC<VideoGridProps> = ({ hideSummary = false, chatPanelWidth = 0 }) => {
+const VideoGrid: React.FC<VideoGridProps> = ({ hideSummary = false }) => {
   const t = useTranslations("browse");
   const locale = useLocale();
   const dispatch = useDispatch();
   const queryState = useSelector((state: RootState) => state.query);
 
-  // Video detail overlay state
+  // Video detail state
   const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null);
   const [originRect, setOriginRect] = useState<DOMRect | null>(null);
+  const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
+  const [isFlying, setIsFlying] = useState(false);
   const galleryRef = useRef<HTMLDivElement>(null);
 
   // Fetch taxonomy properties for grouped filter contract
@@ -134,14 +135,14 @@ const VideoGrid: React.FC<VideoGridProps> = ({ hideSummary = false, chatPanelWid
   // Direct mapping - dimensions come from API, no loading phase needed
   const photos = videos.map(videoToPhoto);
 
-  // Handle photo click — capture the clicked element's bounding rect for the fly animation
+  // Handle photo click — capture rect, start the flying clone
   const handleClickPhoto = useCallback((photo: Photo) => {
-    // Find the video element that was clicked by matching the data key within the gallery
     const videoEl = galleryRef.current?.querySelector(
       `[data-photo-key="${photo.key}"]`
     );
     if (videoEl) {
       setOriginRect(videoEl.getBoundingClientRect());
+      setIsFlying(true);
     } else {
       setOriginRect(null);
     }
@@ -151,6 +152,18 @@ const VideoGrid: React.FC<VideoGridProps> = ({ hideSummary = false, chatPanelWid
   const handleCloseDetail = useCallback(() => {
     setSelectedPhoto(null);
     setOriginRect(null);
+    setTargetRect(null);
+    setIsFlying(false);
+  }, []);
+
+  // Called by VideoDetailView once its target container is measured
+  const handleTargetReady = useCallback((rect: DOMRect) => {
+    setTargetRect(rect);
+  }, []);
+
+  // Called when the flying clone finishes its animation
+  const handleFlyComplete = useCallback(() => {
+    setIsFlying(false);
   }, []);
 
   // Build "similar shots" — all photos except the selected one
@@ -224,8 +237,8 @@ const VideoGrid: React.FC<VideoGridProps> = ({ hideSummary = false, chatPanelWid
 
   return (
     <div className="w-full flex flex-col h-full">
-      {/* Results summary */}
-      {!hideSummary && (
+      {/* Results summary — hidden when detail is open */}
+      {!hideSummary && !selectedPhoto && (
         <div className="mb-1 text-xs text-default-500 shrink-0">
           {t("showingCount", { current: videos.length, more: hasMore ? "+" : "", total: totalItems })}
           {queryState.textSearch.trim() && queryState.selectedFilters.length > 0 && (
@@ -234,39 +247,83 @@ const VideoGrid: React.FC<VideoGridProps> = ({ hideSummary = false, chatPanelWid
         </div>
       )}
 
-      {/* Video Grid with Custom Infinite Scroll */}
-      <VirtualInfiniteScroll
-        hasMore={hasMore}
-        isLoading={isFetching}
-        onLoadMore={handleLoadMore}
-        threshold={800}
-        resetKey={searchKey}
-      >
-        <VideoVisibilityProvider>
-          <div ref={galleryRef}>
-            <JustifiedGallery
-              photos={photos}
-              targetRowHeight={180}
-              spacing={3}
-              onClick={handleClickPhoto}
-              hasMore={hasMore}
-            />
-          </div>
-        </VideoVisibilityProvider>
-      </VirtualInfiniteScroll>
-
-      {/* Video Detail Overlay */}
-      <AnimatePresence>
-        {selectedPhoto && (
-          <VideoDetailOverlay
+      {selectedPhoto ? (
+        <div className="flex-1 min-h-0 overflow-y-auto">
+          <VideoDetailView
             selectedPhoto={selectedPhoto}
             similarPhotos={similarPhotos}
             onClose={handleCloseDetail}
-            originRect={originRect}
-            rightOffset={chatPanelWidth}
+            onTargetReady={handleTargetReady}
+            videoVisible={!isFlying}
           />
-        )}
-      </AnimatePresence>
+        </div>
+      ) : (
+        <VirtualInfiniteScroll
+          hasMore={hasMore}
+          isLoading={isFetching}
+          onLoadMore={handleLoadMore}
+          threshold={800}
+          resetKey={searchKey}
+        >
+          <VideoVisibilityProvider>
+            <div ref={galleryRef}>
+              <JustifiedGallery
+                photos={photos}
+                targetRowHeight={180}
+                spacing={3}
+                onClick={handleClickPhoto}
+                hasMore={hasMore}
+              />
+            </div>
+          </VideoVisibilityProvider>
+        </VirtualInfiniteScroll>
+      )}
+
+      {/* Flying clone — sits above everything, animates from grid position to detail position */}
+      {isFlying && selectedPhoto && originRect && (
+        <motion.div
+          className="rounded-lg overflow-hidden"
+          style={{
+            position: "fixed",
+            zIndex: 100,
+            aspectRatio: `${selectedPhoto.width} / ${selectedPhoto.height}`,
+          }}
+          initial={{
+            top: originRect.top,
+            left: originRect.left,
+            width: originRect.width,
+            height: originRect.height,
+            borderRadius: 0,
+          }}
+          animate={
+            targetRect
+              ? {
+                  top: targetRect.top,
+                  left: targetRect.left,
+                  width: targetRect.width,
+                  height: targetRect.height,
+                  borderRadius: 8,
+                }
+              : undefined
+          }
+          transition={{
+            type: "spring",
+            stiffness: 200,
+            damping: 28,
+            mass: 1,
+          }}
+          onAnimationComplete={handleFlyComplete}
+        >
+          <video
+            src={selectedPhoto.src}
+            className="w-full h-full object-cover"
+            autoPlay
+            loop
+            muted
+            playsInline
+          />
+        </motion.div>
+      )}
     </div>
   );
 };

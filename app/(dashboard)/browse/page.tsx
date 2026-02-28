@@ -179,7 +179,7 @@ export default function BrowsePage() {
                 <Breadcrumb />
               </div>
 
-              <VideoGrid chatPanelWidth={chatPanelActualWidth} />
+              <VideoGrid />
             </div>
           </div>
         </main>
