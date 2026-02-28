@@ -47,6 +47,7 @@ interface VideoDetailOverlayProps {
   similarPhotos: Photo[];
   onClose: () => void;
   originRect: DOMRect | null;
+  rightOffset?: number;
 }
 
 export function VideoDetailOverlay({
@@ -54,6 +55,7 @@ export function VideoDetailOverlay({
   similarPhotos,
   onClose,
   originRect,
+  rightOffset = 0,
 }: VideoDetailOverlayProps) {
   const detail: VideoDetailData = MOCK_VIDEO_DETAIL;
   const overlayRef = useRef<HTMLDivElement>(null);
@@ -111,6 +113,7 @@ export function VideoDetailOverlay({
     <motion.div
       ref={overlayRef}
       className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm overflow-y-auto"
+      style={{ right: rightOffset }}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
@@ -121,7 +124,7 @@ export function VideoDetailOverlay({
         {/* Close button */}
         <button
           onClick={onClose}
-          className="fixed top-4 right-4 z-60 p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
+          className="absolute top-4 right-4 z-60 p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
         >
           <X size={20} className="text-white" />
         </button>
@@ -134,7 +137,7 @@ export function VideoDetailOverlay({
             <div className="lg:w-[55%] shrink-0">
               <div
                 ref={videoTargetRef}
-                className="relative rounded-lg overflow-hidden bg-neutral-900"
+                className="relative rounded-lg overflow-hidden"
                 style={{
                   aspectRatio: `${selectedPhoto.width} / ${selectedPhoto.height}`,
                 }}

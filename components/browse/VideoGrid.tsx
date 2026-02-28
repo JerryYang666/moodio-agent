@@ -33,9 +33,10 @@ const videoToPhoto = (video: Video): Photo => ({
 
 interface VideoGridProps {
   hideSummary?: boolean;
+  chatPanelWidth?: number;
 }
 
-const VideoGrid: React.FC<VideoGridProps> = ({ hideSummary = false }) => {
+const VideoGrid: React.FC<VideoGridProps> = ({ hideSummary = false, chatPanelWidth = 0 }) => {
   const t = useTranslations("browse");
   const locale = useLocale();
   const dispatch = useDispatch();
@@ -262,6 +263,7 @@ const VideoGrid: React.FC<VideoGridProps> = ({ hideSummary = false }) => {
             similarPhotos={similarPhotos}
             onClose={handleCloseDetail}
             originRect={originRect}
+            rightOffset={chatPanelWidth}
           />
         )}
       </AnimatePresence>

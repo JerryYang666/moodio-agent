@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { useSelector } from "react-redux";
 import { useFeatureFlag } from "@/lib/feature-flags";
@@ -8,6 +8,8 @@ import FilterMenu from "@/components/browse/FilterMenu";
 import SearchBar from "@/components/browse/SearchBar";
 import Breadcrumb from "@/components/browse/Breadcrumb";
 import VideoGrid from "@/components/browse/VideoGrid";
+import ChatSidePanel from "@/components/chat/chat-side-panel";
+import { siteConfig } from "@/config/site";
 import { SlidersHorizontal, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { Button } from "@heroui/button";
 import { Badge } from "@heroui/badge";
@@ -18,6 +20,9 @@ import {
   DrawerBody,
 } from "@heroui/drawer";
 import type { RootState } from "@/lib/redux/store";
+
+const DEFAULT_CHAT_PANEL_WIDTH = 380;
+const COLLAPSED_CHAT_WIDTH = 48;
 
 // Disable body-level scrolling on this page to prevent double scrollbars
 // The VirtualInfiniteScroll component handles all scrolling for the video grid
@@ -39,6 +44,29 @@ export default function BrowsePage() {
   const showBrowse = useFeatureFlag<boolean>("user_retrieval") ?? false;
   const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
   const [isFilterCollapsed, setIsFilterCollapsed] = useState(false);
+
+  // Chat panel state — mirrors the pattern from storyboard page
+  const [isChatPanelCollapsed, setIsChatPanelCollapsed] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem(siteConfig.chatPanelCollapsed) === "true";
+  });
+
+  const [chatPanelWidth, setChatPanelWidth] = useState(() => {
+    if (typeof window === "undefined") return DEFAULT_CHAT_PANEL_WIDTH;
+    const stored = localStorage.getItem(siteConfig.chatPanelWidth);
+    return stored ? parseInt(stored, 10) : DEFAULT_CHAT_PANEL_WIDTH;
+  });
+
+  const handleChatPanelCollapseChange = useCallback((collapsed: boolean) => {
+    setIsChatPanelCollapsed(collapsed);
+    localStorage.setItem(siteConfig.chatPanelCollapsed, String(collapsed));
+  }, []);
+
+  const handleChatPanelWidthChange = useCallback((width: number) => {
+    setChatPanelWidth(width);
+  }, []);
+
+  const chatPanelActualWidth = isChatPanelCollapsed ? COLLAPSED_CHAT_WIDTH : chatPanelWidth;
 
   const selectedFilters = useSelector(
     (state: RootState) => state.query.selectedFilters
@@ -68,92 +96,108 @@ export default function BrowsePage() {
 
   return (
     <div className="flex h-screen bg-background overflow-hidden">
-      <main className="flex-1 h-screen px-4 py-6 min-w-0 flex flex-col">
-        <div className="mb-6 shrink-0 flex gap-2 items-start">
-          <SearchBar
-            placeholder={t("searchPlaceholder")}
-            className="flex-1 min-w-0"
-          />
+      {/* Main browse content */}
+      <main className="flex-1 px-4 py-6 min-w-0 flex flex-col overflow-hidden">
+          <div className="mb-6 shrink-0 flex gap-2 items-start">
+            <SearchBar
+              placeholder={t("searchPlaceholder")}
+              className="flex-1 min-w-0"
+            />
 
-          {/* Mobile filter trigger button — visible only below lg breakpoint */}
-          <Button
-            isIconOnly
-            variant="bordered"
-            size="lg"
-            className="lg:hidden shrink-0"
-            aria-label={t("filters")}
-            onPress={() => setIsFilterDrawerOpen(true)}
-          >
-            <Badge
-              content={activeFilterCount}
-              color="primary"
-              size="sm"
-              isInvisible={activeFilterCount === 0}
-              placement="top-right"
+            {/* Mobile filter trigger button — visible only below lg breakpoint */}
+            <Button
+              isIconOnly
+              variant="bordered"
+              size="lg"
+              className="lg:hidden shrink-0"
+              aria-label={t("filters")}
+              onPress={() => setIsFilterDrawerOpen(true)}
             >
-              <SlidersHorizontal size={18} />
-            </Badge>
-          </Button>
-        </div>
+              <Badge
+                content={activeFilterCount}
+                color="primary"
+                size="sm"
+                isInvisible={activeFilterCount === 0}
+                placement="top-right"
+              >
+                <SlidersHorizontal size={18} />
+              </Badge>
+            </Button>
+          </div>
 
-        <div className="flex flex-1 min-h-0">
-          {/* Desktop sidebar filter — collapsible, hidden on mobile */}
-          <div
-            className={`mr-4 shrink-0 hidden lg:flex flex-col transition-[width] duration-300 ease-in-out overflow-hidden ${
-              isFilterCollapsed ? "w-0 mr-0" : "w-64"
-            }`}
-          >
-            <div className="w-64 h-full flex flex-col">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-semibold text-default-600">{t("filters")}</span>
+          <div className="flex flex-1 min-h-0">
+            {/* Desktop sidebar filter — collapsible, hidden on mobile */}
+            <div
+              className={`mr-4 shrink-0 hidden lg:flex flex-col transition-[width] duration-300 ease-in-out overflow-hidden ${
+                isFilterCollapsed ? "w-0 mr-0" : "w-64"
+              }`}
+            >
+              <div className="w-64 h-full flex flex-col">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-semibold text-default-600">{t("filters")}</span>
+                  <Button
+                    isIconOnly
+                    variant="light"
+                    size="sm"
+                    onPress={() => setIsFilterCollapsed(true)}
+                    aria-label="Collapse filters"
+                  >
+                    <PanelLeftClose size={16} />
+                  </Button>
+                </div>
+                <div className="flex-1 min-h-0 overflow-y-auto">
+                  <FilterMenu />
+                </div>
+              </div>
+            </div>
+
+            {/* Collapsed filter toggle — only visible when sidebar is collapsed */}
+            {isFilterCollapsed && (
+              <div className="shrink-0 hidden lg:flex items-start mr-2 pt-0.5">
                 <Button
                   isIconOnly
                   variant="light"
                   size="sm"
-                  onPress={() => setIsFilterCollapsed(true)}
-                  aria-label="Collapse filters"
+                  onPress={() => setIsFilterCollapsed(false)}
+                  aria-label="Expand filters"
                 >
-                  <PanelLeftClose size={16} />
+                  <Badge
+                    content={activeFilterCount}
+                    color="primary"
+                    size="sm"
+                    isInvisible={activeFilterCount === 0}
+                    placement="top-right"
+                  >
+                    <PanelLeftOpen size={16} />
+                  </Badge>
                 </Button>
               </div>
-              <div className="flex-1 min-h-0 overflow-y-auto">
-                <FilterMenu />
+            )}
+
+            <div className="flex-1 min-w-0 flex flex-col min-h-0">
+              <div className="shrink-0">
+                <Breadcrumb />
               </div>
+
+              <VideoGrid chatPanelWidth={chatPanelActualWidth} />
             </div>
           </div>
+        </main>
 
-          {/* Collapsed filter toggle — only visible when sidebar is collapsed */}
-          {isFilterCollapsed && (
-            <div className="shrink-0 hidden lg:flex items-start mr-2 pt-0.5">
-              <Button
-                isIconOnly
-                variant="light"
-                size="sm"
-                onPress={() => setIsFilterCollapsed(false)}
-                aria-label="Expand filters"
-              >
-                <Badge
-                  content={activeFilterCount}
-                  color="primary"
-                  size="sm"
-                  isInvisible={activeFilterCount === 0}
-                  placement="top-right"
-                >
-                  <PanelLeftOpen size={16} />
-                </Badge>
-              </Button>
-            </div>
-          )}
-
-          <div className="flex-1 min-w-0 flex flex-col min-h-0">
-            <div className="shrink-0">
-              <Breadcrumb />
-            </div>
-
-            <VideoGrid />
-          </div>
+        {/* Right Panel — Agent Chat (desktop only, always on top) */}
+        <div
+          className="hidden lg:block shrink-0 min-h-0 z-60"
+          style={{
+            width: chatPanelActualWidth,
+            transition: isChatPanelCollapsed ? "width 0.3s ease-in-out" : undefined,
+          }}
+        >
+          <ChatSidePanel
+            defaultExpanded={!isChatPanelCollapsed}
+            onCollapseChange={handleChatPanelCollapseChange}
+            onWidthChange={handleChatPanelWidthChange}
+          />
         </div>
-      </main>
 
       {/* Mobile filter drawer */}
       <Drawer
