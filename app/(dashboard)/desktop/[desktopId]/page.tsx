@@ -20,6 +20,8 @@ import { Tooltip } from "@heroui/tooltip";
 import { ArrowLeft, Share2, Pencil, X, Wifi, WifiOff } from "lucide-react";
 import DesktopCanvas from "@/components/desktop/DesktopCanvas";
 import DesktopToolbar from "@/components/desktop/DesktopToolbar";
+import ChatSidePanel from "@/components/chat/chat-side-panel";
+import { siteConfig } from "@/config/site";
 import {
   useDesktopDetail,
   type CameraState,
@@ -32,6 +34,8 @@ import {
 
 const DEFAULT_CAMERA: CameraState = { x: 0, y: 0, zoom: 1 };
 const VIEWPORT_SAVE_DEBOUNCE = 2000;
+const DEFAULT_CHAT_PANEL_WIDTH = 380;
+const COLLAPSED_CHAT_WIDTH = 48;
 
 function userIdToHslColor(userId: string): string {
   let hash = 0;
@@ -106,6 +110,29 @@ export default function DesktopDetailPage({
     "viewer" | "collaborator"
   >("viewer");
   const [isSharing, setIsSharing] = useState(false);
+
+  // Chat panel state
+  const [isChatPanelCollapsed, setIsChatPanelCollapsed] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem(siteConfig.chatPanelCollapsed) === "true";
+  });
+
+  const [chatPanelWidth, setChatPanelWidth] = useState(() => {
+    if (typeof window === "undefined") return DEFAULT_CHAT_PANEL_WIDTH;
+    const stored = localStorage.getItem(siteConfig.chatPanelWidth);
+    return stored ? parseInt(stored, 10) : DEFAULT_CHAT_PANEL_WIDTH;
+  });
+
+  const handleChatPanelCollapseChange = useCallback((collapsed: boolean) => {
+    setIsChatPanelCollapsed(collapsed);
+    localStorage.setItem(siteConfig.chatPanelCollapsed, String(collapsed));
+  }, []);
+
+  const handleChatPanelWidthChange = useCallback((width: number) => {
+    setChatPanelWidth(width);
+  }, []);
+
+  const chatPanelActualWidth = isChatPanelCollapsed ? COLLAPSED_CHAT_WIDTH : chatPanelWidth;
 
   useEffect(() => {
     fetchDetail().then((data) => {
@@ -271,7 +298,9 @@ export default function DesktopDetailPage({
   const canEdit = desktop.permission === "owner" || desktop.permission === "collaborator";
 
   return (
-    <div className="relative w-full h-full flex flex-col">
+    <div className="flex h-full w-full overflow-hidden">
+      {/* Main desktop content */}
+      <div className="relative flex-1 min-w-0 h-full flex flex-col">
       {/* Header bar */}
       <div className="flex items-center gap-3 px-4 py-2 border-b border-divider bg-background/80 backdrop-blur-sm z-20 shrink-0">
         <Button
@@ -369,6 +398,22 @@ export default function DesktopDetailPage({
           camera={camera}
           assets={assets}
           onCameraChange={handleCameraChange}
+        />
+      </div>
+      </div>
+
+      {/* Right Panel — Agent Chat (desktop only) */}
+      <div
+        className="hidden lg:block shrink-0 min-h-0 z-60"
+        style={{
+          width: chatPanelActualWidth,
+          transition: isChatPanelCollapsed ? "width 0.3s ease-in-out" : undefined,
+        }}
+      >
+        <ChatSidePanel
+          defaultExpanded={!isChatPanelCollapsed}
+          onCollapseChange={handleChatPanelCollapseChange}
+          onWidthChange={handleChatPanelWidthChange}
         />
       </div>
 
