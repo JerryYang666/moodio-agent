@@ -373,7 +373,9 @@
     "frameCaptureFailed": "擷取畫面失敗",
     "sendingRequest": "正在傳送影片生成請求...",
     "undo": "復原",
-    "requestCancelled": "請求已取消"
+    "requestCancelled": "請求已取消",
+    "errorPromptViolation": "您的提示詞可能違反了內容規範，請修改提示詞後重試。",
+    "errorGenericFailure": "影片生成失敗，點數已退還，請重試。"
   },
   "menu": {
     "mode": "模式",

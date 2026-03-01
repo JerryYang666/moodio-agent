@@ -11,12 +11,15 @@ import {
 import { useAuth } from "@/hooks/use-auth";
 import { usePathname, useRouter } from "next/navigation";
 import { addToast } from "@heroui/toast";
+import { useTranslations } from "next-intl";
+import { getUserFriendlyErrorKey } from "@/lib/video/error-classify";
 
 interface VideoGeneration {
   id: string;
   status: "pending" | "processing" | "completed" | "failed";
   thumbnailUrl: string | null;
   params: Record<string, any>;
+  error?: string | null;
 }
 
 interface VideoContextType {
@@ -44,6 +47,7 @@ export function VideoProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
+  const t = useTranslations("video");
 
   // Set of generation IDs being monitored (with their initial status)
   const [monitoredGenerations, setMonitoredGenerations] = useState<
@@ -126,7 +130,7 @@ export function VideoProvider({ children }: { children: React.ReactNode }) {
                     const notification = new Notification("Moodio Agent", {
                       body: isSuccess
                         ? "Your video generation is complete!"
-                        : "Video generation failed",
+                        : t(getUserFriendlyErrorKey(generation.error)),
                       icon: "/favicon.ico",
                       tag: `video-${generationId}`,
                     });
@@ -147,7 +151,7 @@ export function VideoProvider({ children }: { children: React.ReactNode }) {
                     title: isSuccess ? "Video Ready" : "Video Failed",
                     description: isSuccess
                       ? "Your video generation is complete!"
-                      : generation.params?.error || "Video generation failed",
+                      : t(getUserFriendlyErrorKey(generation.error)),
                     color: isSuccess ? "success" : "danger",
                     endContent: (
                       <button

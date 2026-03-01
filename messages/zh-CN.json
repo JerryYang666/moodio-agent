@@ -373,7 +373,9 @@
     "frameCaptureFailed": "截帧失败",
     "sendingRequest": "正在发送视频生成请求...",
     "undo": "撤销",
-    "requestCancelled": "请求已取消"
+    "requestCancelled": "请求已取消",
+    "errorPromptViolation": "您的提示词可能违反了内容规范，请修改提示词后重试。",
+    "errorGenericFailure": "视频生成失败，积分已退还，请重试。"
   },
   "menu": {
     "mode": "模式",

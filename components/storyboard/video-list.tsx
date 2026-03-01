@@ -46,6 +46,7 @@ import { getVideoModel } from "@/lib/video/models";
 import { useCollections } from "@/hooks/use-collections";
 import type { Collection } from "@/components/collections-provider";
 import VideoPlayer from "./video-player";
+import { getUserFriendlyErrorKey } from "@/lib/video/error-classify";
 
 // Fake progress bar component for video generation
 // Animates to 97% over ~200 seconds at even speed, never reaches 100% until completed
@@ -1008,7 +1009,7 @@ export default function VideoList({ refreshTrigger, onRestore }: VideoListProps)
                     {/* Error */}
                     {selectedVideo.error && (
                       <div className="text-xs sm:text-sm text-danger bg-danger-50 p-2 sm:p-3 rounded-lg">
-                        {selectedVideo.error}
+                        {t(getUserFriendlyErrorKey(selectedVideo.error))}
                       </div>
                     )}
 

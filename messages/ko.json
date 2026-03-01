@@ -373,7 +373,9 @@
     "frameCaptureFailed": "프레임 캡처에 실패했습니다",
     "sendingRequest": "비디오 생성 요청 전송 중...",
     "undo": "실행 취소",
-    "requestCancelled": "요청이 취소되었습니다"
+    "requestCancelled": "요청이 취소되었습니다",
+    "errorPromptViolation": "프롬프트가 콘텐츠 가이드라인을 위반했을 수 있습니다. 프롬프트를 수정한 후 다시 시도해 주세요.",
+    "errorGenericFailure": "비디오 생성에 실패했습니다. 크레딧이 환불되었습니다. 다시 시도해 주세요."
   },
   "menu": {
     "mode": "모드",

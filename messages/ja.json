@@ -373,7 +373,9 @@
     "frameCaptureFailed": "フレームのキャプチャに失敗しました",
     "sendingRequest": "動画生成リクエストを送信中...",
     "undo": "取り消す",
-    "requestCancelled": "リクエストがキャンセルされました"
+    "requestCancelled": "リクエストがキャンセルされました",
+    "errorPromptViolation": "プロンプトがコンテンツガイドラインに違反している可能性があります。プロンプトを修正して再度お試しください。",
+    "errorGenericFailure": "動画の生成に失敗しました。クレジットは返金されました。再度お試しください。"
   },
   "menu": {
     "mode": "モード",

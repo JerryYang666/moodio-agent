@@ -420,7 +420,9 @@
     "frameCaptureFailed": "Failed to capture frame",
     "sendingRequest": "Sending video generation request...",
     "undo": "Undo",
-    "requestCancelled": "Request cancelled"
+    "requestCancelled": "Request cancelled",
+    "errorPromptViolation": "Your prompt may have violated content guidelines. Please revise your prompt and try again.",
+    "errorGenericFailure": "Video generation failed. Your credits have been refunded. Please try again."
   },
   "menu": {
     "mode": "Mode",
