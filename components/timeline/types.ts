@@ -1,0 +1,35 @@
+/**
+ * Timeline editor types.
+ *
+ * The timeline is a lightweight sequencing layer — no real media processing.
+ * Video/audio separation is a UI-only abstraction.
+ */
+
+export interface TimelineClip {
+  /** Unique clip ID (generated client-side) */
+  id: string;
+  /** The desktop asset ID this clip references */
+  assetId: string;
+  /** Display title */
+  title: string;
+  /** Thumbnail URL (the asset's poster image) */
+  thumbnailUrl: string | null;
+  /** Playback URL for the video */
+  videoUrl: string | null;
+  /** Duration in seconds (from asset metadata, or 0 if unknown) */
+  duration: number;
+}
+
+export interface TimelineState {
+  /** Ordered list of clips on the timeline */
+  clips: TimelineClip[];
+  /** ID of the desktop this timeline belongs to */
+  desktopId: string;
+}
+
+/** localStorage key prefix for timeline state */
+export const TIMELINE_STORAGE_KEY_PREFIX = "moodio-timeline-";
+
+export function getTimelineStorageKey(desktopId: string): string {
+  return `${TIMELINE_STORAGE_KEY_PREFIX}${desktopId}`;
+}

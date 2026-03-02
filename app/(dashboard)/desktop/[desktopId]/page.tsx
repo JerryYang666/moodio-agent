@@ -34,7 +34,10 @@ import {
 } from "@/hooks/use-desktop-ws";
 import { useDesktopVideoSync } from "@/hooks/use-desktop-video-sync";
 import { setDesktopViewport, clearDesktopViewport } from "@/lib/desktop/types";
+import type { VideoAssetMeta } from "@/lib/desktop/types";
 import { useAuth } from "@/hooks/use-auth";
+import { TimelinePanel } from "@/components/timeline";
+import { useTimeline } from "@/hooks/use-timeline";
 
 const DEFAULT_CAMERA: CameraState = { x: 0, y: 0, zoom: 1 };
 const VIEWPORT_SAVE_DEBOUNCE = 2000;
@@ -418,6 +421,40 @@ export default function DesktopDetailPage({
     []
   );
 
+  // Timeline editor state
+  const {
+    clips: timelineClips,
+    isExpanded: isTimelineExpanded,
+    toggleExpanded: toggleTimelineExpanded,
+    addClip: addTimelineClip,
+    removeClip: removeTimelineClip,
+    reorderClips: reorderTimelineClips,
+    clearTimeline,
+  } = useTimeline(desktopId);
+
+  const handleSendToTimeline = useCallback(
+    (asset: EnrichedDesktopAsset) => {
+      if (asset.assetType !== "video") return;
+      const meta = asset.metadata as unknown as VideoAssetMeta;
+      addTimelineClip({
+        id: `clip-${asset.id}-${Date.now()}`,
+        assetId: asset.id,
+        title: meta.title || "Untitled video",
+        thumbnailUrl: asset.imageUrl || null,
+        videoUrl: asset.videoUrl || null,
+        duration: meta.duration || 0,
+      });
+      // Dispatch event so TimelinePanel auto-expands
+      window.dispatchEvent(new CustomEvent("timeline-clip-added"));
+      addToast({
+        title: "Added to Timeline",
+        description: meta.title || "Video clip added",
+        color: "success",
+      });
+    },
+    [addTimelineClip]
+  );
+
   const handleSearchUser = async () => {
     if (!searchEmail.trim()) return;
     setIsSearching(true);
@@ -612,6 +649,7 @@ export default function DesktopDetailPage({
           currentUserId={user?.id}
           cellLocks={cellLocks}
           onCellCommit={handleCellCommit}
+          onSendToTimeline={canEdit ? handleSendToTimeline : undefined}
         />
         <DesktopToolbar
           camera={camera}
@@ -619,6 +657,16 @@ export default function DesktopDetailPage({
           onCameraChange={handleCameraChange}
         />
       </div>
+
+      {/* Timeline Editor — bottom panel */}
+      <TimelinePanel
+        clips={timelineClips}
+        isExpanded={isTimelineExpanded}
+        onToggleExpanded={toggleTimelineExpanded}
+        onRemoveClip={removeTimelineClip}
+        onReorderClips={reorderTimelineClips}
+        onClearTimeline={clearTimeline}
+      />
       </div>
 
       {/* Right Panel — Agent Chat (desktop only) */}
