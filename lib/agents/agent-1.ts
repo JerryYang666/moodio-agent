@@ -656,7 +656,7 @@ export class Agent1 implements Agent {
     const llmStream = await new OpenAI({
       apiKey: process.env.LLM_API_KEY,
     }).chat.completions.create({
-      model: "gpt-4.1",
+      model: "gpt-5.2",
       messages: prepared.messages as any,
       stream: true,
     });
@@ -966,7 +966,7 @@ export class Agent1 implements Agent {
     const continuationStream = await new OpenAI({
       apiKey: process.env.LLM_API_KEY,
     }).chat.completions.create({
-      model: "gpt-4.1",
+      model: "gpt-5.2",
       messages: continuationMessages as any,
       stream: true,
     });

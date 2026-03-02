@@ -109,7 +109,7 @@ Moodio Agent is a comprehensive creative AI platform that combines conversationa
 │                     External Services                          │
 │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐       │
 │  │  OpenAI  │  │  Fal.ai  │  │  Google  │  │   AWS    │       │
-│  │  GPT-4.1 │  │  Video   │  │  Gemini  │  │ S3/CF    │       │
+│  │  GPT-5.2 │  │  Video   │  │  Gemini  │  │ S3/CF    │       │
 │  └──────────┘  └──────────┘  └──────────┘  └──────────┘       │
 └───────────────────────────────────────────────────────────────┘
         │
@@ -145,7 +145,7 @@ Moodio Agent is a comprehensive creative AI platform that combines conversationa
 ### AI/ML Services
 | Provider | Models | Purpose |
 |----------|--------|---------|
-| OpenAI | GPT-4.1 | Chat agent LLM |
+| OpenAI | GPT-5.2 | Chat agent LLM |
 | Google | Gemini 3 Pro | Image generation/editing |
 | Fal.ai | Multiple | Video generation, image generation |
 
@@ -386,7 +386,7 @@ All admin endpoints require the `admin` role.
 The platform uses a sophisticated AI agent system (`Agent1`) that processes user requests through multiple stages:
 
 1. **Message Preparation**: Filters conversation history, prepares images, and constructs the prompt
-2. **LLM Processing**: Streams response from GPT-4.1 with structured output parsing
+2. **LLM Processing**: Streams response from GPT-5.2 with structured output parsing
 3. **Image Generation**: Parallel generation of up to 8 image suggestions
 4. **Response Assembly**: Combines text response with generated images
 

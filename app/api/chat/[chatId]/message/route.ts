@@ -386,7 +386,7 @@ export async function POST(
             const llmClient = createLLMClient({
               apiKey: process.env.LLM_API_KEY,
               provider: "openai",
-              model: "gpt-4.1",
+              model: "gpt-5.2",
             });
 
             try {
