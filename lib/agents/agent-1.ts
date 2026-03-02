@@ -22,7 +22,7 @@ import {
   getVideoModelsPromptText,
 } from "@/lib/video/models";
 import { calculateCost } from "@/lib/pricing";
-import { deductCredits, InsufficientCreditsError } from "@/lib/credits";
+import { deductCredits, getUserBalance, InsufficientCreditsError } from "@/lib/credits";
 
 // Maximum number of retries for failed operations
 const MAX_RETRY = 2;
@@ -1085,15 +1085,13 @@ export class Agent1 implements Agent {
     try {
       const modelId = prepared.imageModelId;
 
-      // Check and deduct credits before generating
+      // Calculate cost and verify balance before generating
       const cost = await calculateCost("Image/all", {});
       if (cost > 0) {
-        await deductCredits(
-          userId,
-          cost,
-          "image_generation",
-          `Image generation (${modelId || "default"})`
-        );
+        const balance = await getUserBalance(userId);
+        if (balance < cost) {
+          throw new InsufficientCreditsError();
+        }
       }
 
       let result;
@@ -1122,6 +1120,16 @@ export class Agent1 implements Agent {
         result.contentType,
         preGeneratedImageId
       );
+
+      // Deduct credits only after successful generation
+      if (cost > 0) {
+        await deductCredits(
+          userId,
+          cost,
+          "image_generation",
+          `Image generation (${modelId || "default"})`
+        );
+      }
 
       const response =
         result.provider === "google"

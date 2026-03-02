@@ -10,7 +10,7 @@ import OpenAI, { toFile } from "openai";
 import { getSystemPrompt } from "./system-prompts";
 import { recordEvent, sanitizeOpenAIResponse } from "@/lib/telemetry";
 import { calculateCost } from "@/lib/pricing";
-import { deductCredits, InsufficientCreditsError } from "@/lib/credits";
+import { deductCredits, getUserBalance, InsufficientCreditsError } from "@/lib/credits";
 
 interface Suggestion {
   title: string;
@@ -288,15 +288,13 @@ export class Agent0 implements Agent {
             `[${Date.now() - startTime}ms]`
           );
 
-          // Check and deduct credits before generating
+          // Check balance before generating (deduct only on success)
           const cost = await calculateCost("Image/all", {});
           if (cost > 0) {
-            await deductCredits(
-              userId,
-              cost,
-              "image_generation",
-              `Image generation (gpt-image-1)`
-            );
+            const balance = await getUserBalance(userId);
+            if (balance < cost) {
+              throw new InsufficientCreditsError();
+            }
           }
 
           let finalImageId: string;
@@ -346,6 +344,16 @@ export class Agent0 implements Agent {
 
             const buf = Buffer.from(data.b64_json, "base64");
             finalImageId = await uploadImage(buf, "image/png");
+          }
+
+          // Deduct credits only after successful generation
+          if (cost > 0) {
+            await deductCredits(
+              userId,
+              cost,
+              "image_generation",
+              `Image generation (gpt-image-1)`
+            );
           }
 
           // Record success event
