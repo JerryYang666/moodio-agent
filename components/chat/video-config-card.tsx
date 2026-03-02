@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useVideo } from "@/components/video-provider";
+import { useCredits } from "@/hooks/use-credits";
 import { useGenerateVideoMutation } from "@/lib/redux/services/next-api";
 import type { MessageContentPart } from "@/lib/llm/types";
 
@@ -49,6 +50,7 @@ export default function VideoConfigCard({
 }: VideoConfigCardProps) {
   const t = useTranslations();
   const { monitorGeneration } = useVideo();
+  const { balance } = useCredits();
   const [generateVideo] = useGenerateVideoMutation();
   const [status, setStatus] = useState<AgentVideoPart["status"]>(part.status);
   const [generationId, setGenerationId] = useState<string | undefined>(
@@ -60,6 +62,9 @@ export default function VideoConfigCard({
   // Cost estimation
   const [estimatedCost, setEstimatedCost] = useState<number | null>(null);
   const [costLoading, setCostLoading] = useState(false);
+
+  const insufficientCredits =
+    estimatedCost !== null && balance !== null && balance < estimatedCost;
 
   // Prefer the sourceImageId specified by the agent; fall back to the most recent image
   const selectedSourceImage = useMemo(() => {
@@ -329,6 +334,13 @@ export default function VideoConfigCard({
           </div>
         )}
 
+        {/* Insufficient credits warning */}
+        {insufficientCredits && status === "pending" && (
+          <div className="text-xs text-danger bg-danger-50 p-2 rounded-lg">
+            {t("credits.insufficientCredits")}
+          </div>
+        )}
+
         {/* Error message */}
         {error && (
           <div className="text-xs text-danger bg-danger-50 p-2 rounded-lg">
@@ -348,7 +360,7 @@ export default function VideoConfigCard({
               creating ? undefined : <Sparkles size={16} />
             }
             isLoading={creating}
-            isDisabled={!selectedSourceImage || creating}
+            isDisabled={!selectedSourceImage || creating || insufficientCredits}
             onPress={handleCreate}
           >
             {creating ? (

@@ -15,6 +15,7 @@ import AssetPickerModal, {
   AssetSummary,
 } from "@/components/chat/asset-picker-modal";
 import { useVideo } from "@/components/video-provider";
+import { useCredits } from "@/hooks/use-credits";
 import { uploadImage } from "@/lib/upload/client";
 import UndoSendOverlay from "./undo-send-overlay";
 import { useGenerateVideoMutation } from "@/lib/redux/services/next-api";
@@ -122,6 +123,7 @@ export default function VideoGenerationPanel({
   const tChat = useTranslations("chat");
   const tCredits = useTranslations("credits");
   const { monitorGeneration } = useVideo();
+  const { balance } = useCredits();
   const [generateVideo] = useGenerateVideoMutation();
   const [models, setModels] = useState<VideoModelConfig[]>([]);
   const [defaultModelId, setDefaultModelId] = useState<string>("");
@@ -158,6 +160,9 @@ export default function VideoGenerationPanel({
   // Cost preview state
   const [estimatedCost, setEstimatedCost] = useState<number | null>(null);
   const [costLoading, setCostLoading] = useState(false);
+
+  const insufficientCredits =
+    estimatedCost !== null && balance !== null && balance < estimatedCost;
 
   // Undo send state
   const [showUndoOverlay, setShowUndoOverlay] = useState(false);
@@ -875,6 +880,13 @@ export default function VideoGenerationPanel({
               </div>
             )}
 
+            {/* Insufficient credits warning */}
+            {insufficientCredits && !error && (
+              <div className="text-xs sm:text-sm text-danger bg-danger-50 p-2 sm:p-3 rounded-lg w-full">
+                {tCredits("insufficientCredits")}
+              </div>
+            )}
+
             {/* Generate Button */}
             <Button
               color="primary"
@@ -882,7 +894,7 @@ export default function VideoGenerationPanel({
               className="w-full text-sm sm:text-base"
               startContent={!submitting && <Sparkles size={18} />}
               isLoading={submitting}
-              isDisabled={!sourceImageId || !params.prompt?.trim() || isUploading || showUndoOverlay}
+              isDisabled={!sourceImageId || !params.prompt?.trim() || isUploading || showUndoOverlay || insufficientCredits}
               onPress={handleGenerate}
             >
               {submitting ? (
