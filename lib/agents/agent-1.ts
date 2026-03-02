@@ -28,6 +28,11 @@ import {
   serializeTaxonomyForLLM,
   parseToolCallBody,
 } from "./taxonomy-tool";
+import {
+  validateBufferTags,
+  extractTag,
+  VALID_TAGS,
+} from "./parse-agent-output";
 
 // Maximum number of retries for failed operations
 const MAX_RETRY = 2;
@@ -82,9 +87,6 @@ interface PreparedMessages {
   imageModelId?: string;
 }
 
-/** All XML tags the LLM is allowed to output. Used for validation. */
-const VALID_TAGS = ["TEXT", "JSON", "VIDEO", "SHOTLIST", "TOOL_CALL", "SEARCH", "think"];
-
 /** Mutable state shared across the stream parsing pipeline. */
 interface ParseState {
   buffer: string;
@@ -104,73 +106,6 @@ interface ParseContext {
   send: (data: any) => void;
   userId: string;
   agent: Agent1;
-}
-
-/**
- * Validate that no non-whitespace text appears outside known XML tags.
- * Throws if invalid content is found.
- */
-function validateBufferTags(buffer: string): void {
-  let insideTag = false;
-  let inAngleBrackets = false;
-  let i = 0;
-
-  while (i < buffer.length) {
-    const remaining = buffer.substring(i);
-
-    let tagMatched = false;
-    for (const tag of VALID_TAGS) {
-      const open = `<${tag}>`;
-      const close = `</${tag}>`;
-      if (remaining.startsWith(open)) {
-        insideTag = true;
-        i += open.length;
-        tagMatched = true;
-        break;
-      }
-      if (remaining.startsWith(close)) {
-        insideTag = false;
-        i += close.length;
-        tagMatched = true;
-        break;
-      }
-    }
-    if (tagMatched) continue;
-
-    const char = buffer[i];
-    if (char === "<") {
-      inAngleBrackets = true;
-    } else if (char === ">") {
-      inAngleBrackets = false;
-    } else if (!insideTag && !inAngleBrackets && char.trim() !== "") {
-      console.error(
-        `[Agent-1] Invalid text outside tags detected: "${buffer.substring(
-          Math.max(0, i - 20),
-          Math.min(buffer.length, i + 20)
-        )}"`
-      );
-      throw new Error(
-        `Invalid LLM response: text outside tags at position ${i}`
-      );
-    }
-
-    i++;
-  }
-}
-
-/**
- * Extract content between an XML open/close tag pair from the buffer.
- * Returns { content, rest } if found, or null if the closing tag isn't present yet.
- */
-function extractTag(buffer: string, tag: string): { content: string; rest: string } | null {
-  const open = `<${tag}>`;
-  const close = `</${tag}>`;
-  const start = buffer.indexOf(open);
-  const end = buffer.indexOf(close);
-  if (start === -1 || end === -1 || start >= end) return null;
-  const content = buffer.substring(start + open.length, end);
-  const rest = buffer.substring(end + close.length);
-  return { content, rest };
 }
 
 export class Agent1 implements Agent {
