@@ -124,8 +124,7 @@ export default function DesktopDetailPage({
           height: 200,
           rotation: 0,
           zIndex: 9999,
-          createdAt: new Date(),
-          updatedAt: new Date(),
+          addedAt: new Date(),
           imageUrl: null,
           videoUrl: null,
         };
@@ -263,8 +262,7 @@ export default function DesktopDetailPage({
           height: 200,
           rotation: 0,
           zIndex: 9999,
-          createdAt: new Date(),
-          updatedAt: new Date(),
+          addedAt: new Date(),
           imageUrl: null,
           videoUrl: null,
         };
