@@ -25,6 +25,7 @@ function cellKey(rowId: string, colIndex: number) {
 }
 
 const TYPING_BROADCAST_INTERVAL_MS = 100;
+const SELECTION_HEARTBEAT_MS = 1000;
 
 export default function TableAsset({ asset, sendEvent, cellLocks, currentUserId, onCellCommit }: TableAssetProps) {
   const meta = asset.metadata as unknown as TableAssetMeta;
@@ -49,6 +50,20 @@ export default function TableAsset({ asset, sendEvent, cellLocks, currentUserId,
       if (pendingBroadcast.current) clearTimeout(pendingBroadcast.current);
     };
   }, []);
+
+  // Re-broadcast cell_selected every second so newcomers see the lock
+  useEffect(() => {
+    if (!editingCell || !sendEvent) return;
+    const dashIdx = editingCell.lastIndexOf("-");
+    const rowId = editingCell.substring(0, dashIdx);
+    const colIndex = parseInt(editingCell.substring(dashIdx + 1), 10);
+
+    const interval = setInterval(() => {
+      sendEvent("cell_selected", { assetId: asset.id, rowId, colIndex });
+    }, SELECTION_HEARTBEAT_MS);
+
+    return () => clearInterval(interval);
+  }, [editingCell, sendEvent, asset.id]);
 
   const handleCellClick = useCallback(
     (rowId: string, colIndex: number, e: React.MouseEvent) => {
