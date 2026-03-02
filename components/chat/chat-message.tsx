@@ -14,11 +14,12 @@ import ImageHoverPreview from "./image-hover-preview";
 import { formatTime } from "./utils";
 import { Button } from "@heroui/button";
 import { Popover, PopoverTrigger, PopoverContent } from "@heroui/popover";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useTranslations } from "next-intl";
 import { useAuth } from "@/hooks/use-auth";
 import { AI_IMAGE_DRAG_MIME } from "./asset-dnd";
 import VideoPromptBlock from "./video-prompt-block";
+import VideoConfigCard from "./video-config-card";
 
 interface ChatMessageProps {
   message: Message;
@@ -40,6 +41,17 @@ interface ChatMessageProps {
   onUserImageClick?: (images: ImageInfo[], index: number) => void;
   onForkChat?: (messageIndex: number) => void;
   hideAvatar?: boolean;
+  /** Desktop ID for adding video assets to desktop */
+  desktopId?: string;
+  /** All messages in conversation - used to find source images for video config */
+  allMessages?: Message[];
+  /** Callback when video creation status changes */
+  onVideoStatusChange?: (
+    messageIndex: number,
+    partIndex: number,
+    status: "pending" | "creating" | "created" | "error",
+    generationId?: string
+  ) => void;
 }
 
 export default function ChatMessage({
@@ -53,6 +65,9 @@ export default function ChatMessage({
   onUserImageClick,
   onForkChat,
   hideAvatar = false,
+  desktopId,
+  allMessages,
+  onVideoStatusChange,
 }: ChatMessageProps) {
   const isUser = message.role === "user";
   const [isForkPopoverOpen, setIsForkPopoverOpen] = useState(false);
@@ -60,6 +75,24 @@ export default function ChatMessage({
   const { user: currentUser } = useAuth();
   const isAdmin = currentUser?.roles?.includes("admin");
   const t = useTranslations();
+
+  // Collect source images from all messages for video config card
+  const sourceImagesForVideo = useMemo(() => {
+    if (!allMessages) return [];
+    const images: Array<{ imageId: string; imageUrl: string; title?: string }> = [];
+    for (const msg of allMessages) {
+      if (!Array.isArray(msg.content)) continue;
+      for (const part of msg.content) {
+        if (part.type === "agent_image" && part.imageId && part.imageUrl && part.status === "generated") {
+          images.push({ imageId: part.imageId, imageUrl: part.imageUrl, title: part.title });
+        }
+        if (part.type === "image" && part.imageId && (part as any).imageUrl) {
+          images.push({ imageId: part.imageId, imageUrl: (part as any).imageUrl, title: (part as any).title });
+        }
+      }
+    }
+    return images;
+  }, [allMessages]);
 
   const handleAgentDragStart = (e: React.DragEvent, part: any) => {
     if (part.status !== "generated" || !part.imageId || !part.imageUrl) return;
@@ -126,6 +159,7 @@ export default function ChatMessage({
       (p) => p.type === "image" || p.type === "image_url"
     );
     const agentParts = content.filter((p) => p.type === "agent_image");
+    const videoParts = content.filter((p) => p.type === "agent_video");
     const thinkParts = content.filter((p) => p.type === "internal_think");
 
     return (
@@ -309,6 +343,25 @@ export default function ChatMessage({
             })}
           </div>
         )}
+
+        {videoParts.length > 0 &&
+          videoParts.map((part: any, i) => {
+            const realPartIndex = (content as MessageContentPart[]).indexOf(part);
+            return (
+              <VideoConfigCard
+                key={`video-${i}`}
+                part={part}
+                sourceImages={sourceImagesForVideo}
+                desktopId={desktopId}
+                chatId={chatId}
+                onStatusChange={(status, generationId) => {
+                  if (onVideoStatusChange && msgIndex !== undefined) {
+                    onVideoStatusChange(msgIndex, realPartIndex, status, generationId);
+                  }
+                }}
+              />
+            );
+          })}
       </div>
     );
   };

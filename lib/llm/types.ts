@@ -20,6 +20,20 @@ export type MessageContentPart =
       prompt: string;
       status: "loading" | "generated" | "error";
       isSelected?: boolean;
+    }
+  | {
+      type: "agent_video";
+      config: {
+        modelId: string;
+        modelName: string;
+        prompt: string;
+        sourceImageId?: string; // Reference to an image in the chat
+        sourceImageUrl?: string; // CloudFront URL for display
+        params: Record<string, any>; // Model-specific parameters (duration, resolution, etc.)
+      };
+      status: "pending" | "creating" | "created" | "error";
+      generationId?: string; // Set after video creation starts
+      error?: string;
     };
 
 export interface Message {

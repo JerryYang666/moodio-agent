@@ -82,6 +82,8 @@ interface ChatInterfaceProps {
   compactMode?: boolean;
   /** Hide avatars for both user and assistant messages */
   hideAvatars?: boolean;
+  /** Desktop ID for linking video assets to desktop */
+  desktopId?: string;
 }
 
 export default function ChatInterface({
@@ -91,6 +93,7 @@ export default function ChatInterface({
   onChatCreated,
   compactMode = false,
   hideAvatars = false,
+  desktopId,
 }: ChatInterfaceProps) {
   const t = useTranslations();
   const { user } = useAuth();
@@ -1772,6 +1775,8 @@ export default function ChatInterface({
                 onUserImageClick={handleUserImageClick}
                 onForkChat={handleForkChat}
                 hideAvatar={hideAvatars}
+                desktopId={desktopId}
+                allMessages={messages}
               />
             );
           } else {
@@ -1804,6 +1809,8 @@ export default function ChatInterface({
                   generatingVariantTimestamp === messageTimestamp
                 }
                 isSending={isSending}
+                desktopId={desktopId}
+                allMessages={messages}
               />
             );
           }

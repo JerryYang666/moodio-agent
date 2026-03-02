@@ -14,6 +14,7 @@ A modern AI-powered creative platform for image and video generation with an int
 - [API Reference](#api-reference)
 - [AI Agent System](#ai-agent-system)
 - [Video Generation](#video-generation)
+- [Desktop & Collaborative Video Sync](#desktop--collaborative-video-sync)
 - [Image Generation](#image-generation)
 - [Credits System](#credits-system)
 - [Authentication](#authentication)
@@ -458,6 +459,223 @@ The system uses a "replace and fill" strategy:
 - Hidden parameters are always set to defaults
 - Disabled parameters are excluded entirely
 
+## Desktop & Collaborative Video Sync
+
+### Overview
+
+The **Desktop** is a collaborative, infinite-canvas workspace where users place and arrange assets (images, videos, text, links). Multiple users can view and edit the same desktop simultaneously via WebSocket-based real-time sync. When a video is generated from the desktop's chat panel, it appears as a video asset on the canvas and all room participants see its status update in real time — without redundant API polling.
+
+### Desktop Architecture
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│                    Desktop Detail Page                            │
+│                                                                  │
+│  ┌────────────────────────────┐   ┌──────────────────────────┐  │
+│  │      DesktopCanvas         │   │    ChatSidePanel         │  │
+│  │  (infinite-canvas with     │   │  (AI agent chat with     │  │
+│  │   draggable assets)        │   │   video generation)      │  │
+│  │                            │   │                          │  │
+│  │  ┌─────┐ ┌─────┐ ┌─────┐  │   │                          │  │
+│  │  │Image│ │Video│ │Text │  │   │                          │  │
+│  │  │Asset│ │Asset│ │Asset│  │   │                          │  │
+│  │  └─────┘ └─────┘ └─────┘  │   │                          │  │
+│  └────────────────────────────┘   └──────────────────────────┘  │
+│                                                                  │
+│  ┌──────────────────────────────────────────────────────────┐   │
+│  │                  useDesktopVideoSync                      │   │
+│  │  Coordinates polling leadership across room participants  │   │
+│  └──────────────────────────────────────────────────────────┘   │
+└──────────────────────────────────────────────────────────────────┘
+        │                              │
+        ▼                              ▼
+┌───────────────────┐   ┌───────────────────────────────────────┐
+│  WebSocket Server │   │  Global VideoProvider (React Context) │
+│  (Room-scoped     │   │  Polls /api/video/generations/{id}    │
+│   event broadcast)│   │  every 5s per monitored generation    │
+└───────────────────┘   └───────────────────────────────────────┘
+```
+
+### Key Components
+
+| Component | File | Role |
+|-----------|------|------|
+| Desktop page | `app/(dashboard)/desktop/[desktopId]/page.tsx` | Page shell, wires hooks together |
+| `DesktopCanvas` | `components/desktop/DesktopCanvas.tsx` | Infinite canvas renderer |
+| `VideoAsset` | `components/desktop/assets/VideoAsset.tsx` | Renders a video asset card on canvas |
+| `useDesktopDetail` | `hooks/use-desktop.ts` | Fetches & mutates desktop state |
+| `useDesktopWebSocket` | `hooks/use-desktop-ws.ts` | WebSocket connection for real-time room events |
+| `useDesktopVideoSync` | `hooks/use-desktop-video-sync.ts` | Coordinates video-polling leadership |
+| `VideoProvider` | `components/video-provider.tsx` | Global context that polls individual generations |
+
+### Video Asset Lifecycle
+
+```
+1. User sends a prompt in ChatSidePanel
+      │
+      ▼
+2. Agent calls video generation tool → POST /api/video/generate
+      │
+      ▼
+3. Video asset added to desktop (status: "pending")
+   - metadata.generationId links to videoGenerations table
+   - WebSocket broadcasts "asset_added" to room
+      │
+      ▼
+4. useDesktopVideoSync detects pending generation
+   - Registers it with global VideoProvider
+   - VideoProvider starts polling GET /api/video/generations/{id} every 5s
+   - Heartbeat "video_generation_polling" broadcast to room every 5s
+      │
+      ▼
+5. Fal.ai completes → webhook → updates videoGenerations table
+      │
+      ▼
+6. Next poll detects status = "completed"
+   - VideoProvider fires onGenerationUpdate listeners
+   - useDesktopVideoSync broadcasts "video_generation_updated" to room
+   - All clients call fetchDetail() to get enriched asset data
+      │
+      ▼
+7. VideoAsset re-renders with thumbnail, play overlay, and video URL
+```
+
+### Collaborative Polling Leadership Protocol
+
+When multiple users are viewing the same desktop, only **one client** should poll for a given video generation's status. This avoids N users making N redundant API calls every 5 seconds.
+
+#### WebSocket Event Types
+
+| Event | Direction | Payload | Purpose |
+|-------|-----------|---------|---------|
+| `video_generation_polling` | Broadcast | `{ generationId }` | Heartbeat — "I am polling this generation" |
+| `video_generation_updated` | Broadcast | `{ generationId, status }` | "This generation just completed/failed" |
+
+#### Leadership Election Flow
+
+```
+                    ┌─────────────────────────────────────────┐
+                    │         User A (generator / poller)      │
+                    │                                          │
+                    │  1. Detects pending generation in assets │
+                    │  2. Claims it (adds to ownedPollingRef)  │
+                    │  3. Calls monitorGeneration(genId)       │
+                    │  4. Every 5s:                            │
+                    │     - VideoProvider polls the API        │
+                    │     - Broadcasts "video_generation_      │
+                    │       polling" heartbeat to room         │
+                    └──────────────────┬──────────────────────┘
+                                       │
+              ┌────────────────────────┼────────────────────────┐
+              ▼                        ▼                        ▼
+  ┌───────────────────┐   ┌───────────────────┐   ┌───────────────────┐
+  │   User B (new)    │   │   User C (new)    │   │   User D (new)    │
+  │                   │   │                   │   │                   │
+  │ Enters 6s grace   │   │ Enters 6s grace   │   │ Enters 6s grace   │
+  │ period on mount.  │   │ period on mount.  │   │ period on mount.  │
+  │                   │   │                   │   │                   │
+  │ Receives A's      │   │ Receives A's      │   │ Receives A's      │
+  │ heartbeat →       │   │ heartbeat →       │   │ heartbeat →       │
+  │ records in        │   │ records in        │   │ records in        │
+  │ remotePollingRef  │   │ remotePollingRef  │   │ remotePollingRef  │
+  │                   │   │                   │   │                   │
+  │ Grace expires →   │   │ Grace expires →   │   │ Grace expires →   │
+  │ sees A is polling │   │ sees A is polling │   │ sees A is polling │
+  │ → does NOT poll   │   │ → does NOT poll   │   │ → does NOT poll   │
+  └───────────────────┘   └───────────────────┘   └───────────────────┘
+```
+
+#### Edge Cases
+
+| Scenario | Behavior |
+|----------|----------|
+| **Poller leaves the room** | Heartbeats stop. After the next asset scan (triggered by `fetchDetail` or new assets), another client's grace check will find no active poller and claim the generation. |
+| **Nobody is in the room** | No polling happens. When the next user opens the desktop, they detect the pending generation and start polling. The API also has a server-side recovery system (`lib/video/recovery.ts`) that checks stale generations (20+ min old) as a safety net. |
+| **Two users join simultaneously** | Both enter the 6-second grace period. The one whose `useEffect` fires first claims the generation. The second one sees it in `ownedPollingRef` (or receives the first one's heartbeat) and skips. In the worst case, both poll briefly until one sees the other's heartbeat, which is harmless. |
+| **Generation completes** | The poller broadcasts `video_generation_updated`. All clients (including the poller) call `fetchDetail()` to refresh the canvas with the completed video asset. |
+
+#### Timing Constants
+
+| Constant | Value | Location | Purpose |
+|----------|-------|----------|---------|
+| `POLL_INTERVAL` | 5,000 ms | `video-provider.tsx`, `use-desktop-video-sync.ts` | How often the VideoProvider polls each generation |
+| `NEWCOMER_GRACE_PERIOD` | 6,000 ms | `use-desktop-video-sync.ts` | How long a new client listens for heartbeats before claiming leadership |
+
+The grace period (6s) is intentionally slightly longer than the poll interval (5s) to guarantee that a newcomer will receive at least one heartbeat from an existing poller before the grace period expires.
+
+### Global VideoProvider
+
+The `VideoProvider` (`components/video-provider.tsx`) wraps the entire application and provides:
+
+| Export | Type | Purpose |
+|--------|------|---------|
+| `monitorGeneration(id)` | Function | Start polling a specific generation ID |
+| `cancelMonitorGeneration(id)` | Function | Stop polling a generation |
+| `isGenerationMonitored(id)` | Function | Check if a generation is being polled |
+| `generationStatuses` | `Record<string, VideoGenerationStatus>` | Live status cache for all monitored generations |
+| `onGenerationUpdate(listener)` | Function → unsubscribe | Subscribe to completion/failure events |
+
+The provider also handles **browser notifications** and **in-app toasts** when a generation completes while the user is on a different page or the tab is hidden.
+
+### Shared Video UI Components
+
+To avoid code duplication between the Storyboard page and Desktop canvas, shared video UI primitives live in `components/video/`:
+
+| Component | File | Used By |
+|-----------|------|---------|
+| `FakeProgressBar` | `components/video/fake-progress-bar.tsx` | Storyboard video cards, Desktop `VideoAsset` |
+| `VideoStatusOverlay` | `components/video/video-status-overlay.tsx` | Storyboard video cards, Desktop `VideoAsset`, `VideoPlayer` |
+| `VideoPlayOverlay` | `components/video/video-play-overlay.tsx` | Storyboard video cards, Desktop `VideoAsset` |
+| `VideoStatusChip` | `components/video/video-status-chip.tsx` | Storyboard video list, Admin video management |
+| `VideoPlayer` | `components/video/video-player.tsx` | Storyboard detail modal |
+
+The old `components/storyboard/video-status-chip.tsx` and `components/storyboard/video-player.tsx` files re-export from `components/video/` for backwards compatibility.
+
+### Desktop API: Asset Enrichment
+
+When the desktop detail API (`GET /api/desktop/[id]`) returns assets, video assets are **enriched** with data from the `videoGenerations` table:
+
+```typescript
+// EnrichedDesktopAsset (components/desktop/assets/types.ts)
+interface EnrichedDesktopAsset extends DesktopAsset {
+  imageUrl?: string | null;      // CloudFront URL for the source image
+  videoUrl?: string | null;      // CloudFront URL for the completed video
+  generationData?: {             // Joined from videoGenerations table
+    generationId: string;
+    status: string;              // "pending" | "processing" | "completed" | "failed"
+    videoId: string | null;
+    modelId: string;
+    params: Record<string, any>;
+    error: string | null;
+    createdAt: string;
+    completedAt: string | null;
+  } | null;
+}
+```
+
+This enrichment happens in both:
+- `GET /api/desktop/[id]` — main desktop detail route
+- `GET /api/desktop/[id]/assets` — standalone assets route
+
+### Desktop WebSocket Events (Complete Reference)
+
+| Event | Payload | Description |
+|-------|---------|-------------|
+| `room_joined` | `{ sessionId, sessions[] }` | Sent to the joining client with current room state |
+| `session_joined` | `{ sessionId, userId, firstName, email, permission }` | Broadcast when a new session joins |
+| `session_left` | `{ sessionId }` | Broadcast when a session disconnects |
+| `cursor_move` | `{ x, y }` | Real-time cursor position |
+| `cursor_leave` | — | Cursor left the canvas |
+| `asset_moved` | `{ assetId, posX, posY }` | Asset drag completed |
+| `asset_dragging` | `{ assetId, posX, posY }` | Asset being dragged (live) |
+| `asset_resized` | `{ assetId, width, height }` | Asset resize completed |
+| `asset_added` | `{ asset }` | New asset placed on canvas |
+| `asset_removed` | `{ assetId }` | Asset deleted |
+| `asset_selected` | `{ assetId }` | User selected an asset |
+| `asset_deselected` | `{ assetId }` | User deselected an asset |
+| `video_generation_polling` | `{ generationId }` | Heartbeat: this client is polling the generation |
+| `video_generation_updated` | `{ generationId, status }` | Generation finished: completed or failed |
+
 ## Image Generation
 
 ### Supported Models
@@ -604,6 +822,8 @@ moodio-agent/
 │   │   ├── chat/                 # Chat interface
 │   │   ├── collection/           # Collection management
 │   │   ├── credits/              # Credit balance
+│   │   ├── desktop/              # Collaborative desktop canvases
+│   │   │   └── [desktopId]/      # Individual desktop view
 │   │   ├── profile/              # User profile
 │   │   ├── projects/             # Project management
 │   │   └── storyboard/           # Video generation
@@ -612,15 +832,30 @@ moodio-agent/
 │   │   ├── auth/                 # Authentication
 │   │   ├── chat/                 # Chat endpoints
 │   │   ├── collection/           # Collection endpoints
+│   │   ├── desktop/              # Desktop endpoints (CRUD, assets, sharing)
 │   │   ├── image/                # Image endpoints
 │   │   ├── projects/             # Project endpoints
 │   │   ├── users/                # User endpoints
 │   │   └── video/                # Video endpoints
 │   └── auth/                     # Auth pages
 ├── components/                   # Shared React components
+│   ├── chat/                    # Chat interface components
+│   ├── desktop/                 # Desktop canvas and asset components
+│   │   └── assets/              # Asset renderers (ImageAsset, VideoAsset, etc.)
+│   ├── storyboard/              # Storyboard-specific components
+│   └── video/                   # Shared video UI primitives
+│       ├── fake-progress-bar.tsx  # Animated generation progress bar
+│       ├── video-play-overlay.tsx # Hover play button overlay
+│       ├── video-player.tsx       # Video player with frame capture
+│       ├── video-status-chip.tsx  # Status chip (Queued/Generating/Done/Failed)
+│       └── video-status-overlay.tsx # Dark scrim + status icon overlay
 ├── config/                       # App configuration
 ├── drizzle/                      # Database migrations
 ├── hooks/                        # Custom React hooks
+│   ├── use-desktop.ts           # Desktop detail state management
+│   ├── use-desktop-ws.ts        # Desktop WebSocket connection
+│   ├── use-desktop-video-sync.ts # Collaborative video polling leadership
+│   └── ...                      # Other hooks
 ├── i18n/                         # Internationalization
 ├── lib/                          # Core libraries
 │   ├── agents/                   # AI agent system

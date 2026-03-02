@@ -24,7 +24,9 @@
     "create": "Create",
     "new": "New",
     "share": "Share",
-    "remove": "Remove"
+    "remove": "Remove",
+    "on": "On",
+    "off": "Off"
   },
   "nav": {
     "browse": "Browse",
@@ -422,7 +424,20 @@
     "undo": "Undo",
     "requestCancelled": "Request cancelled",
     "errorPromptViolation": "Your prompt may have violated content guidelines. Please revise your prompt and try again.",
-    "errorGenericFailure": "Video generation failed. Your credits have been refunded. Please try again."
+    "errorGenericFailure": "Video generation failed. Your credits have been refunded. Please try again.",
+    "videoCreation": "Video Creation",
+    "createVideo": "Create Video",
+    "creating": "Creating...",
+    "createdStatus": "Created",
+    "durationLabel": "Duration",
+    "resolution": "Resolution",
+    "aspectRatio": "Aspect Ratio",
+    "audio": "Audio",
+    "noSourceImage": "No source image",
+    "noSourceImageDesc": "Please provide or generate an image first before creating a video.",
+    "noSourceImageInChat": "No source image found in this conversation. Please generate or upload an image first.",
+    "generationStarted": "Video generation started!",
+    "generationInProgress": "Video is being generated..."
   },
   "menu": {
     "mode": "Mode",

@@ -38,6 +38,10 @@ interface ParallelMessageProps {
   isGeneratingVariant?: boolean;
   /** Whether a message is currently being sent (disables New Idea button) */
   isSending?: boolean;
+  /** Desktop ID for linking video assets to desktop */
+  desktopId?: string;
+  /** All messages in conversation - used for source images */
+  allMessages?: Message[];
 }
 
 export default function ParallelMessage({
@@ -54,6 +58,8 @@ export default function ParallelMessage({
   onGenerateVariant,
   isGeneratingVariant = false,
   isSending = false,
+  desktopId,
+  allMessages,
 }: ParallelMessageProps) {
   const t = useTranslations();
   const [currentVariantIndex, setCurrentVariantIndex] = useState(0);
@@ -138,6 +144,8 @@ export default function ParallelMessage({
           onAgentTitleClick={onAgentTitleClick}
           onForkChat={onForkChat}
           hideAvatar={hideAvatars}
+          desktopId={desktopId}
+          allMessages={allMessages}
         />
         {/* Generate Another Option button - only show when not sending */}
         {onGenerateVariant && !isSending && (
@@ -192,6 +200,8 @@ export default function ParallelMessage({
                 onAgentTitleClick={onAgentTitleClick}
                 onForkChat={onForkChat}
                 hideAvatar={idx > 0 || hideAvatars}
+                desktopId={desktopId}
+                allMessages={allMessages}
               />
             </div>
           ))}
@@ -274,6 +284,8 @@ export default function ParallelMessage({
               onAgentTitleClick={onAgentTitleClick}
               onForkChat={onForkChat}
               hideAvatar={hideAvatars}
+              desktopId={desktopId}
+              allMessages={allMessages}
             />
           </div>
         </div>

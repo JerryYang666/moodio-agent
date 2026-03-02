@@ -29,7 +29,7 @@ import { ExternalLink, RefreshCw, Video } from "lucide-react";
 import { api } from "@/lib/api/client";
 import { useAuth } from "@/hooks/use-auth";
 import { SearchIcon } from "@/components/icons";
-import VideoStatusChip from "@/components/storyboard/video-status-chip";
+import VideoStatusChip from "@/components/video/video-status-chip";
 
 interface AdminVideoGeneration {
   id: string;

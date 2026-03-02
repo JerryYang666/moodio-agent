@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { desktopAssets } from "@/lib/db/schema";
+import { desktopAssets, videoGenerations } from "@/lib/db/schema";
 import { getAccessToken } from "@/lib/auth/cookies";
 import { verifyAccessToken } from "@/lib/auth/jwt";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, inArray } from "drizzle-orm";
 import { getDesktopPermission } from "@/lib/desktop/permissions";
 import { validateAssetMetadata } from "@/lib/desktop/types";
 import { getImageUrl, getVideoUrl } from "@/lib/storage/s3";
@@ -42,14 +42,57 @@ export async function GET(
       .where(eq(desktopAssets.desktopId, id))
       .orderBy(desc(desktopAssets.addedAt));
 
+    // Collect generationIds for video assets that need enrichment
+    const generationIds = rawAssets
+      .filter((a) => a.assetType === "video")
+      .map((a) => {
+        const m = a.metadata as Record<string, unknown>;
+        return typeof m.generationId === "string" ? m.generationId : null;
+      })
+      .filter(Boolean) as string[];
+
+    // Fetch video generation records for enrichment
+    let generationMap = new Map<string, any>();
+    if (generationIds.length > 0) {
+      const generations = await db
+        .select()
+        .from(videoGenerations)
+        .where(inArray(videoGenerations.id, generationIds));
+      generationMap = new Map(generations.map((g) => [g.id, g]));
+    }
+
     const assets = rawAssets.map((asset) => {
       const meta = asset.metadata as Record<string, unknown>;
       const imageId = typeof meta.imageId === "string" ? meta.imageId : null;
-      const videoId = typeof meta.videoId === "string" ? meta.videoId : null;
+      let videoId = typeof meta.videoId === "string" ? meta.videoId : null;
+
+      // Enrich video assets with generation data
+      let generationData: Record<string, unknown> | undefined;
+      if (asset.assetType === "video" && typeof meta.generationId === "string") {
+        const gen = generationMap.get(meta.generationId);
+        if (gen) {
+          // Update videoId from generation if completed
+          if (!videoId && gen.videoId) {
+            videoId = gen.videoId;
+          }
+          generationData = {
+            generationId: gen.id,
+            status: gen.status,
+            videoId: gen.videoId,
+            modelId: gen.modelId,
+            params: gen.params,
+            error: gen.error,
+            createdAt: gen.createdAt,
+            completedAt: gen.completedAt,
+          };
+        }
+      }
+
       return {
         ...asset,
         imageUrl: imageId ? getImageUrl(imageId) : null,
         videoUrl: asset.assetType === "video" && videoId ? getVideoUrl(videoId) : null,
+        generationData,
       };
     });
 

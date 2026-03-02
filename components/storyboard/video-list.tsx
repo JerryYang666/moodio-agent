@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useTranslations } from "next-intl";
 import { Card, CardBody, CardHeader } from "@heroui/card";
 import { Spinner } from "@heroui/spinner";
@@ -29,9 +29,6 @@ import {
   RefreshCw,
   Play,
   Download,
-  Clock,
-  XCircle,
-  Loader2,
   ExternalLink,
   RotateCcw,
   FolderPlus,
@@ -41,75 +38,15 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { VideoGenerationRestore } from "./video-generation-panel";
-import VideoStatusChip from "./video-status-chip";
+import VideoStatusChip from "@/components/video/video-status-chip";
 import { getVideoModel } from "@/lib/video/models";
 import { useCollections } from "@/hooks/use-collections";
 import type { Collection } from "@/components/collections-provider";
-import VideoPlayer from "./video-player";
+import VideoPlayer from "@/components/video/video-player";
+import FakeProgressBar from "@/components/video/fake-progress-bar";
+import VideoStatusOverlay from "@/components/video/video-status-overlay";
+import VideoPlayOverlay from "@/components/video/video-play-overlay";
 import { getUserFriendlyErrorKey } from "@/lib/video/error-classify";
-
-// Fake progress bar component for video generation
-// Animates to 97% over ~200 seconds at even speed, never reaches 100% until completed
-interface FakeProgressBarProps {
-  status: "pending" | "processing" | "completed" | "failed";
-  createdAt: string;
-}
-
-const PROGRESS_DURATION_MS = 200000; // 200 seconds to reach 97%
-const MAX_PROGRESS = 97; // Never exceed 97% until completed
-
-function FakeProgressBar({ status, createdAt }: FakeProgressBarProps) {
-  const [progress, setProgress] = useState(0);
-
-  // Calculate initial progress based on how long ago the generation started
-  const initialProgress = useMemo(() => {
-    if (status === "completed") return 100;
-    if (status === "failed") return 0;
-    
-    const elapsed = Date.now() - new Date(createdAt).getTime();
-    // Linear progress: elapsed / duration * max
-    const rawProgress = (elapsed / PROGRESS_DURATION_MS) * MAX_PROGRESS;
-    return Math.min(rawProgress, MAX_PROGRESS);
-  }, [status, createdAt]);
-
-  useEffect(() => {
-    // Set initial progress
-    setProgress(initialProgress);
-
-    // If completed or failed, no need to animate
-    if (status === "completed" || status === "failed") {
-      return;
-    }
-
-    // Animate progress over time with even/linear speed
-    const animate = () => {
-      const totalElapsed = Date.now() - new Date(createdAt).getTime();
-      
-      // Linear progress: elapsed / duration * max
-      const newProgress = (totalElapsed / PROGRESS_DURATION_MS) * MAX_PROGRESS;
-      setProgress(Math.min(newProgress, MAX_PROGRESS));
-    };
-
-    const interval = setInterval(animate, 500); // Update every 500ms
-    return () => clearInterval(interval);
-  }, [status, createdAt, initialProgress]);
-
-  // Don't show progress bar for completed or failed videos
-  if (status === "completed" || status === "failed") {
-    return null;
-  }
-
-  return (
-    <div className="h-1 w-full bg-default-200 overflow-hidden">
-      <motion.div
-        className="h-full bg-primary"
-        initial={{ width: `${initialProgress}%` }}
-        animate={{ width: `${progress}%` }}
-        transition={{ duration: 0.5, ease: "easeOut" }}
-      />
-    </div>
-  );
-}
 
 interface VideoGeneration {
   id: string;
@@ -578,54 +515,17 @@ export default function VideoList({ refreshTrigger, onRestore }: VideoListProps)
 
                             {/* Status Overlay */}
                             {gen.status !== "completed" && (
-                              <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                                {gen.status === "processing" && (
-                                  <div className="text-center">
-                                    <Loader2
-                                      size={24}
-                                      className="sm:w-8 sm:h-8 text-white animate-spin mx-auto mb-1 sm:mb-2"
-                                    />
-                                    <span className="text-white text-xs sm:text-sm">
-                                      {t("generating")}
-                                    </span>
-                                  </div>
-                                )}
-                                {gen.status === "pending" && (
-                                  <div className="text-center">
-                                    <Clock
-                                      size={24}
-                                      className="sm:w-8 sm:h-8 text-white mx-auto mb-1 sm:mb-2"
-                                    />
-                                    <span className="text-white text-xs sm:text-sm">
-                                      {t("queued")}
-                                    </span>
-                                  </div>
-                                )}
-                                {gen.status === "failed" && (
-                                  <div className="text-center">
-                                    <XCircle
-                                      size={24}
-                                      className="sm:w-8 sm:h-8 text-danger mx-auto mb-1 sm:mb-2"
-                                    />
-                                    <span className="text-white text-xs sm:text-sm">
-                                      {t("failed")}
-                                    </span>
-                                  </div>
-                                )}
-                              </div>
+                              <VideoStatusOverlay
+                                status={gen.status}
+                                processingLabel={t("generating")}
+                                pendingLabel={t("queued")}
+                                failedLabel={t("failed")}
+                              />
                             )}
 
                             {/* Play Button Overlay */}
                             {gen.status === "completed" && (
-                              <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 sm:transition-opacity">
-                                <div className="bg-black/50 rounded-full p-2 sm:p-3">
-                                  <Play
-                                    size={20}
-                                    className="sm:w-6 sm:h-6 text-white"
-                                    fill="white"
-                                  />
-                                </div>
-                              </div>
+                              <VideoPlayOverlay />
                             )}
                           </div>
 
@@ -873,54 +773,17 @@ export default function VideoList({ refreshTrigger, onRestore }: VideoListProps)
 
                       {/* Status Overlay */}
                       {video.status !== "completed" && (
-                        <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                          {video.status === "processing" && (
-                            <div className="text-center">
-                              <Loader2
-                                size={24}
-                                className="sm:w-8 sm:h-8 text-white animate-spin mx-auto mb-1 sm:mb-2"
-                              />
-                              <span className="text-white text-xs sm:text-sm">
-                                {t("generating")}
-                              </span>
-                            </div>
-                          )}
-                          {video.status === "pending" && (
-                            <div className="text-center">
-                              <Clock
-                                size={24}
-                                className="sm:w-8 sm:h-8 text-white mx-auto mb-1 sm:mb-2"
-                              />
-                              <span className="text-white text-xs sm:text-sm">
-                                {t("queued")}
-                              </span>
-                            </div>
-                          )}
-                          {video.status === "failed" && (
-                            <div className="text-center">
-                              <XCircle
-                                size={24}
-                                className="sm:w-8 sm:h-8 text-danger mx-auto mb-1 sm:mb-2"
-                              />
-                              <span className="text-white text-xs sm:text-sm">
-                                {t("failed")}
-                              </span>
-                            </div>
-                          )}
-                        </div>
+                        <VideoStatusOverlay
+                          status={video.status}
+                          processingLabel={t("generating")}
+                          pendingLabel={t("queued")}
+                          failedLabel={t("failed")}
+                        />
                       )}
 
                       {/* Play Button Overlay */}
                       {video.status === "completed" && (
-                        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 sm:transition-opacity">
-                          <div className="bg-black/50 rounded-full p-2 sm:p-3">
-                            <Play
-                              size={20}
-                              className="sm:w-6 sm:h-6 text-white"
-                              fill="white"
-                            />
-                          </div>
-                        </div>
+                        <VideoPlayOverlay />
                       )}
                     </div>
 
