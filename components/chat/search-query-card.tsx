@@ -17,9 +17,11 @@ interface SearchQueryCardProps {
     filterIds: number[];
   };
   status: "pending" | "executed";
+  /** Only the first suggestion should auto-execute to avoid redundant API calls */
+  autoExecute?: boolean;
 }
 
-export default function SearchQueryCard({ query, status }: SearchQueryCardProps) {
+export default function SearchQueryCard({ query, status, autoExecute = false }: SearchQueryCardProps) {
   const dispatch = useDispatch();
   const router = useRouter();
   const pathname = usePathname();
@@ -30,19 +32,20 @@ export default function SearchQueryCard({ query, status }: SearchQueryCardProps)
   const isOnBrowse = pathname === "/browse";
   const hasExecuted = useRef(false);
 
-  // Auto-execute search on Browse page when the part first arrives
   useEffect(() => {
-    if (isOnBrowse && !hasExecuted.current && status === "pending") {
+    if (autoExecute && isOnBrowse && !hasExecuted.current && status === "pending") {
       hasExecuted.current = true;
       dispatch(setTextSearch(query.textSearch));
       dispatch(setSelectedFilters(query.filterIds));
     }
-  }, [isOnBrowse, status, query, dispatch]);
+  }, [autoExecute, isOnBrowse, status, query, dispatch]);
 
-  const handleGoToBrowse = () => {
+  const handleSearch = () => {
     dispatch(setTextSearch(query.textSearch));
     dispatch(setSelectedFilters(query.filterIds));
-    router.push("/browse");
+    if (!isOnBrowse) {
+      router.push("/browse");
+    }
   };
 
   const isExecuted = isOnBrowse || status === "executed";
@@ -79,18 +82,16 @@ export default function SearchQueryCard({ query, status }: SearchQueryCardProps)
         </div>
       )}
 
-      {!isOnBrowse && (
-        <Button
-          size="sm"
-          color="primary"
-          variant="flat"
-          startContent={<ExternalLink size={14} />}
-          onPress={handleGoToBrowse}
-          className="self-start mt-1"
-        >
-          {t("goToBrowse")}
-        </Button>
-      )}
+      <Button
+        size="sm"
+        color="primary"
+        variant="flat"
+        startContent={isOnBrowse ? <Search size={14} /> : <ExternalLink size={14} />}
+        onPress={handleSearch}
+        className="self-start mt-1"
+      >
+        {isOnBrowse ? t("searchQuery") : t("goToBrowse")}
+      </Button>
     </div>
   );
 }

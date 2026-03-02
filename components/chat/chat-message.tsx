@@ -405,6 +405,7 @@ export default function ChatMessage({
               key={`search-${i}`}
               query={part.query}
               status={part.status}
+              autoExecute={i === 0}
             />
           ))}
       </div>
