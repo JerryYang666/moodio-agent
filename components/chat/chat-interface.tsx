@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useTranslations } from "next-intl";
 import { useAuth } from "@/hooks/use-auth";
+import { useCredits } from "@/hooks/use-credits";
 import { Spinner } from "@heroui/spinner";
 import { useDisclosure } from "@heroui/modal";
 import { Card, CardBody } from "@heroui/card";
@@ -97,6 +98,7 @@ export default function ChatInterface({
 }: ChatInterfaceProps) {
   const t = useTranslations();
   const { user } = useAuth();
+  const { refreshBalance } = useCredits();
   const { monitorChat, cancelMonitorChat } = useChat();
   const router = useRouter();
   const [chatId, setChatId] = useState<string | undefined>(initialChatId);
@@ -1521,6 +1523,30 @@ export default function ChatInterface({
             console.error("Parse error", e);
           }
         }
+      }
+
+      // Check if any images had insufficient credits and show toast
+      const allVariantContents = Object.values(variantContents);
+      let hasInsufficientCredits = false;
+      let hasAnyImages = false;
+      for (const content of allVariantContents) {
+        for (const part of content) {
+          if (part.type === "agent_image") {
+            hasAnyImages = true;
+            if (part.status === "error" && part.reason === "INSUFFICIENT_CREDITS") {
+              hasInsufficientCredits = true;
+            }
+          }
+        }
+      }
+      if (hasInsufficientCredits) {
+        addToast({
+          title: t("credits.insufficientCredits"),
+          color: "danger",
+        });
+      }
+      if (hasAnyImages) {
+        refreshBalance();
       }
 
       if (messages.length <= 1) {

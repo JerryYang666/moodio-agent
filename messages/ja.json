@@ -789,11 +789,20 @@
     "transactionTypes": {
       "admin_grant": "管理者付与",
       "video_generation": "動画生成",
+      "image_generation": "画像生成",
+      "daily_checkin": "デイリーチェックイン",
       "refund": "返金"
     },
     "date": "日付",
     "type": "種類",
-    "insufficientCredits": "クレジットが不足しています"
+    "insufficientCredits": "クレジットが不足しています",
+    "dailyCheckin": {
+      "title": "デイリーチェックイン",
+      "claim": "{amount}クレジットを受け取る",
+      "claimed": "本日はチェックイン済みです",
+      "success": "{amount}クレジットを受け取りました！",
+      "nextAvailable": "明日チェックインできます"
+    }
   },
   "mention": {
     "noItemsAvailable": "利用可能な画像がありません",

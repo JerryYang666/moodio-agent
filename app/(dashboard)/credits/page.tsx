@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useTranslations } from "next-intl";
 import { Card, CardBody, CardHeader } from "@heroui/card";
 import {
@@ -13,8 +13,11 @@ import {
 } from "@heroui/table";
 import { Chip } from "@heroui/chip";
 import { Spinner } from "@heroui/spinner";
-import { Bean } from "lucide-react";
+import { Button } from "@heroui/button";
+import { addToast } from "@heroui/toast";
+import { Bean, CalendarCheck } from "lucide-react";
 import { api } from "@/lib/api/client";
+import { useCredits } from "@/hooks/use-credits";
 
 interface Transaction {
   id: string;
@@ -24,17 +27,22 @@ interface Transaction {
   createdAt: string;
 }
 
+interface CheckinStatus {
+  available: boolean;
+  amount: number;
+  nextAvailable: string | null;
+}
+
 export default function CreditsPage() {
   const t = useTranslations("credits");
+  const { refreshBalance } = useCredits();
   const [balance, setBalance] = useState<number | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
+  const [checkinStatus, setCheckinStatus] = useState<CheckinStatus | null>(null);
+  const [claiming, setClaiming] = useState(false);
 
-  useEffect(() => {
-    fetchCredits();
-  }, []);
-
-  const fetchCredits = async () => {
+  const fetchCredits = useCallback(async () => {
     try {
       const data = await api.get("/api/users/credits");
       setBalance(data.balance);
@@ -43,6 +51,47 @@ export default function CreditsPage() {
       console.error("Failed to fetch credits:", error);
     } finally {
       setLoading(false);
+    }
+  }, []);
+
+  const fetchCheckinStatus = useCallback(async () => {
+    try {
+      const data = await api.get("/api/users/credits/daily-checkin");
+      setCheckinStatus(data);
+    } catch (error) {
+      console.error("Failed to fetch check-in status:", error);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchCredits();
+    fetchCheckinStatus();
+  }, [fetchCredits, fetchCheckinStatus]);
+
+  const handleCheckin = async () => {
+    setClaiming(true);
+    try {
+      const data = await api.post("/api/users/credits/daily-checkin", {});
+      if (data.success) {
+        setBalance(data.balance);
+        setCheckinStatus({ available: false, amount: data.amount, nextAvailable: null });
+        addToast({
+          title: t("dailyCheckin.success", { amount: data.amount }),
+          color: "success",
+        });
+        refreshBalance();
+        fetchCredits();
+      } else if (data.alreadyClaimed) {
+        setCheckinStatus({
+          available: false,
+          amount: checkinStatus?.amount ?? 100,
+          nextAvailable: data.nextAvailable,
+        });
+      }
+    } catch (error) {
+      console.error("Failed to claim daily check-in:", error);
+    } finally {
+      setClaiming(false);
     }
   };
 
@@ -77,7 +126,7 @@ export default function CreditsPage() {
       </div>
 
       {/* Balance Card */}
-      <Card className="bg-gradient-to-br from-primary/10 to-primary/5">
+      <Card className="bg-linear-to-br from-primary/10 to-primary/5">
         <CardBody className="py-8">
           <div className="flex flex-col items-center gap-4">
             <div className="p-4 bg-primary/20 rounded-full">
@@ -97,6 +146,41 @@ export default function CreditsPage() {
           </div>
         </CardBody>
       </Card>
+
+      {/* Daily Check-in Card */}
+      {checkinStatus && (
+        <Card className="bg-linear-to-br from-success/10 to-success/5">
+          <CardBody className="py-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-success/20 rounded-full">
+                  <CalendarCheck size={28} className="text-success" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold">{t("dailyCheckin.title")}</h3>
+                  <p className="text-sm text-default-500">
+                    {checkinStatus.available
+                      ? t("dailyCheckin.claim", { amount: checkinStatus.amount })
+                      : t("dailyCheckin.nextAvailable")}
+                  </p>
+                </div>
+              </div>
+              <Button
+                color="success"
+                variant={checkinStatus.available ? "solid" : "flat"}
+                isDisabled={!checkinStatus.available}
+                isLoading={claiming}
+                onPress={handleCheckin}
+                startContent={!claiming && <Bean size={16} />}
+              >
+                {checkinStatus.available
+                  ? t("dailyCheckin.claim", { amount: checkinStatus.amount })
+                  : t("dailyCheckin.claimed")}
+              </Button>
+            </div>
+          </CardBody>
+        </Card>
+      )}
 
       {/* Transaction History */}
       <Card>

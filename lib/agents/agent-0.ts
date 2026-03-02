@@ -9,6 +9,8 @@ import {
 import OpenAI, { toFile } from "openai";
 import { getSystemPrompt } from "./system-prompts";
 import { recordEvent, sanitizeOpenAIResponse } from "@/lib/telemetry";
+import { calculateCost } from "@/lib/pricing";
+import { deductCredits, InsufficientCreditsError } from "@/lib/credits";
 
 interface Suggestion {
   title: string;
@@ -285,6 +287,18 @@ export class Agent0 implements Agent {
             `[Perf] Image generation start index=${index}`,
             `[${Date.now() - startTime}ms]`
           );
+
+          // Check and deduct credits before generating
+          const cost = await calculateCost("Image/all", {});
+          if (cost > 0) {
+            await deductCredits(
+              userId,
+              cost,
+              "image_generation",
+              `Image generation (gpt-image-1)`
+            );
+          }
+
           let finalImageId: string;
           let response: any;
 
@@ -373,19 +387,24 @@ export class Agent0 implements Agent {
         } catch (e) {
           console.error(e);
 
-          // Record failure event
-          await recordEvent("image_generation", userId, {
-            status: "failed",
-            provider: "openai",
-            error: (e as Error).message || "Image generation failed",
-            prompt: suggestion.prompt,
-          });
+          const isInsufficientCredits = e instanceof InsufficientCreditsError;
+
+          if (!isInsufficientCredits) {
+            // Record failure event (skip for credit errors -- not a generation failure)
+            await recordEvent("image_generation", userId, {
+              status: "failed",
+              provider: "openai",
+              error: (e as Error).message || "Image generation failed",
+              prompt: suggestion.prompt,
+            });
+          }
 
           const part: MessageContentPart = {
             type: "agent_image",
             title: suggestion.title,
             prompt: suggestion.prompt,
             status: "error",
+            ...(isInsufficientCredits && { reason: "INSUFFICIENT_CREDITS" }),
           };
           if (controller) {
             controller.enqueue(

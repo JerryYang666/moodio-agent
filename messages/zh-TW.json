@@ -789,11 +789,20 @@
     "transactionTypes": {
       "admin_grant": "管理員授予",
       "video_generation": "影片生成",
+      "image_generation": "圖片生成",
+      "daily_checkin": "每日簽到",
       "refund": "退款"
     },
     "date": "日期",
     "type": "類型",
-    "insufficientCredits": "點數不足"
+    "insufficientCredits": "點數不足",
+    "dailyCheckin": {
+      "title": "每日簽到",
+      "claim": "領取 {amount} 點數",
+      "claimed": "今日已簽到",
+      "success": "成功領取 {amount} 點數！",
+      "nextAvailable": "明天可再次簽到"
+    }
   },
   "mention": {
     "noItemsAvailable": "沒有可用的圖片",

@@ -40,6 +40,13 @@ export async function GET(request: NextRequest) {
         })),
     }));
 
+    // Add image generation as a configurable pricing entry
+    models.push({
+      id: "Image/all",
+      name: "Image (All Models)",
+      params: [],
+    });
+
     return NextResponse.json({
       formulas,
       models,

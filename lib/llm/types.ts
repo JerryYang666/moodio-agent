@@ -20,6 +20,7 @@ export type MessageContentPart =
       prompt: string;
       status: "loading" | "generated" | "error";
       isSelected?: boolean;
+      reason?: string; // Error reason code (e.g., "INSUFFICIENT_CREDITS")
     }
   | {
       type: "agent_video";

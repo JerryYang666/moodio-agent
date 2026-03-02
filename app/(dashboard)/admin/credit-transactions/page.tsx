@@ -52,6 +52,7 @@ const TYPE_OPTIONS = [
   { key: "admin_grant", label: "Admin Grant" },
   { key: "video_generation", label: "Video Generation" },
   { key: "image_generation", label: "Image Generation" },
+  { key: "daily_checkin", label: "Daily Check-in" },
   { key: "refund", label: "Refund" },
   { key: "signup_bonus", label: "Signup Bonus" },
 ];
@@ -66,6 +67,7 @@ function getTypeColor(type: string) {
     case "refund":
       return "success";
     case "signup_bonus":
+    case "daily_checkin":
       return "secondary";
     default:
       return "default";

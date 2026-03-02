@@ -21,6 +21,8 @@ import {
   getModelConfigForApi,
   getVideoModelsPromptText,
 } from "@/lib/video/models";
+import { calculateCost } from "@/lib/pricing";
+import { deductCredits, InsufficientCreditsError } from "@/lib/credits";
 
 // Maximum number of retries for failed operations
 const MAX_RETRY = 2;
@@ -776,6 +778,7 @@ export class Agent1 implements Agent {
                         `Image gen error for imageId ${trackingImageId}`,
                         err
                       );
+                      const isInsufficientCredits = err instanceof InsufficientCreditsError;
                       const errorPart: MessageContentPart = {
                         type: "agent_image",
                         imageId: trackingImageId, // Keep the tracking ID
@@ -783,6 +786,7 @@ export class Agent1 implements Agent {
                         aspectRatio: "1:1",
                         prompt: suggestion.prompt || "",
                         status: "error",
+                        ...(isInsufficientCredits && { reason: "INSUFFICIENT_CREDITS" }),
                       };
                       send({
                         type: "part_update",
@@ -995,6 +999,9 @@ export class Agent1 implements Agent {
 
         return result;
       } catch (error) {
+        if (error instanceof InsufficientCreditsError) {
+          throw error;
+        }
         lastError = error as Error;
         console.error(
           `[Agent-1] Image generation attempt ${attempt + 1}/${MAX_RETRY + 1
@@ -1077,6 +1084,18 @@ export class Agent1 implements Agent {
 
     try {
       const modelId = prepared.imageModelId;
+
+      // Check and deduct credits before generating
+      const cost = await calculateCost("Image/all", {});
+      if (cost > 0) {
+        await deductCredits(
+          userId,
+          cost,
+          "image_generation",
+          `Image generation (${modelId || "default"})`
+        );
+      }
+
       let result;
       if (useImageEditing && validImageBase64.length > 0) {
         console.log(

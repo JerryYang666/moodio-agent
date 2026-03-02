@@ -836,11 +836,20 @@
     "transactionTypes": {
       "admin_grant": "Admin Grant",
       "video_generation": "Video Generation",
+      "image_generation": "Image Generation",
+      "daily_checkin": "Daily Check-in",
       "refund": "Refund"
     },
     "date": "Date",
     "type": "Type",
-    "insufficientCredits": "Insufficient credits"
+    "insufficientCredits": "Insufficient credits",
+    "dailyCheckin": {
+      "title": "Daily Check-in",
+      "claim": "Claim {amount} Credits",
+      "claimed": "Already claimed today",
+      "success": "Successfully claimed {amount} credits!",
+      "nextAvailable": "Next check-in available tomorrow"
+    }
   },
   "mention": {
     "noItemsAvailable": "No images available",

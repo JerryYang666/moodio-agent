@@ -789,11 +789,20 @@
     "transactionTypes": {
       "admin_grant": "管理员发放",
       "video_generation": "视频生成",
+      "image_generation": "图片生成",
+      "daily_checkin": "每日签到",
       "refund": "退款"
     },
     "date": "日期",
     "type": "类型",
-    "insufficientCredits": "积分不足"
+    "insufficientCredits": "积分不足",
+    "dailyCheckin": {
+      "title": "每日签到",
+      "claim": "领取 {amount} 积分",
+      "claimed": "今日已签到",
+      "success": "成功领取 {amount} 积分！",
+      "nextAvailable": "明天可再次签到"
+    }
   },
   "mention": {
     "noItemsAvailable": "暂无可用图片",
