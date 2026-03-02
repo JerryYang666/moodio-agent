@@ -12,6 +12,7 @@ import {
   MessageSquare,
   FolderPlus,
   MousePointer2,
+  SendHorizontal,
 } from "lucide-react";
 
 const MIN_ZOOM = 0.1;
@@ -555,6 +556,16 @@ export default function DesktopCanvas({
       ? ((contextAsset.metadata as Record<string, unknown>).chatId as string)
       : null;
 
+  const contextImageInfo =
+    contextAsset?.assetType === "image"
+      ? {
+          assetId: contextAsset.id,
+          imageId: (contextAsset.metadata as Record<string, unknown>)?.imageId as string | undefined,
+          url: contextAsset.imageUrl,
+          title: ((contextAsset.metadata as Record<string, unknown>)?.title as string) || "Image",
+        }
+      : null;
+
   const worldStyle = {
     transform: `translate(${camera.x}px, ${camera.y}px) scale(${camera.zoom})`,
     transformOrigin: "0 0",
@@ -794,6 +805,27 @@ export default function DesktopCanvas({
             >
               <MessageSquare size={14} />
               Open in Chat
+            </button>
+          )}
+          {contextImageInfo?.imageId && contextImageInfo.url && (
+            <button
+              className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-default-100 transition-colors text-left"
+              onClick={() => {
+                window.dispatchEvent(
+                  new CustomEvent("moodio-asset-selected", {
+                    detail: {
+                      assetId: contextImageInfo.assetId,
+                      imageId: contextImageInfo.imageId,
+                      url: contextImageInfo.url,
+                      title: contextImageInfo.title,
+                    },
+                  })
+                );
+                setContextMenu(null);
+              }}
+            >
+              <SendHorizontal size={14} />
+              Send to Chat
             </button>
           )}
           {contextAsset && onCopyToCollection && (
