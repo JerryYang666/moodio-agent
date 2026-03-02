@@ -14,6 +14,8 @@ interface ImageHoverPreviewProps {
   maxPreviewWidth?: number;
   /** Maximum height of the preview in pixels (default: 400) */
   maxPreviewHeight?: number;
+  /** Additional CSS class for the wrapper div */
+  className?: string;
 }
 
 export default function ImageHoverPreview({
@@ -23,6 +25,7 @@ export default function ImageHoverPreview({
   delay = 1000,
   maxPreviewWidth = 500,
   maxPreviewHeight = 500,
+  className = "inline-block",
 }: ImageHoverPreviewProps) {
   const [showPreview, setShowPreview] = useState(false);
   const [previewPosition, setPreviewPosition] = useState({ x: 0, y: 0 });
@@ -170,7 +173,7 @@ export default function ImageHoverPreview({
       ref={containerRef}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      className="inline-block"
+      className={className}
     >
       {children}
       {mounted && createPortal(previewContent, document.body)}

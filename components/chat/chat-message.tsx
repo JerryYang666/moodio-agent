@@ -280,6 +280,7 @@ export default function ChatMessage({
                     alt={part.title}
                     maxPreviewWidth={600}
                     maxPreviewHeight={600}
+                    className="block"
                   >
                     <Card
                       className={clsx(
@@ -288,7 +289,7 @@ export default function ChatMessage({
                       )}
                     >
                       <CardBody
-                        className="p-0 overflow-hidden relative aspect-square cursor-pointer group/image rounded-lg"
+                        className="p-0 overflow-hidden relative cursor-pointer group/image rounded-lg"
                         draggable={effectiveStatus === "generated"}
                         onClick={() =>
                           effectiveStatus === "generated" &&
@@ -311,6 +312,7 @@ export default function ChatMessage({
                           }
                         }}
                       >
+                        <div className="aspect-square w-full">
                         {effectiveStatus === "loading" && (
                           <div className="w-full h-full flex items-center justify-center bg-default-100">
                             <Spinner />
@@ -332,6 +334,7 @@ export default function ChatMessage({
                             }}
                           />
                         )}
+                        </div>
                         {(effectiveStatus === "generated" ||
                           effectiveStatus === "error") && (
                           <div className="absolute bottom-0 left-0 right-0 bg-white/90 dark:bg-black/60 text-black dark:text-white p-2 text-xs truncate md:opacity-0 md:group-hover/image:opacity-100 transition-opacity z-10 pointer-events-none">
