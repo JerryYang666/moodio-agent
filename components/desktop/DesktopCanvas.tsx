@@ -782,6 +782,7 @@ export default function DesktopCanvas({
         <div
           className="fixed z-100 bg-background border border-divider rounded-xl shadow-lg py-1 min-w-[180px]"
           style={{ left: contextMenu.x, top: contextMenu.y }}
+          onPointerDown={(e) => e.stopPropagation()}
         >
           {contextChatId && onOpenChat && (
             <button
