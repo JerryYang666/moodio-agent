@@ -12,6 +12,10 @@ import {
   FolderPlus,
   Copy,
   MousePointer2,
+  Loader2,
+  Clock,
+  AlertCircle,
+  Video,
 } from "lucide-react";
 
 const MIN_ZOOM = 0.1;
@@ -24,6 +28,16 @@ const CURSOR_THROTTLE_MS = 40;
 interface EnrichedDesktopAsset extends DesktopAsset {
   imageUrl?: string | null;
   videoUrl?: string | null;
+  generationData?: {
+    generationId: string;
+    status: string;
+    videoId: string | null;
+    modelId: string;
+    params: Record<string, any>;
+    error: string | null;
+    createdAt: string;
+    completedAt: string | null;
+  } | null;
 }
 
 interface DesktopCanvasProps {
@@ -667,7 +681,37 @@ function AssetCardContent({
   if (asset.assetType === "video") {
     const vidMeta = meta as unknown as VideoAssetMeta;
     const src = asset.imageUrl;
-    if (!src) return <div className="w-full h-full bg-default-200 animate-pulse" />;
+    const genStatus = (asset as EnrichedDesktopAsset).generationData?.status || vidMeta.status;
+    const isProcessing = genStatus === "pending" || genStatus === "processing";
+    const isFailed = genStatus === "failed";
+    const isCompleted = genStatus === "completed" || !!vidMeta.videoId;
+
+    if (!src) {
+      // No thumbnail - show placeholder based on status
+      return (
+        <div className="w-full h-full bg-default-200 flex flex-col items-center justify-center gap-2 p-4">
+          {isProcessing && (
+            <>
+              <Loader2 size={24} className="text-primary animate-spin" />
+              <span className="text-xs text-default-500">Generating...</span>
+            </>
+          )}
+          {isFailed && (
+            <>
+              <AlertCircle size={24} className="text-danger" />
+              <span className="text-xs text-danger">Failed</span>
+            </>
+          )}
+          {!isProcessing && !isFailed && (
+            <>
+              <Video size={24} className="text-default-400" />
+              <span className="text-xs text-default-400">{vidMeta.title || "Video"}</span>
+            </>
+          )}
+        </div>
+      );
+    }
+
     return (
       <>
         <img
@@ -681,9 +725,26 @@ function AssetCardContent({
           }}
         />
         <div className="absolute top-2 left-2 z-10">
-          <div className="bg-black/70 text-white rounded-full p-1 flex items-center gap-1">
-            <Play size={10} fill="white" />
-          </div>
+          {isProcessing ? (
+            <div className="bg-primary/80 text-white rounded-full p-1.5 flex items-center gap-1">
+              <Loader2 size={10} className="animate-spin" />
+              <span className="text-[9px] font-medium pr-0.5">Processing</span>
+            </div>
+          ) : isFailed ? (
+            <div className="bg-danger/80 text-white rounded-full p-1.5 flex items-center gap-1">
+              <AlertCircle size={10} />
+              <span className="text-[9px] font-medium pr-0.5">Failed</span>
+            </div>
+          ) : isCompleted ? (
+            <div className="bg-black/70 text-white rounded-full p-1 flex items-center gap-1">
+              <Play size={10} fill="white" />
+            </div>
+          ) : (
+            <div className="bg-default-500/70 text-white rounded-full p-1.5 flex items-center gap-1">
+              <Clock size={10} />
+              <span className="text-[9px] font-medium pr-0.5">Pending</span>
+            </div>
+          )}
         </div>
         <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white p-1.5 text-xs truncate opacity-0 group-hover:opacity-100 transition-opacity">
           {vidMeta.title || "Untitled video"}

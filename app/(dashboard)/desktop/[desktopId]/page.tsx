@@ -142,6 +142,18 @@ export default function DesktopDetailPage({
     });
   }, [fetchDetail]);
 
+  // Listen for video assets added from chat
+  useEffect(() => {
+    const handleAssetAdded = (e: CustomEvent) => {
+      if (e.detail?.desktopId === desktopId) {
+        // Refresh desktop to pick up the new asset
+        fetchDetail();
+      }
+    };
+    window.addEventListener("desktop-asset-added", handleAssetAdded as EventListener);
+    return () => window.removeEventListener("desktop-asset-added", handleAssetAdded as EventListener);
+  }, [desktopId, fetchDetail]);
+
   const handleCameraChange = useCallback(
     (newCamera: CameraState) => {
       setCamera(newCamera);
@@ -414,6 +426,7 @@ export default function DesktopDetailPage({
           defaultExpanded={!isChatPanelCollapsed}
           onCollapseChange={handleChatPanelCollapseChange}
           onWidthChange={handleChatPanelWidthChange}
+          desktopId={desktopId}
         />
       </div>
 

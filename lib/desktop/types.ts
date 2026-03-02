@@ -9,12 +9,14 @@ export type ImageAssetMeta = {
 
 export type VideoAssetMeta = {
   imageId: string;
-  videoId: string;
+  videoId?: string;
+  generationId?: string; // Links to videoGenerations table as canonical record
   chatId?: string;
   title?: string;
   prompt?: string;
   status?: string;
   duration?: number;
+  modelId?: string;
 };
 
 export type TextAssetMeta = {
@@ -62,8 +64,11 @@ export function validateAssetMetadata(
       if (typeof m.imageId !== "string" || !m.imageId) {
         return { valid: false, error: "video metadata requires a non-empty imageId string" };
       }
-      if (typeof m.videoId !== "string" || !m.videoId) {
-        return { valid: false, error: "video metadata requires a non-empty videoId string" };
+      // Video asset requires either videoId (completed) or generationId (in-progress/pending)
+      const hasVideoId = typeof m.videoId === "string" && m.videoId;
+      const hasGenerationId = typeof m.generationId === "string" && m.generationId;
+      if (!hasVideoId && !hasGenerationId) {
+        return { valid: false, error: "video metadata requires either a videoId or generationId" };
       }
       break;
     case "text":

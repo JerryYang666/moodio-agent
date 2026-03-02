@@ -15,6 +15,11 @@ import {
   generateImageWithModel,
 } from "@/lib/image/service";
 import { getImageModel } from "@/lib/image/models";
+import {
+  DEFAULT_VIDEO_MODEL_ID,
+  getVideoModel,
+  getModelConfigForApi,
+} from "@/lib/video/models";
 
 // Maximum number of retries for failed operations
 const MAX_RETRY = 2;
@@ -218,7 +223,7 @@ export class Agent1 implements Agent {
       SUPPORTED_ASPECT_RATIOS.join(", ")
     );
 
-    // Convert previous agent_image parts to text in history
+    // Convert previous agent_image and agent_video parts to text in history
     const cleanHistory = history.map((m) => {
       if (Array.isArray(m.content)) {
         return {
@@ -229,6 +234,12 @@ export class Agent1 implements Agent {
                 type: "text" as const,
                 text: `Suggestion: ${p.title}\nAspect Ratio: ${p.aspectRatio || "1:1"
                   }\nPrompt: ${p.prompt}`,
+              };
+            }
+            if (p.type === "agent_video") {
+              return {
+                type: "text" as const,
+                text: `[Video Configuration: ${p.config.modelName} - "${p.config.prompt}" - Status: ${p.status}${p.generationId ? ` (Generation ID: ${p.generationId})` : ""}]`,
               };
             }
             return p;
@@ -561,12 +572,13 @@ export class Agent1 implements Agent {
         fullLlmResponse += delta; // Accumulate full response
 
         // Check for invalid text outside tags
-        // Valid text should only be inside <TEXT>...</TEXT> or <JSON>...</JSON> or <think>...</think>
+        // Valid text should only be inside <TEXT>...</TEXT> or <JSON>...</JSON> or <VIDEO>...</VIDEO> or <think>...</think>
         // Whitespace outside is OK
         let checkBuffer = buffer;
         let inAngleBrackets = false;
         let inTextTag = false;
         let inJsonTag = false;
+        let inVideoTag = false;
         let inThinkTag = false;
         let i = 0;
 
@@ -591,6 +603,14 @@ export class Agent1 implements Agent {
             inJsonTag = false;
             i += 7;
             continue;
+          } else if (remaining.startsWith("<VIDEO>")) {
+            inVideoTag = true;
+            i += 7;
+            continue;
+          } else if (remaining.startsWith("</VIDEO>")) {
+            inVideoTag = false;
+            i += 8;
+            continue;
           } else if (remaining.startsWith("<think>")) {
             inThinkTag = true;
             i += 7;
@@ -609,6 +629,7 @@ export class Agent1 implements Agent {
           } else if (
             !inTextTag &&
             !inJsonTag &&
+            !inVideoTag &&
             !inThinkTag &&
             !inAngleBrackets &&
             char.trim() !== ""
@@ -773,6 +794,63 @@ export class Agent1 implements Agent {
             buffer = buffer.substring(sEnd + 7);
           } else {
             break;
+          }
+        }
+
+        // 3. Parse Video Configuration (max 1)
+        if (buffer.includes("</VIDEO>")) {
+          const vStart = buffer.indexOf("<VIDEO>");
+          const vEnd = buffer.indexOf("</VIDEO>");
+
+          if (vStart !== -1 && vEnd !== -1 && vStart < vEnd) {
+            const videoJsonStr = buffer.substring(vStart + 7, vEnd);
+            try {
+              const videoConfig = JSON.parse(videoJsonStr);
+              const modelId = DEFAULT_VIDEO_MODEL_ID;
+              const model = getVideoModel(modelId);
+              const modelApiConfig = getModelConfigForApi(modelId);
+
+              if (model && modelApiConfig) {
+                // Build params from the agent output, excluding prompt and image params
+                const videoParams: Record<string, any> = {};
+                for (const param of modelApiConfig.params) {
+                  if (
+                    param.name === "prompt" ||
+                    param.name === model.imageParams.sourceImage ||
+                    param.name === model.imageParams.endImage
+                  ) {
+                    continue;
+                  }
+                  if (videoConfig[param.name] !== undefined) {
+                    videoParams[param.name] = videoConfig[param.name];
+                  } else if (param.default !== undefined) {
+                    videoParams[param.name] = param.default;
+                  }
+                }
+
+                const videoPart: MessageContentPart = {
+                  type: "agent_video",
+                  config: {
+                    modelId,
+                    modelName: model.name,
+                    prompt: videoConfig.prompt || "",
+                    params: videoParams,
+                  },
+                  status: "pending",
+                };
+
+                send({ type: "part", part: videoPart });
+                finalContent.push(videoPart);
+
+                console.log(
+                  "[Perf] Agent video config sent",
+                  `[${Date.now() - startTime}ms]`
+                );
+              }
+            } catch (e) {
+              console.error("Failed to parse video config JSON", e);
+            }
+            buffer = buffer.substring(vEnd + 8);
           }
         }
       }

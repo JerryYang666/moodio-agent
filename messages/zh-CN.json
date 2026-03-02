@@ -24,7 +24,9 @@
     "create": "创建",
     "new": "新建",
     "share": "共享",
-    "remove": "移除"
+    "remove": "移除",
+    "on": "开",
+    "off": "关"
   },
   "nav": {
     "browse": "浏览",
@@ -375,7 +377,20 @@
     "undo": "撤销",
     "requestCancelled": "请求已取消",
     "errorPromptViolation": "您的提示词可能违反了内容规范，请修改提示词后重试。",
-    "errorGenericFailure": "视频生成失败，积分已退还，请重试。"
+    "errorGenericFailure": "视频生成失败，积分已退还，请重试。",
+    "videoCreation": "视频创建",
+    "createVideo": "创建视频",
+    "creating": "创建中...",
+    "createdStatus": "已创建",
+    "durationLabel": "时长",
+    "resolution": "分辨率",
+    "aspectRatio": "纵横比",
+    "audio": "音频",
+    "noSourceImage": "没有源图片",
+    "noSourceImageDesc": "请先提供或生成图片，然后再创建视频。",
+    "noSourceImageInChat": "此对话中未找到源图片。请先生成或上传图片。",
+    "generationStarted": "视频生成已开始！",
+    "generationInProgress": "视频正在生成中..."
   },
   "menu": {
     "mode": "模式",

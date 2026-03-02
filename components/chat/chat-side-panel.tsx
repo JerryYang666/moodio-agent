@@ -36,6 +36,8 @@ export interface ChatSidePanelProps {
   onWidthChange?: (width: number) => void;
   /** Custom class name */
   className?: string;
+  /** Desktop ID for linking video assets to desktop */
+  desktopId?: string;
 }
 
 /**
@@ -47,6 +49,7 @@ export default function ChatSidePanel({
   onCollapseChange,
   onWidthChange,
   className,
+  desktopId,
 }: ChatSidePanelProps) {
   const router = useRouter();
   const t = useTranslations("chat");
@@ -313,6 +316,7 @@ export default function ChatSidePanel({
                   onChatCreated={handleChatCreated}
                   compactMode
                   hideAvatars
+                  desktopId={desktopId}
                 />
               </motion.div>
             )}
