@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { usePathname } from "next/navigation";
 import NextLink from "next/link";
 import clsx from "clsx";
@@ -16,6 +16,8 @@ import {
   Bean,
   PencilRuler,
   LayoutDashboard,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from "lucide-react";
 import { Avatar } from "@heroui/avatar";
 import { Tooltip } from "@heroui/tooltip";
@@ -41,6 +43,7 @@ export const PrimarySidebar = () => {
   const tCredits = useTranslations("credits");
   const tLanguage = useTranslations("language");
   const showDesktop = useFeatureFlag<boolean>("user_desktop") ?? false;
+  const [collapsed, setCollapsed] = useState(false);
 
   const navItems = [
     {
@@ -81,7 +84,10 @@ export const PrimarySidebar = () => {
   return (
     <motion.aside
       layout
-      className="hidden md:flex flex-col h-screen sticky top-0 border-r border-divider bg-background z-50 w-16 items-center py-6"
+      className={clsx(
+        "hidden md:flex flex-col h-screen sticky top-0 border-r border-divider bg-background z-50 items-center py-6 transition-[width] duration-300",
+        collapsed ? "w-14" : "w-20"
+      )}
     >
       {/* Logo */}
       <NextLink href="/" className="mb-8">
@@ -91,7 +97,7 @@ export const PrimarySidebar = () => {
       </NextLink>
 
       {/* Navigation Items */}
-      <div className="flex flex-col gap-4 w-full px-2 items-center flex-1">
+      <div className="flex flex-col gap-1 w-full px-1 items-center flex-1">
         {navItems.map((item) => {
           const isActive = item.isActive
             ? item.isActive(pathname || "")
@@ -107,13 +113,19 @@ export const PrimarySidebar = () => {
               <NextLink
                 href={item.href}
                 className={clsx(
-                  "p-2 rounded-xl transition-all duration-300 group relative z-0 flex items-center justify-center",
+                  "py-2 px-1 rounded-xl transition-all duration-300 group relative z-0 flex flex-col items-center justify-center w-full",
+                  !collapsed && "gap-0.5",
                   isActive
                     ? "text-primary"
                     : "text-default-500 hover:bg-default-100 hover:text-default-900"
                 )}
               >
                 {item.icon}
+                {!collapsed && (
+                  <span className="text-[10px] leading-tight font-medium truncate max-w-full">
+                    {item.label}
+                  </span>
+                )}
                 {isActive && (
                   <motion.div
                     layoutId="active-indicator"
@@ -129,7 +141,7 @@ export const PrimarySidebar = () => {
         })}
 
         {/* Annotation Platform & Admin Links */}
-        <div className="mt-auto flex flex-col gap-2 items-center">
+        <div className="mt-auto flex flex-col gap-1 items-center w-full">
           {/* Annotation Platform Link */}
           {user &&
             (user.roles.includes("admin") ||
@@ -141,9 +153,17 @@ export const PrimarySidebar = () => {
               >
                 <a
                   href={siteConfig.annotationPlatformUrl}
-                  className="p-2 rounded-xl transition-all duration-300 group relative z-0 flex items-center justify-center text-default-500 hover:bg-default-100 hover:text-default-900"
+                  className={clsx(
+                    "py-2 px-1 rounded-xl transition-all duration-300 group relative z-0 flex flex-col items-center justify-center w-full text-default-500 hover:bg-default-100 hover:text-default-900",
+                    !collapsed && "gap-0.5"
+                  )}
                 >
                   <PencilRuler size={20} />
+                  {!collapsed && (
+                    <span className="text-[10px] leading-tight font-medium truncate max-w-full">
+                      {t("annotationPlatform")}
+                    </span>
+                  )}
                 </a>
               </Tooltip>
             )}
@@ -154,13 +174,19 @@ export const PrimarySidebar = () => {
               <NextLink
                 href="/admin"
                 className={clsx(
-                  "p-2 rounded-xl transition-all duration-300 group relative z-0 flex items-center justify-center",
+                  "py-2 px-1 rounded-xl transition-all duration-300 group relative z-0 flex flex-col items-center justify-center w-full",
+                  !collapsed && "gap-0.5",
                   pathname?.startsWith("/admin")
                     ? "text-primary"
                     : "text-default-500 hover:bg-default-100 hover:text-default-900"
                 )}
               >
                 <Shield size={20} />
+                {!collapsed && (
+                  <span className="text-[10px] leading-tight font-medium truncate max-w-full">
+                    {t("admin")}
+                  </span>
+                )}
                 {pathname?.startsWith("/admin") && (
                   <motion.div
                     layoutId="active-indicator"
@@ -269,6 +295,14 @@ export const PrimarySidebar = () => {
           </Popover>
         )}
       </div>
+
+      {/* Collapse Toggle */}
+      <button
+        onClick={() => setCollapsed((prev) => !prev)}
+        className="mt-2 p-1.5 rounded-lg text-default-400 hover:text-default-700 hover:bg-default-100 transition-colors"
+      >
+        {collapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
+      </button>
     </motion.aside>
   );
 };
