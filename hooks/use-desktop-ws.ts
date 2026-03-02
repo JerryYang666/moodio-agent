@@ -83,6 +83,7 @@ export function useDesktopWebSocket({
   const reconnectAttempts = useRef(0);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pollingTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const intentionalClose = useRef(false);
   const onRemoteEventRef = useRef(onRemoteEvent);
   const fetchDetailRef = useRef(fetchDetail);
 
@@ -109,6 +110,8 @@ export function useDesktopWebSocket({
   const connect = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
     if (wsRef.current?.readyState === WebSocket.CONNECTING) return;
+
+    intentionalClose.current = false;
 
     const url = `${baseUrl}/ws/desktop/${desktopId}`;
     setConnectionState(
@@ -236,6 +239,7 @@ export function useDesktopWebSocket({
 
     ws.onclose = () => {
       wsRef.current = null;
+      if (intentionalClose.current) return;
       if (reconnectAttempts.current >= MAX_RECONNECT_BEFORE_POLLING) {
         setConnectionState("polling");
         startPolling();
@@ -264,6 +268,7 @@ export function useDesktopWebSocket({
     if (!enabled || !desktopId) return;
     connect();
     return () => {
+      intentionalClose.current = true;
       if (reconnectTimer.current) clearTimeout(reconnectTimer.current);
       stopPolling();
       wsRef.current?.close();
