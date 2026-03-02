@@ -232,7 +232,7 @@ export class Agent1 implements Agent {
             if (p.type === "agent_image") {
               return {
                 type: "text" as const,
-                text: `Suggestion: ${p.title}\nAspect Ratio: ${p.aspectRatio || "1:1"
+                text: `[Image ID: ${p.imageId || "unknown"}] Suggestion: ${p.title}\nAspect Ratio: ${p.aspectRatio || "1:1"
                   }\nPrompt: ${p.prompt}`,
               };
             }
@@ -282,19 +282,24 @@ export class Agent1 implements Agent {
     const formattedUserMessage: any = {
       role: userMessage.role,
       content: Array.isArray(userMessage.content)
-        ? userMessage.content.map((p) => {
+        ? userMessage.content.flatMap((p) => {
           if (p.type === "image") {
-            return {
-              type: "image_url",
-              image_url: {
-                url: getSignedImageUrl(p.imageId),
+            return [
+              {
+                type: "text" as const,
+                text: `[Image ID: ${p.imageId}${p.title ? ` | Title: ${p.title}` : ""}]`,
               },
-            };
+              {
+                type: "image_url" as const,
+                image_url: {
+                  url: getSignedImageUrl(p.imageId),
+                },
+              },
+            ];
           }
-          return p;
+          return [p];
         })
         : [
-          // If userMessage.content is string, convert to array format for consistency
           { type: "text", text: userMessage.content as string },
         ],
     };
@@ -307,18 +312,16 @@ export class Agent1 implements Agent {
       }
       
       for (const ref of referenceImages) {
-        // Add the reference image
+        const tagLabel = ref.tag === "none" ? "general reference" : ref.tag;
+        formattedUserMessage.content.push({
+          type: "text",
+          text: `[Reference Image ID: ${ref.imageId} - ${tagLabel}${ref.title ? `: ${ref.title}` : ""}]`,
+        });
         formattedUserMessage.content.push({
           type: "image_url",
           image_url: {
             url: getSignedImageUrl(ref.imageId),
           },
-        });
-        // Add tag context for the AI to understand the image's purpose
-        const tagLabel = ref.tag === "none" ? "general reference" : ref.tag;
-        formattedUserMessage.content.push({
-          type: "text",
-          text: `[Reference Image - ${tagLabel}${ref.title ? `: ${ref.title}` : ""}]`,
         });
       }
       
@@ -361,11 +364,9 @@ export class Agent1 implements Agent {
           const newContent = m.content
             .map((c, pIdx) => {
               if (c.type === "image") {
-                // Convert history images to text placeholders instead of sending them
-                // Only pending images and reference images are sent to the LLM
                 return {
                   type: "text",
-                  text: "[User provided an image in this message]",
+                  text: `[User provided an image in this message | Image ID: ${c.imageId}${c.title ? ` | Title: ${c.title}` : ""}]`,
                 };
               }
               if (c.type === "internal_think") {
@@ -837,6 +838,7 @@ export class Agent1 implements Agent {
                     modelId,
                     modelName: model.name,
                     prompt: videoConfig.prompt || "",
+                    sourceImageId: typeof videoConfig.sourceImageId === "string" ? videoConfig.sourceImageId : undefined,
                     params: videoParams,
                   },
                   status: "pending",

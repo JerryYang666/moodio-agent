@@ -61,8 +61,16 @@ export default function VideoConfigCard({
   const [estimatedCost, setEstimatedCost] = useState<number | null>(null);
   const [costLoading, setCostLoading] = useState(false);
 
-  // Use the most recent source image by default
-  const selectedSourceImage = sourceImages[sourceImages.length - 1] || null;
+  // Prefer the sourceImageId specified by the agent; fall back to the most recent image
+  const selectedSourceImage = useMemo(() => {
+    if (part.config.sourceImageId) {
+      const match = sourceImages.find(
+        (img) => img.imageId === part.config.sourceImageId
+      );
+      if (match) return match;
+    }
+    return sourceImages[sourceImages.length - 1] || null;
+  }, [sourceImages, part.config.sourceImageId]);
 
   // Memoize cost params to avoid unnecessary refetches
   const costParamsKey = useMemo(() => {
@@ -216,7 +224,7 @@ export default function VideoConfigCard({
   const generateAudio = params.generate_audio !== false;
 
   return (
-    <Card className="my-3 border border-primary/20 bg-gradient-to-br from-primary/5 to-secondary/5 dark:from-primary/10 dark:to-secondary/10">
+    <Card className="my-3 border border-primary/20 bg-linear-to-br from-primary/5 to-secondary/5 dark:from-primary/10 dark:to-secondary/10">
       <CardBody className="p-3 sm:p-4 gap-3">
         {/* Header */}
         <div className="flex items-center gap-2">

@@ -58,7 +58,7 @@ export class Agent0 implements Agent {
             if (p.type === "agent_image") {
               return {
                 type: "text" as const,
-                text: `Suggestion: ${p.title}\nPrompt: ${p.prompt}`,
+                text: `[Image ID: ${p.imageId || "unknown"}] Suggestion: ${p.title}\nPrompt: ${p.prompt}`,
               };
             }
             return p;
@@ -90,16 +90,22 @@ export class Agent0 implements Agent {
     const formattedUserMessage: any = {
       role: userMessage.role,
       content: Array.isArray(userMessage.content)
-        ? userMessage.content.map((p) => {
+        ? userMessage.content.flatMap((p) => {
             if (p.type === "image") {
-              return {
-                type: "image_url",
-                image_url: {
-                  url: getSignedImageUrl(p.imageId),
+              return [
+                {
+                  type: "text" as const,
+                  text: `[Image ID: ${p.imageId}${p.title ? ` | Title: ${p.title}` : ""}]`,
                 },
-              };
+                {
+                  type: "image_url" as const,
+                  image_url: {
+                    url: getSignedImageUrl(p.imageId),
+                  },
+                },
+              ];
             }
-            return p;
+            return [p];
           })
         : userMessage.content,
     };
@@ -110,15 +116,21 @@ export class Agent0 implements Agent {
         if (Array.isArray(m.content)) {
           return {
             role: m.role,
-            content: m.content.map((c) => {
+            content: m.content.flatMap((c) => {
               if (c.type === "image")
-                return {
-                  type: "image_url",
-                  image_url: {
-                    url: getSignedImageUrl(c.imageId),
+                return [
+                  {
+                    type: "text" as const,
+                    text: `[Image ID: ${c.imageId}${c.title ? ` | Title: ${c.title}` : ""}]`,
                   },
-                };
-              return c;
+                  {
+                    type: "image_url" as const,
+                    image_url: {
+                      url: getSignedImageUrl(c.imageId),
+                    },
+                  },
+                ];
+              return [c];
             }),
           };
         }
