@@ -1967,6 +1967,16 @@ export default function ChatInterface({
               </Card>
             </div>
           )}
+        {isSending &&
+          groupedMessages.length > 0 &&
+          groupedMessages[groupedMessages.length - 1]?.type !== "user" && (
+            <div className="flex gap-3 max-w-3xl mx-auto justify-start items-center">
+              {!hideAvatars && (
+                <div className="hidden md:flex w-8 h-8 shrink-0" />
+              )}
+              <Spinner variant="dots" size="sm" className="ml-1" />
+            </div>
+          )}
         <div ref={messagesEndRef} />
       </div>
 
