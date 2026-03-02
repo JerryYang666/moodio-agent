@@ -22,6 +22,7 @@ import { useTranslations } from "next-intl";
 import { useVideo } from "@/components/video-provider";
 import { useCredits } from "@/hooks/use-credits";
 import { useGenerateVideoMutation } from "@/lib/redux/services/next-api";
+import { getViewportCenterPosition } from "@/lib/desktop/types";
 import type { MessageContentPart } from "@/lib/llm/types";
 
 type AgentVideoPart = Extract<MessageContentPart, { type: "agent_video" }>;
@@ -158,6 +159,7 @@ export default function VideoConfigCard({
       // Add video as desktop asset if on desktop page
       if (desktopId) {
         try {
+          const pos = getViewportCenterPosition();
           const assetRes = await fetch(`/api/desktop/${desktopId}/assets`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -174,8 +176,8 @@ export default function VideoConfigCard({
                     modelId: part.config.modelId,
                     chatId,
                   },
-                  posX: Math.random() * 200,
-                  posY: Math.random() * 200,
+                  posX: pos.x,
+                  posY: pos.y,
                 },
               ],
             }),

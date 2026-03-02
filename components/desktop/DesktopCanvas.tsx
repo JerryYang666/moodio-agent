@@ -30,6 +30,9 @@ interface DesktopCanvasProps {
   onAssetDelete?: (assetId: string) => void;
   onAssetBatchDelete?: (assetIds: string[]) => void;
   onOpenChat?: (chatId: string) => void;
+  onAssetOpen?: (asset: EnrichedDesktopAsset) => void;
+  onAssetClick?: (asset: EnrichedDesktopAsset) => void;
+  playingAssetId?: string | null;
   onCopyToCollection?: (asset: EnrichedDesktopAsset) => void;
   sendEvent?: (type: string, payload: Record<string, unknown>) => void;
   remoteCursors?: RemoteCursor[];
@@ -75,6 +78,8 @@ export default function DesktopCanvas({
   onAssetDelete,
   onAssetBatchDelete,
   onOpenChat,
+  onAssetClick,
+  playingAssetId,
   onCopyToCollection,
   sendEvent,
   remoteCursors,
@@ -88,6 +93,7 @@ export default function DesktopCanvas({
   const [draggingAssetId, setDraggingAssetId] = useState<string | null>(null);
   const dragOffset = useRef({ x: 0, y: 0 });
   const [dragPos, setDragPos] = useState<{ x: number; y: number } | null>(null);
+  const assetPointerDownPos = useRef<{ x: number; y: number; assetId: string } | null>(null);
 
   // Track natural image dimensions for aspect-ratio sizing
   const [naturalDims, setNaturalDims] = useState<Map<string, { w: number; h: number }>>(
@@ -303,6 +309,24 @@ export default function DesktopCanvas({
       // Finish asset drag
       if (draggingAssetId && dragPos) {
         containerRef.current?.releasePointerCapture(e.pointerId);
+
+        // Detect click: if pointer barely moved, treat as click instead of drag
+        const downPos = assetPointerDownPos.current;
+        const dx = downPos ? Math.abs(e.clientX - downPos.x) : Infinity;
+        const dy = downPos ? Math.abs(e.clientY - downPos.y) : Infinity;
+        const isClick = dx < 5 && dy < 5;
+        assetPointerDownPos.current = null;
+
+        if (isClick) {
+          const clickedAsset = assets.find((a) => a.id === draggingAssetId);
+          if (clickedAsset && onAssetClick) {
+            onAssetClick(clickedAsset);
+          }
+          setDraggingAssetId(null);
+          setDragPos(null);
+          return;
+        }
+
         if (selectedIds.has(draggingAssetId) && selectedIds.size > 1) {
           const orig = assets.find((a) => a.id === draggingAssetId);
           if (orig && onAssetBatchMove) {
@@ -328,7 +352,7 @@ export default function DesktopCanvas({
       isPanning.current = false;
       (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
     },
-    [draggingAssetId, dragPos, onAssetMove, onAssetBatchMove, assets, selectedIds, marquee, sendEvent]
+    [draggingAssetId, dragPos, onAssetMove, onAssetBatchMove, onAssetClick, assets, selectedIds, marquee, sendEvent]
   );
 
   const handleAssetPointerDown = useCallback(
@@ -371,6 +395,7 @@ export default function DesktopCanvas({
       const worldX = (e.clientX - rect.left - camera.x) / camera.zoom;
       const worldY = (e.clientY - rect.top - camera.y) / camera.zoom;
       dragOffset.current = { x: worldX - asset.posX, y: worldY - asset.posY };
+      assetPointerDownPos.current = { x: e.clientX, y: e.clientY, assetId: asset.id };
       setDraggingAssetId(asset.id);
       setDragPos({ x: asset.posX, y: asset.posY });
 
@@ -525,6 +550,8 @@ export default function DesktopCanvas({
             >
               <AssetCardContent
                 asset={asset}
+                playing={playingAssetId === asset.id}
+                onPlayToggle={onAssetClick ? () => onAssetClick(asset) : undefined}
                 onImageLoad={handleImageLoad}
               />
               {remoteSelectorsForAsset?.length && !isSelected ? (
@@ -628,16 +655,20 @@ export default function DesktopCanvas({
 
 function AssetCardContent({
   asset,
+  playing,
+  onPlayToggle,
   onImageLoad,
 }: {
   asset: EnrichedDesktopAsset;
+  playing?: boolean;
+  onPlayToggle?: () => void;
   onImageLoad: (assetId: string, naturalWidth: number, naturalHeight: number) => void;
 }) {
   switch (asset.assetType) {
     case "image":
       return <ImageAsset asset={asset} onImageLoad={onImageLoad} />;
     case "video":
-      return <VideoAsset asset={asset} onImageLoad={onImageLoad} />;
+      return <VideoAsset asset={asset} playing={playing} onPlayToggle={onPlayToggle} onImageLoad={onImageLoad} />;
     case "text":
       return <TextAsset asset={asset} />;
     case "link":

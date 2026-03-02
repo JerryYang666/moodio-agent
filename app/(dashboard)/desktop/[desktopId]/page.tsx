@@ -19,6 +19,7 @@ import { addToast } from "@heroui/toast";
 import { Tooltip } from "@heroui/tooltip";
 import { ArrowLeft, Share2, Pencil, X, Wifi, WifiOff } from "lucide-react";
 import DesktopCanvas from "@/components/desktop/DesktopCanvas";
+import type { EnrichedDesktopAsset } from "@/components/desktop/assets";
 import DesktopToolbar from "@/components/desktop/DesktopToolbar";
 import ChatSidePanel from "@/components/chat/chat-side-panel";
 import { siteConfig } from "@/config/site";
@@ -32,6 +33,7 @@ import {
   type RemoteEvent,
 } from "@/hooks/use-desktop-ws";
 import { useDesktopVideoSync } from "@/hooks/use-desktop-video-sync";
+import { setDesktopViewport, clearDesktopViewport } from "@/lib/desktop/types";
 
 const DEFAULT_CAMERA: CameraState = { x: 0, y: 0, zoom: 1 };
 const VIEWPORT_SAVE_DEBOUNCE = 2000;
@@ -109,6 +111,8 @@ export default function DesktopDetailPage({
   const cameraRef = useRef(camera);
   cameraRef.current = camera;
 
+  const canvasWrapperRef = useRef<HTMLDivElement>(null);
+
   // Share modal state
   const {
     isOpen: isShareOpen,
@@ -183,8 +187,31 @@ export default function DesktopDetailPage({
         clearTimeout(viewportSaveTimer.current);
         saveViewport(cameraRef.current);
       }
+      clearDesktopViewport();
     };
   }, [saveViewport]);
+
+  // Publish viewport state so components outside this tree (e.g. chat panel)
+  // can place assets within the user's visible area.
+  useEffect(() => {
+    const el = canvasWrapperRef.current;
+    if (!el) return;
+
+    const publish = () => {
+      const rect = el.getBoundingClientRect();
+      setDesktopViewport({
+        camera,
+        width: rect.width,
+        height: rect.height,
+      });
+    };
+
+    publish();
+
+    const observer = new ResizeObserver(publish);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [camera]);
 
   const handleAssetMove = useCallback(
     (assetId: string, posX: number, posY: number) => {
@@ -227,6 +254,24 @@ export default function DesktopDetailPage({
       router.push(`/chat/${chatId}`);
     },
     [router]
+  );
+
+  // Inline video playback state
+  const [playingAssetId, setPlayingAssetId] = useState<string | null>(null);
+
+  const handleAssetClick = useCallback(
+    (asset: EnrichedDesktopAsset) => {
+      if (asset.assetType === "video") {
+        const meta = asset.metadata as Record<string, unknown>;
+        const status = asset.generationData?.status || meta.status;
+        const hasVideo = !!asset.videoUrl || !!meta.videoId;
+        if ((status === "completed" || hasVideo)) {
+          setPlayingAssetId((prev) => (prev === asset.id ? null : asset.id));
+          return;
+        }
+      }
+    },
+    []
   );
 
   const handleSearchUser = async () => {
@@ -403,7 +448,7 @@ export default function DesktopDetailPage({
       )}
 
       {/* Canvas */}
-      <div className="flex-1 relative">
+      <div ref={canvasWrapperRef} className="flex-1 relative">
         <DesktopCanvas
           assets={assets}
           camera={camera}
@@ -414,6 +459,8 @@ export default function DesktopDetailPage({
           onAssetDelete={canEdit ? handleAssetDelete : undefined}
           onAssetBatchDelete={canEdit ? handleAssetBatchDelete : undefined}
           onOpenChat={handleOpenChat}
+          onAssetClick={handleAssetClick}
+          playingAssetId={playingAssetId}
           sendEvent={sendEvent}
           remoteCursors={remoteCursors}
           remoteSelections={remoteSelections}

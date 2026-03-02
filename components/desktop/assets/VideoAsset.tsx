@@ -1,16 +1,18 @@
 "use client";
 
+import { useRef, useCallback } from "react";
 import type { VideoAssetMeta } from "@/lib/desktop/types";
 import type { EnrichedDesktopAsset } from "./types";
-import { Play, Loader2, Clock, AlertCircle, Video } from "lucide-react";
+import { Play, Pause, Loader2, Clock, AlertCircle, Video } from "lucide-react";
 import { useVideo } from "@/components/video-provider";
 import FakeProgressBar from "@/components/video/fake-progress-bar";
 import VideoStatusOverlay from "@/components/video/video-status-overlay";
-import VideoPlayOverlay from "@/components/video/video-play-overlay";
 import type { VideoGenerationStatus } from "@/components/video-provider";
 
 interface VideoAssetProps {
   asset: EnrichedDesktopAsset;
+  playing?: boolean;
+  onPlayToggle?: () => void;
   onImageLoad: (
     assetId: string,
     naturalWidth: number,
@@ -18,22 +20,36 @@ interface VideoAssetProps {
   ) => void;
 }
 
-export default function VideoAsset({ asset, onImageLoad }: VideoAssetProps) {
+export default function VideoAsset({
+  asset,
+  playing,
+  onPlayToggle,
+  onImageLoad,
+}: VideoAssetProps) {
   const meta = asset.metadata as unknown as VideoAssetMeta;
   const src = asset.imageUrl;
+  const videoUrl = asset.videoUrl;
   const genId = meta.generationId;
   const { generationStatuses } = useVideo();
+  const videoRef = useRef<HTMLVideoElement>(null);
 
   const liveStatus = genId ? generationStatuses[genId] : undefined;
+  const canonicalStatus = asset.generationData?.status || meta.status;
   const genStatus =
-    liveStatus || asset.generationData?.status || meta.status;
+    canonicalStatus === "completed" || canonicalStatus === "failed"
+      ? canonicalStatus
+      : liveStatus || canonicalStatus;
   const isProcessing = genStatus === "pending" || genStatus === "processing";
   const isFailed = genStatus === "failed";
   const isCompleted = genStatus === "completed" || !!meta.videoId;
   const createdAt =
     asset.generationData?.createdAt || asset.addedAt?.toString();
 
-  if (!src) {
+  const handleVideoEnded = useCallback(() => {
+    onPlayToggle?.();
+  }, [onPlayToggle]);
+
+  if (!src && !videoUrl) {
     return (
       <div className="w-full h-full bg-default-200 flex flex-col items-center justify-center gap-2 p-4 relative">
         {isProcessing && (
@@ -67,10 +83,33 @@ export default function VideoAsset({ asset, onImageLoad }: VideoAssetProps) {
     );
   }
 
+  // Inline video playback for completed videos
+  if (playing && isCompleted && videoUrl) {
+    return (
+      <>
+        <video
+          ref={videoRef}
+          src={videoUrl}
+          autoPlay
+          loop={false}
+          playsInline
+          className="w-full h-full object-contain bg-black"
+          onEnded={handleVideoEnded}
+        />
+        {/* Pause button overlay */}
+        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-1">
+          <div className="w-10 h-10 rounded-full bg-black/60 flex items-center justify-center backdrop-blur-sm">
+            <Pause size={18} className="text-white" />
+          </div>
+        </div>
+      </>
+    );
+  }
+
   return (
     <>
       <img
-        src={src}
+        src={src!}
         alt={meta.title || "Video"}
         draggable={false}
         className="w-full h-full object-contain"
@@ -116,10 +155,11 @@ export default function VideoAsset({ asset, onImageLoad }: VideoAssetProps) {
 
       {/* Play button overlay on hover — completed only */}
       {isCompleted && (
-        <VideoPlayOverlay
-          iconSize={18}
-          className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-1"
-        />
+        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-1">
+          <div className="w-10 h-10 rounded-full bg-black/60 flex items-center justify-center backdrop-blur-sm">
+            <Play size={18} className="text-white" fill="white" />
+          </div>
+        </div>
       )}
 
       {/* Title on hover */}

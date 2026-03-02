@@ -62,6 +62,7 @@ export function useDesktopVideoSync({
       const genId = meta.generationId;
       if (!genId) continue;
       const status = asset.generationData?.status || meta.status;
+      if (status === "completed" || status === "failed") continue;
       if (status === "pending" || status === "processing") {
         pending.push({ generationId: genId, assetId: asset.id });
       }

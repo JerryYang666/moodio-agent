@@ -85,3 +85,58 @@ export function validateAssetMetadata(
 
   return { valid: true, assetType: assetType as SupportedAssetType };
 }
+
+// ---------------------------------------------------------------------------
+// Desktop viewport helpers
+// ---------------------------------------------------------------------------
+
+export interface DesktopViewport {
+  camera: { x: number; y: number; zoom: number };
+  /** Canvas container width in CSS pixels */
+  width: number;
+  /** Canvas container height in CSS pixels */
+  height: number;
+}
+
+declare global {
+  interface Window {
+    __desktopViewport?: DesktopViewport;
+  }
+}
+
+/**
+ * Store the current desktop viewport on `window` so that components outside
+ * the React tree (e.g. the chat panel) can read it synchronously.
+ */
+export function setDesktopViewport(viewport: DesktopViewport) {
+  if (typeof window !== "undefined") {
+    window.__desktopViewport = viewport;
+  }
+}
+
+export function clearDesktopViewport() {
+  if (typeof window !== "undefined") {
+    delete window.__desktopViewport;
+  }
+}
+
+/**
+ * Compute a world-coordinate position that falls within the user's current
+ * visible viewport with some random scatter so assets don't stack exactly.
+ */
+export function getViewportCenterPosition(): { x: number; y: number } {
+  const vp = typeof window !== "undefined" ? window.__desktopViewport : undefined;
+  if (!vp) {
+    return { x: Math.random() * 200, y: Math.random() * 200 };
+  }
+
+  const { camera, width, height } = vp;
+  const centerX = (-camera.x + width / 2) / camera.zoom;
+  const centerY = (-camera.y + height / 2) / camera.zoom;
+
+  const scatter = 80;
+  return {
+    x: centerX + (Math.random() - 0.5) * scatter,
+    y: centerY + (Math.random() - 0.5) * scatter,
+  };
+}

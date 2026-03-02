@@ -92,10 +92,11 @@ export function VideoProvider({ children }: { children: React.ReactNode }) {
       ...prev,
       [generationId]: "processing",
     }));
-    setGenerationStatuses((prev) => ({
-      ...prev,
-      [generationId]: "processing",
-    }));
+    setGenerationStatuses((prev) => {
+      const existing = prev[generationId];
+      if (existing === "completed" || existing === "failed") return prev;
+      return { ...prev, [generationId]: "processing" };
+    });
   }, []);
 
   const cancelMonitorGeneration = useCallback((generationId: string) => {
