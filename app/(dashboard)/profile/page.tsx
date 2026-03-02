@@ -8,7 +8,7 @@ import { Button } from "@heroui/button";
 import { Card, CardBody, CardHeader } from "@heroui/card";
 import { useAuth } from "@/hooks/use-auth";
 import { startRegistration } from "@simplewebauthn/browser";
-import { Key, Lock } from "lucide-react";
+import { Key, Lock, Eye, EyeOff } from "lucide-react";
 import { addToast } from "@heroui/toast";
 import { siteConfig } from "@/config/site";
 
@@ -31,6 +31,8 @@ export default function ProfilePage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordLoading, setPasswordLoading] = useState(false);
   const [passwordError, setPasswordError] = useState("");
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const OTP_LENGTH = siteConfig.auth.otp.length;
 
@@ -206,6 +208,8 @@ export default function ProfilePage() {
     setNewPassword("");
     setConfirmPassword("");
     setPasswordError("");
+    setShowNewPassword(false);
+    setShowConfirmPassword(false);
   };
 
   return (
@@ -353,21 +357,55 @@ export default function ProfilePage() {
                 </div>
 
                 <Input
-                  type="password"
+                  type={showNewPassword ? "text" : "password"}
                   label={t("profile.newPassword")}
                   value={newPassword}
                   onValueChange={setNewPassword}
                   variant="bordered"
                   isDisabled={passwordLoading}
+                  endContent={
+                    <button
+                      type="button"
+                      className="focus:outline-none"
+                      onMouseDown={() => setShowNewPassword(true)}
+                      onMouseUp={() => setShowNewPassword(false)}
+                      onMouseLeave={() => setShowNewPassword(false)}
+                      onTouchStart={() => setShowNewPassword(true)}
+                      onTouchEnd={() => setShowNewPassword(false)}
+                    >
+                      {showNewPassword ? (
+                        <EyeOff size={18} className="text-default-400" />
+                      ) : (
+                        <Eye size={18} className="text-default-400" />
+                      )}
+                    </button>
+                  }
                 />
 
                 <Input
-                  type="password"
+                  type={showConfirmPassword ? "text" : "password"}
                   label={t("profile.confirmPassword")}
                   value={confirmPassword}
                   onValueChange={setConfirmPassword}
                   variant="bordered"
                   isDisabled={passwordLoading}
+                  endContent={
+                    <button
+                      type="button"
+                      className="focus:outline-none"
+                      onMouseDown={() => setShowConfirmPassword(true)}
+                      onMouseUp={() => setShowConfirmPassword(false)}
+                      onMouseLeave={() => setShowConfirmPassword(false)}
+                      onTouchStart={() => setShowConfirmPassword(true)}
+                      onTouchEnd={() => setShowConfirmPassword(false)}
+                    >
+                      {showConfirmPassword ? (
+                        <EyeOff size={18} className="text-default-400" />
+                      ) : (
+                        <Eye size={18} className="text-default-400" />
+                      )}
+                    </button>
+                  }
                 />
 
                 <div className="flex gap-2 justify-end">

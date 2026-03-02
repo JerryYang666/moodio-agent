@@ -8,7 +8,7 @@ import { Button } from "@heroui/button";
 import { Card } from "@heroui/card";
 import { siteConfig } from "@/config/site";
 import { startAuthentication } from "@simplewebauthn/browser";
-import { Key, Lock } from "lucide-react";
+import { Key, Lock, Eye, EyeOff } from "lucide-react";
 import { LanguageSwitch } from "@/components/language-switch";
 
 export default function LoginPage() {
@@ -17,6 +17,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [otp, setOtp] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [passkeyLoading, setPasskeyLoading] = useState(false);
   const [error, setError] = useState("");
@@ -267,7 +268,7 @@ export default function LoginPage() {
                 />
 
                 <Input
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   label={t("auth.password")}
                   placeholder={t("auth.passwordPlaceholder")}
                   value={password}
@@ -276,6 +277,23 @@ export default function LoginPage() {
                   size="lg"
                   isDisabled={loading}
                   autoFocus
+                  endContent={
+                    <button
+                      type="button"
+                      className="focus:outline-none"
+                      onMouseDown={() => setShowPassword(true)}
+                      onMouseUp={() => setShowPassword(false)}
+                      onMouseLeave={() => setShowPassword(false)}
+                      onTouchStart={() => setShowPassword(true)}
+                      onTouchEnd={() => setShowPassword(false)}
+                    >
+                      {showPassword ? (
+                        <EyeOff size={20} className="text-default-400" />
+                      ) : (
+                        <Eye size={20} className="text-default-400" />
+                      )}
+                    </button>
+                  }
                 />
 
                 <Button
