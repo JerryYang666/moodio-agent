@@ -13,6 +13,7 @@ import {
   FolderPlus,
   MousePointer2,
   SendHorizontal,
+  Film,
 } from "lucide-react";
 
 const MIN_ZOOM = 0.1;
@@ -38,6 +39,7 @@ interface DesktopCanvasProps {
   onAssetClick?: (asset: EnrichedDesktopAsset) => void;
   playingAssetId?: string | null;
   onCopyToCollection?: (asset: EnrichedDesktopAsset) => void;
+  onSendToTimeline?: (asset: EnrichedDesktopAsset) => void;
   sendEvent?: (type: string, payload: Record<string, unknown>) => void;
   remoteCursors?: RemoteCursor[];
   remoteSelections?: Map<string, { sessionId: string; userId: string; firstName: string }[]>;
@@ -94,6 +96,7 @@ export default function DesktopCanvas({
   onAssetClick,
   playingAssetId,
   onCopyToCollection,
+  onSendToTimeline,
   sendEvent,
   remoteCursors,
   remoteSelections,
@@ -838,6 +841,18 @@ export default function DesktopCanvas({
             >
               <FolderPlus size={14} />
               Copy to Collection
+            </button>
+          )}
+          {contextAsset?.assetType === "video" && onSendToTimeline && (
+            <button
+              className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-default-100 transition-colors text-left"
+              onClick={() => {
+                onSendToTimeline(contextAsset);
+                setContextMenu(null);
+              }}
+            >
+              <Film size={14} />
+              Send to Timeline
             </button>
           )}
           <button
