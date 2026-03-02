@@ -302,8 +302,10 @@ export default function DesktopDetailPage({
 
   const handleAssetDelete = useCallback(
     (assetId: string) => {
-      removeAsset(assetId);
       sendEvent("asset_removed", { assetId });
+      removeAsset(assetId).catch((e) =>
+        console.error("Failed to delete asset:", e)
+      );
     },
     [removeAsset, sendEvent]
   );
@@ -321,8 +323,10 @@ export default function DesktopDetailPage({
   const handleAssetBatchDelete = useCallback(
     (assetIds: string[]) => {
       for (const id of assetIds) {
-        removeAsset(id);
         sendEvent("asset_removed", { assetId: id });
+        removeAsset(id).catch((e) =>
+          console.error("Failed to delete asset:", e)
+        );
       }
     },
     [removeAsset, sendEvent]
@@ -340,9 +344,15 @@ export default function DesktopDetailPage({
 
   const handleOpenChat = useCallback(
     (chatId: string) => {
-      router.push(`/chat/${chatId}`);
+      // Open the chat in the side panel instead of navigating away
+      if (isChatPanelCollapsed) {
+        handleChatPanelCollapseChange(false);
+      }
+      window.dispatchEvent(
+        new CustomEvent("open-chat-in-panel", { detail: { chatId } })
+      );
     },
-    [router]
+    [isChatPanelCollapsed, handleChatPanelCollapseChange]
   );
 
   // Inline video playback state

@@ -104,6 +104,22 @@ export default function ChatSidePanel({
     return () => window.removeEventListener("storage", handleStorage);
   }, []);
 
+  // Listen for programmatic "open this chat" requests from the same window
+  useEffect(() => {
+    const handleOpenChat = (e: Event) => {
+      const chatId = (e as CustomEvent).detail?.chatId;
+      if (chatId && typeof chatId === "string") {
+        setActiveChatId(chatId);
+        setInitialMessages([]);
+        setChatSessionKey(chatId);
+        localStorage.setItem(siteConfig.activeChatId, chatId);
+      }
+    };
+
+    window.addEventListener("open-chat-in-panel", handleOpenChat);
+    return () => window.removeEventListener("open-chat-in-panel", handleOpenChat);
+  }, []);
+
   // Fetch chat messages when activeChatId changes
   useEffect(() => {
     const fetchChat = async () => {
