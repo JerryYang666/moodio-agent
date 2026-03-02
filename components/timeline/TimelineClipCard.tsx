@@ -1,18 +1,21 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useRef } from "react";
 import { GripVertical, X, Film, Music } from "lucide-react";
 import type { TimelineClip } from "./types";
+
+export type DropSide = "before" | "after";
 
 interface TimelineClipCardProps {
   clip: TimelineClip;
   index: number;
   variant: "video" | "audio";
   isActive?: boolean;
+  isDragging?: boolean;
   onRemove: (clipId: string) => void;
   onClick: (index: number) => void;
   onDragStart: (index: number) => void;
-  onDragOver: (index: number) => void;
+  onDragOver: (index: number, side: DropSide) => void;
   onDragEnd: () => void;
 }
 
@@ -29,12 +32,15 @@ export default function TimelineClipCard({
   index,
   variant,
   isActive,
+  isDragging,
   onRemove,
   onClick,
   onDragStart,
   onDragOver,
   onDragEnd,
 }: TimelineClipCardProps) {
+  const cardRef = useRef<HTMLDivElement>(null);
+
   const handleDragStart = useCallback(
     (e: React.DragEvent) => {
       e.dataTransfer.effectAllowed = "move";
@@ -48,7 +54,11 @@ export default function TimelineClipCard({
     (e: React.DragEvent) => {
       e.preventDefault();
       e.dataTransfer.dropEffect = "move";
-      onDragOver(index);
+      const rect = cardRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const midX = rect.left + rect.width / 2;
+      const side: DropSide = e.clientX < midX ? "before" : "after";
+      onDragOver(index, side);
     },
     [index, onDragOver]
   );
@@ -56,19 +66,21 @@ export default function TimelineClipCard({
   const isVideo = variant === "video";
   const Icon = isVideo ? Film : Music;
 
-  // Width proportional to duration, with a minimum width
   const minWidth = 120;
   const pxPerSecond = 30;
   const width = Math.max(minWidth, (clip.duration || 4) * pxPerSecond);
 
   return (
     <div
+      ref={cardRef}
       draggable
       onClick={() => onClick(index)}
       onDragStart={handleDragStart}
       onDragOver={handleDragOver}
       onDragEnd={onDragEnd}
       className={`relative shrink-0 h-full rounded-lg border overflow-hidden cursor-pointer active:cursor-grabbing select-none group/clip transition-all ${
+        isDragging ? "opacity-30" : ""
+      } ${
         isActive
           ? "border-primary ring-1 ring-primary"
           : isVideo

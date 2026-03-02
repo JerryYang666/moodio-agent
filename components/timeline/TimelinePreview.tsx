@@ -40,6 +40,9 @@ export default function TimelinePreview({
   const frontRef = frontSlot === "A" ? videoARef : videoBRef;
   const backRef = frontSlot === "A" ? videoBRef : videoARef;
 
+  // Flag to distinguish auto-advance (onEnded) from manual clip changes
+  const autoAdvancingRef = useRef(false);
+
   // ---- Keep the back buffer preloaded with the next clip ----
   useEffect(() => {
     const back = backRef.current;
@@ -57,10 +60,15 @@ export default function TimelinePreview({
     if (prevIndexRef.current === activeClipIndex) return;
     prevIndexRef.current = activeClipIndex;
 
+    // Skip reset when the advance came from handleVideoEnded
+    if (autoAdvancingRef.current) {
+      autoAdvancingRef.current = false;
+      return;
+    }
+
     const front = frontRef.current;
     if (!front) return;
 
-    // Stop current playback so the button resets to "play"
     front.pause();
     setIsPlaying(false);
 
@@ -80,13 +88,13 @@ export default function TimelinePreview({
       return;
     }
 
-    // The back buffer already has the next clip loaded — swap it to front
     const back = backRef.current;
     if (back) {
       back.currentTime = 0;
       back.play().catch(() => {});
     }
 
+    autoAdvancingRef.current = true;
     setFrontSlot((prev) => (prev === "A" ? "B" : "A"));
     onActiveClipChange(activeClipIndex + 1);
   }, [activeClipIndex, clips.length, onActiveClipChange, backRef]);
