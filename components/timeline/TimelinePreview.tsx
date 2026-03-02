@@ -60,6 +60,10 @@ export default function TimelinePreview({
     const front = frontRef.current;
     if (!front) return;
 
+    // Stop current playback so the button resets to "play"
+    front.pause();
+    setIsPlaying(false);
+
     const url = activeClip?.videoUrl ?? "";
     if (front.src !== url) {
       front.src = url;
@@ -104,16 +108,18 @@ export default function TimelinePreview({
   }, [isPlaying, activeClip?.videoUrl, frontRef]);
 
   const handlePrev = useCallback(() => {
-    if (activeClipIndex > 0) {
-      onActiveClipChange(activeClipIndex - 1);
-    }
-  }, [activeClipIndex, onActiveClipChange]);
+    if (activeClipIndex <= 0) return;
+    frontRef.current?.pause();
+    setIsPlaying(false);
+    onActiveClipChange(activeClipIndex - 1);
+  }, [activeClipIndex, onActiveClipChange, frontRef]);
 
   const handleNext = useCallback(() => {
-    if (activeClipIndex < clips.length - 1) {
-      onActiveClipChange(activeClipIndex + 1);
-    }
-  }, [activeClipIndex, clips.length, onActiveClipChange]);
+    if (activeClipIndex >= clips.length - 1) return;
+    frontRef.current?.pause();
+    setIsPlaying(false);
+    onActiveClipChange(activeClipIndex + 1);
+  }, [activeClipIndex, clips.length, onActiveClipChange, frontRef]);
 
   const formatTime = (seconds: number): string => {
     const m = Math.floor(seconds / 60);
@@ -129,13 +135,6 @@ export default function TimelinePreview({
     );
   }
 
-  // Shared props for both video elements
-  const sharedVideoProps = {
-    playsInline: true,
-    onPlay: () => setIsPlaying(true),
-    onPause: () => setIsPlaying(false),
-  } as const;
-
   return (
     <div className="flex flex-col h-full">
       {/* Video display — two overlapping <video> elements */}
@@ -148,7 +147,9 @@ export default function TimelinePreview({
           }`}
           onEnded={frontSlot === "A" ? handleVideoEnded : undefined}
           onTimeUpdate={frontSlot === "A" ? handleTimeUpdate : undefined}
-          {...sharedVideoProps}
+          onPlay={frontSlot === "A" ? () => setIsPlaying(true) : undefined}
+          onPause={frontSlot === "A" ? () => setIsPlaying(false) : undefined}
+          playsInline
         />
         <video
           ref={videoBRef}
@@ -158,7 +159,9 @@ export default function TimelinePreview({
           }`}
           onEnded={frontSlot === "B" ? handleVideoEnded : undefined}
           onTimeUpdate={frontSlot === "B" ? handleTimeUpdate : undefined}
-          {...sharedVideoProps}
+          onPlay={frontSlot === "B" ? () => setIsPlaying(true) : undefined}
+          onPause={frontSlot === "B" ? () => setIsPlaying(false) : undefined}
+          playsInline
         />
 
         {/* Fallback when no video URL */}

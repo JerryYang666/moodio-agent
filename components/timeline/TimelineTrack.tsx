@@ -10,6 +10,7 @@ interface TimelineTrackProps {
   clips: TimelineClip[];
   activeClipId: string | null;
   onRemoveClip: (clipId: string) => void;
+  onClipClick: (index: number) => void;
   onReorder: (fromIndex: number, toIndex: number) => void;
 }
 
@@ -19,6 +20,7 @@ export default function TimelineTrack({
   clips,
   activeClipId,
   onRemoveClip,
+  onClipClick,
   onReorder,
 }: TimelineTrackProps) {
   const [dragIndex, setDragIndex] = useState<number | null>(null);
@@ -77,6 +79,7 @@ export default function TimelineTrack({
               variant={variant}
               isActive={clip.id === activeClipId}
               onRemove={onRemoveClip}
+              onClick={onClipClick}
               onDragStart={handleDragStart}
               onDragOver={handleDragOver}
               onDragEnd={handleDragEnd}

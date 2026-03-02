@@ -10,6 +10,7 @@ interface TimelineClipCardProps {
   variant: "video" | "audio";
   isActive?: boolean;
   onRemove: (clipId: string) => void;
+  onClick: (index: number) => void;
   onDragStart: (index: number) => void;
   onDragOver: (index: number) => void;
   onDragEnd: () => void;
@@ -29,6 +30,7 @@ export default function TimelineClipCard({
   variant,
   isActive,
   onRemove,
+  onClick,
   onDragStart,
   onDragOver,
   onDragEnd,
@@ -62,10 +64,11 @@ export default function TimelineClipCard({
   return (
     <div
       draggable
+      onClick={() => onClick(index)}
       onDragStart={handleDragStart}
       onDragOver={handleDragOver}
       onDragEnd={onDragEnd}
-      className={`relative flex-shrink-0 h-full rounded-lg border overflow-hidden cursor-grab active:cursor-grabbing select-none group/clip transition-all ${
+      className={`relative flex-shrink-0 h-full rounded-lg border overflow-hidden cursor-pointer active:cursor-grabbing select-none group/clip transition-all ${
         isActive
           ? "border-primary ring-1 ring-primary"
           : isVideo

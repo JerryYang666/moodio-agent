@@ -127,6 +127,7 @@ export default function TimelinePanel({
                 clips={clips}
                 activeClipId={activeClipId}
                 onRemoveClip={onRemoveClip}
+                onClipClick={handleActiveClipChange}
                 onReorder={onReorderClips}
               />
             </div>
@@ -139,6 +140,7 @@ export default function TimelinePanel({
                 clips={clips}
                 activeClipId={activeClipId}
                 onRemoveClip={onRemoveClip}
+                onClipClick={handleActiveClipChange}
                 onReorder={onReorderClips}
               />
             </div>
