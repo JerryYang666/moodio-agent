@@ -328,6 +328,16 @@ export default function DesktopDetailPage({
     [removeAsset, sendEvent]
   );
 
+  const handleCellCommit = useCallback(
+    (assetId: string, rowId: string, colIndex: number, value: string) => {
+      applyRemoteEvent({
+        type: "cell_updated",
+        payload: { assetId, rowId, colIndex, value },
+      });
+    },
+    [applyRemoteEvent]
+  );
+
   const handleOpenChat = useCallback(
     (chatId: string) => {
       router.push(`/chat/${chatId}`);
@@ -546,6 +556,7 @@ export default function DesktopDetailPage({
           remoteSelections={remoteSelections}
           currentUserId={user?.id}
           cellLocks={cellLocks}
+          onCellCommit={handleCellCommit}
         />
         <DesktopToolbar
           camera={camera}

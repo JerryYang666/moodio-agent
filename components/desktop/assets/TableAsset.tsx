@@ -17,19 +17,25 @@ interface TableAssetProps {
   sendEvent?: (type: string, payload: Record<string, unknown>) => void;
   cellLocks?: Map<string, CellLock>;
   currentUserId?: string;
+  onCellCommit?: (assetId: string, rowId: string, colIndex: number, value: string) => void;
 }
 
 function cellKey(rowId: string, colIndex: number) {
   return `${rowId}-${colIndex}`;
 }
 
-export default function TableAsset({ asset, sendEvent, cellLocks, currentUserId }: TableAssetProps) {
+const TYPING_BROADCAST_INTERVAL_MS = 100;
+
+export default function TableAsset({ asset, sendEvent, cellLocks, currentUserId, onCellCommit }: TableAssetProps) {
   const meta = asset.metadata as unknown as TableAssetMeta;
   const isStreaming = meta.status === "streaming";
 
   const [editingCell, setEditingCell] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
+  const [localCellOverride, setLocalCellOverride] = useState<{ key: string; value: string } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const lastBroadcast = useRef(0);
+  const pendingBroadcast = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (editingCell && inputRef.current) {
@@ -37,8 +43,16 @@ export default function TableAsset({ asset, sendEvent, cellLocks, currentUserId 
     }
   }, [editingCell]);
 
+  // Cleanup pending broadcast on unmount
+  useEffect(() => {
+    return () => {
+      if (pendingBroadcast.current) clearTimeout(pendingBroadcast.current);
+    };
+  }, []);
+
   const handleCellClick = useCallback(
-    (rowId: string, colIndex: number) => {
+    (rowId: string, colIndex: number, e: React.MouseEvent) => {
+      e.stopPropagation();
       if (isStreaming) return;
 
       const key = cellKey(rowId, colIndex);
@@ -47,11 +61,9 @@ export default function TableAsset({ asset, sendEvent, cellLocks, currentUserId 
 
       if (editingCell === key) return;
 
-      // Deselect previous cell
+      // Commit previous cell first
       if (editingCell) {
-        const [prevRowId, prevColStr] = editingCell.split("-");
-        const prevCol = parseInt(prevColStr, 10);
-        sendEvent?.("cell_deselected", { assetId: asset.id, rowId: prevRowId, colIndex: prevCol });
+        commitEditForCell(editingCell);
       }
 
       const row = meta.rows.find((r) => r.id === rowId);
@@ -59,47 +71,107 @@ export default function TableAsset({ asset, sendEvent, cellLocks, currentUserId 
 
       setEditingCell(key);
       setEditValue(cellValue);
+      setLocalCellOverride(null);
       sendEvent?.("cell_selected", { assetId: asset.id, rowId, colIndex });
     },
-    [isStreaming, editingCell, cellLocks, currentUserId, sendEvent, asset.id, meta.rows]
+    [isStreaming, editingCell, cellLocks, currentUserId, sendEvent, asset.id, meta.rows] // eslint-disable-line react-hooks/exhaustive-deps
+  );
+
+  const commitEditForCell = useCallback(
+    (cellKeyStr: string, value?: string) => {
+      // Flush any pending typing broadcast
+      if (pendingBroadcast.current) {
+        clearTimeout(pendingBroadcast.current);
+        pendingBroadcast.current = null;
+      }
+
+      const dashIdx = cellKeyStr.lastIndexOf("-");
+      const rowId = cellKeyStr.substring(0, dashIdx);
+      const colIndex = parseInt(cellKeyStr.substring(dashIdx + 1), 10);
+      const finalValue = value ?? editValue;
+
+      const row = meta.rows.find((r) => r.id === rowId);
+      const oldValue = row?.cells[colIndex]?.value ?? "";
+
+      if (finalValue !== oldValue) {
+        fetch(`/api/desktop/${asset.desktopId}/assets/${asset.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ cellPatch: { rowId, colIndex, value: finalValue } }),
+        }).catch((e) => console.error("Failed to patch cell:", e));
+
+        sendEvent?.("cell_updated", { assetId: asset.id, rowId, colIndex, value: finalValue });
+        onCellCommit?.(asset.id, rowId, colIndex, finalValue);
+      }
+
+      sendEvent?.("cell_deselected", { assetId: asset.id, rowId, colIndex });
+      setLocalCellOverride({ key: cellKeyStr, value: finalValue });
+    },
+    [editValue, meta.rows, asset.id, asset.desktopId, sendEvent, onCellCommit]
   );
 
   const commitEdit = useCallback(() => {
     if (!editingCell) return;
-
-    const [rowId, colStr] = editingCell.split("-");
-    const colIndex = parseInt(colStr, 10);
-
-    const row = meta.rows.find((r) => r.id === rowId);
-    const oldValue = row?.cells[colIndex]?.value ?? "";
-
-    if (editValue !== oldValue) {
-      // Persist via cell patch API
-      fetch(`/api/desktop/${asset.desktopId}/assets/${asset.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cellPatch: { rowId, colIndex, value: editValue } }),
-      }).catch((e) => console.error("Failed to patch cell:", e));
-
-      sendEvent?.("cell_updated", { assetId: asset.id, rowId, colIndex, value: editValue });
-    }
-
-    sendEvent?.("cell_deselected", { assetId: asset.id, rowId, colIndex });
+    commitEditForCell(editingCell);
     setEditingCell(null);
-  }, [editingCell, editValue, meta.rows, asset.id, asset.desktopId, sendEvent]);
+  }, [editingCell, commitEditForCell]);
+
+  const broadcastTyping = useCallback(
+    (rowId: string, colIndex: number, value: string) => {
+      const now = Date.now();
+      const send = () => {
+        sendEvent?.("cell_updated", { assetId: asset.id, rowId, colIndex, value });
+        lastBroadcast.current = Date.now();
+      };
+
+      if (pendingBroadcast.current) {
+        clearTimeout(pendingBroadcast.current);
+        pendingBroadcast.current = null;
+      }
+
+      if (now - lastBroadcast.current >= TYPING_BROADCAST_INTERVAL_MS) {
+        send();
+      } else {
+        pendingBroadcast.current = setTimeout(send, TYPING_BROADCAST_INTERVAL_MS);
+      }
+    },
+    [sendEvent, asset.id]
+  );
+
+  const handleInputChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const newValue = e.target.value;
+      setEditValue(newValue);
+
+      if (editingCell) {
+        const dashIdx = editingCell.lastIndexOf("-");
+        const rowId = editingCell.substring(0, dashIdx);
+        const colIndex = parseInt(editingCell.substring(dashIdx + 1), 10);
+        broadcastTyping(rowId, colIndex, newValue);
+      }
+    },
+    [editingCell, broadcastTyping]
+  );
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
+      e.stopPropagation();
       if (e.key === "Enter" || e.key === "Tab") {
         e.preventDefault();
         commitEdit();
       } else if (e.key === "Escape") {
+        if (pendingBroadcast.current) {
+          clearTimeout(pendingBroadcast.current);
+          pendingBroadcast.current = null;
+        }
         if (editingCell) {
-          const [rowId, colStr] = editingCell.split("-");
-          const colIndex = parseInt(colStr, 10);
+          const dashIdx = editingCell.lastIndexOf("-");
+          const rowId = editingCell.substring(0, dashIdx);
+          const colIndex = parseInt(editingCell.substring(dashIdx + 1), 10);
           sendEvent?.("cell_deselected", { assetId: asset.id, rowId, colIndex });
         }
         setEditingCell(null);
+        setLocalCellOverride(null);
       }
     },
     [commitEdit, editingCell, sendEvent, asset.id]
@@ -116,11 +188,8 @@ export default function TableAsset({ asset, sendEvent, cellLocks, currentUserId 
   }
 
   return (
-    <div
-      className="w-full h-full overflow-auto bg-background"
-      onPointerDown={(e) => e.stopPropagation()}
-    >
-      {/* Title bar */}
+    <div className="w-full h-full overflow-auto bg-background">
+      {/* Title bar -- does NOT stopPropagation so canvas drag still works */}
       <div className="sticky top-0 z-10 flex items-center gap-2 px-3 py-2 bg-secondary/5 border-b border-divider">
         <Clapperboard size={14} className="text-secondary shrink-0" />
         <span className="text-xs font-semibold text-default-700 truncate">
@@ -131,8 +200,11 @@ export default function TableAsset({ asset, sendEvent, cellLocks, currentUserId 
         </span>
       </div>
 
-      {/* Table */}
-      <table className="w-full text-[11px] border-collapse">
+      {/* Table -- stopPropagation only on the table so cell clicks don't trigger canvas drag */}
+      <table
+        className="w-full text-[11px] border-collapse"
+        onPointerDown={(e) => e.stopPropagation()}
+      >
         <thead>
           <tr>
             {meta.columns.map((col, i) => (
@@ -153,6 +225,13 @@ export default function TableAsset({ asset, sendEvent, cellLocks, currentUserId 
                 const isEditing = editingCell === key;
                 const lock = cellLocks?.get(key);
                 const isLockedByOther = lock && lock.userId !== currentUserId;
+                const isLockedByMe = lock && lock.userId === currentUserId;
+
+                // Show local override if we just committed this cell
+                const displayValue =
+                  localCellOverride?.key === key
+                    ? localCellOverride.value
+                    : cell.value;
 
                 return (
                   <td
@@ -161,28 +240,31 @@ export default function TableAsset({ asset, sendEvent, cellLocks, currentUserId 
                     style={
                       isLockedByOther
                         ? { boxShadow: `inset 0 0 0 2px hsl(${hashToHue(lock.userId)}, 70%, 60%)` }
-                        : isEditing
+                        : isEditing || isLockedByMe
                           ? { boxShadow: "inset 0 0 0 2px hsl(var(--heroui-primary))" }
                           : undefined
                     }
-                    onClick={() => handleCellClick(row.id, ci)}
+                    onClick={(e) => handleCellClick(row.id, ci, e)}
                   >
                     {isEditing ? (
                       <input
                         ref={inputRef}
                         className="w-full bg-transparent outline-none text-[11px] text-foreground"
                         value={editValue}
-                        onChange={(e) => setEditValue(e.target.value)}
+                        onChange={handleInputChange}
                         onBlur={commitEdit}
                         onKeyDown={handleKeyDown}
                       />
                     ) : (
                       <span className="text-default-700 whitespace-pre-wrap wrap-break-word">
-                        {cell.value}
+                        {displayValue}
                       </span>
                     )}
                     {isLockedByOther && (
-                      <span className="absolute -top-3 left-1 text-[9px] px-1 rounded bg-default-200 text-default-600 whitespace-nowrap">
+                      <span
+                        className="absolute -top-3 left-1 text-[9px] px-1 rounded text-white whitespace-nowrap"
+                        style={{ backgroundColor: `hsl(${hashToHue(lock.userId)}, 70%, 50%)` }}
+                      >
                         {lock.firstName}
                       </span>
                     )}

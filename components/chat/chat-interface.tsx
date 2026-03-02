@@ -1396,8 +1396,19 @@ export default function ChatInterface({
                 currentContent[0] = { type: "text", text: event.content };
               }
             } else if (event.type === "part") {
-              // Add new part
-              currentContent.push(event.part);
+              // If this is a completed shot list, replace the streaming placeholder
+              if (event.part.type === "agent_shot_list" && event.part.status === "complete") {
+                const placeholderIdx = currentContent.findIndex(
+                  (p) => p.type === "agent_shot_list" && (p as any).status === "streaming"
+                );
+                if (placeholderIdx !== -1) {
+                  currentContent[placeholderIdx] = event.part;
+                } else {
+                  currentContent.push(event.part);
+                }
+              } else {
+                currentContent.push(event.part);
+              }
 
               // Auto-create desktop asset for shot lists
               if (event.part.type === "agent_shot_list" && desktopId) {

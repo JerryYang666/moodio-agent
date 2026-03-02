@@ -163,6 +163,8 @@ export function useDesktopWebSocket({
             next.delete(info.sessionId);
             return next;
           });
+          // Forward to onRemoteEvent so page can clean up cell locks, etc.
+          onRemoteEventRef.current?.(data);
           return;
         }
 

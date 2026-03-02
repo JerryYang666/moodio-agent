@@ -42,6 +42,7 @@ interface DesktopCanvasProps {
   remoteSelections?: Map<string, { sessionId: string; userId: string; firstName: string }[]>;
   currentUserId?: string;
   cellLocks?: Map<string, { userId: string; sessionId: string; firstName: string }>;
+  onCellCommit?: (assetId: string, rowId: string, colIndex: number, value: string) => void;
 }
 
 interface ContextMenuState {
@@ -97,6 +98,7 @@ export default function DesktopCanvas({
   remoteSelections,
   currentUserId,
   cellLocks,
+  onCellCommit,
 }: DesktopCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const isPanning = useRef(false);
@@ -668,6 +670,7 @@ export default function DesktopCanvas({
                 sendEvent={sendEvent}
                 cellLocks={cellLocks}
                 currentUserId={currentUserId}
+                onCellCommit={onCellCommit}
               />
               </div>
               {/* Resize handles — visible when selected */}
@@ -830,6 +833,7 @@ function AssetCardContent({
   sendEvent,
   cellLocks,
   currentUserId,
+  onCellCommit,
 }: {
   asset: EnrichedDesktopAsset;
   playing?: boolean;
@@ -838,6 +842,7 @@ function AssetCardContent({
   sendEvent?: (type: string, payload: Record<string, unknown>) => void;
   cellLocks?: Map<string, { userId: string; sessionId: string; firstName: string }>;
   currentUserId?: string;
+  onCellCommit?: (assetId: string, rowId: string, colIndex: number, value: string) => void;
 }) {
   switch (asset.assetType) {
     case "image":
@@ -858,7 +863,7 @@ function AssetCardContent({
           }
         });
       }
-      return <TableAsset asset={asset} sendEvent={sendEvent} cellLocks={assetCellLocks} currentUserId={currentUserId} />;
+      return <TableAsset asset={asset} sendEvent={sendEvent} cellLocks={assetCellLocks} currentUserId={currentUserId} onCellCommit={onCellCommit} />;
     }
     default:
       return (
