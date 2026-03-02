@@ -10,63 +10,98 @@ interface TimelinePreviewProps {
   onActiveClipChange: (index: number) => void;
 }
 
+/**
+ * Double-buffered video preview for gapless sequential playback.
+ *
+ * Two <video> elements alternate roles:
+ *   - "front"  → visible, currently playing
+ *   - "back"   → hidden, preloading the next clip
+ *
+ * When the front video ends we instantly swap: the back becomes front
+ * (already loaded & ready to play) and the old front begins preloading
+ * the clip after that.
+ */
 export default function TimelinePreview({
   clips,
   activeClipIndex,
   onActiveClipChange,
 }: TimelinePreviewProps) {
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const videoARef = useRef<HTMLVideoElement>(null);
+  const videoBRef = useRef<HTMLVideoElement>(null);
+
+  // Which ref is currently the "front" (visible) player
+  const [frontSlot, setFrontSlot] = useState<"A" | "B">("A");
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
 
   const activeClip = clips[activeClipIndex] ?? null;
+  const nextClip = clips[activeClipIndex + 1] ?? null;
 
-  // When active clip changes, reset playback position
+  const frontRef = frontSlot === "A" ? videoARef : videoBRef;
+  const backRef = frontSlot === "A" ? videoBRef : videoARef;
+
+  // ---- Keep the back buffer preloaded with the next clip ----
   useEffect(() => {
-    if (videoRef.current) {
-      videoRef.current.currentTime = 0;
-      setCurrentTime(0);
+    const back = backRef.current;
+    if (!back) return;
+    const nextUrl = nextClip?.videoUrl ?? "";
+    if (back.src !== nextUrl) {
+      back.src = nextUrl;
+      if (nextUrl) back.load();
     }
-  }, [activeClipIndex]);
+  }, [nextClip?.videoUrl, backRef]);
 
-  const handlePlay = useCallback(() => {
-    if (!activeClip?.videoUrl) return;
-    videoRef.current?.play();
-    setIsPlaying(true);
-  }, [activeClip]);
+  // ---- When activeClipIndex changes externally (skip / click), reset ----
+  const prevIndexRef = useRef(activeClipIndex);
+  useEffect(() => {
+    if (prevIndexRef.current === activeClipIndex) return;
+    prevIndexRef.current = activeClipIndex;
 
-  const handlePause = useCallback(() => {
-    videoRef.current?.pause();
-    setIsPlaying(false);
-  }, []);
+    const front = frontRef.current;
+    if (!front) return;
 
-  const handleTogglePlay = useCallback(() => {
-    if (isPlaying) {
-      handlePause();
-    } else {
-      handlePlay();
+    const url = activeClip?.videoUrl ?? "";
+    if (front.src !== url) {
+      front.src = url;
+      if (url) front.load();
     }
-  }, [isPlaying, handlePlay, handlePause]);
+    front.currentTime = 0;
+    setCurrentTime(0);
+  }, [activeClipIndex, activeClip?.videoUrl, frontRef]);
 
+  // ---- Gapless advance: swap buffers on ended ----
   const handleVideoEnded = useCallback(() => {
-    // Auto-advance to next clip for sequential playback
-    if (activeClipIndex < clips.length - 1) {
-      onActiveClipChange(activeClipIndex + 1);
-      // Will auto-play when src changes
-      setTimeout(() => {
-        videoRef.current?.play();
-      }, 100);
-    } else {
-      // End of timeline
+    if (activeClipIndex >= clips.length - 1) {
       setIsPlaying(false);
+      return;
     }
-  }, [activeClipIndex, clips.length, onActiveClipChange]);
+
+    // The back buffer already has the next clip loaded — swap it to front
+    const back = backRef.current;
+    if (back) {
+      back.currentTime = 0;
+      back.play().catch(() => {});
+    }
+
+    setFrontSlot((prev) => (prev === "A" ? "B" : "A"));
+    onActiveClipChange(activeClipIndex + 1);
+  }, [activeClipIndex, clips.length, onActiveClipChange, backRef]);
 
   const handleTimeUpdate = useCallback(() => {
-    if (videoRef.current) {
-      setCurrentTime(videoRef.current.currentTime);
+    const front = frontRef.current;
+    if (front) setCurrentTime(front.currentTime);
+  }, [frontRef]);
+
+  // ---- Transport controls ----
+  const handleTogglePlay = useCallback(() => {
+    const front = frontRef.current;
+    if (!front || !activeClip?.videoUrl) return;
+    if (isPlaying) {
+      front.pause();
+    } else {
+      front.play().catch(() => {});
     }
-  }, []);
+  }, [isPlaying, activeClip?.videoUrl, frontRef]);
 
   const handlePrev = useCallback(() => {
     if (activeClipIndex > 0) {
@@ -94,36 +129,55 @@ export default function TimelinePreview({
     );
   }
 
+  // Shared props for both video elements
+  const sharedVideoProps = {
+    playsInline: true,
+    onPlay: () => setIsPlaying(true),
+    onPause: () => setIsPlaying(false),
+  } as const;
+
   return (
     <div className="flex flex-col h-full">
-      {/* Video display */}
+      {/* Video display — two overlapping <video> elements */}
       <div className="flex-1 bg-black rounded-lg overflow-hidden relative min-h-0">
-        {activeClip?.videoUrl ? (
-          <video
-            ref={videoRef}
-            src={activeClip.videoUrl}
-            className="w-full h-full object-contain"
-            onEnded={handleVideoEnded}
-            onTimeUpdate={handleTimeUpdate}
-            onPlay={() => setIsPlaying(true)}
-            onPause={() => setIsPlaying(false)}
-            playsInline
-          />
-        ) : activeClip?.thumbnailUrl ? (
+        <video
+          ref={videoARef}
+          src={frontSlot === "A" ? (activeClip?.videoUrl ?? "") : (nextClip?.videoUrl ?? "")}
+          className={`absolute inset-0 w-full h-full object-contain transition-opacity duration-75 ${
+            frontSlot === "A" ? "opacity-100 z-10" : "opacity-0 z-0"
+          }`}
+          onEnded={frontSlot === "A" ? handleVideoEnded : undefined}
+          onTimeUpdate={frontSlot === "A" ? handleTimeUpdate : undefined}
+          {...sharedVideoProps}
+        />
+        <video
+          ref={videoBRef}
+          src={frontSlot === "B" ? (activeClip?.videoUrl ?? "") : (nextClip?.videoUrl ?? "")}
+          className={`absolute inset-0 w-full h-full object-contain transition-opacity duration-75 ${
+            frontSlot === "B" ? "opacity-100 z-10" : "opacity-0 z-0"
+          }`}
+          onEnded={frontSlot === "B" ? handleVideoEnded : undefined}
+          onTimeUpdate={frontSlot === "B" ? handleTimeUpdate : undefined}
+          {...sharedVideoProps}
+        />
+
+        {/* Fallback when no video URL */}
+        {!activeClip?.videoUrl && activeClip?.thumbnailUrl && (
           <img
             src={activeClip.thumbnailUrl}
             alt={activeClip.title}
-            className="w-full h-full object-contain"
+            className="absolute inset-0 w-full h-full object-contain z-20"
           />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center text-default-400 text-xs">
+        )}
+        {!activeClip?.videoUrl && !activeClip?.thumbnailUrl && (
+          <div className="absolute inset-0 w-full h-full flex items-center justify-center text-default-400 text-xs z-20">
             No preview available
           </div>
         )}
 
         {/* Clip title overlay */}
         {activeClip && (
-          <div className="absolute top-2 left-2 bg-black/60 text-white text-[10px] px-2 py-0.5 rounded">
+          <div className="absolute top-2 left-2 bg-black/60 text-white text-[10px] px-2 py-0.5 rounded z-30">
             {activeClipIndex + 1}/{clips.length} - {activeClip.title || "Untitled"}
           </div>
         )}
