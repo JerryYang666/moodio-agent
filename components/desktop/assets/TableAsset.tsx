@@ -190,7 +190,7 @@ export default function TableAsset({ asset, sendEvent, cellLocks, currentUserId,
   return (
     <div className="w-full h-full overflow-auto bg-background">
       {/* Title bar -- does NOT stopPropagation so canvas drag still works */}
-      <div className="sticky top-0 z-10 flex items-center gap-2 px-3 py-2 bg-secondary/5 border-b border-divider">
+      <div className="sticky top-0 z-10 flex items-center gap-2 px-3 py-2 bg-background border-b border-divider">
         <Clapperboard size={14} className="text-secondary shrink-0" />
         <span className="text-xs font-semibold text-default-700 truncate">
           {meta.title || "Shot List"}
