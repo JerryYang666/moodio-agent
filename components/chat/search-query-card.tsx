@@ -54,7 +54,7 @@ export default function SearchQueryCard({ query, status }: SearchQueryCardProps)
         {isExecuted ? (
           <span className="font-medium text-success">{t("searched")}</span>
         ) : (
-          <span className="font-medium">{t("textQuery")}</span>
+          <span className="font-medium">{t("searchQuery")}</span>
         )}
       </div>
 
