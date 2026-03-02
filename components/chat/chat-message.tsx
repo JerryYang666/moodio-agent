@@ -281,6 +281,7 @@ export default function ChatMessage({
                     maxPreviewWidth={600}
                     maxPreviewHeight={600}
                     className="block"
+                    disabled={effectiveStatus !== "generated"}
                   >
                     <Card
                       className={clsx(

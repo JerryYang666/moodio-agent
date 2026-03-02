@@ -16,6 +16,8 @@ interface ImageHoverPreviewProps {
   maxPreviewHeight?: number;
   /** Additional CSS class for the wrapper div */
   className?: string;
+  /** When true, hover preview is disabled (container still renders) */
+  disabled?: boolean;
 }
 
 export default function ImageHoverPreview({
@@ -26,6 +28,7 @@ export default function ImageHoverPreview({
   maxPreviewWidth = 500,
   maxPreviewHeight = 500,
   className = "inline-block",
+  disabled = false,
 }: ImageHoverPreviewProps) {
   const [showPreview, setShowPreview] = useState(false);
   const [previewPosition, setPreviewPosition] = useState({ x: 0, y: 0 });
@@ -76,6 +79,7 @@ export default function ImageHoverPreview({
   }, [maxPreviewWidth, maxPreviewHeight]);
 
   const handleMouseEnter = useCallback(() => {
+    if (disabled) return;
     isHoveringRef.current = true;
 
     // Clear any existing timeout
@@ -91,7 +95,7 @@ export default function ImageHoverPreview({
         setShowPreview(true);
       }
     }, delay);
-  }, [delay, calculatePosition]);
+  }, [delay, calculatePosition, disabled]);
 
   const handleMouseLeave = useCallback(() => {
     isHoveringRef.current = false;
