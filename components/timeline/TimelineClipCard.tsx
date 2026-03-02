@@ -68,7 +68,7 @@ export default function TimelineClipCard({
       onDragStart={handleDragStart}
       onDragOver={handleDragOver}
       onDragEnd={onDragEnd}
-      className={`relative flex-shrink-0 h-full rounded-lg border overflow-hidden cursor-pointer active:cursor-grabbing select-none group/clip transition-all ${
+      className={`relative shrink-0 h-full rounded-lg border overflow-hidden cursor-pointer active:cursor-grabbing select-none group/clip transition-all ${
         isActive
           ? "border-primary ring-1 ring-primary"
           : isVideo
@@ -93,16 +93,16 @@ export default function TimelineClipCard({
       <div className="relative z-10 flex items-center gap-1.5 h-full px-2">
         <GripVertical
           size={12}
-          className="text-default-400 flex-shrink-0 opacity-0 group-hover/clip:opacity-100 transition-opacity"
+          className="text-default-400 shrink-0 opacity-0 group-hover/clip:opacity-100 transition-opacity"
         />
         <Icon
           size={12}
-          className={`flex-shrink-0 ${isVideo ? "text-primary" : "text-secondary"}`}
+          className={`shrink-0 ${isVideo ? "text-primary" : "text-secondary"}`}
         />
         <span className="text-[10px] font-medium truncate text-default-700 flex-1">
           {clip.title || "Untitled"}
         </span>
-        <span className="text-[9px] text-default-400 flex-shrink-0">
+        <span className="text-[9px] text-default-400 shrink-0">
           {formatDuration(clip.duration)}
         </span>
         <button
@@ -110,7 +110,7 @@ export default function TimelineClipCard({
             e.stopPropagation();
             onRemove(clip.id);
           }}
-          className="ml-0.5 p-0.5 rounded hover:bg-danger/20 text-default-400 hover:text-danger opacity-0 group-hover/clip:opacity-100 transition-all flex-shrink-0"
+          className="ml-0.5 p-0.5 rounded hover:bg-danger/20 text-default-400 hover:text-danger opacity-0 group-hover/clip:opacity-100 transition-all shrink-0"
         >
           <X size={10} />
         </button>

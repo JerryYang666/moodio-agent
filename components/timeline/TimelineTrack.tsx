@@ -49,7 +49,7 @@ export default function TimelineTrack({
     <div className="flex items-stretch gap-0 h-[52px]">
       {/* Track label */}
       <div
-        className={`w-[80px] flex-shrink-0 flex items-center justify-center text-[10px] font-semibold uppercase tracking-wider border-r border-divider ${
+        className={`w-[80px] shrink-0 flex items-center justify-center text-[10px] font-semibold uppercase tracking-wider border-r border-divider ${
           isVideo
             ? "text-primary bg-primary/5"
             : "text-secondary bg-secondary/5"
