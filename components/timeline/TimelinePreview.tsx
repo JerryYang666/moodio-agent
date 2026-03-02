@@ -186,12 +186,6 @@ export default function TimelinePreview({
           </div>
         )}
 
-        {/* Clip title overlay */}
-        {activeClip && (
-          <div className="absolute top-2 left-2 bg-black/60 text-white text-[10px] px-2 py-0.5 rounded z-30">
-            {activeClipIndex + 1}/{clips.length} - {activeClip.title || "Untitled"}
-          </div>
-        )}
       </div>
 
       {/* Transport controls */}
