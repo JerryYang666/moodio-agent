@@ -54,7 +54,7 @@
     "useDifferentEmail": "使用其他邮箱",
     "resendCode": "重新发送验证码",
     "signInWithPasskey": "使用通行密钥登录",
-    "newUserHint": "新用户？首次登录需要邮箱验证。您可以在引导流程中设置通行密钥以便下次更快登录。",
+    "newUserHint": "新用户？首次登录需要邮箱验证。通行密钥和密码登录仅在账户设置完成后可用。忘记密码？直接使用邮箱验证码登录即可。",
     "codeSentTo": "验证码已发送至：",
     "invalidOtpCode": "验证码无效",
     "verifying": "验证中...",
@@ -62,7 +62,13 @@
     "failedToSendOtp": "发送验证码失败",
     "failedToVerifyOtp": "验证失败",
     "passkeyLoginFailed": "通行密钥登录失败",
-    "verificationFailed": "验证失败"
+    "verificationFailed": "验证失败",
+    "signInWithPassword": "使用密码登录",
+    "password": "密码",
+    "passwordPlaceholder": "请输入密码",
+    "invalidCredentials": "邮箱或密码无效",
+    "backToOtp": "返回邮箱验证码登录",
+    "emailRequired": "请先输入邮箱"
   },
   "onboarding": {
     "welcomeTitle": "欢迎使用 moodio agent！",
@@ -177,7 +183,20 @@
     "addedOn": "添加于 {date}",
     "profileUpdated": "个人资料更新成功",
     "failedToUpdateProfile": "更新个人资料失败",
-    "failedToFetchPasskeys": "获取通行密钥失败"
+    "failedToFetchPasskeys": "获取通行密钥失败",
+    "password": "密码",
+    "noPasswordSet": "未设置密码",
+    "passwordIsSet": "密码已设置",
+    "setPassword": "设置密码",
+    "changePassword": "修改密码",
+    "newPassword": "新密码",
+    "confirmPassword": "确认密码",
+    "passwordMismatch": "两次密码不一致",
+    "passwordTooWeak": "密码至少需要8位，包含大写字母、小写字母和数字",
+    "passwordChanged": "密码修改成功",
+    "passwordSetSuccess": "密码设置成功",
+    "otpSentForPassword": "验证码已发送到您的邮箱",
+    "enterOtpAndNewPassword": "请输入邮箱中的验证码和新密码"
   },
   "projects": {
     "title": "项目",

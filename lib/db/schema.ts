@@ -25,6 +25,7 @@ export const users = pgTable("users", {
     .notNull()
     .default("email"), // 'email', 'cwru_sso', etc.
   authProviderMetadata: jsonb("auth_provider_metadata"), // Provider-specific metadata (e.g., studentId for CWRU)
+  passwordHash: text("password_hash"),
   roles: jsonb("roles").$type<string[]>().notNull().default(["new_user"]), // Array of role names
   testingGroups: jsonb("testing_groups").$type<string[]>().notNull().default([]), // Array of testing group UUIDs
   createdAt: timestamp("created_at").defaultNow().notNull(),

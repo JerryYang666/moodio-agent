@@ -54,7 +54,7 @@
     "useDifferentEmail": "다른 이메일 사용",
     "resendCode": "코드 재전송",
     "signInWithPasskey": "패스키로 로그인",
-    "newUserHint": "처음이신가요? 첫 로그인에는 이메일 인증이 필요합니다. 온보딩 중 패스키를 설정하면 다음 번에 더 빠르게 접속할 수 있습니다.",
+    "newUserHint": "처음이신가요? 첫 로그인에는 이메일 인증이 필요합니다. 패스키와 비밀번호 로그인은 계정 설정 후에만 사용 가능합니다. 비밀번호를 잊으셨나요? 이메일 로그인 코드를 사용하세요.",
     "codeSentTo": "코드 전송 대상:",
     "invalidOtpCode": "잘못된 OTP 코드입니다",
     "verifying": "인증 중...",
@@ -62,7 +62,13 @@
     "failedToSendOtp": "OTP 전송에 실패했습니다",
     "failedToVerifyOtp": "OTP 인증에 실패했습니다",
     "passkeyLoginFailed": "패스키 로그인에 실패했습니다",
-    "verificationFailed": "인증에 실패했습니다"
+    "verificationFailed": "인증에 실패했습니다",
+    "signInWithPassword": "비밀번호로 로그인",
+    "password": "비밀번호",
+    "passwordPlaceholder": "비밀번호를 입력하세요",
+    "invalidCredentials": "이메일 또는 비밀번호가 올바르지 않습니다",
+    "backToOtp": "이메일 로그인 코드로 돌아가기",
+    "emailRequired": "먼저 이메일을 입력해 주세요"
   },
   "onboarding": {
     "welcomeTitle": "moodio agent에 오신 것을 환영합니다!",
@@ -177,7 +183,20 @@
     "addedOn": "{date}에 추가됨",
     "profileUpdated": "프로필이 성공적으로 업데이트되었습니다",
     "failedToUpdateProfile": "프로필 업데이트에 실패했습니다",
-    "failedToFetchPasskeys": "패스키를 가져오는 데 실패했습니다"
+    "failedToFetchPasskeys": "패스키를 가져오는 데 실패했습니다",
+    "password": "비밀번호",
+    "noPasswordSet": "비밀번호 미설정",
+    "passwordIsSet": "비밀번호 설정됨",
+    "setPassword": "비밀번호 설정",
+    "changePassword": "비밀번호 변경",
+    "newPassword": "새 비밀번호",
+    "confirmPassword": "비밀번호 확인",
+    "passwordMismatch": "비밀번호가 일치하지 않습니다",
+    "passwordTooWeak": "비밀번호는 8자 이상이며 대문자, 소문자, 숫자를 포함해야 합니다",
+    "passwordChanged": "비밀번호가 성공적으로 변경되었습니다",
+    "passwordSetSuccess": "비밀번호가 성공적으로 설정되었습니다",
+    "otpSentForPassword": "인증 코드가 이메일로 전송되었습니다",
+    "enterOtpAndNewPassword": "이메일로 받은 인증 코드와 새 비밀번호를 입력하세요"
   },
   "projects": {
     "title": "프로젝트",

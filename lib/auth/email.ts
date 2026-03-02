@@ -98,6 +98,70 @@ function getOTPEmailTemplate(code: string, firstName?: string): string {
   `.trim();
 }
 
+function getPasswordOTPEmailTemplate(
+  code: string,
+  firstName?: string
+): string {
+  const greeting = firstName ? `Hi ${firstName}` : "Hi there";
+
+  return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Password Change Verification</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f5f5f5;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f5f5f5; padding: 40px 20px;">
+    <tr>
+      <td align="center">
+        <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 600px; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+          <tr>
+            <td style="padding: 40px 40px 20px 40px; text-align: center;">
+              <h1 style="margin: 0; font-size: 28px; font-weight: 600; color: #1a1a1a;">
+                Password Change Verification
+              </h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 0 40px 30px 40px;">
+              <p style="margin: 0 0 20px 0; font-size: 16px; line-height: 24px; color: #4a4a4a;">
+                ${greeting},
+              </p>
+              <p style="margin: 0 0 30px 0; font-size: 16px; line-height: 24px; color: #4a4a4a;">
+                Use the following code to verify your password change:
+              </p>
+              <table width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td align="center" style="padding: 20px; background-color: #fff7ed; border-radius: 8px; border: 2px dashed #fed7aa;">
+                    <div style="font-size: 36px; font-weight: 700; letter-spacing: 8px; color: #1a1a1a;">
+                      ${code}
+                    </div>
+                  </td>
+                </tr>
+              </table>
+              <p style="margin: 30px 0 0 0; font-size: 14px; line-height: 20px; color: #6b7280;">
+                This code will expire in <strong>10 minutes</strong>. If you didn't request a password change, please ignore this email and your password will remain unchanged.
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 30px 40px 40px 40px; border-top: 1px solid #e5e7eb;">
+              <p style="margin: 0; font-size: 14px; line-height: 20px; color: #9ca3af; text-align: center;">
+                This is an automated message, please do not reply to this email.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `.trim();
+}
+
 function getInviteEmailTemplate(): string {
   return `
 <!DOCTYPE html>
@@ -189,6 +253,33 @@ export async function sendOTPEmail(
   } catch (error) {
     console.error("Error sending OTP email:", error);
     throw new Error("Failed to send OTP email");
+  }
+}
+
+/**
+ * Send OTP email for password set/change verification
+ */
+export async function sendPasswordOTPEmail(
+  email: string,
+  code: string,
+  firstName?: string
+): Promise<void> {
+  try {
+    const transporter = createTransporter();
+    const htmlContent = getPasswordOTPEmailTemplate(code, firstName);
+
+    await transporter.sendMail({
+      from: process.env.SMTP_USER,
+      to: email,
+      subject: `Your password change code: ${code}`,
+      html: htmlContent,
+      text: `Your password change verification code is: ${code}. This code will expire in 10 minutes. If you didn't request this, please ignore this email.`,
+    });
+
+    console.log(`Password OTP email sent to ${email}`);
+  } catch (error) {
+    console.error("Error sending password OTP email:", error);
+    throw new Error("Failed to send password OTP email");
   }
 }
 

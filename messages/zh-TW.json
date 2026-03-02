@@ -54,7 +54,7 @@
     "useDifferentEmail": "使用其他電子郵件",
     "resendCode": "重新傳送驗證碼",
     "signInWithPasskey": "使用通行密鑰登入",
-    "newUserHint": "新用戶？首次登入需要電子郵件驗證。您可以在引導流程中設定通行密鑰，下次就能更快速登入。",
+    "newUserHint": "新用戶？首次登入需要電子郵件驗證。通行密鑰和密碼登入僅在帳戶設定完成後可用。忘記密碼？直接使用電子郵件驗證碼登入即可。",
     "codeSentTo": "驗證碼已傳送至：",
     "invalidOtpCode": "無效的 OTP 驗證碼",
     "verifying": "驗證中...",
@@ -62,7 +62,13 @@
     "failedToSendOtp": "傳送 OTP 失敗",
     "failedToVerifyOtp": "驗證 OTP 失敗",
     "passkeyLoginFailed": "通行密鑰登入失敗",
-    "verificationFailed": "驗證失敗"
+    "verificationFailed": "驗證失敗",
+    "signInWithPassword": "使用密碼登入",
+    "password": "密碼",
+    "passwordPlaceholder": "請輸入密碼",
+    "invalidCredentials": "電子郵件或密碼無效",
+    "backToOtp": "返回電子郵件驗證碼登入",
+    "emailRequired": "請先輸入電子郵件"
   },
   "onboarding": {
     "welcomeTitle": "歡迎使用 moodio agent！",
@@ -177,7 +183,20 @@
     "addedOn": "新增於 {date}",
     "profileUpdated": "個人檔案已成功更新",
     "failedToUpdateProfile": "更新個人檔案失敗",
-    "failedToFetchPasskeys": "取得通行密鑰失敗"
+    "failedToFetchPasskeys": "取得通行密鑰失敗",
+    "password": "密碼",
+    "noPasswordSet": "尚未設定密碼",
+    "passwordIsSet": "密碼已設定",
+    "setPassword": "設定密碼",
+    "changePassword": "變更密碼",
+    "newPassword": "新密碼",
+    "confirmPassword": "確認密碼",
+    "passwordMismatch": "兩次密碼不一致",
+    "passwordTooWeak": "密碼至少需要8位，包含大寫字母、小寫字母和數字",
+    "passwordChanged": "密碼變更成功",
+    "passwordSetSuccess": "密碼設定成功",
+    "otpSentForPassword": "驗證碼已傳送至您的電子郵件",
+    "enterOtpAndNewPassword": "請輸入電子郵件中的驗證碼和新密碼"
   },
   "projects": {
     "title": "專案",

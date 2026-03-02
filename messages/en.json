@@ -54,7 +54,7 @@
     "useDifferentEmail": "Use a different email",
     "resendCode": "Resend code",
     "signInWithPasskey": "Sign in with Passkey",
-    "newUserHint": "New user? First-time login requires email verification. You can set up passkey during onboarding for faster access next time.",
+    "newUserHint": "New user? First-time login requires email verification. Passkey and password login are only available after account setup. Forgot your password? Just use email login code.",
     "codeSentTo": "Code sent to:",
     "invalidOtpCode": "Invalid OTP code",
     "verifying": "Verifying...",
@@ -62,7 +62,13 @@
     "failedToSendOtp": "Failed to send OTP",
     "failedToVerifyOtp": "Failed to verify OTP",
     "passkeyLoginFailed": "Passkey login failed",
-    "verificationFailed": "Verification failed"
+    "verificationFailed": "Verification failed",
+    "signInWithPassword": "Sign in with Password",
+    "password": "Password",
+    "passwordPlaceholder": "Enter your password",
+    "invalidCredentials": "Invalid email or password",
+    "backToOtp": "Back to email login code",
+    "emailRequired": "Please enter your email first"
   },
   "onboarding": {
     "welcomeTitle": "Welcome to moodio agent!",
@@ -177,7 +183,20 @@
     "addedOn": "Added on {date}",
     "profileUpdated": "Profile updated successfully",
     "failedToUpdateProfile": "Failed to update profile",
-    "failedToFetchPasskeys": "Failed to fetch passkeys"
+    "failedToFetchPasskeys": "Failed to fetch passkeys",
+    "password": "Password",
+    "noPasswordSet": "No password set",
+    "passwordIsSet": "Password is set",
+    "setPassword": "Set Password",
+    "changePassword": "Change Password",
+    "newPassword": "New Password",
+    "confirmPassword": "Confirm Password",
+    "passwordMismatch": "Passwords do not match",
+    "passwordTooWeak": "Password must be at least 8 characters with uppercase, lowercase, and a digit",
+    "passwordChanged": "Password changed successfully",
+    "passwordSetSuccess": "Password set successfully",
+    "otpSentForPassword": "Verification code sent to your email",
+    "enterOtpAndNewPassword": "Enter the verification code from your email and your new password"
   },
   "projects": {
     "title": "Projects",

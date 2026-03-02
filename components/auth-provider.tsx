@@ -11,6 +11,7 @@ export interface User {
   lastName?: string | null;
   roles: string[];
   authProvider: string;
+  hasPassword?: boolean;
   createdAt: string;
   updatedAt: string;
 }

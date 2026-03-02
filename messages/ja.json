@@ -54,7 +54,7 @@
     "useDifferentEmail": "別のメールアドレスを使用",
     "resendCode": "コードを再送信",
     "signInWithPasskey": "パスキーでサインイン",
-    "newUserHint": "新規ユーザーですか？初回ログインにはメール認証が必要です。オンボーディング中にパスキーを設定すると、次回からより速くアクセスできます。",
+    "newUserHint": "新規ユーザーですか？初回ログインにはメール認証が必要です。パスキーとパスワードによるログインはアカウント設定後にのみ利用可能です。パスワードを忘れた場合は、メールログインコードをご利用ください。",
     "codeSentTo": "コード送信先：",
     "invalidOtpCode": "無効なOTPコードです",
     "verifying": "認証中...",
@@ -62,7 +62,13 @@
     "failedToSendOtp": "OTPの送信に失敗しました",
     "failedToVerifyOtp": "OTPの認証に失敗しました",
     "passkeyLoginFailed": "パスキーログインに失敗しました",
-    "verificationFailed": "認証に失敗しました"
+    "verificationFailed": "認証に失敗しました",
+    "signInWithPassword": "パスワードでサインイン",
+    "password": "パスワード",
+    "passwordPlaceholder": "パスワードを入力",
+    "invalidCredentials": "メールアドレスまたはパスワードが無効です",
+    "backToOtp": "メールログインコードに戻る",
+    "emailRequired": "まずメールアドレスを入力してください"
   },
   "onboarding": {
     "welcomeTitle": "moodio agentへようこそ！",
@@ -177,7 +183,20 @@
     "addedOn": "{date}に追加",
     "profileUpdated": "プロフィールが正常に更新されました",
     "failedToUpdateProfile": "プロフィールの更新に失敗しました",
-    "failedToFetchPasskeys": "パスキーの取得に失敗しました"
+    "failedToFetchPasskeys": "パスキーの取得に失敗しました",
+    "password": "パスワード",
+    "noPasswordSet": "パスワード未設定",
+    "passwordIsSet": "パスワード設定済み",
+    "setPassword": "パスワードを設定",
+    "changePassword": "パスワードを変更",
+    "newPassword": "新しいパスワード",
+    "confirmPassword": "パスワードを確認",
+    "passwordMismatch": "パスワードが一致しません",
+    "passwordTooWeak": "パスワードは8文字以上で、大文字・小文字・数字を含む必要があります",
+    "passwordChanged": "パスワードが正常に変更されました",
+    "passwordSetSuccess": "パスワードが正常に設定されました",
+    "otpSentForPassword": "認証コードがメールに送信されました",
+    "enterOtpAndNewPassword": "メールの認証コードと新しいパスワードを入力してください"
   },
   "projects": {
     "title": "プロジェクト",

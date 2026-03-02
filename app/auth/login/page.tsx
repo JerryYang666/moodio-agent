@@ -8,14 +8,15 @@ import { Button } from "@heroui/button";
 import { Card } from "@heroui/card";
 import { siteConfig } from "@/config/site";
 import { startAuthentication } from "@simplewebauthn/browser";
-import { Key } from "lucide-react";
+import { Key, Lock } from "lucide-react";
 import { LanguageSwitch } from "@/components/language-switch";
 
 export default function LoginPage() {
   const t = useTranslations();
-  const [step, setStep] = useState<"email" | "otp">("email");
+  const [step, setStep] = useState<"email" | "otp" | "password">("email");
   const [email, setEmail] = useState("");
   const [otp, setOtp] = useState("");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [passkeyLoading, setPasskeyLoading] = useState(false);
   const [error, setError] = useState("");
@@ -68,11 +69,40 @@ export default function LoginPage() {
         throw new Error(data.error || t("auth.failedToVerifyOtp"));
       }
 
-      // Hard redirect to home page to ensure cookies are properly loaded
       window.location.href = "/";
     } catch (err) {
       setError(err instanceof Error ? err.message : t("auth.failedToVerifyOtp"));
       setOtp("");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePasswordLogin = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (!password) return;
+
+    setError("");
+    setLoading(true);
+
+    try {
+      const response = await fetch("/api/auth/login-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || t("auth.invalidCredentials"));
+      }
+
+      window.location.href = "/";
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : t("auth.invalidCredentials")
+      );
     } finally {
       setLoading(false);
     }
@@ -83,7 +113,6 @@ export default function LoginPage() {
     setError("");
 
     try {
-      // 1. Get options
       const resp = await fetch("/api/auth/passkey/login/options", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -93,7 +122,6 @@ export default function LoginPage() {
       const options = await resp.json();
       if (options.error) throw new Error(options.error);
 
-      // 2. Start authentication
       let asseResp;
       try {
         asseResp = await startAuthentication(options);
@@ -104,7 +132,6 @@ export default function LoginPage() {
         throw err;
       }
 
-      // 3. Verify
       const verifyResp = await fetch("/api/auth/passkey/login/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -120,13 +147,14 @@ export default function LoginPage() {
       }
     } catch (err) {
       console.error(err);
-      setError(err instanceof Error ? err.message : t("auth.passkeyLoginFailed"));
+      setError(
+        err instanceof Error ? err.message : t("auth.passkeyLoginFailed")
+      );
     } finally {
       setPasskeyLoading(false);
     }
   };
 
-  // Auto-submit when OTP is complete
   const handleOTPChange = (value: string) => {
     setOtp(value);
     if (value.length === OTP_LENGTH) {
@@ -146,7 +174,9 @@ export default function LoginPage() {
             <p className="text-gray-600 dark:text-gray-400">
               {step === "email"
                 ? t("auth.signInTitle")
-                : t("auth.enterOtpCode", { count: OTP_LENGTH })}
+                : step === "password"
+                  ? t("auth.signInWithPassword")
+                  : t("auth.enterOtpCode", { count: OTP_LENGTH })}
             </p>
           </div>
 
@@ -182,6 +212,26 @@ export default function LoginPage() {
                 </Button>
               </form>
 
+              <Button
+                type="button"
+                color="default"
+                variant="flat"
+                size="lg"
+                className="w-full"
+                onPress={() => {
+                  if (!email) {
+                    setError(t("auth.emailRequired"));
+                    return;
+                  }
+                  setError("");
+                  setStep("password");
+                }}
+                isDisabled={loading || passkeyLoading}
+                startContent={<Lock size={20} />}
+              >
+                {t("auth.signInWithPassword")}
+              </Button>
+
               <div className="relative flex py-2 items-center">
                 <div className="grow border-t border-default-200"></div>
               </div>
@@ -203,6 +253,57 @@ export default function LoginPage() {
               <p className="text-xs text-center text-gray-500 dark:text-gray-400 mt-2">
                 {t("auth.newUserHint")}
               </p>
+            </div>
+          ) : step === "password" ? (
+            <div className="space-y-4">
+              <form onSubmit={handlePasswordLogin} className="space-y-4">
+                <Input
+                  type="email"
+                  label={t("auth.emailLabel")}
+                  value={email}
+                  isReadOnly
+                  size="lg"
+                  variant="bordered"
+                />
+
+                <Input
+                  type="password"
+                  label={t("auth.password")}
+                  placeholder={t("auth.passwordPlaceholder")}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  isRequired
+                  size="lg"
+                  isDisabled={loading}
+                  autoFocus
+                />
+
+                <Button
+                  type="submit"
+                  color="primary"
+                  size="lg"
+                  className="w-full"
+                  isLoading={loading}
+                  isDisabled={!password || loading}
+                >
+                  {t("auth.signInWithPassword")}
+                </Button>
+              </form>
+
+              <Button
+                color="default"
+                variant="light"
+                size="sm"
+                className="w-full"
+                onPress={() => {
+                  setStep("email");
+                  setPassword("");
+                  setError("");
+                }}
+                isDisabled={loading}
+              >
+                {t("auth.backToOtp")}
+              </Button>
             </div>
           ) : (
             <div className="space-y-6">
