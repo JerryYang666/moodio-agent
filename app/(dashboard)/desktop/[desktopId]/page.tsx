@@ -110,10 +110,27 @@ export default function DesktopDetailPage({
           });
         }
       } else if (event.type === "table_generating") {
-        addToast({
-          title: `${event.firstName} is generating a shot list...`,
-          color: "default",
-        });
+        const posX = typeof event.payload?.posX === "number" ? event.payload.posX : 0;
+        const posY = typeof event.payload?.posY === "number" ? event.payload.posY : 0;
+
+        const placeholder: EnrichedDesktopAsset = {
+          id: EPHEMERAL_TABLE_ID,
+          desktopId,
+          assetType: "table",
+          metadata: { title: "", columns: [], rows: [], status: "streaming" },
+          posX,
+          posY,
+          width: 700,
+          height: 200,
+          rotation: 0,
+          zIndex: 9999,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          imageUrl: null,
+          videoUrl: null,
+        };
+
+        applyRemoteEvent({ type: "asset_added", payload: { asset: placeholder } });
       } else if (event.type === "session_left") {
         const { sessionId } = event.payload || {};
         if (sessionId) {
@@ -204,6 +221,8 @@ export default function DesktopDetailPage({
     });
   }, [fetchDetail]);
 
+  const EPHEMERAL_TABLE_ID = "__generating_table__";
+
   // Listen for video assets added from chat — refresh local state and broadcast to room
   useEffect(() => {
     const handleAssetAdded = (e: CustomEvent) => {
@@ -211,10 +230,11 @@ export default function DesktopDetailPage({
         fetchDetail();
         const newAssets = e.detail?.assets as EnrichedDesktopAsset[] | undefined;
         if (newAssets) {
+          // Remove the ephemeral placeholder since the real asset has arrived
+          applyRemoteEvent({ type: "asset_removed", payload: { assetId: EPHEMERAL_TABLE_ID } });
+
           for (const asset of newAssets) {
             sendEvent("asset_added", { asset });
-            // For processing video assets, immediately signal that we're polling
-            // so remote clients don't start duplicate polling
             if (asset.assetType === "video") {
               const meta = asset.metadata as Record<string, unknown>;
               const genId = meta.generationId as string | undefined;
@@ -229,7 +249,28 @@ export default function DesktopDetailPage({
 
     const handleTableGenerating = (e: CustomEvent) => {
       if (e.detail?.desktopId === desktopId) {
-        sendEvent("table_generating", {});
+        const posX = typeof e.detail.posX === "number" ? e.detail.posX : 0;
+        const posY = typeof e.detail.posY === "number" ? e.detail.posY : 0;
+
+        const placeholder: EnrichedDesktopAsset = {
+          id: EPHEMERAL_TABLE_ID,
+          desktopId,
+          assetType: "table",
+          metadata: { title: "", columns: [], rows: [], status: "streaming" },
+          posX,
+          posY,
+          width: 700,
+          height: 200,
+          rotation: 0,
+          zIndex: 9999,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          imageUrl: null,
+          videoUrl: null,
+        };
+
+        applyRemoteEvent({ type: "asset_added", payload: { asset: placeholder } });
+        sendEvent("table_generating", { posX, posY });
       }
     };
 
@@ -239,7 +280,7 @@ export default function DesktopDetailPage({
       window.removeEventListener("desktop-asset-added", handleAssetAdded as EventListener);
       window.removeEventListener("desktop-table-generating", handleTableGenerating as EventListener);
     };
-  }, [desktopId, fetchDetail, sendEvent]);
+  }, [desktopId, fetchDetail, sendEvent, applyRemoteEvent]);
 
   const handleCameraChange = useCallback(
     (newCamera: CameraState) => {

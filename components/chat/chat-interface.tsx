@@ -1461,11 +1461,23 @@ export default function ChatInterface({
 
               // Broadcast generating event to the room
               if (desktopId) {
-                window.dispatchEvent(
-                  new CustomEvent("desktop-table-generating", {
-                    detail: { desktopId },
-                  })
-                );
+                (async () => {
+                  try {
+                    const { getViewportCenterPosition } = await import("@/lib/desktop/types");
+                    const pos = getViewportCenterPosition();
+                    window.dispatchEvent(
+                      new CustomEvent("desktop-table-generating", {
+                        detail: { desktopId, posX: pos.x, posY: pos.y },
+                      })
+                    );
+                  } catch {
+                    window.dispatchEvent(
+                      new CustomEvent("desktop-table-generating", {
+                        detail: { desktopId, posX: 0, posY: 0 },
+                      })
+                    );
+                  }
+                })();
               }
             } else if (event.type === "part_update") {
               // Update existing part by imageId (for parallel support)

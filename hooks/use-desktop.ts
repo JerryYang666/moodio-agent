@@ -309,7 +309,10 @@ export function useDesktopDetail(desktopId: string) {
             prev
               ? {
                   ...prev,
-                  assets: [asset, ...prev.assets.filter((a) => a.id !== asset.id)],
+                  assets: [asset, ...prev.assets.filter((a) =>
+                    a.id !== asset.id &&
+                    !(asset.assetType === "table" && a.id === "__generating_table__")
+                  )],
                 }
               : null
           );
