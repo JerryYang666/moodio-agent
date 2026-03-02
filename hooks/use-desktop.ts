@@ -88,6 +88,21 @@ export function useDesktops() {
   return { desktops, loading, fetchDesktops, createDesktop, deleteDesktop, renameDesktop };
 }
 
+/**
+ * Merge a server-returned asset into the local one, preserving locally
+ * enriched fields (videoUrl, generationData, imageUrl) that the server
+ * doesn't always return (e.g. PATCH responses lack the videoGenerations join).
+ */
+function mergeAsset<T extends DesktopAsset>(local: T, server: DesktopAsset): T {
+  const merged = { ...local, ...server } as T;
+  const s = server as Record<string, unknown>;
+  const l = local as Record<string, unknown>;
+  if (s.videoUrl == null && l.videoUrl != null) (merged as Record<string, unknown>).videoUrl = l.videoUrl;
+  if (s.generationData == null && l.generationData != null) (merged as Record<string, unknown>).generationData = l.generationData;
+  if (s.imageUrl == null && l.imageUrl != null) (merged as Record<string, unknown>).imageUrl = l.imageUrl;
+  return merged;
+}
+
 export function useDesktopDetail(desktopId: string) {
   const [detail, setDetail] = useState<DesktopDetail | null>(null);
   const [loading, setLoading] = useState(false);
@@ -162,7 +177,7 @@ export function useDesktopDetail(desktopId: string) {
           ? {
               ...prev,
               assets: prev.assets.map((a) =>
-                a.id === assetId ? { ...a, ...data.asset } : a
+                a.id === assetId ? mergeAsset(a, data.asset) : a
               ),
             }
           : null
@@ -228,7 +243,7 @@ export function useDesktopDetail(desktopId: string) {
               ...prev,
               assets: prev.assets.map((a) => {
                 const server = updatedMap.get(a.id);
-                return server ? { ...a, ...server } : a;
+                return server ? mergeAsset(a, server) : a;
               }),
             }
           : null
