@@ -16,7 +16,7 @@ export async function fetchTaxonomyTree(lang: string): Promise<Property[]> {
   if (!res.ok) {
     throw new Error(`Failed to fetch taxonomy tree: ${res.status} ${res.statusText}`);
   }
-  await new Promise((r) => setTimeout(r, 1500)); // TODO: remove — artificial delay for UI testing
+  await new Promise((r) => setTimeout(r, 1000)); // TODO: remove — artificial delay for UI testing
   return res.json();
 }
 

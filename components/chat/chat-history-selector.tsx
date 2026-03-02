@@ -19,7 +19,6 @@ import {
   DropdownItem,
 } from "@heroui/dropdown";
 import {
-  MessageSquare,
   List,
   GalleryThumbnails,
   MoreHorizontal,
@@ -27,6 +26,7 @@ import {
   Check,
   Trash2,
   SquarePen,
+  ImageOff,
   ChevronDown,
 } from "lucide-react";
 
@@ -191,7 +191,7 @@ export const ChatItem = ({ chat, isActive, viewMode, onSelect }: ChatItemProps) 
             exit={{ opacity: 0, scale: 0.9 }}
             className={clsx(
               "w-full rounded-lg overflow-hidden bg-default-100 relative border border-default-200",
-              !thumbnailUrl && "aspect-square"
+              !thumbnailUrl && "h-10"
             )}
           >
             {thumbnailUrl ? (
@@ -207,7 +207,7 @@ export const ChatItem = ({ chat, isActive, viewMode, onSelect }: ChatItemProps) 
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center text-default-300">
-                <MessageSquare size={24} />
+                <ImageOff size={16} />
               </div>
             )}
             {isMonitored && (

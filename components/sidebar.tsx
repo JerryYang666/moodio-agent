@@ -9,13 +9,13 @@ import {
   PanelRightClose,
   PanelRightOpen,
   SquarePen,
-  MessageSquare,
   Pencil,
   Check,
   MoreHorizontal,
   List,
   GalleryThumbnails,
   Trash2,
+  ImageOff,
 } from "lucide-react";
 import { Tooltip } from "@heroui/tooltip";
 import { Image } from "@heroui/image";
@@ -109,7 +109,7 @@ const ChatItem = ({ chat, isActive, isCollapsed, viewMode }: ChatItemProps) => {
           exit={{ opacity: 0, scale: 0.9 }}
           className={clsx(
             "w-full rounded-lg overflow-hidden bg-default-100 relative border border-default-200",
-            !thumbnailUrl && "aspect-square" // Only force square aspect ratio if no image
+            !thumbnailUrl && "h-10"
           )}
         >
           {thumbnailUrl ? (
@@ -125,7 +125,7 @@ const ChatItem = ({ chat, isActive, isCollapsed, viewMode }: ChatItemProps) => {
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center text-default-300">
-              <MessageSquare size={24} />
+              <ImageOff size={16} />
             </div>
           )}
           {isMonitored && (
