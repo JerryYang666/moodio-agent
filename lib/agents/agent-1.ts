@@ -23,6 +23,11 @@ import {
 } from "@/lib/video/models";
 import { calculateCost } from "@/lib/pricing";
 import { deductCredits, getUserBalance, InsufficientCreditsError } from "@/lib/credits";
+import {
+  fetchTaxonomyTree,
+  serializeTaxonomyForLLM,
+  parseToolCallBody,
+} from "./taxonomy-tool";
 
 // Maximum number of retries for failed operations
 const MAX_RETRY = 2;
@@ -75,6 +80,97 @@ interface PreparedMessages {
   aspectRatioOverride?: AspectRatio;
   imageSizeOverride?: ImageSize;
   imageModelId?: string;
+}
+
+/** All XML tags the LLM is allowed to output. Used for validation. */
+const VALID_TAGS = ["TEXT", "JSON", "VIDEO", "SHOTLIST", "TOOL_CALL", "SEARCH", "think"];
+
+/** Mutable state shared across the stream parsing pipeline. */
+interface ParseState {
+  buffer: string;
+  fullLlmResponse: string;
+  thoughtSent: boolean;
+  questionSent: boolean;
+  suggestionIndex: number;
+  shotListStartSent: boolean;
+  imageTasks: Promise<void>[];
+  finalContent: MessageContentPart[];
+}
+
+/** Immutable context passed to all parsing helpers. */
+interface ParseContext {
+  prepared: PreparedMessages;
+  startTime: number;
+  send: (data: any) => void;
+  userId: string;
+  agent: Agent1;
+}
+
+/**
+ * Validate that no non-whitespace text appears outside known XML tags.
+ * Throws if invalid content is found.
+ */
+function validateBufferTags(buffer: string): void {
+  let insideTag = false;
+  let inAngleBrackets = false;
+  let i = 0;
+
+  while (i < buffer.length) {
+    const remaining = buffer.substring(i);
+
+    let tagMatched = false;
+    for (const tag of VALID_TAGS) {
+      const open = `<${tag}>`;
+      const close = `</${tag}>`;
+      if (remaining.startsWith(open)) {
+        insideTag = true;
+        i += open.length;
+        tagMatched = true;
+        break;
+      }
+      if (remaining.startsWith(close)) {
+        insideTag = false;
+        i += close.length;
+        tagMatched = true;
+        break;
+      }
+    }
+    if (tagMatched) continue;
+
+    const char = buffer[i];
+    if (char === "<") {
+      inAngleBrackets = true;
+    } else if (char === ">") {
+      inAngleBrackets = false;
+    } else if (!insideTag && !inAngleBrackets && char.trim() !== "") {
+      console.error(
+        `[Agent-1] Invalid text outside tags detected: "${buffer.substring(
+          Math.max(0, i - 20),
+          Math.min(buffer.length, i + 20)
+        )}"`
+      );
+      throw new Error(
+        `Invalid LLM response: text outside tags at position ${i}`
+      );
+    }
+
+    i++;
+  }
+}
+
+/**
+ * Extract content between an XML open/close tag pair from the buffer.
+ * Returns { content, rest } if found, or null if the closing tag isn't present yet.
+ */
+function extractTag(buffer: string, tag: string): { content: string; rest: string } | null {
+  const open = `<${tag}>`;
+  const close = `</${tag}>`;
+  const start = buffer.indexOf(open);
+  const end = buffer.indexOf(close);
+  if (start === -1 || end === -1 || start >= end) return null;
+  const content = buffer.substring(start + open.length, end);
+  const rest = buffer.substring(end + close.length);
+  return { content, rest };
 }
 
 export class Agent1 implements Agent {
@@ -252,6 +348,18 @@ export class Agent1 implements Agent {
               return {
                 type: "text" as const,
                 text: `[Shot List: ${p.title}]\n${header}\n${rows}`,
+              };
+            }
+            if (p.type === "agent_search") {
+              return {
+                type: "text" as const,
+                text: `[Search executed: text="${p.query.textSearch}", filters=${JSON.stringify(p.query.filterIds)}]`,
+              };
+            }
+            if (p.type === "tool_call") {
+              return {
+                type: "text" as const,
+                text: `[Tool call: ${p.tool} — ${p.status}]`,
               };
             }
             return p;
@@ -543,416 +651,361 @@ export class Agent1 implements Agent {
     send: (data: any) => void,
     userId: string
   ): Promise<Message> {
-    const client = new OpenAI({
+    console.log("prepared.messages", JSON.stringify(prepared.messages, null, 2));
+
+    const llmStream = await new OpenAI({
       apiKey: process.env.LLM_API_KEY,
-    });
-
-    console.log(
-      "prepared.messages",
-      JSON.stringify(prepared.messages, null, 2)
-    );
-
-    // Call LLM with stream
-    const llmStream = await client.chat.completions.create({
+    }).chat.completions.create({
       model: "gpt-4.1",
       messages: prepared.messages as any,
       stream: true,
     });
-    console.log(
-      "[Perf] Agent LLM stream started",
-      `[${Date.now() - startTime}ms]`
-    );
+    console.log("[Perf] Agent LLM stream started", `[${Date.now() - startTime}ms]`);
 
-    // Track final content for completion
-    const finalContent: MessageContentPart[] = [];
-    const self = this;
-
-    console.log(
-      "[Perf] Agent output stream start",
-      `[${Date.now() - startTime}ms]`
-    );
-    let buffer = "";
-    let fullLlmResponse = ""; // Track complete LLM response
-    let thoughtSent = false;
-    let questionSent = false;
-    let suggestionIndex = 0;
-    let shotListStartSent = false;
-    const imageTasks: Promise<void>[] = [];
+    const state: ParseState = {
+      buffer: "",
+      fullLlmResponse: "",
+      thoughtSent: false,
+      questionSent: false,
+      suggestionIndex: 0,
+      shotListStartSent: false,
+      imageTasks: [],
+      finalContent: [],
+    };
+    const ctx: ParseContext = { prepared, startTime, send, userId, agent: this };
 
     try {
-      for await (const chunk of llmStream) {
-        const delta = chunk.choices[0]?.delta?.content || "";
-        buffer += delta;
-        fullLlmResponse += delta; // Accumulate full response
+      await this.consumeLLMStream(llmStream, state, ctx);
 
-        // Check for invalid text outside tags
-        // Valid text should only be inside <TEXT>...</TEXT> or <JSON>...</JSON> or <VIDEO>...</VIDEO> or <SHOTLIST>...</SHOTLIST> or <think>...</think>
-        // Whitespace outside is OK
-        let checkBuffer = buffer;
-        let inAngleBrackets = false;
-        let inTextTag = false;
-        let inJsonTag = false;
-        let inVideoTag = false;
-        let inShotListTag = false;
-        let inThinkTag = false;
-        let i = 0;
+      await Promise.all(state.imageTasks);
 
-        while (i < checkBuffer.length) {
-          const char = checkBuffer[i];
-          const remaining = checkBuffer.substring(i);
-
-          // Check for opening tags
-          if (remaining.startsWith("<TEXT>")) {
-            inTextTag = true;
-            i += 6;
-            continue;
-          } else if (remaining.startsWith("</TEXT>")) {
-            inTextTag = false;
-            i += 7;
-            continue;
-          } else if (remaining.startsWith("<JSON>")) {
-            inJsonTag = true;
-            i += 6;
-            continue;
-          } else if (remaining.startsWith("</JSON>")) {
-            inJsonTag = false;
-            i += 7;
-            continue;
-          } else if (remaining.startsWith("<VIDEO>")) {
-            inVideoTag = true;
-            i += 7;
-            continue;
-          } else if (remaining.startsWith("</VIDEO>")) {
-            inVideoTag = false;
-            i += 8;
-            continue;
-          } else if (remaining.startsWith("<SHOTLIST>")) {
-            inShotListTag = true;
-            i += 10;
-            continue;
-          } else if (remaining.startsWith("</SHOTLIST>")) {
-            inShotListTag = false;
-            i += 11;
-            continue;
-          } else if (remaining.startsWith("<think>")) {
-            inThinkTag = true;
-            i += 7;
-            continue;
-          } else if (remaining.startsWith("</think>")) {
-            inThinkTag = false;
-            i += 8;
-            continue;
-          }
-
-          // Track if we're in angle brackets (for any other tags)
-          if (char === "<") {
-            inAngleBrackets = true;
-          } else if (char === ">") {
-            inAngleBrackets = false;
-          } else if (
-            !inTextTag &&
-            !inJsonTag &&
-            !inVideoTag &&
-            !inShotListTag &&
-            !inThinkTag &&
-            !inAngleBrackets &&
-            char.trim() !== ""
-          ) {
-            // Found non-whitespace text outside of valid tag content
-            console.error(
-              `[Agent-1] Invalid text outside tags detected: "${checkBuffer.substring(
-                Math.max(0, i - 20),
-                Math.min(checkBuffer.length, i + 20)
-              )}"`
-            );
-            throw new Error(
-              `Invalid LLM response: text outside tags at position ${i}`
-            );
-          }
-
-          i++;
-        }
-
-        // 1. Parse Thought
-        if (!thoughtSent) {
-          const tStart = buffer.indexOf("<think>");
-          const tEnd = buffer.indexOf("</think>");
-
-          if (tStart !== -1 && tEnd !== -1) {
-            const thoughtText = buffer.substring(tStart + 7, tEnd).trim();
-            send({ type: "internal_think", content: thoughtText });
-            console.log(
-              "[Perf] Agent thought sent",
-              `[${Date.now() - startTime}ms]`
-            );
-            finalContent.push({ type: "internal_think", text: thoughtText });
-            thoughtSent = true;
-            buffer = buffer.substring(tEnd + 8);
-          }
-        }
-
-        // 2. Parse Question
-        if (!questionSent) {
-          const qStart = buffer.indexOf("<TEXT>");
-          const qEnd = buffer.indexOf("</TEXT>");
-
-          if (qStart !== -1 && qEnd !== -1) {
-            const questionText = buffer.substring(qStart + 6, qEnd).trim();
-            send({ type: "text", content: questionText });
-            console.log(
-              "[Perf] Agent question sent",
-              `[${Date.now() - startTime}ms]`
-            );
-            finalContent.push({ type: "text", text: questionText });
-            questionSent = true;
-            buffer = buffer.substring(qEnd + 7);
-          }
-        }
-
-        // 2. Parse Suggestions (max 8)
-        while (buffer.includes("</JSON>")) {
-          const sStart = buffer.indexOf("<JSON>");
-          const sEnd = buffer.indexOf("</JSON>");
-
-          if (sStart !== -1 && sEnd !== -1) {
-            if (sStart < sEnd) {
-              const jsonStr = buffer.substring(sStart + 6, sEnd);
-              try {
-                const suggestion = JSON.parse(jsonStr);
-
-                // Hard limit: only start up to 8 image generation tasks
-                if (suggestionIndex < 8) {
-                  const currentIndex = suggestionIndex;
-                  suggestionIndex++;
-
-                  // Pre-generate imageId for tracking (enables parallel variant support)
-                  const trackingImageId = generateImageId();
-
-                  // Start image generation
-                  const task = (async () => {
-                    try {
-                      // Send placeholder when image generation starts - include trackingImageId
-                      const placeholder: MessageContentPart = {
-                        type: "agent_image",
-                        imageId: trackingImageId, // Pre-generated ID for tracking
-                        title: "Loading...",
-                        aspectRatio: suggestion.aspectRatio as AspectRatio,
-                        prompt: suggestion.prompt,
-                        status: "loading",
-                      };
-                      send({ type: "part", part: placeholder });
-                      finalContent.push(placeholder);
-
-                      console.log(
-                        "[Perf] Agent image generation start",
-                        `[${Date.now() - startTime}ms]`,
-                        `imageId=${trackingImageId}`
-                      );
-                      const part = await self.generateImage(
-                        suggestion,
-                        prepared,
-                        currentIndex,
-                        startTime,
-                        userId,
-                        trackingImageId // Pass pre-generated ID
-                      );
-
-                      // Send update using imageId instead of index for parallel support
-                      send({
-                        type: "part_update",
-                        imageId: trackingImageId,
-                        part: part,
-                      });
-
-                      // Update final content by finding the placeholder with matching imageId
-                      const placeholderIndex = finalContent.findIndex(
-                        (p) =>
-                          p.type === "agent_image" &&
-                          p.imageId === trackingImageId
-                      );
-                      if (placeholderIndex !== -1) {
-                        finalContent[placeholderIndex] = part;
-                      }
-                    } catch (err) {
-                      console.error(
-                        `Image gen error for imageId ${trackingImageId}`,
-                        err
-                      );
-                      const isInsufficientCredits = err instanceof InsufficientCreditsError;
-                      const errorPart: MessageContentPart = {
-                        type: "agent_image",
-                        imageId: trackingImageId, // Keep the tracking ID
-                        title: suggestion.title || "Error",
-                        aspectRatio: "1:1",
-                        prompt: suggestion.prompt || "",
-                        status: "error",
-                        ...(isInsufficientCredits && { reason: "INSUFFICIENT_CREDITS" }),
-                      };
-                      send({
-                        type: "part_update",
-                        imageId: trackingImageId,
-                        part: errorPart,
-                      });
-                      // Update final content by finding the placeholder with matching imageId
-                      const placeholderIndex = finalContent.findIndex(
-                        (p) =>
-                          p.type === "agent_image" &&
-                          p.imageId === trackingImageId
-                      );
-                      if (placeholderIndex !== -1) {
-                        finalContent[placeholderIndex] = errorPart;
-                      }
-                    }
-                  })();
-
-                  imageTasks.push(task);
-                } else {
-                  console.log(
-                    `[Agent-1] Skipping suggestion beyond limit of 8. Title: ${suggestion.title}`
-                  );
-                }
-              } catch (e) {
-                console.error("Failed to parse suggestion JSON", e);
-                throw new Error(`JSON parsing failed: ${e}`);
-              }
-            }
-            // Remove processed part
-            buffer = buffer.substring(sEnd + 7);
-          } else {
-            break;
-          }
-        }
-
-        // 3. Parse Video Configuration (max 1)
-        if (buffer.includes("</VIDEO>")) {
-          const vStart = buffer.indexOf("<VIDEO>");
-          const vEnd = buffer.indexOf("</VIDEO>");
-
-          if (vStart !== -1 && vEnd !== -1 && vStart < vEnd) {
-            const videoJsonStr = buffer.substring(vStart + 7, vEnd);
-            try {
-              const videoConfig = JSON.parse(videoJsonStr);
-              const modelId =
-                typeof videoConfig.modelId === "string" && getVideoModel(videoConfig.modelId)
-                  ? videoConfig.modelId
-                  : DEFAULT_VIDEO_MODEL_ID;
-              const model = getVideoModel(modelId);
-              const modelApiConfig = getModelConfigForApi(modelId);
-
-              if (model && modelApiConfig) {
-                // Build params from the agent output, excluding prompt and image params
-                const videoParams: Record<string, any> = {};
-                for (const param of modelApiConfig.params) {
-                  if (
-                    param.name === "prompt" ||
-                    param.name === model.imageParams.sourceImage ||
-                    param.name === model.imageParams.endImage
-                  ) {
-                    continue;
-                  }
-                  if (videoConfig[param.name] !== undefined) {
-                    videoParams[param.name] = videoConfig[param.name];
-                  } else if (param.default !== undefined) {
-                    videoParams[param.name] = param.default;
-                  }
-                }
-
-                const videoPart: MessageContentPart = {
-                  type: "agent_video",
-                  config: {
-                    modelId,
-                    modelName: model.name,
-                    prompt: videoConfig.prompt || "",
-                    sourceImageId: typeof videoConfig.sourceImageId === "string" ? videoConfig.sourceImageId : undefined,
-                    params: videoParams,
-                  },
-                  status: "pending",
-                };
-
-                send({ type: "part", part: videoPart });
-                finalContent.push(videoPart);
-
-                console.log(
-                  "[Perf] Agent video config sent",
-                  `model=${model.name}`,
-                  `[${Date.now() - startTime}ms]`
-                );
-              }
-            } catch (e) {
-              console.error("Failed to parse video config JSON", e);
-            }
-            buffer = buffer.substring(vEnd + 8);
-          }
-        }
-
-        // 4. Parse Shot List (max 1)
-        if (!shotListStartSent && buffer.includes("<SHOTLIST>")) {
-          shotListStartSent = true;
-          send({ type: "shot_list_start" });
-          console.log(
-            "[Perf] Agent shot list generation started",
-            `[${Date.now() - startTime}ms]`
-          );
-        }
-
-        if (buffer.includes("</SHOTLIST>")) {
-          const slStart = buffer.indexOf("<SHOTLIST>");
-          const slEnd = buffer.indexOf("</SHOTLIST>");
-
-          if (slStart !== -1 && slEnd !== -1 && slStart < slEnd) {
-            const shotListJsonStr = buffer.substring(slStart + 10, slEnd);
-            try {
-              const shotListData = JSON.parse(shotListJsonStr);
-              const shotListPart: MessageContentPart = {
-                type: "agent_shot_list",
-                title: shotListData.title || "Shot List",
-                columns: Array.isArray(shotListData.columns) ? shotListData.columns : [],
-                rows: Array.isArray(shotListData.rows) ? shotListData.rows : [],
-                status: "complete",
-              };
-
-              send({ type: "part", part: shotListPart });
-              finalContent.push(shotListPart);
-
-              console.log(
-                "[Perf] Agent shot list sent",
-                `rows=${shotListPart.rows.length}`,
-                `[${Date.now() - startTime}ms]`
-              );
-            } catch (e) {
-              console.error("Failed to parse shot list JSON", e);
-            }
-            buffer = buffer.substring(slEnd + 11);
-          }
-        }
-      }
-
-      // Stream ended
-      await Promise.all(imageTasks);
-
-      // Log final LLM response
       console.log("=== FINAL AI LLM RESPONSE ===");
-      console.log(fullLlmResponse);
+      console.log(state.fullLlmResponse);
       console.log("=== END FINAL AI LLM RESPONSE ===");
 
-      // If no question found (fallback)
-      if (finalContent.length === 0) {
-        // Maybe buffer has text?
-        const text = buffer.replace(/<[^>]*>/g, "").trim();
+      if (state.finalContent.length === 0) {
+        const text = state.buffer.replace(/<[^>]*>/g, "").trim();
         if (text) {
           send({ type: "text", content: text });
-          finalContent.push({ type: "text", text });
+          state.finalContent.push({ type: "text", text });
         }
       }
 
       return {
         role: "assistant",
-        content: finalContent,
+        content: state.finalContent,
         agentId: "agent-1",
       };
     } catch (err) {
       console.error("Stream processing error", err);
       throw err;
+    }
+  }
+
+  // --- Shared parsing helpers called by consumeLLMStream ---
+
+  private parseThought(state: ParseState, ctx: ParseContext): void {
+    if (state.thoughtSent) return;
+    const result = extractTag(state.buffer, "think");
+    if (!result) return;
+
+    const thoughtText = result.content.trim();
+    ctx.send({ type: "internal_think", content: thoughtText });
+    console.log("[Perf] Agent thought sent", `[${Date.now() - ctx.startTime}ms]`);
+    state.finalContent.push({ type: "internal_think", text: thoughtText });
+    state.thoughtSent = true;
+    state.buffer = result.rest;
+  }
+
+  private parseText(state: ParseState, ctx: ParseContext): void {
+    if (state.questionSent) return;
+    const result = extractTag(state.buffer, "TEXT");
+    if (!result) return;
+
+    const questionText = result.content.trim();
+    ctx.send({ type: "text", content: questionText });
+    console.log("[Perf] Agent question sent", `[${Date.now() - ctx.startTime}ms]`);
+    state.finalContent.push({ type: "text", text: questionText });
+    state.questionSent = true;
+    state.buffer = result.rest;
+  }
+
+  private parseSuggestions(state: ParseState, ctx: ParseContext): void {
+    while (state.buffer.includes("</JSON>")) {
+      const result = extractTag(state.buffer, "JSON");
+      if (!result) break;
+
+      try {
+        const suggestion = JSON.parse(result.content);
+
+        if (state.suggestionIndex < 8) {
+          const currentIndex = state.suggestionIndex;
+          state.suggestionIndex++;
+          const trackingImageId = generateImageId();
+
+          const task = (async () => {
+            try {
+              const placeholder: MessageContentPart = {
+                type: "agent_image",
+                imageId: trackingImageId,
+                title: "Loading...",
+                aspectRatio: suggestion.aspectRatio as AspectRatio,
+                prompt: suggestion.prompt,
+                status: "loading",
+              };
+              ctx.send({ type: "part", part: placeholder });
+              state.finalContent.push(placeholder);
+
+              console.log(
+                "[Perf] Agent image generation start",
+                `[${Date.now() - ctx.startTime}ms]`,
+                `imageId=${trackingImageId}`
+              );
+              const part = await ctx.agent.generateImage(
+                suggestion, ctx.prepared, currentIndex, ctx.startTime, ctx.userId, trackingImageId
+              );
+
+              ctx.send({ type: "part_update", imageId: trackingImageId, part });
+              const idx = state.finalContent.findIndex(
+                (p) => p.type === "agent_image" && p.imageId === trackingImageId
+              );
+              if (idx !== -1) state.finalContent[idx] = part;
+            } catch (err) {
+              console.error(`Image gen error for imageId ${trackingImageId}`, err);
+              const isInsufficientCredits = err instanceof InsufficientCreditsError;
+              const errorPart: MessageContentPart = {
+                type: "agent_image",
+                imageId: trackingImageId,
+                title: suggestion.title || "Error",
+                aspectRatio: "1:1",
+                prompt: suggestion.prompt || "",
+                status: "error",
+                ...(isInsufficientCredits && { reason: "INSUFFICIENT_CREDITS" }),
+              };
+              ctx.send({ type: "part_update", imageId: trackingImageId, part: errorPart });
+              const idx = state.finalContent.findIndex(
+                (p) => p.type === "agent_image" && p.imageId === trackingImageId
+              );
+              if (idx !== -1) state.finalContent[idx] = errorPart;
+            }
+          })();
+
+          state.imageTasks.push(task);
+        } else {
+          console.log(`[Agent-1] Skipping suggestion beyond limit of 8. Title: ${suggestion.title}`);
+        }
+      } catch (e) {
+        console.error("Failed to parse suggestion JSON", e);
+        throw new Error(`JSON parsing failed: ${e}`);
+      }
+      state.buffer = result.rest;
+    }
+  }
+
+  private parseVideo(state: ParseState, ctx: ParseContext): void {
+    if (!state.buffer.includes("</VIDEO>")) return;
+    const result = extractTag(state.buffer, "VIDEO");
+    if (!result) return;
+
+    try {
+      const videoConfig = JSON.parse(result.content);
+      const modelId =
+        typeof videoConfig.modelId === "string" && getVideoModel(videoConfig.modelId)
+          ? videoConfig.modelId
+          : DEFAULT_VIDEO_MODEL_ID;
+      const model = getVideoModel(modelId);
+      const modelApiConfig = getModelConfigForApi(modelId);
+
+      if (model && modelApiConfig) {
+        const videoParams: Record<string, any> = {};
+        for (const param of modelApiConfig.params) {
+          if (
+            param.name === "prompt" ||
+            param.name === model.imageParams.sourceImage ||
+            param.name === model.imageParams.endImage
+          ) continue;
+          if (videoConfig[param.name] !== undefined) {
+            videoParams[param.name] = videoConfig[param.name];
+          } else if (param.default !== undefined) {
+            videoParams[param.name] = param.default;
+          }
+        }
+
+        const videoPart: MessageContentPart = {
+          type: "agent_video",
+          config: {
+            modelId,
+            modelName: model.name,
+            prompt: videoConfig.prompt || "",
+            sourceImageId: typeof videoConfig.sourceImageId === "string" ? videoConfig.sourceImageId : undefined,
+            params: videoParams,
+          },
+          status: "pending",
+        };
+
+        ctx.send({ type: "part", part: videoPart });
+        state.finalContent.push(videoPart);
+        console.log("[Perf] Agent video config sent", `model=${model.name}`, `[${Date.now() - ctx.startTime}ms]`);
+      }
+    } catch (e) {
+      console.error("Failed to parse video config JSON", e);
+    }
+    state.buffer = result.rest;
+  }
+
+  private parseShotList(state: ParseState, ctx: ParseContext): void {
+    if (!state.shotListStartSent && state.buffer.includes("<SHOTLIST>")) {
+      state.shotListStartSent = true;
+      ctx.send({ type: "shot_list_start" });
+      console.log("[Perf] Agent shot list generation started", `[${Date.now() - ctx.startTime}ms]`);
+    }
+
+    if (!state.buffer.includes("</SHOTLIST>")) return;
+    const result = extractTag(state.buffer, "SHOTLIST");
+    if (!result) return;
+
+    try {
+      const shotListData = JSON.parse(result.content);
+      const shotListPart: MessageContentPart = {
+        type: "agent_shot_list",
+        title: shotListData.title || "Shot List",
+        columns: Array.isArray(shotListData.columns) ? shotListData.columns : [],
+        rows: Array.isArray(shotListData.rows) ? shotListData.rows : [],
+        status: "complete",
+      };
+
+      ctx.send({ type: "part", part: shotListPart });
+      state.finalContent.push(shotListPart);
+      console.log("[Perf] Agent shot list sent", `rows=${shotListPart.rows.length}`, `[${Date.now() - ctx.startTime}ms]`);
+    } catch (e) {
+      console.error("Failed to parse shot list JSON", e);
+    }
+    state.buffer = result.rest;
+  }
+
+  private parseSearch(state: ParseState, ctx: ParseContext): void {
+    if (!state.buffer.includes("</SEARCH>")) return;
+    const result = extractTag(state.buffer, "SEARCH");
+    if (!result) return;
+
+    try {
+      const searchData = JSON.parse(result.content);
+      const searchPart: MessageContentPart = {
+        type: "agent_search",
+        query: {
+          textSearch: typeof searchData.text === "string" ? searchData.text : "",
+          filterIds: Array.isArray(searchData.filters) ? searchData.filters : [],
+        },
+        status: "pending",
+      };
+
+      ctx.send({ type: "part", part: searchPart });
+      state.finalContent.push(searchPart);
+      console.log(
+        "[Perf] Agent search query sent",
+        `text="${searchPart.query.textSearch}"`,
+        `filters=${JSON.stringify(searchPart.query.filterIds)}`,
+        `[${Date.now() - ctx.startTime}ms]`
+      );
+    } catch (e) {
+      console.error("Failed to parse search JSON", e);
+    }
+    state.buffer = result.rest;
+  }
+
+  private async handleToolCall(
+    state: ParseState,
+    ctx: ParseContext,
+  ): Promise<boolean> {
+    if (!state.buffer.includes("</TOOL_CALL>")) return false;
+    const result = extractTag(state.buffer, "TOOL_CALL");
+    if (!result) return false;
+
+    let toolCall;
+    try {
+      toolCall = parseToolCallBody(result.content.trim());
+    } catch (e) {
+      console.error("Failed to parse tool call JSON", e);
+      state.buffer = result.rest;
+      return false;
+    }
+
+    if (toolCall.tool !== "CHECK_TAXONOMY") {
+      state.buffer = result.rest;
+      return false;
+    }
+
+    console.log(`[Agent-1] Tool call detected: CHECK_TAXONOMY lang=${toolCall.lang}`, `[${Date.now() - ctx.startTime}ms]`);
+
+    ctx.send({ type: "tool_call", tool: "check_taxonomy", status: "loading" });
+    state.finalContent.push({ type: "tool_call", tool: "check_taxonomy", status: "loading" });
+
+    const partialResponse = state.fullLlmResponse.substring(0, state.fullLlmResponse.indexOf("<TOOL_CALL>"));
+
+    const taxonomyTree = await fetchTaxonomyTree(toolCall.lang);
+    const serialized = serializeTaxonomyForLLM(taxonomyTree);
+    console.log(`[Agent-1] Taxonomy tree fetched: ${serialized.length} chars`, `[${Date.now() - ctx.startTime}ms]`);
+
+    ctx.send({ type: "tool_call", tool: "check_taxonomy", status: "complete" });
+    const toolCallIdx = state.finalContent.findIndex(
+      (p) => p.type === "tool_call" && (p as any).status === "loading"
+    );
+    if (toolCallIdx !== -1) {
+      state.finalContent[toolCallIdx] = { type: "tool_call", tool: "check_taxonomy", status: "complete" };
+    }
+
+    const continuationMessages = [
+      ...ctx.prepared.messages,
+      { role: "assistant", content: partialResponse.trim() },
+      {
+        role: "user",
+        content: `[System: Tool call result for CHECK_TAXONOMY]\n\nHere is the taxonomy tree. Each selectable item has an [id:NUMBER] prefix. Use these IDs in your <SEARCH> filters and taxonomy: links.\n\n${serialized}`,
+      },
+    ];
+
+    const continuationStream = await new OpenAI({
+      apiKey: process.env.LLM_API_KEY,
+    }).chat.completions.create({
+      model: "gpt-4.1",
+      messages: continuationMessages as any,
+      stream: true,
+    });
+
+    console.log("[Perf] Agent continuation LLM stream started after tool call", `[${Date.now() - ctx.startTime}ms]`);
+
+    state.buffer = "";
+    state.fullLlmResponse = "";
+    state.thoughtSent = true;
+    state.questionSent = false;
+    state.suggestionIndex = 0;
+    state.shotListStartSent = false;
+
+    await this.consumeLLMStream(continuationStream, state, ctx);
+    return true;
+  }
+
+  private async consumeLLMStream(
+    llmStream: AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>,
+    state: ParseState,
+    ctx: ParseContext,
+  ): Promise<void> {
+    for await (const chunk of llmStream) {
+      const delta = chunk.choices[0]?.delta?.content || "";
+      state.buffer += delta;
+      state.fullLlmResponse += delta;
+
+      validateBufferTags(state.buffer);
+
+      this.parseThought(state, ctx);
+
+      const toolCallHandled = await this.handleToolCall(state, ctx);
+      if (toolCallHandled) return;
+
+      this.parseText(state, ctx);
+      this.parseSuggestions(state, ctx);
+      this.parseVideo(state, ctx);
+      this.parseShotList(state, ctx);
+      this.parseSearch(state, ctx);
     }
   }
 

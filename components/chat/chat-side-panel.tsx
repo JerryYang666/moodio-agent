@@ -57,6 +57,7 @@ export default function ChatSidePanel({
   const [activeChatId, setActiveChatId] = useState<string | undefined>(undefined);
   const [initialMessages, setInitialMessages] = useState<Message[]>([]);
   const [isLoadingChat, setIsLoadingChat] = useState(false);
+  const skipFetchRef = useRef(false);
 
   // Stable key for AnimatePresence: only changes on explicit user navigation
   // (new chat button / chat selector), NOT when a chat is created mid-send.
@@ -122,6 +123,11 @@ export default function ChatSidePanel({
 
   // Fetch chat messages when activeChatId changes
   useEffect(() => {
+    if (skipFetchRef.current) {
+      skipFetchRef.current = false;
+      return;
+    }
+
     const fetchChat = async () => {
       if (!activeChatId) {
         setInitialMessages([]);
@@ -232,6 +238,7 @@ export default function ChatSidePanel({
 
   // Handle when ChatInterface creates a new chat
   const handleChatCreated = useCallback((chatId: string) => {
+    skipFetchRef.current = true;
     setActiveChatId(chatId);
     localStorage.setItem(siteConfig.activeChatId, chatId);
   }, []);

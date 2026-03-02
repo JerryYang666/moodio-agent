@@ -120,6 +120,16 @@
       "sparkle": "讓我再試一次，加點創意！"
     },
     "thinkingProcess": "思考過程",
+    "toolCall": {
+      "checkingTaxonomy": "正在查看分類標籤樹...",
+      "taxonomyLoaded": "分類標籤樹已載入"
+    },
+    "search": {
+      "searched": "已搜尋",
+      "goToBrowse": "前往瀏覽頁面搜尋",
+      "textQuery": "文字",
+      "filters": "篩選"
+    },
     "userUpload": "使用者上傳",
     "editMessage": "編輯訊息",
     "editInNewChatTitle": "在新對話中編輯？",

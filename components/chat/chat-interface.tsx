@@ -1384,6 +1384,24 @@ export default function ChatInterface({
                 type: "internal_think",
                 text: event.content,
               });
+            } else if (event.type === "tool_call") {
+              // Tool call status updates — find existing or push new
+              const existingIdx = currentContent.findIndex(
+                (p) => p.type === "tool_call" && (p as any).tool === event.tool
+              );
+              if (existingIdx !== -1) {
+                currentContent[existingIdx] = {
+                  type: "tool_call",
+                  tool: event.tool,
+                  status: event.status,
+                };
+              } else {
+                currentContent.push({
+                  type: "tool_call",
+                  tool: event.tool,
+                  status: event.status,
+                });
+              }
             } else if (event.type === "text") {
               // Append text to the first part if it's text, or create new
               if (

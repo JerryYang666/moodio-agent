@@ -120,6 +120,16 @@
       "sparkle": "Let me try that again with more sparkle!"
     },
     "thinkingProcess": "Thinking Process",
+    "toolCall": {
+      "checkingTaxonomy": "Checking taxonomy tree...",
+      "taxonomyLoaded": "Taxonomy tree loaded"
+    },
+    "search": {
+      "searched": "Searched",
+      "goToBrowse": "Go to Browse to search",
+      "textQuery": "Text",
+      "filters": "Filters"
+    },
     "userUpload": "User upload",
     "editMessage": "Edit message",
     "editInNewChatTitle": "Edit in new chat?",

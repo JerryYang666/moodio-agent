@@ -6,7 +6,7 @@ import { Avatar } from "@heroui/avatar";
 import { Image } from "@heroui/image";
 import { Bot, X, Pencil, ChevronDown, ChevronRight, Brain } from "lucide-react";
 import clsx from "clsx";
-import ReactMarkdown from "react-markdown";
+import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
 import { Message, MessageContentPart } from "@/lib/llm/types";
 import ImageWithMenu from "@/components/collection/image-with-menu";
 import { ImageInfo } from "./image-detail-modal";
@@ -21,6 +21,9 @@ import { AI_IMAGE_DRAG_MIME } from "./asset-dnd";
 import VideoPromptBlock from "./video-prompt-block";
 import VideoConfigCard from "./video-config-card";
 import ShotListCard from "./shot-list-card";
+import ToolCallCard from "./tool-call-card";
+import SearchQueryCard from "./search-query-card";
+import TaxonomyLink from "./taxonomy-link";
 
 interface ChatMessageProps {
   message: Message;
@@ -119,6 +122,11 @@ export default function ChatMessage({
     messageTimestamp?: number
   ) => {
     // Custom components for ReactMarkdown to handle video-prompt code blocks
+    const urlTransform = (url: string) => {
+      if (url.startsWith("taxonomy:")) return url;
+      return defaultUrlTransform(url);
+    };
+
     const markdownComponents = {
       code({ node, className, children, ...props }: any) {
         const match = /language-video-prompt/.exec(className || "");
@@ -142,11 +150,20 @@ export default function ChatMessage({
         }
         return <pre>{children}</pre>;
       },
+      a({ href, children, ...props }: any) {
+        if (href?.startsWith("taxonomy:")) {
+          const id = parseInt(href.replace("taxonomy:", ""), 10);
+          if (!isNaN(id)) {
+            return <TaxonomyLink id={id}>{children}</TaxonomyLink>;
+          }
+        }
+        return <a href={href} {...props}>{children}</a>;
+      },
     };
 
     if (typeof content === "string") {
       return (
-        <ReactMarkdown components={markdownComponents}>{content}</ReactMarkdown>
+        <ReactMarkdown urlTransform={urlTransform} components={markdownComponents}>{content}</ReactMarkdown>
       );
     }
 
@@ -163,6 +180,8 @@ export default function ChatMessage({
     const videoParts = content.filter((p) => p.type === "agent_video");
     const shotListParts = content.filter((p) => p.type === "agent_shot_list");
     const thinkParts = content.filter((p) => p.type === "internal_think");
+    const toolCallParts = content.filter((p) => p.type === "tool_call");
+    const searchParts = content.filter((p) => p.type === "agent_search");
 
     return (
       <div className="space-y-4">
@@ -190,8 +209,13 @@ export default function ChatMessage({
           </div>
         )}
 
+        {toolCallParts.length > 0 &&
+          toolCallParts.map((part: any, i) => (
+            <ToolCallCard key={`tool-${i}`} tool={part.tool} status={part.status} />
+          ))}
+
         {textParts.map((part: any, i) => (
-          <ReactMarkdown key={`text-${i}`} components={markdownComponents}>
+          <ReactMarkdown key={`text-${i}`} urlTransform={urlTransform} components={markdownComponents}>
             {part.text}
           </ReactMarkdown>
         ))}
@@ -373,6 +397,15 @@ export default function ChatMessage({
         {shotListParts.length > 0 &&
           shotListParts.map((part: any, i) => (
             <ShotListCard key={`shotlist-${i}`} part={part} />
+          ))}
+
+        {searchParts.length > 0 &&
+          searchParts.map((part: any, i) => (
+            <SearchQueryCard
+              key={`search-${i}`}
+              query={part.query}
+              status={part.status}
+            />
           ))}
       </div>
     );

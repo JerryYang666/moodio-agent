@@ -120,6 +120,16 @@
       "sparkle": "让我再试一次，加点创意！"
     },
     "thinkingProcess": "思考过程",
+    "toolCall": {
+      "checkingTaxonomy": "正在查看分类标签树...",
+      "taxonomyLoaded": "分类标签树已加载"
+    },
+    "search": {
+      "searched": "已搜索",
+      "goToBrowse": "前往浏览页面搜索",
+      "textQuery": "文本",
+      "filters": "筛选"
+    },
     "userUpload": "用户上传",
     "editMessage": "编辑消息",
     "editInNewChatTitle": "在新对话中编辑？",

@@ -43,6 +43,19 @@ export type MessageContentPart =
       rows: Array<{ id: string; cells: Array<{ value: string }> }>;
       status: "streaming" | "complete";
       desktopAssetId?: string;
+    }
+  | {
+      type: "agent_search";
+      query: {
+        textSearch: string;
+        filterIds: number[];
+      };
+      status: "pending" | "executed";
+    }
+  | {
+      type: "tool_call";
+      tool: string;
+      status: "loading" | "complete" | "error";
     };
 
 export interface Message {

@@ -120,6 +120,16 @@
       "sparkle": "もう一度、もっと輝きを加えてやってみます！"
     },
     "thinkingProcess": "思考プロセス",
+    "toolCall": {
+      "checkingTaxonomy": "タクソノミーツリーを確認中...",
+      "taxonomyLoaded": "タクソノミーツリーを読み込みました"
+    },
+    "search": {
+      "searched": "検索済み",
+      "goToBrowse": "ブラウズページで検索",
+      "textQuery": "テキスト",
+      "filters": "フィルター"
+    },
     "userUpload": "ユーザーアップロード",
     "editMessage": "メッセージを編集",
     "editInNewChatTitle": "新しいチャットで編集しますか？",
