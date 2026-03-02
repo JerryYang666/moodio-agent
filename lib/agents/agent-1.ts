@@ -19,6 +19,7 @@ import {
   DEFAULT_VIDEO_MODEL_ID,
   getVideoModel,
   getModelConfigForApi,
+  getVideoModelsPromptText,
 } from "@/lib/video/models";
 
 // Maximum number of retries for failed operations
@@ -218,10 +219,9 @@ export class Agent1 implements Agent {
     referenceImages?: ReferenceImageEntry[] // Reference images with tags
   ): Promise<PreparedMessages> {
     const rawSystemPrompt = systemPromptOverride || getSystemPrompt(this.id);
-    const systemPrompt = rawSystemPrompt.replace(
-      "{{SUPPORTED_ASPECT_RATIOS}}",
-      SUPPORTED_ASPECT_RATIOS.join(", ")
-    );
+    const systemPrompt = rawSystemPrompt
+      .replace("{{SUPPORTED_ASPECT_RATIOS}}", SUPPORTED_ASPECT_RATIOS.join(", "))
+      .replace("{{VIDEO_MODELS_INFO}}", getVideoModelsPromptText());
 
     // Convert previous agent_image and agent_video parts to text in history
     const cleanHistory = history.map((m) => {
@@ -806,7 +806,10 @@ export class Agent1 implements Agent {
             const videoJsonStr = buffer.substring(vStart + 7, vEnd);
             try {
               const videoConfig = JSON.parse(videoJsonStr);
-              const modelId = DEFAULT_VIDEO_MODEL_ID;
+              const modelId =
+                typeof videoConfig.modelId === "string" && getVideoModel(videoConfig.modelId)
+                  ? videoConfig.modelId
+                  : DEFAULT_VIDEO_MODEL_ID;
               const model = getVideoModel(modelId);
               const modelApiConfig = getModelConfigForApi(modelId);
 
@@ -844,6 +847,7 @@ export class Agent1 implements Agent {
 
                 console.log(
                   "[Perf] Agent video config sent",
+                  `model=${model.name}`,
                   `[${Date.now() - startTime}ms]`
                 );
               }

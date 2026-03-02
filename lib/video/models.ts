@@ -1132,3 +1132,74 @@ export function getModelConfigForApi(modelId: string) {
 export function getAllModelsForApi() {
   return VIDEO_MODELS.map((m) => getModelConfigForApi(m.id));
 }
+
+/**
+ * Build a human-readable description of a model's user-facing parameters
+ * for inclusion in the AI system prompt. Excludes image params (handled
+ * automatically), hidden/disabled params, and the prompt param (always required).
+ */
+function describeModelParams(model: VideoModelConfig): string {
+  const lines: string[] = [];
+  for (const param of model.params) {
+    if (param.status === "hidden" || param.status === "disabled") continue;
+    if (param.name === "prompt") continue;
+    if (param.name === model.imageParams.sourceImage) continue;
+    if (param.name === model.imageParams.endImage) continue;
+
+    let desc = `- ${param.name}`;
+    if (param.label) desc += ` (${param.label})`;
+    desc += `: `;
+
+    if (param.type === "enum" && param.options?.length) {
+      desc += `Options: ${param.options.map((o) => JSON.stringify(o)).join(", ")}`;
+    } else if (param.type === "boolean") {
+      desc += `true/false`;
+    } else if (param.type === "number") {
+      const parts: string[] = ["number"];
+      if (param.min !== undefined) parts.push(`min ${param.min}`);
+      if (param.max !== undefined) parts.push(`max ${param.max}`);
+      desc += parts.join(", ");
+    } else if (param.type === "string") {
+      desc += "string";
+    } else if (param.type === "string_array") {
+      desc += "array of strings";
+      if (param.maxItems) desc += ` (max ${param.maxItems})`;
+    }
+
+    if (param.default !== undefined) {
+      desc += `. Default: ${JSON.stringify(param.default)}`;
+    }
+    if (param.description) {
+      desc += `. ${param.description}`;
+    }
+
+    lines.push(desc);
+  }
+  return lines.join("\n");
+}
+
+/**
+ * Generate the dynamic video models section for the AI system prompt.
+ * Iterates over every registered model and describes its available parameters
+ * so the AI can pick the right model and fill in the correct params.
+ */
+export function getVideoModelsPromptText(): string {
+  const defaultModel = getVideoModel(DEFAULT_VIDEO_MODEL_ID);
+  const sections: string[] = [];
+
+  sections.push(`Available video models (${VIDEO_MODELS.length} total):`);
+  sections.push(`Default model: "${defaultModel?.name || "unknown"}" (${DEFAULT_VIDEO_MODEL_ID})\n`);
+
+  for (const model of VIDEO_MODELS) {
+    const header = `Model: "${model.name}" (modelId: "${model.id}")`;
+    const desc = model.description ? `  ${model.description}` : "";
+    const supportsEndImage = model.imageParams.endImage ? "  Supports end image: yes" : "  Supports end image: no";
+    const params = describeModelParams(model);
+
+    sections.push(
+      [header, desc, supportsEndImage, "  Parameters:", params.split("\n").map((l) => "  " + l).join("\n")].filter(Boolean).join("\n")
+    );
+  }
+
+  return sections.join("\n\n");
+}

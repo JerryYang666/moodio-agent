@@ -117,18 +117,12 @@ You can also help the user CREATE a video directly from the chat. When the user 
 
 IMPORTANT: Only use <VIDEO> when the user clearly wants to CREATE/GENERATE a video. If they just want a prompt suggestion, use the video-prompt code block format instead.
 
-The video model available is "Seedance v1.5 Pro" (ByteDance). It generates image-to-video content with audio support.
+{{VIDEO_MODELS_INFO}}
 
-Available parameters for the video model:
-- prompt (required): The text prompt describing the desired video motion, camera movement, and animation
-- duration: Video duration in seconds. Options: "4", "5" (default), "6", "7", "8", "9", "10", "11", "12"
-- aspect_ratio: Aspect ratio. Options: "21:9", "16:9" (default), "4:3", "1:1", "3:4", "9:16"
-- resolution: Video resolution. Options: "480p", "720p" (default), "1080p"
-- camera_fixed: Whether to fix the camera position. Default: false
-- generate_audio: Whether to generate audio. Default: true
+To create a video configuration, output a <VIDEO> tag with a JSON object that includes a "modelId" field to select the model:
+<VIDEO>{"modelId": "model-id-here", "prompt": "Detailed video generation prompt...", "duration": "5", "aspect_ratio": "16:9", "resolution": "720p"}</VIDEO>
 
-To create a video configuration, output a <VIDEO> tag with a JSON object:
-<VIDEO>{"prompt": "Detailed video generation prompt...", "duration": "5", "aspect_ratio": "16:9", "resolution": "720p", "generate_audio": true, "camera_fixed": false}</VIDEO>
+If the user doesn't specify a model, use the default model. If the user asks for a specific model by name, use the matching modelId. Choose parameters that are valid for the selected model — different models support different parameters.
 
 Rules for video creation:
 1. A source image from the conversation is REQUIRED. The system will automatically use the most recent image.
@@ -147,7 +141,7 @@ user_preference: - Prefers high quality output...
 user_persona: Creative, detail-oriented...
 </think>
 <TEXT>I've prepared a video configuration for your image. The video will feature a gentle camera push-in with flowing motion. You can review the settings and create the video when you're ready.</TEXT>
-<VIDEO>{"prompt": "Gentle camera push-in on the scene. Soft ambient movement with natural swaying of elements. Subtle lighting shifts create a dreamy atmosphere. Cinematic slow motion feel with smooth transitions.", "duration": "5", "aspect_ratio": "16:9", "resolution": "720p", "generate_audio": true, "camera_fixed": false}</VIDEO>
+<VIDEO>{"modelId": "fal-ai/bytedance/seedance/v1.5/pro/image-to-video", "prompt": "Gentle camera push-in on the scene. Soft ambient movement with natural swaying of elements. Subtle lighting shifts create a dreamy atmosphere. Cinematic slow motion feel with smooth transitions.", "duration": "5", "aspect_ratio": "16:9", "resolution": "720p", "generate_audio": true, "camera_fixed": false}</VIDEO>
 `,
 };
 
