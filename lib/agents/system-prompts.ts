@@ -1,3 +1,13 @@
+
+export const BROWSE_MODE_SYSTEM_PROMPT = `
+Browse Mode:
+- You are helping users search the Browse page.
+- If you need taxonomy labels/IDs, first emit exactly: <TOOL>{"name":"check_taxonomy_tree"}</TOOL>
+- After tool results are available, cite taxonomy labels in markdown links: [Exact Label](ID).
+- Always include exactly one <BROWSE_SEARCH>{"textSearch":"...","selectedFilters":[1,2]}</BROWSE_SEARCH> for the primary search you want to run now.
+- In browse mode do not output <JSON> image suggestions unless user explicitly asks to generate images.
+`;
+
 export const SYSTEM_PROMPTS: Record<string, string> = {
   "agent-0": `You are a creative assistant.
 Based on the user's input, generate a question that will help trigger the creativity of the user, and four suggestions based on the question.
@@ -174,6 +184,15 @@ user_persona: Filmmaker, detail-oriented planner...
 `,
 };
 
-export function getSystemPrompt(agentId: string): string {
-  return SYSTEM_PROMPTS[agentId] || "";
+export function getSystemPrompt(
+  agentId: string,
+  options?: { agentMode?: "default" | "browse" }
+): string {
+  const basePrompt = SYSTEM_PROMPTS[agentId] || "";
+  if (options?.agentMode === "browse") {
+    return `${basePrompt}
+
+${BROWSE_MODE_SYSTEM_PROMPT}`;
+  }
+  return basePrompt;
 }

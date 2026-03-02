@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
-import { useSelector } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { useFeatureFlag } from "@/lib/feature-flags";
 import FilterMenu from "@/components/browse/FilterMenu";
 import SearchBar from "@/components/browse/SearchBar";
@@ -20,6 +20,7 @@ import {
   DrawerBody,
 } from "@heroui/drawer";
 import type { RootState } from "@/lib/redux/store";
+import { setSelectedFilters } from "@/lib/redux/slices/querySlice";
 
 const DEFAULT_CHAT_PANEL_WIDTH = 380;
 const COLLAPSED_CHAT_WIDTH = 48;
@@ -41,6 +42,7 @@ const useDisableBodyScroll = (enabled: boolean) => {
 
 export default function BrowsePage() {
   const t = useTranslations("browse");
+  const dispatch = useDispatch();
   const showBrowse = useFeatureFlag<boolean>("user_retrieval") ?? false;
   const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
   const [isFilterCollapsed, setIsFilterCollapsed] = useState(false);
@@ -75,6 +77,13 @@ export default function BrowsePage() {
     (state: RootState) => state.query.contentTypes
   );
   const isAigc = useSelector((state: RootState) => state.query.isAigc);
+
+  const handleTaxonomyLinkClick = useCallback((taxonomyId: number) => {
+    const next = selectedFilters.includes(taxonomyId)
+      ? selectedFilters
+      : [...selectedFilters, taxonomyId];
+    dispatch(setSelectedFilters(next));
+  }, [dispatch, selectedFilters]);
 
   // Count all active filters (taxonomy filters + content type + AI source)
   const activeFilterCount =
@@ -196,6 +205,8 @@ export default function BrowsePage() {
             defaultExpanded={!isChatPanelCollapsed}
             onCollapseChange={handleChatPanelCollapseChange}
             onWidthChange={handleChatPanelWidthChange}
+            agentMode="browse"
+            onTaxonomyLinkClick={handleTaxonomyLinkClick}
           />
         </div>
 

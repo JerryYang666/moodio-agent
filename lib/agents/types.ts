@@ -26,7 +26,8 @@ export interface Agent {
     systemPromptOverride?: string,
     aspectRatioOverride?: string,
     imageSizeOverride?: ImageSize,
-    imageModelId?: string
+    imageModelId?: string,
+    agentMode?: "default" | "browse"
   ): Promise<AgentResponse>;
 
   // Process request with parallel variants
@@ -42,6 +43,13 @@ export interface Agent {
     systemPromptOverride?: string,
     aspectRatioOverride?: string,
     imageSizeOverride?: ImageSize,
-    imageModelId?: string
+    imageModelId?: string,
+    messageTimestamp?: number,
+    referenceImages?: Array<{
+      imageId: string;
+      tag: "none" | "subject" | "scene" | "item" | "style";
+      title?: string;
+    }>,
+    agentMode?: "default" | "browse"
   ): Promise<ParallelAgentResponse>;
 }

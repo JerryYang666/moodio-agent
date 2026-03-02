@@ -38,6 +38,10 @@ export interface ChatSidePanelProps {
   className?: string;
   /** Desktop ID for linking video assets to desktop */
   desktopId?: string;
+  /** Agent mode for context-specific behaviors */
+  agentMode?: "default" | "browse";
+  /** Callback for taxonomy link click in assistant markdown */
+  onTaxonomyLinkClick?: (taxonomyId: number) => void;
 }
 
 /**
@@ -50,6 +54,8 @@ export default function ChatSidePanel({
   onWidthChange,
   className,
   desktopId,
+  agentMode = "default",
+  onTaxonomyLinkClick,
 }: ChatSidePanelProps) {
   const router = useRouter();
   const t = useTranslations("chat");
@@ -337,6 +343,8 @@ export default function ChatSidePanel({
                   compactMode
                   hideAvatars
                   desktopId={desktopId}
+                  agentMode={agentMode}
+                  onTaxonomyLinkClick={onTaxonomyLinkClick}
                 />
               </motion.div>
             )}

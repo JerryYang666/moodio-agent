@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useTranslations } from "next-intl";
+import { useDispatch } from "react-redux";
 import { useAuth } from "@/hooks/use-auth";
 import { useCredits } from "@/hooks/use-credits";
 import { Spinner } from "@heroui/spinner";
@@ -64,6 +65,7 @@ import {
 } from "./reference-image-utils";
 import { getPreselectImages } from "./preselect-images-utils";
 import type { JSONContent } from "@tiptap/react";
+import { setSelectedFilters, setTextSearch } from "@/lib/redux/slices/querySlice";
 
 // Helper to group consecutive assistant messages with the same timestamp as variants
 interface MessageGroup {
@@ -85,6 +87,8 @@ interface ChatInterfaceProps {
   hideAvatars?: boolean;
   /** Desktop ID for linking video assets to desktop */
   desktopId?: string;
+  agentMode?: "default" | "browse";
+  onTaxonomyLinkClick?: (taxonomyId: number) => void;
 }
 
 export default function ChatInterface({
@@ -95,8 +99,11 @@ export default function ChatInterface({
   compactMode = false,
   hideAvatars = false,
   desktopId,
+  agentMode = "default",
+  onTaxonomyLinkClick,
 }: ChatInterfaceProps) {
   const t = useTranslations();
+  const dispatch = useDispatch();
   const { user } = useAuth();
   const { refreshBalance } = useCredits();
   const { monitorChat, cancelMonitorChat } = useChat();
@@ -1205,6 +1212,8 @@ export default function ChatInterface({
       // Check for system prompt override
       const overrideEnabled =
         localStorage.getItem(SYSTEM_PROMPT_STORAGE_KEY + "_enabled") === "true";
+      payload.agentMode = agentMode;
+
       if (overrideEnabled) {
         const overridePrompt = localStorage.getItem(SYSTEM_PROMPT_STORAGE_KEY);
         if (overridePrompt) {
@@ -1410,6 +1419,11 @@ export default function ChatInterface({
                 }
               } else {
                 currentContent.push(event.part);
+              }
+
+              if (event.part.type === "agent_browse_search" && agentMode === "browse") {
+                dispatch(setTextSearch(event.part.textSearch || ""));
+                dispatch(setSelectedFilters(event.part.selectedFilters || []));
               }
 
               // Auto-create desktop asset for shot lists
@@ -1894,6 +1908,7 @@ export default function ChatInterface({
                 hideAvatar={hideAvatars}
                 desktopId={desktopId}
                 allMessages={messages}
+                onTaxonomyLinkClick={onTaxonomyLinkClick}
               />
             );
           } else {
@@ -1928,6 +1943,7 @@ export default function ChatInterface({
                 isSending={isSending}
                 desktopId={desktopId}
                 allMessages={messages}
+                onTaxonomyLinkClick={onTaxonomyLinkClick}
               />
             );
           }

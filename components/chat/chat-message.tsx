@@ -4,7 +4,7 @@ import { Card, CardBody } from "@heroui/card";
 import { Spinner } from "@heroui/spinner";
 import { Avatar } from "@heroui/avatar";
 import { Image } from "@heroui/image";
-import { Bot, X, Pencil, ChevronDown, ChevronRight, Brain } from "lucide-react";
+import { Bot, X, Pencil, ChevronDown, ChevronRight, Brain, Wrench } from "lucide-react";
 import clsx from "clsx";
 import ReactMarkdown from "react-markdown";
 import { Message, MessageContentPart } from "@/lib/llm/types";
@@ -53,6 +53,7 @@ interface ChatMessageProps {
     status: "pending" | "creating" | "created" | "error",
     generationId?: string
   ) => void;
+  onTaxonomyLinkClick?: (taxonomyId: number) => void;
 }
 
 export default function ChatMessage({
@@ -69,6 +70,7 @@ export default function ChatMessage({
   desktopId,
   allMessages,
   onVideoStatusChange,
+  onTaxonomyLinkClick,
 }: ChatMessageProps) {
   const isUser = message.role === "user";
   const [isForkPopoverOpen, setIsForkPopoverOpen] = useState(false);
@@ -120,6 +122,23 @@ export default function ChatMessage({
   ) => {
     // Custom components for ReactMarkdown to handle video-prompt code blocks
     const markdownComponents = {
+      a({ href, children, ...props }: any) {
+        const raw = String(href || "").trim();
+        const match = raw.match(/^\d+$/) || raw.match(/^taxonomy:\/\/(\d+)$/);
+        const taxonomyId = match ? Number(match[1] || match[0]) : null;
+        if (taxonomyId && onTaxonomyLinkClick) {
+          return (
+            <button
+              type="button"
+              className="text-primary underline underline-offset-2"
+              onClick={() => onTaxonomyLinkClick(taxonomyId)}
+            >
+              {children}
+            </button>
+          );
+        }
+        return <a href={href} {...props}>{children}</a>;
+      },
       code({ node, className, children, ...props }: any) {
         const match = /language-video-prompt/.exec(className || "");
         if (match) {
@@ -163,6 +182,7 @@ export default function ChatMessage({
     const videoParts = content.filter((p) => p.type === "agent_video");
     const shotListParts = content.filter((p) => p.type === "agent_shot_list");
     const thinkParts = content.filter((p) => p.type === "internal_think");
+    const toolParts = content.filter((p) => p.type === "agent_tool_call");
 
     return (
       <div className="space-y-4">
@@ -189,6 +209,13 @@ export default function ChatMessage({
             )}
           </div>
         )}
+
+        {toolParts.map((part: any, i) => (
+          <div key={`tool-${i}`} className="flex items-center gap-2 text-xs text-default-500">
+            <Wrench size={14} />
+            <span>{part.summary || part.toolName} ({part.status})</span>
+          </div>
+        ))}
 
         {textParts.map((part: any, i) => (
           <ReactMarkdown key={`text-${i}`} components={markdownComponents}>

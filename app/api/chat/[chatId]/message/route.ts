@@ -151,6 +151,8 @@ export async function POST(
         : undefined;
     const imageModelId: string | undefined =
       typeof json.imageModelId === "string" ? json.imageModelId : undefined;
+    const agentMode: "default" | "browse" =
+      json.agentMode === "browse" ? "browse" : "default";
     // Accept optional variantCount parameter, default to 1 (lazy variant generation)
     const variantCount: number =
       typeof json.variantCount === "number" && json.variantCount >= 1
@@ -207,6 +209,7 @@ export async function POST(
         aspectRatioOverride,
         imageSizeOverride,
         imageModelId,
+        agentMode,
       },
       ipAddress
     );
@@ -291,7 +294,8 @@ export async function POST(
         imageSizeOverride,
         imageModelId,
         messageTimestamp, // Pass timestamp for frontend sync
-        referenceImages // Pass reference images with tags
+        referenceImages, // Pass reference images with tags
+        agentMode
       );
 
     // Handle background completion (saving history)

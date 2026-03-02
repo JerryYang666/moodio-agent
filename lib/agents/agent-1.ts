@@ -75,6 +75,7 @@ interface PreparedMessages {
   aspectRatioOverride?: AspectRatio;
   imageSizeOverride?: ImageSize;
   imageModelId?: string;
+  agentMode?: "default" | "browse";
 }
 
 export class Agent1 implements Agent {
@@ -92,7 +93,8 @@ export class Agent1 implements Agent {
     systemPromptOverride?: string,
     aspectRatioOverride?: string,
     imageSizeOverride?: ImageSize,
-    imageModelId?: string
+    imageModelId?: string,
+    agentMode: "default" | "browse" = "default"
   ): Promise<AgentResponse> {
     const startTime = requestStartTime || Date.now();
     console.log(
@@ -139,7 +141,9 @@ export class Agent1 implements Agent {
       systemPromptOverride,
       validatedAspectRatio,
       validatedImageSize,
-      imageModelId
+      imageModelId,
+      undefined,
+      agentMode
     );
 
     // Step 2: Call LLM and parse response
@@ -218,9 +222,11 @@ export class Agent1 implements Agent {
     aspectRatioOverride?: AspectRatio,
     imageSizeOverride?: ImageSize,
     imageModelId?: string,
-    referenceImages?: ReferenceImageEntry[] // Reference images with tags
+    referenceImages?: ReferenceImageEntry[], // Reference images with tags
+    agentMode: "default" | "browse" = "default"
   ): Promise<PreparedMessages> {
-    const rawSystemPrompt = systemPromptOverride || getSystemPrompt(this.id);
+    const rawSystemPrompt =
+      systemPromptOverride || getSystemPrompt(this.id, { agentMode });
     const systemPrompt = rawSystemPrompt
       .replace("{{SUPPORTED_ASPECT_RATIOS}}", SUPPORTED_ASPECT_RATIOS.join(", "))
       .replace("{{VIDEO_MODELS_INFO}}", getVideoModelsPromptText());
@@ -421,7 +427,18 @@ export class Agent1 implements Agent {
       aspectRatioOverride,
       imageSizeOverride,
       imageModelId,
+      agentMode,
     };
+  }
+
+  private async getBrowseTaxonomyTree(locale = "en"): Promise<string> {
+    const url = `${process.env.NEXT_PUBLIC_FLASK_URL}/api/properties?lang=${encodeURIComponent(locale)}`;
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) {
+      throw new Error(`Failed taxonomy fetch: ${res.status}`);
+    }
+    const data = await res.json();
+    return JSON.stringify(data);
   }
 
   private async callLLMAndParse(
@@ -552,6 +569,45 @@ export class Agent1 implements Agent {
       JSON.stringify(prepared.messages, null, 2)
     );
 
+    const isBrowseMode = prepared.agentMode === "browse";
+    if (isBrowseMode) {
+      const first = await client.chat.completions.create({
+        model: "gpt-4.1",
+        messages: prepared.messages as any,
+        stream: false,
+      });
+      const firstText = first.choices?.[0]?.message?.content || "";
+      if (firstText.includes("<TOOL>")) {
+        const toolPart: MessageContentPart = {
+          type: "agent_tool_call",
+          toolName: "check_taxonomy_tree",
+          status: "running",
+          summary: "Checking taxonomy tree",
+        };
+        send({ type: "part", part: toolPart });
+        const taxonomyTree = await this.getBrowseTaxonomyTree();
+        send({
+          type: "part",
+          part: { ...toolPart, status: "complete", summary: "Taxonomy tree loaded" },
+        });
+        prepared.messages = [
+          ...prepared.messages,
+          { role: "assistant", content: firstText },
+          {
+            role: "tool",
+            content: taxonomyTree,
+          } as any,
+          {
+            role: "user",
+            content:
+              "Continue and provide the final browse response with <TEXT> and <BROWSE_SEARCH>.",
+          },
+        ];
+      } else {
+        prepared.messages = [...prepared.messages, { role: "assistant", content: firstText }];
+      }
+    }
+
     // Call LLM with stream
     const llmStream = await client.chat.completions.create({
       model: "gpt-4.1",
@@ -595,6 +651,7 @@ export class Agent1 implements Agent {
         let inVideoTag = false;
         let inShotListTag = false;
         let inThinkTag = false;
+        let inBrowseSearchTag = false;
         let i = 0;
 
         while (i < checkBuffer.length) {
@@ -642,6 +699,14 @@ export class Agent1 implements Agent {
             inThinkTag = false;
             i += 8;
             continue;
+          } else if (remaining.startsWith("<BROWSE_SEARCH>")) {
+            inBrowseSearchTag = true;
+            i += 15;
+            continue;
+          } else if (remaining.startsWith("</BROWSE_SEARCH>")) {
+            inBrowseSearchTag = false;
+            i += 16;
+            continue;
           }
 
           // Track if we're in angle brackets (for any other tags)
@@ -655,6 +720,7 @@ export class Agent1 implements Agent {
             !inVideoTag &&
             !inShotListTag &&
             !inThinkTag &&
+            !inBrowseSearchTag &&
             !inAngleBrackets &&
             char.trim() !== ""
           ) {
@@ -925,6 +991,32 @@ export class Agent1 implements Agent {
             buffer = buffer.substring(slEnd + 11);
           }
         }
+
+        if (buffer.includes("</BROWSE_SEARCH>")) {
+          const bStart = buffer.indexOf("<BROWSE_SEARCH>");
+          const bEnd = buffer.indexOf("</BROWSE_SEARCH>");
+          if (bStart !== -1 && bEnd !== -1 && bStart < bEnd) {
+            const browseJson = buffer.substring(bStart + 15, bEnd);
+            try {
+              const browseSearch = JSON.parse(browseJson);
+              const browsePart: MessageContentPart = {
+                type: "agent_browse_search",
+                textSearch:
+                  typeof browseSearch.textSearch === "string"
+                    ? browseSearch.textSearch
+                    : "",
+                selectedFilters: Array.isArray(browseSearch.selectedFilters)
+                  ? browseSearch.selectedFilters.filter((v: unknown) => typeof v === "number")
+                  : [],
+              };
+              send({ type: "part", part: browsePart });
+              finalContent.push(browsePart);
+            } catch (e) {
+              console.error("Failed to parse browse search JSON", e);
+            }
+            buffer = buffer.substring(bEnd + 16);
+          }
+        }
       }
 
       // Stream ended
@@ -1188,7 +1280,8 @@ export class Agent1 implements Agent {
     imageSizeOverride?: ImageSize,
     imageModelId?: string,
     messageTimestamp?: number, // Timestamp to use for all variants (for frontend sync)
-    referenceImages?: ReferenceImageEntry[] // Reference images with tags
+    referenceImages?: ReferenceImageEntry[], // Reference images with tags
+    agentMode: "default" | "browse" = "default"
   ): Promise<ParallelAgentResponse> {
     const startTime = requestStartTime || Date.now();
     // Use provided timestamp or generate one
@@ -1229,7 +1322,8 @@ export class Agent1 implements Agent {
       validatedAspectRatio,
       validatedImageSize,
       imageModelId,
-      referenceImages
+      referenceImages,
+      agentMode
     );
 
     const encoder = new TextEncoder();

@@ -43,6 +43,17 @@ export type MessageContentPart =
       rows: Array<{ id: string; cells: Array<{ value: string }> }>;
       status: "streaming" | "complete";
       desktopAssetId?: string;
+    }
+  | {
+      type: "agent_tool_call";
+      toolName: string;
+      status: "running" | "complete";
+      summary?: string;
+    }
+  | {
+      type: "agent_browse_search";
+      textSearch: string;
+      selectedFilters: number[];
     };
 
 export interface Message {

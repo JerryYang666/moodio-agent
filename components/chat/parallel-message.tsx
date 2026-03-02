@@ -42,6 +42,7 @@ interface ParallelMessageProps {
   desktopId?: string;
   /** All messages in conversation - used for source images */
   allMessages?: Message[];
+  onTaxonomyLinkClick?: (taxonomyId: number) => void;
 }
 
 export default function ParallelMessage({
@@ -60,6 +61,7 @@ export default function ParallelMessage({
   isSending = false,
   desktopId,
   allMessages,
+  onTaxonomyLinkClick,
 }: ParallelMessageProps) {
   const t = useTranslations();
   const [currentVariantIndex, setCurrentVariantIndex] = useState(0);
@@ -146,6 +148,7 @@ export default function ParallelMessage({
           hideAvatar={hideAvatars}
           desktopId={desktopId}
           allMessages={allMessages}
+          onTaxonomyLinkClick={onTaxonomyLinkClick}
         />
         {/* Generate Another Option button - only show when not sending */}
         {onGenerateVariant && !isSending && (
@@ -202,6 +205,7 @@ export default function ParallelMessage({
                 hideAvatar={idx > 0 || hideAvatars}
                 desktopId={desktopId}
                 allMessages={allMessages}
+                onTaxonomyLinkClick={onTaxonomyLinkClick}
               />
             </div>
           ))}
@@ -286,6 +290,7 @@ export default function ParallelMessage({
               hideAvatar={hideAvatars}
               desktopId={desktopId}
               allMessages={allMessages}
+              onTaxonomyLinkClick={onTaxonomyLinkClick}
             />
           </div>
         </div>
