@@ -242,6 +242,16 @@ export class Agent1 implements Agent {
                 text: `[Video Configuration: ${p.config.modelName} - "${p.config.prompt}" - Status: ${p.status}${p.generationId ? ` (Generation ID: ${p.generationId})` : ""}]`,
               };
             }
+            if (p.type === "agent_shot_list") {
+              const header = p.columns.join(" | ");
+              const rows = p.rows
+                .map((r) => r.cells.map((c) => c.value).join(" | "))
+                .join("\n");
+              return {
+                type: "text" as const,
+                text: `[Shot List: ${p.title}]\n${header}\n${rows}`,
+              };
+            }
             return p;
           }),
         };
