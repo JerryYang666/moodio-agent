@@ -265,7 +265,8 @@ export function useDesktopDetail(desktopId: string) {
           );
           break;
         }
-        case "asset_resized": {
+        case "asset_resized":
+        case "asset_resizing": {
           const { assetId, width, height } = event.payload || {};
           if (!assetId) return;
           setDetail((prev) =>

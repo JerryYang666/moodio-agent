@@ -351,7 +351,7 @@ func TestViewerCannotMutate(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 	editor.clearMessages()
 
-	mutationEvents := []string{"asset_moved", "asset_resized", "asset_added", "asset_removed", "asset_dragging", "asset_selected", "asset_deselected"}
+	mutationEvents := []string{"asset_moved", "asset_resized", "asset_added", "asset_removed", "asset_dragging", "asset_resizing", "asset_selected", "asset_deselected"}
 	for _, evt := range mutationEvents {
 		viewer.send(t, map[string]any{"type": evt, "payload": map[string]any{"id": "x"}})
 	}

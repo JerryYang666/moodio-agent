@@ -7,6 +7,7 @@ import type { RemoteEvent } from "@/hooks/use-desktop-ws";
 
 const POLL_INTERVAL = 5000;
 const NEWCOMER_GRACE_PERIOD = 6000;
+const HEARTBEAT_STALE_MS = POLL_INTERVAL * 3;
 
 interface PendingGeneration {
   generationId: string;
@@ -73,11 +74,15 @@ export function useDesktopVideoSync({
     for (const { generationId } of pending) {
       if (ownedPollingRef.current.has(generationId)) continue;
 
+      const lastHeartbeat = remotePollingRef.current.get(generationId);
+      const someoneElsePolling =
+        lastHeartbeat !== undefined &&
+        Date.now() - lastHeartbeat < HEARTBEAT_STALE_MS;
+      if (someoneElsePolling) continue;
+
       const isNewcomer =
         Date.now() - mountedAtRef.current < NEWCOMER_GRACE_PERIOD;
-      const someoneElsePolling = remotePollingRef.current.has(generationId);
-
-      if (isNewcomer && someoneElsePolling) continue;
+      if (isNewcomer) continue;
 
       ownedPollingRef.current.add(generationId);
       monitorGeneration(generationId);
@@ -125,15 +130,17 @@ export function useDesktopVideoSync({
   useEffect(() => {
     const timer = setTimeout(() => {
       // Grace period expired — if any pending generations still have no
-      // remote poller, claim them.
+      // active remote poller, claim them.
       for (const { generationId } of pendingGens.current) {
-        if (
-          !ownedPollingRef.current.has(generationId) &&
-          !remotePollingRef.current.has(generationId)
-        ) {
-          ownedPollingRef.current.add(generationId);
-          monitorGeneration(generationId);
-        }
+        if (ownedPollingRef.current.has(generationId)) continue;
+        const lastHeartbeat = remotePollingRef.current.get(generationId);
+        const someoneElsePolling =
+          lastHeartbeat !== undefined &&
+          Date.now() - lastHeartbeat < HEARTBEAT_STALE_MS;
+        if (someoneElsePolling) continue;
+
+        ownedPollingRef.current.add(generationId);
+        monitorGeneration(generationId);
       }
     }, NEWCOMER_GRACE_PERIOD);
     return () => clearTimeout(timer);

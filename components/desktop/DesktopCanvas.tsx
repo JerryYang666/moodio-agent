@@ -17,6 +17,7 @@ const MIN_ZOOM = 0.1;
 const MAX_ZOOM = 5;
 const ZOOM_SENSITIVITY = 0.001;
 const DEFAULT_ASSET_WIDTH = 300;
+const MIN_ASSET_SIZE = 50;
 const CULL_PADDING = 200;
 const CURSOR_THROTTLE_MS = 40;
 
@@ -29,6 +30,7 @@ interface DesktopCanvasProps {
   onAssetBatchMove?: (moves: Array<{ id: string; posX: number; posY: number }>) => void;
   onAssetDelete?: (assetId: string) => void;
   onAssetBatchDelete?: (assetIds: string[]) => void;
+  onAssetResize?: (assetId: string, width: number, height: number) => void;
   onOpenChat?: (chatId: string) => void;
   onAssetOpen?: (asset: EnrichedDesktopAsset) => void;
   onAssetClick?: (asset: EnrichedDesktopAsset) => void;
@@ -77,6 +79,7 @@ export default function DesktopCanvas({
   onAssetBatchMove,
   onAssetDelete,
   onAssetBatchDelete,
+  onAssetResize,
   onOpenChat,
   onAssetClick,
   playingAssetId,
@@ -104,6 +107,16 @@ export default function DesktopCanvas({
   const lastCursorSend = useRef(0);
   const lastDragSend = useRef(0);
 
+  // Resize state
+  const [resizingAssetId, setResizingAssetId] = useState<string | null>(null);
+  const resizeStartDims = useRef<{ w: number; h: number; posX: number; posY: number }>({ w: 0, h: 0, posX: 0, posY: 0 });
+  const resizeStartMouse = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const resizeHandle = useRef<string>("");
+  const [resizeDims, setResizeDims] = useState<{ w: number; h: number; posX: number; posY: number } | null>(null);
+  const lastResizeSend = useRef(0);
+
+  const canEdit = permission === "owner" || permission === "collaborator";
+
   const handleImageLoad = useCallback(
     (assetId: string, naturalWidth: number, naturalHeight: number) => {
       setNaturalDims((prev) => {
@@ -114,6 +127,22 @@ export default function DesktopCanvas({
       });
     },
     []
+  );
+
+  const handleResizePointerDown = useCallback(
+    (e: React.PointerEvent, asset: DesktopAsset, handle: string) => {
+      if (!canEdit) return;
+      e.stopPropagation();
+      e.preventDefault();
+      const dims = getAssetDimensions(asset, naturalDims.get(asset.id));
+      resizeStartDims.current = { w: dims.w, h: dims.h, posX: asset.posX, posY: asset.posY };
+      resizeStartMouse.current = { x: e.clientX, y: e.clientY };
+      resizeHandle.current = handle;
+      setResizingAssetId(asset.id);
+      setResizeDims({ w: dims.w, h: dims.h, posX: asset.posX, posY: asset.posY });
+      containerRef.current?.setPointerCapture(e.pointerId);
+    },
+    [canEdit, naturalDims]
   );
 
   // Multi-select
@@ -130,8 +159,6 @@ export default function DesktopCanvas({
 
   // Context menu
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
-
-  const canEdit = permission === "owner" || permission === "collaborator";
 
   const visibleAssets = useMemo(() => {
     if (!containerRef.current) return assets;
@@ -231,6 +258,57 @@ export default function DesktopCanvas({
         return;
       }
 
+      // Resize drag
+      if (resizingAssetId && resizeDims) {
+        const dx = (e.clientX - resizeStartMouse.current.x) / camera.zoom;
+        const dy = (e.clientY - resizeStartMouse.current.y) / camera.zoom;
+        const start = resizeStartDims.current;
+        const handle = resizeHandle.current;
+        const aspect = start.w / start.h;
+
+        let newW = start.w;
+        let newH = start.h;
+        let newPosX = start.posX;
+        let newPosY = start.posY;
+
+        if (handle === "se") {
+          newW = Math.max(MIN_ASSET_SIZE, start.w + dx);
+          newH = newW / aspect;
+        } else if (handle === "sw") {
+          newW = Math.max(MIN_ASSET_SIZE, start.w - dx);
+          newH = newW / aspect;
+          newPosX = start.posX + (start.w - newW);
+        } else if (handle === "ne") {
+          newW = Math.max(MIN_ASSET_SIZE, start.w + dx);
+          newH = newW / aspect;
+          newPosY = start.posY + (start.h - newH);
+        } else if (handle === "nw") {
+          newW = Math.max(MIN_ASSET_SIZE, start.w - dx);
+          newH = newW / aspect;
+          newPosX = start.posX + (start.w - newW);
+          newPosY = start.posY + (start.h - newH);
+        } else if (handle === "e") {
+          newW = Math.max(MIN_ASSET_SIZE, start.w + dx);
+        } else if (handle === "w") {
+          newW = Math.max(MIN_ASSET_SIZE, start.w - dx);
+          newPosX = start.posX + (start.w - newW);
+        } else if (handle === "s") {
+          newH = Math.max(MIN_ASSET_SIZE, start.h + dy);
+        } else if (handle === "n") {
+          newH = Math.max(MIN_ASSET_SIZE, start.h - dy);
+          newPosY = start.posY + (start.h - newH);
+        }
+
+        setResizeDims({ w: newW, h: newH, posX: newPosX, posY: newPosY });
+
+        const now = Date.now();
+        if (sendEvent && now - lastResizeSend.current >= CURSOR_THROTTLE_MS) {
+          lastResizeSend.current = now;
+          sendEvent("asset_resizing", { assetId: resizingAssetId, width: newW, height: newH });
+        }
+        return;
+      }
+
       // Asset drag
       if (draggingAssetId) {
         const rect = containerRef.current?.getBoundingClientRect();
@@ -264,7 +342,7 @@ export default function DesktopCanvas({
         y: cameraAtPanStart.current.y + dy,
       });
     },
-    [camera, onCameraChange, draggingAssetId, marquee, screenToWorld, sendEvent]
+    [camera, onCameraChange, draggingAssetId, resizingAssetId, resizeDims, marquee, screenToWorld, sendEvent]
   );
 
   const handlePointerUp = useCallback(
@@ -303,6 +381,18 @@ export default function DesktopCanvas({
         setSelectedIds(selected);
         marqueeStart.current = null;
         setMarquee(null);
+        return;
+      }
+
+      // Finish resize
+      if (resizingAssetId && resizeDims) {
+        containerRef.current?.releasePointerCapture(e.pointerId);
+        onAssetResize?.(resizingAssetId, resizeDims.w, resizeDims.h);
+        if (resizeDims.posX !== resizeStartDims.current.posX || resizeDims.posY !== resizeStartDims.current.posY) {
+          onAssetMove(resizingAssetId, resizeDims.posX, resizeDims.posY);
+        }
+        setResizingAssetId(null);
+        setResizeDims(null);
         return;
       }
 
@@ -352,7 +442,7 @@ export default function DesktopCanvas({
       isPanning.current = false;
       (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
     },
-    [draggingAssetId, dragPos, onAssetMove, onAssetBatchMove, onAssetClick, assets, selectedIds, marquee, sendEvent]
+    [draggingAssetId, dragPos, onAssetMove, onAssetBatchMove, onAssetResize, onAssetClick, assets, selectedIds, marquee, sendEvent, resizingAssetId, resizeDims]
   );
 
   const handleAssetPointerDown = useCallback(
@@ -490,13 +580,20 @@ export default function DesktopCanvas({
       {/* World container */}
       <div className="absolute top-0 left-0" style={worldStyle}>
         {visibleAssets.map((asset) => {
-          const { w, h } = getAssetDimensions(asset, naturalDims.get(asset.id));
+          const baseDims = getAssetDimensions(asset, naturalDims.get(asset.id));
+          const isResizing = resizingAssetId === asset.id;
           const isDragging = draggingAssetId === asset.id;
           const isSelected = selectedIds.has(asset.id);
           const remoteSelectorsForAsset = remoteSelections?.get(asset.id);
 
+          const w = isResizing && resizeDims ? resizeDims.w : baseDims.w;
+          const h = isResizing && resizeDims ? resizeDims.h : baseDims.h;
+
           let posX: number, posY: number;
-          if (isDragging && dragPos) {
+          if (isResizing && resizeDims) {
+            posX = resizeDims.posX;
+            posY = resizeDims.posY;
+          } else if (isDragging && dragPos) {
             posX = dragPos.x;
             posY = dragPos.y;
           } else if (
@@ -520,40 +617,99 @@ export default function DesktopCanvas({
             posY = asset.posY;
           }
 
+          const handleSize = Math.max(8, 8 / camera.zoom);
+
           return (
             <div
               key={asset.id}
               data-asset-card
               draggable={false}
-              className={`absolute group transition-shadow duration-150 rounded-xl overflow-hidden bg-background shadow-md hover:shadow-lg ${
-                isSelected
-                  ? "ring-2 ring-primary ring-offset-2 ring-offset-background"
-                  : remoteSelectorsForAsset?.length
-                    ? "ring-offset-2 ring-offset-background"
-                    : "border border-divider"
-              } ${isDragging ? "opacity-80 shadow-xl" : ""}`}
+              className="absolute group"
               style={{
                 left: posX,
                 top: posY,
                 width: w,
                 height: h,
-                zIndex: isDragging ? 9999 : asset.zIndex,
+                zIndex: isDragging || isResizing ? 9999 : asset.zIndex,
                 cursor: canEdit ? "move" : "default",
-                ...(remoteSelectorsForAsset?.length && !isSelected
-                  ? {
-                      boxShadow: `0 0 0 2px ${userIdToColor(remoteSelectorsForAsset[0].userId)}`,
-                    }
-                  : {}),
               }}
               onPointerDown={(e) => handleAssetPointerDown(e, asset)}
               onContextMenu={(e) => handleContextMenu(e, asset)}
             >
+              <div
+                className={`w-full h-full rounded-xl overflow-hidden bg-background shadow-md transition-shadow duration-150 hover:shadow-lg ${
+                  isSelected
+                    ? "ring-2 ring-primary ring-offset-2 ring-offset-background"
+                    : remoteSelectorsForAsset?.length
+                      ? "ring-offset-2 ring-offset-background"
+                      : "border border-divider"
+                } ${isDragging ? "opacity-80 shadow-xl" : ""}`}
+                style={
+                  remoteSelectorsForAsset?.length && !isSelected
+                    ? { boxShadow: `0 0 0 2px ${userIdToColor(remoteSelectorsForAsset[0].userId)}` }
+                    : undefined
+                }
+              >
               <AssetCardContent
                 asset={asset}
                 playing={playingAssetId === asset.id}
                 onPlayToggle={onAssetClick ? () => onAssetClick(asset) : undefined}
                 onImageLoad={handleImageLoad}
               />
+              </div>
+              {/* Resize handles — visible when selected */}
+              {canEdit && (isSelected || isResizing) && (
+                <>
+                  {(["nw", "ne", "sw", "se"] as const).map((corner) => {
+                    const isTop = corner.startsWith("n");
+                    const isLeft = corner.endsWith("w");
+                    const cursorMap = { nw: "nwse-resize", ne: "nesw-resize", sw: "nesw-resize", se: "nwse-resize" } as const;
+                    return (
+                      <div
+                        key={corner}
+                        className="absolute z-10 bg-primary border-2 border-white rounded-sm shadow-sm"
+                        style={{
+                          width: handleSize,
+                          height: handleSize,
+                          top: isTop ? -handleSize / 2 : undefined,
+                          bottom: isTop ? undefined : -handleSize / 2,
+                          left: isLeft ? -handleSize / 2 : undefined,
+                          right: isLeft ? undefined : -handleSize / 2,
+                          cursor: cursorMap[corner],
+                        }}
+                        onPointerDown={(e) => handleResizePointerDown(e, asset, corner)}
+                      />
+                    );
+                  })}
+                  {(["n", "s", "e", "w"] as const).map((edge) => {
+                    const isHorizontal = edge === "n" || edge === "s";
+                    const cursorMap = { n: "ns-resize", s: "ns-resize", e: "ew-resize", w: "ew-resize" } as const;
+                    return (
+                      <div
+                        key={edge}
+                        className="absolute z-10"
+                        style={{
+                          cursor: cursorMap[edge],
+                          ...(isHorizontal
+                            ? {
+                                left: handleSize,
+                                right: handleSize,
+                                height: Math.max(6, 6 / camera.zoom),
+                                ...(edge === "n" ? { top: -3 / camera.zoom } : { bottom: -3 / camera.zoom }),
+                              }
+                            : {
+                                top: handleSize,
+                                bottom: handleSize,
+                                width: Math.max(6, 6 / camera.zoom),
+                                ...(edge === "w" ? { left: -3 / camera.zoom } : { right: -3 / camera.zoom }),
+                              }),
+                        }}
+                        onPointerDown={(e) => handleResizePointerDown(e, asset, edge)}
+                      />
+                    );
+                  })}
+                </>
+              )}
               {remoteSelectorsForAsset?.length && !isSelected ? (
                 <div
                   className="absolute -top-5 left-1 text-[10px] font-medium px-1 rounded text-white whitespace-nowrap"

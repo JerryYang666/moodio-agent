@@ -159,16 +159,31 @@ export default function DesktopDetailPage({
     });
   }, [fetchDetail]);
 
-  // Listen for video assets added from chat
+  // Listen for video assets added from chat — refresh local state and broadcast to room
   useEffect(() => {
     const handleAssetAdded = (e: CustomEvent) => {
       if (e.detail?.desktopId === desktopId) {
         fetchDetail();
+        const newAssets = e.detail?.assets as EnrichedDesktopAsset[] | undefined;
+        if (newAssets) {
+          for (const asset of newAssets) {
+            sendEvent("asset_added", { asset });
+            // For processing video assets, immediately signal that we're polling
+            // so remote clients don't start duplicate polling
+            if (asset.assetType === "video") {
+              const meta = asset.metadata as Record<string, unknown>;
+              const genId = meta.generationId as string | undefined;
+              if (genId) {
+                sendEvent("video_generation_polling", { generationId: genId });
+              }
+            }
+          }
+        }
       }
     };
     window.addEventListener("desktop-asset-added", handleAssetAdded as EventListener);
     return () => window.removeEventListener("desktop-asset-added", handleAssetAdded as EventListener);
-  }, [desktopId, fetchDetail]);
+  }, [desktopId, fetchDetail, sendEvent]);
 
   const handleCameraChange = useCallback(
     (newCamera: CameraState) => {
@@ -217,6 +232,14 @@ export default function DesktopDetailPage({
     (assetId: string, posX: number, posY: number) => {
       updateAsset(assetId, { posX, posY });
       sendEvent("asset_moved", { assetId, posX, posY });
+    },
+    [updateAsset, sendEvent]
+  );
+
+  const handleAssetResize = useCallback(
+    (assetId: string, width: number, height: number) => {
+      updateAsset(assetId, { width, height });
+      sendEvent("asset_resized", { assetId, width, height });
     },
     [updateAsset, sendEvent]
   );
@@ -458,6 +481,7 @@ export default function DesktopDetailPage({
           onAssetBatchMove={handleAssetBatchMove}
           onAssetDelete={canEdit ? handleAssetDelete : undefined}
           onAssetBatchDelete={canEdit ? handleAssetBatchDelete : undefined}
+          onAssetResize={canEdit ? handleAssetResize : undefined}
           onOpenChat={handleOpenChat}
           onAssetClick={handleAssetClick}
           playingAssetId={playingAssetId}
