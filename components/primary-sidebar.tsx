@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
 import NextLink from "next/link";
 import clsx from "clsx";
@@ -43,7 +43,16 @@ export const PrimarySidebar = () => {
   const tCredits = useTranslations("credits");
   const tLanguage = useTranslations("language");
   const showDesktop = useFeatureFlag<boolean>("user_desktop") ?? false;
-  const [collapsed, setCollapsed] = useState(false);
+
+  const STORAGE_KEY = "moodio:sidebar-collapsed";
+  const [collapsed, setCollapsed] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem(STORAGE_KEY) === "true";
+  });
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY, String(collapsed));
+  }, [collapsed]);
 
   const navItems = [
     {
