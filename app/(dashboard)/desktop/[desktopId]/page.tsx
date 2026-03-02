@@ -31,6 +31,7 @@ import {
   type ConnectedUser,
   type RemoteEvent,
 } from "@/hooks/use-desktop-ws";
+import { useDesktopVideoSync } from "@/hooks/use-desktop-video-sync";
 
 const DEFAULT_CAMERA: CameraState = { x: 0, y: 0, zoom: 1 };
 const VIEWPORT_SAVE_DEBOUNCE = 2000;
@@ -71,9 +72,13 @@ export default function DesktopDetailPage({
     applyRemoteEvent,
   } = useDesktopDetail(desktopId);
 
+  // Stable ref for the video-sync remote-event handler (defined after the hook below)
+  const handleVideoRemoteEventRef = useRef<(event: RemoteEvent) => void>(() => {});
+
   const handleRemoteEvent = useCallback(
     (event: RemoteEvent) => {
       applyRemoteEvent(event);
+      handleVideoRemoteEventRef.current(event);
     },
     [applyRemoteEvent]
   );
@@ -90,6 +95,14 @@ export default function DesktopDetailPage({
     onRemoteEvent: handleRemoteEvent,
     fetchDetail,
   });
+
+  // Coordinate video-generation polling across room members
+  const { handleVideoRemoteEvent } = useDesktopVideoSync({
+    assets: detail?.assets ?? [],
+    sendEvent,
+    fetchDetail,
+  });
+  handleVideoRemoteEventRef.current = handleVideoRemoteEvent;
 
   const [camera, setCamera] = useState<CameraState>(DEFAULT_CAMERA);
   const viewportSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -146,7 +159,6 @@ export default function DesktopDetailPage({
   useEffect(() => {
     const handleAssetAdded = (e: CustomEvent) => {
       if (e.detail?.desktopId === desktopId) {
-        // Refresh desktop to pick up the new asset
         fetchDetail();
       }
     };

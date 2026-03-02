@@ -14,19 +14,28 @@ import { addToast } from "@heroui/toast";
 import { useTranslations } from "next-intl";
 import { getUserFriendlyErrorKey } from "@/lib/video/error-classify";
 
+export type VideoGenerationStatus = "pending" | "processing" | "completed" | "failed";
+
 interface VideoGeneration {
   id: string;
-  status: "pending" | "processing" | "completed" | "failed";
+  status: VideoGenerationStatus;
   thumbnailUrl: string | null;
   params: Record<string, any>;
   error?: string | null;
 }
+
+type GenerationUpdateListener = (
+  generationId: string,
+  status: VideoGenerationStatus
+) => void;
 
 interface VideoContextType {
   monitoredGenerations: string[];
   monitorGeneration: (generationId: string) => void;
   cancelMonitorGeneration: (generationId: string) => void;
   isGenerationMonitored: (generationId: string) => boolean;
+  generationStatuses: Record<string, VideoGenerationStatus>;
+  onGenerationUpdate: (listener: GenerationUpdateListener) => () => void;
 }
 
 export const VideoContext = createContext<VideoContextType | undefined>(
@@ -55,22 +64,35 @@ export function VideoProvider({ children }: { children: React.ReactNode }) {
   >({});
   const monitoredRef = useRef<Record<string, "pending" | "processing">>({});
 
+  // Global generation status cache — tracks the latest known status for any monitored generation
+  const [generationStatuses, setGenerationStatuses] = useState<
+    Record<string, VideoGenerationStatus>
+  >({});
+
+  // Listeners that want to be notified when a generation completes/fails
+  const listenersRef = useRef<Set<GenerationUpdateListener>>(new Set());
+
+  const onGenerationUpdate = useCallback(
+    (listener: GenerationUpdateListener) => {
+      listenersRef.current.add(listener);
+      return () => {
+        listenersRef.current.delete(listener);
+      };
+    },
+    []
+  );
+
   // Keep ref in sync
   useEffect(() => {
     monitoredRef.current = monitoredGenerations;
   }, [monitoredGenerations]);
 
   const monitorGeneration = useCallback((generationId: string) => {
-    // Only monitor if we have notification permission or might get it
-    try {
-      if ("Notification" in window && Notification.permission === "denied") {
-        return;
-      }
-    } catch (e) {
-      console.warn("Error checking notification permission:", e);
-    }
-
     setMonitoredGenerations((prev) => ({
+      ...prev,
+      [generationId]: "processing",
+    }));
+    setGenerationStatuses((prev) => ({
       ...prev,
       [generationId]: "processing",
     }));
@@ -109,16 +131,30 @@ export function VideoProvider({ children }: { children: React.ReactNode }) {
             const data = await res.json();
             const generation = data.generation as VideoGeneration;
 
+            // Update global status cache
+            setGenerationStatuses((prev) => ({
+              ...prev,
+              [generationId]: generation.status,
+            }));
+
             // Check if generation is now complete or failed
             if (
               generation.status === "completed" ||
               generation.status === "failed"
             ) {
-              // Determine if we should notify
+              // Notify all listeners
+              for (const listener of Array.from(listenersRef.current)) {
+                try {
+                  listener(generationId, generation.status);
+                } catch (e) {
+                  console.error("Error in generation update listener:", e);
+                }
+              }
+
+              // Determine if we should send browser/toast notification
               const isStoryboardOpen = pathname === "/storyboard";
               const isHidden = document.hidden;
 
-              // Notify if: Tab is hidden OR User is not on storyboard
               if (isHidden || !isStoryboardOpen) {
                 const isSuccess = generation.status === "completed";
 
@@ -145,7 +181,6 @@ export function VideoProvider({ children }: { children: React.ReactNode }) {
                   console.error("Error showing notification:", e);
                 }
 
-                // Also show toast if user is active but on different page
                 if (!isHidden && !isStoryboardOpen) {
                   addToast({
                     title: isSuccess ? "Video Ready" : "Video Failed",
@@ -189,6 +224,8 @@ export function VideoProvider({ children }: { children: React.ReactNode }) {
         monitorGeneration,
         cancelMonitorGeneration,
         isGenerationMonitored,
+        generationStatuses,
+        onGenerationUpdate,
       }}
     >
       {children}
