@@ -119,12 +119,21 @@ export function validateAssetMetadata(
 // Desktop viewport helpers
 // ---------------------------------------------------------------------------
 
+export interface AssetRect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
 export interface DesktopViewport {
   camera: { x: number; y: number; zoom: number };
   /** Canvas container width in CSS pixels */
   width: number;
   /** Canvas container height in CSS pixels */
   height: number;
+  /** Bounding boxes of existing assets in world coordinates */
+  assetRects?: AssetRect[];
 }
 
 declare global {
@@ -150,22 +159,77 @@ export function clearDesktopViewport() {
 }
 
 /**
- * Compute a world-coordinate position that falls within the user's current
- * visible viewport with some random scatter so assets don't stack exactly.
+ * Find a good position for a new asset on the desktop.
+ *
+ * Strategy: find the densest cluster of existing assets and place the new
+ * asset to the right of the rightmost asset in that cluster, with a small gap.
+ * Falls back to viewport center if no assets exist.
+ *
+ * @param newW  Width of the asset being placed (default 400)
+ * @param newH  Height of the asset being placed (default 300)
  */
-export function getViewportCenterPosition(): { x: number; y: number } {
+export function getViewportCenterPosition(newW = 400, newH = 300): { x: number; y: number } {
   const vp = typeof window !== "undefined" ? window.__desktopViewport : undefined;
   if (!vp) {
     return { x: Math.random() * 200, y: Math.random() * 200 };
   }
 
   const { camera, width, height } = vp;
+  const rects = vp.assetRects;
+
+  // Viewport center in world coordinates (fallback)
   const centerX = (-camera.x + width / 2) / camera.zoom;
   const centerY = (-camera.y + height / 2) / camera.zoom;
 
-  const scatter = 80;
+  if (!rects || rects.length === 0) {
+    return { x: centerX - newW / 2, y: centerY - newH / 2 };
+  }
+
+  // For each asset, count how many neighbors are within PROXIMITY_RADIUS of
+  // its center, then pick the asset with the highest neighbor count (= densest spot).
+  const PROXIMITY_RADIUS = 600;
+  const centers = rects.map((r) => ({ cx: r.x + r.w / 2, cy: r.y + r.h / 2, ...r }));
+
+  let bestIdx = 0;
+  let bestCount = -1;
+  for (let i = 0; i < centers.length; i++) {
+    let count = 0;
+    for (let j = 0; j < centers.length; j++) {
+      if (i === j) continue;
+      const dx = centers[i].cx - centers[j].cx;
+      const dy = centers[i].cy - centers[j].cy;
+      if (dx * dx + dy * dy < PROXIMITY_RADIUS * PROXIMITY_RADIUS) count++;
+    }
+    if (count > bestCount) {
+      bestCount = count;
+      bestIdx = i;
+    }
+  }
+
+  // Collect the cluster: all assets within PROXIMITY_RADIUS of the densest asset
+  const anchor = centers[bestIdx];
+  const cluster = centers.filter((c) => {
+    const dx = c.cx - anchor.cx;
+    const dy = c.cy - anchor.cy;
+    return dx * dx + dy * dy < PROXIMITY_RADIUS * PROXIMITY_RADIUS;
+  });
+
+  // Find the bounding box of the cluster
+  let maxRight = -Infinity;
+  let clusterTop = Infinity;
+  let clusterBottom = -Infinity;
+  for (const c of cluster) {
+    const right = c.x + c.w;
+    if (right > maxRight) maxRight = right;
+    if (c.y < clusterTop) clusterTop = c.y;
+    if (c.y + c.h > clusterBottom) clusterBottom = c.y + c.h;
+  }
+
+  const GAP = 24;
+  const clusterMidY = (clusterTop + clusterBottom) / 2;
+
   return {
-    x: centerX + (Math.random() - 0.5) * scatter,
-    y: centerY + (Math.random() - 0.5) * scatter,
+    x: maxRight + GAP,
+    y: clusterMidY - newH / 2,
   };
 }

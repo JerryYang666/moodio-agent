@@ -313,6 +313,12 @@ export default function DesktopDetailPage({
         camera,
         width: rect.width,
         height: rect.height,
+        assetRects: (detail?.assets ?? []).map((a) => ({
+          x: a.posX,
+          y: a.posY,
+          w: a.width ?? 400,
+          h: a.height ?? 300,
+        })),
       });
     };
 
@@ -321,7 +327,7 @@ export default function DesktopDetailPage({
     const observer = new ResizeObserver(publish);
     observer.observe(el);
     return () => observer.disconnect();
-  }, [camera]);
+  }, [camera, detail?.assets]);
 
   const handleAssetMove = useCallback(
     (assetId: string, posX: number, posY: number) => {
