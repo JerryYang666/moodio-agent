@@ -325,6 +325,31 @@ export function useDesktopDetail(desktopId: string) {
           );
           break;
         }
+        case "cell_updated": {
+          const { assetId, rowId, colIndex, value } = event.payload || {};
+          if (!assetId || !rowId || colIndex == null) return;
+          setDetail((prev) => {
+            if (!prev) return null;
+            return {
+              ...prev,
+              assets: prev.assets.map((a) => {
+                if (a.id !== assetId || a.assetType !== "table") return a;
+                const meta = a.metadata as Record<string, unknown>;
+                const rows = Array.isArray(meta.rows) ? [...meta.rows] : [];
+                const rowIndex = rows.findIndex((r: any) => r.id === rowId);
+                if (rowIndex === -1) return a;
+                const row = { ...rows[rowIndex] } as any;
+                const cells = Array.isArray(row.cells) ? [...row.cells] : [];
+                if (colIndex < 0 || colIndex >= cells.length) return a;
+                cells[colIndex] = { ...cells[colIndex], value };
+                row.cells = cells;
+                rows[rowIndex] = row;
+                return { ...a, metadata: { ...meta, rows } };
+              }),
+            };
+          });
+          break;
+        }
       }
     },
     []

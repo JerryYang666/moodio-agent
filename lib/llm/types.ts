@@ -34,6 +34,14 @@ export type MessageContentPart =
       status: "pending" | "creating" | "created" | "error";
       generationId?: string; // Set after video creation starts
       error?: string;
+    }
+  | {
+      type: "agent_shot_list";
+      title: string;
+      columns: string[];
+      rows: Array<{ id: string; cells: Array<{ value: string }> }>;
+      status: "streaming" | "complete";
+      desktopAssetId?: string;
     };
 
 export interface Message {

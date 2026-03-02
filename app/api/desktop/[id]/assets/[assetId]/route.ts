@@ -47,6 +47,59 @@ export async function PATCH(
     }
 
     const body = await req.json();
+
+    // Cell-level patch for table assets (read-modify-write a single cell)
+    if (body.cellPatch && typeof body.cellPatch === "object") {
+      const { rowId, colIndex, value } = body.cellPatch;
+      if (typeof rowId !== "string" || typeof colIndex !== "number" || typeof value !== "string") {
+        return NextResponse.json({ error: "cellPatch requires rowId (string), colIndex (number), and value (string)" }, { status: 400 });
+      }
+
+      const [existing] = await db
+        .select()
+        .from(desktopAssets)
+        .where(and(eq(desktopAssets.id, assetId), eq(desktopAssets.desktopId, id)));
+
+      if (!existing) {
+        return NextResponse.json({ error: "Asset not found" }, { status: 404 });
+      }
+
+      if (existing.assetType !== "table") {
+        return NextResponse.json({ error: "cellPatch is only supported for table assets" }, { status: 400 });
+      }
+
+      const meta = existing.metadata as Record<string, unknown>;
+      const rows = Array.isArray(meta.rows) ? [...meta.rows] : [];
+      const rowIndex = rows.findIndex((r: any) => r.id === rowId);
+      if (rowIndex === -1) {
+        return NextResponse.json({ error: `Row ${rowId} not found` }, { status: 404 });
+      }
+
+      const row = { ...rows[rowIndex] } as any;
+      const cells = Array.isArray(row.cells) ? [...row.cells] : [];
+      if (colIndex < 0 || colIndex >= cells.length) {
+        return NextResponse.json({ error: `Column index ${colIndex} out of range` }, { status: 400 });
+      }
+
+      cells[colIndex] = { ...cells[colIndex], value };
+      row.cells = cells;
+      rows[rowIndex] = row;
+
+      const patchedMetadata = { ...meta, rows };
+
+      const [updated] = await db
+        .update(desktopAssets)
+        .set({ metadata: patchedMetadata })
+        .where(and(eq(desktopAssets.id, assetId), eq(desktopAssets.desktopId, id)))
+        .returning();
+
+      if (!updated) {
+        return NextResponse.json({ error: "Asset not found" }, { status: 404 });
+      }
+
+      return NextResponse.json({ asset: enrichAsset(updated) });
+    }
+
     const updates: Record<string, unknown> = {};
 
     if (typeof body.posX === "number") updates.posX = body.posX;

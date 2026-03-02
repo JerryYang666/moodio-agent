@@ -6,6 +6,7 @@ import type { CameraState } from "@/hooks/use-desktop";
 import type { RemoteCursor } from "@/hooks/use-desktop-ws";
 import type { EnrichedDesktopAsset } from "./assets";
 import { ImageAsset, VideoAsset, TextAsset, LinkAsset } from "./assets";
+import TableAsset from "./assets/TableAsset";
 import {
   Trash2,
   MessageSquare,
@@ -39,6 +40,8 @@ interface DesktopCanvasProps {
   sendEvent?: (type: string, payload: Record<string, unknown>) => void;
   remoteCursors?: RemoteCursor[];
   remoteSelections?: Map<string, { sessionId: string; userId: string; firstName: string }[]>;
+  currentUserId?: string;
+  cellLocks?: Map<string, { userId: string; sessionId: string; firstName: string }>;
 }
 
 interface ContextMenuState {
@@ -62,6 +65,11 @@ function getAssetDimensions(
 ) {
   if (asset.width != null && asset.height != null) {
     return { w: asset.width, h: asset.height };
+  }
+  if (asset.assetType === "table") {
+    const meta = asset.metadata as Record<string, unknown>;
+    const rows = Array.isArray(meta.rows) ? meta.rows : [];
+    return { w: 700, h: 40 + rows.length * 36 + 40 };
   }
   if (naturalDims) {
     const scale = DEFAULT_ASSET_WIDTH / naturalDims.w;
@@ -87,6 +95,8 @@ export default function DesktopCanvas({
   sendEvent,
   remoteCursors,
   remoteSelections,
+  currentUserId,
+  cellLocks,
 }: DesktopCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const isPanning = useRef(false);
@@ -655,6 +665,9 @@ export default function DesktopCanvas({
                 playing={playingAssetId === asset.id}
                 onPlayToggle={onAssetClick ? () => onAssetClick(asset) : undefined}
                 onImageLoad={handleImageLoad}
+                sendEvent={sendEvent}
+                cellLocks={cellLocks}
+                currentUserId={currentUserId}
               />
               </div>
               {/* Resize handles — visible when selected */}
@@ -814,11 +827,17 @@ function AssetCardContent({
   playing,
   onPlayToggle,
   onImageLoad,
+  sendEvent,
+  cellLocks,
+  currentUserId,
 }: {
   asset: EnrichedDesktopAsset;
   playing?: boolean;
   onPlayToggle?: () => void;
   onImageLoad: (assetId: string, naturalWidth: number, naturalHeight: number) => void;
+  sendEvent?: (type: string, payload: Record<string, unknown>) => void;
+  cellLocks?: Map<string, { userId: string; sessionId: string; firstName: string }>;
+  currentUserId?: string;
 }) {
   switch (asset.assetType) {
     case "image":
@@ -829,6 +848,18 @@ function AssetCardContent({
       return <TextAsset asset={asset} />;
     case "link":
       return <LinkAsset asset={asset} />;
+    case "table": {
+      const assetPrefix = `${asset.id}:`;
+      const assetCellLocks = new Map<string, { userId: string; sessionId: string; firstName: string }>();
+      if (cellLocks) {
+        Array.from(cellLocks.entries()).forEach(([k, v]) => {
+          if (k.startsWith(assetPrefix)) {
+            assetCellLocks.set(k.slice(assetPrefix.length), v);
+          }
+        });
+      }
+      return <TableAsset asset={asset} sendEvent={sendEvent} cellLocks={assetCellLocks} currentUserId={currentUserId} />;
+    }
     default:
       return (
         <div className="w-full h-full flex items-center justify-center text-default-400 text-xs bg-background">

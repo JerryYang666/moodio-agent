@@ -20,6 +20,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { AI_IMAGE_DRAG_MIME } from "./asset-dnd";
 import VideoPromptBlock from "./video-prompt-block";
 import VideoConfigCard from "./video-config-card";
+import ShotListCard from "./shot-list-card";
 
 interface ChatMessageProps {
   message: Message;
@@ -160,6 +161,7 @@ export default function ChatMessage({
     );
     const agentParts = content.filter((p) => p.type === "agent_image");
     const videoParts = content.filter((p) => p.type === "agent_video");
+    const shotListParts = content.filter((p) => p.type === "agent_shot_list");
     const thinkParts = content.filter((p) => p.type === "internal_think");
 
     return (
@@ -362,6 +364,11 @@ export default function ChatMessage({
               />
             );
           })}
+
+        {shotListParts.length > 0 &&
+          shotListParts.map((part: any, i) => (
+            <ShotListCard key={`shotlist-${i}`} part={part} />
+          ))}
       </div>
     );
   };

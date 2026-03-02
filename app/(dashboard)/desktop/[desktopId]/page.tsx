@@ -34,6 +34,7 @@ import {
 } from "@/hooks/use-desktop-ws";
 import { useDesktopVideoSync } from "@/hooks/use-desktop-video-sync";
 import { setDesktopViewport, clearDesktopViewport } from "@/lib/desktop/types";
+import { useAuth } from "@/hooks/use-auth";
 
 const DEFAULT_CAMERA: CameraState = { x: 0, y: 0, zoom: 1 };
 const VIEWPORT_SAVE_DEBOUNCE = 2000;
@@ -63,6 +64,7 @@ export default function DesktopDetailPage({
 }) {
   const { desktopId } = use(params);
   const router = useRouter();
+  const { user } = useAuth();
   const {
     detail,
     loading,
@@ -74,6 +76,11 @@ export default function DesktopDetailPage({
     applyRemoteEvent,
   } = useDesktopDetail(desktopId);
 
+  // Cell-level locks for table assets (managed via WS events)
+  const [cellLocks, setCellLocks] = useState<Map<string, { userId: string; sessionId: string; firstName: string }>>(
+    () => new Map()
+  );
+
   // Stable ref for the video-sync remote-event handler (defined after the hook below)
   const handleVideoRemoteEventRef = useRef<(event: RemoteEvent) => void>(() => {});
 
@@ -81,6 +88,44 @@ export default function DesktopDetailPage({
     (event: RemoteEvent) => {
       applyRemoteEvent(event);
       handleVideoRemoteEventRef.current(event);
+
+      if (event.type === "cell_selected") {
+        const { assetId, rowId, colIndex } = event.payload || {};
+        if (assetId && rowId != null && colIndex != null) {
+          const key = `${assetId}:${rowId}-${colIndex}`;
+          setCellLocks((prev) => {
+            const next = new Map(prev);
+            next.set(key, { userId: event.userId, sessionId: event.sessionId, firstName: event.firstName });
+            return next;
+          });
+        }
+      } else if (event.type === "cell_deselected") {
+        const { assetId, rowId, colIndex } = event.payload || {};
+        if (assetId && rowId != null && colIndex != null) {
+          const key = `${assetId}:${rowId}-${colIndex}`;
+          setCellLocks((prev) => {
+            const next = new Map(prev);
+            next.delete(key);
+            return next;
+          });
+        }
+      } else if (event.type === "table_generating") {
+        addToast({
+          title: `${event.firstName} is generating a shot list...`,
+          color: "default",
+        });
+      } else if (event.type === "session_left") {
+        const { sessionId } = event.payload || {};
+        if (sessionId) {
+          setCellLocks((prev) => {
+            const next = new Map(prev);
+            Array.from(next.entries()).forEach(([k, v]) => {
+              if (v.sessionId === sessionId) next.delete(k);
+            });
+            return next.size === prev.size ? prev : next;
+          });
+        }
+      }
     },
     [applyRemoteEvent]
   );
@@ -181,8 +226,19 @@ export default function DesktopDetailPage({
         }
       }
     };
+
+    const handleTableGenerating = (e: CustomEvent) => {
+      if (e.detail?.desktopId === desktopId) {
+        sendEvent("table_generating", {});
+      }
+    };
+
     window.addEventListener("desktop-asset-added", handleAssetAdded as EventListener);
-    return () => window.removeEventListener("desktop-asset-added", handleAssetAdded as EventListener);
+    window.addEventListener("desktop-table-generating", handleTableGenerating as EventListener);
+    return () => {
+      window.removeEventListener("desktop-asset-added", handleAssetAdded as EventListener);
+      window.removeEventListener("desktop-table-generating", handleTableGenerating as EventListener);
+    };
   }, [desktopId, fetchDetail, sendEvent]);
 
   const handleCameraChange = useCallback(
@@ -488,6 +544,8 @@ export default function DesktopDetailPage({
           sendEvent={sendEvent}
           remoteCursors={remoteCursors}
           remoteSelections={remoteSelections}
+          currentUserId={user?.id}
+          cellLocks={cellLocks}
         />
         <DesktopToolbar
           camera={camera}

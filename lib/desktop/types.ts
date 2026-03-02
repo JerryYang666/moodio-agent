@@ -31,13 +31,31 @@ export type LinkAssetMeta = {
   thumbnailUrl?: string;
 };
 
+export type TableCell = {
+  value: string;
+};
+
+export type TableRow = {
+  id: string;
+  cells: TableCell[];
+};
+
+export type TableAssetMeta = {
+  title: string;
+  columns: string[];
+  rows: TableRow[];
+  chatId?: string;
+  status?: "streaming" | "complete";
+};
+
 export type DesktopAssetMetadata =
   | { assetType: "image"; metadata: ImageAssetMeta }
   | { assetType: "video"; metadata: VideoAssetMeta }
   | { assetType: "text"; metadata: TextAssetMeta }
-  | { assetType: "link"; metadata: LinkAssetMeta };
+  | { assetType: "link"; metadata: LinkAssetMeta }
+  | { assetType: "table"; metadata: TableAssetMeta };
 
-const SUPPORTED_ASSET_TYPES = ["image", "video", "text", "link"] as const;
+const SUPPORTED_ASSET_TYPES = ["image", "video", "text", "link", "table"] as const;
 export type SupportedAssetType = (typeof SUPPORTED_ASSET_TYPES)[number];
 
 export function validateAssetMetadata(
@@ -79,6 +97,17 @@ export function validateAssetMetadata(
     case "link":
       if (typeof m.url !== "string" || !m.url) {
         return { valid: false, error: "link metadata requires a non-empty url string" };
+      }
+      break;
+    case "table":
+      if (typeof m.title !== "string" || !m.title) {
+        return { valid: false, error: "table metadata requires a non-empty title string" };
+      }
+      if (!Array.isArray(m.columns) || m.columns.length === 0) {
+        return { valid: false, error: "table metadata requires a non-empty columns array" };
+      }
+      if (!Array.isArray(m.rows)) {
+        return { valid: false, error: "table metadata requires a rows array" };
       }
       break;
   }

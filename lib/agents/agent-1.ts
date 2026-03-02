@@ -564,6 +564,7 @@ export class Agent1 implements Agent {
     let thoughtSent = false;
     let questionSent = false;
     let suggestionIndex = 0;
+    let shotListStartSent = false;
     const imageTasks: Promise<void>[] = [];
 
     try {
@@ -573,13 +574,14 @@ export class Agent1 implements Agent {
         fullLlmResponse += delta; // Accumulate full response
 
         // Check for invalid text outside tags
-        // Valid text should only be inside <TEXT>...</TEXT> or <JSON>...</JSON> or <VIDEO>...</VIDEO> or <think>...</think>
+        // Valid text should only be inside <TEXT>...</TEXT> or <JSON>...</JSON> or <VIDEO>...</VIDEO> or <SHOTLIST>...</SHOTLIST> or <think>...</think>
         // Whitespace outside is OK
         let checkBuffer = buffer;
         let inAngleBrackets = false;
         let inTextTag = false;
         let inJsonTag = false;
         let inVideoTag = false;
+        let inShotListTag = false;
         let inThinkTag = false;
         let i = 0;
 
@@ -612,6 +614,14 @@ export class Agent1 implements Agent {
             inVideoTag = false;
             i += 8;
             continue;
+          } else if (remaining.startsWith("<SHOTLIST>")) {
+            inShotListTag = true;
+            i += 10;
+            continue;
+          } else if (remaining.startsWith("</SHOTLIST>")) {
+            inShotListTag = false;
+            i += 11;
+            continue;
           } else if (remaining.startsWith("<think>")) {
             inThinkTag = true;
             i += 7;
@@ -631,6 +641,7 @@ export class Agent1 implements Agent {
             !inTextTag &&
             !inJsonTag &&
             !inVideoTag &&
+            !inShotListTag &&
             !inThinkTag &&
             !inAngleBrackets &&
             char.trim() !== ""
@@ -857,6 +868,47 @@ export class Agent1 implements Agent {
               console.error("Failed to parse video config JSON", e);
             }
             buffer = buffer.substring(vEnd + 8);
+          }
+        }
+
+        // 4. Parse Shot List (max 1)
+        if (!shotListStartSent && buffer.includes("<SHOTLIST>")) {
+          shotListStartSent = true;
+          send({ type: "shot_list_start" });
+          console.log(
+            "[Perf] Agent shot list generation started",
+            `[${Date.now() - startTime}ms]`
+          );
+        }
+
+        if (buffer.includes("</SHOTLIST>")) {
+          const slStart = buffer.indexOf("<SHOTLIST>");
+          const slEnd = buffer.indexOf("</SHOTLIST>");
+
+          if (slStart !== -1 && slEnd !== -1 && slStart < slEnd) {
+            const shotListJsonStr = buffer.substring(slStart + 10, slEnd);
+            try {
+              const shotListData = JSON.parse(shotListJsonStr);
+              const shotListPart: MessageContentPart = {
+                type: "agent_shot_list",
+                title: shotListData.title || "Shot List",
+                columns: Array.isArray(shotListData.columns) ? shotListData.columns : [],
+                rows: Array.isArray(shotListData.rows) ? shotListData.rows : [],
+                status: "complete",
+              };
+
+              send({ type: "part", part: shotListPart });
+              finalContent.push(shotListPart);
+
+              console.log(
+                "[Perf] Agent shot list sent",
+                `rows=${shotListPart.rows.length}`,
+                `[${Date.now() - startTime}ms]`
+              );
+            } catch (e) {
+              console.error("Failed to parse shot list JSON", e);
+            }
+            buffer = buffer.substring(slEnd + 11);
           }
         }
       }

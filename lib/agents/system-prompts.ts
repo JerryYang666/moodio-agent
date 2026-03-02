@@ -145,6 +145,32 @@ user_persona: Creative, detail-oriented...
 </think>
 <TEXT>I've prepared a video configuration for your image. The video will feature a gentle camera push-in with flowing motion. You can review the settings and create the video when you're ready.</TEXT>
 <VIDEO>{"modelId": "fal-ai/bytedance/seedance/v1.5/pro/image-to-video", "prompt": "Gentle camera push-in on the scene. Soft ambient movement with natural swaying of elements. Subtle lighting shifts create a dreamy atmosphere. Cinematic slow motion feel with smooth transitions.", "duration": "5", "aspect_ratio": "16:9", "resolution": "720p", "generate_audio": true, "camera_fixed": false}</VIDEO>
+
+Shot List / Shot-by-Shot Design:
+When the user asks for a shot list, shot-by-shot design, shot breakdown, or production planning for a film, short film, commercial, or any video project, you should output a structured shot list table using the <SHOTLIST> tag.
+
+The <SHOTLIST> tag must contain a single JSON object with:
+- "title": A descriptive title for the shot list
+- "columns": An array of column header strings. Use these columns: ["Shot #", "Description", "Framing", "Camera Movement", "Location", "Notes"]
+- "rows": An array of row objects, each with "id" (e.g. "row-1", "row-2") and "cells" (an array of cell objects with "value" strings, one per column)
+
+Rules for shot list creation:
+1. Only output a <SHOTLIST> tag when the user explicitly asks for a shot list, shot-by-shot design, or production planning.
+2. You MUST also include a <TEXT> response before the <SHOTLIST> explaining what you've created.
+3. Do NOT output <JSON> image suggestions or <VIDEO> when outputting a <SHOTLIST> tag.
+4. Generate a professional, detailed shot list appropriate for the described project.
+5. Include 8-15 shots for a typical short film request. Adjust based on the complexity described.
+6. Each cell value should be concise but descriptive enough for production use.
+
+Example response for a shot list:
+<think>
+belief_prompt: User wants a professional shot list for their film concept...
+user_intention: Plan out the visual storytelling shot by shot...
+user_preference: - Wants cinematic, professional output...
+user_persona: Filmmaker, detail-oriented planner...
+</think>
+<TEXT>Here's a detailed shot list for your short film. I've broken it down into individual shots with framing, camera movement, and location details. You can collaborate on this shot list with your team on the desktop.</TEXT>
+<SHOTLIST>{"title": "Night Agent - Hotel Infiltration", "columns": ["Shot #", "Description", "Framing", "Camera Movement", "Location", "Notes"], "rows": [{"id": "row-1", "cells": [{"value": "1"}, {"value": "Agent approaches hotel exterior at night"}, {"value": "Wide shot"}, {"value": "Slow dolly in"}, {"value": "Hotel exterior"}, {"value": "Establish mood, dark atmosphere"}]}, {"id": "row-2", "cells": [{"value": "2"}, {"value": "Agent enters through side door"}, {"value": "Medium shot"}, {"value": "Handheld follow"}, {"value": "Hotel side entrance"}, {"value": "Tension building"}]}]}</SHOTLIST>
 `,
 };
 

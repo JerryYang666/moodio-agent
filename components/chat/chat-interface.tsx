@@ -1398,6 +1398,64 @@ export default function ChatInterface({
             } else if (event.type === "part") {
               // Add new part
               currentContent.push(event.part);
+
+              // Auto-create desktop asset for shot lists
+              if (event.part.type === "agent_shot_list" && desktopId) {
+                (async () => {
+                  try {
+                    const { getViewportCenterPosition } = await import("@/lib/desktop/types");
+                    const pos = getViewportCenterPosition();
+                    const assetRes = await fetch(`/api/desktop/${desktopId}/assets`, {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        assets: [{
+                          assetType: "table",
+                          metadata: {
+                            title: event.part.title,
+                            columns: event.part.columns,
+                            rows: event.part.rows,
+                            chatId: chatId,
+                            status: "complete",
+                          },
+                          posX: pos.x,
+                          posY: pos.y,
+                          width: 700,
+                          height: 40 + event.part.rows.length * 36 + 40,
+                        }],
+                      }),
+                    });
+                    if (assetRes.ok) {
+                      const assetData = await assetRes.json();
+                      window.dispatchEvent(
+                        new CustomEvent("desktop-asset-added", {
+                          detail: { assets: assetData.assets, desktopId },
+                        })
+                      );
+                    }
+                  } catch (e) {
+                    console.error("Failed to add shot list asset to desktop:", e);
+                  }
+                })();
+              }
+            } else if (event.type === "shot_list_start") {
+              // Show loading placeholder in chat
+              currentContent.push({
+                type: "agent_shot_list",
+                title: "",
+                columns: [],
+                rows: [],
+                status: "streaming",
+              } as any);
+
+              // Broadcast generating event to the room
+              if (desktopId) {
+                window.dispatchEvent(
+                  new CustomEvent("desktop-table-generating", {
+                    detail: { desktopId },
+                  })
+                );
+              }
             } else if (event.type === "part_update") {
               // Update existing part by imageId (for parallel support)
               if (event.imageId) {
@@ -1682,7 +1740,18 @@ export default function ChatInterface({
                 variantContent[0] = { type: "text", text: event.content };
               }
             } else if (event.type === "part") {
-              variantContent.push(event.part);
+              if (event.part.type === "agent_shot_list" && event.part.status === "complete") {
+                const placeholderIdx = variantContent.findIndex(
+                  (p) => p.type === "agent_shot_list" && (p as any).status === "streaming"
+                );
+                if (placeholderIdx !== -1) {
+                  variantContent[placeholderIdx] = event.part;
+                } else {
+                  variantContent.push(event.part);
+                }
+              } else {
+                variantContent.push(event.part);
+              }
             } else if (event.type === "part_update") {
               // Update existing part by imageId
               if (event.imageId) {

@@ -254,7 +254,8 @@ func buildSessionEvent(eventType string, s *melody.Session) []byte {
 func isMutationEvent(eventType string) bool {
 	switch eventType {
 	case "asset_moved", "asset_resized", "asset_added", "asset_removed",
-		"asset_dragging", "asset_resizing", "asset_selected", "asset_deselected":
+		"asset_dragging", "asset_resizing", "asset_selected", "asset_deselected",
+		"cell_selected", "cell_deselected", "cell_updated", "table_generating":
 		return true
 	}
 	return false
@@ -262,7 +263,8 @@ func isMutationEvent(eventType string) bool {
 
 func isStateEvent(eventType string) bool {
 	switch eventType {
-	case "asset_moved", "asset_resized", "asset_added", "asset_removed":
+	case "asset_moved", "asset_resized", "asset_added", "asset_removed",
+		"cell_updated":
 		return true
 	}
 	return false
