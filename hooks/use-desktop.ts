@@ -162,7 +162,7 @@ export function useDesktopDetail(desktopId: string) {
           ? {
               ...prev,
               assets: prev.assets.map((a) =>
-                a.id === assetId ? data.asset : a
+                a.id === assetId ? { ...a, ...data.asset } : a
               ),
             }
           : null
@@ -226,7 +226,10 @@ export function useDesktopDetail(desktopId: string) {
         prev
           ? {
               ...prev,
-              assets: prev.assets.map((a) => updatedMap.get(a.id) || a),
+              assets: prev.assets.map((a) => {
+                const server = updatedMap.get(a.id);
+                return server ? { ...a, ...server } : a;
+              }),
             }
           : null
       );
@@ -267,14 +270,17 @@ export function useDesktopDetail(desktopId: string) {
         }
         case "asset_resized":
         case "asset_resizing": {
-          const { assetId, width, height } = event.payload || {};
+          const { assetId, width, height, posX, posY } = event.payload || {};
           if (!assetId) return;
+          const updates: Record<string, unknown> = { width, height };
+          if (posX != null) updates.posX = posX;
+          if (posY != null) updates.posY = posY;
           setDetail((prev) =>
             prev
               ? {
                   ...prev,
                   assets: prev.assets.map((a) =>
-                    a.id === assetId ? { ...a, width, height } : a
+                    a.id === assetId ? { ...a, ...updates } : a
                   ),
                 }
               : null

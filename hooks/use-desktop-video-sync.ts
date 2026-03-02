@@ -62,7 +62,10 @@ export function useDesktopVideoSync({
       const meta = asset.metadata as unknown as VideoAssetMeta;
       const genId = meta.generationId;
       if (!genId) continue;
-      const status = asset.generationData?.status || meta.status;
+
+      // Check all status sources: live cache, enriched API data, and metadata
+      const liveStatus = generationStatuses[genId];
+      const status = liveStatus || asset.generationData?.status || meta.status;
       if (status === "completed" || status === "failed") continue;
       if (status === "pending" || status === "processing") {
         pending.push({ generationId: genId, assetId: asset.id });
@@ -87,7 +90,7 @@ export function useDesktopVideoSync({
       ownedPollingRef.current.add(generationId);
       monitorGeneration(generationId);
     }
-  }, [assets, monitorGeneration]);
+  }, [assets, monitorGeneration, generationStatuses]);
 
   // ---------------------------------------------------------------
   // 2. Heartbeat: while we are polling a generation, broadcast that

@@ -304,7 +304,7 @@ export default function DesktopCanvas({
         const now = Date.now();
         if (sendEvent && now - lastResizeSend.current >= CURSOR_THROTTLE_MS) {
           lastResizeSend.current = now;
-          sendEvent("asset_resizing", { assetId: resizingAssetId, width: newW, height: newH });
+          sendEvent("asset_resizing", { assetId: resizingAssetId, width: newW, height: newH, posX: newPosX, posY: newPosY });
         }
         return;
       }
