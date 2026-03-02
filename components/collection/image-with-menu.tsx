@@ -45,6 +45,8 @@ interface ImageWithMenuProps {
   };
   onViewDetails: () => void;
   children?: React.ReactNode;
+  /** When set, skip desktop picker and send directly to this desktop */
+  desktopId?: string;
 }
 
 interface FlyingImageProps {
@@ -103,6 +105,7 @@ export default function ImageWithMenu({
   generationDetails,
   onViewDetails,
   children,
+  desktopId,
 }: ImageWithMenuProps) {
   const tMenu = useTranslations("imageMenu");
   const tCollections = useTranslations("collections");
@@ -376,6 +379,7 @@ export default function ImageWithMenu({
       <SendToDesktopModal
         isOpen={isDesktopOpen}
         onOpenChange={onDesktopOpenChange}
+        desktopId={desktopId}
         assets={[
           {
             assetType: "image",

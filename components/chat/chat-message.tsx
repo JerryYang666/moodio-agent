@@ -267,6 +267,7 @@ export default function ChatMessage({
                   imageId={part.imageId || ""}
                   imageUrl={url}
                   chatId={chatId}
+                  desktopId={desktopId}
                   generationDetails={{
                     title: part.title,
                     prompt: part.prompt,

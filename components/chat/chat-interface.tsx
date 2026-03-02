@@ -1974,6 +1974,7 @@ export default function ChatInterface({
         onNavigate={handleImageNavigate}
         onClose={onClose}
         chatId={chatId}
+        desktopId={desktopId}
       />
 
       {/* Drawing modal for "circle to change" feature (局部重绘) */}

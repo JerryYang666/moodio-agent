@@ -12,6 +12,7 @@ import { Select, SelectItem } from "@heroui/select";
 import { Button } from "@heroui/button";
 import { Spinner } from "@heroui/spinner";
 import { addToast } from "@heroui/toast";
+import { getViewportCenterPosition } from "@/lib/desktop/types";
 
 interface SendToDesktopModalProps {
   isOpen: boolean;
@@ -20,6 +21,8 @@ interface SendToDesktopModalProps {
     assetType: "image" | "video";
     metadata: Record<string, unknown>;
   }>;
+  /** When provided, skip desktop selection and send directly to this desktop */
+  desktopId?: string;
 }
 
 interface DesktopOption {
@@ -29,18 +32,85 @@ interface DesktopOption {
   isOwner: boolean;
 }
 
+async function sendAssetsToDesktop(
+  targetDesktopId: string,
+  assets: SendToDesktopModalProps["assets"],
+  onOpenChange: (isOpen: boolean) => void,
+  useViewportPlacement: boolean,
+) {
+  const res = await fetch(`/api/desktop/${targetDesktopId}/assets`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      assets: assets.map((a, i) => {
+        if (useViewportPlacement) {
+          const pos = getViewportCenterPosition();
+          return { ...a, posX: pos.x + i * 280, posY: pos.y };
+        }
+        return {
+          ...a,
+          posX: (i % 2) * 280,
+          posY: Math.floor(i / 2) * 280,
+        };
+      }),
+    }),
+  });
+  if (!res.ok) throw new Error("Failed to add to desktop");
+  const data = await res.json();
+
+  if (useViewportPlacement) {
+    window.dispatchEvent(
+      new CustomEvent("desktop-asset-added", {
+        detail: { assets: data.assets, desktopId: targetDesktopId },
+      })
+    );
+  }
+
+  addToast({
+    title: "Added to desktop",
+    description: `${assets.length} asset(s) sent to desktop`,
+    color: "success",
+  });
+  onOpenChange(false);
+}
+
 export default function SendToDesktopModal({
   isOpen,
   onOpenChange,
   assets,
+  desktopId,
 }: SendToDesktopModalProps) {
   const [desktops, setDesktops] = useState<DesktopOption[]>([]);
   const [selectedDesktopId, setSelectedDesktopId] = useState("");
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
 
+  // When a desktopId is provided, send immediately without showing a picker
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || !desktopId || assets.length === 0) return;
+
+    let cancelled = false;
+    setSending(true);
+    sendAssetsToDesktop(desktopId, assets, onOpenChange, true)
+      .catch(() => {
+        if (!cancelled) {
+          addToast({
+            title: "Error",
+            description: "Failed to send to desktop",
+            color: "danger",
+          });
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setSending(false);
+      });
+
+    return () => { cancelled = true; };
+  }, [isOpen, desktopId, assets, onOpenChange]);
+
+  // Only fetch desktop list when no desktopId is provided (picker mode)
+  useEffect(() => {
+    if (!isOpen || desktopId) return;
     setLoading(true);
     fetch("/api/desktop")
       .then((res) => res.json())
@@ -53,30 +123,13 @@ export default function SendToDesktopModal({
       })
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, [isOpen]);
+  }, [isOpen, desktopId]);
 
   const handleSend = useCallback(async () => {
     if (!selectedDesktopId || assets.length === 0) return;
     setSending(true);
     try {
-      const res = await fetch(`/api/desktop/${selectedDesktopId}/assets`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          assets: assets.map((a, i) => ({
-            ...a,
-            posX: (i % 2) * 280,
-            posY: Math.floor(i / 2) * 280,
-          })),
-        }),
-      });
-      if (!res.ok) throw new Error("Failed to add to desktop");
-      addToast({
-        title: "Added to desktop",
-        description: `${assets.length} asset(s) sent to desktop`,
-        color: "success",
-      });
-      onOpenChange(false);
+      await sendAssetsToDesktop(selectedDesktopId, assets, onOpenChange, false);
     } catch {
       addToast({
         title: "Error",
@@ -87,6 +140,11 @@ export default function SendToDesktopModal({
       setSending(false);
     }
   }, [selectedDesktopId, assets, onOpenChange]);
+
+  // Direct-send mode: render nothing visible (the effect handles everything)
+  if (desktopId) {
+    return null;
+  }
 
   return (
     <Modal isOpen={isOpen} onOpenChange={onOpenChange}>

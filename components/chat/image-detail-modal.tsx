@@ -61,6 +61,8 @@ interface ImageDetailModalProps {
   onNavigate: (index: number) => void;
   onClose: () => void;
   chatId?: string;
+  /** When set, skip desktop picker and send directly to this desktop */
+  desktopId?: string;
 }
 
 // Flying image animation component (same as ImageWithMenu)
@@ -122,6 +124,7 @@ export default function ImageDetailModal({
   onNavigate,
   onClose,
   chatId,
+  desktopId,
 }: ImageDetailModalProps) {
   const t = useTranslations("imageDetail");
   const tMenu = useTranslations("imageMenu");
@@ -804,6 +807,7 @@ export default function ImageDetailModal({
         <SendToDesktopModal
           isOpen={isDesktopOpen}
           onOpenChange={onDesktopOpenChange}
+          desktopId={desktopId}
           assets={[
             {
               assetType: "image",
