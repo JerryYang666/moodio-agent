@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useCallback, useMemo } from "react";
+import { useRef, useState, useCallback, useMemo, useEffect } from "react";
 import type { DesktopAsset } from "@/lib/db/schema";
 import type { CameraState } from "@/hooks/use-desktop";
 import type { RemoteCursor } from "@/hooks/use-desktop-ws";
@@ -195,7 +195,7 @@ export default function DesktopCanvas({
   }, [assets, camera, naturalDims]);
 
   const handleWheel = useCallback(
-    (e: React.WheelEvent) => {
+    (e: WheelEvent) => {
       e.preventDefault();
       const rect = containerRef.current?.getBoundingClientRect();
       if (!rect) return;
@@ -215,6 +215,14 @@ export default function DesktopCanvas({
     },
     [camera, onCameraChange]
   );
+
+  // Attach wheel listener with { passive: false } so preventDefault() works
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    el.addEventListener("wheel", handleWheel, { passive: false });
+    return () => el.removeEventListener("wheel", handleWheel);
+  }, [handleWheel]);
 
   const screenToWorld = useCallback(
     (clientX: number, clientY: number) => {
@@ -572,7 +580,6 @@ export default function DesktopCanvas({
     <div
       ref={containerRef}
       className="relative w-full h-full overflow-hidden bg-default-100 cursor-grab active:cursor-grabbing select-none"
-      onWheel={handleWheel}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
