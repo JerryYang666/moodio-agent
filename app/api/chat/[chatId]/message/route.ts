@@ -6,7 +6,7 @@ import { chats } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getChatHistory, saveChatHistory } from "@/lib/storage/s3";
 import { createLLMClient } from "@/lib/llm/client";
-import { Message, MessageContentPart } from "@/lib/llm/types";
+import { Message, MessageContentPart, DEFAULT_LLM_MODEL } from "@/lib/llm/types";
 import { agent1 } from "@/lib/agents/agent-1";
 import { waitUntil } from "@vercel/functions";
 import { recordEvent } from "@/lib/telemetry";
@@ -386,7 +386,7 @@ export async function POST(
             const llmClient = createLLMClient({
               apiKey: process.env.LLM_API_KEY,
               provider: "openai",
-              model: "gpt-5.2",
+              model: DEFAULT_LLM_MODEL,
             });
 
             try {

@@ -19,7 +19,7 @@ import dotenv from "dotenv";
 dotenv.config();
 
 import OpenAI from "openai";
-import { MessageContentPart } from "@/lib/llm/types";
+import { MessageContentPart, DEFAULT_LLM_MODEL } from "@/lib/llm/types";
 import { getSystemPrompt } from "@/lib/agents/system-prompts";
 import { getVideoModelsPromptText } from "@/lib/video/models";
 import {
@@ -49,7 +49,7 @@ beforeAll(() => {
 
 async function callLLM(userMessage: string): Promise<string> {
   const response = await openai.chat.completions.create({
-    model: "gpt-5.2",
+    model: DEFAULT_LLM_MODEL,
     messages: [
       { role: "system", content: systemPrompt },
       { role: "user", content: userMessage },
@@ -65,7 +65,7 @@ async function callLLMMultiTurn(
   messages: Array<{ role: "user" | "assistant"; content: string }>
 ): Promise<string> {
   const response = await openai.chat.completions.create({
-    model: "gpt-5.2",
+    model: DEFAULT_LLM_MODEL,
     messages: [
       { role: "system", content: systemPrompt },
       ...messages,

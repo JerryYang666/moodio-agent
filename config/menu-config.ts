@@ -1,3 +1,5 @@
+import { DEFAULT_LLM_MODEL } from "@/lib/llm/types";
+
 export const MENU_CONFIG = {
   version: "1.0",
   categories: {
@@ -150,11 +152,11 @@ export const MENU_CONFIG = {
 
     chat: {
       defaults: {
-        model: "gpt-5.2",
+        model: DEFAULT_LLM_MODEL,
         expertise: "commercial",
       },
       availability: {
-        model: { enabled: true, allowed: ["gpt-5.2", "gemini-3"] },
+        model: { enabled: true, allowed: [DEFAULT_LLM_MODEL, "gemini-3"] },
         expertise: {
           enabled: true,
           allowed: ["commercial", "product", "uiux"],

@@ -1,5 +1,5 @@
 import { Agent, AgentResponse, ParallelAgentResponse } from "./types";
-import { Message, MessageContentPart } from "@/lib/llm/types";
+import { Message, MessageContentPart, DEFAULT_LLM_MODEL } from "@/lib/llm/types";
 import { ImageSize } from "@/lib/image/types";
 import {
   downloadImage,
@@ -591,7 +591,7 @@ export class Agent1 implements Agent {
     const llmStream = await new OpenAI({
       apiKey: process.env.LLM_API_KEY,
     }).chat.completions.create({
-      model: "gpt-5.2",
+      model: DEFAULT_LLM_MODEL,
       messages: prepared.messages as any,
       stream: true,
     });
@@ -901,7 +901,7 @@ export class Agent1 implements Agent {
     const continuationStream = await new OpenAI({
       apiKey: process.env.LLM_API_KEY,
     }).chat.completions.create({
-      model: "gpt-5.2",
+      model: DEFAULT_LLM_MODEL,
       messages: continuationMessages as any,
       stream: true,
     });

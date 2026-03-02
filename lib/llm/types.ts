@@ -1,5 +1,7 @@
 // Common types for LLM integration
 
+export const DEFAULT_LLM_MODEL = "gpt-5.2";
+
 export type MessageContentPart =
   | { type: "text"; text: string }
   | { type: "internal_think"; text: string }

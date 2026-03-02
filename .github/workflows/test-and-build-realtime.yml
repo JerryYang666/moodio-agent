@@ -1,7 +1,12 @@
-name: Build & Push Realtime Image
+name: Realtime – Test, Build & Push
 
 on:
   push:
+    branches: [main]
+    paths:
+      - "realtime/**"
+  pull_request:
+    branches: ["**"]
     paths:
       - "realtime/**"
 
@@ -10,7 +15,24 @@ env:
   IMAGE_NAME: ${{ github.repository }}/realtime
 
 jobs:
+  test:
+    name: Go tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: realtime
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "1.26"
+          cache-dependency-path: realtime/go.sum
+      - run: go test -v -race -skip 'TestLatencyUnderPressure' ./...
+
   build-and-push:
+    name: Build & push container
+    needs: test
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
 
     permissions:
