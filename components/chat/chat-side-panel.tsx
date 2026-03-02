@@ -57,6 +57,10 @@ export default function ChatSidePanel({
   const [activeChatId, setActiveChatId] = useState<string | undefined>(undefined);
   const [initialMessages, setInitialMessages] = useState<Message[]>([]);
   const [isLoadingChat, setIsLoadingChat] = useState(false);
+
+  // Stable key for AnimatePresence: only changes on explicit user navigation
+  // (new chat button / chat selector), NOT when a chat is created mid-send.
+  const [chatSessionKey, setChatSessionKey] = useState("new");
   
   // Resizable panel state
   const [panelWidth, setPanelWidth] = useState(() => {
@@ -74,24 +78,24 @@ export default function ChatSidePanel({
       const storedChatId = localStorage.getItem(siteConfig.activeChatId);
       if (storedChatId && storedChatId !== "new") {
         setActiveChatId(storedChatId);
+        setChatSessionKey(storedChatId);
       } else {
-        // Either no stored value or "new" marker - show fresh chat
         setActiveChatId(undefined);
       }
     }
   }, []);
 
-  // Listen for storage changes from other tabs/pages
   useEffect(() => {
     const handleStorage = (e: StorageEvent) => {
       if (e.key === siteConfig.activeChatId) {
         if (e.newValue && e.newValue !== "new") {
           setActiveChatId(e.newValue);
-          setInitialMessages([]); // Clear messages to trigger reload
+          setInitialMessages([]);
+          setChatSessionKey(e.newValue);
         } else {
-          // "new" marker or removed - show fresh chat
           setActiveChatId(undefined);
           setInitialMessages([]);
+          setChatSessionKey("new-" + Date.now());
         }
       }
     };
@@ -198,15 +202,15 @@ export default function ChatSidePanel({
   const handleNewChat = useCallback(() => {
     setActiveChatId(undefined);
     setInitialMessages([]);
-    // Set "new" marker to indicate new chat state
+    setChatSessionKey("new-" + Date.now());
     localStorage.setItem(siteConfig.activeChatId, "new");
-    // Dispatch reset event for ChatInterface
     window.dispatchEvent(new CustomEvent("reset-chat"));
   }, []);
 
   const handleChatSelect = useCallback((chatId: string) => {
     setActiveChatId(chatId);
-    setInitialMessages([]); // Clear to trigger reload
+    setInitialMessages([]);
+    setChatSessionKey(chatId);
     localStorage.setItem(siteConfig.activeChatId, chatId);
   }, []);
 
@@ -303,7 +307,7 @@ export default function ChatSidePanel({
               </motion.div>
             ) : (
               <motion.div
-                key={activeChatId || "new"}
+                key={chatSessionKey}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}

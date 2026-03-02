@@ -1147,10 +1147,9 @@ export default function ChatInterface({
         const createData = await createRes.json();
         currentChatId = createData.chat.id as string;
         setChatId(currentChatId);
-        window.history.replaceState(null, "", `/chat/${currentChatId}`);
         window.dispatchEvent(new Event("refresh-chats"));
-        // Persist active chat ID for cross-page continuity (unless disabled)
         if (!disableActiveChatPersistence) {
+          window.history.replaceState(null, "", `/chat/${currentChatId}`);
           localStorage.setItem(siteConfig.activeChatId, currentChatId);
         }
         // Notify parent of new chat creation
