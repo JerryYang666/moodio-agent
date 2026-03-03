@@ -9,6 +9,7 @@ import { getSignedUrl as getS3SignedUrl } from "@aws-sdk/s3-request-presigner";
 import { Message } from "@/lib/llm/types";
 import { randomUUID } from "crypto";
 import { siteConfig } from "@/config/site";
+import { compressImageIfNeeded } from "@/lib/image/compress";
 
 const s3Client = new S3Client({
   region: process.env.AWS_REGION!,
@@ -48,12 +49,16 @@ export async function uploadImage(
   const imageId = preGeneratedId || randomUUID();
   const key = `images/${imageId}`;
 
-  let body;
+  let body: Buffer;
   if (file instanceof Blob) {
     body = Buffer.from(await file.arrayBuffer());
   } else {
     body = file;
   }
+
+  const compressed = await compressImageIfNeeded(body, contentType);
+  body = compressed.buffer;
+  contentType = compressed.contentType;
 
   await s3Client.send(
     new PutObjectCommand({

@@ -15,6 +15,20 @@ function resolveImageSize(imageSize?: ImageSize): "2K" | "4K" {
   return imageSize === "4k" ? "4K" : "2K";
 }
 
+function detectMimeType(base64: string): string {
+  const header = Buffer.from(base64.slice(0, 16), "base64");
+  if (header[0] === 0x52 && header[1] === 0x49 && header[2] === 0x46 && header[3] === 0x46) {
+    return "image/webp";
+  }
+  if (header[0] === 0xff && header[1] === 0xd8) {
+    return "image/jpeg";
+  }
+  if (header[0] === 0x47 && header[1] === 0x49 && header[2] === 0x46) {
+    return "image/gif";
+  }
+  return "image/png";
+}
+
 export async function generateWithGemini(
   modelId: string,
   input: ImageGenerationInput
@@ -98,7 +112,7 @@ export async function editWithGemini(
   for (const base64 of imageBase64) {
     prompt.push({
       inlineData: {
-        mimeType: "image/png",
+        mimeType: detectMimeType(base64),
         data: base64,
       },
     });

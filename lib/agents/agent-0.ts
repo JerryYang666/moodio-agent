@@ -303,8 +303,13 @@ export class Agent0 implements Agent {
           if (userImageId) {
             if (!userImageBuffer)
               throw new Error("Failed to download user image");
-            const file = await toFile(userImageBuffer, "image.png", {
-              type: "image/png",
+            const isWebp = userImageBuffer[0] === 0x52 && userImageBuffer[1] === 0x49 &&
+              userImageBuffer[2] === 0x46 && userImageBuffer[3] === 0x46;
+            const isJpeg = userImageBuffer[0] === 0xff && userImageBuffer[1] === 0xd8;
+            const ext = isWebp ? "webp" : isJpeg ? "jpg" : "png";
+            const mime = isWebp ? "image/webp" : isJpeg ? "image/jpeg" : "image/png";
+            const file = await toFile(userImageBuffer, `image.${ext}`, {
+              type: mime,
             });
             console.log("editing image");
             response = await client.images.edit({
