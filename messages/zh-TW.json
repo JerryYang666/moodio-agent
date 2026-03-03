@@ -316,7 +316,10 @@
     "imagesUploaded": "已新增 {count} 張圖片到合集",
     "uploadFailed": "上傳圖片失敗",
     "invalidImageType": "不支援的圖片類型。請使用 JPEG、PNG、GIF 或 WebP。",
-    "fileSizeTooLarge": "檔案過大。最大 {maxSize}MB。"
+    "fileSizeTooLarge": "檔案過大。最大 {maxSize}MB。",
+    "searchAssets": "依名稱搜尋素材...",
+    "noAssetsMatch": "沒有符合的素材",
+    "filterByRating": "星級"
   },
   "storyboard": {
     "title": "分鏡腳本",

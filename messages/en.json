@@ -316,7 +316,10 @@
     "imagesUploaded": "{count} {count, plural, one {image} other {images}} added to collection",
     "uploadFailed": "Failed to upload image",
     "invalidImageType": "Unsupported image type. Use JPEG, PNG, GIF, or WebP.",
-    "fileSizeTooLarge": "File size too large. Max {maxSize}MB."
+    "fileSizeTooLarge": "File size too large. Max {maxSize}MB.",
+    "searchAssets": "Search assets by name...",
+    "noAssetsMatch": "No assets match your search",
+    "filterByRating": "Stars"
   },
   "desktop": {
     "title": "Desktops",

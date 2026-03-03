@@ -148,6 +148,7 @@ export const collectionImages = pgTable("collection_images", {
   assetType: varchar("asset_type", { length: 20 }).notNull().default("image"), // "image" or "video"
   chatId: uuid("chat_id").references(() => chats.id, { onDelete: "set null" }), // Which chat this image came from
   generationDetails: jsonb("generation_details").notNull(), // Prompt, title, status, etc.
+  rating: integer("rating"), // 1-5 star rating, null = unrated
   addedAt: timestamp("added_at").defaultNow().notNull(),
 });
 

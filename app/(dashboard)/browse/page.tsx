@@ -10,7 +10,7 @@ import Breadcrumb from "@/components/browse/Breadcrumb";
 import VideoGrid from "@/components/browse/VideoGrid";
 import ChatSidePanel from "@/components/chat/chat-side-panel";
 import { siteConfig } from "@/config/site";
-import { SlidersHorizontal, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { SlidersHorizontal, Filter } from "lucide-react";
 import { Button } from "@heroui/button";
 import { Badge } from "@heroui/badge";
 import {
@@ -96,9 +96,45 @@ export default function BrowsePage() {
 
   return (
     <div className="flex h-screen bg-background overflow-hidden">
+      {/* Desktop sidebar filter — full height, collapsible, hidden on mobile */}
+      <div
+        className={`shrink-0 hidden lg:flex flex-col transition-[width] duration-300 ease-in-out overflow-hidden border-r border-divider ${
+          isFilterCollapsed ? "w-0 border-r-0" : "w-64"
+        }`}
+      >
+        <div className="w-64 h-full flex flex-col px-4 py-6">
+          <div className="flex items-center mb-3">
+            <span className="text-sm font-semibold text-default-600">{t("filters")}</span>
+          </div>
+          <div className="flex-1 min-h-0 overflow-y-auto">
+            <FilterMenu />
+          </div>
+        </div>
+      </div>
+
       {/* Main browse content */}
       <main className="flex-1 px-4 py-6 min-w-0 flex flex-col overflow-hidden">
           <div className="mb-6 shrink-0 flex gap-2 items-start">
+            {/* Desktop filter toggle button — visible only on lg+ */}
+            <Button
+              isIconOnly
+              variant="bordered"
+              size="lg"
+              className="hidden lg:flex shrink-0"
+              aria-label={isFilterCollapsed ? "Expand filters" : "Collapse filters"}
+              onPress={() => setIsFilterCollapsed((v) => !v)}
+            >
+              <Badge
+                content={activeFilterCount}
+                color="primary"
+                size="sm"
+                isInvisible={activeFilterCount === 0}
+                placement="top-right"
+              >
+                <Filter size={18} />
+              </Badge>
+            </Button>
+
             <SearchBar
               placeholder={t("searchPlaceholder")}
               className="flex-1 min-w-0"
@@ -126,54 +162,6 @@ export default function BrowsePage() {
           </div>
 
           <div className="flex flex-1 min-h-0">
-            {/* Desktop sidebar filter — collapsible, hidden on mobile */}
-            <div
-              className={`mr-4 shrink-0 hidden lg:flex flex-col transition-[width] duration-300 ease-in-out overflow-hidden ${
-                isFilterCollapsed ? "w-0 mr-0" : "w-64"
-              }`}
-            >
-              <div className="w-64 h-full flex flex-col">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-semibold text-default-600">{t("filters")}</span>
-                  <Button
-                    isIconOnly
-                    variant="light"
-                    size="sm"
-                    onPress={() => setIsFilterCollapsed(true)}
-                    aria-label="Collapse filters"
-                  >
-                    <PanelLeftClose size={16} />
-                  </Button>
-                </div>
-                <div className="flex-1 min-h-0 overflow-y-auto">
-                  <FilterMenu />
-                </div>
-              </div>
-            </div>
-
-            {/* Collapsed filter toggle — only visible when sidebar is collapsed */}
-            {isFilterCollapsed && (
-              <div className="shrink-0 hidden lg:flex items-start mr-2 pt-0.5">
-                <Button
-                  isIconOnly
-                  variant="light"
-                  size="sm"
-                  onPress={() => setIsFilterCollapsed(false)}
-                  aria-label="Expand filters"
-                >
-                  <Badge
-                    content={activeFilterCount}
-                    color="primary"
-                    size="sm"
-                    isInvisible={activeFilterCount === 0}
-                    placement="top-right"
-                  >
-                    <PanelLeftOpen size={16} />
-                  </Badge>
-                </Button>
-              </div>
-            )}
-
             <div className="flex-1 min-w-0 flex flex-col min-h-0">
               <div className="shrink-0">
                 <Breadcrumb />

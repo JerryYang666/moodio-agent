@@ -316,7 +316,10 @@
     "imagesUploaded": "已添加 {count} 张图片到合集",
     "uploadFailed": "上传图片失败",
     "invalidImageType": "不支持的图片类型。请使用 JPEG、PNG、GIF 或 WebP。",
-    "fileSizeTooLarge": "文件过大。最大 {maxSize}MB。"
+    "fileSizeTooLarge": "文件过大。最大 {maxSize}MB。",
+    "searchAssets": "按名称搜索素材...",
+    "noAssetsMatch": "没有匹配的素材",
+    "filterByRating": "星级"
   },
   "storyboard": {
     "title": "故事板",

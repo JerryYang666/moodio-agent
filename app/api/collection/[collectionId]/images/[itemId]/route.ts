@@ -46,11 +46,18 @@ export async function PATCH(
     }
 
     const body = await req.json();
-    const { title } = body;
+    const { title, rating } = body;
 
     if (title !== undefined && (typeof title !== "string" || !title.trim())) {
       return NextResponse.json(
         { error: "Title must be a non-empty string" },
+        { status: 400 }
+      );
+    }
+
+    if (rating !== undefined && rating !== null && (typeof rating !== "number" || rating < 1 || rating > 5 || !Number.isInteger(rating))) {
+      return NextResponse.json(
+        { error: "Rating must be an integer between 1 and 5, or null" },
         { status: 400 }
       );
     }
@@ -64,12 +71,18 @@ export async function PATCH(
       );
     }
 
-    // Update the generationDetails with new title using jsonb_set
+    // Build update payload
+    const updateSet: Record<string, unknown> = {};
+    if (title !== undefined) {
+      updateSet.generationDetails = sql`jsonb_set(${collectionImages.generationDetails}, '{title}', ${JSON.stringify(title.trim())}::jsonb)`;
+    }
+    if (rating !== undefined) {
+      updateSet.rating = rating;
+    }
+
     const [updatedImage] = await db
       .update(collectionImages)
-      .set({
-        generationDetails: sql`jsonb_set(${collectionImages.generationDetails}, '{title}', ${JSON.stringify(title.trim())}::jsonb)`,
-      })
+      .set(updateSet)
       .where(eq(collectionImages.id, itemId))
       .returning();
 

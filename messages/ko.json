@@ -316,7 +316,10 @@
     "imagesUploaded": "{count}개의 이미지가 컬렉션에 추가되었습니다",
     "uploadFailed": "이미지 업로드 실패",
     "invalidImageType": "지원하지 않는 이미지 형식입니다. JPEG, PNG, GIF 또는 WebP를 사용하세요.",
-    "fileSizeTooLarge": "파일이 너무 큽니다. 최대 {maxSize}MB."
+    "fileSizeTooLarge": "파일이 너무 큽니다. 최대 {maxSize}MB.",
+    "searchAssets": "이름으로 에셋 검색...",
+    "noAssetsMatch": "일치하는 에셋이 없습니다",
+    "filterByRating": "별점"
   },
   "storyboard": {
     "title": "스토리보드",

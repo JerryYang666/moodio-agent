@@ -36,6 +36,8 @@ import {
   LayoutDashboard,
   Upload,
   ImagePlus,
+  Search,
+  Star,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useCollections } from "@/hooks/use-collections";
@@ -69,6 +71,7 @@ interface CollectionAsset {
     imageUrl?: string;
     videoUrl?: string;
   };
+  rating: number | null;
   addedAt: Date;
 }
 
@@ -201,6 +204,11 @@ export default function CollectionPage({
   const [isDraggingExternalFile, setIsDraggingExternalFile] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const dragCounterRef = useRef(0);
+
+  // Asset search filter
+  const [assetSearchQuery, setAssetSearchQuery] = useState("");
+  const [hoveredRating, setHoveredRating] = useState<{ assetId: string; star: number } | null>(null);
+  const [filterRating, setFilterRating] = useState<number | null>(null);
 
   const [selectedPermission, setSelectedPermission] = useState<
     "viewer" | "collaborator"
@@ -596,6 +604,53 @@ export default function CollectionPage({
     }
   };
 
+  const handleRateAsset = async (asset: CollectionAsset, newRating: number) => {
+    const ratingValue = asset.rating === newRating ? null : newRating;
+    setCollectionData((prev) =>
+      prev
+        ? {
+            ...prev,
+            images: prev.images.map((img) =>
+              img.id === asset.id ? { ...img, rating: ratingValue } : img
+            ),
+          }
+        : null
+    );
+    try {
+      const res = await fetch(
+        `/api/collection/${collectionId}/images/${asset.id}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ rating: ratingValue }),
+        }
+      );
+      if (!res.ok) {
+        setCollectionData((prev) =>
+          prev
+            ? {
+                ...prev,
+                images: prev.images.map((img) =>
+                  img.id === asset.id ? { ...img, rating: asset.rating } : img
+                ),
+              }
+            : null
+        );
+      }
+    } catch {
+      setCollectionData((prev) =>
+        prev
+          ? {
+              ...prev,
+              images: prev.images.map((img) =>
+                img.id === asset.id ? { ...img, rating: asset.rating } : img
+              ),
+            }
+          : null
+      );
+    }
+  };
+
   const handleVideoDownload = async (asset: CollectionAsset) => {
     if (!asset.videoUrl) return;
     try {
@@ -901,112 +956,213 @@ export default function CollectionPage({
           <p className="text-default-500">{t("noAssetsInCollection")}</p>
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-          {images.map((asset) => (
-            <Card key={asset.id} className="group relative">
-              <CardBody className="p-0 overflow-hidden aspect-square relative rounded-lg">
-                <Image
-                  src={asset.imageUrl} // Use CloudFront URL from API (signed cookies)
-                  alt={asset.generationDetails.title}
-                  radius="none"
-                  classNames={{
-                    wrapper: "w-full h-full !max-w-full cursor-pointer",
-                    img: "w-full h-full object-cover",
-                  }}
-                  onClick={() => handleAssetClick(asset)}
-                />
-                {/* Video Badge */}
-                {asset.assetType === "video" && (
-                  <div className="absolute top-2 left-2 z-10">
-                    <div className="bg-black/70 text-white rounded-full p-1.5 flex items-center gap-1">
-                      <Play size={12} fill="white" />
-                      <span className="text-[10px] font-medium pr-1">{t("video")}</span>
-                    </div>
-                  </div>
-                )}
-                <div className="absolute bottom-0 left-0 right-0 bg-white/90 dark:bg-black/60 text-black dark:text-white p-2 text-xs truncate opacity-0 group-hover:opacity-100 transition-opacity">
-                  {asset.generationDetails.title}
+        <>
+          <div className="mb-4 flex flex-wrap items-center gap-3">
+            <Input
+              placeholder={t("searchAssets")}
+              value={assetSearchQuery}
+              onValueChange={setAssetSearchQuery}
+              startContent={<Search size={18} className="text-default-400" />}
+              isClearable
+              onClear={() => setAssetSearchQuery("")}
+              className="max-w-sm"
+            />
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-default-500 mr-0.5">{t("filterByRating")}:</span>
+              {[1, 2, 3, 4, 5].map((star) => (
+                <button
+                  key={star}
+                  type="button"
+                  className="p-0.5 leading-none cursor-pointer"
+                  onClick={() => setFilterRating(filterRating === star ? null : star)}
+                >
+                  <Star
+                    size={18}
+                    className={
+                      filterRating !== null && star <= filterRating
+                        ? "text-yellow-400 fill-yellow-400"
+                        : "text-default-300"
+                    }
+                  />
+                </button>
+              ))}
+              {filterRating !== null && (
+                <Button
+                  size="sm"
+                  variant="light"
+                  isIconOnly
+                  onPress={() => setFilterRating(null)}
+                  className="min-w-6 w-6 h-6"
+                >
+                  <X size={14} />
+                </Button>
+              )}
+            </div>
+          </div>
+          {(() => {
+            let filteredImages = images;
+            if (assetSearchQuery.trim()) {
+              const q = assetSearchQuery.trim().toLowerCase();
+              filteredImages = filteredImages.filter((a) =>
+                a.generationDetails.title.toLowerCase().includes(q)
+              );
+            }
+            if (filterRating !== null) {
+              filteredImages = filteredImages.filter(
+                (a) => a.rating !== null && a.rating >= filterRating
+              );
+            }
+
+            if (filteredImages.length === 0) {
+              return (
+                <div className="text-center py-20">
+                  <p className="text-default-500">{t("noAssetsMatch")}</p>
                 </div>
-                {canAddImages && (
-                  <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
-                    <Dropdown>
-                      <DropdownTrigger>
-                        <Button
-                          isIconOnly
-                          size="sm"
-                          variant="solid"
-                          className="bg-background/80 backdrop-blur-sm"
+              );
+            }
+
+            return (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                {filteredImages.map((asset) => (
+                  <Card key={asset.id} className="group relative">
+                    <CardBody className="p-0 overflow-hidden aspect-square relative rounded-lg">
+                      <Image
+                        src={asset.imageUrl}
+                        alt={asset.generationDetails.title}
+                        radius="none"
+                        classNames={{
+                          wrapper: "w-full h-full !max-w-full cursor-pointer",
+                          img: "w-full h-full object-cover",
+                        }}
+                        onClick={() => handleAssetClick(asset)}
+                      />
+                      {/* Video Badge */}
+                      {asset.assetType === "video" && (
+                        <div className="absolute top-2 left-2 z-10">
+                          <div className="bg-black/70 text-white rounded-full p-1.5 flex items-center gap-1">
+                            <Play size={12} fill="white" />
+                            <span className="text-[10px] font-medium pr-1">{t("video")}</span>
+                          </div>
+                        </div>
+                      )}
+                      <div className="absolute bottom-0 left-0 right-0 z-10 bg-linear-to-t from-black/70 to-transparent pt-6 pb-1.5 px-2">
+                        <p className="text-xs text-white truncate pointer-events-none">
+                          {asset.generationDetails.title}
+                        </p>
+                        <div
+                          className="flex gap-0.5 mt-0.5"
+                          onMouseLeave={() => setHoveredRating(null)}
                         >
-                          <MoreVertical size={16} />
-                        </Button>
-                      </DropdownTrigger>
-                      <DropdownMenu aria-label="Asset actions">
-                        <DropdownItem
-                          key="view"
-                          startContent={<Eye size={16} />}
-                          onPress={() => handleAssetClick(asset)}
-                        >
-                          {t("viewDetails")}
-                        </DropdownItem>
-                        <DropdownItem
-                          key="rename"
-                          startContent={<Pencil size={16} />}
-                          onPress={() => openRenameItemModal(asset)}
-                        >
-                          {tCommon("rename")}
-                        </DropdownItem>
-                        <DropdownItem
-                          key="move"
-                          startContent={<Move size={16} />}
-                          onPress={() => openMoveItemModal(asset)}
-                          isDisabled={availableCollections.length === 0}
-                        >
-                          {t("moveTo")}
-                        </DropdownItem>
-                        <DropdownItem
-                          key="copy"
-                          startContent={<Copy size={16} />}
-                          onPress={() => openCopyItemModal(asset)}
-                          isDisabled={availableCollections.length === 0}
-                        >
-                          {t("copyTo")}
-                        </DropdownItem>
-                        <DropdownItem
-                          key="desktop"
-                          startContent={<LayoutDashboard size={16} />}
-                          onPress={() => {
-                            setDesktopSendAsset(asset);
-                            onSendToDesktopOpen();
-                          }}
-                        >
-                          Send to Desktop
-                        </DropdownItem>
-                        {asset.chatId && collection.isOwner ? (
-                          <DropdownItem
-                            key="chat"
-                            startContent={<MessageSquare size={16} />}
-                            onPress={() => router.push(`/chat/${asset.chatId}`)}
-                          >
-                            {t("goToChat")}
-                          </DropdownItem>
-                        ) : null}
-                        <DropdownItem
-                          key="remove"
-                          className="text-danger"
-                          color="danger"
-                          startContent={<Trash2 size={16} />}
-                          onPress={() => confirmRemoveImage(asset)}
-                        >
-                          {t("removeFromCollection")}
-                        </DropdownItem>
-                      </DropdownMenu>
-                    </Dropdown>
-                  </div>
-                )}
-              </CardBody>
-            </Card>
-          ))}
-        </div>
+                          {[1, 2, 3, 4, 5].map((star) => {
+                            const preview = hoveredRating?.assetId === asset.id ? hoveredRating.star : null;
+                            const filled = preview !== null ? star <= preview : star <= (asset.rating ?? 0);
+                            return (
+                              <button
+                                key={star}
+                                type="button"
+                                className="p-0 leading-none cursor-pointer"
+                                onMouseEnter={() => setHoveredRating({ assetId: asset.id, star })}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleRateAsset(asset, star);
+                                }}
+                              >
+                                <Star
+                                  size={14}
+                                  className={
+                                    filled
+                                      ? "text-yellow-400 fill-yellow-400"
+                                      : "text-white/50"
+                                  }
+                                />
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                      {canAddImages && (
+                        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                          <Dropdown>
+                              <DropdownTrigger>
+                                <Button
+                                  isIconOnly
+                                  size="sm"
+                                  variant="solid"
+                                  className="bg-background/80 backdrop-blur-sm"
+                                >
+                                  <MoreVertical size={16} />
+                                </Button>
+                              </DropdownTrigger>
+                              <DropdownMenu aria-label="Asset actions">
+                                <DropdownItem
+                                  key="view"
+                                  startContent={<Eye size={16} />}
+                                  onPress={() => handleAssetClick(asset)}
+                                >
+                                  {t("viewDetails")}
+                                </DropdownItem>
+                                <DropdownItem
+                                  key="rename"
+                                  startContent={<Pencil size={16} />}
+                                  onPress={() => openRenameItemModal(asset)}
+                                >
+                                  {tCommon("rename")}
+                                </DropdownItem>
+                                <DropdownItem
+                                  key="move"
+                                  startContent={<Move size={16} />}
+                                  onPress={() => openMoveItemModal(asset)}
+                                  isDisabled={availableCollections.length === 0}
+                                >
+                                  {t("moveTo")}
+                                </DropdownItem>
+                                <DropdownItem
+                                  key="copy"
+                                  startContent={<Copy size={16} />}
+                                  onPress={() => openCopyItemModal(asset)}
+                                  isDisabled={availableCollections.length === 0}
+                                >
+                                  {t("copyTo")}
+                                </DropdownItem>
+                                <DropdownItem
+                                  key="desktop"
+                                  startContent={<LayoutDashboard size={16} />}
+                                  onPress={() => {
+                                    setDesktopSendAsset(asset);
+                                    onSendToDesktopOpen();
+                                  }}
+                                >
+                                  Send to Desktop
+                                </DropdownItem>
+                                {asset.chatId && collection.isOwner ? (
+                                  <DropdownItem
+                                    key="chat"
+                                    startContent={<MessageSquare size={16} />}
+                                    onPress={() => router.push(`/chat/${asset.chatId}`)}
+                                  >
+                                    {t("goToChat")}
+                                  </DropdownItem>
+                                ) : null}
+                                <DropdownItem
+                                  key="remove"
+                                  className="text-danger"
+                                  color="danger"
+                                  startContent={<Trash2 size={16} />}
+                                  onPress={() => confirmRemoveImage(asset)}
+                                >
+                                  {t("removeFromCollection")}
+                                </DropdownItem>
+                              </DropdownMenu>
+                            </Dropdown>
+                          </div>
+                        )}
+                      </CardBody>
+                    </Card>
+                ))}
+              </div>
+            );
+          })()}
+        </>
       )}
 
       {/* Rename Modal */}
