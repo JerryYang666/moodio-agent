@@ -469,79 +469,99 @@ export default function ChatInterface({
     }
   }, [chatId, disableActiveChatPersistence]);
 
-  // Upload a file using presigned URL (bypasses Vercel's 4.5MB limit)
-  const uploadAndAddImage = useCallback(
-    async (file: File) => {
-      // Validate file before upload
-      const validationError = validateFile(file);
-      if (validationError) {
-        addToast({
-          title:
-            validationError.code === "FILE_TOO_LARGE"
-              ? t("chat.fileSizeTooLarge", { maxSize: getMaxFileSizeMB() })
-              : t("chat.uploadFailed"),
-          color: "danger",
-        });
-        return;
+  // Upload files using presigned URL (bypasses Vercel's 4.5MB limit)
+  // Accepts one or more files. Fails the entire batch if adding them would exceed the limit.
+  const uploadAndAddImages = useCallback(
+    async (files: File[]) => {
+      // Validate every file first before starting any uploads
+      for (const file of files) {
+        const validationError = validateFile(file);
+        if (validationError) {
+          addToast({
+            title:
+              validationError.code === "FILE_TOO_LARGE"
+                ? t("chat.fileSizeTooLarge", { maxSize: getMaxFileSizeMB() })
+                : t("chat.uploadFailed"),
+            color: "danger",
+          });
+          return;
+        }
       }
 
-      if (!canAddImage(pendingImages)) {
+      // Check if adding ALL files would exceed the limit — reject the whole batch if so
+      const remaining = MAX_PENDING_IMAGES - pendingImages.length;
+      if (files.length > remaining) {
         addToast({
-          title: t("chat.maxImagesReached", { max: MAX_PENDING_IMAGES }),
+          title: t("chat.tooManyImages", {
+            count: files.length,
+            max: MAX_PENDING_IMAGES,
+            current: pendingImages.length,
+          }),
           color: "warning",
         });
         return;
       }
 
-      // Create a temporary ID for tracking during upload
-      const tempId = `uploading-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-      const localPreviewUrl = URL.createObjectURL(file);
+      // All checks passed — create placeholders and start uploads in parallel
+      const entries = files.map((file) => {
+        const tempId = `uploading-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const localPreviewUrl = URL.createObjectURL(file);
+        const placeholder: PendingImage = {
+          imageId: tempId,
+          url: localPreviewUrl,
+          source: "upload",
+          title: file.name,
+          isUploading: true,
+          localPreviewUrl,
+        };
+        return { file, tempId, localPreviewUrl, placeholder };
+      });
 
-      // Add placeholder to pending images with uploading state
-      const uploadingImage: PendingImage = {
-        imageId: tempId,
-        url: localPreviewUrl,
-        source: "upload",
-        title: file.name,
-        isUploading: true,
-        localPreviewUrl,
-      };
+      // Add all placeholders at once
+      setPendingImages((prev) => [...prev, ...entries.map((e) => e.placeholder)]);
 
-      setPendingImages((prev) => [...prev, uploadingImage]);
+      // Upload all files in parallel
+      await Promise.all(
+        entries.map(async ({ file, tempId, localPreviewUrl }) => {
+          const result = await uploadImage(file);
 
-      const result = await uploadImage(file);
+          if (result.success) {
+            setPendingImages((prev) =>
+              prev.map((img) =>
+                img.imageId === tempId
+                  ? {
+                    ...img,
+                    imageId: result.data.imageId,
+                    url: result.data.imageUrl,
+                    isUploading: false,
+                    localPreviewUrl: undefined,
+                  }
+                  : img
+              )
+            );
+            URL.revokeObjectURL(localPreviewUrl);
+          } else {
+            console.error("Image upload failed:", result.error);
+            setPendingImages((prev) =>
+              prev.filter((img) => img.imageId !== tempId)
+            );
+            URL.revokeObjectURL(localPreviewUrl);
 
-      if (result.success) {
-        // Update the pending image with the real ID and URL
-        setPendingImages((prev) =>
-          prev.map((img) =>
-            img.imageId === tempId
-              ? {
-                ...img,
-                imageId: result.data.imageId,
-                url: result.data.imageUrl,
-                isUploading: false,
-                localPreviewUrl: undefined,
-              }
-              : img
-          )
-        );
-        URL.revokeObjectURL(localPreviewUrl);
-      } else {
-        console.error("Image upload failed:", result.error);
-        // Remove the failed upload from pending images
-        setPendingImages((prev) =>
-          prev.filter((img) => img.imageId !== tempId)
-        );
-        URL.revokeObjectURL(localPreviewUrl);
-
-        addToast({
-          title: t("chat.uploadFailed"),
-          color: "danger",
-        });
-      }
+            addToast({
+              title: t("chat.uploadFailed"),
+              color: "danger",
+            });
+          }
+        })
+      );
     },
     [pendingImages, t]
+  );
+
+  // Convenience wrapper for single-file upload (used by asset picker modal)
+  const uploadAndAddImage = useCallback(
+    async (file: File) => uploadAndAddImages([file]),
+    [uploadAndAddImages]
   );
 
   // Remove a pending image by its imageId
@@ -791,14 +811,16 @@ export default function ChatInterface({
 
   // Get the appropriate upload handler based on asset picker mode
   const handleAssetUpload = useCallback(
-    async (file: File) => {
+    async (files: File[]) => {
       if (assetPickerMode === "reference") {
-        await uploadAndAddReferenceImage(file);
+        for (const file of files) {
+          await uploadAndAddReferenceImage(file);
+        }
       } else {
-        await uploadAndAddImage(file);
+        await uploadAndAddImages(files);
       }
     },
-    [assetPickerMode, uploadAndAddImage, uploadAndAddReferenceImage]
+    [assetPickerMode, uploadAndAddImages, uploadAndAddReferenceImage]
   );
 
   // Listen for asset selection events from the hover sidebar
@@ -1995,6 +2017,7 @@ export default function ChatInterface({
         onRemovePendingImage={removePendingImage}
         onOpenAssetPicker={openPendingImagePicker}
         onAssetDrop={handleAssetDrop}
+        onFilesUpload={uploadAndAddImages}
         showFileUpload={true}
         precisionEditing={precisionEditing}
         onPrecisionEditingChange={handlePrecisionEditingChange}

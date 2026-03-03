@@ -56,7 +56,7 @@ export default function AssetPickerModal({
   isOpen: boolean;
   onOpenChange: () => void;
   onSelect: (asset: AssetSummary) => void;
-  onUpload: (file: File) => void;
+  onUpload: (files: File[]) => void;
 }) {
   const t = useTranslations();
   const [loading, setLoading] = useState(false);
@@ -174,25 +174,29 @@ export default function AssetPickerModal({
                       ref={fileInputRef}
                       className="hidden"
                       accept="image/png, image/jpeg, image/webp, image/gif"
+                      multiple
                       onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (!file) return;
+                        const fileList = e.target.files;
+                        if (!fileList || fileList.length === 0) return;
                         const maxBytes = siteConfig.upload.maxFileSizeMB * 1024 * 1024;
                         const validTypes = siteConfig.upload.allowedImageTypes;
-                        if (file.size > maxBytes) {
-                          setUploadError(t("assetPicker.uploadTooLarge", { maxSize: siteConfig.upload.maxFileSizeMB }));
-                          e.currentTarget.value = "";
-                          return;
-                        }
-                        if (!validTypes.includes(file.type)) {
-                          setUploadError(t("assetPicker.uploadUnsupportedType"));
-                          e.currentTarget.value = "";
-                          return;
+                        const validFiles: File[] = [];
+                        for (const file of Array.from(fileList)) {
+                          if (file.size > maxBytes) {
+                            setUploadError(t("assetPicker.uploadTooLarge", { maxSize: siteConfig.upload.maxFileSizeMB }));
+                            e.currentTarget.value = "";
+                            return;
+                          }
+                          if (!validTypes.includes(file.type)) {
+                            setUploadError(t("assetPicker.uploadUnsupportedType"));
+                            e.currentTarget.value = "";
+                            return;
+                          }
+                          validFiles.push(file);
                         }
                         setUploadError(null);
-                        onUpload(file);
+                        onUpload(validFiles);
                         onClose();
-                        // allow re-selecting the same file later
                         e.currentTarget.value = "";
                       }}
                     />

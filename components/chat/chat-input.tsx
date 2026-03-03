@@ -7,6 +7,7 @@ import { Button } from "@heroui/button";
 import { Popover, PopoverTrigger, PopoverContent } from "@heroui/popover";
 import { Tooltip } from "@heroui/tooltip";
 import { Spinner } from "@heroui/spinner";
+import { addToast } from "@heroui/toast";
 import { siteConfig } from "@/config/site";
 import {
   Send,
@@ -72,6 +73,8 @@ interface ChatInputProps {
     url?: string;
     title?: string;
   }) => void;
+  /** Handler for uploading files (paste or external file drop) */
+  onFilesUpload: (files: File[]) => void;
   showFileUpload: boolean;
   /** Precision editing state - kept for logic but not rendered as UI */
   precisionEditing: boolean;
@@ -121,6 +124,7 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
   onRemovePendingImage,
   onOpenAssetPicker,
   onAssetDrop,
+  onFilesUpload,
   showFileUpload,
   // precisionEditing state is kept but not rendered - auto-enabled by drawing or edit mode
   precisionEditing: _precisionEditing,
@@ -148,6 +152,10 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
   const [hoveredDeckId, setHoveredDeckId] = useState<string | null>(null);
   // Track click timeout for distinguishing single vs double click
   const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Track whether the user is dragging an external file over the browser
+  const [isDraggingExternalFile, setIsDraggingExternalFile] = useState(false);
+  const dragCounterRef = useRef(0);
   
   // Feature flag: show circle-to-edit button (default false if flag not configured)
   const showCircleToEdit = useFeatureFlag<boolean>("circle_to_edit") ?? false;
@@ -263,7 +271,9 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    setIsDraggingExternalFile(false);
     try {
+      // First: check for internal asset drag (custom MIME type)
       const json = e.dataTransfer.getData(ASSET_DRAG_MIME);
       if (json) {
         const parsed = JSON.parse(json);
@@ -273,13 +283,110 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
         }
       }
       const fallbackId = e.dataTransfer.getData("text/plain");
-      if (fallbackId) {
+      if (fallbackId && !e.dataTransfer.files.length) {
         onAssetDrop({ assetId: fallbackId });
+        return;
       }
     } catch (err) {
       console.error("Failed to parse dropped asset", err);
     }
+
+    // Second: check for dropped files (external file drag)
+    if (e.dataTransfer.files.length > 0) {
+      const allowedTypes = siteConfig.upload.allowedImageTypes;
+      const validFiles: File[] = [];
+      let hasInvalid = false;
+      for (const file of Array.from(e.dataTransfer.files)) {
+        if (allowedTypes.includes(file.type)) {
+          validFiles.push(file);
+        } else {
+          hasInvalid = true;
+        }
+      }
+      if (hasInvalid) {
+        addToast({ title: t("chat.invalidImageType"), color: "warning" });
+      }
+      if (validFiles.length > 0) {
+        onFilesUpload(validFiles);
+      }
+    }
   };
+
+  // Handle paste: extract image data from clipboard
+  const handlePaste = useCallback(
+    (e: React.ClipboardEvent) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+
+      const allowedTypes = siteConfig.upload.allowedImageTypes;
+      const files: File[] = [];
+      for (const item of Array.from(items)) {
+        if (item.kind === "file" && allowedTypes.includes(item.type)) {
+          const file = item.getAsFile();
+          if (file) {
+            files.push(
+              new File(
+                [file],
+                `${t("chat.pastedImage")}.${file.type.split("/")[1]}`,
+                { type: file.type }
+              )
+            );
+          }
+        }
+      }
+      if (files.length > 0) {
+        e.preventDefault();
+        onFilesUpload(files);
+      }
+    },
+    [onFilesUpload, t]
+  );
+
+  // Global drag listeners: detect when an external file enters the browser window
+  // and show a drop-zone overlay scoped near the chat input.
+  useEffect(() => {
+    const hasFiles = (e: DragEvent) =>
+      e.dataTransfer?.types?.includes("Files") ?? false;
+
+    const onDragEnter = (e: DragEvent) => {
+      if (!hasFiles(e)) return;
+      dragCounterRef.current++;
+      if (dragCounterRef.current === 1) {
+        setIsDraggingExternalFile(true);
+      }
+    };
+
+    const onDragOver = (e: DragEvent) => {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+    };
+
+    const onDragLeave = (e: DragEvent) => {
+      if (!hasFiles(e)) return;
+      dragCounterRef.current--;
+      if (dragCounterRef.current === 0) {
+        setIsDraggingExternalFile(false);
+      }
+    };
+
+    const onDrop = (e: DragEvent) => {
+      dragCounterRef.current = 0;
+      setIsDraggingExternalFile(false);
+    };
+
+    window.addEventListener("dragenter", onDragEnter);
+    window.addEventListener("dragover", onDragOver);
+    window.addEventListener("dragleave", onDragLeave);
+    window.addEventListener("drop", onDrop);
+
+    return () => {
+      window.removeEventListener("dragenter", onDragEnter);
+      window.removeEventListener("dragover", onDragOver);
+      window.removeEventListener("dragleave", onDragLeave);
+      window.removeEventListener("drop", onDrop);
+      dragCounterRef.current = 0;
+    };
+  }, []);
 
   // Handle click outside to collapse
   useEffect(() => {
@@ -363,8 +470,41 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
 
   return (
     <div className="absolute bottom-4 left-0 right-0 z-50 flex justify-center px-4 pointer-events-none">
+      {/* Full-width drop zone overlay when dragging external files */}
+      <AnimatePresence>
+        {isDraggingExternalFile && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            className="fixed inset-0 z-60 pointer-events-auto"
+            onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+            onDrop={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleDrop(e);
+            }}
+          >
+            <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+            <div className="absolute inset-x-0 bottom-0 flex justify-center pb-8 px-4">
+              <div className="w-full max-w-2xl rounded-2xl border-2 border-dashed border-primary bg-primary/10 backdrop-blur-md p-8 flex flex-col items-center gap-2 shadow-xl">
+                <Upload size={36} className="text-primary" />
+                <span className="text-lg font-semibold text-primary">
+                  {t("chat.dropZoneTitle")}
+                </span>
+                <span className="text-sm text-default-500">
+                  {t("chat.dropZoneSubtitle", { maxSize: siteConfig.upload.maxFileSizeMB })}
+                </span>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <div
         ref={containerRef}
+        onPaste={handlePaste}
         onDragOver={(e) => e.preventDefault()}
         onDrop={handleDrop}
         style={{
