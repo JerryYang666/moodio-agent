@@ -5,10 +5,11 @@ const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
 const QUALITY_STEPS = [99, 97, 95] as const;
 
 /**
- * If the image buffer exceeds 19 MB, convert to high-quality lossy WebP.
- * Starts at quality 97 (visually indistinguishable from lossless) and
- * steps down only if needed. Avoids lossless WebP encoding which requires
- * excessive memory and would OOM on serverless runtimes.
+ * If the image buffer exceeds 5 MB, convert to high-quality WebP.
+ * Starts at quality 99 with smartSubsample for virtually pixel-perfect
+ * output. Falls back to lower quality steps only if needed.
+ * Avoids lossless/nearLossless encoding which is too slow and
+ * memory-intensive for serverless runtimes.
  */
 export async function compressImageIfNeeded(
   imageBuffer: Buffer,
@@ -25,7 +26,7 @@ export async function compressImageIfNeeded(
 
   for (const quality of QUALITY_STEPS) {
     const compressed = await sharp(imageBuffer)
-      .webp({ quality, effort: 2 })
+      .webp({ quality, effort: 2, smartSubsample: true })
       .toBuffer();
 
     const compressedSizeMB = (compressed.length / (1024 * 1024)).toFixed(2);
@@ -39,7 +40,7 @@ export async function compressImageIfNeeded(
   }
 
   const fallback = await sharp(imageBuffer)
-    .webp({ quality: 85, effort: 4 })
+    .webp({ quality: 85, effort: 4, smartSubsample: true })
     .toBuffer();
 
   const fallbackSizeMB = (fallback.length / (1024 * 1024)).toFixed(2);
