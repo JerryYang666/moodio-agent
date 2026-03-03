@@ -36,6 +36,7 @@ import { Button } from "@heroui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { useChat } from "@/hooks/use-chat";
 import { useCredits } from "@/hooks/use-credits";
+import { useFeatureFlag } from "@/lib/feature-flags";
 import { ChatHistorySelector } from "@/components/chat/chat-history-selector";
 import { siteConfig } from "@/config/site";
 
@@ -47,6 +48,7 @@ export const Navbar = () => {
   const { balance: credits } = useCredits();
   const t = useTranslations();
   const tCredits = useTranslations("credits");
+  const showDesktop = useFeatureFlag<boolean>("user_desktop") ?? false;
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [activeSection, setActiveSection] = useState<
     "inspiration" | "image" | "video" | "assets" | "canvas"
@@ -107,12 +109,16 @@ export const Navbar = () => {
       icon: <Folder size={20} />,
       href: "/projects",
     },
-    {
-      id: "canvas",
-      label: t("nav.canvas"),
-      icon: <Monitor size={20} />,
-      href: "/desktop",
-    },
+    ...(showDesktop
+      ? [
+          {
+            id: "canvas",
+            label: t("nav.canvas"),
+            icon: <Monitor size={20} />,
+            href: "/desktop",
+          },
+        ]
+      : []),
   ];
 
   return (
@@ -150,7 +156,7 @@ export const Navbar = () => {
       <NavbarMenu className="pt-0 mt-0 top-12 bottom-0 pb-0 h-[calc(100dvh-3rem)] overflow-hidden flex flex-col">
         <div className="flex flex-col h-full pt-2 pb-4">
           {/* Top Tabs */}
-          <div className="grid grid-cols-5 gap-1 px-2 mb-1 shrink-0">
+          <div className={clsx("grid gap-1 px-2 mb-1 shrink-0", showDesktop ? "grid-cols-5" : "grid-cols-4")}>
             {navTabs.map((tab) => (
               <button
                 key={tab.id}

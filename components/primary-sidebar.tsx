@@ -24,6 +24,7 @@ import { Avatar } from "@heroui/avatar";
 import { Tooltip } from "@heroui/tooltip";
 import { useAuth } from "@/hooks/use-auth";
 import { useCredits } from "@/hooks/use-credits";
+import { useFeatureFlag } from "@/lib/feature-flags";
 import { motion } from "framer-motion";
 import { Button } from "@heroui/button";
 import { ThemeSwitch } from "@/components/theme-switch";
@@ -42,6 +43,7 @@ export const PrimarySidebar = () => {
   const t = useTranslations("nav");
   const tCredits = useTranslations("credits");
   const tLanguage = useTranslations("language");
+  const showDesktop = useFeatureFlag<boolean>("user_desktop") ?? false;
 
   const STORAGE_KEY = "moodio:sidebar-collapsed";
   const [collapsed, setCollapsed] = useState(() => {
@@ -79,12 +81,16 @@ export const PrimarySidebar = () => {
       isActive: (path: string) =>
         path.startsWith("/projects") || path.startsWith("/collection"),
     },
-    {
-      label: t("canvas"),
-      href: "/desktop",
-      icon: <Monitor size={20} />,
-      isActive: (path: string) => path.startsWith("/desktop"),
-    },
+    ...(showDesktop
+      ? [
+          {
+            label: t("canvas"),
+            href: "/desktop",
+            icon: <Monitor size={20} />,
+            isActive: (path: string) => path.startsWith("/desktop"),
+          },
+        ]
+      : []),
   ];
 
   return (
