@@ -7,10 +7,12 @@ import { useTabVisibility } from "@/hooks/use-tab-visibility";
 export interface LazyVideoProps {
     /** Video source URL */
     src: string;
-    /** Video width in pixels */
-    width: number;
-    /** Video height in pixels */
-    height: number;
+    /** Video width in pixels (used in fixed-size mode) */
+    width?: number;
+    /** Video height in pixels (used in fixed-size mode) */
+    height?: number;
+    /** Aspect ratio (width/height) — when provided, uses fluid sizing (100% width, auto height) */
+    aspectRatio?: number;
     /** Additional CSS classes */
     className?: string;
     /** Click handler */
@@ -34,9 +36,11 @@ export function LazyVideo({
     src,
     width,
     height,
+    aspectRatio,
     className = "",
     onClick,
 }: LazyVideoProps) {
+    const isFluid = aspectRatio != null;
     const videoRef = useRef<HTMLVideoElement>(null);
     const { isVisible, isNearViewport, isFarFromViewport } = useVideoVisibility(videoRef);
     const isTabVisible = useTabVisibility();
@@ -142,7 +146,10 @@ export function LazyVideo({
     return (
         <div
             className={`relative overflow-hidden shrink-0 bg-neutral-300 dark:bg-neutral-700 ${className}`}
-            style={{ width, height }}
+            style={isFluid
+                ? { width: "100%", aspectRatio: String(aspectRatio) }
+                : { width, height }
+            }
         >
             {/* Skeleton overlay - pulses until video is loaded */}
             {!isLoaded && (

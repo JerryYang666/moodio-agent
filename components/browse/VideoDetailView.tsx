@@ -14,6 +14,7 @@ import {
   ArrowLeft,
 } from "lucide-react";
 import { JustifiedGallery, type Photo } from "./JustifiedGallery";
+import { Squircle } from "@/components/Squircle";
 import { VideoVisibilityProvider } from "@/hooks/use-video-visibility";
 import { MOCK_VIDEO_DETAIL, type VideoDetailData } from "./video-detail-data";
 
@@ -113,9 +114,9 @@ export function VideoDetailView({
       <div className="flex flex-col lg:flex-row gap-6 mb-6">
         {/* Video player area */}
         <div className="lg:w-[55%] shrink-0">
-          <div
+          <Squircle
             ref={videoTargetRef}
-            className="relative rounded-lg overflow-hidden"
+            className="relative overflow-hidden"
             style={{
               aspectRatio: `${selectedPhoto.width} / ${selectedPhoto.height}`,
             }}
@@ -124,7 +125,7 @@ export function VideoDetailView({
             <div className={`w-full h-full ${videoVisible ? "visible" : "invisible"}`}>
               <video
                 src={selectedPhoto.src}
-                className="w-full h-full object-cover rounded-lg"
+                className="w-full h-full object-cover"
                 autoPlay
                 loop
                 muted
@@ -148,7 +149,7 @@ export function VideoDetailView({
                 </button>
               ))}
             </motion.div>
-          </div>
+          </Squircle>
         </div>
 
         {/* Info panel */}

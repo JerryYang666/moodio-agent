@@ -14,6 +14,7 @@ import {
 } from "@/components/browse/JustifiedGallery";
 import { VirtualInfiniteScroll } from "@/components/browse/VirtualInfiniteScroll";
 import { VideoDetailView } from "@/components/browse/VideoDetailView";
+import { Squircle } from "@/components/Squircle";
 import { getVideoUrl } from "@/lib/config/video.config";
 import { useInfiniteContent } from "@/lib/redux/hooks/useInfiniteContent";
 import { VideoVisibilityProvider } from "@/hooks/use-video-visibility";
@@ -269,8 +270,7 @@ const VideoGrid: React.FC<VideoGridProps> = ({ hideSummary = false }) => {
             <div ref={galleryRef}>
               <JustifiedGallery
                 photos={photos}
-                targetRowHeight={180}
-                spacing={3}
+                spacing={6}
                 onClick={handleClickPhoto}
                 hasMore={hasMore}
               />
@@ -282,7 +282,6 @@ const VideoGrid: React.FC<VideoGridProps> = ({ hideSummary = false }) => {
       {/* Flying clone — sits above everything, animates from grid position to detail position */}
       {isFlying && selectedPhoto && originRect && (
         <motion.div
-          className="rounded-lg overflow-hidden"
           style={{
             position: "fixed",
             zIndex: 100,
@@ -293,7 +292,6 @@ const VideoGrid: React.FC<VideoGridProps> = ({ hideSummary = false }) => {
             left: originRect.left,
             width: originRect.width,
             height: originRect.height,
-            borderRadius: 0,
           }}
           animate={
             targetRect
@@ -302,7 +300,6 @@ const VideoGrid: React.FC<VideoGridProps> = ({ hideSummary = false }) => {
                   left: targetRect.left,
                   width: targetRect.width,
                   height: targetRect.height,
-                  borderRadius: 8,
                 }
               : undefined
           }
@@ -314,14 +311,16 @@ const VideoGrid: React.FC<VideoGridProps> = ({ hideSummary = false }) => {
           }}
           onAnimationComplete={handleFlyComplete}
         >
-          <video
-            src={selectedPhoto.src}
-            className="w-full h-full object-cover"
-            autoPlay
-            loop
-            muted
-            playsInline
-          />
+          <Squircle className="w-full h-full overflow-hidden">
+            <video
+              src={selectedPhoto.src}
+              className="w-full h-full object-cover"
+              autoPlay
+              loop
+              muted
+              playsInline
+            />
+          </Squircle>
         </motion.div>
       )}
     </div>
