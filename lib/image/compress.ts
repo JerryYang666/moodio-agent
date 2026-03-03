@@ -2,7 +2,7 @@ import sharp from "sharp";
 
 const MAX_IMAGE_SIZE_BYTES = 19 * 1024 * 1024; // 19 MB
 
-const QUALITY_STEPS = [97, 95, 90] as const;
+const QUALITY_STEPS = [99, 97, 95] as const;
 
 /**
  * If the image buffer exceeds 19 MB, convert to high-quality lossy WebP.
