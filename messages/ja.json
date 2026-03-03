@@ -309,7 +309,15 @@
     "copyTo": "コピー先...",
     "goToChat": "チャットへ移動",
     "video": "動画",
-    "remove": "削除"
+    "remove": "削除",
+    "uploadImages": "画像をアップロード",
+    "dropZoneTitle": "ここに画像をドロップしてコレクションに追加",
+    "dropZoneSubtitle": "JPEG、PNG、GIF、WebP（最大{maxSize}MB）",
+    "uploadingImages": "{count}枚の画像をアップロード中...",
+    "imagesUploaded": "{count}枚の画像をコレクションに追加しました",
+    "uploadFailed": "画像のアップロードに失敗しました",
+    "invalidImageType": "サポートされていない画像形式です。JPEG、PNG、GIF、WebPをお使いください。",
+    "fileSizeTooLarge": "ファイルが大きすぎます。最大{maxSize}MB。"
   },
   "storyboard": {
     "title": "ストーリーボード",

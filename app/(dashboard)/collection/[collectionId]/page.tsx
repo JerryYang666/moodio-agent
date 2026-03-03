@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, use, useCallback } from "react";
+import { useState, useEffect, use, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Card, CardBody } from "@heroui/card";
@@ -34,7 +34,10 @@ import {
   Move,
   Copy,
   LayoutDashboard,
+  Upload,
+  ImagePlus,
 } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { useCollections } from "@/hooks/use-collections";
 import ImageDetailModal, {
   ImageInfo,
@@ -46,6 +49,9 @@ import {
   DropdownItem,
 } from "@heroui/dropdown";
 import SendToDesktopModal from "@/components/desktop/SendToDesktopModal";
+import AssetPickerModal from "@/components/chat/asset-picker-modal";
+import { siteConfig } from "@/config/site";
+import { uploadImage, validateFile, getMaxFileSizeMB } from "@/lib/upload/client";
 
 interface CollectionAsset {
   id: string;
@@ -189,6 +195,12 @@ export default function CollectionPage({
   const [searchedUser, setSearchedUser] = useState<User | null>(null);
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState("");
+
+  // Upload state
+  const [isUploadPickerOpen, setIsUploadPickerOpen] = useState(false);
+  const [isDraggingExternalFile, setIsDraggingExternalFile] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const dragCounterRef = useRef(0);
 
   const [selectedPermission, setSelectedPermission] = useState<
     "viewer" | "collaborator"
@@ -612,6 +624,154 @@ export default function CollectionPage({
     [allImages]
   );
 
+  // Upload files to S3, then add each to the collection
+  const uploadFilesToCollection = useCallback(
+    async (files: File[]) => {
+      // Validate all files first
+      const allowedTypes = siteConfig.upload.allowedImageTypes;
+      for (const file of files) {
+        const validationError = validateFile(file);
+        if (validationError) {
+          addToast({
+            title:
+              validationError.code === "FILE_TOO_LARGE"
+                ? t("fileSizeTooLarge", { maxSize: getMaxFileSizeMB() })
+                : t("uploadFailed"),
+            color: "danger",
+          });
+          return;
+        }
+        if (!allowedTypes.includes(file.type)) {
+          addToast({ title: t("invalidImageType"), color: "warning" });
+          return;
+        }
+      }
+
+      setIsUploading(true);
+      let successCount = 0;
+
+      try {
+        await Promise.all(
+          files.map(async (file) => {
+            const result = await uploadImage(file, { skipCollection: true });
+            if (!result.success) {
+              addToast({ title: t("uploadFailed"), color: "danger" });
+              return;
+            }
+
+            // Add the uploaded image to the collection
+            const res = await fetch(`/api/collection/${collectionId}/images`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                imageId: result.data.imageId,
+                generationDetails: {
+                  title: file.name.replace(/\.[^/.]+$/, ""),
+                  prompt: "",
+                  status: "generated",
+                },
+              }),
+            });
+
+            if (res.ok) {
+              successCount++;
+            } else {
+              addToast({ title: t("uploadFailed"), color: "danger" });
+            }
+          })
+        );
+
+        if (successCount > 0) {
+          addToast({
+            title: t("imagesUploaded", { count: successCount }),
+            color: "success",
+          });
+          fetchCollectionData();
+        }
+      } finally {
+        setIsUploading(false);
+      }
+    },
+    [collectionId, t]
+  );
+
+  // Handle dropped files on the page
+  const handleFileDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsDraggingExternalFile(false);
+      dragCounterRef.current = 0;
+
+      if (!e.dataTransfer.files.length) return;
+
+      const allowedTypes = siteConfig.upload.allowedImageTypes;
+      const validFiles: File[] = [];
+      let hasInvalid = false;
+      for (const file of Array.from(e.dataTransfer.files)) {
+        if (allowedTypes.includes(file.type)) {
+          validFiles.push(file);
+        } else {
+          hasInvalid = true;
+        }
+      }
+      if (hasInvalid) {
+        addToast({ title: t("invalidImageType"), color: "warning" });
+      }
+      if (validFiles.length > 0) {
+        uploadFilesToCollection(validFiles);
+      }
+    },
+    [uploadFilesToCollection, t]
+  );
+
+  // Global drag listeners for external file drop zone overlay
+  useEffect(() => {
+    const permission = collectionData?.collection?.permission;
+    const userCanAdd = permission === "owner" || permission === "collaborator";
+    const hasFiles = (e: DragEvent) =>
+      e.dataTransfer?.types?.includes("Files") ?? false;
+
+    const onDragEnter = (e: DragEvent) => {
+      if (!hasFiles(e) || !userCanAdd) return;
+      dragCounterRef.current++;
+      if (dragCounterRef.current === 1) {
+        setIsDraggingExternalFile(true);
+      }
+    };
+
+    const onDragOver = (e: DragEvent) => {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+    };
+
+    const onDragLeave = (e: DragEvent) => {
+      if (!hasFiles(e)) return;
+      dragCounterRef.current--;
+      if (dragCounterRef.current === 0) {
+        setIsDraggingExternalFile(false);
+      }
+    };
+
+    const onDrop = () => {
+      dragCounterRef.current = 0;
+      setIsDraggingExternalFile(false);
+    };
+
+    window.addEventListener("dragenter", onDragEnter);
+    window.addEventListener("dragover", onDragOver);
+    window.addEventListener("dragleave", onDragLeave);
+    window.addEventListener("drop", onDrop);
+
+    return () => {
+      window.removeEventListener("dragenter", onDragEnter);
+      window.removeEventListener("dragover", onDragOver);
+      window.removeEventListener("dragleave", onDragLeave);
+      window.removeEventListener("drop", onDrop);
+      dragCounterRef.current = 0;
+    };
+  }, [collectionData]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -689,35 +849,49 @@ export default function CollectionPage({
             <p className="text-default-500">{getAssetCountText()}</p>
           </div>
 
-          {canEdit && (
-            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+            {canAddImages && (
               <Button
+                color="primary"
                 variant="flat"
-                startContent={<Pencil size={18} />}
-                onPress={onRenameOpen}
+                startContent={isUploading ? undefined : <ImagePlus size={18} />}
+                onPress={() => setIsUploadPickerOpen(true)}
+                isLoading={isUploading}
                 className="w-full sm:w-auto"
               >
-                {tCommon("rename")}
+                {t("uploadImages")}
               </Button>
-              <Button
-                variant="flat"
-                startContent={<Share2 size={18} />}
-                onPress={onShareOpen}
-                className="w-full sm:w-auto"
-              >
-                {tCommon("share") || "Share"}
-              </Button>
-              <Button
-                color="danger"
-                variant="flat"
-                startContent={<Trash2 size={18} />}
-                onPress={onDeleteOpen}
-                className="w-full sm:w-auto"
-              >
-                {tCommon("delete")}
-              </Button>
-            </div>
-          )}
+            )}
+            {canEdit && (
+              <>
+                <Button
+                  variant="flat"
+                  startContent={<Pencil size={18} />}
+                  onPress={onRenameOpen}
+                  className="w-full sm:w-auto"
+                >
+                  {tCommon("rename")}
+                </Button>
+                <Button
+                  variant="flat"
+                  startContent={<Share2 size={18} />}
+                  onPress={onShareOpen}
+                  className="w-full sm:w-auto"
+                >
+                  {tCommon("share") || "Share"}
+                </Button>
+                <Button
+                  color="danger"
+                  variant="flat"
+                  startContent={<Trash2 size={18} />}
+                  onPress={onDeleteOpen}
+                  className="w-full sm:w-auto"
+                >
+                  {tCommon("delete")}
+                </Button>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
@@ -1296,6 +1470,45 @@ export default function CollectionPage({
               ]
             : []
         }
+      />
+
+      {/* Drop zone overlay for external file drag */}
+      <AnimatePresence>
+        {isDraggingExternalFile && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            className="fixed inset-0 z-50"
+            onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+            onDrop={handleFileDrop}
+          >
+            <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+            <div className="absolute inset-0 flex items-center justify-center p-8">
+              <div className="w-full max-w-xl rounded-2xl border-2 border-dashed border-primary bg-primary/10 backdrop-blur-md p-10 flex flex-col items-center gap-3 shadow-xl">
+                <Upload size={40} className="text-primary" />
+                <span className="text-xl font-semibold text-primary">
+                  {t("dropZoneTitle")}
+                </span>
+                <span className="text-sm text-default-500">
+                  {t("dropZoneSubtitle", { maxSize: siteConfig.upload.maxFileSizeMB })}
+                </span>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Upload picker modal (upload-only, no library tab) */}
+      <AssetPickerModal
+        isOpen={isUploadPickerOpen}
+        onOpenChange={() => setIsUploadPickerOpen((v) => !v)}
+        onSelect={() => {}}
+        onUpload={(files) => {
+          uploadFilesToCollection(files);
+        }}
+        hideLibraryTab
       />
     </div>
   );

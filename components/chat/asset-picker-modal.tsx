@@ -52,11 +52,14 @@ export default function AssetPickerModal({
   onOpenChange,
   onSelect,
   onUpload,
+  hideLibraryTab = false,
 }: {
   isOpen: boolean;
   onOpenChange: () => void;
   onSelect: (asset: AssetSummary) => void;
   onUpload: (files: File[]) => void;
+  /** When true, only shows the upload tab (hides the library picker) */
+  hideLibraryTab?: boolean;
 }) {
   const t = useTranslations();
   const [loading, setLoading] = useState(false);
@@ -76,7 +79,7 @@ export default function AssetPickerModal({
       setPreviewAsset(null);
       return;
     }
-    setTabKey("library");
+    setTabKey(hideLibraryTab ? "upload" : "library");
     setUploadError(null);
     const load = async () => {
       setLoading(true);
@@ -155,15 +158,17 @@ export default function AssetPickerModal({
             <>
               <ModalHeader className="flex flex-col gap-2">
                 <div>{t("assetPicker.title")}</div>
-                <Tabs
-                  selectedKey={tabKey}
-                  onSelectionChange={(k) => setTabKey(k as "library" | "upload")}
-                  size="sm"
-                  variant="underlined"
-                >
-                  <Tab key="library" title={t("assetPicker.libraryTab")} />
-                  <Tab key="upload" title={t("assetPicker.uploadTab")} />
-                </Tabs>
+                {!hideLibraryTab && (
+                  <Tabs
+                    selectedKey={tabKey}
+                    onSelectionChange={(k) => setTabKey(k as "library" | "upload")}
+                    size="sm"
+                    variant="underlined"
+                  >
+                    <Tab key="library" title={t("assetPicker.libraryTab")} />
+                    <Tab key="upload" title={t("assetPicker.uploadTab")} />
+                  </Tabs>
+                )}
               </ModalHeader>
 
               <ModalBody className="overflow-hidden">

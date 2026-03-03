@@ -309,7 +309,15 @@
     "copyTo": "复制到...",
     "goToChat": "前往对话",
     "video": "视频",
-    "remove": "移除"
+    "remove": "移除",
+    "uploadImages": "上传图片",
+    "dropZoneTitle": "拖放图片到这里添加到合集",
+    "dropZoneSubtitle": "JPEG、PNG、GIF 或 WebP，最大 {maxSize}MB",
+    "uploadingImages": "正在上传 {count} 张图片...",
+    "imagesUploaded": "已添加 {count} 张图片到合集",
+    "uploadFailed": "上传图片失败",
+    "invalidImageType": "不支持的图片类型。请使用 JPEG、PNG、GIF 或 WebP。",
+    "fileSizeTooLarge": "文件过大。最大 {maxSize}MB。"
   },
   "storyboard": {
     "title": "故事板",

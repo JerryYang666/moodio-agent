@@ -309,7 +309,15 @@
     "copyTo": "Copy to...",
     "goToChat": "Go to Chat",
     "video": "Video",
-    "remove": "Remove"
+    "remove": "Remove",
+    "uploadImages": "Upload Images",
+    "dropZoneTitle": "Drop images here to add to collection",
+    "dropZoneSubtitle": "JPEG, PNG, GIF, or WebP up to {maxSize}MB",
+    "uploadingImages": "Uploading {count} {count, plural, one {image} other {images}}...",
+    "imagesUploaded": "{count} {count, plural, one {image} other {images}} added to collection",
+    "uploadFailed": "Failed to upload image",
+    "invalidImageType": "Unsupported image type. Use JPEG, PNG, GIF, or WebP.",
+    "fileSizeTooLarge": "File size too large. Max {maxSize}MB."
   },
   "desktop": {
     "title": "Desktops",
