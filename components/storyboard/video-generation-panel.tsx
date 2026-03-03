@@ -587,7 +587,7 @@ export default function VideoGenerationPanel({
                     isIconOnly
                     size="sm"
                     variant="flat"
-                    className="absolute top-2 right-2 bg-background/80"
+                    className="absolute top-2 right-2 z-20 bg-background/80"
                     onPress={() => {
                       setSourceImageId(null);
                       setSourceImageUrl(null);
@@ -643,7 +643,7 @@ export default function VideoGenerationPanel({
                       isIconOnly
                       size="sm"
                       variant="flat"
-                      className="absolute top-2 right-2 bg-background/80"
+                      className="absolute top-2 right-2 z-20 bg-background/80"
                       onPress={() => {
                         setEndImageId(null);
                         setEndImageUrl(null);
