@@ -397,7 +397,9 @@ export default function VideoGenerationPanel({
     }
   };
 
-  const handleUpload = async (file: File) => {
+  const handleUpload = async (files: File[]) => {
+    const file = files[0];
+    if (!file) return;
     // Create local preview and show uploading state
     const localPreview = URL.createObjectURL(file);
     setUploadPreviewUrl(localPreview);
