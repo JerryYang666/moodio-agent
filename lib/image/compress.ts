@@ -1,6 +1,6 @@
 import sharp from "sharp";
 
-const MAX_IMAGE_SIZE_BYTES = 19 * 1024 * 1024; // 19 MB
+const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
 
 const QUALITY_STEPS = [99, 97, 95] as const;
 
