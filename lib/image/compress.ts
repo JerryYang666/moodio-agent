@@ -2,12 +2,10 @@ import sharp from "sharp";
 
 const MAX_IMAGE_SIZE_BYTES = 19 * 1024 * 1024; // 19 MB
 
-const QUALITY_STEPS = [92, 85, 78] as const;
-
 /**
- * If the image buffer exceeds 19 MB, progressively compress it to WebP
- * at decreasing quality levels until it fits. Returns the original buffer
- * untouched when it's already under the limit.
+ * If the image buffer exceeds 19 MB, compress it to WebP.
+ * First tries lossless WebP (pixel-perfect, typically 3-6x smaller than PNG).
+ * Falls back to high-quality lossy WebP only if lossless still exceeds the limit.
  */
 export async function compressImageIfNeeded(
   imageBuffer: Buffer,
@@ -22,7 +20,22 @@ export async function compressImageIfNeeded(
     `[Image Compress] Image size ${originalSizeMB} MB exceeds limit, compressing...`
   );
 
-  for (const quality of QUALITY_STEPS) {
+  // Step 1: Try lossless WebP (identical quality, much smaller than PNG)
+  const lossless = await sharp(imageBuffer)
+    .webp({ lossless: true })
+    .toBuffer();
+
+  const losslessSizeMB = (lossless.length / (1024 * 1024)).toFixed(2);
+  console.log(
+    `[Image Compress] WebP lossless → ${losslessSizeMB} MB`
+  );
+
+  if (lossless.length <= MAX_IMAGE_SIZE_BYTES) {
+    return { buffer: lossless, contentType: "image/webp" };
+  }
+
+  // Step 2: Lossless still too large — use near-lossless (quality 97-95)
+  for (const quality of [97, 95, 90] as const) {
     const compressed = await sharp(imageBuffer)
       .webp({ quality, effort: 4 })
       .toBuffer();
@@ -37,14 +50,14 @@ export async function compressImageIfNeeded(
     }
   }
 
-  // Last resort: already went through all quality steps, return the best we got
+  // Last resort: quality 85
   const fallback = await sharp(imageBuffer)
-    .webp({ quality: QUALITY_STEPS[QUALITY_STEPS.length - 1], effort: 6 })
+    .webp({ quality: 85, effort: 6 })
     .toBuffer();
 
   const fallbackSizeMB = (fallback.length / (1024 * 1024)).toFixed(2);
   console.warn(
-    `[Image Compress] Could not get below limit. Final size: ${fallbackSizeMB} MB`
+    `[Image Compress] Could not get below limit with lossless. Final size: ${fallbackSizeMB} MB`
   );
 
   return { buffer: fallback, contentType: "image/webp" };
