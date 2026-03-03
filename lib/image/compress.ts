@@ -1,11 +1,11 @@
 import sharp from "sharp";
 
-const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
+const MAX_IMAGE_SIZE_BYTES = 6 * 1024 * 1024; // 6 MB
 
 const QUALITY_STEPS = [99, 97, 95] as const;
 
 /**
- * If the image buffer exceeds 5 MB, convert to high-quality WebP.
+ * If the image buffer exceeds 6 MB, convert to high-quality WebP.
  * Starts at quality 99 with smartSubsample for virtually pixel-perfect
  * output. Falls back to lower quality steps only if needed.
  * Avoids lossless/nearLossless encoding which is too slow and
