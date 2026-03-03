@@ -9,21 +9,21 @@ import {
   BotMessageSquare,
   Folder,
   Shield,
-  Clapperboard,
   LogOut,
   User as UserIcon,
   BookOpen,
   Bean,
   PencilRuler,
-  LayoutDashboard,
   PanelLeftClose,
   PanelLeftOpen,
+  Image,
+  Video,
+  Monitor,
 } from "lucide-react";
 import { Avatar } from "@heroui/avatar";
 import { Tooltip } from "@heroui/tooltip";
 import { useAuth } from "@/hooks/use-auth";
 import { useCredits } from "@/hooks/use-credits";
-import { useFeatureFlag } from "@/lib/feature-flags";
 import { motion } from "framer-motion";
 import { Button } from "@heroui/button";
 import { ThemeSwitch } from "@/components/theme-switch";
@@ -42,7 +42,6 @@ export const PrimarySidebar = () => {
   const t = useTranslations("nav");
   const tCredits = useTranslations("credits");
   const tLanguage = useTranslations("language");
-  const showDesktop = useFeatureFlag<boolean>("user_desktop") ?? false;
 
   const STORAGE_KEY = "moodio:sidebar-collapsed";
   const [collapsed, setCollapsed] = useState(() => {
@@ -56,38 +55,36 @@ export const PrimarySidebar = () => {
 
   const navItems = [
     {
-      label: t("browse"),
+      label: t("inspiration"),
       href: "/browse",
       icon: <BookOpen size={20} />,
+      isActive: (path: string) => path.startsWith("/browse") || path === "/",
     },
     {
-      label: t("agent"),
+      label: t("image"),
       href: "/chat",
-      icon: <BotMessageSquare size={20} />,
-      isActive: (path: string) => path.startsWith("/chat") || path === "/",
+      icon: <Image size={20} />,
+      isActive: (path: string) => path.startsWith("/chat"),
     },
     {
-      label: t("projects"),
+      label: t("video"),
+      href: "/storyboard",
+      icon: <Video size={20} />,
+      isActive: (path: string) => path.startsWith("/storyboard"),
+    },
+    {
+      label: t("assets"),
       href: "/projects",
       icon: <Folder size={20} />,
       isActive: (path: string) =>
         path.startsWith("/projects") || path.startsWith("/collection"),
     },
     {
-      label: t("storyboard"),
-      href: "/storyboard",
-      icon: <Clapperboard size={20} />,
+      label: t("canvas"),
+      href: "/desktop",
+      icon: <Monitor size={20} />,
+      isActive: (path: string) => path.startsWith("/desktop"),
     },
-    ...(showDesktop
-      ? [
-          {
-            label: t("desktop"),
-            href: "/desktop",
-            icon: <LayoutDashboard size={20} />,
-            isActive: (path: string) => path.startsWith("/desktop"),
-          },
-        ]
-      : []),
   ];
 
   return (

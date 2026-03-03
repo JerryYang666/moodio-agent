@@ -29,12 +29,11 @@
     "off": "オフ"
   },
   "nav": {
-    "browse": "ブラウズ",
-    "agent": "エージェント",
-    "projects": "プロジェクト",
-    "storyboard": "ストーリーボード",
-    "storyboardShort": "ストーリー",
-    "desktop": "デスクトップ",
+    "inspiration": "インスピレーション",
+    "image": "画像",
+    "video": "動画",
+    "assets": "アセット",
+    "canvas": "キャンバス",
     "admin": "管理",
     "adminDashboard": "管理ダッシュボード",
     "annotationPlatform": "アノテーションプラットフォーム",

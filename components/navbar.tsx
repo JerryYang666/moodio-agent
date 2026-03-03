@@ -21,12 +21,14 @@ import {
   Shield,
   Folder,
   LogOut,
-  Globe,
-  Clapperboard,
+  BookOpen,
   MoreHorizontal,
   Bean,
   User as UserIcon,
   PencilRuler,
+  Image,
+  Video,
+  Monitor,
 } from "lucide-react";
 import { Avatar } from "@heroui/avatar";
 import { Popover, PopoverTrigger, PopoverContent } from "@heroui/popover";
@@ -47,19 +49,20 @@ export const Navbar = () => {
   const tCredits = useTranslations("credits");
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [activeSection, setActiveSection] = useState<
-    "browse" | "agent" | "projects" | "storyboard"
-  >("agent");
+    "inspiration" | "image" | "video" | "assets" | "canvas"
+  >("inspiration");
 
   useEffect(() => {
-    if (pathname?.startsWith("/browse")) setActiveSection("browse");
+    if (pathname?.startsWith("/chat")) setActiveSection("image");
+    else if (pathname?.startsWith("/storyboard")) setActiveSection("video");
     else if (
       pathname?.startsWith("/projects") ||
       pathname?.startsWith("/collection")
     )
-      setActiveSection("projects");
-    else if (pathname?.startsWith("/storyboard"))
-      setActiveSection("storyboard");
-    else setActiveSection("agent");
+      setActiveSection("assets");
+    else if (pathname?.startsWith("/desktop"))
+      setActiveSection("canvas");
+    else setActiveSection("inspiration");
   }, [pathname]);
 
   useEffect(() => {
@@ -81,28 +84,34 @@ export const Navbar = () => {
 
   const navTabs = [
     {
-      id: "browse",
-      label: t("nav.browse"),
-      icon: <Globe size={20} />,
+      id: "inspiration",
+      label: t("nav.inspiration"),
+      icon: <BookOpen size={20} />,
       href: "/browse",
     },
     {
-      id: "agent",
-      label: t("nav.agent"),
-      icon: <BotMessageSquare size={20} />,
+      id: "image",
+      label: t("nav.image"),
+      icon: <Image size={20} />,
       href: "/chat",
     },
     {
-      id: "projects",
-      label: t("nav.projects"),
+      id: "video",
+      label: t("nav.video"),
+      icon: <Video size={20} />,
+      href: "/storyboard",
+    },
+    {
+      id: "assets",
+      label: t("nav.assets"),
       icon: <Folder size={20} />,
       href: "/projects",
     },
     {
-      id: "storyboard",
-      label: t("nav.storyboardShort"),
-      icon: <Clapperboard size={20} />,
-      href: "/storyboard",
+      id: "canvas",
+      label: t("nav.canvas"),
+      icon: <Monitor size={20} />,
+      href: "/desktop",
     },
   ];
 
@@ -141,7 +150,7 @@ export const Navbar = () => {
       <NavbarMenu className="pt-0 mt-0 top-12 bottom-0 pb-0 h-[calc(100dvh-3rem)] overflow-hidden flex flex-col">
         <div className="flex flex-col h-full pt-2 pb-4">
           {/* Top Tabs */}
-          <div className="grid grid-cols-4 gap-1 px-2 mb-1 shrink-0">
+          <div className="grid grid-cols-5 gap-1 px-2 mb-1 shrink-0">
             {navTabs.map((tab) => (
               <button
                 key={tab.id}
@@ -164,7 +173,25 @@ export const Navbar = () => {
 
           {/* Dynamic Content Area based on activeSection */}
           <div className="flex-1 overflow-y-auto overflow-x-hidden px-4 flex flex-col gap-2 min-h-0">
-            {activeSection === "agent" && (
+            {activeSection === "inspiration" && (
+              <div className="flex flex-col items-center justify-center h-full text-default-500">
+                <BookOpen size={48} className="mb-2 opacity-50" />
+                <p>{t("browse.subtitle")}</p>
+                <Button
+                  className="mt-4"
+                  color="primary"
+                  variant="flat"
+                  onPress={() => {
+                    router.push("/browse");
+                    setIsMenuOpen(false);
+                  }}
+                >
+                  {t("browse.goToBrowse")}
+                </Button>
+              </div>
+            )}
+
+            {activeSection === "image" && (
               <ChatHistorySelector
                 onChatSelect={() => setIsMenuOpen(false)}
                 onNewChat={handleNewChat}
@@ -172,7 +199,25 @@ export const Navbar = () => {
               />
             )}
 
-            {activeSection === "projects" && (
+            {activeSection === "video" && (
+              <div className="flex flex-col items-center justify-center h-full text-default-500">
+                <Video size={48} className="mb-2 opacity-50" />
+                <p>{t("storyboard.subtitle")}</p>
+                <Button
+                  className="mt-4"
+                  color="primary"
+                  variant="flat"
+                  onPress={() => {
+                    router.push("/storyboard");
+                    setIsMenuOpen(false);
+                  }}
+                >
+                  {t("storyboard.goToStoryboard")}
+                </Button>
+              </div>
+            )}
+
+            {activeSection === "assets" && (
               <div className="flex flex-col items-center justify-center h-full text-default-500">
                 <Folder size={48} className="mb-2 opacity-50" />
                 <p>{t("projects.manageProjectsHere")}</p>
@@ -190,38 +235,20 @@ export const Navbar = () => {
               </div>
             )}
 
-            {activeSection === "browse" && (
+            {activeSection === "canvas" && (
               <div className="flex flex-col items-center justify-center h-full text-default-500">
-                <Globe size={48} className="mb-2 opacity-50" />
-                <p>{t("browse.subtitle")}</p>
+                <Monitor size={48} className="mb-2 opacity-50" />
+                <p>{t("desktop.subtitle")}</p>
                 <Button
                   className="mt-4"
                   color="primary"
                   variant="flat"
                   onPress={() => {
-                    router.push("/browse");
+                    router.push("/desktop");
                     setIsMenuOpen(false);
                   }}
                 >
-                  {t("browse.goToBrowse")}
-                </Button>
-              </div>
-            )}
-
-            {activeSection === "storyboard" && (
-              <div className="flex flex-col items-center justify-center h-full text-default-500">
-                <Clapperboard size={48} className="mb-2 opacity-50" />
-                <p>{t("storyboard.subtitle")}</p>
-                <Button
-                  className="mt-4"
-                  color="primary"
-                  variant="flat"
-                  onPress={() => {
-                    router.push("/storyboard");
-                    setIsMenuOpen(false);
-                  }}
-                >
-                  {t("storyboard.goToStoryboard")}
+                  {t("nav.canvas")}
                 </Button>
               </div>
             )}

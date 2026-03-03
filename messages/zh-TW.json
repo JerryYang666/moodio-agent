@@ -29,12 +29,11 @@
     "off": "關"
   },
   "nav": {
-    "browse": "瀏覽",
-    "agent": "代理程式",
-    "projects": "專案",
-    "storyboard": "分鏡腳本",
-    "storyboardShort": "分鏡",
-    "desktop": "桌面",
+    "inspiration": "靈感",
+    "image": "圖片",
+    "video": "影片",
+    "assets": "資產",
+    "canvas": "畫布",
     "admin": "管理",
     "adminDashboard": "管理員儀表板",
     "annotationPlatform": "標註平台",

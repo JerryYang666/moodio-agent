@@ -29,12 +29,11 @@
     "off": "关"
   },
   "nav": {
-    "browse": "浏览",
-    "agent": "智能体",
-    "projects": "项目",
-    "storyboard": "故事板",
-    "storyboardShort": "故事",
-    "desktop": "桌面",
+    "inspiration": "灵感",
+    "image": "图片",
+    "video": "视频",
+    "assets": "资产",
+    "canvas": "画布",
     "admin": "管理",
     "adminDashboard": "管理面板",
     "annotationPlatform": "标注平台",

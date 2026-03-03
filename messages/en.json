@@ -29,12 +29,11 @@
     "off": "Off"
   },
   "nav": {
-    "browse": "Browse",
-    "agent": "Agent",
-    "projects": "Projects",
-    "storyboard": "Storyboard",
-    "storyboardShort": "Story.",
-    "desktop": "Desktop",
+    "inspiration": "Inspiration",
+    "image": "Image",
+    "video": "Video",
+    "assets": "Assets",
+    "canvas": "Canvas",
     "admin": "Admin",
     "adminDashboard": "Admin Dashboard",
     "annotationPlatform": "Annotation Platform",
