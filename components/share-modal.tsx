@@ -14,6 +14,11 @@ import {
 } from "@heroui/modal";
 import { X } from "lucide-react";
 import type { ShareEntry, useShareModal } from "@/hooks/use-share-modal";
+import {
+  PERMISSION_VIEWER,
+  PERMISSION_COLLABORATOR,
+  type SharePermission,
+} from "@/lib/permissions";
 
 interface ShareModalProps {
   isOpen: boolean;
@@ -102,16 +107,16 @@ export default function ShareModal({
                             selectedKeys={[share.selectedPermission]}
                             onChange={(e) =>
                               share.setSelectedPermission(
-                                e.target.value as "viewer" | "collaborator"
+                                e.target.value as SharePermission
                               )
                             }
                             className="flex-1"
                             size="sm"
                           >
-                            <SelectItem key="viewer">
+                            <SelectItem key={PERMISSION_VIEWER}>
                               {tShare("viewer")}
                             </SelectItem>
-                            <SelectItem key="collaborator">
+                            <SelectItem key={PERMISSION_COLLABORATOR}>
                               {tShare("collaborator")}
                             </SelectItem>
                           </Select>

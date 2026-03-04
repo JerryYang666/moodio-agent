@@ -12,6 +12,7 @@ import { verifyAccessToken } from "@/lib/auth/jwt";
 import { eq, and, desc } from "drizzle-orm";
 import { getImageUrl, getVideoUrl } from "@/lib/storage/s3";
 import { getUserPermission } from "@/lib/collection-utils";
+import { PERMISSION_OWNER, isOwner, type SharePermission } from "@/lib/permissions";
 
 /**
  * GET /api/collection/[collectionId]
@@ -74,7 +75,7 @@ export async function GET(
 
     // Get shares if user is owner
     let shares: (CollectionShare & { email: string })[] = [];
-    if (permission === "owner") {
+    if (isOwner(permission)) {
       const sharesData = await db
         .select({
           id: collectionShares.id,
@@ -92,7 +93,7 @@ export async function GET(
         id: s.id,
         collectionId: s.collectionId,
         sharedWithUserId: s.sharedWithUserId,
-        permission: s.permission as "viewer" | "collaborator",
+        permission: s.permission as SharePermission,
         sharedAt: s.sharedAt,
         email: s.email
       }));
@@ -102,7 +103,7 @@ export async function GET(
       collection: {
         ...collection,
         permission,
-        isOwner: permission === "owner",
+        isOwner: isOwner(permission),
       },
       images,
       shares,
@@ -140,7 +141,7 @@ export async function PATCH(
 
     // Check permission (must be owner)
     const permission = await getUserPermission(collectionId, userId);
-    if (permission !== "owner") {
+    if (!isOwner(permission)) {
       return NextResponse.json(
         { error: "Only the owner can rename the collection" },
         { status: 403 }
@@ -170,7 +171,7 @@ export async function PATCH(
     return NextResponse.json({
       collection: {
         ...updatedCollection,
-        permission: "owner",
+        permission: PERMISSION_OWNER,
         isOwner: true,
       },
     });
@@ -207,7 +208,7 @@ export async function DELETE(
 
     // Check permission (must be owner)
     const permission = await getUserPermission(collectionId, userId);
-    if (permission !== "owner") {
+    if (!isOwner(permission)) {
       return NextResponse.json(
         { error: "Only the owner can delete the collection" },
         { status: 403 }

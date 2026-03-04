@@ -1,8 +1,14 @@
 import { db } from "@/lib/db";
 import { projects, projectShares } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
+import {
+  PERMISSION_OWNER,
+  hasWriteAccess,
+  type PermissionOrNull,
+  type SharePermission,
+} from "@/lib/permissions";
 
-export type ProjectPermission = "owner" | "collaborator" | "viewer" | null;
+export type ProjectPermission = PermissionOrNull;
 
 /**
  * Check user's permission for a project
@@ -19,7 +25,7 @@ export async function getProjectPermission(
     .limit(1);
 
   if (project) {
-    return "owner";
+    return PERMISSION_OWNER;
   }
 
   // Check if project is shared with user
@@ -35,7 +41,7 @@ export async function getProjectPermission(
     .limit(1);
 
   if (share) {
-    return share.permission as "collaborator" | "viewer";
+    return share.permission as SharePermission;
   }
 
   return null;
@@ -45,5 +51,5 @@ export async function getProjectPermission(
  * Check if user has write permission (owner or collaborator)
  */
 export function hasProjectWritePermission(permission: ProjectPermission): boolean {
-  return permission === "owner" || permission === "collaborator";
+  return hasWriteAccess(permission);
 }

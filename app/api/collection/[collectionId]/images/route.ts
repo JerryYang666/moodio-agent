@@ -5,6 +5,7 @@ import { getAccessToken } from "@/lib/auth/cookies";
 import { verifyAccessToken } from "@/lib/auth/jwt";
 import { eq, and } from "drizzle-orm";
 import { getUserPermission } from "@/lib/collection-utils";
+import { hasWriteAccess } from "@/lib/permissions";
 
 /**
  * POST /api/collection/[collectionId]/images
@@ -40,7 +41,7 @@ export async function POST(
 
     // Check permission (must be owner or collaborator)
     const permission = await getUserPermission(collectionId, userId);
-    if (permission !== "owner" && permission !== "collaborator") {
+    if (!hasWriteAccess(permission)) {
       return NextResponse.json(
         { error: "You don't have permission to add assets to this collection" },
         { status: 403 }

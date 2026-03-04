@@ -1,8 +1,14 @@
 import { db } from "@/lib/db";
 import { collections, collectionImages, collectionShares, projectShares } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
+import {
+  PERMISSION_OWNER,
+  hasWriteAccess,
+  type PermissionOrNull,
+  type SharePermission,
+} from "@/lib/permissions";
 
-export type CollectionPermission = "owner" | "collaborator" | "viewer" | null;
+export type CollectionPermission = PermissionOrNull;
 
 /**
  * Check user's permission for a collection.
@@ -21,7 +27,7 @@ export async function getUserPermission(
 
   if (!collection) return null;
 
-  if (collection.userId === userId) return "owner";
+  if (collection.userId === userId) return PERMISSION_OWNER;
 
   // Check if collection is directly shared with user
   const [share] = await db
@@ -36,7 +42,7 @@ export async function getUserPermission(
     .limit(1);
 
   if (share) {
-    return share.permission as "collaborator" | "viewer";
+    return share.permission as SharePermission;
   }
 
   // Fall back: check if the parent project is shared with user
@@ -52,7 +58,7 @@ export async function getUserPermission(
     .limit(1);
 
   if (projectShare) {
-    return projectShare.permission as "collaborator" | "viewer";
+    return projectShare.permission as SharePermission;
   }
 
   return null;
@@ -62,7 +68,7 @@ export async function getUserPermission(
  * Check if user has write permission (owner or collaborator)
  */
 export function hasWritePermission(permission: CollectionPermission): boolean {
-  return permission === "owner" || permission === "collaborator";
+  return hasWriteAccess(permission);
 }
 
 /**

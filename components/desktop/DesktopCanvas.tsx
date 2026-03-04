@@ -7,6 +7,7 @@ import type { RemoteCursor } from "@/hooks/use-desktop-ws";
 import type { EnrichedDesktopAsset } from "./assets";
 import { ImageAsset, VideoAsset, TextAsset, LinkAsset } from "./assets";
 import TableAsset from "./assets/TableAsset";
+import { hasWriteAccess } from "@/lib/permissions";
 import {
   Trash2,
   MessageSquare,
@@ -131,7 +132,7 @@ export default function DesktopCanvas({
   const [resizeDims, setResizeDims] = useState<{ w: number; h: number; posX: number; posY: number } | null>(null);
   const lastResizeSend = useRef(0);
 
-  const canEdit = permission === "owner" || permission === "collaborator";
+  const canEdit = hasWriteAccess(permission);
 
   const handleImageLoad = useCallback(
     (assetId: string, naturalWidth: number, naturalHeight: number) => {

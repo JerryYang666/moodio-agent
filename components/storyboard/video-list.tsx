@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { hasWriteAccess } from "@/lib/permissions";
 import { useTranslations } from "next-intl";
 import { Card, CardBody, CardHeader } from "@heroui/card";
 import { Spinner } from "@heroui/spinner";
@@ -632,8 +633,7 @@ export default function VideoList({ refreshTrigger, onRestore }: VideoListProps)
                                     collections
                                       .filter(
                                         (c) =>
-                                          c.permission === "owner" ||
-                                          c.permission === "collaborator"
+                                          hasWriteAccess(c.permission)
                                       )
                                       .map((collection) => (
                                         <DropdownItem
@@ -984,8 +984,7 @@ export default function VideoList({ refreshTrigger, onRestore }: VideoListProps)
                                 collections
                                   .filter(
                                     (c) =>
-                                      c.permission === "owner" ||
-                                      c.permission === "collaborator"
+                                      hasWriteAccess(c.permission)
                                   )
                                   .map((collection) => (
                                     <DropdownItem

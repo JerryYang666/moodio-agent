@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { PERMISSION_OWNER } from "@/lib/permissions";
 import { db } from "@/lib/db";
 import { projects, collectionImages, projectShares } from "@/lib/db/schema";
 import { getAccessToken } from "@/lib/auth/cookies";
@@ -58,7 +59,7 @@ export async function GET(req: NextRequest) {
     // Add cover image URL to each project
     const projectsWithCovers = rows.map((project) => ({
       ...project,
-      permission: "owner" as const,
+      permission: PERMISSION_OWNER,
       isOwner: true,
       coverImageUrl: coverMap.get(project.id) || null,
     }));

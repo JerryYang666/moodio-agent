@@ -10,6 +10,7 @@ import { getAccessToken } from "@/lib/auth/cookies";
 import { verifyAccessToken } from "@/lib/auth/jwt";
 import { and, desc, eq, inArray, isNotNull } from "drizzle-orm";
 import { getImageUrl, getVideoUrl } from "@/lib/storage/s3";
+import { PERMISSION_OWNER, type Permission, type SharePermission } from "@/lib/permissions";
 
 // Full video generation details - same structure as /api/video/generations
 interface VideoGenerationDetails {
@@ -41,7 +42,7 @@ interface CollectionWithVideos {
   name: string;
   createdAt: Date;
   updatedAt: Date;
-  permission: "owner" | "collaborator" | "viewer";
+  permission: Permission;
   isOwner: boolean;
   videos: VideoGenerationDetails[];
 }
@@ -101,7 +102,7 @@ export async function GET(req: NextRequest) {
     for (const col of ownedCollections) {
       collectionMap.set(col.id, {
         ...col,
-        permission: "owner" as const,
+        permission: PERMISSION_OWNER,
         isOwner: true,
         videos: [],
       });
@@ -116,7 +117,7 @@ export async function GET(req: NextRequest) {
           name: item.name,
           createdAt: item.createdAt,
           updatedAt: item.updatedAt,
-          permission: item.permission as "collaborator" | "viewer",
+          permission: item.permission as SharePermission,
           isOwner: false,
           videos: [],
         });

@@ -2,6 +2,12 @@
 
 import { useState, useCallback } from "react";
 import { addToast } from "@heroui/toast";
+import {
+  PERMISSION_VIEWER,
+  type SharePermission,
+} from "@/lib/permissions";
+
+export type { SharePermission } from "@/lib/permissions";
 
 export interface ShareUser {
   id: string;
@@ -13,12 +19,10 @@ export interface ShareUser {
 export interface ShareEntry {
   id: string;
   sharedWithUserId: string;
-  permission: "viewer" | "collaborator";
+  permission: SharePermission;
   sharedAt: Date;
   email: string;
 }
-
-export type SharePermission = "viewer" | "collaborator";
 
 interface UseShareModalOptions {
   shareApiPath: string;
@@ -30,7 +34,7 @@ export function useShareModal({ shareApiPath, onShareChanged }: UseShareModalOpt
   const [searchedUser, setSearchedUser] = useState<ShareUser | null>(null);
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState("");
-  const [selectedPermission, setSelectedPermission] = useState<SharePermission>("viewer");
+  const [selectedPermission, setSelectedPermission] = useState<SharePermission>(PERMISSION_VIEWER);
   const [isSharing, setIsSharing] = useState(false);
 
   const handleSearchUser = useCallback(async () => {
@@ -75,7 +79,7 @@ export function useShareModal({ shareApiPath, onShareChanged }: UseShareModalOpt
         await onShareChanged();
         setSearchEmail("");
         setSearchedUser(null);
-        setSelectedPermission("viewer");
+        setSelectedPermission(PERMISSION_VIEWER);
         addToast({ title: "Shared", description: "Shared successfully", color: "success" });
       }
     } catch {
@@ -106,7 +110,7 @@ export function useShareModal({ shareApiPath, onShareChanged }: UseShareModalOpt
     setSearchedUser(null);
     setIsSearching(false);
     setSearchError("");
-    setSelectedPermission("viewer");
+    setSelectedPermission(PERMISSION_VIEWER);
     setIsSharing(false);
   }, []);
 

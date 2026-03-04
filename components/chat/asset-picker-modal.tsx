@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
+import { type Permission } from "@/lib/permissions";
 import {
   Modal,
   ModalContent,
@@ -44,7 +45,7 @@ type Collection = {
   name: string;
   projectId: string;
   isOwner: boolean;
-  permission: "owner" | "collaborator" | "viewer";
+  permission: Permission;
 };
 
 export default function AssetPickerModal({

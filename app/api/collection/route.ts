@@ -7,6 +7,7 @@ import { eq, or, and, desc, sql } from "drizzle-orm";
 import { ensureDefaultProject } from "@/lib/db/projects";
 import { getImageUrl } from "@/lib/storage/s3";
 import { getProjectPermission, hasProjectWritePermission } from "@/lib/project-utils";
+import { PERMISSION_OWNER } from "@/lib/permissions";
 
 /**
  * GET /api/collection
@@ -95,7 +96,7 @@ export async function GET(req: NextRequest) {
     // Format response
     const owned = ownedCollections.map((col) => ({
       ...col,
-      permission: "owner" as const,
+      permission: PERMISSION_OWNER,
       isOwner: true,
       coverImageUrl: coverMap.get(col.id) || null,
     }));
@@ -182,7 +183,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       collection: {
         ...newCollection,
-        permission: "owner",
+        permission: PERMISSION_OWNER,
         isOwner: true,
       },
     });

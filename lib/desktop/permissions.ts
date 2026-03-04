@@ -1,11 +1,16 @@
 import { db } from "@/lib/db";
 import { desktops, desktopShares } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
+import {
+  PERMISSION_OWNER,
+  type PermissionOrNull,
+  type SharePermission,
+} from "@/lib/permissions";
 
 export async function getDesktopPermission(
   desktopId: string,
   userId: string
-): Promise<"owner" | "collaborator" | "viewer" | null> {
+): Promise<PermissionOrNull> {
   const [desktop] = await db
     .select()
     .from(desktops)
@@ -13,7 +18,7 @@ export async function getDesktopPermission(
     .limit(1);
 
   if (desktop) {
-    return "owner";
+    return PERMISSION_OWNER;
   }
 
   const [share] = await db
@@ -28,7 +33,7 @@ export async function getDesktopPermission(
     .limit(1);
 
   if (share) {
-    return share.permission as "collaborator" | "viewer";
+    return share.permission as SharePermission;
   }
 
   return null;

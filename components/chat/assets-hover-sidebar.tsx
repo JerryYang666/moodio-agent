@@ -13,6 +13,7 @@ import { addToast } from "@heroui/toast";
 import { ASSET_DRAG_MIME, AI_IMAGE_DRAG_MIME } from "./asset-dnd";
 import { useCollections } from "@/hooks/use-collections";
 import { ASSETS_UPDATED_EVENT, COLLECTIONS_UPDATED_EVENT } from "@/components/collections-provider";
+import { PERMISSION_VIEWER, type Permission } from "@/lib/permissions";
 
 type Project = {
   id: string;
@@ -25,7 +26,7 @@ type Collection = {
   name: string;
   projectId: string;
   isOwner: boolean;
-  permission: "owner" | "collaborator" | "viewer";
+  permission: Permission;
 };
 
 type Asset = {
@@ -398,7 +399,7 @@ export default function AssetsHoverSidebar() {
                         </span>
                       </button>
                       {(ownedCollectionsByProject.get(p.id) || []).map((c) => {
-                        const canDrop = c.permission !== "viewer";
+                        const canDrop = c.permission !== PERMISSION_VIEWER;
                         return (
                         <button
                           key={c.id}
@@ -445,7 +446,7 @@ export default function AssetsHoverSidebar() {
                     </div>
                     <div className="flex flex-col gap-1 max-h-[140px] overflow-y-auto pr-1">
                       {sharedCollections.map((c) => {
-                        const canDrop = c.permission !== "viewer";
+                        const canDrop = c.permission !== PERMISSION_VIEWER;
                         return (
                         <button
                           key={c.id}

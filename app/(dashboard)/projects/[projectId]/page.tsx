@@ -8,6 +8,7 @@ import { Button } from "@heroui/button";
 import { Input } from "@heroui/input";
 import { Spinner } from "@heroui/spinner";
 import { Chip } from "@heroui/chip";
+import { PERMISSION_COLLABORATOR, type Permission } from "@/lib/permissions";
 import { Image } from "@heroui/image";
 import {
   Modal,
@@ -35,7 +36,7 @@ type Project = {
   isDefault: boolean;
   createdAt: Date;
   updatedAt: Date;
-  permission?: "owner" | "collaborator" | "viewer";
+  permission?: Permission;
   isOwner?: boolean;
 };
 
@@ -289,7 +290,7 @@ export default function ProjectDetailPage({
                 {tCommon("share")}
               </Button>
             )}
-            {(project.isOwner !== false || project.permission === "collaborator") && (
+            {(project.isOwner !== false || project.permission === PERMISSION_COLLABORATOR) && (
               <Button
                 color="primary"
                 startContent={<Plus size={18} />}
