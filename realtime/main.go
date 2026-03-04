@@ -1,9 +1,12 @@
 package main
 
 import (
+	"encoding/json"
+	"io"
 	"log"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/olahol/melody"
 )
@@ -99,12 +102,70 @@ func main() {
 
 	http.HandleFunc("/check", func(w http.ResponseWriter, r *http.Request) {
 		log.Printf("[check] received check request from %s", r.RemoteAddr)
+
+		region := fetchEC2Region()
+
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK!"))
+		json.NewEncoder(w).Encode(map[string]string{
+			"status": "ok",
+			"region": region,
+		})
 	})
 
 	log.Printf("Realtime server starting on :%s", port)
 	if err := http.ListenAndServe(":"+port, nil); err != nil {
 		log.Fatal(err)
 	}
+}
+
+func fetchEC2Region() string {
+	client := &http.Client{}
+
+	tokenReq, err := http.NewRequest(http.MethodPut, "http://169.254.169.254/latest/api/token", nil)
+	if err != nil {
+		log.Printf("[check] failed to create token request: %v", err)
+		return "unknown"
+	}
+	tokenReq.Header.Set("X-aws-ec2-metadata-token-ttl-seconds", "21600")
+
+	tokenResp, err := client.Do(tokenReq)
+	if err != nil {
+		log.Printf("[check] failed to fetch IMDSv2 token: %v", err)
+		return "unknown"
+	}
+	defer tokenResp.Body.Close()
+
+	tokenBytes, err := io.ReadAll(tokenResp.Body)
+	if err != nil {
+		log.Printf("[check] failed to read token response: %v", err)
+		return "unknown"
+	}
+	token := strings.TrimSpace(string(tokenBytes))
+
+	regionReq, err := http.NewRequest(http.MethodGet, "http://169.254.169.254/latest/meta-data/placement/region", nil)
+	if err != nil {
+		log.Printf("[check] failed to create region request: %v", err)
+		return "unknown"
+	}
+	regionReq.Header.Set("X-aws-ec2-metadata-token", token)
+
+	regionResp, err := client.Do(regionReq)
+	if err != nil {
+		log.Printf("[check] failed to fetch region: %v", err)
+		return "unknown"
+	}
+	defer regionResp.Body.Close()
+
+	regionBytes, err := io.ReadAll(regionResp.Body)
+	if err != nil {
+		log.Printf("[check] failed to read region response: %v", err)
+		return "unknown"
+	}
+
+	region := strings.TrimSpace(string(regionBytes))
+	if region == "" {
+		return "unknown"
+	}
+	return region
 }
