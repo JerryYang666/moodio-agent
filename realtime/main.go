@@ -97,6 +97,12 @@ func main() {
 		w.Write([]byte("ok"))
 	})
 
+	http.HandleFunc("/check", func(w http.ResponseWriter, r *http.Request) {
+		log.Printf("[check] received check request from %s", r.RemoteAddr)
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("OK!"))
+	})
+
 	log.Printf("Realtime server starting on :%s", port)
 	if err := http.ListenAndServe(":"+port, nil); err != nil {
 		log.Fatal(err)
