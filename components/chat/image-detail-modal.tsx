@@ -20,7 +20,6 @@ import {
 } from "@heroui/dropdown";
 import {
   X,
-  Download,
   Maximize2,
   Minimize2,
   ZoomIn,
@@ -40,8 +39,8 @@ import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 import { useRouter } from "next/navigation";
 import { useCollections } from "@/hooks/use-collections";
 import { motion, AnimatePresence } from "framer-motion";
-import { downloadImage } from "./utils";
 import { useFeatureFlag } from "@/lib/feature-flags";
+import ImageDownloadDropdown from "./image-download-dropdown";
 import SendToDesktopModal from "@/components/desktop/SendToDesktopModal";
 
 export interface ImageInfo {
@@ -368,20 +367,12 @@ export default function ImageDetailModal({
                               >
                                 <Undo2 size={20} />
                               </Button>
-                              <Button
-                                isIconOnly
-                                variant="flat"
-                                className="bg-black/50 text-white"
-                                onPress={() =>
-                                  downloadImage(
-                                    selectedImage.imageId,
-                                    selectedImage.title || "image",
-                                    selectedImage.url
-                                  )
-                                }
-                              >
-                                <Download size={20} />
-                              </Button>
+                              <ImageDownloadDropdown
+                                imageId={selectedImage.imageId}
+                                title={selectedImage.title || "image"}
+                                url={selectedImage.url}
+                                iconSize={20}
+                              />
                               {/* Collection menu dropdown */}
                               {canAddToCollection && (
                                 <Dropdown
@@ -607,20 +598,12 @@ export default function ImageDetailModal({
                               onDoubleClick={() => setIsFullscreen(true)}
                             />
                             <div className="absolute top-2 right-2 z-10 flex gap-2 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-                              <Button
-                                isIconOnly
-                                variant="flat"
-                                className="bg-black/50 text-white"
-                                onPress={() =>
-                                  downloadImage(
-                                    selectedImage.imageId,
-                                    selectedImage.title || "image",
-                                    selectedImage.url
-                                  )
-                                }
-                              >
-                                <Download size={16} />
-                              </Button>
+                              <ImageDownloadDropdown
+                                imageId={selectedImage.imageId}
+                                title={selectedImage.title || "image"}
+                                url={selectedImage.url}
+                                iconSize={16}
+                              />
                               {/* Collection menu dropdown */}
                               {canAddToCollection && (
                                 <Dropdown

@@ -830,7 +830,8 @@
     "viewFullSize": "檢視完整尺寸",
     "download": "下載",
     "delete": "刪除",
-    "deleteConfirm": "確定要刪除此圖片嗎？"
+    "deleteConfirm": "確定要刪除此圖片嗎？",
+    "downloadFormat": "選擇格式下載"
   },
   "imageMenu": {
     "actionsLabel": "圖片操作",
