@@ -509,6 +509,15 @@
       "2k": "2K",
       "4k": "4K"
     },
+    "imageQuantity": "數量",
+    "imageQuantityOptions": {
+      "smart": "智慧",
+      "smartDesc": "讓代理決定生成圖片的最佳數量",
+      "1": "1",
+      "2": "2",
+      "3": "3",
+      "4": "4"
+    },
     "editModeHint": "請先選擇或上傳圖片以使用編輯模式",
     "expertiseNotAvailable": "在編輯選取的圖片模式下無法使用專業領域。",
     "aspectRatioNotApplicable": "在對話模式下不適用長寬比。"

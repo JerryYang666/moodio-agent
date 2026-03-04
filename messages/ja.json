@@ -509,6 +509,15 @@
       "2k": "2K",
       "4k": "4K"
     },
+    "imageQuantity": "枚数",
+    "imageQuantityOptions": {
+      "smart": "スマート",
+      "smartDesc": "エージェントが生成する画像の最適な枚数を決定します",
+      "1": "1",
+      "2": "2",
+      "3": "3",
+      "4": "4"
+    },
     "editModeHint": "編集モードを使用するには、まず画像を選択またはアップロードしてください",
     "expertiseNotAvailable": "選択した画像を編集モードでは専門分野は利用できません。",
     "aspectRatioNotApplicable": "チャットモードではアスペクト比は適用されません。"

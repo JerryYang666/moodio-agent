@@ -156,6 +156,13 @@ export async function POST(
       typeof json.variantCount === "number" && json.variantCount >= 1
         ? Math.min(json.variantCount, 4) // Cap at 4 variants max
         : 1;
+    // Accept optional imageQuantity parameter (1-6, undefined = smart/agent decides)
+    const imageQuantity: number | undefined =
+      typeof json.imageQuantity === "number" &&
+      json.imageQuantity >= 1 &&
+      json.imageQuantity <= 6
+        ? json.imageQuantity
+        : undefined;
     // Parse reference images with their tags
     const rawReferenceImages = Array.isArray(json.referenceImages)
       ? json.referenceImages
@@ -291,7 +298,8 @@ export async function POST(
         imageSizeOverride,
         imageModelId,
         messageTimestamp, // Pass timestamp for frontend sync
-        referenceImages // Pass reference images with tags
+        referenceImages, // Pass reference images with tags
+        imageQuantity // Pass user-selected image quantity (undefined = smart)
       );
 
     // Handle background completion (saving history)

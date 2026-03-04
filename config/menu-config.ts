@@ -77,6 +77,22 @@ export const MENU_CONFIG = {
         "4k": { label: "4k" },
       },
     },
+    imageQuantity: {
+      label: "Image Quantity",
+      default: "smart",
+      options: {
+        smart: {
+          label: "Smart",
+          description:
+            "Let the agent decide the best number of images to generate",
+          icon: "Sparkles",
+        },
+        "1": { label: "1" },
+        "2": { label: "2" },
+        "3": { label: "3" },
+        "4": { label: "4" },
+      },
+    },
   },
 
   contexts: {
@@ -86,6 +102,7 @@ export const MENU_CONFIG = {
         expertise: "commercial",
         aspectRatio: "smart",
         imageSize: "2k",
+        imageQuantity: "smart",
       },
       availability: {
         model: {
@@ -114,6 +131,10 @@ export const MENU_CONFIG = {
           enabled: true,
           allowed: ["2k", "4k"],
         },
+        imageQuantity: {
+          enabled: true,
+          allowed: ["smart", "1", "2", "3", "4"],
+        },
       },
     },
 
@@ -122,6 +143,7 @@ export const MENU_CONFIG = {
         model: "nano-banana-pro",
         aspectRatio: "smart",
         imageSize: "2k",
+        imageQuantity: "smart",
       },
       availability: {
         model: { enabled: true, allowed: ["nano-banana-pro", "seedream-45"] },
@@ -147,6 +169,10 @@ export const MENU_CONFIG = {
           enabled: true,
           allowed: ["2k", "4k"],
         },
+        imageQuantity: {
+          enabled: true,
+          allowed: ["smart", "1", "2", "3", "4"],
+        },
       },
     },
 
@@ -168,6 +194,10 @@ export const MENU_CONFIG = {
         imageSize: {
           enabled: false,
           reason: "Image size is not applicable in Chat mode.",
+        },
+        imageQuantity: {
+          enabled: false,
+          reason: "Image quantity is not applicable in Chat mode.",
         },
       },
     },

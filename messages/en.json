@@ -556,6 +556,15 @@
       "2k": "2K",
       "4k": "4K"
     },
+    "imageQuantity": "Quantity",
+    "imageQuantityOptions": {
+      "smart": "Smart",
+      "smartDesc": "Let the agent decide the best number of images to generate",
+      "1": "1",
+      "2": "2",
+      "3": "3",
+      "4": "4"
+    },
     "editModeHint": "Select or upload an image first to use Edit mode",
     "expertiseNotAvailable": "Expertise is not available in Edit selected images mode.",
     "aspectRatioNotApplicable": "Aspect ratio is not applicable in Chat mode."
