@@ -39,7 +39,7 @@ import {
   Search,
   Star,
   CheckSquare,
-  CheckCheck,
+  Check,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useCollections } from "@/hooks/use-collections";
@@ -1086,7 +1086,7 @@ export default function CollectionPage({
                 {isSelectionMode ? t("cancelSelection") : t("selectItems")}
               </Button>
             )}
-            {canAddImages && (
+            {canAddImages && !isSelectionMode && (
               <Button
                 color="primary"
                 variant="flat"
@@ -1098,7 +1098,7 @@ export default function CollectionPage({
                 {t("uploadImages")}
               </Button>
             )}
-            {canEdit && (
+            {canEdit && !isSelectionMode && (
               <>
                 <Button
                   variant="flat"
@@ -1229,7 +1229,7 @@ export default function CollectionPage({
                           onClick={(e) => { e.stopPropagation(); toggleSelection(asset.id); }}
                         >
                           <div className={`w-6 h-6 rounded-md flex items-center justify-center transition-colors ${isSelected ? "bg-primary text-white" : "bg-background/80 backdrop-blur-sm border border-default-300"}`}>
-                            {isSelected && <CheckCheck size={14} />}
+                            {isSelected && <Check size={14} />}
                           </div>
                         </div>
                       )}
