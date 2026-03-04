@@ -81,6 +81,23 @@ export interface Property {
   children: Property[]; // Recursive reference for unlimited nesting
 }
 
+export interface ContentLabel {
+  property_value_id: number;
+  value: string;
+  property_path: string | null;
+}
+
+export interface VideoDetail {
+  id: number;
+  content_uuid: string;
+  storage_key: string;
+  width: number;
+  height: number;
+  content_type: string;
+  is_aigc: boolean;
+  labels: ContentLabel[];
+}
+
 export const api = createApi({
   reducerPath: "api",
   baseQuery: createBaseQueryWithReauth(API_BASE_URL),
@@ -208,6 +225,11 @@ export const api = createApi({
       },
     }),
 
+    getVideoDetail: builder.query<VideoDetail, number>({
+      query: (id) => `/content/${id}`,
+      keepUnusedDataFor: 120,
+    }),
+
     getProperties: builder.query<Property[], string>({
       query: (lang) => `/properties?lang=${encodeURIComponent(lang)}`,
       // Cache properties aggressively since they rarely change
@@ -258,6 +280,7 @@ export const api = createApi({
 
 export const {
   useGetVideosQuery,
+  useGetVideoDetailQuery,
   useGetPropertiesQuery,
   useGetInspirationQuery,
 } = api;

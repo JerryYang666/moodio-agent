@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef, useLayoutEffect, useEffect } from "react";
+import React, { useRef, useLayoutEffect, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@heroui/button";
 import { Chip } from "@heroui/chip";
@@ -17,12 +17,34 @@ import { JustifiedGallery, type Photo } from "./JustifiedGallery";
 import { Squircle } from "@/components/Squircle";
 import { VideoVisibilityProvider } from "@/hooks/use-video-visibility";
 import { MOCK_VIDEO_DETAIL, type VideoDetailData } from "./video-detail-data";
+import { useGetVideoDetailQuery, type ContentLabel } from "@/lib/redux/services/api";
 
 const ACTION_ICONS = {
   learn: GraduationCap,
   explore: Search,
   create: Wand2,
 } as const;
+
+/**
+ * Groups labels by the last 2 levels of their property_path.
+ * e.g. "Camera Movement.Zoom" -> "Camera Movement > Zoom"
+ * Single-level paths like "Lighting" stay as-is.
+ * Labels with null property_path are grouped under "Other".
+ */
+function groupLabelsByProperty(labels: ContentLabel[]): Record<string, string[]> {
+  const groups: Record<string, string[]> = {};
+  for (const label of labels) {
+    const path = label.property_path;
+    if (!path) {
+      (groups["Other"] ??= []).push(label.value);
+      continue;
+    }
+    const segments = path.split(".");
+    const groupKey = segments.slice(-2).join(" > ");
+    (groups[groupKey] ??= []).push(label.value);
+  }
+  return groups;
+}
 
 interface MetadataItemProps {
   label: string;
@@ -59,6 +81,14 @@ export function VideoDetailView({
 }: VideoDetailViewProps) {
   const detail: VideoDetailData = MOCK_VIDEO_DETAIL;
   const videoTargetRef = useRef<HTMLDivElement>(null);
+  const { data: videoDetail, isLoading: isLoadingDetail } = useGetVideoDetailQuery(selectedPhoto.id);
+
+  const groupedLabels = useMemo(() => {
+    if (!videoDetail?.labels) return {};
+    return groupLabelsByProperty(videoDetail.labels);
+  }, [videoDetail?.labels]);
+
+  const labelEntries = useMemo(() => Object.entries(groupedLabels), [groupedLabels]);
 
   // Measure after layout but before paint for accurate rect
   useLayoutEffect(() => {
@@ -74,30 +104,6 @@ export function VideoDetailView({
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [onClose]);
-
-  const metadataLeft: MetadataItemProps[] = [
-    { label: "Media Type", value: detail.metadata.mediaType },
-    { label: "Genre", value: detail.metadata.genre },
-    { label: "Aspect Ratio", value: detail.metadata.aspectRatio },
-    { label: "Creative Entities", value: detail.metadata.creativeEntities },
-    { label: "Creator/Director", value: detail.metadata.creatorDirector },
-  ];
-
-  const metadataCenter: MetadataItemProps[] = [
-    { label: "Campaign", value: detail.metadata.campaign },
-    { label: "Camera Movement", value: detail.metadata.cameraMovement },
-    { label: "Video Playback Speed", value: detail.metadata.videoPlaybackSpeed },
-    { label: "Shot Size", value: detail.metadata.shotSize },
-    { label: "Shot Type", value: detail.metadata.shotType },
-  ];
-
-  const metadataRight: MetadataItemProps[] = [
-    { label: "Camera Focus", value: detail.metadata.cameraFocus },
-    { label: "Camera Angle", value: detail.metadata.cameraAngle },
-    { label: "Camera Height", value: detail.metadata.cameraHeight },
-    { label: "Lighting Setup", value: detail.metadata.lightingSetup },
-    { label: "Subject Lighting", value: detail.metadata.subjectLighting },
-  ];
 
   return (
     <div className="w-full">
@@ -196,28 +202,24 @@ export function VideoDetailView({
         </motion.div>
       </div>
 
-      {/* Metadata section */}
+      {/* Metadata section — labels from API, grouped by property */}
       <motion.div
-        className="grid grid-cols-1 sm:grid-cols-3 gap-x-8 gap-y-1 mb-8 px-1"
+        className="mb-8 px-1 max-h-[320px] overflow-y-auto"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.3, duration: 0.4 }}
       >
-        <div>
-          {metadataLeft.map((item) => (
-            <MetadataItem key={item.label} {...item} />
-          ))}
-        </div>
-        <div>
-          {metadataCenter.map((item) => (
-            <MetadataItem key={item.label} {...item} />
-          ))}
-        </div>
-        <div>
-          {metadataRight.map((item) => (
-            <MetadataItem key={item.label} {...item} />
-          ))}
-        </div>
+        {isLoadingDetail ? (
+          <div className="text-sm text-default-400">Loading metadata…</div>
+        ) : labelEntries.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-8 gap-y-1">
+            {labelEntries.map(([group, values]) => (
+              <MetadataItem key={group} label={group} value={values.join(", ")} />
+            ))}
+          </div>
+        ) : (
+          <div className="text-sm text-default-400">No labels available</div>
+        )}
       </motion.div>
 
       {/* Similar Shots */}
