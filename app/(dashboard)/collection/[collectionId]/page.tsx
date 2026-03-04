@@ -56,6 +56,8 @@ import SendToDesktopModal from "@/components/desktop/SendToDesktopModal";
 import AssetPickerModal from "@/components/chat/asset-picker-modal";
 import { siteConfig } from "@/config/site";
 import { uploadImage, validateFile, getMaxFileSizeMB, shouldCompressFile, getCompressThresholdMB } from "@/lib/upload/client";
+import { useShareModal } from "@/hooks/use-share-modal";
+import ShareModal from "@/components/share-modal";
 
 interface CollectionAsset {
   id: string;
@@ -99,13 +101,6 @@ interface CollectionData {
   }>;
 }
 
-interface User {
-  id: string;
-  email: string;
-  firstName?: string;
-  lastName?: string;
-}
-
 export default function CollectionPage({
   params,
 }: {
@@ -140,6 +135,11 @@ export default function CollectionPage({
     onOpen: onShareOpen,
     onOpenChange: onShareOpenChange,
   } = useDisclosure();
+
+  const shareModal = useShareModal({
+    shareApiPath: `/api/collection/${collectionId}/share`,
+    onShareChanged: async () => { await fetchCollectionData(); },
+  });
   const {
     isOpen: isImageDetailOpen,
     onOpen: onImageDetailOpen,
@@ -196,11 +196,6 @@ export default function CollectionPage({
   const [isMovingItem, setIsMovingItem] = useState(false);
   const [isCopyingItem, setIsCopyingItem] = useState(false);
 
-  const [searchEmail, setSearchEmail] = useState("");
-  const [searchedUser, setSearchedUser] = useState<User | null>(null);
-  const [isSearching, setIsSearching] = useState(false);
-  const [searchError, setSearchError] = useState("");
-
   // Upload state
   const [isUploadPickerOpen, setIsUploadPickerOpen] = useState(false);
   const [isDraggingExternalFile, setIsDraggingExternalFile] = useState(false);
@@ -236,11 +231,6 @@ export default function CollectionPage({
   const [isBulkCopying, setIsBulkCopying] = useState(false);
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
 
-  const [selectedPermission, setSelectedPermission] = useState<
-    "viewer" | "collaborator"
-  >("viewer");
-  const [isSharing, setIsSharing] = useState(false);
-
   useEffect(() => {
     fetchCollectionData();
   }, [collectionId]);
@@ -263,34 +253,6 @@ export default function CollectionPage({
       console.error("Error fetching collection:", error);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleSearchUser = async () => {
-    if (!searchEmail.trim()) return;
-    setIsSearching(true);
-    setSearchError("");
-    setSearchedUser(null);
-
-    try {
-      const res = await fetch(
-        `/api/users/search?email=${encodeURIComponent(searchEmail.trim())}`
-      );
-      if (res.ok) {
-        const data = await res.json();
-        if (data.user) {
-          setSearchedUser(data.user);
-        } else {
-          setSearchError("User not found");
-        }
-      } else {
-        setSearchError("Failed to search user");
-      }
-    } catch (error) {
-      console.error("Error searching user:", error);
-      setSearchError("Error searching user");
-    } finally {
-      setIsSearching(false);
     }
   };
 
@@ -359,50 +321,6 @@ export default function CollectionPage({
   const confirmRemoveImage = (asset: CollectionAsset) => {
     setAssetToRemove(asset);
     onRemoveImageOpen();
-  };
-
-  const handleShare = async () => {
-    if (!searchedUser) return;
-    setIsSharing(true);
-    try {
-      const res = await fetch(`/api/collection/${collectionId}/share`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          sharedWithUserId: searchedUser.id,
-          permission: selectedPermission,
-        }),
-      });
-
-      if (res.ok) {
-        await fetchCollectionData();
-        setSearchEmail("");
-        setSearchedUser(null);
-        setSelectedPermission("viewer");
-        // Keep modal open to show updated list or add more
-      }
-    } catch (error) {
-      console.error("Error sharing collection:", error);
-    } finally {
-      setIsSharing(false);
-    }
-  };
-
-  const handleRemoveShare = async (userId: string) => {
-    try {
-      const res = await fetch(
-        `/api/collection/${collectionId}/share/${userId}`,
-        {
-          method: "DELETE",
-        }
-      );
-
-      if (res.ok) {
-        await fetchCollectionData();
-      }
-    } catch (error) {
-      console.error("Error removing share:", error);
-    }
   };
 
   const handleRenameItem = async () => {
@@ -1636,144 +1554,14 @@ export default function CollectionPage({
       </Modal>
 
       {/* Share Modal */}
-      <Modal isOpen={isShareOpen} onOpenChange={onShareOpenChange} size="2xl">
-        <ModalContent>
-          {(onClose) => (
-            <>
-              <ModalHeader>{t("shareCollection")}</ModalHeader>
-              <ModalBody>
-                <div className="space-y-4">
-                  <div className="flex flex-col gap-4">
-                    <div className="flex gap-2">
-                      <Input
-                        label={t("searchUser")}
-                        placeholder={t("enterEmailAddress")}
-                        value={searchEmail}
-                        onValueChange={setSearchEmail}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") handleSearchUser();
-                        }}
-                        errorMessage={searchError}
-                        isInvalid={!!searchError}
-                        className="flex-1"
-                      />
-                      <Button
-                        color="primary"
-                        variant="flat"
-                        onPress={handleSearchUser}
-                        isLoading={isSearching}
-                        className="mt-2 h-10"
-                      >
-                        {tCommon("search")}
-                      </Button>
-                    </div>
-
-                    {searchedUser && (
-                      <div className="flex flex-col gap-2 p-4 bg-default-50 rounded-lg border border-divider">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="font-semibold text-sm">{t("userFound")}</p>
-                            <p className="text-sm">{searchedUser.email}</p>
-                          </div>
-                          {collection.userId === searchedUser.id ? (
-                            <Chip color="warning" variant="flat" size="sm">
-                              {t("owner")}
-                            </Chip>
-                          ) : shares.some(
-                            (s) => s.sharedWithUserId === searchedUser.id
-                          ) ? (
-                            <Chip color="primary" variant="flat" size="sm">
-                              {t("alreadyShared")}
-                            </Chip>
-                          ) : (
-                            <Chip color="success" variant="flat" size="sm">
-                              {t("available")}
-                            </Chip>
-                          )}
-                        </div>
-
-                        {collection.userId !== searchedUser.id && (
-                          <div className="flex gap-2 mt-2 items-end">
-                            <Select
-                              label={t("permission")}
-                              selectedKeys={[selectedPermission]}
-                              onChange={(e) =>
-                                setSelectedPermission(
-                                  e.target.value as "viewer" | "collaborator"
-                                )
-                              }
-                              className="flex-1"
-                              size="sm"
-                            >
-                              <SelectItem key="viewer">{t("viewer")}</SelectItem>
-                              <SelectItem key="collaborator">
-                                {t("collaborator")}
-                              </SelectItem>
-                            </Select>
-                            <Button
-                              color="primary"
-                              onPress={handleShare}
-                              isLoading={isSharing}
-                              className="h-10"
-                            >
-                              {tCommon("share")}
-                            </Button>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  {shares.length > 0 && (
-                    <div className="mt-6">
-                      <h3 className="text-sm font-semibold mb-3">
-                        {t("currentlySharedWith")}
-                      </h3>
-                      <div className="space-y-2">
-                        {shares.map((share) => {
-                          // Since we don't have all users loaded, we might only show email if we have it
-                          // For now, we rely on backend to provide email in shares or we need to fetch it.
-                          // The current API structure returns shares with user ID.
-                          // We should update the GET endpoint to return email for shares.
-                          return (
-                            <div
-                              key={share.id}
-                              className="flex items-center justify-between p-3 bg-default-100 rounded-lg"
-                            >
-                              <div>
-                                <p className="font-medium">{share.email}</p>
-                                <p className="text-xs text-default-500 capitalize">
-                                  {share.permission}
-                                </p>
-                              </div>
-                              <Button
-                                size="sm"
-                                variant="light"
-                                color="danger"
-                                startContent={<X size={16} />}
-                                onPress={() =>
-                                  handleRemoveShare(share.sharedWithUserId)
-                                }
-                              >
-                                {tCommon("remove")}
-                              </Button>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </ModalBody>
-              <ModalFooter>
-                <Button variant="light" onPress={onClose}>
-                  {tCommon("close")}
-                </Button>
-              </ModalFooter>
-            </>
-          )}
-        </ModalContent>
-      </Modal>
+      <ShareModal
+        isOpen={isShareOpen}
+        onOpenChange={onShareOpenChange}
+        title={t("shareCollection")}
+        ownerId={collection.userId}
+        shares={shares}
+        share={shareModal}
+      />
 
       {/* Remove Image Confirmation Modal */}
       <Modal isOpen={isRemoveImageOpen} onOpenChange={onRemoveImageOpenChange}>

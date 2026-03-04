@@ -28,6 +28,18 @@
     "on": "On",
     "off": "Off"
   },
+  "share": {
+    "searchUser": "Search User",
+    "enterEmailAddress": "Enter email address",
+    "userFound": "User Found",
+    "owner": "Owner",
+    "alreadyShared": "Already Shared",
+    "available": "Available",
+    "permission": "Permission",
+    "viewer": "Viewer",
+    "collaborator": "Collaborator",
+    "currentlySharedWith": "Currently Shared With"
+  },
   "nav": {
     "inspiration": "Inspiration",
     "image": "Image",
@@ -238,7 +250,20 @@
     "noRootAssetsYet": "No root assets yet",
     "collectionsCount": "{count, plural, one {# collection} other {# collections}}",
     "rootAssetsCount": "{count, plural, one {# root asset} other {# root assets}}",
-    "noCollectionsInProject": "No collections in this project yet"
+    "noCollectionsInProject": "No collections in this project yet",
+    "shareProject": "Share Project",
+    "sharedProjects": "Shared projects",
+    "searchUser": "Search User",
+    "enterEmailAddress": "Enter email address",
+    "userFound": "User Found",
+    "owner": "Owner",
+    "alreadyShared": "Already Shared",
+    "available": "Available",
+    "permission": "Permission",
+    "viewer": "Viewer",
+    "collaborator": "Collaborator",
+    "currentlySharedWith": "Currently Shared With",
+    "shared": "Shared"
   },
   "collections": {
     "title": "Collections",

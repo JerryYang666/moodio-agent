@@ -28,6 +28,18 @@
     "on": "켜기",
     "off": "끄기"
   },
+  "share": {
+    "searchUser": "사용자 검색",
+    "enterEmailAddress": "이메일 주소 입력",
+    "userFound": "사용자 발견",
+    "owner": "소유자",
+    "alreadyShared": "이미 공유됨",
+    "available": "사용 가능",
+    "permission": "권한",
+    "viewer": "뷰어",
+    "collaborator": "공동 작업자",
+    "currentlySharedWith": "현재 공유 대상"
+  },
   "nav": {
     "inspiration": "영감",
     "image": "이미지",
@@ -238,7 +250,20 @@
     "noRootAssetsYet": "아직 루트 애셋이 없습니다",
     "collectionsCount": "{count}개의 컬렉션",
     "rootAssetsCount": "{count}개의 루트 애셋",
-    "noCollectionsInProject": "이 프로젝트에는 아직 컬렉션이 없습니다"
+    "noCollectionsInProject": "이 프로젝트에는 아직 컬렉션이 없습니다",
+    "shareProject": "프로젝트 공유",
+    "sharedProjects": "공유된 프로젝트",
+    "searchUser": "사용자 검색",
+    "enterEmailAddress": "이메일 주소 입력",
+    "userFound": "사용자 발견",
+    "owner": "소유자",
+    "alreadyShared": "이미 공유됨",
+    "available": "사용 가능",
+    "permission": "권한",
+    "viewer": "뷰어",
+    "collaborator": "공동 작업자",
+    "currentlySharedWith": "현재 공유 대상",
+    "shared": "공유됨"
   },
   "collections": {
     "title": "컬렉션",
