@@ -877,7 +877,8 @@
     "viewFullSize": "View full size",
     "download": "Download",
     "delete": "Delete",
-    "deleteConfirm": "Are you sure you want to delete this image?"
+    "deleteConfirm": "Are you sure you want to delete this image?",
+    "downloadFormat": "Download as..."
   },
   "imageMenu": {
     "actionsLabel": "Image actions",

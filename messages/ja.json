@@ -830,7 +830,8 @@
     "viewFullSize": "フルサイズで表示",
     "download": "ダウンロード",
     "delete": "削除",
-    "deleteConfirm": "この画像を削除してもよろしいですか？"
+    "deleteConfirm": "この画像を削除してもよろしいですか？",
+    "downloadFormat": "形式を選択してダウンロード"
   },
   "imageMenu": {
     "actionsLabel": "画像アクション",

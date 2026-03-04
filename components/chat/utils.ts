@@ -67,12 +67,16 @@ export const formatTime = (timestamp?: number) => {
   });
 };
 
+export type ImageDownloadFormat = "webp" | "png" | "jpeg";
+
 // Helper to trigger image download via backend API
 // Uses the backend endpoint which sets Content-Disposition header to force download
+// Optionally accepts a format parameter to convert the image before download
 export const downloadImage = async (
   imageId: string | undefined,
   title: string,
-  url?: string
+  url?: string,
+  format?: ImageDownloadFormat
 ) => {
   if (!imageId) {
     console.error("No imageId provided for download");
@@ -98,8 +102,9 @@ export const downloadImage = async (
     window.URL.revokeObjectURL(blobUrl);
   };
 
-  // 1. Try fetching from direct URL (if provided)
-  if (url) {
+  // When a specific format is requested, always use the backend endpoint for conversion
+  // When no format is specified, try direct URL first for speed
+  if (!format && url) {
     try {
       const response = await fetch(url);
       if (response.ok) {
@@ -118,8 +123,11 @@ export const downloadImage = async (
   // Sanitize filename for URL
   const safeFilename = encodeURIComponent(filename);
 
-  // Use the backend download endpoint
-  const downloadUrl = `/api/image/${imageId}/download?filename=${safeFilename}`;
+  // Build the backend download URL with optional format parameter
+  let downloadUrl = `/api/image/${imageId}/download?filename=${safeFilename}`;
+  if (format) {
+    downloadUrl += `&format=${format}`;
+  }
 
   // 2. Try fetching from backend proxy (avoids Vercel security checkpoint on navigation)
   try {

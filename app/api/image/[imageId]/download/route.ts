@@ -2,6 +2,63 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAccessToken } from "@/lib/auth/cookies";
 import { verifyAccessToken } from "@/lib/auth/jwt";
 import { downloadImage } from "@/lib/storage/s3";
+import sharp from "sharp";
+
+type ImageFormat = "webp" | "png" | "jpeg";
+
+const FORMAT_CONFIG: Record<
+  ImageFormat,
+  { contentType: string; extension: string }
+> = {
+  webp: { contentType: "image/webp", extension: ".webp" },
+  png: { contentType: "image/png", extension: ".png" },
+  jpeg: { contentType: "image/jpeg", extension: ".jpg" },
+};
+
+function detectFormat(buffer: Buffer): {
+  contentType: string;
+  extension: string;
+} {
+  if (buffer[0] === 0xff && buffer[1] === 0xd8) {
+    return { contentType: "image/jpeg", extension: ".jpg" };
+  }
+  if (
+    buffer[0] === 0x89 &&
+    buffer[1] === 0x50 &&
+    buffer[2] === 0x4e &&
+    buffer[3] === 0x47
+  ) {
+    return { contentType: "image/png", extension: ".png" };
+  }
+  if (buffer[0] === 0x47 && buffer[1] === 0x49 && buffer[2] === 0x46) {
+    return { contentType: "image/gif", extension: ".gif" };
+  }
+  if (
+    buffer[0] === 0x52 &&
+    buffer[1] === 0x49 &&
+    buffer[2] === 0x46 &&
+    buffer[3] === 0x46
+  ) {
+    return { contentType: "image/webp", extension: ".webp" };
+  }
+  return { contentType: "image/png", extension: ".png" };
+}
+
+async function convertImage(
+  imageBuffer: Buffer,
+  targetFormat: ImageFormat
+): Promise<Buffer> {
+  switch (targetFormat) {
+    case "png":
+      return await sharp(imageBuffer).png().toBuffer();
+    case "jpeg":
+      return await sharp(imageBuffer).jpeg({ quality: 95 }).toBuffer();
+    case "webp":
+      return await sharp(imageBuffer)
+        .webp({ quality: 95, smartSubsample: true })
+        .toBuffer();
+  }
+}
 
 export async function GET(
   request: NextRequest,
@@ -21,9 +78,10 @@ export async function GET(
       return NextResponse.json({ error: "Invalid token" }, { status: 401 });
     }
 
-    // Get filename from query params
+    // Get filename and format from query params
     const searchParams = request.nextUrl.searchParams;
     const filename = searchParams.get("filename") || "image";
+    const requestedFormat = searchParams.get("format") as ImageFormat | null;
 
     // Download image from S3
     const imageBuffer = await downloadImage(imageId);
@@ -32,37 +90,32 @@ export async function GET(
       return NextResponse.json({ error: "Image not found" }, { status: 404 });
     }
 
-    // Determine content type from the image buffer (magic bytes)
-    let contentType = "image/png"; // Default
-    let extension = ".png";
+    // Determine the source format from magic bytes
+    const sourceInfo = detectFormat(imageBuffer);
 
-    // Check magic bytes for common image formats
-    if (imageBuffer[0] === 0xff && imageBuffer[1] === 0xd8) {
-      contentType = "image/jpeg";
-      extension = ".jpg";
-    } else if (
-      imageBuffer[0] === 0x89 &&
-      imageBuffer[1] === 0x50 &&
-      imageBuffer[2] === 0x4e &&
-      imageBuffer[3] === 0x47
+    let outputBuffer: Buffer;
+    let contentType: string;
+    let extension: string;
+
+    if (
+      requestedFormat &&
+      FORMAT_CONFIG[requestedFormat] &&
+      sourceInfo.contentType !== FORMAT_CONFIG[requestedFormat].contentType
     ) {
-      contentType = "image/png";
-      extension = ".png";
-    } else if (
-      imageBuffer[0] === 0x47 &&
-      imageBuffer[1] === 0x49 &&
-      imageBuffer[2] === 0x46
-    ) {
-      contentType = "image/gif";
-      extension = ".gif";
-    } else if (
-      imageBuffer[0] === 0x52 &&
-      imageBuffer[1] === 0x49 &&
-      imageBuffer[2] === 0x46 &&
-      imageBuffer[3] === 0x46
-    ) {
-      contentType = "image/webp";
-      extension = ".webp";
+      // Convert to the requested format
+      outputBuffer = await convertImage(imageBuffer, requestedFormat);
+      contentType = FORMAT_CONFIG[requestedFormat].contentType;
+      extension = FORMAT_CONFIG[requestedFormat].extension;
+    } else if (requestedFormat && FORMAT_CONFIG[requestedFormat]) {
+      // Requested format matches source — no conversion needed
+      outputBuffer = imageBuffer;
+      contentType = FORMAT_CONFIG[requestedFormat].contentType;
+      extension = FORMAT_CONFIG[requestedFormat].extension;
+    } else {
+      // No format requested — serve as-is
+      outputBuffer = imageBuffer;
+      contentType = sourceInfo.contentType;
+      extension = sourceInfo.extension;
     }
 
     // Sanitize filename
@@ -75,14 +128,14 @@ export async function GET(
     const finalFilename = `${safeFilename}${extension}`;
 
     // Convert Buffer to Uint8Array for NextResponse compatibility
-    const uint8Array = new Uint8Array(imageBuffer);
+    const uint8Array = new Uint8Array(outputBuffer);
 
     return new NextResponse(uint8Array, {
       status: 200,
       headers: {
         "Content-Type": contentType,
         "Content-Disposition": `attachment; filename="${finalFilename}"`,
-        "Content-Length": imageBuffer.length.toString(),
+        "Content-Length": outputBuffer.length.toString(),
         "Cache-Control": "private, max-age=3600",
       },
     });

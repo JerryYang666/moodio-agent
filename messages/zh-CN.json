@@ -830,7 +830,8 @@
     "viewFullSize": "查看原图",
     "download": "下载",
     "delete": "删除",
-    "deleteConfirm": "确定要删除这张图片吗？"
+    "deleteConfirm": "确定要删除这张图片吗？",
+    "downloadFormat": "选择格式下载"
   },
   "imageMenu": {
     "actionsLabel": "图片操作",

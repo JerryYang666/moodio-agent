@@ -830,7 +830,8 @@
     "viewFullSize": "전체 크기로 보기",
     "download": "다운로드",
     "delete": "삭제",
-    "deleteConfirm": "이 이미지를 삭제하시겠습니까?"
+    "deleteConfirm": "이 이미지를 삭제하시겠습니까?",
+    "downloadFormat": "형식 선택 후 다운로드"
   },
   "imageMenu": {
     "actionsLabel": "이미지 작업",
