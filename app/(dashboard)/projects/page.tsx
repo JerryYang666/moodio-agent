@@ -35,6 +35,12 @@ type Project = {
   coverImageUrl: string | null;
 };
 
+type SharedProject = Project & {
+  permission: string;
+  isOwner: boolean;
+  sharedAt?: Date;
+};
+
 type Collection = {
   id: string;
   userId: string;
@@ -59,6 +65,7 @@ export default function ProjectsPage() {
   } = useDisclosure();
   const [loading, setLoading] = useState(true);
   const [projects, setProjects] = useState<Project[]>([]);
+  const [sharedProjects, setSharedProjects] = useState<SharedProject[]>([]);
   const [collections, setCollections] = useState<Collection[]>([]);
   const [newProjectName, setNewProjectName] = useState("");
   const [isCreating, setIsCreating] = useState(false);
@@ -82,6 +89,7 @@ export default function ProjectsPage() {
         if (projectsRes.ok) {
           const data = await projectsRes.json();
           setProjects(data.projects || []);
+          setSharedProjects(data.sharedProjects || []);
         }
         if (collectionsRes.ok) {
           const data = await collectionsRes.json();
@@ -266,6 +274,53 @@ export default function ProjectsPage() {
               </CardFooter>
             </Card>
           ))}
+        </div>
+      )}
+
+      {sharedProjects.length > 0 && (
+        <div className="mt-10">
+          <div className="flex items-center gap-2 mb-4">
+            <Share2 size={18} className="text-default-500" />
+            <h2 className="text-lg font-semibold">{t("projects.sharedProjects")}</h2>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {sharedProjects.map((project) => (
+              <Card
+                key={project.id}
+                isPressable
+                onPress={() => router.push(`/projects/${project.id}`)}
+                className="hover:scale-105 transition-transform"
+              >
+                <CardBody className="p-3 pb-1">
+                  <div className="w-full h-40 bg-default-100 rounded-lg overflow-hidden">
+                    {project.coverImageUrl ? (
+                      <Image
+                        src={project.coverImageUrl}
+                        alt={project.name}
+                        radius="none"
+                        classNames={{
+                          wrapper: "w-full h-full !max-w-full",
+                          img: "w-full h-full object-cover",
+                        }}
+                      />
+                    ) : (
+                      <div className="flex items-center justify-center w-full h-full">
+                        <Folder size={48} className="text-default-400" />
+                      </div>
+                    )}
+                  </div>
+                </CardBody>
+                <CardFooter className="flex flex-col items-start gap-1 px-3 pt-1 pb-3">
+                  <h3 className="font-semibold text-base truncate w-full">
+                    {project.name}
+                  </h3>
+                  <Chip size="sm" variant="flat" color="secondary">
+                    {project.permission}
+                  </Chip>
+                </CardFooter>
+              </Card>
+            ))}
+          </div>
         </div>
       )}
 

@@ -28,6 +28,18 @@
     "on": "开",
     "off": "关"
   },
+  "share": {
+    "searchUser": "搜索用户",
+    "enterEmailAddress": "输入邮箱地址",
+    "userFound": "已找到用户",
+    "owner": "所有者",
+    "alreadyShared": "已共享",
+    "available": "可用",
+    "permission": "权限",
+    "viewer": "查看者",
+    "collaborator": "协作者",
+    "currentlySharedWith": "当前共享给"
+  },
   "nav": {
     "inspiration": "灵感",
     "image": "图片",
@@ -238,7 +250,20 @@
     "noRootAssetsYet": "暂无根素材",
     "collectionsCount": "{count} 个集合",
     "rootAssetsCount": "{count} 个根素材",
-    "noCollectionsInProject": "此项目暂无集合"
+    "noCollectionsInProject": "此项目暂无集合",
+    "shareProject": "共享项目",
+    "sharedProjects": "共享项目",
+    "searchUser": "搜索用户",
+    "enterEmailAddress": "输入邮箱地址",
+    "userFound": "已找到用户",
+    "owner": "所有者",
+    "alreadyShared": "已共享",
+    "available": "可用",
+    "permission": "权限",
+    "viewer": "查看者",
+    "collaborator": "协作者",
+    "currentlySharedWith": "当前共享给",
+    "shared": "已共享"
   },
   "collections": {
     "title": "集合",

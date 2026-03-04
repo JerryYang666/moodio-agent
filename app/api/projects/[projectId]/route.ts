@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { collectionImages, collections, projects } from "@/lib/db/schema";
+import { collectionImages, collections, projects, projectShares, users, type ProjectShare } from "@/lib/db/schema";
 import { getAccessToken } from "@/lib/auth/cookies";
 import { verifyAccessToken } from "@/lib/auth/jwt";
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { getImageUrl } from "@/lib/storage/s3";
+import { getProjectPermission } from "@/lib/project-utils";
 
 type RouteContext = { params: Promise<{ projectId: string }> };
 
@@ -30,10 +31,16 @@ export async function GET(
     const userId = payload.userId;
     const { projectId } = await params;
 
+    // Check permission (owner or shared)
+    const permission = await getProjectPermission(projectId, userId);
+    if (!permission) {
+      return NextResponse.json({ error: "Project not found" }, { status: 404 });
+    }
+
     const [project] = await db
       .select()
       .from(projects)
-      .where(and(eq(projects.id, projectId), eq(projects.userId, userId)))
+      .where(eq(projects.id, projectId))
       .limit(1);
 
     if (!project) {
@@ -85,10 +92,41 @@ export async function GET(
       coverImageUrl: coverMap.get(col.id) || null,
     }));
 
+    // Get shares if user is owner
+    let shares: (ProjectShare & { email: string })[] = [];
+    if (permission === "owner") {
+      const sharesData = await db
+        .select({
+          id: projectShares.id,
+          projectId: projectShares.projectId,
+          sharedWithUserId: projectShares.sharedWithUserId,
+          permission: projectShares.permission,
+          sharedAt: projectShares.sharedAt,
+          email: users.email,
+        })
+        .from(projectShares)
+        .innerJoin(users, eq(projectShares.sharedWithUserId, users.id))
+        .where(eq(projectShares.projectId, projectId));
+
+      shares = sharesData.map((s) => ({
+        id: s.id,
+        projectId: s.projectId,
+        sharedWithUserId: s.sharedWithUserId,
+        permission: s.permission as "viewer" | "collaborator",
+        sharedAt: s.sharedAt,
+        email: s.email,
+      }));
+    }
+
     return NextResponse.json({
-      project,
+      project: {
+        ...project,
+        permission,
+        isOwner: permission === "owner",
+      },
       collections: collectionsWithCovers,
       rootAssets: assetsWithUrls,
+      shares,
     });
   } catch (error) {
     console.error("Error fetching project:", error);
@@ -130,15 +168,13 @@ export async function PATCH(
       );
     }
 
-    // Verify ownership
-    const [project] = await db
-      .select()
-      .from(projects)
-      .where(and(eq(projects.id, projectId), eq(projects.userId, userId)))
-      .limit(1);
-
-    if (!project) {
-      return NextResponse.json({ error: "Project not found" }, { status: 404 });
+    // Verify ownership (only owner can rename)
+    const permission = await getProjectPermission(projectId, userId);
+    if (permission !== "owner") {
+      return NextResponse.json(
+        { error: "Only the owner can rename the project" },
+        { status: 403 }
+      );
     }
 
     // Update the project name

@@ -23,8 +23,10 @@ import {
   DropdownMenu,
   DropdownItem,
 } from "@heroui/dropdown";
-import { ArrowLeft, Folder, Plus, MoreVertical, Pencil } from "lucide-react";
+import { ArrowLeft, Folder, Plus, MoreVertical, Pencil, Share2 } from "lucide-react";
 import ImageDetailModal, { ImageInfo } from "@/components/chat/image-detail-modal";
+import { useShareModal, type ShareEntry } from "@/hooks/use-share-modal";
+import ShareModal from "@/components/share-modal";
 
 type Project = {
   id: string;
@@ -33,6 +35,8 @@ type Project = {
   isDefault: boolean;
   createdAt: Date;
   updatedAt: Date;
+  permission?: "owner" | "collaborator" | "viewer";
+  isOwner?: boolean;
 };
 
 type Collection = {
@@ -74,6 +78,7 @@ export default function ProjectDetailPage({
   const [project, setProject] = useState<Project | null>(null);
   const [collections, setCollections] = useState<Collection[]>([]);
   const [rootAssets, setRootAssets] = useState<Asset[]>([]);
+  const [shares, setShares] = useState<ShareEntry[]>([]);
 
   const {
     isOpen: isCreateCollectionOpen,
@@ -94,6 +99,17 @@ export default function ProjectDetailPage({
     onClose: onImageDetailClose,
   } = useDisclosure();
 
+  const {
+    isOpen: isShareOpen,
+    onOpen: onShareOpen,
+    onOpenChange: onShareOpenChange,
+  } = useDisclosure();
+
+  const shareModal = useShareModal({
+    shareApiPath: `/api/projects/${projectId}/share`,
+    onShareChanged: async () => { await fetchProjectData(); },
+  });
+
   const [newCollectionName, setNewCollectionName] = useState("");
   const [isCreatingCollection, setIsCreatingCollection] = useState(false);
   const [collectionToRename, setCollectionToRename] = useState<Collection | null>(null);
@@ -104,27 +120,29 @@ export default function ProjectDetailPage({
   const [allImages, setAllImages] = useState<ImageInfo[]>([]);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
-  useEffect(() => {
-    const load = async () => {
-      setLoading(true);
-      try {
-        const res = await fetch(`/api/projects/${projectId}`);
-        if (!res.ok) {
-          router.push("/projects");
-          return;
-        }
-        const data = await res.json();
-        setProject(data.project);
-        setCollections(data.collections || []);
-        setRootAssets(data.rootAssets || []);
-      } catch (e) {
-        console.error("Failed to fetch project", e);
-      } finally {
-        setLoading(false);
+  const fetchProjectData = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/projects/${projectId}`);
+      if (!res.ok) {
+        router.push("/projects");
+        return;
       }
-    };
-    load();
-  }, [projectId, router]);
+      const data = await res.json();
+      setProject(data.project);
+      setCollections(data.collections || []);
+      setRootAssets(data.rootAssets || []);
+      setShares(data.shares || []);
+    } catch (e) {
+      console.error("Failed to fetch project", e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchProjectData();
+  }, [projectId]);
 
   const handleCreateCollection = async () => {
     if (!newCollectionName.trim()) return;
@@ -247,6 +265,11 @@ export default function ProjectDetailPage({
                   {t("default")}
                 </Chip>
               )}
+              {project.permission && !project.isOwner && (
+                <Chip size="sm" variant="flat" color="secondary">
+                  {t(project.permission)}
+                </Chip>
+              )}
             </div>
             <p className="text-default-500">
               {t("collectionsCount", { count: collections.length })} •{" "}
@@ -255,17 +278,30 @@ export default function ProjectDetailPage({
           </div>
 
           <div className="flex gap-2 w-full sm:w-auto">
-            <Button
-              color="primary"
-              startContent={<Plus size={18} />}
-              onPress={() => {
-                setNewCollectionName(`${project.name} Collection`);
-                onCreateCollectionOpen();
-              }}
-              className="w-full sm:w-auto"
-            >
-              {t("newCollection")}
-            </Button>
+            {project.isOwner !== false && (
+              <Button
+                startContent={<Share2 size={18} />}
+                onPress={onShareOpen}
+                color="primary"
+                variant="flat"
+                className="w-full sm:w-auto"
+              >
+                {tCommon("share")}
+              </Button>
+            )}
+            {(project.isOwner !== false || project.permission === "collaborator") && (
+              <Button
+                color="primary"
+                startContent={<Plus size={18} />}
+                onPress={() => {
+                  setNewCollectionName(`${project.name} Collection`);
+                  onCreateCollectionOpen();
+                }}
+                className="w-full sm:w-auto"
+              >
+                {t("newCollection")}
+              </Button>
+            )}
           </div>
         </div>
       </div>
@@ -446,6 +482,16 @@ export default function ProjectDetailPage({
           )}
         </ModalContent>
       </Modal>
+
+      {/* Share Modal */}
+      <ShareModal
+        isOpen={isShareOpen}
+        onOpenChange={onShareOpenChange}
+        title={t("shareProject")}
+        ownerId={project?.userId ?? ""}
+        shares={shares}
+        share={shareModal}
+      />
 
       <ImageDetailModal
         isOpen={isImageDetailOpen}

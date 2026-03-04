@@ -1,44 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { collections, collectionImages, collectionShares } from "@/lib/db/schema";
+import { collections, collectionImages } from "@/lib/db/schema";
 import { getAccessToken } from "@/lib/auth/cookies";
 import { verifyAccessToken } from "@/lib/auth/jwt";
 import { eq, and } from "drizzle-orm";
-
-// Helper to check user's permission for a collection
-async function getUserPermission(
-  collectionId: string,
-  userId: string
-): Promise<"owner" | "collaborator" | "viewer" | null> {
-  // Check if user owns the collection
-  const [collection] = await db
-    .select()
-    .from(collections)
-    .where(and(eq(collections.id, collectionId), eq(collections.userId, userId)))
-    .limit(1);
-
-  if (collection) {
-    return "owner";
-  }
-
-  // Check if collection is shared with user
-  const [share] = await db
-    .select()
-    .from(collectionShares)
-    .where(
-      and(
-        eq(collectionShares.collectionId, collectionId),
-        eq(collectionShares.sharedWithUserId, userId)
-      )
-    )
-    .limit(1);
-
-  if (share) {
-    return share.permission as "collaborator" | "viewer";
-  }
-
-  return null;
-}
+import { getUserPermission } from "@/lib/collection-utils";
 
 /**
  * POST /api/collection/[collectionId]/images

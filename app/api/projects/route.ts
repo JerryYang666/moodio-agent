@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { projects, collectionImages } from "@/lib/db/schema";
+import { projects, collectionImages, projectShares } from "@/lib/db/schema";
 import { getAccessToken } from "@/lib/auth/cookies";
 import { verifyAccessToken } from "@/lib/auth/jwt";
 import { desc, eq, sql } from "drizzle-orm";
@@ -58,10 +58,55 @@ export async function GET(req: NextRequest) {
     // Add cover image URL to each project
     const projectsWithCovers = rows.map((project) => ({
       ...project,
+      permission: "owner" as const,
+      isOwner: true,
       coverImageUrl: coverMap.get(project.id) || null,
     }));
 
-    return NextResponse.json({ projects: projectsWithCovers });
+    // Get projects shared with user
+    const sharedProjectsData = await db
+      .select({
+        project: projects,
+        permission: projectShares.permission,
+        sharedAt: projectShares.sharedAt,
+      })
+      .from(projectShares)
+      .innerJoin(projects, eq(projectShares.projectId, projects.id))
+      .where(eq(projectShares.sharedWithUserId, userId))
+      .orderBy(desc(projectShares.sharedAt));
+
+    // Get cover images for shared projects
+    const sharedProjectIds = sharedProjectsData.map((s) => s.project.id);
+    const sharedCoverImages = sharedProjectIds.length > 0
+      ? await db
+          .select({
+            projectId: collectionImages.projectId,
+            imageId: collectionImages.imageId,
+          })
+          .from(collectionImages)
+          .where(sql`${collectionImages.projectId} IN ${sharedProjectIds}`)
+          .orderBy(desc(collectionImages.addedAt))
+      : [];
+
+    const sharedCoverMap = new Map<string, string>();
+    for (const cover of sharedCoverImages) {
+      if (!sharedCoverMap.has(cover.projectId)) {
+        sharedCoverMap.set(cover.projectId, getImageUrl(cover.imageId));
+      }
+    }
+
+    const sharedProjects = sharedProjectsData.map((item) => ({
+      ...item.project,
+      permission: item.permission,
+      isOwner: false,
+      sharedAt: item.sharedAt,
+      coverImageUrl: sharedCoverMap.get(item.project.id) || null,
+    }));
+
+    return NextResponse.json({
+      projects: projectsWithCovers,
+      sharedProjects,
+    });
   } catch (error) {
     console.error("Error fetching projects:", error);
     return NextResponse.json(
