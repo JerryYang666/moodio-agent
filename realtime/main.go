@@ -33,6 +33,30 @@ func main() {
 	auth := &Auth{jwtSecret: []byte(jwtSecret)}
 	rooms := NewRoomManager(m)
 
+	// Federation: auto-enable if NATS_URL is configured.
+	// Safe even with a single region -- messages published to NATS are
+	// discarded by the regionId dedup check when no other region exists.
+	if natsURL := os.Getenv("NATS_URL"); natsURL != "" {
+		regionId := os.Getenv("REGION_ID")
+		if regionId == "" {
+			regionId = fetchEC2Region()
+			if regionId == "unknown" {
+				regionId = "no-region"
+			}
+			log.Printf("[federation] auto-detected region: %s", regionId)
+		}
+
+		fed, err := NewNATSFederator(natsURL, regionId)
+		if err != nil {
+			log.Printf("[federation] NATS unavailable at %s, running without federation: %v", natsURL, err)
+		} else {
+			rooms.federator = fed
+			rooms.regionId = regionId
+			defer fed.Close()
+			log.Printf("[federation] enabled (region=%s, nats=%s)", regionId, natsURL)
+		}
+	}
+
 	http.HandleFunc("/ws/desktop/{desktopId}", func(w http.ResponseWriter, r *http.Request) {
 		claims, err := auth.ValidateFromCookie(r)
 		if err != nil {

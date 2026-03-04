@@ -78,37 +78,60 @@ func getSessionKeys(s *melody.Session) *SessionKeys {
 }
 
 type RoomManager struct {
-	melody *melody.Melody
-	mu     sync.RWMutex
-	rooms  map[string]map[*melody.Session]struct{}
+	melody    *melody.Melody
+	mu        sync.RWMutex
+	rooms     map[string]map[*melody.Session]struct{}
+	federator Federator
+	regionId  string
+	// remoteSessions tracks sessions connected to other regional relays.
+	// Keyed by roomId -> list of SessionInfo.
+	remoteMu       sync.RWMutex
+	remoteSessions map[string][]SessionInfo
 }
 
 func NewRoomManager(m *melody.Melody) *RoomManager {
 	return &RoomManager{
-		melody: m,
-		rooms:  make(map[string]map[*melody.Session]struct{}),
+		melody:         m,
+		rooms:          make(map[string]map[*melody.Session]struct{}),
+		remoteSessions: make(map[string][]SessionInfo),
 	}
 }
 
 func (rm *RoomManager) addToRoom(roomId string, s *melody.Session) {
 	rm.mu.Lock()
-	defer rm.mu.Unlock()
-	if rm.rooms[roomId] == nil {
+	isFirstSession := rm.rooms[roomId] == nil
+	if isFirstSession {
 		rm.rooms[roomId] = make(map[*melody.Session]struct{})
 	}
 	rm.rooms[roomId][s] = struct{}{}
+	rm.mu.Unlock()
+
+	if isFirstSession && rm.federator != nil {
+		rm.federator.Subscribe(roomId, func(msg []byte) {
+			rm.handleFederatedMessage(roomId, msg)
+		})
+	}
 }
 
 func (rm *RoomManager) removeFromRoom(roomId string, s *melody.Session) {
 	rm.mu.Lock()
-	defer rm.mu.Unlock()
 	members := rm.rooms[roomId]
 	if members == nil {
+		rm.mu.Unlock()
 		return
 	}
 	delete(members, s)
-	if len(members) == 0 {
+	isEmpty := len(members) == 0
+	if isEmpty {
 		delete(rm.rooms, roomId)
+	}
+	rm.mu.Unlock()
+
+	if isEmpty && rm.federator != nil {
+		rm.federator.Unsubscribe(roomId)
+		rm.remoteMu.Lock()
+		delete(rm.remoteSessions, roomId)
+		rm.remoteMu.Unlock()
 	}
 }
 
@@ -133,7 +156,8 @@ func (rm *RoomManager) HandleConnect(s *melody.Session) {
 	}
 	s.Write(data)
 
-	rm.broadcastToRoom(keys.RoomID, s, buildSessionEvent("session_joined", s))
+	sessionEvent := buildSessionEvent("session_joined", s)
+	rm.broadcastToRoom(keys.RoomID, s, sessionEvent)
 }
 
 func (rm *RoomManager) HandleMessage(s *melody.Session, msg []byte) {
@@ -173,11 +197,14 @@ func (rm *RoomManager) HandleDisconnect(s *melody.Session) {
 	remaining := rm.getSessionsInRoom(keys.RoomID, keys.SessionID)
 	log.Printf("[room] %s left room=%s (%d sessions remaining)", keys.FirstName, keys.RoomID[:8], len(remaining))
 
-	rm.broadcastToRoom(keys.RoomID, s, buildSessionEvent("session_left", s))
+	sessionEvent := buildSessionEvent("session_left", s)
+	rm.broadcastToRoom(keys.RoomID, s, sessionEvent)
 }
 
 // broadcastToRoom writes directly to room members, bypassing Melody's
 // global BroadcastFilter which iterates over every session on the server.
+// After local delivery, it publishes to the federation layer (if enabled)
+// so other regional relays can forward the message to their local clients.
 func (rm *RoomManager) broadcastToRoom(roomId string, sender *melody.Session, msg []byte) {
 	rm.mu.RLock()
 	members := rm.rooms[roomId]
@@ -187,15 +214,29 @@ func (rm *RoomManager) broadcastToRoom(roomId string, sender *melody.Session, ms
 		}
 	}
 	rm.mu.RUnlock()
+
+	if rm.federator != nil && msg != nil {
+		if err := rm.federator.Publish(roomId, msg); err != nil {
+			log.Printf("[federation] publish error for room=%s: %v", roomId, err)
+		}
+	}
+}
+
+// broadcastToRoomLocal writes a message to all local sessions in a room
+// without publishing back to the federation layer. Used for messages
+// received from other regions via NATS.
+func (rm *RoomManager) broadcastToRoomLocal(roomId string, msg []byte) {
+	rm.mu.RLock()
+	members := rm.rooms[roomId]
+	for s := range members {
+		s.Write(msg)
+	}
+	rm.mu.RUnlock()
 }
 
 func (rm *RoomManager) getSessionsInRoom(roomId string, excludeSessionId string) []SessionInfo {
 	rm.mu.RLock()
 	members := rm.rooms[roomId]
-	if len(members) == 0 {
-		rm.mu.RUnlock()
-		return nil
-	}
 	result := make([]SessionInfo, 0, len(members))
 	for s := range members {
 		k := getSessionKeys(s)
@@ -211,6 +252,17 @@ func (rm *RoomManager) getSessionsInRoom(roomId string, excludeSessionId string)
 		})
 	}
 	rm.mu.RUnlock()
+
+	if rm.federator != nil {
+		rm.remoteMu.RLock()
+		for _, rs := range rm.remoteSessions[roomId] {
+			if rs.SessionID != excludeSessionId {
+				result = append(result, rs)
+			}
+		}
+		rm.remoteMu.RUnlock()
+	}
+
 	return result
 }
 
@@ -291,4 +343,55 @@ func mustGetString(s *melody.Session, key string) string {
 		return ""
 	}
 	return str
+}
+
+// handleFederatedMessage processes messages received from other regions via
+// NATS. It updates the remote sessions map for presence events and broadcasts
+// the message to all local sessions in the room.
+func (rm *RoomManager) handleFederatedMessage(roomId string, msg []byte) {
+	var event struct {
+		Type string `json:"type"`
+	}
+	if err := json.Unmarshal(msg, &event); err == nil {
+		switch event.Type {
+		case "session_joined":
+			var full OutgoingEvent
+			if err := json.Unmarshal(msg, &full); err == nil {
+				payloadBytes, _ := json.Marshal(full.Payload)
+				var info SessionInfo
+				if json.Unmarshal(payloadBytes, &info) == nil && info.SessionID != "" {
+					rm.remoteMu.Lock()
+					rm.remoteSessions[roomId] = appendRemoteSession(rm.remoteSessions[roomId], info)
+					rm.remoteMu.Unlock()
+				}
+			}
+		case "session_left":
+			var full OutgoingEvent
+			if err := json.Unmarshal(msg, &full); err == nil {
+				rm.remoteMu.Lock()
+				rm.remoteSessions[roomId] = removeRemoteSession(rm.remoteSessions[roomId], full.SessionID)
+				rm.remoteMu.Unlock()
+			}
+		}
+	}
+
+	rm.broadcastToRoomLocal(roomId, msg)
+}
+
+func appendRemoteSession(sessions []SessionInfo, info SessionInfo) []SessionInfo {
+	for _, s := range sessions {
+		if s.SessionID == info.SessionID {
+			return sessions
+		}
+	}
+	return append(sessions, info)
+}
+
+func removeRemoteSession(sessions []SessionInfo, sessionId string) []SessionInfo {
+	for i, s := range sessions {
+		if s.SessionID == sessionId {
+			return append(sessions[:i], sessions[i+1:]...)
+		}
+	}
+	return sessions
 }
