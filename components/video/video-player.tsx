@@ -8,6 +8,7 @@ import { Camera } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { addToast } from "@heroui/toast";
 import VideoStatusOverlay from "@/components/video/video-status-overlay";
+import { uploadImage } from "@/lib/upload/client";
 
 interface VideoPlayerProps {
   videoUrl: string | null;
@@ -80,54 +81,15 @@ export default function VideoPlayer({
       // Step 1: Capture the frame
       const file = await captureFrame(video);
 
-      // Step 2: Get presigned URL
-      const presignResponse = await fetch("/api/image/upload/presign", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contentType: file.type,
-          contentLength: file.size,
-          filename: file.name,
-        }),
+      // Step 2: Upload via shared presigned URL flow
+      const result = await uploadImage(file, {
+        source: "frame-capture",
+        sourceVideoId: videoId,
       });
 
-      if (!presignResponse.ok) {
-        throw new Error("Failed to get upload URL");
+      if (!result.success) {
+        throw new Error(result.error.message);
       }
-
-      const { imageId, uploadUrl } = await presignResponse.json();
-
-      // Step 3: Upload directly to S3
-      const uploadResponse = await fetch(uploadUrl, {
-        method: "PUT",
-        headers: {
-          "Content-Type": file.type,
-          "Content-Length": file.size.toString(),
-        },
-        body: file,
-      });
-
-      if (!uploadResponse.ok) {
-        throw new Error("Failed to upload to storage");
-      }
-
-      // Step 4: Confirm upload to "My Frame Captures" collection
-      const confirmResponse = await fetch("/api/image/upload/confirm", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          imageId,
-          filename: file.name,
-          source: "frame-capture",
-          sourceVideoId: videoId,
-        }),
-      });
-
-      if (!confirmResponse.ok) {
-        throw new Error("Failed to confirm upload");
-      }
-
-      const { imageUrl } = await confirmResponse.json();
 
       // Show success toast
       addToast({
@@ -136,7 +98,7 @@ export default function VideoPlayer({
       });
 
       // Notify parent component
-      onFrameCaptured?.(imageId, imageUrl);
+      onFrameCaptured?.(result.data.imageId, result.data.imageUrl);
     } catch (error) {
       console.error("Frame capture failed:", error);
       addToast({

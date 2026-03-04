@@ -22,6 +22,8 @@ export interface PendingImage {
   title?: string;
   /** Whether this image is currently being uploaded (only for 'upload' source) */
   isUploading?: boolean;
+  /** Whether this image is currently being compressed server-side (only for 'upload' source) */
+  isCompressing?: boolean;
   /** Temporary local URL for preview during upload (only for 'upload' source) */
   localPreviewUrl?: string;
   /** Original message index (only for 'ai_generated' source - for history tracking) */
@@ -45,15 +47,22 @@ export function canAddImage(pendingImages: PendingImage[]): boolean {
 }
 
 /**
- * Check if any images are still uploading
+ * Check if any images are still uploading or compressing
  */
 export function hasUploadingImages(pendingImages: PendingImage[]): boolean {
-  return pendingImages.some((img) => img.isUploading);
+  return pendingImages.some((img) => img.isUploading || img.isCompressing);
 }
 
 /**
- * Get the count of images that are not uploading
+ * Check if any images are being compressed server-side
+ */
+export function hasCompressingImages(pendingImages: PendingImage[]): boolean {
+  return pendingImages.some((img) => img.isCompressing);
+}
+
+/**
+ * Get the count of images that are not uploading or compressing
  */
 export function getReadyImageCount(pendingImages: PendingImage[]): number {
-  return pendingImages.filter((img) => !img.isUploading).length;
+  return pendingImages.filter((img) => !img.isUploading && !img.isCompressing).length;
 }

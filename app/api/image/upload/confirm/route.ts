@@ -4,7 +4,9 @@ import { verifyAccessToken } from "@/lib/auth/jwt";
 import { db } from "@/lib/db";
 import { collectionImages, collections } from "@/lib/db/schema";
 import { ensureDefaultProject } from "@/lib/db/projects";
-import { checkImageExists, getSignedImageUrl } from "@/lib/storage/s3";
+import { checkImageExists, downloadImage, replaceImage, getSignedImageUrl } from "@/lib/storage/s3";
+import { compressImageIfNeeded } from "@/lib/image/compress";
+import { siteConfig } from "@/config/site";
 import { and, desc, eq } from "drizzle-orm";
 
 // Collection names for different upload sources
@@ -62,12 +64,31 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Compress if the uploaded file exceeds the threshold
+    const compressThreshold = siteConfig.upload.compressThresholdMB * 1024 * 1024;
+    let wasCompressed = false;
+    if (imageCheck.contentLength && imageCheck.contentLength > compressThreshold) {
+      const imageBuffer = await downloadImage(imageId);
+      if (imageBuffer) {
+        const compressed = await compressImageIfNeeded(
+          imageBuffer,
+          imageCheck.contentType || "image/jpeg",
+          compressThreshold
+        );
+        if (compressed.buffer !== imageBuffer) {
+          await replaceImage(imageId, compressed.buffer, compressed.contentType);
+          wasCompressed = true;
+        }
+      }
+    }
+
     // If skipCollection is true, just return the signed URL without saving to collection
     if (skipCollection) {
       const imageUrl = getSignedImageUrl(imageId);
       return NextResponse.json({
         imageId,
         imageUrl,
+        wasCompressed,
       });
     }
 
@@ -136,6 +157,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       imageId,
       imageUrl,
+      wasCompressed,
     });
   } catch (error) {
     console.error("[Image Confirm] Error:", error);

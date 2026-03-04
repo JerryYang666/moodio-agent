@@ -16,7 +16,7 @@ import AssetPickerModal, {
 } from "@/components/chat/asset-picker-modal";
 import { useVideo } from "@/components/video-provider";
 import { useCredits } from "@/hooks/use-credits";
-import { uploadImage } from "@/lib/upload/client";
+import { uploadImage, shouldCompressFile, getCompressThresholdMB } from "@/lib/upload/client";
 import UndoSendOverlay from "./undo-send-overlay";
 import { useGenerateVideoMutation } from "@/lib/redux/services/next-api";
 
@@ -405,6 +405,10 @@ export default function VideoGenerationPanel({
     setUploadPreviewUrl(localPreview);
     setUploadingTarget(pickerTarget);
     setPickerOpen(false);
+
+    if (shouldCompressFile(file)) {
+      setError(tChat("fileWillBeCompressed", { threshold: getCompressThresholdMB() }));
+    }
 
     const result = await uploadImage(file);
 

@@ -14,9 +14,17 @@ export type UploadOutcome =
   | { success: true; data: UploadResult }
   | { success: false; error: UploadError };
 
+export type UploadPhase = "uploading" | "compressing" | "done";
+
 export interface UploadOptions {
   /** If true, skip saving the image to a collection (e.g., for marked/annotated images) */
   skipCollection?: boolean;
+  /** Upload source for collection routing (defaults to "upload") */
+  source?: "upload" | "frame-capture";
+  /** Source video ID (only for frame-capture source) */
+  sourceVideoId?: string;
+  /** Called when the upload transitions between phases */
+  onPhaseChange?: (phase: UploadPhase) => void;
 }
 
 /**
@@ -31,6 +39,20 @@ export function getMaxFileSizeBytes(): number {
  */
 export function getMaxFileSizeMB(): number {
   return siteConfig.upload.maxFileSizeMB;
+}
+
+/**
+ * Get the compression threshold in MB (for display)
+ */
+export function getCompressThresholdMB(): number {
+  return siteConfig.upload.compressThresholdMB;
+}
+
+/**
+ * Check whether a file exceeds the compression threshold and will be compressed server-side
+ */
+export function shouldCompressFile(file: File): boolean {
+  return file.size > siteConfig.upload.compressThresholdMB * 1024 * 1024;
 }
 
 /**
@@ -65,7 +87,7 @@ export function validateFile(file: File): UploadError | null {
  * Flow:
  * 1. Request presigned URL from server
  * 2. Upload directly to S3
- * 3. Confirm upload with server (creates DB records)
+ * 3. Confirm upload with server (compresses if needed, creates DB records)
  *
  * @param file The file to upload
  * @param options Optional upload options
@@ -77,6 +99,8 @@ export async function uploadImage(file: File, options?: UploadOptions): Promise<
   if (validationError) {
     return { success: false, error: validationError };
   }
+
+  const willCompress = shouldCompressFile(file);
 
   try {
     // Step 1: Get presigned URL from server
@@ -124,6 +148,11 @@ export async function uploadImage(file: File, options?: UploadOptions): Promise<
     }
 
     // Step 3: Confirm upload and create database records
+    // Server will compress if file exceeds threshold
+    if (willCompress) {
+      options?.onPhaseChange?.("compressing");
+    }
+
     const confirmResponse = await fetch("/api/image/upload/confirm", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -131,6 +160,8 @@ export async function uploadImage(file: File, options?: UploadOptions): Promise<
         imageId,
         filename: file.name,
         skipCollection: options?.skipCollection,
+        source: options?.source,
+        sourceVideoId: options?.sourceVideoId,
       }),
     });
 
@@ -146,6 +177,8 @@ export async function uploadImage(file: File, options?: UploadOptions): Promise<
     }
 
     const { imageUrl } = await confirmResponse.json();
+
+    options?.onPhaseChange?.("done");
 
     return {
       success: true,

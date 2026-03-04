@@ -56,7 +56,8 @@ export async function uploadImage(
     body = file;
   }
 
-  const compressed = await compressImageIfNeeded(body, contentType);
+  const serverTargetBytes = siteConfig.upload.serverCompressThresholdMB * 1024 * 1024;
+  const compressed = await compressImageIfNeeded(body, contentType, serverTargetBytes);
   body = compressed.buffer;
   contentType = compressed.contentType;
 
@@ -264,6 +265,25 @@ export async function downloadImage(imageId: string): Promise<Buffer | null> {
     console.error("Error downloading image:", error);
     return null;
   }
+}
+
+/**
+ * Replace an existing image in S3 with new data (e.g. after compression)
+ */
+export async function replaceImage(
+  imageId: string,
+  body: Buffer,
+  contentType: string
+): Promise<void> {
+  const key = `images/${imageId}`;
+  await s3Client.send(
+    new PutObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: key,
+      Body: body,
+      ContentType: contentType,
+    })
+  );
 }
 
 /**

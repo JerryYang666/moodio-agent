@@ -42,6 +42,8 @@ import {
   uploadImage,
   validateFile,
   getMaxFileSizeMB,
+  shouldCompressFile,
+  getCompressThresholdMB,
 } from "@/lib/upload/client";
 import {
   saveChatDraft,
@@ -520,10 +522,31 @@ export default function ChatInterface({
       // Add all placeholders at once
       setPendingImages((prev) => [...prev, ...entries.map((e) => e.placeholder)]);
 
+      // Show compression warning for any files that exceed the threshold
+      const hasLargeFiles = files.some((f) => shouldCompressFile(f));
+      if (hasLargeFiles) {
+        addToast({
+          title: t("chat.fileWillBeCompressed", { threshold: getCompressThresholdMB() }),
+          color: "warning",
+        });
+      }
+
       // Upload all files in parallel
       await Promise.all(
         entries.map(async ({ file, tempId, localPreviewUrl }) => {
-          const result = await uploadImage(file);
+          const result = await uploadImage(file, {
+            onPhaseChange: (phase) => {
+              if (phase === "compressing") {
+                setPendingImages((prev) =>
+                  prev.map((img) =>
+                    img.imageId === tempId
+                      ? { ...img, isUploading: false, isCompressing: true }
+                      : img
+                  )
+                );
+              }
+            },
+          });
 
           if (result.success) {
             setPendingImages((prev) =>
@@ -534,6 +557,7 @@ export default function ChatInterface({
                     imageId: result.data.imageId,
                     url: result.data.imageUrl,
                     isUploading: false,
+                    isCompressing: false,
                     localPreviewUrl: undefined,
                   }
                   : img
@@ -787,6 +811,13 @@ export default function ChatInterface({
         return;
       }
 
+      if (shouldCompressFile(file)) {
+        addToast({
+          title: t("chat.fileWillBeCompressed", { threshold: getCompressThresholdMB() }),
+          color: "warning",
+        });
+      }
+
       const result = await uploadImage(file);
 
       if (result.success) {
@@ -977,7 +1008,20 @@ export default function ChatInterface({
         return [...newImages, uploadingImage];
       });
 
-      const result = await uploadImage(file, { skipCollection: true });
+      const result = await uploadImage(file, {
+        skipCollection: true,
+        onPhaseChange: (phase) => {
+          if (phase === "compressing") {
+            setPendingImages((prev) =>
+              prev.map((img) =>
+                img.imageId === tempId
+                  ? { ...img, isUploading: false, isCompressing: true }
+                  : img
+              )
+            );
+          }
+        },
+      });
 
       if (result.success) {
         // Update the pending image with the real ID and URL
@@ -989,6 +1033,7 @@ export default function ChatInterface({
                 imageId: result.data.imageId,
                 url: result.data.imageUrl,
                 isUploading: false,
+                isCompressing: false,
                 localPreviewUrl: undefined,
               }
               : img

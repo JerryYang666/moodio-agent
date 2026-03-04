@@ -172,7 +172,7 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
   // Convert pending images to mention items for the textbox
   const mentionItems: MentionItem[] = useMemo(() => {
     return pendingImages
-      .filter((img) => !img.isUploading) // Only show uploaded images
+      .filter((img) => !img.isUploading && !img.isCompressing) // Only show ready images
       .map((img) => ({
         id: img.imageId,
         type: "image",
@@ -718,20 +718,20 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
                             onClick={(e) => {
                               e.preventDefault();
                               e.stopPropagation();
-                              handleImageClick(img.imageId, img.isUploading || false);
+                              handleImageClick(img.imageId, img.isUploading || img.isCompressing || false);
                             }}
                           >
-                            {/* Image with loading overlay if uploading */}
+                            {/* Image with loading overlay if uploading or compressing */}
                             <img
                               src={
-                                img.isUploading && img.localPreviewUrl
+                                (img.isUploading || img.isCompressing) && img.localPreviewUrl
                                   ? img.localPreviewUrl
                                   : img.url
                               }
                               alt={img.title || t("chat.image")}
                               className={clsx(
                                 "w-full h-full object-cover",
-                                img.isUploading && "opacity-50"
+                                (img.isUploading || img.isCompressing) && "opacity-50"
                               )}
                             />
 
@@ -742,8 +742,16 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
                               </div>
                             )}
 
+                            {/* Compressing spinner overlay */}
+                            {img.isCompressing && (
+                              <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/30 gap-1">
+                                <Spinner size="sm" color="white" />
+                                <span className="text-[9px] text-white/90">{t("chat.compressing")}</span>
+                              </div>
+                            )}
+
                             {/* Source indicator and title overlay */}
-                            {!img.isUploading && (
+                            {!img.isUploading && !img.isCompressing && (
                               <div className="absolute inset-0 bg-linear-to-t from-black/70 to-transparent flex flex-col justify-end p-1">
                                 <div className="flex items-center gap-1 text-white/80">
                                   {getSourceIcon(img.source)}
@@ -778,7 +786,7 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
                                 {/* Larger preview image */}
                                 <img
                                   src={
-                                    img.isUploading && img.localPreviewUrl
+                                    (img.isUploading || img.isCompressing) && img.localPreviewUrl
                                       ? img.localPreviewUrl
                                       : img.url
                                   }
@@ -786,8 +794,8 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
                                   className="max-w-[min(600px,calc(100vw-3rem))] max-h-[600px] object-contain"
                                 />
 
-                                {/* Drawing button overlay - only show when not uploading and feature flag enabled */}
-                                {!img.isUploading && showCircleToEdit && (
+                                {/* Drawing button overlay - only show when not uploading/compressing and feature flag enabled */}
+                                {!img.isUploading && !img.isCompressing && showCircleToEdit && (
                                   <div className="absolute top-2 right-2">
                                     <Tooltip content={t("chat.markForChange")}>
                                       <Button
@@ -824,10 +832,10 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
                               e.stopPropagation();
                               onRemovePendingImage(img.imageId);
                             }}
-                            disabled={img.isUploading}
+                            disabled={img.isUploading || img.isCompressing}
                             className={clsx(
                               "absolute -top-2 -right-2 bg-default-100 rounded-full p-1 shadow-sm border border-divider z-10",
-                              img.isUploading
+                              img.isUploading || img.isCompressing
                                 ? "opacity-50 cursor-not-allowed"
                                 : "hover:bg-default-200"
                             )}
@@ -841,7 +849,7 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
                       const { markedImage, originalImage } = item;
                       const deckId = `deck-${markedImage.imageId}`;
                       const isHovered = hoveredDeckId === deckId;
-                      const isUploading = markedImage.isUploading || originalImage.isUploading;
+                      const isUploading = markedImage.isUploading || markedImage.isCompressing || originalImage.isUploading || originalImage.isCompressing;
 
                       return (
                         <div
@@ -872,7 +880,7 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
                           >
                             <img
                               src={
-                                originalImage.isUploading && originalImage.localPreviewUrl
+                                (originalImage.isUploading || originalImage.isCompressing) && originalImage.localPreviewUrl
                                   ? originalImage.localPreviewUrl
                                   : originalImage.url
                               }
@@ -908,19 +916,19 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
                             onClick={(e) => {
                               e.preventDefault();
                               e.stopPropagation();
-                              handleImageClick(markedImage.imageId, markedImage.isUploading || false);
+                              handleImageClick(markedImage.imageId, markedImage.isUploading || markedImage.isCompressing || false);
                             }}
                           >
                             <img
                               src={
-                                markedImage.isUploading && markedImage.localPreviewUrl
+                                (markedImage.isUploading || markedImage.isCompressing) && markedImage.localPreviewUrl
                                   ? markedImage.localPreviewUrl
                                   : markedImage.url
                               }
                               alt={markedImage.title || t("chat.image")}
                               className={clsx(
                                 "w-full h-full object-cover",
-                                markedImage.isUploading && "opacity-50"
+                                (markedImage.isUploading || markedImage.isCompressing) && "opacity-50"
                               )}
                             />
 
@@ -931,8 +939,16 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
                               </div>
                             )}
 
+                            {/* Compressing spinner overlay */}
+                            {markedImage.isCompressing && (
+                              <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/30 gap-1">
+                                <Spinner size="sm" color="white" />
+                                <span className="text-[9px] text-white/90">{t("chat.compressing")}</span>
+                              </div>
+                            )}
+
                             {/* Marked label overlay */}
-                            {!markedImage.isUploading && (
+                            {!markedImage.isUploading && !markedImage.isCompressing && (
                               <div className="absolute inset-0 bg-linear-to-t from-black/70 to-transparent flex flex-col justify-end p-1">
                                 <div className="flex items-center gap-1 text-purple-300">
                                   <Pencil size={10} />
@@ -983,7 +999,7 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
                                   <div className="relative">
                                     <img
                                       src={
-                                        markedImage.isUploading && markedImage.localPreviewUrl
+                                        (markedImage.isUploading || markedImage.isCompressing) && markedImage.localPreviewUrl
                                           ? markedImage.localPreviewUrl
                                           : markedImage.url
                                       }

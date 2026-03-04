@@ -90,7 +90,9 @@ export const siteConfig = {
 
   // Upload Configuration
   upload: {
-    maxFileSizeMB: 15, // Maximum file size in MB for image uploads
+    maxFileSizeMB: 20,
+    compressThresholdMB: 10,
+    serverCompressThresholdMB: 6,
     allowedImageTypes: ["image/jpeg", "image/png", "image/gif", "image/webp"],
     presignedUrlExpiresIn: 300, // 5 minutes in seconds
   },

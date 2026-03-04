@@ -72,10 +72,15 @@ export async function POST(request: NextRequest) {
       expiresIn
     );
 
+    // Check if file will be compressed server-side
+    const compressThreshold = siteConfig.upload.compressThresholdMB * 1024 * 1024;
+    const willCompress = contentLength > compressThreshold;
+
     return NextResponse.json({
       imageId,
       uploadUrl,
       expiresIn,
+      willCompress,
     });
   } catch (error) {
     console.error("[Image Presign] Error:", error);

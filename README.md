@@ -340,8 +340,8 @@ npm run db:studio
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/api/image/upload/presign` | Get presigned S3 URL |
-| POST | `/api/image/upload/confirm` | Confirm upload completion |
+| POST | `/api/image/upload/presign` | Get presigned S3 URL (returns `willCompress` flag) |
+| POST | `/api/image/upload/confirm` | Confirm upload, compress if needed (returns `wasCompressed`) |
 | GET | `/api/image/[imageId]` | Get CloudFront URL |
 | GET | `/api/image/[imageId]/download` | Download image |
 
@@ -700,6 +700,28 @@ Supported ratios: `1:1`, `2:3`, `3:2`, `3:4`, `4:3`, `4:5`, `5:4`, `9:16`, `16:9
 - **2K**: Standard quality (default)
 - **4K**: High resolution output
 
+### Image Upload Limits
+
+All upload size thresholds are configured centrally in `config/site.ts` under `siteConfig.upload`:
+
+| Threshold | Value | Purpose |
+|-----------|-------|---------|
+| `maxFileSizeMB` | 20 MB | Hard cap — files above this are rejected |
+| `compressThresholdMB` | 10 MB | Soft limit — user uploads above this are auto-compressed to WebP |
+| `serverCompressThresholdMB` | 6 MB | Target size for server-initiated uploads (AI-generated images) |
+
+**User upload flow:**
+
+- **<= 10 MB**: Uploaded as-is, no compression.
+- **10–20 MB**: A warning toast is shown, the file is uploaded to S3, then the server downloads it, compresses to WebP via `sharp`, and re-uploads the compressed version. The UI shows a "Compressing..." overlay on the thumbnail during this step.
+- **> 20 MB**: Rejected immediately on both client and server.
+
+**Server upload flow** (AI-generated images via agents):
+
+- Images are passed through `compressImageIfNeeded()` with a 6 MB target before writing to S3. This happens in-memory before the initial upload.
+
+Compression uses progressive WebP quality steps (99 → 97 → 95 → 85 fallback) to minimize quality loss while meeting the target size.
+
 ## Credits System
 
 ### Overview
@@ -1039,7 +1061,9 @@ The project uses ICU message format for pluralization and variables:
   },
   "chat": {
     "timeRemaining": "{seconds}s remaining",
-    "fileSizeTooLarge": "File size too large. Max {maxSize}MB."
+    "fileSizeTooLarge": "File size too large. Max {maxSize}MB.",
+    "fileWillBeCompressed": "Image exceeds {threshold}MB and will be compressed to WebP.",
+    "compressing": "Compressing..."
   }
 }
 ```

@@ -1,11 +1,9 @@
 import sharp from "sharp";
 
-const MAX_IMAGE_SIZE_BYTES = 6 * 1024 * 1024; // 6 MB
-
 const QUALITY_STEPS = [99, 97, 95] as const;
 
 /**
- * If the image buffer exceeds 6 MB, convert to high-quality WebP.
+ * Compress an image to WebP if it exceeds the given target size.
  * Starts at quality 99 with smartSubsample for virtually pixel-perfect
  * output. Falls back to lower quality steps only if needed.
  * Avoids lossless/nearLossless encoding which is too slow and
@@ -13,15 +11,17 @@ const QUALITY_STEPS = [99, 97, 95] as const;
  */
 export async function compressImageIfNeeded(
   imageBuffer: Buffer,
-  contentType: string
+  contentType: string,
+  targetSizeBytes: number
 ): Promise<{ buffer: Buffer; contentType: string }> {
-  if (imageBuffer.length <= MAX_IMAGE_SIZE_BYTES) {
+  if (imageBuffer.length <= targetSizeBytes) {
     return { buffer: imageBuffer, contentType };
   }
 
   const originalSizeMB = (imageBuffer.length / (1024 * 1024)).toFixed(2);
+  const targetSizeMB = (targetSizeBytes / (1024 * 1024)).toFixed(0);
   console.log(
-    `[Image Compress] Image size ${originalSizeMB} MB exceeds limit, compressing...`
+    `[Image Compress] Image size ${originalSizeMB} MB exceeds ${targetSizeMB} MB limit, compressing...`
   );
 
   for (const quality of QUALITY_STEPS) {
@@ -34,7 +34,7 @@ export async function compressImageIfNeeded(
       `[Image Compress] WebP quality=${quality} → ${compressedSizeMB} MB`
     );
 
-    if (compressed.length <= MAX_IMAGE_SIZE_BYTES) {
+    if (compressed.length <= targetSizeBytes) {
       return { buffer: compressed, contentType: "image/webp" };
     }
   }

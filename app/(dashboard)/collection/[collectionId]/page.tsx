@@ -55,7 +55,7 @@ import {
 import SendToDesktopModal from "@/components/desktop/SendToDesktopModal";
 import AssetPickerModal from "@/components/chat/asset-picker-modal";
 import { siteConfig } from "@/config/site";
-import { uploadImage, validateFile, getMaxFileSizeMB } from "@/lib/upload/client";
+import { uploadImage, validateFile, getMaxFileSizeMB, shouldCompressFile, getCompressThresholdMB } from "@/lib/upload/client";
 
 interface CollectionAsset {
   id: string;
@@ -874,6 +874,15 @@ export default function CollectionPage({
 
       setIsUploading(true);
       let successCount = 0;
+
+      // Warn if any files will be compressed
+      const hasLargeFiles = files.some((f) => shouldCompressFile(f));
+      if (hasLargeFiles) {
+        addToast({
+          title: t("fileWillBeCompressed", { threshold: getCompressThresholdMB() }),
+          color: "warning",
+        });
+      }
 
       try {
         await Promise.all(
