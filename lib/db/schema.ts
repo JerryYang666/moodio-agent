@@ -153,6 +153,22 @@ export const collectionImages = pgTable("collection_images", {
 });
 
 /**
+ * Project Shares table
+ * Manages sharing permissions for projects
+ */
+export const projectShares = pgTable("project_shares", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  projectId: uuid("project_id")
+    .notNull()
+    .references(() => projects.id, { onDelete: "cascade" }),
+  sharedWithUserId: uuid("shared_with_user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  permission: varchar("permission", { length: 20 }).notNull(), // 'viewer' or 'collaborator'
+  sharedAt: timestamp("shared_at").defaultNow().notNull(),
+});
+
+/**
  * Collection Shares table
  * Manages sharing permissions for collections
  */
@@ -310,6 +326,9 @@ export type NewCollection = typeof collections.$inferInsert;
 
 export type CollectionImage = typeof collectionImages.$inferSelect;
 export type NewCollectionImage = typeof collectionImages.$inferInsert;
+
+export type ProjectShare = typeof projectShares.$inferSelect;
+export type NewProjectShare = typeof projectShares.$inferInsert;
 
 export type CollectionShare = typeof collectionShares.$inferSelect;
 export type NewCollectionShare = typeof collectionShares.$inferInsert;

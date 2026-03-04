@@ -23,7 +23,8 @@ import {
   DropdownMenu,
   DropdownItem,
 } from "@heroui/dropdown";
-import { ArrowLeft, Folder, Plus, MoreVertical, Pencil } from "lucide-react";
+import { Select, SelectItem } from "@heroui/select";
+import { ArrowLeft, Folder, Plus, MoreVertical, Pencil, Share2, X } from "lucide-react";
 import ImageDetailModal, { ImageInfo } from "@/components/chat/image-detail-modal";
 
 type Project = {
@@ -33,7 +34,25 @@ type Project = {
   isDefault: boolean;
   createdAt: Date;
   updatedAt: Date;
+  permission?: "owner" | "collaborator" | "viewer";
+  isOwner?: boolean;
 };
+
+interface ProjectShareInfo {
+  id: string;
+  projectId: string;
+  sharedWithUserId: string;
+  permission: "viewer" | "collaborator";
+  sharedAt: Date;
+  email: string;
+}
+
+interface User {
+  id: string;
+  email: string;
+  firstName?: string;
+  lastName?: string;
+}
 
 type Collection = {
   id: string;
@@ -74,6 +93,7 @@ export default function ProjectDetailPage({
   const [project, setProject] = useState<Project | null>(null);
   const [collections, setCollections] = useState<Collection[]>([]);
   const [rootAssets, setRootAssets] = useState<Asset[]>([]);
+  const [shares, setShares] = useState<ProjectShareInfo[]>([]);
 
   const {
     isOpen: isCreateCollectionOpen,
@@ -94,7 +114,19 @@ export default function ProjectDetailPage({
     onClose: onImageDetailClose,
   } = useDisclosure();
 
+  const {
+    isOpen: isShareOpen,
+    onOpen: onShareOpen,
+    onOpenChange: onShareOpenChange,
+  } = useDisclosure();
+
   const [newCollectionName, setNewCollectionName] = useState("");
+  const [searchEmail, setSearchEmail] = useState("");
+  const [searchedUser, setSearchedUser] = useState<User | null>(null);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchError, setSearchError] = useState("");
+  const [selectedPermission, setSelectedPermission] = useState<"viewer" | "collaborator">("viewer");
+  const [isSharing, setIsSharing] = useState(false);
   const [isCreatingCollection, setIsCreatingCollection] = useState(false);
   const [collectionToRename, setCollectionToRename] = useState<Collection | null>(null);
   const [renameCollectionValue, setRenameCollectionValue] = useState("");
@@ -104,27 +136,29 @@ export default function ProjectDetailPage({
   const [allImages, setAllImages] = useState<ImageInfo[]>([]);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
-  useEffect(() => {
-    const load = async () => {
-      setLoading(true);
-      try {
-        const res = await fetch(`/api/projects/${projectId}`);
-        if (!res.ok) {
-          router.push("/projects");
-          return;
-        }
-        const data = await res.json();
-        setProject(data.project);
-        setCollections(data.collections || []);
-        setRootAssets(data.rootAssets || []);
-      } catch (e) {
-        console.error("Failed to fetch project", e);
-      } finally {
-        setLoading(false);
+  const fetchProjectData = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/projects/${projectId}`);
+      if (!res.ok) {
+        router.push("/projects");
+        return;
       }
-    };
-    load();
-  }, [projectId, router]);
+      const data = await res.json();
+      setProject(data.project);
+      setCollections(data.collections || []);
+      setRootAssets(data.rootAssets || []);
+      setShares(data.shares || []);
+    } catch (e) {
+      console.error("Failed to fetch project", e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchProjectData();
+  }, [projectId]);
 
   const handleCreateCollection = async () => {
     if (!newCollectionName.trim()) return;
@@ -176,6 +210,75 @@ export default function ProjectDetailPage({
       console.error("Error renaming collection", e);
     } finally {
       setIsRenamingCollection(false);
+    }
+  };
+
+  const handleSearchUser = async () => {
+    if (!searchEmail.trim()) return;
+    setIsSearching(true);
+    setSearchError("");
+    setSearchedUser(null);
+
+    try {
+      const res = await fetch(
+        `/api/users/search?email=${encodeURIComponent(searchEmail.trim())}`
+      );
+      if (res.ok) {
+        const data = await res.json();
+        if (data.user) {
+          setSearchedUser(data.user);
+        } else {
+          setSearchError("User not found");
+        }
+      } else {
+        setSearchError("Failed to search user");
+      }
+    } catch (error) {
+      console.error("Error searching user:", error);
+      setSearchError("Error searching user");
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const handleShare = async () => {
+    if (!searchedUser) return;
+    setIsSharing(true);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/share`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sharedWithUserId: searchedUser.id,
+          permission: selectedPermission,
+        }),
+      });
+
+      if (res.ok) {
+        await fetchProjectData();
+        setSearchEmail("");
+        setSearchedUser(null);
+        setSelectedPermission("viewer");
+      }
+    } catch (error) {
+      console.error("Error sharing project:", error);
+    } finally {
+      setIsSharing(false);
+    }
+  };
+
+  const handleRemoveShare = async (userId: string) => {
+    try {
+      const res = await fetch(
+        `/api/projects/${projectId}/share/${userId}`,
+        { method: "DELETE" }
+      );
+
+      if (res.ok) {
+        await fetchProjectData();
+      }
+    } catch (error) {
+      console.error("Error removing share:", error);
     }
   };
 
@@ -247,6 +350,11 @@ export default function ProjectDetailPage({
                   {t("default")}
                 </Chip>
               )}
+              {project.permission && !project.isOwner && (
+                <Chip size="sm" variant="flat" color="secondary">
+                  {t(project.permission)}
+                </Chip>
+              )}
             </div>
             <p className="text-default-500">
               {t("collectionsCount", { count: collections.length })} •{" "}
@@ -255,17 +363,30 @@ export default function ProjectDetailPage({
           </div>
 
           <div className="flex gap-2 w-full sm:w-auto">
-            <Button
-              color="primary"
-              startContent={<Plus size={18} />}
-              onPress={() => {
-                setNewCollectionName(`${project.name} Collection`);
-                onCreateCollectionOpen();
-              }}
-              className="w-full sm:w-auto"
-            >
-              {t("newCollection")}
-            </Button>
+            {project.isOwner !== false && (
+              <Button
+                startContent={<Share2 size={18} />}
+                onPress={onShareOpen}
+                color="primary"
+                variant="flat"
+                className="w-full sm:w-auto"
+              >
+                {tCommon("share")}
+              </Button>
+            )}
+            {(project.isOwner !== false || project.permission === "collaborator") && (
+              <Button
+                color="primary"
+                startContent={<Plus size={18} />}
+                onPress={() => {
+                  setNewCollectionName(`${project.name} Collection`);
+                  onCreateCollectionOpen();
+                }}
+                className="w-full sm:w-auto"
+              >
+                {t("newCollection")}
+              </Button>
+            )}
           </div>
         </div>
       </div>
@@ -440,6 +561,140 @@ export default function ProjectDetailPage({
                   isDisabled={!renameCollectionValue.trim()}
                 >
                   {tCommon("rename")}
+                </Button>
+              </ModalFooter>
+            </>
+          )}
+        </ModalContent>
+      </Modal>
+
+      {/* Share Modal */}
+      <Modal isOpen={isShareOpen} onOpenChange={onShareOpenChange} size="2xl">
+        <ModalContent>
+          {(onClose) => (
+            <>
+              <ModalHeader>{t("shareProject")}</ModalHeader>
+              <ModalBody>
+                <div className="space-y-4">
+                  <div className="flex flex-col gap-4">
+                    <div className="flex gap-2">
+                      <Input
+                        label={t("searchUser")}
+                        placeholder={t("enterEmailAddress")}
+                        value={searchEmail}
+                        onValueChange={setSearchEmail}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") handleSearchUser();
+                        }}
+                        errorMessage={searchError}
+                        isInvalid={!!searchError}
+                        className="flex-1"
+                      />
+                      <Button
+                        color="primary"
+                        variant="flat"
+                        onPress={handleSearchUser}
+                        isLoading={isSearching}
+                        className="mt-2 h-10"
+                      >
+                        {tCommon("search")}
+                      </Button>
+                    </div>
+
+                    {searchedUser && project && (
+                      <div className="flex flex-col gap-2 p-4 bg-default-50 rounded-lg border border-divider">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="font-semibold text-sm">{t("userFound")}</p>
+                            <p className="text-sm">{searchedUser.email}</p>
+                          </div>
+                          {project.userId === searchedUser.id ? (
+                            <Chip color="warning" variant="flat" size="sm">
+                              {t("owner")}
+                            </Chip>
+                          ) : shares.some(
+                            (s) => s.sharedWithUserId === searchedUser.id
+                          ) ? (
+                            <Chip color="primary" variant="flat" size="sm">
+                              {t("alreadyShared")}
+                            </Chip>
+                          ) : (
+                            <Chip color="success" variant="flat" size="sm">
+                              {t("available")}
+                            </Chip>
+                          )}
+                        </div>
+
+                        {project.userId !== searchedUser.id && (
+                          <div className="flex gap-2 mt-2 items-end">
+                            <Select
+                              label={t("permission")}
+                              selectedKeys={[selectedPermission]}
+                              onChange={(e) =>
+                                setSelectedPermission(
+                                  e.target.value as "viewer" | "collaborator"
+                                )
+                              }
+                              className="flex-1"
+                              size="sm"
+                            >
+                              <SelectItem key="viewer">{t("viewer")}</SelectItem>
+                              <SelectItem key="collaborator">
+                                {t("collaborator")}
+                              </SelectItem>
+                            </Select>
+                            <Button
+                              color="primary"
+                              onPress={handleShare}
+                              isLoading={isSharing}
+                              className="h-10"
+                            >
+                              {tCommon("share")}
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {shares.length > 0 && (
+                    <div className="mt-6">
+                      <h3 className="text-sm font-semibold mb-3">
+                        {t("currentlySharedWith")}
+                      </h3>
+                      <div className="space-y-2">
+                        {shares.map((share) => (
+                          <div
+                            key={share.id}
+                            className="flex items-center justify-between p-3 bg-default-100 rounded-lg"
+                          >
+                            <div>
+                              <p className="font-medium">{share.email}</p>
+                              <p className="text-xs text-default-500 capitalize">
+                                {share.permission}
+                              </p>
+                            </div>
+                            <Button
+                              size="sm"
+                              variant="light"
+                              color="danger"
+                              startContent={<X size={16} />}
+                              onPress={() =>
+                                handleRemoveShare(share.sharedWithUserId)
+                              }
+                            >
+                              {tCommon("remove")}
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </ModalBody>
+              <ModalFooter>
+                <Button variant="light" onPress={onClose}>
+                  {tCommon("close")}
                 </Button>
               </ModalFooter>
             </>

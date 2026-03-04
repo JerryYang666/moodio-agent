@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { collections, collectionShares, collectionImages } from "@/lib/db/schema";
+import { collections, collectionShares, collectionImages, projects } from "@/lib/db/schema";
 import { getAccessToken } from "@/lib/auth/cookies";
 import { verifyAccessToken } from "@/lib/auth/jwt";
 import { eq, or, and, desc, sql } from "drizzle-orm";
 import { ensureDefaultProject } from "@/lib/db/projects";
-import { projects } from "@/lib/db/schema";
 import { getImageUrl } from "@/lib/storage/s3";
+import { getProjectPermission, hasProjectWritePermission } from "@/lib/project-utils";
 
 /**
  * GET /api/collection
@@ -132,14 +132,9 @@ export async function POST(req: NextRequest) {
         ? projectId.trim()
         : (await ensureDefaultProject(userId)).id;
 
-    // Projects are not shareable; only allow creating collections in owned projects.
-    const [ownedProject] = await db
-      .select({ id: projects.id })
-      .from(projects)
-      .where(and(eq(projects.id, resolvedProjectId), eq(projects.userId, userId)))
-      .limit(1);
-
-    if (!ownedProject) {
+    // Check if user has write access (owner or collaborator)
+    const projectPermission = await getProjectPermission(resolvedProjectId, userId);
+    if (!hasProjectWritePermission(projectPermission)) {
       return NextResponse.json(
         { error: "Project not found or access denied" },
         { status: 404 }

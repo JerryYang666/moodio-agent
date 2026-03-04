@@ -238,7 +238,20 @@
     "noRootAssetsYet": "尚無根目錄素材",
     "collectionsCount": "{count} 個集合",
     "rootAssetsCount": "{count} 個根目錄素材",
-    "noCollectionsInProject": "此專案尚無任何集合"
+    "noCollectionsInProject": "此專案尚無任何集合",
+    "shareProject": "分享專案",
+    "sharedProjects": "共享專案",
+    "searchUser": "搜尋使用者",
+    "enterEmailAddress": "輸入電子郵件地址",
+    "userFound": "已找到使用者",
+    "owner": "擁有者",
+    "alreadyShared": "已分享",
+    "available": "可用",
+    "permission": "權限",
+    "viewer": "檢視者",
+    "collaborator": "協作者",
+    "currentlySharedWith": "目前已分享給",
+    "shared": "已分享"
   },
   "collections": {
     "title": "集合",
