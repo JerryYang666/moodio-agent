@@ -1,28 +1,29 @@
 import { db } from "@/lib/db";
-import { collections, collectionImages, collectionShares } from "@/lib/db/schema";
+import { collections, collectionImages, collectionShares, projectShares } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 
 export type CollectionPermission = "owner" | "collaborator" | "viewer" | null;
 
 /**
- * Check user's permission for a collection
+ * Check user's permission for a collection.
+ * Priority: owner > direct collection share > inherited project share.
  */
 export async function getUserPermission(
   collectionId: string,
   userId: string
 ): Promise<CollectionPermission> {
-  // Check if user owns the collection
+  // Fetch the collection (needed for both ownership check and project fallback)
   const [collection] = await db
-    .select()
+    .select({ userId: collections.userId, projectId: collections.projectId })
     .from(collections)
-    .where(and(eq(collections.id, collectionId), eq(collections.userId, userId)))
+    .where(eq(collections.id, collectionId))
     .limit(1);
 
-  if (collection) {
-    return "owner";
-  }
+  if (!collection) return null;
 
-  // Check if collection is shared with user
+  if (collection.userId === userId) return "owner";
+
+  // Check if collection is directly shared with user
   const [share] = await db
     .select()
     .from(collectionShares)
@@ -36,6 +37,22 @@ export async function getUserPermission(
 
   if (share) {
     return share.permission as "collaborator" | "viewer";
+  }
+
+  // Fall back: check if the parent project is shared with user
+  const [projectShare] = await db
+    .select()
+    .from(projectShares)
+    .where(
+      and(
+        eq(projectShares.projectId, collection.projectId),
+        eq(projectShares.sharedWithUserId, userId)
+      )
+    )
+    .limit(1);
+
+  if (projectShare) {
+    return projectShare.permission as "collaborator" | "viewer";
   }
 
   return null;
