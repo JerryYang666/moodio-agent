@@ -38,6 +38,8 @@ import {
   ImagePlus,
   Search,
   Star,
+  CheckSquare,
+  CheckCheck,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useCollections } from "@/hooks/use-collections";
@@ -209,6 +211,29 @@ export default function CollectionPage({
   const [assetSearchQuery, setAssetSearchQuery] = useState("");
   const [hoveredRating, setHoveredRating] = useState<{ assetId: string; star: number } | null>(null);
   const [filterRating, setFilterRating] = useState<number | null>(null);
+
+  // Bulk selection state
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const {
+    isOpen: isBulkMoveOpen,
+    onOpen: onBulkMoveOpen,
+    onOpenChange: onBulkMoveOpenChange,
+  } = useDisclosure();
+  const {
+    isOpen: isBulkCopyOpen,
+    onOpen: onBulkCopyOpen,
+    onOpenChange: onBulkCopyOpenChange,
+  } = useDisclosure();
+  const {
+    isOpen: isBulkDeleteOpen,
+    onOpen: onBulkDeleteOpen,
+    onOpenChange: onBulkDeleteOpenChange,
+  } = useDisclosure();
+  const [bulkTargetCollection, setBulkTargetCollection] = useState<string>("");
+  const [isBulkMoving, setIsBulkMoving] = useState(false);
+  const [isBulkCopying, setIsBulkCopying] = useState(false);
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
 
   const [selectedPermission, setSelectedPermission] = useState<
     "viewer" | "collaborator"
@@ -563,6 +588,147 @@ export default function CollectionPage({
     onCopyItemOpen();
   };
 
+  // --- Bulk action helpers ---
+  const toggleSelection = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const exitSelectionMode = () => {
+    setIsSelectionMode(false);
+    setSelectedIds(new Set());
+  };
+
+  const handleBulkMove = async () => {
+    if (selectedIds.size === 0 || !bulkTargetCollection) return;
+    setIsBulkMoving(true);
+    try {
+      const res = await fetch(
+        `/api/collection/${collectionId}/images/bulk`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            itemIds: Array.from(selectedIds),
+            action: "move",
+            targetCollectionId: bulkTargetCollection,
+          }),
+        }
+      );
+      if (res.ok) {
+        const targetCol = availableCollections.find(
+          (c) => c.id === bulkTargetCollection
+        );
+        setCollectionData((prev) =>
+          prev
+            ? { ...prev, images: prev.images.filter((img) => !selectedIds.has(img.id)) }
+            : null
+        );
+        addToast({
+          title: t("bulkMoved"),
+          description: t("bulkMovedDesc", {
+            count: selectedIds.size,
+            collection: targetCol?.name || "collection",
+          }),
+          color: "success",
+        });
+        onBulkMoveOpenChange();
+        exitSelectionMode();
+        refreshCollections();
+      } else {
+        throw new Error();
+      }
+    } catch {
+      addToast({ title: tCommon("error"), description: t("failedToBulkMove"), color: "danger" });
+    } finally {
+      setIsBulkMoving(false);
+    }
+  };
+
+  const handleBulkCopy = async () => {
+    if (selectedIds.size === 0 || !bulkTargetCollection) return;
+    setIsBulkCopying(true);
+    try {
+      const res = await fetch(
+        `/api/collection/${collectionId}/images/bulk`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            itemIds: Array.from(selectedIds),
+            action: "copy",
+            targetCollectionId: bulkTargetCollection,
+          }),
+        }
+      );
+      if (res.ok) {
+        const targetCol = availableCollections.find(
+          (c) => c.id === bulkTargetCollection
+        );
+        addToast({
+          title: t("bulkCopied"),
+          description: t("bulkCopiedDesc", {
+            count: selectedIds.size,
+            collection: targetCol?.name || "collection",
+          }),
+          color: "success",
+        });
+        onBulkCopyOpenChange();
+        exitSelectionMode();
+        refreshCollections();
+      } else {
+        throw new Error();
+      }
+    } catch {
+      addToast({ title: tCommon("error"), description: t("failedToBulkCopy"), color: "danger" });
+    } finally {
+      setIsBulkCopying(false);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return;
+    setIsBulkDeleting(true);
+    try {
+      const res = await fetch(
+        `/api/collection/${collectionId}/images/bulk`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            itemIds: Array.from(selectedIds),
+            action: "delete",
+          }),
+        }
+      );
+      if (res.ok) {
+        setCollectionData((prev) =>
+          prev
+            ? { ...prev, images: prev.images.filter((img) => !selectedIds.has(img.id)) }
+            : null
+        );
+        addToast({
+          title: t("bulkDeleted"),
+          description: t("bulkDeletedDesc", { count: selectedIds.size }),
+          color: "success",
+        });
+        onBulkDeleteOpenChange();
+        exitSelectionMode();
+        refreshCollections();
+      } else {
+        throw new Error();
+      }
+    } catch {
+      addToast({ title: tCommon("error"), description: t("failedToBulkDelete"), color: "danger" });
+    } finally {
+      setIsBulkDeleting(false);
+    }
+  };
+
   // Get available collections for move/copy (exclude current collection)
   const availableCollections = collections.filter(
     (col) =>
@@ -571,6 +737,10 @@ export default function CollectionPage({
   );
 
   const handleAssetClick = (asset: CollectionAsset) => {
+    if (isSelectionMode) {
+      toggleSelection(asset.id);
+      return;
+    }
     if (asset.assetType === "video") {
       // Open video detail modal
       setSelectedVideo(asset);
@@ -905,6 +1075,17 @@ export default function CollectionPage({
           </div>
 
           <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+            {canAddImages && images.length > 0 && (
+              <Button
+                variant={isSelectionMode ? "solid" : "flat"}
+                color={isSelectionMode ? "primary" : "default"}
+                startContent={isSelectionMode ? <X size={18} /> : <CheckSquare size={18} />}
+                onPress={() => isSelectionMode ? exitSelectionMode() : setIsSelectionMode(true)}
+                className="w-full sm:w-auto"
+              >
+                {isSelectionMode ? t("cancelSelection") : t("selectItems")}
+              </Button>
+            )}
             {canAddImages && (
               <Button
                 color="primary"
@@ -1023,22 +1204,38 @@ export default function CollectionPage({
 
             return (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                {filteredImages.map((asset) => (
-                  <Card key={asset.id} className="group relative">
+                {filteredImages.map((asset) => {
+                  const isSelected = selectedIds.has(asset.id);
+                  return (
+                  <Card
+                    key={asset.id}
+                    className={`group relative ${isSelectionMode && isSelected ? "ring-2 ring-primary ring-offset-2 ring-offset-background" : ""}`}
+                  >
                     <CardBody className="p-0 overflow-hidden aspect-square relative rounded-lg">
                       <Image
                         src={asset.imageUrl}
                         alt={asset.generationDetails.title}
                         radius="none"
                         classNames={{
-                          wrapper: "w-full h-full !max-w-full cursor-pointer",
-                          img: "w-full h-full object-cover",
+                          wrapper: `w-full h-full !max-w-full ${isSelectionMode ? "cursor-pointer" : "cursor-pointer"}`,
+                          img: `w-full h-full object-cover transition-opacity ${isSelectionMode && isSelected ? "opacity-80" : ""}`,
                         }}
                         onClick={() => handleAssetClick(asset)}
                       />
+                      {/* Selection checkbox overlay */}
+                      {isSelectionMode && (
+                        <div
+                          className="absolute top-2 left-2 z-20 cursor-pointer"
+                          onClick={(e) => { e.stopPropagation(); toggleSelection(asset.id); }}
+                        >
+                          <div className={`w-6 h-6 rounded-md flex items-center justify-center transition-colors ${isSelected ? "bg-primary text-white" : "bg-background/80 backdrop-blur-sm border border-default-300"}`}>
+                            {isSelected && <CheckCheck size={14} />}
+                          </div>
+                        </div>
+                      )}
                       {/* Video Badge */}
                       {asset.assetType === "video" && (
-                        <div className="absolute top-2 left-2 z-10">
+                        <div className={`absolute ${isSelectionMode ? "top-2 left-10" : "top-2 left-2"} z-10`}>
                           <div className="bg-black/70 text-white rounded-full p-1.5 flex items-center gap-1">
                             <Play size={12} fill="white" />
                             <span className="text-[10px] font-medium pr-1">{t("video")}</span>
@@ -1080,7 +1277,7 @@ export default function CollectionPage({
                           })}
                         </div>
                       </div>
-                      {canAddImages && (
+                      {canAddImages && !isSelectionMode && (
                         <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
                           <Dropdown>
                               <DropdownTrigger>
@@ -1158,12 +1355,204 @@ export default function CollectionPage({
                         )}
                       </CardBody>
                     </Card>
-                ))}
+                  );
+                })}
               </div>
             );
           })()}
         </>
       )}
+
+      {/* Floating Bulk Selection Bar */}
+      <AnimatePresence>
+        {isSelectionMode && selectedIds.size > 0 && (
+          <motion.div
+            initial={{ y: 80, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 80, opacity: 0 }}
+            transition={{ type: "spring", damping: 25, stiffness: 300 }}
+            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40"
+          >
+            <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-background/95 backdrop-blur-md border border-divider shadow-lg">
+              <span className="text-sm font-medium whitespace-nowrap mr-1">
+                {t("selectedCount", { count: selectedIds.size })}
+              </span>
+              <Button
+                size="sm"
+                variant="flat"
+                onPress={() => {
+                  const currentFiltered = images.filter((a) => {
+                    let pass = true;
+                    if (assetSearchQuery.trim()) {
+                      pass = a.generationDetails.title.toLowerCase().includes(assetSearchQuery.trim().toLowerCase());
+                    }
+                    if (pass && filterRating !== null) {
+                      pass = a.rating !== null && a.rating >= filterRating;
+                    }
+                    return pass;
+                  });
+                  const allSelected = currentFiltered.every((a) => selectedIds.has(a.id));
+                  if (allSelected) {
+                    setSelectedIds(new Set());
+                  } else {
+                    setSelectedIds(new Set(currentFiltered.map((a) => a.id)));
+                  }
+                }}
+              >
+                {(() => {
+                  const currentFiltered = images.filter((a) => {
+                    let pass = true;
+                    if (assetSearchQuery.trim()) {
+                      pass = a.generationDetails.title.toLowerCase().includes(assetSearchQuery.trim().toLowerCase());
+                    }
+                    if (pass && filterRating !== null) {
+                      pass = a.rating !== null && a.rating >= filterRating;
+                    }
+                    return pass;
+                  });
+                  return currentFiltered.every((a) => selectedIds.has(a.id))
+                    ? t("deselectAll")
+                    : t("selectAll");
+                })()}
+              </Button>
+              <div className="w-px h-5 bg-divider mx-1" />
+              <Button
+                size="sm"
+                variant="flat"
+                startContent={<Copy size={14} />}
+                onPress={() => { setBulkTargetCollection(""); onBulkCopyOpen(); }}
+                isDisabled={availableCollections.length === 0}
+              >
+                {t("bulkCopyTo")}
+              </Button>
+              <Button
+                size="sm"
+                variant="flat"
+                startContent={<Move size={14} />}
+                onPress={() => { setBulkTargetCollection(""); onBulkMoveOpen(); }}
+                isDisabled={availableCollections.length === 0}
+              >
+                {t("bulkMoveTo")}
+              </Button>
+              <Button
+                size="sm"
+                variant="flat"
+                color="danger"
+                startContent={<Trash2 size={14} />}
+                onPress={onBulkDeleteOpen}
+              >
+                {t("bulkDelete")}
+              </Button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Bulk Move Modal */}
+      <Modal isOpen={isBulkMoveOpen} onOpenChange={onBulkMoveOpenChange}>
+        <ModalContent>
+          {(onClose) => (
+            <>
+              <ModalHeader>{t("bulkMoveToCollection", { count: selectedIds.size })}</ModalHeader>
+              <ModalBody>
+                {availableCollections.length === 0 ? (
+                  <p className="text-default-500">{t("noOtherCollections")}</p>
+                ) : (
+                  <Select
+                    label={t("selectCollection")}
+                    placeholder={t("chooseCollection")}
+                    selectedKeys={bulkTargetCollection ? [bulkTargetCollection] : []}
+                    onChange={(e) => setBulkTargetCollection(e.target.value)}
+                  >
+                    {availableCollections.map((col) => (
+                      <SelectItem key={col.id}>{col.name}</SelectItem>
+                    ))}
+                  </Select>
+                )}
+              </ModalBody>
+              <ModalFooter>
+                <Button variant="light" onPress={onClose}>
+                  {tCommon("cancel")}
+                </Button>
+                <Button
+                  color="primary"
+                  onPress={handleBulkMove}
+                  isLoading={isBulkMoving}
+                  isDisabled={!bulkTargetCollection}
+                >
+                  {t("move")}
+                </Button>
+              </ModalFooter>
+            </>
+          )}
+        </ModalContent>
+      </Modal>
+
+      {/* Bulk Copy Modal */}
+      <Modal isOpen={isBulkCopyOpen} onOpenChange={onBulkCopyOpenChange}>
+        <ModalContent>
+          {(onClose) => (
+            <>
+              <ModalHeader>{t("bulkCopyToCollection", { count: selectedIds.size })}</ModalHeader>
+              <ModalBody>
+                {availableCollections.length === 0 ? (
+                  <p className="text-default-500">{t("noOtherCollections")}</p>
+                ) : (
+                  <Select
+                    label={t("selectCollection")}
+                    placeholder={t("chooseCollection")}
+                    selectedKeys={bulkTargetCollection ? [bulkTargetCollection] : []}
+                    onChange={(e) => setBulkTargetCollection(e.target.value)}
+                  >
+                    {availableCollections.map((col) => (
+                      <SelectItem key={col.id}>{col.name}</SelectItem>
+                    ))}
+                  </Select>
+                )}
+              </ModalBody>
+              <ModalFooter>
+                <Button variant="light" onPress={onClose}>
+                  {tCommon("cancel")}
+                </Button>
+                <Button
+                  color="primary"
+                  onPress={handleBulkCopy}
+                  isLoading={isBulkCopying}
+                  isDisabled={!bulkTargetCollection}
+                >
+                  {t("copy")}
+                </Button>
+              </ModalFooter>
+            </>
+          )}
+        </ModalContent>
+      </Modal>
+
+      {/* Bulk Delete Confirmation Modal */}
+      <Modal isOpen={isBulkDeleteOpen} onOpenChange={onBulkDeleteOpenChange}>
+        <ModalContent>
+          {(onClose) => (
+            <>
+              <ModalHeader>{t("bulkDeleteItems", { count: selectedIds.size })}</ModalHeader>
+              <ModalBody>
+                <p>{t("bulkDeleteConfirm", { count: selectedIds.size })}</p>
+              </ModalBody>
+              <ModalFooter>
+                <Button variant="light" onPress={onClose}>
+                  {tCommon("cancel")}
+                </Button>
+                <Button
+                  color="danger"
+                  onPress={handleBulkDelete}
+                  isLoading={isBulkDeleting}
+                >
+                  {tCommon("delete")}
+                </Button>
+              </ModalFooter>
+            </>
+          )}
+        </ModalContent>
+      </Modal>
 
       {/* Rename Modal */}
       <Modal isOpen={isRenameOpen} onOpenChange={onRenameOpenChange}>
