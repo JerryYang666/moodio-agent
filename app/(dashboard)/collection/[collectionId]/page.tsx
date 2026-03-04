@@ -1086,25 +1086,27 @@ export default function CollectionPage({
                 {isSelectionMode ? t("cancelSelection") : t("selectItems")}
               </Button>
             )}
-            {canAddImages && !isSelectionMode && (
+            {canAddImages && (
               <Button
                 color="primary"
                 variant="flat"
                 startContent={isUploading ? undefined : <ImagePlus size={18} />}
                 onPress={() => setIsUploadPickerOpen(true)}
                 isLoading={isUploading}
-                className="w-full sm:w-auto"
+                className={`w-full sm:w-auto ${isSelectionMode ? "invisible" : ""}`}
+                tabIndex={isSelectionMode ? -1 : undefined}
               >
                 {t("uploadImages")}
               </Button>
             )}
-            {canEdit && !isSelectionMode && (
+            {canEdit && (
               <>
                 <Button
                   variant="flat"
                   startContent={<Pencil size={18} />}
                   onPress={onRenameOpen}
-                  className="w-full sm:w-auto"
+                  className={`w-full sm:w-auto ${isSelectionMode ? "invisible" : ""}`}
+                  tabIndex={isSelectionMode ? -1 : undefined}
                 >
                   {tCommon("rename")}
                 </Button>
@@ -1112,7 +1114,8 @@ export default function CollectionPage({
                   variant="flat"
                   startContent={<Share2 size={18} />}
                   onPress={onShareOpen}
-                  className="w-full sm:w-auto"
+                  className={`w-full sm:w-auto ${isSelectionMode ? "invisible" : ""}`}
+                  tabIndex={isSelectionMode ? -1 : undefined}
                 >
                   {tCommon("share") || "Share"}
                 </Button>
@@ -1121,7 +1124,8 @@ export default function CollectionPage({
                   variant="flat"
                   startContent={<Trash2 size={18} />}
                   onPress={onDeleteOpen}
-                  className="w-full sm:w-auto"
+                  className={`w-full sm:w-auto ${isSelectionMode ? "invisible" : ""}`}
+                  tabIndex={isSelectionMode ? -1 : undefined}
                 >
                   {tCommon("delete")}
                 </Button>
