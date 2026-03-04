@@ -312,6 +312,7 @@
     "video": "Video",
     "remove": "Remove",
     "uploadImages": "Upload Images",
+    "compressing": "Compressing...",
     "dropZoneTitle": "Drop images here to add to collection",
     "dropZoneSubtitle": "JPEG, PNG, GIF, or WebP up to {maxSize}MB",
     "uploadingImages": "Uploading {count} {count, plural, one {image} other {images}}...",

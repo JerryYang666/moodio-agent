@@ -312,6 +312,7 @@
     "video": "動画",
     "remove": "削除",
     "uploadImages": "画像をアップロード",
+    "compressing": "圧縮中...",
     "dropZoneTitle": "ここに画像をドロップしてコレクションに追加",
     "dropZoneSubtitle": "JPEG、PNG、GIF、WebP（最大{maxSize}MB）",
     "uploadingImages": "{count}枚の画像をアップロード中...",

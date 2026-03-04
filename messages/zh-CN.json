@@ -312,6 +312,7 @@
     "video": "视频",
     "remove": "移除",
     "uploadImages": "上传图片",
+    "compressing": "压缩中...",
     "dropZoneTitle": "拖放图片到这里添加到合集",
     "dropZoneSubtitle": "JPEG、PNG、GIF 或 WebP，最大 {maxSize}MB",
     "uploadingImages": "正在上传 {count} 张图片...",

@@ -205,6 +205,7 @@ export default function CollectionPage({
   const [isUploadPickerOpen, setIsUploadPickerOpen] = useState(false);
   const [isDraggingExternalFile, setIsDraggingExternalFile] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [isCompressing, setIsCompressing] = useState(false);
   const dragCounterRef = useRef(0);
 
   // Asset search filter
@@ -887,7 +888,12 @@ export default function CollectionPage({
       try {
         await Promise.all(
           files.map(async (file) => {
-            const result = await uploadImage(file, { skipCollection: true });
+            const result = await uploadImage(file, {
+              skipCollection: true,
+              onPhaseChange: (phase) => {
+                if (phase === "compressing") setIsCompressing(true);
+              },
+            });
             if (!result.success) {
               addToast({ title: t("uploadFailed"), color: "danger" });
               return;
@@ -924,6 +930,7 @@ export default function CollectionPage({
         }
       } finally {
         setIsUploading(false);
+        setIsCompressing(false);
       }
     },
     [collectionId, t]
@@ -1105,7 +1112,7 @@ export default function CollectionPage({
                 className={`w-full sm:w-auto ${isSelectionMode ? "invisible" : ""}`}
                 tabIndex={isSelectionMode ? -1 : undefined}
               >
-                {t("uploadImages")}
+                {isCompressing ? t("compressing") : t("uploadImages")}
               </Button>
             )}
             {canEdit && (
