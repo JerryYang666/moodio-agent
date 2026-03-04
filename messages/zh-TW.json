@@ -28,6 +28,18 @@
     "on": "開",
     "off": "關"
   },
+  "share": {
+    "searchUser": "搜尋使用者",
+    "enterEmailAddress": "輸入電子郵件地址",
+    "userFound": "已找到使用者",
+    "owner": "擁有者",
+    "alreadyShared": "已分享",
+    "available": "可用",
+    "permission": "權限",
+    "viewer": "檢視者",
+    "collaborator": "協作者",
+    "currentlySharedWith": "目前已分享給"
+  },
   "nav": {
     "inspiration": "靈感",
     "image": "圖片",

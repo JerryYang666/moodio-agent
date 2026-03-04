@@ -28,6 +28,18 @@
     "on": "On",
     "off": "Off"
   },
+  "share": {
+    "searchUser": "Search User",
+    "enterEmailAddress": "Enter email address",
+    "userFound": "User Found",
+    "owner": "Owner",
+    "alreadyShared": "Already Shared",
+    "available": "Available",
+    "permission": "Permission",
+    "viewer": "Viewer",
+    "collaborator": "Collaborator",
+    "currentlySharedWith": "Currently Shared With"
+  },
   "nav": {
     "inspiration": "Inspiration",
     "image": "Image",

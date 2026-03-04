@@ -27,7 +27,7 @@ interface DesktopDetail {
     id: string;
     desktopId: string;
     sharedWithUserId: string;
-    permission: string;
+    permission: "viewer" | "collaborator";
     sharedAt: Date;
     email: string;
   }>;

@@ -28,6 +28,18 @@
     "on": "オン",
     "off": "オフ"
   },
+  "share": {
+    "searchUser": "ユーザーを検索",
+    "enterEmailAddress": "メールアドレスを入力",
+    "userFound": "ユーザーが見つかりました",
+    "owner": "オーナー",
+    "alreadyShared": "共有済み",
+    "available": "利用可能",
+    "permission": "権限",
+    "viewer": "閲覧者",
+    "collaborator": "共同編集者",
+    "currentlySharedWith": "現在の共有先"
+  },
   "nav": {
     "inspiration": "インスピレーション",
     "image": "画像",
