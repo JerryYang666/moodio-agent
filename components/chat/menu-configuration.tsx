@@ -34,6 +34,7 @@ export type MenuState = {
   expertise: string;
   aspectRatio: string;
   imageSize: string;
+  imageQuantity: string;
 };
 
 // Default initial state
@@ -43,6 +44,7 @@ export const INITIAL_MENU_STATE: MenuState = {
   expertise: MENU_CONFIG.categories.expertise.default,
   aspectRatio: MENU_CONFIG.categories.aspectRatio.default,
   imageSize: MENU_CONFIG.categories.imageSize.default,
+  imageQuantity: MENU_CONFIG.categories.imageQuantity.default,
 };
 
 // localStorage key for persisting menu preferences
@@ -58,6 +60,7 @@ export const saveMenuState = (state: MenuState) => {
     expertise: state.expertise,
     aspectRatio: state.aspectRatio,
     imageSize: state.imageSize,
+    imageQuantity: state.imageQuantity,
   };
   
   try {
@@ -98,7 +101,12 @@ export const loadMenuState = (): MenuState => {
       if (parsed.imageSize && MENU_CONFIG.categories.imageSize.options[parsed.imageSize as keyof typeof MENU_CONFIG.categories.imageSize.options]) {
         loaded.imageSize = parsed.imageSize;
       }
-      
+
+      // Validate and apply saved imageQuantity
+      if (parsed.imageQuantity && MENU_CONFIG.categories.imageQuantity.options[parsed.imageQuantity as keyof typeof MENU_CONFIG.categories.imageQuantity.options]) {
+        loaded.imageQuantity = parsed.imageQuantity;
+      }
+
       // Now resolve the state to ensure it's valid for the current mode
       return resolveMenuState(loaded);
     }
@@ -136,7 +144,7 @@ export const resolveMenuState = (
   const newState = { ...currentState, mode };
 
   // Categories to resolve
-  const categories = ["model", "expertise", "aspectRatio", "imageSize"] as const;
+  const categories = ["model", "expertise", "aspectRatio", "imageSize", "imageQuantity"] as const;
 
   categories.forEach((category) => {
     const categoryConfig = availability[category];
@@ -199,7 +207,7 @@ export default function MenuConfiguration({
 }: MenuConfigurationProps) {
   const t = useTranslations("menu");
   const getCategoryLabel = (
-    categoryKey: "model" | "expertise" | "aspectRatio" | "imageSize"
+    categoryKey: "model" | "expertise" | "aspectRatio" | "imageSize" | "imageQuantity"
   ) => t(categoryKey);
   const getModeLabel = (key: string) => t(`modes.${key}`);
   const getModeDescription = (key: string) => t(`modes.${key}Desc`);
@@ -207,8 +215,11 @@ export default function MenuConfiguration({
   const getExpertiseLabel = (key: string) => t(`expertiseOptions.${key}`);
   const getAspectRatioLabel = (key: string) => t(`aspectRatioOptions.${key}`);
   const getImageSizeLabel = (key: string) => t(`imageSizeOptions.${key}`);
+  const getImageQuantityLabel = (key: string) => t(`imageQuantityOptions.${key}`);
   const getAspectRatioDescription = (key: string) =>
     key === "smart" ? t("aspectRatioOptions.smartDesc") : undefined;
+  const getImageQuantityDescription = (key: string) =>
+    key === "smart" ? t("imageQuantityOptions.smartDesc") : undefined;
   // Handlers for changes
   const handleModeChange = (keys: any) => {
     const selected = Array.from(keys)[0] as string;
@@ -230,7 +241,7 @@ export default function MenuConfiguration({
 
   // Render a dropdown for a category
   const renderDropdown = (
-    categoryKey: "model" | "expertise" | "aspectRatio" | "imageSize"
+    categoryKey: "model" | "expertise" | "aspectRatio" | "imageSize" | "imageQuantity"
   ) => {
     const availability = currentContext.availability[categoryKey];
 
@@ -253,8 +264,11 @@ export default function MenuConfiguration({
           ? getExpertiseLabel(selectedKey)
           : categoryKey === "aspectRatio"
             ? getAspectRatioLabel(selectedKey)
-            : getImageSizeLabel(selectedKey);
+            : categoryKey === "imageQuantity"
+              ? getImageQuantityLabel(selectedKey)
+              : getImageSizeLabel(selectedKey);
     const isAspectRatio = categoryKey === "aspectRatio";
+    const isImageQuantity = categoryKey === "imageQuantity";
 
     // Get icon for aspect ratio options (if defined in config)
     const getAspectRatioIcon = (key: string, size: number) => {
@@ -266,6 +280,16 @@ export default function MenuConfiguration({
       return (
         <AspectRatioIcon ratio={key} size={size} className="text-default-500" />
       );
+    };
+
+    // Get icon for imageQuantity options (smart option has Sparkles icon)
+    const getQuantityIcon = (key: string, size: number) => {
+      const option = (options as any)[key];
+      if (option?.icon && ICON_MAP[option.icon]) {
+        const Icon = ICON_MAP[option.icon];
+        return <Icon size={size} className="text-default-500" />;
+      }
+      return undefined;
     };
 
     return (
@@ -280,7 +304,11 @@ export default function MenuConfiguration({
               variant="bordered"
               size="sm"
               startContent={
-                isAspectRatio ? getAspectRatioIcon(selectedKey, 16) : undefined
+                isAspectRatio
+                  ? getAspectRatioIcon(selectedKey, 16)
+                  : isImageQuantity
+                    ? getQuantityIcon(selectedKey, 16)
+                    : undefined
               }
               endContent={<ChevronUp size={14} className="text-default-400" />}
             >
@@ -303,7 +331,9 @@ export default function MenuConfiguration({
               const description =
                 categoryKey === "aspectRatio"
                   ? getAspectRatioDescription(key)
-                  : undefined;
+                  : categoryKey === "imageQuantity"
+                    ? getImageQuantityDescription(key)
+                    : undefined;
               const hasDescription = Boolean(description);
               const optionLabel =
                 categoryKey === "model"
@@ -312,13 +342,19 @@ export default function MenuConfiguration({
                     ? getExpertiseLabel(key)
                     : categoryKey === "aspectRatio"
                       ? getAspectRatioLabel(key)
-                      : getImageSizeLabel(key);
+                      : categoryKey === "imageQuantity"
+                        ? getImageQuantityLabel(key)
+                        : getImageSizeLabel(key);
 
               return (
                 <DropdownItem
                   key={key}
                   startContent={
-                    isAspectRatio ? getAspectRatioIcon(key, 20) : undefined
+                    isAspectRatio
+                      ? getAspectRatioIcon(key, 20)
+                      : isImageQuantity
+                        ? getQuantityIcon(key, 20)
+                        : undefined
                   }
                   endContent={
                     hasDescription ? (
@@ -443,6 +479,7 @@ export default function MenuConfiguration({
         {renderDropdown("expertise")}
         {renderDropdown("aspectRatio")}
         {renderDropdown("imageSize")}
+        {renderDropdown("imageQuantity")}
       </div>
     </div>
   );

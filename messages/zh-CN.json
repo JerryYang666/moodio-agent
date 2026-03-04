@@ -509,6 +509,15 @@
       "2k": "2K",
       "4k": "4K"
     },
+    "imageQuantity": "数量",
+    "imageQuantityOptions": {
+      "smart": "智能",
+      "smartDesc": "让代理决定生成图片的最佳数量",
+      "1": "1",
+      "2": "2",
+      "3": "3",
+      "4": "4"
+    },
     "editModeHint": "请先选择或上传图片以使用编辑模式",
     "expertiseNotAvailable": "编辑已选图片模式下不支持专业领域选项。",
     "aspectRatioNotApplicable": "对话模式下不适用宽高比设置。"

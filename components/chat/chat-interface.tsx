@@ -1269,6 +1269,11 @@ export default function ChatInterface({
         payload.aspectRatio = menuState.aspectRatio;
       }
 
+      // Pass image quantity if not "smart" (let agent decide)
+      if (menuState.imageQuantity && menuState.imageQuantity !== "smart") {
+        payload.imageQuantity = parseInt(menuState.imageQuantity, 10);
+      }
+
       // Check for system prompt override
       const overrideEnabled =
         localStorage.getItem(SYSTEM_PROMPT_STORAGE_KEY + "_enabled") === "true";

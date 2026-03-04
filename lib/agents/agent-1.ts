@@ -99,6 +99,9 @@ interface ParseState {
   finalContent: MessageContentPart[];
 }
 
+/** Hard cap on the number of image suggestions the agent can generate. */
+const MAX_SUGGESTIONS_HARD_CAP = 6;
+
 /** Immutable context passed to all parsing helpers. */
 interface ParseContext {
   prepared: PreparedMessages;
@@ -106,6 +109,7 @@ interface ParseContext {
   send: (data: any) => void;
   userId: string;
   agent: Agent1;
+  maxSuggestions: number;
 }
 
 export class Agent1 implements Agent {
@@ -123,7 +127,8 @@ export class Agent1 implements Agent {
     systemPromptOverride?: string,
     aspectRatioOverride?: string,
     imageSizeOverride?: ImageSize,
-    imageModelId?: string
+    imageModelId?: string,
+    maxImageQuantity?: number // User-selected max image quantity (undefined = smart/agent decides)
   ): Promise<AgentResponse> {
     const startTime = requestStartTime || Date.now();
     console.log(
@@ -170,15 +175,23 @@ export class Agent1 implements Agent {
       systemPromptOverride,
       validatedAspectRatio,
       validatedImageSize,
-      imageModelId
+      imageModelId,
+      undefined, // referenceImages
+      maxImageQuantity
     );
+
+    // Determine effective max suggestions: user selection capped at hard limit
+    const effectiveMaxSuggestions = maxImageQuantity
+      ? Math.min(maxImageQuantity, MAX_SUGGESTIONS_HARD_CAP)
+      : MAX_SUGGESTIONS_HARD_CAP;
 
     // Step 2: Call LLM and parse response
     const { stream, completion } = await this.callLLMAndParse(
       prepared,
       startTime,
       isAdmin,
-      userId
+      userId,
+      effectiveMaxSuggestions
     );
 
     return { stream, completion };
@@ -249,7 +262,8 @@ export class Agent1 implements Agent {
     aspectRatioOverride?: AspectRatio,
     imageSizeOverride?: ImageSize,
     imageModelId?: string,
-    referenceImages?: ReferenceImageEntry[] // Reference images with tags
+    referenceImages?: ReferenceImageEntry[], // Reference images with tags
+    maxImageQuantity?: number // User-selected image quantity (undefined = smart/agent decides)
   ): Promise<PreparedMessages> {
     const rawSystemPrompt = systemPromptOverride || getSystemPrompt(this.id);
     const systemPrompt = rawSystemPrompt
@@ -395,6 +409,18 @@ export class Agent1 implements Agent {
       }
     }
 
+    // Add image quantity instruction if user selected a specific number
+    if (maxImageQuantity && maxImageQuantity >= 1 && maxImageQuantity <= MAX_SUGGESTIONS_HARD_CAP) {
+      if (!Array.isArray(formattedUserMessage.content)) {
+        formattedUserMessage.content = [{ type: "text", text: formattedUserMessage.content as string }];
+      }
+      formattedUserMessage.content.push({
+        type: "text",
+        text: `\nGenerate exactly ${maxImageQuantity} image suggestion${maxImageQuantity === 1 ? "" : "s"}.`,
+      });
+      console.log(`[Agent-1] User selected image quantity: ${maxImageQuantity}`);
+    }
+
     // Find last think part location in filteredHistory
     let lastThinkMessageIndex = -1;
     let lastThinkPartIndex = -1;
@@ -471,7 +497,8 @@ export class Agent1 implements Agent {
     prepared: PreparedMessages,
     startTime: number,
     isAdmin: boolean,
-    userId: string
+    userId: string,
+    maxSuggestions: number = MAX_SUGGESTIONS_HARD_CAP
   ): Promise<AgentResponse> {
     const encoder = new TextEncoder();
     let resolveCompletion: (value: Message) => void;
@@ -534,7 +561,8 @@ export class Agent1 implements Agent {
               prepared,
               startTime,
               send,
-              userId
+              userId,
+              maxSuggestions
             );
 
             if (attempt > 0) {
@@ -584,7 +612,8 @@ export class Agent1 implements Agent {
     prepared: PreparedMessages,
     startTime: number,
     send: (data: any) => void,
-    userId: string
+    userId: string,
+    maxSuggestions: number = MAX_SUGGESTIONS_HARD_CAP
   ): Promise<Message> {
     console.log("prepared.messages", JSON.stringify(prepared.messages, null, 2));
 
@@ -607,7 +636,7 @@ export class Agent1 implements Agent {
       imageTasks: [],
       finalContent: [],
     };
-    const ctx: ParseContext = { prepared, startTime, send, userId, agent: this };
+    const ctx: ParseContext = { prepared, startTime, send, userId, agent: this, maxSuggestions };
 
     try {
       await this.consumeLLMStream(llmStream, state, ctx);
@@ -673,7 +702,7 @@ export class Agent1 implements Agent {
       try {
         const suggestion = JSON.parse(result.content);
 
-        if (state.suggestionIndex < 8) {
+        if (state.suggestionIndex < ctx.maxSuggestions) {
           const currentIndex = state.suggestionIndex;
           state.suggestionIndex++;
           const trackingImageId = generateImageId();
@@ -727,7 +756,7 @@ export class Agent1 implements Agent {
 
           state.imageTasks.push(task);
         } else {
-          console.log(`[Agent-1] Skipping suggestion beyond limit of 8. Title: ${suggestion.title}`);
+          console.log(`[Agent-1] Skipping suggestion beyond limit of ${ctx.maxSuggestions}. Title: ${suggestion.title}`);
         }
       } catch (e) {
         console.error("Failed to parse suggestion JSON", e);
@@ -1176,7 +1205,8 @@ export class Agent1 implements Agent {
     imageSizeOverride?: ImageSize,
     imageModelId?: string,
     messageTimestamp?: number, // Timestamp to use for all variants (for frontend sync)
-    referenceImages?: ReferenceImageEntry[] // Reference images with tags
+    referenceImages?: ReferenceImageEntry[], // Reference images with tags
+    maxImageQuantity?: number // User-selected max image quantity (undefined = smart/agent decides)
   ): Promise<ParallelAgentResponse> {
     const startTime = requestStartTime || Date.now();
     // Use provided timestamp or generate one
@@ -1217,8 +1247,14 @@ export class Agent1 implements Agent {
       validatedAspectRatio,
       validatedImageSize,
       imageModelId,
-      referenceImages
+      referenceImages,
+      maxImageQuantity
     );
+
+    // Determine effective max suggestions: user selection capped at hard limit
+    const effectiveMaxSuggestions = maxImageQuantity
+      ? Math.min(maxImageQuantity, MAX_SUGGESTIONS_HARD_CAP)
+      : MAX_SUGGESTIONS_HARD_CAP;
 
     const encoder = new TextEncoder();
     const self = this;
@@ -1281,7 +1317,8 @@ export class Agent1 implements Agent {
                   prepared,
                   startTime,
                   send,
-                  userId
+                  userId,
+                  effectiveMaxSuggestions
                 );
 
                 // Add variantId and createdAt to the result message
