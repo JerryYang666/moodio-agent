@@ -7,7 +7,7 @@ import "encoding/json"
 // operates in single-server mode (backward compatible).
 type Federator interface {
 	Publish(roomId string, msg []byte) error
-	Subscribe(roomId string, handler func(msg []byte)) error
+	Subscribe(roomId string, handler func(sourceRegion string, msg []byte)) error
 	Unsubscribe(roomId string) error
 	Close()
 }

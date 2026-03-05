@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"log"
 	"sync"
 	"time"
 
@@ -107,8 +106,8 @@ func (rm *RoomManager) addToRoom(roomId string, s *melody.Session) {
 	rm.mu.Unlock()
 
 	if isFirstSession && rm.federator != nil {
-		rm.federator.Subscribe(roomId, func(msg []byte) {
-			rm.handleFederatedMessage(roomId, msg)
+		rm.federator.Subscribe(roomId, func(sourceRegion string, msg []byte) {
+			rm.handleFederatedMessage(roomId, sourceRegion, msg)
 		})
 	}
 }
@@ -142,7 +141,7 @@ func (rm *RoomManager) HandleConnect(s *melody.Session) {
 
 	sessions := rm.getSessionsInRoom(keys.RoomID, keys.SessionID)
 
-	log.Printf("[room] %s joined room=%s (%d other sessions present)", keys.FirstName, keys.RoomID[:8], len(sessions))
+	logf(regionLocal, "[room] %s joined room=%s (%d other sessions present)", keys.FirstName, keys.RoomID[:8], len(sessions))
 
 	joined := RoomJoinedEvent{
 		Type:      "room_joined",
@@ -151,7 +150,7 @@ func (rm *RoomManager) HandleConnect(s *melody.Session) {
 	}
 	data, err := json.Marshal(joined)
 	if err != nil {
-		log.Printf("Error marshalling room_joined: %v", err)
+		logf(regionLocal, "error marshalling room_joined: %v", err)
 		return
 	}
 	s.Write(data)
@@ -165,24 +164,24 @@ func (rm *RoomManager) HandleMessage(s *melody.Session, msg []byte) {
 
 	var incoming IncomingEvent
 	if err := json.Unmarshal(msg, &incoming); err != nil {
-		log.Printf("Invalid message from session: %v", err)
+		logf(regionLocal, "invalid message from session: %v", err)
 		return
 	}
 
 	if keys.Permission == "viewer" && isMutationEvent(incoming.Type) {
-		log.Printf("[room] blocked mutation %s from viewer session=%s", incoming.Type, keys.SessionID)
+		logf(regionLocal, "[room] blocked mutation %s from viewer session=%s", incoming.Type, keys.SessionID)
 		return
 	}
 
 	if isStateEvent(incoming.Type) {
-		log.Printf("[event] %s %s in room=%s by %s",
+		logf(regionLocal, "[event] %s %s in room=%s by %s",
 			incoming.Type, truncatePayloadForLog(incoming.Payload), keys.RoomID[:8], keys.FirstName)
 	}
 
 	stamped := stampIdentity(keys, &incoming)
 	data, err := json.Marshal(stamped)
 	if err != nil {
-		log.Printf("Error marshalling stamped event: %v", err)
+		logf(regionLocal, "error marshalling stamped event: %v", err)
 		return
 	}
 
@@ -195,7 +194,7 @@ func (rm *RoomManager) HandleDisconnect(s *melody.Session) {
 	rm.removeFromRoom(keys.RoomID, s)
 
 	remaining := rm.getSessionsInRoom(keys.RoomID, keys.SessionID)
-	log.Printf("[room] %s left room=%s (%d sessions remaining)", keys.FirstName, keys.RoomID[:8], len(remaining))
+	logf(regionLocal, "[room] %s left room=%s (%d sessions remaining)", keys.FirstName, keys.RoomID[:8], len(remaining))
 
 	sessionEvent := buildSessionEvent("session_left", s)
 	rm.broadcastToRoom(keys.RoomID, s, sessionEvent)
@@ -217,7 +216,7 @@ func (rm *RoomManager) broadcastToRoom(roomId string, sender *melody.Session, ms
 
 	if rm.federator != nil && msg != nil {
 		if err := rm.federator.Publish(roomId, msg); err != nil {
-			log.Printf("[federation] publish error for room=%s: %v", roomId, err)
+			logf(regionLocal, "[federation] publish error for room=%s: %v", roomId, err)
 		}
 	}
 }
@@ -297,7 +296,7 @@ func buildSessionEvent(eventType string, s *melody.Session) []byte {
 	}
 	data, err := json.Marshal(event)
 	if err != nil {
-		log.Printf("Error marshalling %s event: %v", eventType, err)
+		logf(regionLocal, "error marshalling %s event: %v", eventType, err)
 		return nil
 	}
 	return data
@@ -348,9 +347,10 @@ func mustGetString(s *melody.Session, key string) string {
 // handleFederatedMessage processes messages received from other regions via
 // NATS. It updates the remote sessions map for presence events and broadcasts
 // the message to all local sessions in the room.
-func (rm *RoomManager) handleFederatedMessage(roomId string, msg []byte) {
+func (rm *RoomManager) handleFederatedMessage(roomId string, sourceRegion string, msg []byte) {
 	var event struct {
-		Type string `json:"type"`
+		Type      string `json:"type"`
+		FirstName string `json:"firstName"`
 	}
 	if err := json.Unmarshal(msg, &event); err == nil {
 		switch event.Type {
@@ -365,6 +365,7 @@ func (rm *RoomManager) handleFederatedMessage(roomId string, msg []byte) {
 					rm.remoteMu.Unlock()
 				}
 			}
+			logf(sourceRegion, "[room] %s joined room=%s", event.FirstName, roomId[:8])
 		case "session_left":
 			var full OutgoingEvent
 			if err := json.Unmarshal(msg, &full); err == nil {
@@ -372,6 +373,16 @@ func (rm *RoomManager) handleFederatedMessage(roomId string, msg []byte) {
 				rm.remoteSessions[roomId] = removeRemoteSession(rm.remoteSessions[roomId], full.SessionID)
 				rm.remoteMu.Unlock()
 			}
+			logf(sourceRegion, "[room] %s left room=%s", event.FirstName, roomId[:8])
+		}
+
+		if isStateEvent(event.Type) {
+			var raw struct {
+				Payload json.RawMessage `json:"payload"`
+			}
+			json.Unmarshal(msg, &raw)
+			logf(sourceRegion, "[event] %s %s in room=%s by %s",
+				event.Type, truncatePayloadForLog(raw.Payload), roomId[:8], event.FirstName)
 		}
 	}
 

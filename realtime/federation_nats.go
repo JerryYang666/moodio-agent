@@ -1,7 +1,6 @@
 package main
 
 import (
-	"log"
 	"sync"
 	"time"
 
@@ -24,16 +23,16 @@ func NewNATSFederator(url, regionId string) (*NATSFederator, error) {
 		nats.ReconnectWait(2*time.Second),
 		nats.MaxReconnects(-1),
 		nats.DisconnectErrHandler(func(_ *nats.Conn, err error) {
-			log.Printf("[nats] disconnected: %v", err)
+		logf(regionLocal, "[nats] disconnected: %v", err)
 		}),
 		nats.ReconnectHandler(func(nc *nats.Conn) {
-			log.Printf("[nats] reconnected to %s", nc.ConnectedUrl())
+		logf(regionLocal, "[nats] reconnected to %s", nc.ConnectedUrl())
 		}),
 	)
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("[nats] connected to %s (region=%s)", nc.ConnectedUrl(), regionId)
+	logf(regionLocal, "[nats] connected to %s (region=%s)", nc.ConnectedUrl(), regionId)
 	return &NATSFederator{
 		conn:     nc,
 		regionId: regionId,
@@ -49,17 +48,17 @@ func (f *NATSFederator) Publish(roomId string, msg []byte) error {
 	return f.conn.Publish("room."+roomId, data)
 }
 
-func (f *NATSFederator) Subscribe(roomId string, handler func([]byte)) error {
+func (f *NATSFederator) Subscribe(roomId string, handler func(string, []byte)) error {
 	sub, err := f.conn.Subscribe("room."+roomId, func(m *nats.Msg) {
 		fm, err := decodeFederatedMsg(m.Data)
 		if err != nil {
-			log.Printf("[nats] bad federated message: %v", err)
+			logf(regionLocal, "[nats] bad federated message: %v", err)
 			return
 		}
 		if fm.RegionID == f.regionId {
 			return
 		}
-		handler(fm.Payload)
+		handler(fm.RegionID, fm.Payload)
 	})
 	if err != nil {
 		return err

@@ -13,13 +13,13 @@ import (
 type mockFederator struct {
 	regionId string
 	mu       sync.Mutex
-	subs     map[string]func([]byte)
+	subs     map[string]func(string, []byte)
 	peer     *mockFederator
 }
 
 func newMockFederatorPair(regionA, regionB string) (*mockFederator, *mockFederator) {
-	a := &mockFederator{regionId: regionA, subs: make(map[string]func([]byte))}
-	b := &mockFederator{regionId: regionB, subs: make(map[string]func([]byte))}
+	a := &mockFederator{regionId: regionA, subs: make(map[string]func(string, []byte))}
+	b := &mockFederator{regionId: regionB, subs: make(map[string]func(string, []byte))}
 	a.peer = b
 	b.peer = a
 	return a, b
@@ -41,14 +41,14 @@ func (f *mockFederator) Publish(roomId string, msg []byte) error {
 				return err
 			}
 			if fm.RegionID != f.peer.regionId {
-				go handler(fm.Payload)
+				go handler(fm.RegionID, fm.Payload)
 			}
 		}
 	}
 	return nil
 }
 
-func (f *mockFederator) Subscribe(roomId string, handler func([]byte)) error {
+func (f *mockFederator) Subscribe(roomId string, handler func(string, []byte)) error {
 	f.mu.Lock()
 	f.subs[roomId] = handler
 	f.mu.Unlock()

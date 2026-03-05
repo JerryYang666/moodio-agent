@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -19,7 +18,7 @@ func main() {
 
 	jwtSecret := os.Getenv("JWT_ACCESS_SECRET")
 	if jwtSecret == "" {
-		log.Fatal("JWT_ACCESS_SECRET environment variable is required")
+		fatalf(regionLocal, "JWT_ACCESS_SECRET environment variable is required")
 	}
 
 	permissionAPIBase := os.Getenv("PERMISSION_API_BASE")
@@ -43,24 +42,24 @@ func main() {
 			if regionId == "unknown" {
 				regionId = "no-region"
 			}
-			log.Printf("[federation] auto-detected region: %s", regionId)
+			logf(regionLocal, "[federation] auto-detected region: %s", regionId)
 		}
 
 		fed, err := NewNATSFederator(natsURL, regionId)
 		if err != nil {
-			log.Printf("[federation] NATS unavailable at %s, running without federation: %v", natsURL, err)
+			logf(regionLocal, "[federation] NATS unavailable at %s, running without federation: %v", natsURL, err)
 		} else {
 			rooms.federator = fed
 			rooms.regionId = regionId
 			defer fed.Close()
-			log.Printf("[federation] enabled (region=%s, nats=%s)", regionId, natsURL)
+			logf(regionLocal, "[federation] enabled (region=%s, nats=%s)", regionId, natsURL)
 		}
 	}
 
 	http.HandleFunc("/ws/desktop/{desktopId}", func(w http.ResponseWriter, r *http.Request) {
 		claims, err := auth.ValidateFromCookie(r)
 		if err != nil {
-			log.Printf("[auth] rejected connection: %v", err)
+			logf(regionLocal, "[auth] rejected connection: %v", err)
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
@@ -73,13 +72,13 @@ func main() {
 
 		permission, err := checkPermission(permissionAPIBase, desktopId, claims.UserID, r)
 		if err != nil || permission == "" {
-			log.Printf("[auth] permission denied for user=%s desktop=%s: %v", claims.UserID, desktopId, err)
+			logf(regionLocal, "[auth] permission denied for user=%s desktop=%s: %v", claims.UserID, desktopId, err)
 			http.Error(w, "forbidden", http.StatusForbidden)
 			return
 		}
 
 		sessionId := generateSessionId()
-		log.Printf("[connect] user=%s (%s) -> desktop=%s session=%s permission=%s",
+		logf(regionLocal, "[connect] user=%s (%s) -> desktop=%s session=%s permission=%s",
 			claims.FirstName, claims.UserID[:8], desktopId[:8], sessionId, permission)
 
 		err = m.HandleRequestWithKeys(w, r, map[string]any{
@@ -91,7 +90,7 @@ func main() {
 			"roomId":     desktopId,
 		})
 		if err != nil {
-			log.Printf("WebSocket upgrade error: %v", err)
+			logf(regionLocal, "WebSocket upgrade error: %v", err)
 		}
 	})
 
@@ -115,7 +114,7 @@ func main() {
 
 	http.HandleFunc("/ws/ping", func(w http.ResponseWriter, r *http.Request) {
 		if err := pingMelody.HandleRequest(w, r); err != nil {
-			log.Printf("Ping WebSocket upgrade error: %v", err)
+			logf(regionLocal, "ping WebSocket upgrade error: %v", err)
 		}
 	})
 
@@ -125,7 +124,7 @@ func main() {
 	})
 
 	http.HandleFunc("/check", func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("[check] received check request from %s", r.RemoteAddr)
+		logf(regionLocal, "[check] received check request from %s", r.RemoteAddr)
 
 		region := fetchEC2Region()
 
@@ -137,9 +136,9 @@ func main() {
 		})
 	})
 
-	log.Printf("Realtime server starting on :%s", port)
+	logf(regionLocal, "realtime server starting on :%s", port)
 	if err := http.ListenAndServe(":"+port, nil); err != nil {
-		log.Fatal(err)
+		fatalf(regionLocal, "listen error: %v", err)
 	}
 }
 
@@ -148,42 +147,42 @@ func fetchEC2Region() string {
 
 	tokenReq, err := http.NewRequest(http.MethodPut, "http://169.254.169.254/latest/api/token", nil)
 	if err != nil {
-		log.Printf("[check] failed to create token request: %v", err)
+		logf(regionLocal, "[check] failed to create token request: %v", err)
 		return "unknown"
 	}
 	tokenReq.Header.Set("X-aws-ec2-metadata-token-ttl-seconds", "21600")
 
 	tokenResp, err := client.Do(tokenReq)
 	if err != nil {
-		log.Printf("[check] failed to fetch IMDSv2 token: %v", err)
+		logf(regionLocal, "[check] failed to fetch IMDSv2 token: %v", err)
 		return "unknown"
 	}
 	defer tokenResp.Body.Close()
 
 	tokenBytes, err := io.ReadAll(tokenResp.Body)
 	if err != nil {
-		log.Printf("[check] failed to read token response: %v", err)
+		logf(regionLocal, "[check] failed to read token response: %v", err)
 		return "unknown"
 	}
 	token := strings.TrimSpace(string(tokenBytes))
 
 	regionReq, err := http.NewRequest(http.MethodGet, "http://169.254.169.254/latest/meta-data/placement/region", nil)
 	if err != nil {
-		log.Printf("[check] failed to create region request: %v", err)
+		logf(regionLocal, "[check] failed to create region request: %v", err)
 		return "unknown"
 	}
 	regionReq.Header.Set("X-aws-ec2-metadata-token", token)
 
 	regionResp, err := client.Do(regionReq)
 	if err != nil {
-		log.Printf("[check] failed to fetch region: %v", err)
+		logf(regionLocal, "[check] failed to fetch region: %v", err)
 		return "unknown"
 	}
 	defer regionResp.Body.Close()
 
 	regionBytes, err := io.ReadAll(regionResp.Body)
 	if err != nil {
-		log.Printf("[check] failed to read region response: %v", err)
+		logf(regionLocal, "[check] failed to read region response: %v", err)
 		return "unknown"
 	}
 
