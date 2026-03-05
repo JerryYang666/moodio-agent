@@ -51,6 +51,16 @@ export default function TableAsset({ asset, sendEvent, cellLocks, currentUserId,
     };
   }, []);
 
+  // Clear localCellOverride once the canonical prop has updated (whether it
+  // caught up to the same value or diverged due to a remote edit). The
+  // override only needs to survive the single render between commit and the
+  // state propagation; after that, cell.value is the source of truth.
+  useEffect(() => {
+    if (!localCellOverride) return;
+    if (editingCell === localCellOverride.key) return;
+    setLocalCellOverride(null);
+  }, [meta.rows, localCellOverride, editingCell]);
+
   // Re-broadcast cell_selected every second so newcomers see the lock
   useEffect(() => {
     if (!editingCell || !sendEvent) return;
