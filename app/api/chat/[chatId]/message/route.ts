@@ -349,7 +349,8 @@ export async function POST(
                     const imageBase64Data = await Promise.all(
                       imageIds.map(async (imgId) => {
                         try {
-                          return await downloadImage(imgId);
+                          const buf = await downloadImage(imgId);
+                          return buf ? buf.toString("base64") : undefined;
                         } catch {
                           return undefined;
                         }
