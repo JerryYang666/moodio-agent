@@ -109,6 +109,7 @@ func (rm *RoomManager) addToRoom(roomId string, s *melody.Session) {
 		rm.federator.Subscribe(roomId, func(sourceRegion string, msg []byte) {
 			rm.handleFederatedMessage(roomId, sourceRegion, msg)
 		})
+		rm.requestPresenceSync(roomId)
 	}
 }
 
@@ -345,6 +346,35 @@ func mustGetString(s *melody.Session, key string) string {
 	return str
 }
 
+// requestPresenceSync publishes a presence_sync_request to NATS so that
+// other regional servers reply with session_joined events for their local
+// sessions in this room. Called when the first local session joins a room.
+func (rm *RoomManager) requestPresenceSync(roomId string) {
+	msg, _ := json.Marshal(map[string]string{"type": "presence_sync_request"})
+	if err := rm.federator.Publish(roomId, msg); err != nil {
+		logf(regionLocal, "[federation] presence sync request failed for room=%s: %v", roomId, err)
+	}
+}
+
+// publishLocalPresence publishes session_joined events for every local
+// session in a room. Called in response to a presence_sync_request from
+// another region so the newcomer can discover who is already here.
+func (rm *RoomManager) publishLocalPresence(roomId string) {
+	rm.mu.RLock()
+	members := rm.rooms[roomId]
+	events := make([][]byte, 0, len(members))
+	for s := range members {
+		if evt := buildSessionEvent("session_joined", s); evt != nil {
+			events = append(events, evt)
+		}
+	}
+	rm.mu.RUnlock()
+
+	for _, evt := range events {
+		rm.federator.Publish(roomId, evt)
+	}
+}
+
 // handleFederatedMessage processes messages received from other regions via
 // NATS. It updates the remote sessions map for presence events and broadcasts
 // the message to all local sessions in the room.
@@ -354,6 +384,11 @@ func (rm *RoomManager) handleFederatedMessage(roomId string, sourceRegion string
 		FirstName string `json:"firstName"`
 	}
 	if err := json.Unmarshal(msg, &event); err == nil {
+		if event.Type == "presence_sync_request" {
+			rm.publishLocalPresence(roomId)
+			return
+		}
+
 		switch event.Type {
 		case "session_joined":
 			var full OutgoingEvent

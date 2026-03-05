@@ -302,3 +302,78 @@ func TestFederationSenderDoesNotEcho(t *testing.T) {
 		t.Fatalf("Alice should not receive her own message back, got %d", aliceMsgs)
 	}
 }
+
+func TestFederationPresenceSync(t *testing.T) {
+	fedUS, fedHK := newMockFederatorPair("us-east-2", "ap-northeast-1")
+
+	_, roomsUS, serverUS := setupTestServer()
+	defer serverUS.Close()
+	roomsUS.federator = fedUS
+	roomsUS.regionId = "us-east-2"
+
+	_, roomsHK, serverHK := setupTestServer()
+	defer serverHK.Close()
+	roomsHK.federator = fedHK
+	roomsHK.regionId = "ap-northeast-1"
+
+	roomId := "room-sync-test"
+
+	// Alice connects in the US first -- HK has no subscription yet
+	alice := connectClient(t, serverUS, roomId, "user-alice", "Alice", "editor")
+	defer alice.close()
+	time.Sleep(100 * time.Millisecond)
+
+	// Bob connects in HK later -- should discover Alice via presence sync
+	bob := connectClient(t, serverHK, roomId, "user-bob", "Bob", "editor")
+	defer bob.close()
+	time.Sleep(200 * time.Millisecond)
+
+	// Bob should receive session_joined for Alice (via sync response)
+	msgs := bob.waitForMessages(2, 2*time.Second)
+	foundAlice := false
+	for _, m := range msgs {
+		if parseEventType(m) == "session_joined" {
+			var out OutgoingEvent
+			json.Unmarshal(m, &out)
+			if out.FirstName == "Alice" {
+				foundAlice = true
+			}
+		}
+	}
+	if !foundAlice {
+		t.Fatal("Bob (HK latecomer) should discover Alice (US) via presence sync")
+	}
+
+	// Alice should also know about Bob (via normal federation)
+	msgs = alice.waitForMessages(2, 2*time.Second)
+	foundBob := false
+	for _, m := range msgs {
+		if parseEventType(m) == "session_joined" {
+			var out OutgoingEvent
+			json.Unmarshal(m, &out)
+			if out.FirstName == "Bob" {
+				foundBob = true
+			}
+		}
+	}
+	if !foundBob {
+		t.Fatal("Alice (US) should know about Bob (HK) via normal federation")
+	}
+
+	// Verify remoteSessions is populated on both sides
+	roomsHK.remoteMu.RLock()
+	hkRemote := roomsHK.remoteSessions[roomId]
+	roomsHK.remoteMu.RUnlock()
+	if len(hkRemote) == 0 {
+		t.Fatal("HK remoteSessions should contain Alice")
+	}
+	foundAlice = false
+	for _, s := range hkRemote {
+		if s.FirstName == "Alice" {
+			foundAlice = true
+		}
+	}
+	if !foundAlice {
+		t.Fatal("HK remoteSessions should contain Alice's session info")
+	}
+}
