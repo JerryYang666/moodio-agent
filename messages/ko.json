@@ -497,12 +497,10 @@
     "selectCategory": "{category} 선택",
     "with": "으로",
     "modes": {
-      "create": "새 이미지 만들기",
-      "createDesc": "전체 생성 워크플로우",
-      "edit": "선택한 이미지 편집",
-      "editDesc": "기존 이미지 편집",
-      "chat": "채팅",
-      "chatDesc": "대화형 상호작용"
+      "agent": "에이전트",
+      "agentDesc": "AI 지원 이미지 생성, 프롬프트 도움",
+      "image": "이미지",
+      "imageDesc": "프롬프트에서 직접 이미지 생성"
     },
     "models": {
       "nano-banana-pro": "Nano-banana Pro",
@@ -543,9 +541,7 @@
       "3": "3",
       "4": "4"
     },
-    "editModeHint": "편집 모드를 사용하려면 먼저 이미지를 선택하거나 업로드하세요",
-    "expertiseNotAvailable": "선택한 이미지 편집 모드에서는 전문 분야를 사용할 수 없습니다.",
-    "aspectRatioNotApplicable": "채팅 모드에서는 화면 비율이 적용되지 않습니다."
+    "expertiseNotAvailable": "직접 이미지 생성 모드에서는 전문 분야를 사용할 수 없습니다."
   },
   "notifications": {
     "enableTitle": "알림 활성화",
