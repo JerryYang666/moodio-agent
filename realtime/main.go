@@ -27,7 +27,7 @@ func main() {
 	}
 
 	m := melody.New()
-	m.Config.MaxMessageSize = 4096
+	m.Config.MaxMessageSize = 65536
 
 	auth := &Auth{jwtSecret: []byte(jwtSecret)}
 	rooms := NewRoomManager(m)
