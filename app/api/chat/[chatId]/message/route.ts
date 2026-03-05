@@ -602,6 +602,7 @@ export async function POST(
               role: "assistant",
               content: generatedParts,
               createdAt: messageTimestamp,
+              agentId: "direct-image",
               variantId,
             };
 
