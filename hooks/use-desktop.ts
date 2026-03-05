@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from "react";
 import type { DesktopAsset } from "@/lib/db/schema";
-import { type SharePermission } from "@/lib/permissions";
+import { type SharePermission, type Permission } from "@/lib/permissions";
 
 interface CameraState {
   x: number;
@@ -15,7 +15,7 @@ interface DesktopSummary {
   userId: string;
   name: string;
   viewportState: CameraState | null;
-  permission: string;
+  permission: Permission;
   isOwner: boolean;
   createdAt: Date;
   updatedAt: Date;

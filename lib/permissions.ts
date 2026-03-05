@@ -21,8 +21,8 @@ export type SharePermission = (typeof SHARE_PERMISSION_VALUES)[number];
 /** Full permission level including ownership. */
 export type Permission = typeof PERMISSION_OWNER | SharePermission;
 
-/** Permission or null (user has no access). */
-export type PermissionOrNull = Permission | null;
+/** Permission or null/undefined (user has no access). */
+export type PermissionOrNull = Permission | null | undefined;
 
 /** Check whether the given value is a valid share permission. */
 export function isValidSharePermission(

@@ -13,7 +13,7 @@ import { Button } from "@heroui/button";
 import { Spinner } from "@heroui/spinner";
 import { addToast } from "@heroui/toast";
 import { getViewportCenterPosition } from "@/lib/desktop/types";
-import { hasWriteAccess } from "@/lib/permissions";
+import { hasWriteAccess, type Permission } from "@/lib/permissions";
 
 interface SendToDesktopModalProps {
   isOpen: boolean;
@@ -29,7 +29,7 @@ interface SendToDesktopModalProps {
 interface DesktopOption {
   id: string;
   name: string;
-  permission: string;
+  permission: Permission;
   isOwner: boolean;
 }
 

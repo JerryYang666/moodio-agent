@@ -7,7 +7,7 @@ import type { RemoteCursor } from "@/hooks/use-desktop-ws";
 import type { EnrichedDesktopAsset } from "./assets";
 import { ImageAsset, VideoAsset, TextAsset, LinkAsset } from "./assets";
 import TableAsset from "./assets/TableAsset";
-import { hasWriteAccess } from "@/lib/permissions";
+import { hasWriteAccess, type Permission } from "@/lib/permissions";
 import {
   Trash2,
   MessageSquare,
@@ -28,7 +28,7 @@ const CURSOR_THROTTLE_MS = 40;
 interface DesktopCanvasProps {
   assets: EnrichedDesktopAsset[];
   camera: CameraState;
-  permission: string;
+  permission: Permission;
   onCameraChange: (camera: CameraState) => void;
   onAssetMove: (assetId: string, posX: number, posY: number) => void;
   onAssetBatchMove?: (moves: Array<{ id: string; posX: number; posY: number }>) => void;
