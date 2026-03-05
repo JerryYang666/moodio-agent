@@ -4,6 +4,7 @@ import { projects, projectShares, users } from "@/lib/db/schema";
 import { getAccessToken } from "@/lib/auth/cookies";
 import { verifyAccessToken } from "@/lib/auth/jwt";
 import { eq, and } from "drizzle-orm";
+import { isValidSharePermission } from "@/lib/permissions";
 
 // Helper to check if user is owner
 async function isOwner(projectId: string, userId: string): Promise<boolean> {
@@ -56,7 +57,7 @@ export async function POST(
       );
     }
 
-    if (permission !== "viewer" && permission !== "collaborator") {
+    if (!isValidSharePermission(permission)) {
       return NextResponse.json(
         { error: "permission must be 'viewer' or 'collaborator'" },
         { status: 400 }

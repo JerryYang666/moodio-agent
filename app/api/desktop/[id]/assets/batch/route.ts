@@ -5,6 +5,7 @@ import { getAccessToken } from "@/lib/auth/cookies";
 import { verifyAccessToken } from "@/lib/auth/jwt";
 import { eq, and } from "drizzle-orm";
 import { getDesktopPermission } from "@/lib/desktop/permissions";
+import { hasWriteAccess } from "@/lib/permissions";
 import { getImageUrl, getVideoUrl } from "@/lib/storage/s3";
 
 function enrichAsset(asset: typeof desktopAssets.$inferSelect) {
@@ -49,7 +50,7 @@ export async function POST(
 
     const { id } = await params;
     const permission = await getDesktopPermission(id, payload.userId);
-    if (permission !== "owner" && permission !== "collaborator") {
+    if (!hasWriteAccess(permission)) {
       return NextResponse.json(
         { error: "You don't have permission to modify assets on this desktop" },
         { status: 403 }

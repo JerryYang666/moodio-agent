@@ -8,6 +8,7 @@ import { Button } from "@heroui/button";
 import { Input } from "@heroui/input";
 import { Spinner } from "@heroui/spinner";
 import { Chip } from "@heroui/chip";
+import { type Permission } from "@/lib/permissions";
 import { Image } from "@heroui/image";
 import {
   Modal,
@@ -48,7 +49,7 @@ type Collection = {
   name: string;
   createdAt: Date;
   updatedAt: Date;
-  permission: "owner" | "collaborator" | "viewer";
+  permission: Permission;
   isOwner: boolean;
   sharedAt?: Date;
   coverImageUrl: string | null;

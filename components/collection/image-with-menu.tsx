@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
+import { hasWriteAccess } from "@/lib/permissions";
 import { useTranslations } from "next-intl";
 import { Button } from "@heroui/button";
 import {
@@ -304,8 +305,7 @@ export default function ImageWithMenu({
                   collections
                     .filter(
                       (c) =>
-                        c.permission === "owner" ||
-                        c.permission === "collaborator"
+                        hasWriteAccess(c.permission)
                     )
                     .map((collection) => (
                       <DropdownItem

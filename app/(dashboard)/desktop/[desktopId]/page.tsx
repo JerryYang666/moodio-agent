@@ -32,6 +32,7 @@ import { TimelinePanel } from "@/components/timeline";
 import { useTimeline } from "@/hooks/use-timeline";
 import { useShareModal } from "@/hooks/use-share-modal";
 import ShareModal from "@/components/share-modal";
+import { hasWriteAccess } from "@/lib/permissions";
 
 const DEFAULT_CAMERA: CameraState = { x: 0, y: 0, zoom: 1 };
 const VIEWPORT_SAVE_DEBOUNCE = 2000;
@@ -457,7 +458,7 @@ export default function DesktopDetailPage({
   }
 
   const { desktop, assets, shares } = detail;
-  const canEdit = desktop.permission === "owner" || desktop.permission === "collaborator";
+  const canEdit = hasWriteAccess(desktop.permission);
 
   return (
     <div className="flex h-full w-full overflow-hidden">

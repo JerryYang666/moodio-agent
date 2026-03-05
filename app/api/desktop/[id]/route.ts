@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isOwner, hasWriteAccess, type SharePermission } from "@/lib/permissions";
 import { db } from "@/lib/db";
 import {
   desktops,
@@ -110,7 +111,7 @@ export async function GET(
     });
 
     let shares: (DesktopShare & { email: string })[] = [];
-    if (permission === "owner") {
+    if (isOwner(permission)) {
       const sharesData = await db
         .select({
           id: desktopShares.id,
@@ -128,14 +129,14 @@ export async function GET(
         id: s.id,
         desktopId: s.desktopId,
         sharedWithUserId: s.sharedWithUserId,
-        permission: s.permission as "viewer" | "collaborator",
+        permission: s.permission as SharePermission,
         sharedAt: s.sharedAt,
         email: s.email,
       }));
     }
 
     return NextResponse.json({
-      desktop: { ...desktop, permission, isOwner: permission === "owner" },
+      desktop: { ...desktop, permission, isOwner: isOwner(permission) },
       assets,
       shares,
     });
@@ -173,7 +174,7 @@ export async function PATCH(
     const body = await req.json();
     const { name, viewportState } = body;
 
-    if (name !== undefined && permission !== "owner") {
+    if (name !== undefined && !isOwner(permission)) {
       return NextResponse.json(
         { error: "Only the owner can rename the desktop" },
         { status: 403 }
@@ -182,8 +183,7 @@ export async function PATCH(
 
     if (
       viewportState !== undefined &&
-      permission !== "owner" &&
-      permission !== "collaborator"
+      !hasWriteAccess(permission)
     ) {
       return NextResponse.json(
         { error: "You don't have permission to update this desktop" },
@@ -206,7 +206,7 @@ export async function PATCH(
       .returning();
 
     return NextResponse.json({
-      desktop: { ...updated, permission, isOwner: permission === "owner" },
+      desktop: { ...updated, permission, isOwner: isOwner(permission) },
     });
   } catch (error) {
     console.error("Error updating desktop:", error);
@@ -238,7 +238,7 @@ export async function DELETE(
 
     const { id } = await params;
     const permission = await getDesktopPermission(id, payload.userId);
-    if (permission !== "owner") {
+    if (!isOwner(permission)) {
       return NextResponse.json(
         { error: "Only the owner can delete the desktop" },
         { status: 403 }

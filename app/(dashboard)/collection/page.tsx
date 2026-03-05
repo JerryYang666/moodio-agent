@@ -8,6 +8,7 @@ import { Button } from "@heroui/button";
 import { Input } from "@heroui/input";
 import { Spinner } from "@heroui/spinner";
 import { Chip } from "@heroui/chip";
+import { PERMISSION_COLLABORATOR } from "@/lib/permissions";
 import { Image } from "@heroui/image";
 import {
   Modal,
@@ -153,7 +154,7 @@ export default function CollectionsPage() {
                     </div>
                   )}
                 </div>
-                {(collection.isOwner || collection.permission === "collaborator") && (
+                {(collection.isOwner || collection.permission === PERMISSION_COLLABORATOR) && (
                   <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity z-10" onClick={(e) => e.stopPropagation()}>
                     <Dropdown>
                       <DropdownTrigger>

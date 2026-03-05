@@ -10,6 +10,7 @@ import { Spinner } from "@heroui/spinner";
 import { Chip } from "@heroui/chip";
 import { Image } from "@heroui/image";
 import { Select, SelectItem } from "@heroui/select";
+import { PERMISSION_OWNER, PERMISSION_COLLABORATOR, hasWriteAccess, isOwner, type Permission, type SharePermission } from "@/lib/permissions";
 import {
   Modal,
   ModalContent,
@@ -87,7 +88,7 @@ interface CollectionData {
     name: string;
     createdAt: Date;
     updatedAt: Date;
-    permission: "owner" | "collaborator" | "viewer";
+    permission: Permission;
     isOwner: boolean;
   };
   images: CollectionAsset[];
@@ -95,7 +96,7 @@ interface CollectionData {
     id: string;
     collectionId: string;
     sharedWithUserId: string;
-    permission: "viewer" | "collaborator";
+    permission: SharePermission;
     sharedAt: Date;
     email: string;
   }>;
@@ -652,7 +653,7 @@ export default function CollectionPage({
   const availableCollections = collections.filter(
     (col) =>
       col.id !== collectionId &&
-      (col.permission === "owner" || col.permission === "collaborator")
+      hasWriteAccess(col.permission)
   );
 
   const handleAssetClick = (asset: CollectionAsset) => {
@@ -887,7 +888,7 @@ export default function CollectionPage({
   // Global drag listeners for external file drop zone overlay
   useEffect(() => {
     const permission = collectionData?.collection?.permission;
-    const userCanAdd = permission === "owner" || permission === "collaborator";
+    const userCanAdd = hasWriteAccess(permission);
     const hasFiles = (e: DragEvent) =>
       e.dataTransfer?.types?.includes("Files") ?? false;
 
@@ -948,10 +949,8 @@ export default function CollectionPage({
   }
 
   const { collection, images, shares } = collectionData;
-  const canEdit = collection.permission === "owner";
-  const canAddImages =
-    collection.permission === "owner" ||
-    collection.permission === "collaborator";
+  const canEdit = isOwner(collection.permission);
+  const canAddImages = hasWriteAccess(collection.permission);
 
   // Count images and videos separately
   const imageCount = images.filter((a) => a.assetType === "image").length;

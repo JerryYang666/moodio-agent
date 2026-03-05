@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { PERMISSION_OWNER } from "@/lib/permissions";
 import { db } from "@/lib/db";
 import { desktops, desktopShares } from "@/lib/db/schema";
 import { getAccessToken } from "@/lib/auth/cookies";
@@ -42,7 +43,7 @@ export async function GET(req: NextRequest) {
 
     const owned = ownedDesktops.map((d) => ({
       ...d,
-      permission: "owner" as const,
+      permission: PERMISSION_OWNER,
       isOwner: true,
     }));
 
@@ -98,7 +99,7 @@ export async function POST(req: NextRequest) {
       .returning();
 
     return NextResponse.json({
-      desktop: { ...newDesktop, permission: "owner", isOwner: true },
+      desktop: { ...newDesktop, permission: PERMISSION_OWNER, isOwner: true },
     });
   } catch (error) {
     console.error("Error creating desktop:", error);

@@ -4,6 +4,7 @@ import { desktops, desktopShares, users } from "@/lib/db/schema";
 import { getAccessToken } from "@/lib/auth/cookies";
 import { verifyAccessToken } from "@/lib/auth/jwt";
 import { eq, and } from "drizzle-orm";
+import { isValidSharePermission } from "@/lib/permissions";
 
 async function isDesktopOwner(desktopId: string, userId: string): Promise<boolean> {
   const [desktop] = await db
@@ -104,7 +105,7 @@ export async function POST(
       );
     }
 
-    if (permission !== "viewer" && permission !== "collaborator") {
+    if (!isValidSharePermission(permission)) {
       return NextResponse.json(
         { error: "permission must be 'viewer' or 'collaborator'" },
         { status: 400 }

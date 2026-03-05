@@ -8,6 +8,7 @@ import {
   ModalFooter,
   useDisclosure,
 } from "@heroui/modal";
+import { hasWriteAccess } from "@/lib/permissions";
 import { Button } from "@heroui/button";
 import { Image } from "@heroui/image";
 import { Input } from "@heroui/input";
@@ -446,8 +447,7 @@ export default function ImageDetailModal({
                                         collections
                                           .filter(
                                             (c) =>
-                                              c.permission === "owner" ||
-                                              c.permission === "collaborator"
+                                              hasWriteAccess(c.permission)
                                           )
                                           .map((collection) => (
                                             <DropdownItem
@@ -677,8 +677,7 @@ export default function ImageDetailModal({
                                         collections
                                           .filter(
                                             (c) =>
-                                              c.permission === "owner" ||
-                                              c.permission === "collaborator"
+                                              hasWriteAccess(c.permission)
                                           )
                                           .map((collection) => (
                                             <DropdownItem

@@ -6,6 +6,7 @@ import { verifyAccessToken } from "@/lib/auth/jwt";
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { getImageUrl } from "@/lib/storage/s3";
 import { getProjectPermission } from "@/lib/project-utils";
+import { PERMISSION_OWNER, isOwner, type SharePermission } from "@/lib/permissions";
 
 type RouteContext = { params: Promise<{ projectId: string }> };
 
@@ -94,7 +95,7 @@ export async function GET(
 
     // Get shares if user is owner
     let shares: (ProjectShare & { email: string })[] = [];
-    if (permission === "owner") {
+    if (isOwner(permission)) {
       const sharesData = await db
         .select({
           id: projectShares.id,
@@ -112,7 +113,7 @@ export async function GET(
         id: s.id,
         projectId: s.projectId,
         sharedWithUserId: s.sharedWithUserId,
-        permission: s.permission as "viewer" | "collaborator",
+        permission: s.permission as SharePermission,
         sharedAt: s.sharedAt,
         email: s.email,
       }));
@@ -122,7 +123,7 @@ export async function GET(
       project: {
         ...project,
         permission,
-        isOwner: permission === "owner",
+        isOwner: isOwner(permission),
       },
       collections: collectionsWithCovers,
       rootAssets: assetsWithUrls,
@@ -170,7 +171,7 @@ export async function PATCH(
 
     // Verify ownership (only owner can rename)
     const permission = await getProjectPermission(projectId, userId);
-    if (permission !== "owner") {
+    if (!isOwner(permission)) {
       return NextResponse.json(
         { error: "Only the owner can rename the project" },
         { status: 403 }

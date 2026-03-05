@@ -168,6 +168,7 @@ func (rm *RoomManager) HandleMessage(s *melody.Session, msg []byte) {
 		return
 	}
 
+	// Permission value defined centrally in lib/permissions.ts (PERMISSION_VIEWER)
 	if keys.Permission == "viewer" && isMutationEvent(incoming.Type) {
 		logf(regionLocal, "[room] blocked mutation %s from viewer session=%s", incoming.Type, keys.SessionID)
 		return

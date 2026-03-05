@@ -3,6 +3,7 @@
 import React, { createContext, useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { addToast } from "@heroui/toast";
+import { type Permission, type SharePermission } from "@/lib/permissions";
 
 // Custom event names for real-time sync
 export const ASSETS_UPDATED_EVENT = "moodio-assets-updated";
@@ -15,7 +16,7 @@ export interface Collection {
   name: string;
   createdAt: Date;
   updatedAt: Date;
-  permission: "owner" | "collaborator" | "viewer";
+  permission: Permission;
   isOwner: boolean;
   sharedAt?: Date;
   coverImageUrl?: string | null;
@@ -43,7 +44,7 @@ export interface CollectionShare {
   id: string;
   collectionId: string;
   sharedWithUserId: string;
-  permission: "viewer" | "collaborator";
+  permission: SharePermission;
   sharedAt: Date;
 }
 
@@ -74,7 +75,7 @@ interface CollectionsContextValue {
   shareCollection: (
     collectionId: string,
     userId: string,
-    permission: "viewer" | "collaborator"
+    permission: SharePermission
   ) => Promise<boolean>;
   removeShare: (collectionId: string, userId: string) => Promise<boolean>;
   getDefaultCollectionName: () => string;
@@ -339,7 +340,7 @@ export function CollectionsProvider({
     async (
       collectionId: string,
       userId: string,
-      permission: "viewer" | "collaborator"
+      permission: SharePermission
     ) => {
       try {
         const res = await fetch(`/api/collection/${collectionId}/share`, {

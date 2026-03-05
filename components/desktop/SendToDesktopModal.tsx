@@ -13,6 +13,7 @@ import { Button } from "@heroui/button";
 import { Spinner } from "@heroui/spinner";
 import { addToast } from "@heroui/toast";
 import { getViewportCenterPosition } from "@/lib/desktop/types";
+import { hasWriteAccess, type Permission } from "@/lib/permissions";
 
 interface SendToDesktopModalProps {
   isOpen: boolean;
@@ -28,7 +29,7 @@ interface SendToDesktopModalProps {
 interface DesktopOption {
   id: string;
   name: string;
-  permission: string;
+  permission: Permission;
   isOwner: boolean;
 }
 
@@ -117,7 +118,7 @@ export default function SendToDesktopModal({
       .then((data) => {
         const writable = (data.desktops || []).filter(
           (d: DesktopOption) =>
-            d.permission === "owner" || d.permission === "collaborator"
+            hasWriteAccess(d.permission)
         );
         setDesktops(writable);
       })
