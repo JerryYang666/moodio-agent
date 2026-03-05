@@ -316,8 +316,7 @@ func isMutationEvent(eventType string) bool {
 
 func isStateEvent(eventType string) bool {
 	switch eventType {
-	case "asset_moved", "asset_resized", "asset_added", "asset_removed",
-		"cell_updated":
+	case "asset_moved", "asset_resized", "asset_added", "asset_removed":
 		return true
 	}
 	return false
