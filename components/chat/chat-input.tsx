@@ -1179,7 +1179,6 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
                   <MenuConfiguration
                     state={menuState}
                     onStateChange={onMenuStateChange}
-                    hasSelectedImages={pendingImages.length > 0}
                   />
                 </div>
               </motion.div>

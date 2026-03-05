@@ -5,11 +5,24 @@ import { db } from "@/lib/db";
 import { chats } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getChatHistory, saveChatHistory } from "@/lib/storage/s3";
+import {
+  uploadImage,
+  getSignedImageUrl,
+  generateImageId,
+  downloadImage,
+} from "@/lib/storage/s3";
 import { createLLMClient } from "@/lib/llm/client";
 import { Message, MessageContentPart, DEFAULT_LLM_MODEL } from "@/lib/llm/types";
 import { agent1 } from "@/lib/agents/agent-1";
 import { waitUntil } from "@vercel/functions";
-import { recordEvent } from "@/lib/telemetry";
+import { recordEvent, sanitizeGeminiResponse } from "@/lib/telemetry";
+import {
+  generateImageWithModel,
+  editImageWithModel,
+} from "@/lib/image/service";
+import { ImageSize } from "@/lib/image/types";
+import { calculateCost } from "@/lib/pricing";
+import { deductCredits, getUserBalance, InsufficientCreditsError } from "@/lib/credits";
 
 /** Maximum number of images allowed per message */
 const MAX_IMAGES_PER_MESSAGE = 5;
@@ -182,6 +195,9 @@ export async function POST(
         title: typeof entry.title === "string" ? entry.title : undefined,
       }));
 
+    // Parse mode (agent or image)
+    const mode: string = json.mode === "image" ? "image" : "agent";
+
     // Validate: must have content or images
     if (!content && imageIds.length === 0) {
       return NextResponse.json(
@@ -276,11 +292,225 @@ export async function POST(
       userMessage = { role: "user", content, createdAt: Date.now() };
     }
 
-    console.log("[Perf] Calling agent", `[${Date.now() - requestStartTime}ms]`);
+    console.log(`[Perf] Mode=${mode}, calling handler`, `[${Date.now() - requestStartTime}ms]`);
 
     // Generate a timestamp for all variants - this will be synced with frontend
     const messageTimestamp = Date.now();
 
+    if (mode === "image") {
+      // ===== Direct Image Generation Mode =====
+      // Bypass the agent and send the user's prompt directly to the image API
+      const encoder = new TextEncoder();
+      const variantId = `variant-0-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const numImages = imageQuantity || 1;
+
+      const directStream = new ReadableStream<Uint8Array>({
+        start(controller) {
+          const send = (data: any) => {
+            controller.enqueue(encoder.encode(JSON.stringify(data) + "\n"));
+          };
+
+          // Send timestamp first
+          send({ type: "message_timestamp", timestamp: messageTimestamp });
+
+          (async () => {
+            const generatedParts: MessageContentPart[] = [];
+
+            try {
+              // Generate images in parallel
+              const imagePromises = Array.from({ length: numImages }, async (_, i) => {
+                const trackingImageId = generateImageId();
+
+                // Send placeholder
+                const placeholder: MessageContentPart = {
+                  type: "agent_image",
+                  imageId: trackingImageId,
+                  title: content || "Image",
+                  aspectRatio: aspectRatioOverride || "1:1",
+                  prompt: content,
+                  status: "loading",
+                };
+                send({ type: "part", part: placeholder, variantId });
+
+                try {
+                  // Calculate cost and verify balance
+                  const cost = await calculateCost("Image/all", {});
+                  if (cost > 0) {
+                    const balance = await getUserBalance(payload.userId);
+                    if (balance < cost) {
+                      throw new InsufficientCreditsError();
+                    }
+                  }
+
+                  // Determine whether to edit or generate
+                  let result;
+                  if (imageIds.length > 0) {
+                    // Download reference images for editing
+                    const imageBase64Data = await Promise.all(
+                      imageIds.map(async (imgId) => {
+                        try {
+                          return await downloadImage(imgId);
+                        } catch {
+                          return undefined;
+                        }
+                      })
+                    );
+                    const validImageBase64 = imageBase64Data.filter(
+                      (data): data is string => data !== undefined
+                    );
+
+                    if (validImageBase64.length > 0) {
+                      result = await editImageWithModel(imageModelId, {
+                        prompt: content,
+                        imageIds,
+                        imageBase64: validImageBase64,
+                        aspectRatio: aspectRatioOverride,
+                        imageSize: imageSizeOverride,
+                      });
+                    } else {
+                      result = await generateImageWithModel(imageModelId, {
+                        prompt: content,
+                        aspectRatio: aspectRatioOverride,
+                        imageSize: imageSizeOverride,
+                      });
+                    }
+                  } else {
+                    result = await generateImageWithModel(imageModelId, {
+                      prompt: content,
+                      aspectRatio: aspectRatioOverride,
+                      imageSize: imageSizeOverride,
+                    });
+                  }
+
+                  // Upload the generated image
+                  const finalImageId = await uploadImage(
+                    result.imageBuffer,
+                    result.contentType,
+                    trackingImageId
+                  );
+
+                  // Deduct credits
+                  if (cost > 0) {
+                    await deductCredits(
+                      payload.userId,
+                      cost,
+                      "image_generation",
+                      `Direct image generation (${imageModelId || "default"})`
+                    );
+                  }
+
+                  // Record success
+                  const response =
+                    result.provider === "google"
+                      ? sanitizeGeminiResponse(result.response)
+                      : result.response;
+                  await recordEvent("image_generation", payload.userId, {
+                    status: "success",
+                    mode: "direct",
+                    provider: result.provider,
+                    modelId: result.modelId,
+                    providerModelId: result.providerModelId,
+                    prompt: content,
+                    aspectRatio: aspectRatioOverride,
+                    imageSize: imageSizeOverride,
+                    response,
+                  });
+
+                  const successPart: MessageContentPart = {
+                    type: "agent_image",
+                    imageId: finalImageId,
+                    imageUrl: getSignedImageUrl(finalImageId),
+                    title: content || "Image",
+                    aspectRatio: aspectRatioOverride || "1:1",
+                    prompt: content,
+                    status: "generated",
+                  };
+                  send({ type: "part_update", imageId: trackingImageId, part: successPart, variantId });
+                  return successPart;
+                } catch (err) {
+                  console.error(`Direct image gen error for imageId ${trackingImageId}`, err);
+                  const isInsufficientCredits = err instanceof InsufficientCreditsError;
+                  const errorPart: MessageContentPart = {
+                    type: "agent_image",
+                    imageId: trackingImageId,
+                    title: content || "Error",
+                    aspectRatio: "1:1",
+                    prompt: content,
+                    status: "error",
+                    reason: isInsufficientCredits ? "insufficient_credits" : "generation_failed",
+                  };
+                  send({ type: "part_update", imageId: trackingImageId, part: errorPart, variantId });
+                  return errorPart;
+                }
+              });
+
+              const results = await Promise.all(imagePromises);
+              generatedParts.push(...results);
+            } catch (err) {
+              console.error("Direct image generation failed:", err);
+              send({ type: "variant_failed", variantId, reason: "generation_failed" });
+            }
+
+            controller.close();
+
+            // Save history in background
+            const assistantMessage: Message = {
+              role: "assistant",
+              content: generatedParts,
+              createdAt: messageTimestamp,
+              variantId,
+            };
+
+            const historyWithSelections = applyImageSelections(history, imageSources);
+            const updatedHistory = [...historyWithSelections, userMessage, assistantMessage];
+
+            try {
+              await saveChatHistory(chatId, updatedHistory);
+
+              // Calculate thumbnail
+              let thumbnailImageId: string | null = null;
+              for (const part of generatedParts) {
+                if (part.type === "agent_image" && part.imageId && part.status === "generated") {
+                  thumbnailImageId = part.imageId;
+                  break;
+                }
+              }
+              if (!thumbnailImageId && Array.isArray(userMessage.content)) {
+                const userImage = (userMessage.content as MessageContentPart[]).find(
+                  (c) => c.type === "image"
+                );
+                if (userImage && "imageId" in userImage) {
+                  thumbnailImageId = userImage.imageId;
+                }
+              }
+
+              // Generate chat name if first interaction
+              const isFirstInteraction = history.length === 0;
+              if (isFirstInteraction) {
+                const newChatName = content ? content.slice(0, 50) : chat.name;
+                await db
+                  .update(chats)
+                  .set({ updatedAt: new Date(), name: newChatName, thumbnailImageId })
+                  .where(eq(chats.id, chatId));
+              } else {
+                await db
+                  .update(chats)
+                  .set({ updatedAt: new Date(), thumbnailImageId })
+                  .where(eq(chats.id, chatId));
+              }
+            } catch (err) {
+              console.error("Failed to save direct image history:", err);
+            }
+          })();
+        },
+      });
+
+      return new NextResponse(directStream, {
+        headers: { "Content-Type": "text/plain; charset=utf-8" },
+      });
+    }
+
+    // ===== Agent Mode (default) =====
     // Use Agent 1 with parallel variants
     // Pass all imageIds directly - the agent will use these for image generation
     const { stream: agentStream, completions } =

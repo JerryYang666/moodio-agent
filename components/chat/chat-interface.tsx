@@ -28,7 +28,6 @@ import { SYSTEM_PROMPT_STORAGE_KEY } from "@/components/test-kit";
 import {
   MenuState,
   INITIAL_MENU_STATE,
-  resolveMenuState,
   loadMenuState,
   saveMenuState,
 } from "./menu-configuration";
@@ -598,12 +597,6 @@ export default function ChatInterface({
         }
         const newImages = prev.filter((i) => i.imageId !== imageId);
 
-        // If in "edit" mode and no images remain, switch to "create" mode
-        if (menuState.mode === "edit" && newImages.length === 0) {
-          const newState = resolveMenuState(menuState, "create");
-          setMenuState(newState);
-        }
-
         return newImages;
       });
     },
@@ -1043,12 +1036,6 @@ export default function ChatInterface({
 
         // Auto-enable precision editing when user creates a marked image
         setPrecisionEditing(true);
-
-        // Auto-switch to edit mode if in create mode
-        if (menuState.mode === "create") {
-          const newState = resolveMenuState(menuState, "edit");
-          setMenuState(newState);
-        }
       } else {
         console.error("Marked image upload failed:", result.error);
         // Remove the failed upload from pending images
@@ -1252,12 +1239,15 @@ export default function ChatInterface({
         })),
       };
 
-      if (menuState.mode === "create" || menuState.mode === "edit") {
+      if (menuState.mode === "agent" || menuState.mode === "image") {
         payload.imageModelId = menuState.model;
         if (menuState.imageSize) {
           payload.imageSize = menuState.imageSize;
         }
       }
+
+      // Pass the mode so the backend knows whether to use agent or direct generation
+      payload.mode = menuState.mode;
 
       // Add precision editing flag if enabled
       if (precisionEditing) {
@@ -1651,27 +1641,18 @@ export default function ChatInterface({
     }
   };
 
-  // Handle precision editing toggle - auto-switch mode to "edit" when enabled
+  // Handle precision editing toggle
   const handlePrecisionEditingChange = useCallback(
     (value: boolean) => {
       setPrecisionEditing(value);
-      // When precision editing is turned ON and mode is "create", switch to "edit"
-      if (value && menuState.mode === "create") {
-        const newState = resolveMenuState(menuState, "edit");
-        setMenuState(newState);
-      }
     },
-    [menuState]
+    []
   );
 
-  // Handle menu state change - auto-enable precision editing when switching to edit mode
+  // Handle menu state change
   const handleMenuStateChange = useCallback(
     (newState: MenuState) => {
       setMenuState(newState);
-      // Auto-enable precision editing when switching to edit mode
-      if (newState.mode === "edit") {
-        setPrecisionEditing(true);
-      }
     },
     []
   );

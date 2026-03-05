@@ -497,12 +497,10 @@
     "selectCategory": "选择{category}",
     "with": "使用",
     "modes": {
-      "create": "创建新图片",
-      "createDesc": "完整的生成工作流",
-      "edit": "编辑已选图片",
-      "editDesc": "编辑现有图片",
-      "chat": "对话",
-      "chatDesc": "对话交互"
+      "agent": "智能体",
+      "agentDesc": "AI辅助图片生成，帮助构思和优化提示词",
+      "image": "图片",
+      "imageDesc": "直接根据提示词生成图片"
     },
     "models": {
       "nano-banana-pro": "Nano-banana Pro",
@@ -543,9 +541,7 @@
       "3": "3",
       "4": "4"
     },
-    "editModeHint": "请先选择或上传图片以使用编辑模式",
-    "expertiseNotAvailable": "编辑已选图片模式下不支持专业领域选项。",
-    "aspectRatioNotApplicable": "对话模式下不适用宽高比设置。"
+    "expertiseNotAvailable": "直接图片生成模式下不支持专业领域选项。"
   },
   "notifications": {
     "enableTitle": "启用通知",

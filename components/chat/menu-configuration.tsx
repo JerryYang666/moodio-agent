@@ -14,7 +14,6 @@ import { MENU_CONFIG } from "@/config/menu-config";
 import {
   WandSparkles,
   Pencil,
-  MessageSquare,
   Sparkles,
   Info,
   ChevronUp,
@@ -24,7 +23,6 @@ import { AspectRatioIcon } from "./aspect-ratio-icon";
 const ICON_MAP: Record<string, React.ElementType> = {
   WandSparkles,
   Pencil,
-  MessageSquare,
   Sparkles,
 };
 
@@ -197,13 +195,11 @@ export const resolveMenuState = (
 interface MenuConfigurationProps {
   state: MenuState;
   onStateChange: (newState: MenuState) => void;
-  hasSelectedImages?: boolean;
 }
 
 export default function MenuConfiguration({
   state,
   onStateChange,
-  hasSelectedImages = false,
 }: MenuConfigurationProps) {
   const t = useTranslations("menu");
   const getCategoryLabel = (
@@ -394,10 +390,9 @@ export default function MenuConfiguration({
     const SelectedIcon = selectedIconName ? ICON_MAP[selectedIconName] : null;
 
     // Different colors for different modes
-    const modeColors: Record<string, "primary" | "secondary" | "success"> = {
-      create: "primary",
-      edit: "secondary",
-      chat: "success",
+    const modeColors: Record<string, "primary" | "secondary"> = {
+      agent: "primary",
+      image: "secondary",
     };
     const buttonColor = modeColors[selectedKey] || "primary";
 
@@ -428,7 +423,6 @@ export default function MenuConfiguration({
             selectionMode="single"
             variant="flat"
             onSelectionChange={handleModeChange}
-            disabledKeys={!hasSelectedImages ? ["edit"] : []}
           >
             {Object.entries(categoryDef.options).map(([key, value]) => {
               const Icon = (value as any).icon
@@ -436,11 +430,8 @@ export default function MenuConfiguration({
                 : null;
               const description = getModeDescription(key);
               const hasDescription = Boolean(description);
-              const isEditDisabled = key === "edit" && !hasSelectedImages;
-              const tooltipContent = isEditDisabled
-                ? t("editModeHint")
-                : description;
-              const showTooltip = hasDescription || isEditDisabled;
+              const tooltipContent = description;
+              const showTooltip = hasDescription;
               return (
                 <DropdownItem
                   key={key}
