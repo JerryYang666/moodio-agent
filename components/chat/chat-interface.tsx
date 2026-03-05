@@ -15,7 +15,7 @@ import {
   NotificationPermissionModal,
   NotificationPermissionModalRef,
 } from "@/components/notification-permission-modal";
-import { Message, MessageContentPart } from "@/lib/llm/types";
+import { Message, MessageContentPart, isGeneratedImagePart } from "@/lib/llm/types";
 import ImageDetailModal, { ImageInfo } from "./image-detail-modal";
 import ImageDrawingModal from "./image-drawing-modal";
 import ChatMessage from "./chat-message";
@@ -371,7 +371,7 @@ export default function ChatInterface({
       if (message.role === "assistant" && Array.isArray(message.content)) {
         for (const part of message.content) {
           if (
-            part.type === "agent_image" &&
+            isGeneratedImagePart(part) &&
             (part.status === "generated" || part.status === "error")
           ) {
             images.push({
@@ -1150,15 +1150,15 @@ export default function ChatInterface({
               // Find the part by imageId
               const imgIndex = newContent.findIndex(
                 (p) =>
-                  p.type === "agent_image" && p.imageId === selection.imageId
+                  isGeneratedImagePart(p) && p.imageId === selection.imageId
               );
               if (
                 imgIndex !== -1 &&
-                newContent[imgIndex].type === "agent_image"
+                isGeneratedImagePart(newContent[imgIndex])
               ) {
                 const agentImagePart = newContent[imgIndex] as Extract<
                   MessageContentPart,
-                  { type: "agent_image" }
+                  { type: "agent_image" } | { type: "direct_image" }
                 >;
                 newContent[imgIndex] = {
                   ...agentImagePart,
@@ -1566,7 +1566,7 @@ export default function ChatInterface({
               if (event.imageId) {
                 // Find the part with matching imageId
                 const partIdx = currentContent.findIndex(
-                  (p) => p.type === "agent_image" && p.imageId === event.imageId
+                  (p) => isGeneratedImagePart(p) && p.imageId === event.imageId
                 );
                 if (partIdx !== -1) {
                   currentContent[partIdx] = event.part;
@@ -1611,7 +1611,7 @@ export default function ChatInterface({
       let hasAnyImages = false;
       for (const content of allVariantContents) {
         for (const part of content) {
-          if (part.type === "agent_image") {
+          if (isGeneratedImagePart(part)) {
             hasAnyImages = true;
             if (part.status === "error" && part.reason === "INSUFFICIENT_CREDITS") {
               hasInsufficientCredits = true;
@@ -1876,7 +1876,7 @@ export default function ChatInterface({
               // Update existing part by imageId
               if (event.imageId) {
                 const partIdx = variantContent.findIndex(
-                  (p) => p.type === "agent_image" && p.imageId === event.imageId
+                  (p) => isGeneratedImagePart(p) && p.imageId === event.imageId
                 );
                 if (partIdx !== -1) {
                   variantContent[partIdx] = event.part;

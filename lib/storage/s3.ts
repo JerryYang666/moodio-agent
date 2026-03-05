@@ -158,7 +158,7 @@ function stripImageUrls(messages: Message[]): Message[] {
         const { imageUrl, ...rest } = part;
         return rest;
       }
-      if (part.type === "agent_image" && "imageUrl" in part) {
+      if ((part.type === "agent_image" || part.type === "direct_image") && "imageUrl" in part) {
         const { imageUrl, ...rest } = part;
         return rest;
       }
@@ -205,7 +205,7 @@ function addImageUrls(messages: Message[]): Message[] {
           imageUrl: getImageUrl(part.imageId),
         };
       }
-      if (part.type === "agent_image" && part.imageId) {
+      if ((part.type === "agent_image" || part.type === "direct_image") && part.imageId) {
         return {
           ...part,
           imageUrl: getImageUrl(part.imageId),

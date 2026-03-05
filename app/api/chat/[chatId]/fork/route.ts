@@ -62,7 +62,7 @@ export async function POST(
       const lastMsg = newHistory[newHistory.length - 1];
       if (Array.isArray(lastMsg.content)) {
         const newContent = lastMsg.content.map((part) => {
-          if (part.type === "agent_image") {
+          if (part.type === "agent_image" || part.type === "direct_image") {
             // Create a copy without isSelected
             const { isSelected, ...rest } = part;
             return rest;

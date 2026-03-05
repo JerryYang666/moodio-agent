@@ -12,7 +12,7 @@ import {
   downloadImage,
 } from "@/lib/storage/s3";
 import { createLLMClient } from "@/lib/llm/client";
-import { Message, MessageContentPart, DEFAULT_LLM_MODEL } from "@/lib/llm/types";
+import { Message, MessageContentPart, DEFAULT_LLM_MODEL, isGeneratedImagePart } from "@/lib/llm/types";
 import { agent1 } from "@/lib/agents/agent-1";
 import { waitUntil } from "@vercel/functions";
 import { recordEvent, sanitizeGeminiResponse } from "@/lib/telemetry";
@@ -70,7 +70,7 @@ const applyImageSelections = (
         if (!Array.isArray(msg.content)) return false;
         return msg.content.some(
           (part) =>
-            part.type === "agent_image" && part.imageId === selection.imageId
+            isGeneratedImagePart(part) && part.imageId === selection.imageId
         );
       });
     }
@@ -82,7 +82,7 @@ const applyImageSelections = (
     const content = [...target.content];
     let partIndex = content.findIndex(
       (part) =>
-        part.type === "agent_image" && part.imageId === selection.imageId
+        isGeneratedImagePart(part) && part.imageId === selection.imageId
     );
 
     if (
@@ -95,7 +95,7 @@ const applyImageSelections = (
     }
 
     const part = content[partIndex];
-    if (part && part.type === "agent_image" && !part.isSelected) {
+    if (part && isGeneratedImagePart(part) && !part.isSelected) {
       content[partIndex] = { ...part, isSelected: true };
       updated[targetIndex] = { ...target, content };
     }
@@ -103,6 +103,136 @@ const applyImageSelections = (
 
   return updated;
 };
+
+/**
+ * Shared post-processing for both agent and direct image modes.
+ * Saves chat history, calculates thumbnail, generates chat name on first interaction.
+ */
+async function postProcessMessages(opts: {
+  chatId: string;
+  chat: { name: string | null };
+  history: Message[];
+  userMessage: Message;
+  assistantMessages: Message[];
+  imageSources: ImageSourceEntry[];
+  userId: string;
+}) {
+  const { chatId, chat, history, userMessage, assistantMessages, imageSources, userId } = opts;
+
+  const historyWithSelections = applyImageSelections(history, imageSources);
+  const updatedHistory = [...historyWithSelections, userMessage, ...assistantMessages];
+  await saveChatHistory(chatId, updatedHistory);
+
+  // Use the first variant for thumbnail calculation
+  const primaryMessage = assistantMessages[0];
+
+  // Calculate thumbnail image ID
+  // Priority: 1. User image  2. Generated image in response  3. Latest image in history
+  let thumbnailImageId: string | null = null;
+
+  // 1. Check current user images
+  if (Array.isArray(userMessage.content)) {
+    const userImage = userMessage.content.find((c) => c.type === "image");
+    if (userImage && "imageId" in userImage) {
+      thumbnailImageId = userImage.imageId;
+    }
+  }
+
+  // 2. Check the primary message for generated images
+  if (!thumbnailImageId && primaryMessage && Array.isArray(primaryMessage.content)) {
+    for (const part of primaryMessage.content) {
+      if (isGeneratedImagePart(part) && part.imageId && part.status === "generated") {
+        thumbnailImageId = part.imageId;
+        break;
+      }
+    }
+  }
+
+  // 3. Fallback: Traverse backwards to find the latest image
+  if (!thumbnailImageId) {
+    for (let i = updatedHistory.length - 1; i >= 0; i--) {
+      const msg = updatedHistory[i];
+      if (Array.isArray(msg.content)) {
+        for (let j = msg.content.length - 1; j >= 0; j--) {
+          const part = msg.content[j];
+          if (part.type === "image") {
+            thumbnailImageId = part.imageId;
+            break;
+          }
+          if (isGeneratedImagePart(part) && part.imageId && part.status === "generated") {
+            thumbnailImageId = part.imageId;
+            break;
+          }
+        }
+      }
+      if (thumbnailImageId) break;
+    }
+  }
+
+  // Generate chat name if first interaction
+  const isFirstInteraction = history.length === 0;
+  if (isFirstInteraction) {
+    const llmClient = createLLMClient({
+      apiKey: process.env.LLM_API_KEY,
+      provider: "openai",
+      model: DEFAULT_LLM_MODEL,
+    });
+
+    try {
+      const messagesForNaming = [userMessage, ...(primaryMessage ? [primaryMessage] : [])];
+      const namePrompt: Message[] = [
+        {
+          role: "system",
+          content:
+            "You are a helpful assistant that generates concise names for chat sessions. " +
+            "Based on the first two messages of a conversation, generate a short, descriptive name. " +
+            "The name MUST be very concise and no longer than 50 characters. " +
+            "Give the name in the same language as the messages. " +
+            'Output JSON only. Format: {"chat_name": "Your Chat Name"}',
+        },
+        ...messagesForNaming.map((msg) => {
+          if (typeof msg.content === "string") {
+            return msg;
+          }
+          const textContent = msg.content
+            .filter((c) => c.type === "text")
+            .map((c) => (c as { type: "text"; text: string }).text)
+            .join("\n");
+          return { role: msg.role, content: textContent };
+        }),
+      ];
+
+      const nameResponse = await llmClient.chatComplete(namePrompt);
+      let newChatName = chat.name || "New Chat";
+
+      if (nameResponse) {
+        try {
+          const cleanResponse = nameResponse.replace(/```json\n?|```/g, "").trim();
+          const parsed = JSON.parse(cleanResponse);
+          if (parsed && parsed.chat_name) {
+            newChatName = parsed.chat_name.trim().slice(0, 255);
+          }
+        } catch (e) {
+          if (nameResponse.length < 255 && !nameResponse.includes("{")) {
+            newChatName = nameResponse.trim();
+          }
+        }
+      }
+
+      await db
+        .update(chats)
+        .set({ updatedAt: new Date(), name: newChatName, thumbnailImageId })
+        .where(eq(chats.id, chatId));
+    } catch (err) {
+      console.error("Failed to generate chat name:", err);
+    }
+  } else {
+    await db
+      .update(chats)
+      .set({ updatedAt: new Date(), thumbnailImageId })
+      .where(eq(chats.id, chatId));
+  }
+}
 
 export async function POST(
   request: NextRequest,
@@ -304,6 +434,12 @@ export async function POST(
       const variantId = `variant-0-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
       const numImages = imageQuantity || 1;
 
+      // Promise that resolves when generation is complete (for post-processing)
+      let resolveCompletion: (parts: MessageContentPart[]) => void;
+      const completionPromise = new Promise<MessageContentPart[]>((resolve) => {
+        resolveCompletion = resolve;
+      });
+
       const directStream = new ReadableStream<Uint8Array>({
         start(controller) {
           const send = (data: any) => {
@@ -323,7 +459,7 @@ export async function POST(
 
                 // Send placeholder
                 const placeholder: MessageContentPart = {
-                  type: "agent_image",
+                  type: "direct_image",
                   imageId: trackingImageId,
                   title: content || "Image",
                   aspectRatio: aspectRatioOverride || "1:1",
@@ -418,7 +554,7 @@ export async function POST(
                   });
 
                   const successPart: MessageContentPart = {
-                    type: "agent_image",
+                    type: "direct_image",
                     imageId: finalImageId,
                     imageUrl: getSignedImageUrl(finalImageId),
                     title: content || "Image",
@@ -432,7 +568,7 @@ export async function POST(
                   console.error(`Direct image gen error for imageId ${trackingImageId}`, err);
                   const isInsufficientCredits = err instanceof InsufficientCreditsError;
                   const errorPart: MessageContentPart = {
-                    type: "agent_image",
+                    type: "direct_image",
                     imageId: trackingImageId,
                     title: content || "Error",
                     aspectRatio: "1:1",
@@ -453,8 +589,15 @@ export async function POST(
             }
 
             controller.close();
+            resolveCompletion(generatedParts);
+          })();
+        },
+      });
 
-            // Save history in background
+      // Use waitUntil for reliable post-processing (same as agent mode)
+      waitUntil(
+        completionPromise
+          .then(async (generatedParts) => {
             const assistantMessage: Message = {
               role: "assistant",
               content: generatedParts,
@@ -462,49 +605,20 @@ export async function POST(
               variantId,
             };
 
-            const historyWithSelections = applyImageSelections(history, imageSources);
-            const updatedHistory = [...historyWithSelections, userMessage, assistantMessage];
-
-            try {
-              await saveChatHistory(chatId, updatedHistory);
-
-              // Calculate thumbnail
-              let thumbnailImageId: string | null = null;
-              for (const part of generatedParts) {
-                if (part.type === "agent_image" && part.imageId && part.status === "generated") {
-                  thumbnailImageId = part.imageId;
-                  break;
-                }
-              }
-              if (!thumbnailImageId && Array.isArray(userMessage.content)) {
-                const userImage = (userMessage.content as MessageContentPart[]).find(
-                  (c) => c.type === "image"
-                );
-                if (userImage && "imageId" in userImage) {
-                  thumbnailImageId = userImage.imageId;
-                }
-              }
-
-              // Generate chat name if first interaction
-              const isFirstInteraction = history.length === 0;
-              if (isFirstInteraction) {
-                const newChatName = content ? content.slice(0, 50) : chat.name;
-                await db
-                  .update(chats)
-                  .set({ updatedAt: new Date(), name: newChatName, thumbnailImageId })
-                  .where(eq(chats.id, chatId));
-              } else {
-                await db
-                  .update(chats)
-                  .set({ updatedAt: new Date(), thumbnailImageId })
-                  .where(eq(chats.id, chatId));
-              }
-            } catch (err) {
-              console.error("Failed to save direct image history:", err);
-            }
-          })();
-        },
-      });
+            await postProcessMessages({
+              chatId,
+              chat,
+              history,
+              userMessage,
+              assistantMessages: [assistantMessage],
+              imageSources,
+              userId: payload.userId,
+            });
+          })
+          .catch((err) => {
+            console.error("Direct image post-processing failed:", err);
+          })
+      );
 
       return new NextResponse(directStream, {
         headers: { "Content-Type": "text/plain; charset=utf-8" },
@@ -543,163 +657,15 @@ export async function POST(
             createdAt: msg.createdAt || messageTimestamp,
           }));
 
-          // For backward compatibility, store as array of messages with variantId
-          // Frontend will group messages with the same timestamp but different variantIds
-          const historyWithSelections = applyImageSelections(
+          await postProcessMessages({
+            chatId,
+            chat,
             history,
-            imageSources
-          );
-          const updatedHistory = [
-            ...historyWithSelections,
             userMessage,
-            ...messagesToSave,
-          ];
-          await saveChatHistory(chatId, updatedHistory);
-
-          // Use the first variant for thumbnail calculation
-          const primaryMessage = messagesToSave[0];
-
-          // Calculate thumbnail image ID - simplified logic
-          // Priority:
-          // 1. First image from current user message (most recent user upload/selection)
-          // 2. First generated image from assistant response
-          // 3. Latest image from history
-          let thumbnailImageId: string | null = null;
-
-          // 1. Check current user images
-          if (Array.isArray(userMessage.content)) {
-            const userImage = userMessage.content.find(
-              (c) => c.type === "image"
-            );
-            if (userImage && "imageId" in userImage) {
-              thumbnailImageId = userImage.imageId;
-            }
-          }
-
-          // 2. Check the primary message for generated images
-          if (!thumbnailImageId && Array.isArray(primaryMessage.content)) {
-            for (const part of primaryMessage.content) {
-              if (
-                part.type === "agent_image" &&
-                part.imageId &&
-                part.status === "generated"
-              ) {
-                thumbnailImageId = part.imageId;
-                break;
-              }
-            }
-          }
-
-          // 3. Fallback: Traverse backwards to find the latest image
-          if (!thumbnailImageId) {
-            for (let i = updatedHistory.length - 1; i >= 0; i--) {
-              const msg = updatedHistory[i];
-              if (Array.isArray(msg.content)) {
-                for (let j = msg.content.length - 1; j >= 0; j--) {
-                  const part = msg.content[j];
-
-                  if (part.type === "image") {
-                    thumbnailImageId = part.imageId;
-                    break;
-                  }
-
-                  if (
-                    part.type === "agent_image" &&
-                    part.imageId &&
-                    part.status === "generated"
-                  ) {
-                    thumbnailImageId = part.imageId;
-                    break;
-                  }
-                }
-              }
-              if (thumbnailImageId) break;
-            }
-          }
-
-          // Generate chat name if needed (check for 1 user message + N variants)
-          const isFirstInteraction =
-            history.length === 0 &&
-            updatedHistory.length === 1 + variantCount;
-          if (isFirstInteraction) {
-            const llmClient = createLLMClient({
-              apiKey: process.env.LLM_API_KEY,
-              provider: "openai",
-              model: DEFAULT_LLM_MODEL,
-            });
-
-            try {
-              // Use only the user message and primary variant for name generation
-              const messagesForNaming = [userMessage, primaryMessage];
-              const namePrompt: Message[] = [
-                {
-                  role: "system",
-                  content:
-                    "You are a helpful assistant that generates concise names for chat sessions. " +
-                    "Based on the first two messages of a conversation, generate a short, descriptive name. " +
-                    "The name MUST be very concise and no longer than 50 characters. " +
-                    "Give the name in the same language as the messages. " +
-                    'Output JSON only. Format: {"chat_name": "Your Chat Name"}',
-                },
-                ...messagesForNaming.map((msg) => {
-                  if (typeof msg.content === "string") {
-                    return msg;
-                  }
-                  const textContent = msg.content
-                    .filter((c) => c.type === "text")
-                    .map((c) => (c as { type: "text"; text: string }).text)
-                    .join("\n");
-
-                  return {
-                    role: msg.role,
-                    content: textContent,
-                  };
-                }),
-              ];
-
-              const nameResponse = await llmClient.chatComplete(namePrompt);
-              let newChatName = chat.name;
-
-              if (nameResponse) {
-                try {
-                  const cleanResponse = nameResponse
-                    .replace(/```json\n?|```/g, "")
-                    .trim();
-                  const parsed = JSON.parse(cleanResponse);
-                  if (parsed && parsed.chat_name) {
-                    newChatName = parsed.chat_name.trim().slice(0, 255);
-                  }
-                } catch (e) {
-                  if (
-                    nameResponse.length < 255 &&
-                    !nameResponse.includes("{")
-                  ) {
-                    newChatName = nameResponse.trim();
-                  }
-                }
-              }
-
-              await db
-                .update(chats)
-                .set({
-                  updatedAt: new Date(),
-                  name: newChatName,
-                  thumbnailImageId,
-                })
-                .where(eq(chats.id, chatId));
-            } catch (err) {
-              console.error("Failed to generate chat name:", err);
-            }
-          } else {
-            await db
-              .update(chats)
-              .set({
-                updatedAt: new Date(),
-                thumbnailImageId,
-              })
-              .where(eq(chats.id, chatId));
-          }
-
+            assistantMessages: messagesToSave,
+            imageSources,
+            userId: payload.userId,
+          });
         })
         .catch((err) => {
           console.error("Agent completion failed:", err);

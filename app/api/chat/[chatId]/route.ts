@@ -48,8 +48,8 @@ export async function GET(
       const processedContent = msg.content
         .filter((part) => isAdmin || !part.type.startsWith("internal_"))
         .map((part) => {
-          // Add CloudFront URL for agent_image parts
-          if (part.type === "agent_image" && part.imageId && !part.imageUrl) {
+          // Add CloudFront URL for agent_image/direct_image parts
+          if ((part.type === "agent_image" || part.type === "direct_image") && part.imageId && !part.imageUrl) {
             return {
               ...part,
               imageUrl: getImageUrl(part.imageId),
