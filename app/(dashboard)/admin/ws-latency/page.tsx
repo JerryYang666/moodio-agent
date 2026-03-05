@@ -13,7 +13,9 @@ const WS_BASE_URL =
     ? process.env.NEXT_PUBLIC_WS_URL || `ws://${window.location.hostname}:8081`
     : "";
 
-const DEFAULT_PING_COUNT = 20;
+const HTTP_BASE_URL = WS_BASE_URL.replace(/^ws(s?):\/\//, "http$1://");
+
+const DEFAULT_PING_COUNT = 100;
 
 interface PingResult {
   seq: number;
@@ -41,10 +43,30 @@ export default function WsLatencyPage() {
   const [pingCount, setPingCount] = useState(DEFAULT_PING_COUNT);
   const [errorMsg, setErrorMsg] = useState("");
   const [outOfOrder, setOutOfOrder] = useState(false);
+  const [region, setRegion] = useState<string | null>(null);
+  const [regionLoading, setRegionLoading] = useState(false);
   const abortRef = useRef(false);
   const wsRef = useRef<WebSocket | null>(null);
 
+  const fetchRegion = useCallback(async () => {
+    setRegionLoading(true);
+    try {
+      const res = await fetch(`${HTTP_BASE_URL}/check`);
+      if (res.ok) {
+        const data = await res.json();
+        setRegion(data.region ?? "unknown");
+      } else {
+        setRegion("unavailable");
+      }
+    } catch {
+      setRegion("unavailable");
+    } finally {
+      setRegionLoading(false);
+    }
+  }, []);
+
   const runTest = useCallback(() => {
+    fetchRegion();
     abortRef.current = false;
     setResults([]);
     setProgress(0);
@@ -116,7 +138,7 @@ export default function WsLatencyPage() {
         setErrorMsg("Connection closed before any pings completed.");
       }
     };
-  }, [pingCount]);
+  }, [pingCount, fetchRegion]);
 
   const handleStop = useCallback(() => {
     abortRef.current = true;
@@ -165,6 +187,25 @@ export default function WsLatencyPage() {
             <p className="text-xs text-default-400 font-mono">
               Target: {WS_BASE_URL}/ws/ping
             </p>
+
+            {region && (
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium">Region:</span>
+                <Chip
+                  size="sm"
+                  variant="flat"
+                  color={region === "unavailable" || region === "unknown" ? "warning" : "primary"}
+                >
+                  {region}
+                </Chip>
+              </div>
+            )}
+            {regionLoading && (
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium">Region:</span>
+                <Spinner size="sm" />
+              </div>
+            )}
 
             <div className="flex items-center gap-4">
               <label className="text-sm font-medium whitespace-nowrap">
