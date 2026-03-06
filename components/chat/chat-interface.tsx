@@ -15,7 +15,7 @@ import {
   NotificationPermissionModal,
   NotificationPermissionModalRef,
 } from "@/components/notification-permission-modal";
-import { Message, MessageContentPart } from "@/lib/llm/types";
+import { Message, MessageContentPart, isGeneratedImagePart } from "@/lib/llm/types";
 import ImageDetailModal, { ImageInfo } from "./image-detail-modal";
 import ImageDrawingModal from "./image-drawing-modal";
 import ChatMessage from "./chat-message";
@@ -28,7 +28,6 @@ import { SYSTEM_PROMPT_STORAGE_KEY } from "@/components/test-kit";
 import {
   MenuState,
   INITIAL_MENU_STATE,
-  resolveMenuState,
   loadMenuState,
   saveMenuState,
 } from "./menu-configuration";
@@ -372,7 +371,7 @@ export default function ChatInterface({
       if (message.role === "assistant" && Array.isArray(message.content)) {
         for (const part of message.content) {
           if (
-            part.type === "agent_image" &&
+            isGeneratedImagePart(part) &&
             (part.status === "generated" || part.status === "error")
           ) {
             images.push({
@@ -398,6 +397,8 @@ export default function ChatInterface({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const notificationModalRef = useRef<NotificationPermissionModalRef>(null);
   const lastUserInputRef = useRef<string>("");
+  const lastPendingImagesRef = useRef<PendingImage[]>([]);
+  const lastEditorContentRef = useRef<JSONContent | null>(null);
 
   // Voice recorder hook
   const handleTranscriptionComplete = useCallback((text: string) => {
@@ -597,12 +598,6 @@ export default function ChatInterface({
           URL.revokeObjectURL(img.localPreviewUrl);
         }
         const newImages = prev.filter((i) => i.imageId !== imageId);
-
-        // If in "edit" mode and no images remain, switch to "create" mode
-        if (menuState.mode === "edit" && newImages.length === 0) {
-          const newState = resolveMenuState(menuState, "create");
-          setMenuState(newState);
-        }
 
         return newImages;
       });
@@ -1043,12 +1038,6 @@ export default function ChatInterface({
 
         // Auto-enable precision editing when user creates a marked image
         setPrecisionEditing(true);
-
-        // Auto-switch to edit mode if in create mode
-        if (menuState.mode === "create") {
-          const newState = resolveMenuState(menuState, "edit");
-          setMenuState(newState);
-        }
       } else {
         console.error("Marked image upload failed:", result.error);
         // Remove the failed upload from pending images
@@ -1102,6 +1091,8 @@ export default function ChatInterface({
 
     // Save the original input for potential retry exhausted scenario
     lastUserInputRef.current = input;
+    lastPendingImagesRef.current = [...pendingImages];
+    lastEditorContentRef.current = chatInputRef.current?.getEditorJSON() || null;
 
     // Capture current pending images before clearing
     const currentPendingImages = [...pendingImages];
@@ -1163,15 +1154,15 @@ export default function ChatInterface({
               // Find the part by imageId
               const imgIndex = newContent.findIndex(
                 (p) =>
-                  p.type === "agent_image" && p.imageId === selection.imageId
+                  isGeneratedImagePart(p) && p.imageId === selection.imageId
               );
               if (
                 imgIndex !== -1 &&
-                newContent[imgIndex].type === "agent_image"
+                isGeneratedImagePart(newContent[imgIndex])
               ) {
                 const agentImagePart = newContent[imgIndex] as Extract<
                   MessageContentPart,
-                  { type: "agent_image" }
+                  { type: "agent_image" } | { type: "direct_image" }
                 >;
                 newContent[imgIndex] = {
                   ...agentImagePart,
@@ -1190,10 +1181,6 @@ export default function ChatInterface({
 
     // Clear input and pending images
     setInput("");
-    // Clean up local preview URLs
-    currentPendingImages.forEach((img) => {
-      if (img.localPreviewUrl) URL.revokeObjectURL(img.localPreviewUrl);
-    });
     setPendingImages([]);
     setPrecisionEditing(false);
     
@@ -1252,12 +1239,15 @@ export default function ChatInterface({
         })),
       };
 
-      if (menuState.mode === "create" || menuState.mode === "edit") {
+      if (menuState.mode === "agent" || menuState.mode === "image") {
         payload.imageModelId = menuState.model;
         if (menuState.imageSize) {
           payload.imageSize = menuState.imageSize;
         }
       }
+
+      // Pass the mode so the backend knows whether to use agent or direct generation
+      payload.mode = menuState.mode;
 
       // Add precision editing flag if enabled
       if (precisionEditing) {
@@ -1384,6 +1374,9 @@ export default function ChatInterface({
                 `[Chat] Variant ${variantId} failed: ${event.reason}`
               );
 
+              // Clear this variant's content (may have partial data from the last attempt)
+              variantContents[variantId] = [];
+
               // If all variants failed, handle the error
               const allFailed = Object.keys(variantContents).every(
                 (v) => variantContents[v].length === 0
@@ -1414,8 +1407,12 @@ export default function ChatInterface({
                   color: "danger",
                 });
 
-                // Restore the user's original input
+                // Restore the user's original input and pending images
                 setInput(lastUserInputRef.current);
+                setPendingImages(lastPendingImagesRef.current);
+                if (lastEditorContentRef.current && chatInputRef.current) {
+                  chatInputRef.current.setEditorContent(lastEditorContentRef.current);
+                }
 
                 // Remove all variant messages and user message
                 setMessages((prev) => {
@@ -1576,7 +1573,7 @@ export default function ChatInterface({
               if (event.imageId) {
                 // Find the part with matching imageId
                 const partIdx = currentContent.findIndex(
-                  (p) => p.type === "agent_image" && p.imageId === event.imageId
+                  (p) => isGeneratedImagePart(p) && p.imageId === event.imageId
                 );
                 if (partIdx !== -1) {
                   currentContent[partIdx] = event.part;
@@ -1621,7 +1618,7 @@ export default function ChatInterface({
       let hasAnyImages = false;
       for (const content of allVariantContents) {
         for (const part of content) {
-          if (part.type === "agent_image") {
+          if (isGeneratedImagePart(part)) {
             hasAnyImages = true;
             if (part.status === "error" && part.reason === "INSUFFICIENT_CREDITS") {
               hasInsufficientCredits = true;
@@ -1644,34 +1641,41 @@ export default function ChatInterface({
           window.dispatchEvent(new Event("refresh-chats"));
         }, 3000);
       }
+
+      // Send succeeded — clean up saved refs and local preview URLs
+      lastPendingImagesRef.current.forEach((img) => {
+        if (img.localPreviewUrl) URL.revokeObjectURL(img.localPreviewUrl);
+      });
+      lastPendingImagesRef.current = [];
+      lastUserInputRef.current = "";
+      lastEditorContentRef.current = null;
     } catch (error) {
       console.error("Error sending message", error);
+      setInput(lastUserInputRef.current);
+      setPendingImages(lastPendingImagesRef.current);
+      if (lastEditorContentRef.current && chatInputRef.current) {
+        chatInputRef.current.setEditorContent(lastEditorContentRef.current);
+      }
+      setMessages((prev) =>
+        prev.filter((msg) => !(msg.role === "user" && msg === userMessage))
+      );
     } finally {
       setIsSending(false);
     }
   };
 
-  // Handle precision editing toggle - auto-switch mode to "edit" when enabled
+  // Handle precision editing toggle
   const handlePrecisionEditingChange = useCallback(
     (value: boolean) => {
       setPrecisionEditing(value);
-      // When precision editing is turned ON and mode is "create", switch to "edit"
-      if (value && menuState.mode === "create") {
-        const newState = resolveMenuState(menuState, "edit");
-        setMenuState(newState);
-      }
     },
-    [menuState]
+    []
   );
 
-  // Handle menu state change - auto-enable precision editing when switching to edit mode
+  // Handle menu state change
   const handleMenuStateChange = useCallback(
     (newState: MenuState) => {
       setMenuState(newState);
-      // Auto-enable precision editing when switching to edit mode
-      if (newState.mode === "edit") {
-        setPrecisionEditing(true);
-      }
     },
     []
   );
@@ -1895,7 +1899,7 @@ export default function ChatInterface({
               // Update existing part by imageId
               if (event.imageId) {
                 const partIdx = variantContent.findIndex(
-                  (p) => p.type === "agent_image" && p.imageId === event.imageId
+                  (p) => isGeneratedImagePart(p) && p.imageId === event.imageId
                 );
                 if (partIdx !== -1) {
                   variantContent[partIdx] = event.part;
@@ -1989,11 +1993,14 @@ export default function ChatInterface({
           } else {
             // Assistant message(s) - use ParallelMessage for variants
             const messageTimestamp = group.messages[0]?.createdAt;
-            // Only show "New Idea" button on the last assistant message group
+            // Only show "New Idea" button on the last assistant message group (not for direct image mode)
             const isLastAssistantGroup =
               groupIdx === groupedMessages.length - 1 ||
               (groupIdx === groupedMessages.length - 2 &&
                 groupedMessages[groupedMessages.length - 1]?.type === "user");
+            const isDirectImage = group.messages.some(
+              (m) => m.agentId === "direct-image"
+            );
             return (
               <ParallelMessage
                 key={`assistant-${group.originalIndex}`}
@@ -2008,7 +2015,7 @@ export default function ChatInterface({
                 compactMode={compactMode}
                 hideAvatars={hideAvatars}
                 onGenerateVariant={
-                  isLastAssistantGroup && messageTimestamp
+                  isLastAssistantGroup && !isDirectImage && messageTimestamp
                     ? () => handleGenerateVariant(messageTimestamp)
                     : undefined
                 }

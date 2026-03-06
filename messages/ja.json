@@ -497,12 +497,10 @@
     "selectCategory": "{category}を選択",
     "with": "で",
     "modes": {
-      "create": "新しい画像を作成",
-      "createDesc": "フル生成ワークフロー",
-      "edit": "選択した画像を編集",
-      "editDesc": "既存の画像を編集",
-      "chat": "チャット",
-      "chatDesc": "会話形式のインタラクション"
+      "agent": "エージェント",
+      "agentDesc": "AIアシスト付き画像生成、プロンプトのサポート",
+      "image": "画像",
+      "imageDesc": "プロンプトから直接画像を生成"
     },
     "models": {
       "nano-banana-pro": "Nano-banana Pro",
@@ -543,9 +541,7 @@
       "3": "3",
       "4": "4"
     },
-    "editModeHint": "編集モードを使用するには、まず画像を選択またはアップロードしてください",
-    "expertiseNotAvailable": "選択した画像を編集モードでは専門分野は利用できません。",
-    "aspectRatioNotApplicable": "チャットモードではアスペクト比は適用されません。"
+    "expertiseNotAvailable": "直接画像生成モードでは専門分野は利用できません。"
   },
   "notifications": {
     "enableTitle": "通知を有効にする",

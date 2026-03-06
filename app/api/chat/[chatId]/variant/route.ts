@@ -21,7 +21,7 @@ function extractTextContent(message: Message): string {
   for (const part of message.content) {
     if (part.type === "text") {
       textParts.push(part.text);
-    } else if (part.type === "agent_image") {
+    } else if (part.type === "agent_image" || part.type === "direct_image") {
       // Include image suggestions as context
       textParts.push(
         `[Image suggestion: "${part.title}" - ${part.prompt}]`

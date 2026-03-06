@@ -276,7 +276,7 @@ export class Agent1 implements Agent {
         return {
           ...m,
           content: m.content.map((p) => {
-            if (p.type === "agent_image") {
+            if (p.type === "agent_image" || p.type === "direct_image") {
               return {
                 type: "text" as const,
                 text: `[Image ID: ${p.imageId || "unknown"}] Suggestion: ${p.title}\nAspect Ratio: ${p.aspectRatio || "1:1"

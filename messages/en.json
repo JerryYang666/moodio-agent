@@ -544,12 +544,10 @@
     "selectCategory": "Select {category}",
     "with": "with",
     "modes": {
-      "create": "Create new image",
-      "createDesc": "Full generation workflow",
-      "edit": "Edit selected images",
-      "editDesc": "Edit existing images",
-      "chat": "Chat",
-      "chatDesc": "Conversational interaction"
+      "agent": "Agent",
+      "agentDesc": "AI-assisted image generation with prompt help",
+      "image": "Image",
+      "imageDesc": "Direct image generation from your prompt"
     },
     "models": {
       "nano-banana-pro": "Nano-banana Pro",
@@ -590,9 +588,7 @@
       "3": "3",
       "4": "4"
     },
-    "editModeHint": "Select or upload an image first to use Edit mode",
-    "expertiseNotAvailable": "Expertise is not available in Edit selected images mode.",
-    "aspectRatioNotApplicable": "Aspect ratio is not applicable in Chat mode."
+    "expertiseNotAvailable": "Expertise is not available in direct image generation mode."
   },
   "notifications": {
     "enableTitle": "Enable Notifications",

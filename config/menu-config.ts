@@ -5,22 +5,17 @@ export const MENU_CONFIG = {
   categories: {
     mode: {
       label: "Mode",
-      default: "create",
+      default: "agent",
       options: {
-        create: {
-          label: "Create new image",
-          description: "Full generation workflow",
-          icon: "WandSparkles",
+        agent: {
+          label: "Agent",
+          description: "AI-assisted image generation with prompt help",
+          icon: "BotMessageSquare",
         },
-        edit: {
-          label: "Edit selected images",
-          description: "Edit existing images",
-          icon: "Pencil",
-        },
-        chat: {
-          label: "Chat",
-          description: "Conversational interaction",
-          icon: "MessageSquare",
+        image: {
+          label: "Image",
+          description: "Direct image generation from your prompt",
+          icon: "ImageIcon",
         },
       },
     },
@@ -96,7 +91,7 @@ export const MENU_CONFIG = {
   },
 
   contexts: {
-    create: {
+    agent: {
       defaults: {
         model: "nano-banana-pro",
         expertise: "commercial",
@@ -138,18 +133,18 @@ export const MENU_CONFIG = {
       },
     },
 
-    edit: {
+    image: {
       defaults: {
         model: "nano-banana-pro",
         aspectRatio: "smart",
         imageSize: "2k",
-        imageQuantity: "smart",
+        imageQuantity: "1",
       },
       availability: {
         model: { enabled: true, allowed: ["nano-banana-pro", "seedream-45"] },
         expertise: {
           enabled: false,
-          reason: "Expertise is not available in Edit selected images mode.",
+          reason: "Expertise is not available in direct image generation mode.",
         },
         aspectRatio: {
           enabled: true,
@@ -171,33 +166,7 @@ export const MENU_CONFIG = {
         },
         imageQuantity: {
           enabled: true,
-          allowed: ["smart", "1", "2", "3", "4"],
-        },
-      },
-    },
-
-    chat: {
-      defaults: {
-        model: DEFAULT_LLM_MODEL,
-        expertise: "commercial",
-      },
-      availability: {
-        model: { enabled: true, allowed: [DEFAULT_LLM_MODEL, "gemini-3"] },
-        expertise: {
-          enabled: true,
-          allowed: ["commercial", "product", "uiux"],
-        },
-        aspectRatio: {
-          enabled: false,
-          reason: "Aspect ratio is not applicable in Chat mode.",
-        },
-        imageSize: {
-          enabled: false,
-          reason: "Image size is not applicable in Chat mode.",
-        },
-        imageQuantity: {
-          enabled: false,
-          reason: "Image quantity is not applicable in Chat mode.",
+          allowed: ["1", "2", "3", "4"],
         },
       },
     },

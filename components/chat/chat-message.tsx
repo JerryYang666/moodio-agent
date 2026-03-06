@@ -7,7 +7,7 @@ import { Image } from "@heroui/image";
 import { Bot, X, Pencil, ChevronDown, ChevronRight, Brain } from "lucide-react";
 import clsx from "clsx";
 import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
-import { Message, MessageContentPart } from "@/lib/llm/types";
+import { Message, MessageContentPart, isGeneratedImagePart } from "@/lib/llm/types";
 import ImageWithMenu from "@/components/collection/image-with-menu";
 import { ImageInfo } from "./image-detail-modal";
 import ImageHoverPreview from "./image-hover-preview";
@@ -87,7 +87,7 @@ export default function ChatMessage({
     for (const msg of allMessages) {
       if (!Array.isArray(msg.content)) continue;
       for (const part of msg.content) {
-        if (part.type === "agent_image" && part.imageId && part.imageUrl && part.status === "generated") {
+        if (isGeneratedImagePart(part) && part.imageId && part.imageUrl && part.status === "generated") {
           images.push({ imageId: part.imageId, imageUrl: part.imageUrl, title: part.title });
         }
         if (part.type === "image" && part.imageId && (part as any).imageUrl) {
@@ -176,7 +176,7 @@ export default function ChatMessage({
     const imageParts = content.filter(
       (p) => p.type === "image" || p.type === "image_url"
     );
-    const agentParts = content.filter((p) => p.type === "agent_image");
+    const agentParts = content.filter((p) => isGeneratedImagePart(p));
     const videoParts = content.filter((p) => p.type === "agent_video");
     const shotListParts = content.filter((p) => p.type === "agent_shot_list");
     const thinkParts = content.filter((p) => p.type === "internal_think");
@@ -428,7 +428,7 @@ export default function ChatMessage({
       <div
         className={clsx(
           "flex flex-col gap-1",
-          isUser ? "max-w-[80%]" : "max-w-full"
+          isUser ? "max-w-[80%]" : "max-w-full w-full"
         )}
       >
         <Card

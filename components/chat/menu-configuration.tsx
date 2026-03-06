@@ -12,9 +12,8 @@ import { Button } from "@heroui/button";
 import { Tooltip } from "@heroui/tooltip";
 import { MENU_CONFIG } from "@/config/menu-config";
 import {
-  WandSparkles,
-  Pencil,
-  MessageSquare,
+  BotMessageSquare,
+  Image as ImageIcon,
   Sparkles,
   Info,
   ChevronUp,
@@ -22,9 +21,8 @@ import {
 import { AspectRatioIcon } from "./aspect-ratio-icon";
 
 const ICON_MAP: Record<string, React.ElementType> = {
-  WandSparkles,
-  Pencil,
-  MessageSquare,
+  BotMessageSquare,
+  ImageIcon,
   Sparkles,
 };
 
@@ -48,14 +46,14 @@ export const INITIAL_MENU_STATE: MenuState = {
 };
 
 // localStorage key for persisting menu preferences
-const MENU_STORAGE_KEY = "chat-menu-params";
+const MENU_STORAGE_KEY = "moodio.chat-menu-params";
 
-// Save menu state to localStorage (excludes mode as it's context-dependent)
+// Save menu state to localStorage
 export const saveMenuState = (state: MenuState) => {
   if (typeof window === "undefined") return;
   
-  // Save all preferences except mode (mode is contextual and resets per session)
   const toSave = {
+    mode: state.mode,
     model: state.model,
     expertise: state.expertise,
     aspectRatio: state.aspectRatio,
@@ -82,6 +80,11 @@ export const loadMenuState = (): MenuState => {
       // Merge with initial state, validating each value
       const loaded: MenuState = { ...INITIAL_MENU_STATE };
       
+      // Validate and apply saved mode
+      if (parsed.mode && MENU_CONFIG.categories.mode.options[parsed.mode as keyof typeof MENU_CONFIG.categories.mode.options]) {
+        loaded.mode = parsed.mode;
+      }
+
       // Validate and apply saved model
       if (parsed.model && MENU_CONFIG.categories.model.options[parsed.model as keyof typeof MENU_CONFIG.categories.model.options]) {
         loaded.model = parsed.model;
@@ -197,13 +200,11 @@ export const resolveMenuState = (
 interface MenuConfigurationProps {
   state: MenuState;
   onStateChange: (newState: MenuState) => void;
-  hasSelectedImages?: boolean;
 }
 
 export default function MenuConfiguration({
   state,
   onStateChange,
-  hasSelectedImages = false,
 }: MenuConfigurationProps) {
   const t = useTranslations("menu");
   const getCategoryLabel = (
@@ -394,10 +395,9 @@ export default function MenuConfiguration({
     const SelectedIcon = selectedIconName ? ICON_MAP[selectedIconName] : null;
 
     // Different colors for different modes
-    const modeColors: Record<string, "primary" | "secondary" | "success"> = {
-      create: "primary",
-      edit: "secondary",
-      chat: "success",
+    const modeColors: Record<string, "primary" | "secondary"> = {
+      agent: "primary",
+      image: "secondary",
     };
     const buttonColor = modeColors[selectedKey] || "primary";
 
@@ -428,7 +428,6 @@ export default function MenuConfiguration({
             selectionMode="single"
             variant="flat"
             onSelectionChange={handleModeChange}
-            disabledKeys={!hasSelectedImages ? ["edit"] : []}
           >
             {Object.entries(categoryDef.options).map(([key, value]) => {
               const Icon = (value as any).icon
@@ -436,11 +435,8 @@ export default function MenuConfiguration({
                 : null;
               const description = getModeDescription(key);
               const hasDescription = Boolean(description);
-              const isEditDisabled = key === "edit" && !hasSelectedImages;
-              const tooltipContent = isEditDisabled
-                ? t("editModeHint")
-                : description;
-              const showTooltip = hasDescription || isEditDisabled;
+              const tooltipContent = description;
+              const showTooltip = hasDescription;
               return (
                 <DropdownItem
                   key={key}
