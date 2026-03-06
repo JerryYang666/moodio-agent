@@ -107,6 +107,7 @@
     "failedToRenameChat": "重新命名對話失敗",
     "failedToDeleteChat": "刪除對話失敗",
     "typeMessage": "輸入訊息...",
+    "typePrompt": "輸入提示詞...",
     "addImage": "新增圖片",
     "recordVoice": "錄製語音",
     "send": "傳送",

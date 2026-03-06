@@ -107,6 +107,7 @@
     "failedToRenameChat": "채팅 이름 변경에 실패했습니다",
     "failedToDeleteChat": "채팅 삭제에 실패했습니다",
     "typeMessage": "메시지를 입력하세요...",
+    "typePrompt": "프롬프트를 입력하세요...",
     "addImage": "이미지 추가",
     "recordVoice": "음성 녹음",
     "send": "보내기",

@@ -107,6 +107,7 @@
     "failedToRenameChat": "Failed to rename chat",
     "failedToDeleteChat": "Failed to delete chat",
     "typeMessage": "Type a message...",
+    "typePrompt": "Enter your prompt...",
     "addImage": "Add image",
     "recordVoice": "Record voice",
     "send": "Send",

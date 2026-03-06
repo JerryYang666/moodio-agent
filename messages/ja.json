@@ -107,6 +107,7 @@
     "failedToRenameChat": "チャット名の変更に失敗しました",
     "failedToDeleteChat": "チャットの削除に失敗しました",
     "typeMessage": "メッセージを入力...",
+    "typePrompt": "プロンプトを入力...",
     "addImage": "画像を追加",
     "recordVoice": "音声を録音",
     "send": "送信",

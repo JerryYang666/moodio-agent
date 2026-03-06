@@ -1129,7 +1129,7 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
               value={input}
               onChange={handleMentionChange}
               mentionItems={mentionItems}
-              placeholder={t("chat.typeMessage")}
+              placeholder={menuState.mode === "image" ? t("chat.typePrompt") : t("chat.typeMessage")}
               minRows={1}
               maxRows={isExpanded ? 5 : 1}
               onSubmit={onSend}
