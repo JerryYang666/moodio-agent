@@ -46,14 +46,14 @@ export const INITIAL_MENU_STATE: MenuState = {
 };
 
 // localStorage key for persisting menu preferences
-const MENU_STORAGE_KEY = "chat-menu-params";
+const MENU_STORAGE_KEY = "moodio.chat-menu-params";
 
-// Save menu state to localStorage (excludes mode as it's context-dependent)
+// Save menu state to localStorage
 export const saveMenuState = (state: MenuState) => {
   if (typeof window === "undefined") return;
   
-  // Save all preferences except mode (mode is contextual and resets per session)
   const toSave = {
+    mode: state.mode,
     model: state.model,
     expertise: state.expertise,
     aspectRatio: state.aspectRatio,
@@ -80,6 +80,11 @@ export const loadMenuState = (): MenuState => {
       // Merge with initial state, validating each value
       const loaded: MenuState = { ...INITIAL_MENU_STATE };
       
+      // Validate and apply saved mode
+      if (parsed.mode && MENU_CONFIG.categories.mode.options[parsed.mode as keyof typeof MENU_CONFIG.categories.mode.options]) {
+        loaded.mode = parsed.mode;
+      }
+
       // Validate and apply saved model
       if (parsed.model && MENU_CONFIG.categories.model.options[parsed.model as keyof typeof MENU_CONFIG.categories.model.options]) {
         loaded.model = parsed.model;

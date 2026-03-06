@@ -428,7 +428,7 @@ export default function ChatMessage({
       <div
         className={clsx(
           "flex flex-col gap-1",
-          isUser ? "max-w-[80%]" : "max-w-full"
+          isUser ? "max-w-[80%]" : "max-w-full w-full"
         )}
       >
         <Card
