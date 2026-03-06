@@ -397,6 +397,8 @@ export default function ChatInterface({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const notificationModalRef = useRef<NotificationPermissionModalRef>(null);
   const lastUserInputRef = useRef<string>("");
+  const lastPendingImagesRef = useRef<PendingImage[]>([]);
+  const lastEditorContentRef = useRef<JSONContent | null>(null);
 
   // Voice recorder hook
   const handleTranscriptionComplete = useCallback((text: string) => {
@@ -1089,6 +1091,8 @@ export default function ChatInterface({
 
     // Save the original input for potential retry exhausted scenario
     lastUserInputRef.current = input;
+    lastPendingImagesRef.current = [...pendingImages];
+    lastEditorContentRef.current = chatInputRef.current?.getEditorJSON() || null;
 
     // Capture current pending images before clearing
     const currentPendingImages = [...pendingImages];
@@ -1177,10 +1181,6 @@ export default function ChatInterface({
 
     // Clear input and pending images
     setInput("");
-    // Clean up local preview URLs
-    currentPendingImages.forEach((img) => {
-      if (img.localPreviewUrl) URL.revokeObjectURL(img.localPreviewUrl);
-    });
     setPendingImages([]);
     setPrecisionEditing(false);
     
@@ -1404,8 +1404,12 @@ export default function ChatInterface({
                   color: "danger",
                 });
 
-                // Restore the user's original input
+                // Restore the user's original input and pending images
                 setInput(lastUserInputRef.current);
+                setPendingImages(lastPendingImagesRef.current);
+                if (lastEditorContentRef.current && chatInputRef.current) {
+                  chatInputRef.current.setEditorContent(lastEditorContentRef.current);
+                }
 
                 // Remove all variant messages and user message
                 setMessages((prev) => {
@@ -1634,8 +1638,24 @@ export default function ChatInterface({
           window.dispatchEvent(new Event("refresh-chats"));
         }, 3000);
       }
+
+      // Send succeeded — clean up saved refs and local preview URLs
+      lastPendingImagesRef.current.forEach((img) => {
+        if (img.localPreviewUrl) URL.revokeObjectURL(img.localPreviewUrl);
+      });
+      lastPendingImagesRef.current = [];
+      lastUserInputRef.current = "";
+      lastEditorContentRef.current = null;
     } catch (error) {
       console.error("Error sending message", error);
+      setInput(lastUserInputRef.current);
+      setPendingImages(lastPendingImagesRef.current);
+      if (lastEditorContentRef.current && chatInputRef.current) {
+        chatInputRef.current.setEditorContent(lastEditorContentRef.current);
+      }
+      setMessages((prev) =>
+        prev.filter((msg) => !(msg.role === "user" && msg === userMessage))
+      );
     } finally {
       setIsSending(false);
     }
@@ -1970,11 +1990,14 @@ export default function ChatInterface({
           } else {
             // Assistant message(s) - use ParallelMessage for variants
             const messageTimestamp = group.messages[0]?.createdAt;
-            // Only show "New Idea" button on the last assistant message group
+            // Only show "New Idea" button on the last assistant message group (not for direct image mode)
             const isLastAssistantGroup =
               groupIdx === groupedMessages.length - 1 ||
               (groupIdx === groupedMessages.length - 2 &&
                 groupedMessages[groupedMessages.length - 1]?.type === "user");
+            const isDirectImage = group.messages.some(
+              (m) => m.agentId === "direct-image"
+            );
             return (
               <ParallelMessage
                 key={`assistant-${group.originalIndex}`}
@@ -1989,7 +2012,7 @@ export default function ChatInterface({
                 compactMode={compactMode}
                 hideAvatars={hideAvatars}
                 onGenerateVariant={
-                  isLastAssistantGroup && messageTimestamp
+                  isLastAssistantGroup && !isDirectImage && messageTimestamp
                     ? () => handleGenerateVariant(messageTimestamp)
                     : undefined
                 }

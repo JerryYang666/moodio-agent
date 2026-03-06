@@ -108,6 +108,8 @@ export interface ChatInputRef {
   getEditorJSON: () => JSONContent | null;
   /** Insert plain text at the current cursor position (for voice transcription) */
   insertText: (text: string) => void;
+  /** Set the editor content from JSON (for restoring content) */
+  setEditorContent: (content: JSONContent) => void;
 }
 
 const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
@@ -167,6 +169,7 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
   useImperativeHandle(ref, () => ({
     getEditorJSON: () => mentionTextboxRef.current?.getJSON() || null,
     insertText: (text: string) => mentionTextboxRef.current?.insertText(text),
+    setEditorContent: (content: JSONContent) => mentionTextboxRef.current?.setContent(content),
   }), []);
 
   // Convert pending images to mention items for the textbox

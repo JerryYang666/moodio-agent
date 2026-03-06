@@ -434,6 +434,47 @@ export async function POST(
       const variantId = `variant-0-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
       const numImages = imageQuantity || 1;
 
+      // Generate a concise title from the prompt using LLM
+      let baseTitle = content?.slice(0, 50) || "Image";
+      try {
+        const titleClient = createLLMClient({
+          apiKey: process.env.LLM_API_KEY,
+          provider: "openai",
+          model: DEFAULT_LLM_MODEL,
+        });
+        const titlePrompt: Message[] = [
+          {
+            role: "system",
+            content:
+              "You are a helpful assistant that generates concise, descriptive titles for AI-generated images. " +
+              "Based on the user's image generation prompt, generate a short title that captures the essence of the image. " +
+              "The title MUST be very concise and no longer than 50 characters. " +
+              "Give the title in the same language as the prompt. " +
+              'Output JSON only. Format: {"title": "Your Image Title"}',
+          },
+          { role: "user", content: content || "Image" },
+        ];
+        const titleResponse = await titleClient.chatComplete(titlePrompt);
+        if (titleResponse) {
+          try {
+            const clean = titleResponse.replace(/```json\n?|```/g, "").trim();
+            const parsed = JSON.parse(clean);
+            if (parsed?.title) {
+              baseTitle = parsed.title.trim().slice(0, 50);
+            }
+          } catch {
+            if (titleResponse.length < 50 && !titleResponse.includes("{")) {
+              baseTitle = titleResponse.trim();
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Failed to generate image title:", err);
+      }
+
+      const getImageTitle = (index: number) =>
+        numImages > 1 ? `${baseTitle}-${index + 1}` : baseTitle;
+
       // Promise that resolves when generation is complete (for post-processing)
       let resolveCompletion: (parts: MessageContentPart[]) => void;
       const completionPromise = new Promise<MessageContentPart[]>((resolve) => {
@@ -461,7 +502,7 @@ export async function POST(
                 const placeholder: MessageContentPart = {
                   type: "direct_image",
                   imageId: trackingImageId,
-                  title: content || "Image",
+                  title: getImageTitle(i),
                   aspectRatio: aspectRatioOverride || "1:1",
                   prompt: content,
                   status: "loading",
@@ -557,7 +598,7 @@ export async function POST(
                     type: "direct_image",
                     imageId: finalImageId,
                     imageUrl: getSignedImageUrl(finalImageId),
-                    title: content || "Image",
+                    title: getImageTitle(i),
                     aspectRatio: aspectRatioOverride || "1:1",
                     prompt: content,
                     status: "generated",
@@ -570,7 +611,7 @@ export async function POST(
                   const errorPart: MessageContentPart = {
                     type: "direct_image",
                     imageId: trackingImageId,
-                    title: content || "Error",
+                    title: getImageTitle(i),
                     aspectRatio: "1:1",
                     prompt: content,
                     status: "error",
@@ -652,8 +693,18 @@ export async function POST(
     waitUntil(
       completions
         .then(async (finalMessages) => {
-          // Messages already have createdAt set to messageTimestamp by the agent
-          const messagesToSave: Message[] = finalMessages.map((msg) => ({
+          // Filter out failed variants (error-only messages that the client already discarded)
+          const successfulMessages = finalMessages.filter((msg) => {
+            if (!Array.isArray(msg.content)) {
+              const text = typeof msg.content === "string" ? msg.content : "";
+              if (text === "Failed to generate response") return false;
+            }
+            return true;
+          });
+
+          if (successfulMessages.length === 0) return;
+
+          const messagesToSave: Message[] = successfulMessages.map((msg) => ({
             ...msg,
             createdAt: msg.createdAt || messageTimestamp,
           }));
