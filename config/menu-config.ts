@@ -10,12 +10,12 @@ export const MENU_CONFIG = {
         agent: {
           label: "Agent",
           description: "AI-assisted image generation with prompt help",
-          icon: "WandSparkles",
+          icon: "BotMessageSquare",
         },
         image: {
           label: "Image",
           description: "Direct image generation from your prompt",
-          icon: "Pencil",
+          icon: "ImageIcon",
         },
       },
     },

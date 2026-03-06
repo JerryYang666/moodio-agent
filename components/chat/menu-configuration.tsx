@@ -12,8 +12,8 @@ import { Button } from "@heroui/button";
 import { Tooltip } from "@heroui/tooltip";
 import { MENU_CONFIG } from "@/config/menu-config";
 import {
-  WandSparkles,
-  Pencil,
+  BotMessageSquare,
+  Image as ImageIcon,
   Sparkles,
   Info,
   ChevronUp,
@@ -21,8 +21,8 @@ import {
 import { AspectRatioIcon } from "./aspect-ratio-icon";
 
 const ICON_MAP: Record<string, React.ElementType> = {
-  WandSparkles,
-  Pencil,
+  BotMessageSquare,
+  ImageIcon,
   Sparkles,
 };
 
