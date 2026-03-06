@@ -113,7 +113,7 @@
     "preview": "預覽",
     "selectedAsset": "已選擇的素材",
     "precisionEditing": "精準編輯",
-    "precisionEditingDesc": "啟用後，代理程式會盡力只編輯您想要變更的部分，其餘保持不變。",
+    "precisionEditingDesc": "啟用後，智慧代理會盡力只編輯您想要變更的部分，其餘保持不變。",
     "timeRemaining": "剩餘 {seconds} 秒",
     "fileSizeTooLarge": "檔案大小過大。最大 {maxSize}MB。",
     "fileWillBeCompressed": "圖片超過 {threshold}MB，將自動壓縮為 WebP 格式。",
@@ -150,9 +150,9 @@
     "editInNewChatDescription": "這將從此處建立新對話，並保留到目前為止的對話記錄。",
     "editAndFork": "編輯並分支",
     "errorMessages": {
-      "overwhelmed": "糟糕！代理程式有點手忙腳亂...可以再試一次嗎？",
-      "coffeeBreak": "抱歉！代理程式正在喝咖啡休息中。請再試一次！",
-      "tripped": "哎呀！代理程式被自己的思緒絆倒了。再試一次？"
+      "overwhelmed": "糟糕！智慧代理有點手忙腳亂...可以再試一次嗎？",
+      "coffeeBreak": "抱歉！智慧代理正在喝咖啡休息中。請再試一次！",
+      "tripped": "哎呀！智慧代理被自己的思緒絆倒了。再試一次？"
     },
     "waitForUpload": "請等待圖片上傳完成",
     "uploadFailed": "圖片上傳失敗",
@@ -497,7 +497,7 @@
     "selectCategory": "選擇{category}",
     "with": "使用",
     "modes": {
-      "agent": "智能體",
+      "agent": "智慧代理",
       "agentDesc": "AI輔助圖片生成，幫助構思和優化提示詞",
       "image": "圖片",
       "imageDesc": "直接根據提示詞生成圖片"
@@ -535,7 +535,7 @@
     "imageQuantity": "數量",
     "imageQuantityOptions": {
       "smart": "智慧",
-      "smartDesc": "讓代理決定生成圖片的最佳數量",
+      "smartDesc": "讓智慧代理決定生成圖片的最佳數量",
       "1": "1",
       "2": "2",
       "3": "3",
@@ -786,7 +786,7 @@
     "roles": "角色",
     "memberSince": "加入時間",
     "testProtectedApi": "測試受保護的 API",
-    "goToAgent": "前往代理程式",
+    "goToAgent": "前往智慧代理",
     "apiResponse": "來自 /api/test/protected 的回應：",
     "subtitle": "一站式創作平台",
     "welcomeBackName": "歡迎回來，{name}",
