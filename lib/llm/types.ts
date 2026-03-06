@@ -84,12 +84,27 @@ export function isGeneratedImagePart(
   return part.type === "agent_image" || part.type === "direct_image";
 }
 
+export interface MessageMetadata {
+  mode?: string;
+  imageModelId?: string;
+  imageSize?: string;
+  aspectRatio?: string;
+  imageQuantity?: number;
+  precisionEditing?: boolean;
+  referenceImages?: Array<{
+    imageId: string;
+    tag?: string;
+    title?: string;
+  }>;
+}
+
 export interface Message {
   role: "system" | "user" | "assistant";
   content: string | MessageContentPart[];
   agentId?: string;
   createdAt?: number; // Unix timestamp in milliseconds
   variantId?: string; // Unique identifier for parallel variants
+  metadata?: MessageMetadata;
 }
 
 // A message group represents a user message and its assistant response(s)

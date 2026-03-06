@@ -12,7 +12,7 @@ import {
   downloadImage,
 } from "@/lib/storage/s3";
 import { createLLMClient } from "@/lib/llm/client";
-import { Message, MessageContentPart, DEFAULT_LLM_MODEL, isGeneratedImagePart } from "@/lib/llm/types";
+import { Message, MessageContentPart, MessageMetadata, DEFAULT_LLM_MODEL, isGeneratedImagePart } from "@/lib/llm/types";
 import { agent1 } from "@/lib/agents/agent-1";
 import { waitUntil } from "@vercel/functions";
 import { recordEvent, sanitizeGeminiResponse } from "@/lib/telemetry";
@@ -395,6 +395,17 @@ export async function POST(
     // Construct new user message with all image IDs
     // Images are already uploaded, we just reference them by ID
     let userMessage: Message;
+
+    const metadata: MessageMetadata = {
+      mode,
+      imageModelId,
+      imageSize: imageSizeOverride,
+      aspectRatio: aspectRatioOverride,
+      imageQuantity,
+      precisionEditing: precisionEditing || undefined,
+      referenceImages: referenceImages.length > 0 ? referenceImages : undefined,
+    };
+
     if (imageIds.length > 0) {
       const sourceById = new Map<string, ImageSourceEntry>(
         imageSources.map((entry) => [entry.imageId, entry])
@@ -417,9 +428,10 @@ export async function POST(
         role: "user",
         content: parts,
         createdAt: Date.now(),
+        metadata,
       };
     } else {
-      userMessage = { role: "user", content, createdAt: Date.now() };
+      userMessage = { role: "user", content, createdAt: Date.now(), metadata };
     }
 
     console.log(`[Perf] Mode=${mode}, calling handler`, `[${Date.now() - requestStartTime}ms]`);
