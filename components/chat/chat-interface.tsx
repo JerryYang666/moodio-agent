@@ -1374,6 +1374,9 @@ export default function ChatInterface({
                 `[Chat] Variant ${variantId} failed: ${event.reason}`
               );
 
+              // Clear this variant's content (may have partial data from the last attempt)
+              variantContents[variantId] = [];
+
               // If all variants failed, handle the error
               const allFailed = Object.keys(variantContents).every(
                 (v) => variantContents[v].length === 0
