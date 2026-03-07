@@ -2349,14 +2349,22 @@ export default function ChatInterface({
           } else {
             // Assistant message(s) - use ParallelMessage for variants
             const messageTimestamp = group.messages[0]?.createdAt;
-            // Only show "New Idea" button on the last assistant message group (not for direct image mode)
+            // Only show "New Idea" button on the last assistant message group
+            // (not for direct image/video modes)
             const isLastAssistantGroup =
               groupIdx === groupedMessages.length - 1 ||
               (groupIdx === groupedMessages.length - 2 &&
                 groupedMessages[groupedMessages.length - 1]?.type === "user");
-            const isDirectImage = group.messages.some(
-              (m) => m.agentId === "direct-image"
-            );
+            const isDirectGeneration = group.messages.some((m) => {
+              if (m.agentId === "direct-image" || m.agentId === "direct-video") {
+                return true;
+              }
+              if (!Array.isArray(m.content)) return false;
+              return m.content.some(
+                (part) =>
+                  part.type === "direct_image" || part.type === "direct_video"
+              );
+            });
             return (
               <ParallelMessage
                 key={`assistant-${group.originalIndex}`}
@@ -2371,7 +2379,7 @@ export default function ChatInterface({
                 compactMode={compactMode}
                 hideAvatars={hideAvatars}
                 onGenerateVariant={
-                  isLastAssistantGroup && !isDirectImage && messageTimestamp
+                  isLastAssistantGroup && !isDirectGeneration && messageTimestamp
                     ? () => handleGenerateVariant(messageTimestamp)
                     : undefined
                 }
