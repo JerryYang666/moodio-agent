@@ -161,6 +161,11 @@
     "tooManyImages": "{count}枚の画像を追加できません。最大{max}枚（現在{current}枚添付済み）。",
     "imageAlreadyAdded": "この画像はすでに追加されています",
     "pendingImagesCount": "{max}枚中{count}枚の画像を選択中",
+    "videoSourceImages": "ビデオソースフレーム",
+    "videoSourceLabel": "ソース",
+    "videoEndLabel": "エンド",
+    "videoAddSource": "最初のフレームを追加",
+    "videoAddEnd": "最後のフレームを追加（任意）",
     "image": "画像",
     "sourceUpload": "アップロード",
     "sourceAsset": "ライブラリ",
@@ -375,7 +380,8 @@
   "storyboard": {
     "title": "ストーリーボード",
     "subtitle": "アイデアをストーリーボードに",
-    "goToStoryboard": "ストーリーボードへ移動"
+    "goToStoryboard": "ストーリーボードへ移動",
+    "model": "モデル"
   },
   "browse": {
     "title": "ブラウズ",
@@ -501,7 +507,9 @@
       "agent": "エージェント",
       "agentDesc": "AIアシスト付き画像生成、プロンプトのサポート",
       "image": "画像",
-      "imageDesc": "プロンプトから直接画像を生成"
+      "imageDesc": "プロンプトから直接画像を生成",
+      "video": "ビデオ",
+      "videoDesc": "プロンプトから直接ビデオ生成"
     },
     "models": {
       "nano-banana-pro": "Nano-banana Pro",

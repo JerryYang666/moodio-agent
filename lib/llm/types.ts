@@ -50,6 +50,28 @@ export type MessageContentPart =
       error?: string;
     }
   | {
+      type: "direct_video";
+      config: {
+        modelId: string;
+        modelName: string;
+        prompt: string;
+        sourceImageId: string;
+        sourceImageUrl?: string;
+        endImageId?: string;
+        endImageUrl?: string;
+        params: Record<string, any>;
+      };
+      generationId?: string;
+      status: "pending" | "processing" | "completed" | "failed";
+      thumbnailUrl?: string;
+      videoId?: string;
+      videoUrl?: string;
+      signedVideoUrl?: string;
+      error?: string;
+      createdAt: string;
+      seed?: number;
+    }
+  | {
       type: "agent_shot_list";
       title: string;
       columns: string[];
@@ -96,6 +118,8 @@ export interface MessageMetadata {
     tag?: string;
     title?: string;
   }>;
+  videoModelId?: string;
+  videoParams?: Record<string, any>;
 }
 
 export interface Message {

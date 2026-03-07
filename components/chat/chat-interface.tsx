@@ -16,6 +16,7 @@ import {
   NotificationPermissionModalRef,
 } from "@/components/notification-permission-modal";
 import { Message, MessageContentPart, isGeneratedImagePart } from "@/lib/llm/types";
+import { getVideoModel } from "@/lib/video/models";
 import ImageDetailModal, { ImageInfo } from "./image-detail-modal";
 import ImageDrawingModal from "./image-drawing-modal";
 import ChatMessage from "./chat-message";
@@ -170,13 +171,20 @@ export default function ChatInterface({
     }
     return false;
   });
-  const [menuState, setMenuState] = useState<MenuState>(() => {
-    // Load saved preferences from localStorage on mount
-    if (typeof window !== "undefined") {
-      return loadMenuState();
-    }
-    return INITIAL_MENU_STATE;
-  });
+  const [menuState, setMenuState] = useState<MenuState>(INITIAL_MENU_STATE);
+
+  // Load saved menu state from localStorage after hydration
+  const menuStateInitialized = useRef(false);
+  useEffect(() => {
+    if (menuStateInitialized.current) return;
+    menuStateInitialized.current = true;
+    const saved = loadMenuState();
+    setMenuState(saved);
+  }, []);
+
+  // Video cost estimation state
+  const [videoCost, setVideoCost] = useState<number | null>(null);
+  const [videoCostLoading, setVideoCostLoading] = useState(false);
 
   // Drawing modal state for "circle to change" feature (局部重绘)
   const [drawingImage, setDrawingImage] = useState<{
@@ -307,6 +315,54 @@ export default function ChatInterface({
 
     return () => clearTimeout(timeoutId);
   }, [menuState]);
+
+  // Video cost estimation
+  const videoCostParams = useMemo(() => {
+    if (menuState.mode !== "video" || !menuState.videoModelId) return null;
+    const entries = Object.entries(menuState.videoParams)
+      .filter(([key, value]) => key !== "prompt" && value !== undefined && value !== null && value !== "")
+      .sort(([a], [b]) => a.localeCompare(b));
+    return JSON.stringify(entries);
+  }, [menuState.mode, menuState.videoModelId, menuState.videoParams]);
+
+  useEffect(() => {
+    if (menuState.mode !== "video" || !menuState.videoModelId) {
+      setVideoCost(null);
+      return;
+    }
+    const fetchCost = async () => {
+      setVideoCostLoading(true);
+      try {
+        const searchParams = new URLSearchParams();
+        searchParams.set("modelId", menuState.videoModelId);
+        Object.entries(menuState.videoParams).forEach(([key, value]) => {
+          if (key !== "prompt" && value !== undefined && value !== null && value !== "") {
+            searchParams.set(key, String(value));
+          }
+        });
+        const res = await fetch(`/api/video/cost?${searchParams.toString()}`);
+        if (res.ok) {
+          const data = await res.json();
+          setVideoCost(data.cost);
+        }
+      } catch (e) {
+        console.error("Failed to fetch video cost:", e);
+      } finally {
+        setVideoCostLoading(false);
+      }
+    };
+    const timeoutId = setTimeout(fetchCost, 300);
+    return () => clearTimeout(timeoutId);
+  }, [menuState.videoModelId, videoCostParams]);
+
+  // Check if current video model supports end images
+  const videoModelSupportsEndImage = useMemo(() => {
+    if (menuState.mode !== "video" || !menuState.videoModelId) return false;
+    // We'll check this by looking at the video models API data cached in VideoModeParams
+    // For now, import getVideoModel directly
+    const model = getVideoModel(menuState.videoModelId);
+    return !!model?.imageParams.endImage;
+  }, [menuState.mode, menuState.videoModelId]);
 
   // Modal state for agent images
   const { isOpen, onOpen, onOpenChange, onClose } = useDisclosure();
@@ -1078,6 +1134,15 @@ export default function ChatInterface({
     )
       return;
 
+    // Video mode requires a source image
+    if (menuState.mode === "video" && pendingImages.length === 0) {
+      addToast({
+        title: t("chat.videoRequiresImage"),
+        color: "warning",
+      });
+      return;
+    }
+
     // Build the message content with selected image titles
     let currentInput = input;
     const agentImages = pendingImages.filter(
@@ -1244,6 +1309,12 @@ export default function ChatInterface({
         if (menuState.imageSize) {
           payload.imageSize = menuState.imageSize;
         }
+      }
+
+      // Pass video-specific params
+      if (menuState.mode === "video") {
+        payload.videoModelId = menuState.videoModelId;
+        payload.videoParams = menuState.videoParams;
       }
 
       // Pass the mode so the backend knows whether to use agent or direct generation
@@ -1737,6 +1808,180 @@ export default function ChatInterface({
     }
   };
 
+  // Handle sending a video generation request from an agent video card
+  const handleSendVideoFromAgent = useCallback(
+    async (config: {
+      modelId: string;
+      modelName: string;
+      prompt: string;
+      sourceImageId: string;
+      sourceImageUrl?: string;
+      params: Record<string, any>;
+    }) => {
+      if (isSending) return;
+
+      // Build a user message with the source image and prompt text
+      const parts: MessageContentPart[] = [];
+      if (config.prompt) {
+        parts.push({ type: "text", text: config.prompt });
+      }
+      parts.push({
+        type: "image",
+        imageId: config.sourceImageId,
+        imageUrl: config.sourceImageUrl,
+        source: "ai_generated" as const,
+      });
+
+      const userMessage: Message = {
+        role: "user",
+        content: parts,
+        createdAt: Date.now(),
+      };
+
+      setMessages((prev) => [...prev, userMessage]);
+      setIsSending(true);
+
+      try {
+        let currentChatId = chatId;
+
+        if (!currentChatId) {
+          const createRes = await fetch("/api/chat", { method: "POST" });
+          if (!createRes.ok) throw new Error("Failed to create chat");
+          const createData = await createRes.json();
+          currentChatId = createData.chat.id as string;
+          setChatId(currentChatId);
+          window.dispatchEvent(new Event("refresh-chats"));
+          if (!disableActiveChatPersistence) {
+            window.history.replaceState(null, "", `/chat/${currentChatId}`);
+            localStorage.setItem(siteConfig.activeChatId, currentChatId);
+          }
+          onChatCreated?.(currentChatId);
+        }
+
+        const payload = {
+          content: config.prompt,
+          mode: "video",
+          videoModelId: config.modelId,
+          videoParams: config.params,
+          imageIds: [config.sourceImageId],
+          imageSources: [
+            {
+              imageId: config.sourceImageId,
+              source: "ai_generated",
+            },
+          ],
+          referenceImages: [],
+        };
+
+        const res = await fetch(`/api/chat/${currentChatId}/message`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+
+        if (!res.ok || !res.body) {
+          throw new Error("Failed to send message");
+        }
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        let hasInitialized = false;
+        const variantContents: MessageContentPart[] = [];
+        let variantTimestamp: number | null = null;
+        let responseVariantId = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() || "";
+
+          for (const line of lines) {
+            if (!line.trim()) continue;
+            try {
+              const event = JSON.parse(line);
+
+              if (event.type === "message_timestamp") {
+                variantTimestamp = event.timestamp;
+                continue;
+              }
+
+              responseVariantId = event.variantId || "default";
+
+              if (!hasInitialized) {
+                const timestamp = variantTimestamp || Date.now();
+                setMessages((prev) => [
+                  ...prev,
+                  {
+                    role: "assistant",
+                    content: [],
+                    createdAt: timestamp,
+                    variantId: responseVariantId,
+                  },
+                ]);
+                hasInitialized = true;
+              }
+
+              if (event.type === "part") {
+                variantContents.push(event.part);
+              }
+
+              setMessages((prev) => {
+                const newMessages = [...prev];
+                for (let i = newMessages.length - 1; i >= 0; i--) {
+                  if (
+                    newMessages[i].role === "assistant" &&
+                    newMessages[i].variantId === responseVariantId
+                  ) {
+                    newMessages[i] = {
+                      ...newMessages[i],
+                      content: [...variantContents],
+                    };
+                    break;
+                  }
+                }
+                return newMessages;
+              });
+            } catch (e) {
+              console.error("Parse error", e);
+            }
+          }
+        }
+      } catch (e: any) {
+        console.error("Failed to send video from agent:", e);
+        addToast({
+          title: t("chat.sendFailed"),
+          color: "danger",
+        });
+      } finally {
+        setIsSending(false);
+      }
+    },
+    [chatId, isSending, disableActiveChatPersistence, onChatCreated, t]
+  );
+
+  // Handle direct video status updates from DirectVideoCard
+  const handleDirectVideoStatusUpdate = useCallback(
+    (messageIndex: number, partIndex: number, updates: any) => {
+      setMessages((prev) => {
+        const newMessages = [...prev];
+        const msg = newMessages[messageIndex];
+        if (msg && Array.isArray(msg.content)) {
+          const newContent = [...msg.content];
+          if (newContent[partIndex]?.type === "direct_video") {
+            newContent[partIndex] = { ...newContent[partIndex], ...updates };
+            newMessages[messageIndex] = { ...msg, content: newContent };
+          }
+        }
+        return newMessages;
+      });
+    },
+    []
+  );
+
   const handleForkChat = async (messageIndex: number) => {
     if (!chatId) return;
 
@@ -2090,6 +2335,9 @@ export default function ChatInterface({
         onUpdateReferenceImageTag={updateReferenceImageTag}
         isReferenceImagesCollapsed={isReferenceImagesCollapsed}
         onToggleReferenceImagesCollapsed={toggleReferenceImagesCollapsed}
+        videoCost={videoCost}
+        videoCostLoading={videoCostLoading}
+        videoModelSupportsEndImage={videoModelSupportsEndImage}
       />
 
       <AssetPickerModal

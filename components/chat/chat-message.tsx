@@ -20,6 +20,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { AI_IMAGE_DRAG_MIME } from "./asset-dnd";
 import VideoPromptBlock from "./video-prompt-block";
 import VideoConfigCard from "./video-config-card";
+import DirectVideoCard from "./direct-video-card";
 import ShotListCard from "./shot-list-card";
 import ToolCallCard from "./tool-call-card";
 import SearchQueryCard from "./search-query-card";
@@ -56,6 +57,21 @@ interface ChatMessageProps {
     status: "pending" | "creating" | "created" | "error",
     generationId?: string
   ) => void;
+  /** Callback to send a video generation from agent video card as a user message */
+  onSendAsVideoMessage?: (config: {
+    modelId: string;
+    modelName: string;
+    prompt: string;
+    sourceImageId: string;
+    sourceImageUrl?: string;
+    params: Record<string, any>;
+  }) => void;
+  /** Callback when a direct_video part's status updates */
+  onDirectVideoStatusUpdate?: (
+    messageIndex: number,
+    partIndex: number,
+    updates: any
+  ) => void;
 }
 
 export default function ChatMessage({
@@ -72,6 +88,8 @@ export default function ChatMessage({
   desktopId,
   allMessages,
   onVideoStatusChange,
+  onSendAsVideoMessage,
+  onDirectVideoStatusUpdate,
 }: ChatMessageProps) {
   const isUser = message.role === "user";
   const [isForkPopoverOpen, setIsForkPopoverOpen] = useState(false);
@@ -178,6 +196,7 @@ export default function ChatMessage({
     );
     const agentParts = content.filter((p) => isGeneratedImagePart(p));
     const videoParts = content.filter((p) => p.type === "agent_video");
+    const directVideoParts = content.filter((p) => p.type === "direct_video");
     const shotListParts = content.filter((p) => p.type === "agent_shot_list");
     const thinkParts = content.filter((p) => p.type === "internal_think");
     const toolCallParts = content.filter((p) => p.type === "tool_call");
@@ -388,6 +407,23 @@ export default function ChatMessage({
                 onStatusChange={(status, generationId) => {
                   if (onVideoStatusChange && msgIndex !== undefined) {
                     onVideoStatusChange(msgIndex, realPartIndex, status, generationId);
+                  }
+                }}
+                onSendAsVideoMessage={!desktopId ? onSendAsVideoMessage : undefined}
+              />
+            );
+          })}
+
+        {directVideoParts.length > 0 &&
+          directVideoParts.map((part: any, i) => {
+            const realPartIndex = (content as MessageContentPart[]).indexOf(part);
+            return (
+              <DirectVideoCard
+                key={`direct-video-${i}`}
+                part={part}
+                onStatusUpdate={(updates) => {
+                  if (onDirectVideoStatusUpdate && msgIndex !== undefined) {
+                    onDirectVideoStatusUpdate(msgIndex, realPartIndex, updates);
                   }
                 }}
               />
