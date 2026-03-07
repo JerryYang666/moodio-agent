@@ -161,6 +161,9 @@
     "tooManyImages": "無法添加 {count} 張圖片。最多 {max} 張（已附加 {current} 張）。",
     "imageAlreadyAdded": "此圖片已經新增過了",
     "pendingImagesCount": "已選擇 {count}/{max} 張圖片",
+    "videoSourceImages": "影片來源畫面",
+    "videoSourceLabel": "起始",
+    "videoEndLabel": "結束",
     "image": "圖片",
     "sourceUpload": "上傳",
     "sourceAsset": "素材庫",
@@ -501,7 +504,9 @@
       "agent": "智慧代理",
       "agentDesc": "AI輔助圖片生成，幫助構思和優化提示詞",
       "image": "圖片",
-      "imageDesc": "直接根據提示詞生成圖片"
+      "imageDesc": "直接根據提示詞生成圖片",
+      "video": "影片",
+      "videoDesc": "直接透過提示生成影片"
     },
     "models": {
       "nano-banana-pro": "Nano-banana Pro",

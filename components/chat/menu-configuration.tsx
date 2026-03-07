@@ -14,15 +14,18 @@ import { MENU_CONFIG } from "@/config/menu-config";
 import {
   BotMessageSquare,
   Image as ImageIcon,
+  Video,
   Sparkles,
   Info,
   ChevronUp,
 } from "lucide-react";
 import { AspectRatioIcon } from "./aspect-ratio-icon";
+import VideoModeParams from "./video-mode-params";
 
 const ICON_MAP: Record<string, React.ElementType> = {
   BotMessageSquare,
   ImageIcon,
+  Video,
   Sparkles,
 };
 
@@ -33,6 +36,8 @@ export type MenuState = {
   aspectRatio: string;
   imageSize: string;
   imageQuantity: string;
+  videoModelId: string;
+  videoParams: Record<string, any>;
 };
 
 // Default initial state
@@ -43,6 +48,8 @@ export const INITIAL_MENU_STATE: MenuState = {
   aspectRatio: MENU_CONFIG.categories.aspectRatio.default,
   imageSize: MENU_CONFIG.categories.imageSize.default,
   imageQuantity: MENU_CONFIG.categories.imageQuantity.default,
+  videoModelId: "",
+  videoParams: {},
 };
 
 // localStorage key for persisting menu preferences
@@ -59,6 +66,7 @@ export const saveMenuState = (state: MenuState) => {
     aspectRatio: state.aspectRatio,
     imageSize: state.imageSize,
     imageQuantity: state.imageQuantity,
+    videoModelId: state.videoModelId,
   };
   
   try {
@@ -108,6 +116,11 @@ export const loadMenuState = (): MenuState => {
       // Validate and apply saved imageQuantity
       if (parsed.imageQuantity && MENU_CONFIG.categories.imageQuantity.options[parsed.imageQuantity as keyof typeof MENU_CONFIG.categories.imageQuantity.options]) {
         loaded.imageQuantity = parsed.imageQuantity;
+      }
+
+      // Restore video model ID (validated at runtime when models load)
+      if (parsed.videoModelId && typeof parsed.videoModelId === "string") {
+        loaded.videoModelId = parsed.videoModelId;
       }
 
       // Now resolve the state to ensure it's valid for the current mode
@@ -395,9 +408,10 @@ export default function MenuConfiguration({
     const SelectedIcon = selectedIconName ? ICON_MAP[selectedIconName] : null;
 
     // Different colors for different modes
-    const modeColors: Record<string, "primary" | "secondary"> = {
+    const modeColors: Record<string, "primary" | "secondary" | "warning"> = {
       agent: "primary",
       image: "secondary",
+      video: "warning",
     };
     const buttonColor = modeColors[selectedKey] || "primary";
 
@@ -471,11 +485,26 @@ export default function MenuConfiguration({
       <div className="flex gap-2 items-center p-2 bg-transparent pt-0 rounded-lg min-w-max">
         {renderModeDropdown()}
         <span className="text-default-400 text-sm mx-1 mt-4">{t("with")}</span>
-        {renderDropdown("model")}
-        {renderDropdown("expertise")}
-        {renderDropdown("aspectRatio")}
-        {renderDropdown("imageSize")}
-        {renderDropdown("imageQuantity")}
+        {state.mode === "video" ? (
+          <VideoModeParams
+            videoModelId={state.videoModelId}
+            videoParams={state.videoParams}
+            onModelChange={(modelId) =>
+              onStateChange({ ...state, videoModelId: modelId })
+            }
+            onParamsChange={(params) =>
+              onStateChange({ ...state, videoParams: params })
+            }
+          />
+        ) : (
+          <>
+            {renderDropdown("model")}
+            {renderDropdown("expertise")}
+            {renderDropdown("aspectRatio")}
+            {renderDropdown("imageSize")}
+            {renderDropdown("imageQuantity")}
+          </>
+        )}
       </div>
     </div>
   );

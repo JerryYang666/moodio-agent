@@ -24,6 +24,8 @@ import {
   ChevronUp,
   Plus,
   Info,
+  Bean,
+  Video,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Dropdown, DropdownTrigger, DropdownMenu, DropdownItem } from "@heroui/dropdown";
@@ -100,6 +102,12 @@ interface ChatInputProps {
   isReferenceImagesCollapsed?: boolean;
   /** Handler to toggle reference images collapsed state */
   onToggleReferenceImagesCollapsed?: () => void;
+  /** Estimated video cost (for video mode send button) */
+  videoCost?: number | null;
+  /** Whether the video cost is loading */
+  videoCostLoading?: boolean;
+  /** Whether the selected video model supports end images */
+  videoModelSupportsEndImage?: boolean;
 }
 
 /** Ref handle for ChatInput to allow getting editor content */
@@ -143,6 +151,9 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
   onUpdateReferenceImageTag,
   isReferenceImagesCollapsed = false,
   onToggleReferenceImagesCollapsed,
+  videoCost,
+  videoCostLoading,
+  videoModelSupportsEndImage,
 }, ref) {
   const t = useTranslations();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -700,12 +711,18 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
               >
                 <div className="flex gap-2 flex-wrap mb-2">
                   {/* Display count indicator if multiple images */}
-                  {pendingImages.length > 1 && (
+                  {pendingImages.length > 1 && menuState.mode !== "video" && (
                     <div className="text-xs text-default-500 w-full mb-1">
                       {t("chat.pendingImagesCount", {
                         count: pendingImages.length,
                         max: MAX_PENDING_IMAGES,
                       })}
+                    </div>
+                  )}
+                  {menuState.mode === "video" && pendingImages.length > 0 && (
+                    <div className="text-xs text-default-500 w-full mb-1 flex items-center gap-1">
+                      <Video size={12} />
+                      {t("chat.videoSourceImages")}
                     </div>
                   )}
 
@@ -750,6 +767,15 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
                               <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/30 gap-1">
                                 <Spinner size="sm" color="white" />
                                 <span className="text-[9px] text-white/90">{t("chat.compressing")}</span>
+                              </div>
+                            )}
+
+                            {/* Video mode label badge */}
+                            {menuState.mode === "video" && !img.isUploading && !img.isCompressing && (
+                              <div className="absolute top-1 left-1 z-10">
+                                <span className="text-[9px] font-semibold bg-warning/90 text-warning-foreground px-1.5 py-0.5 rounded">
+                                  {pendingImages.indexOf(img) === 0 ? t("chat.videoSourceLabel") : t("chat.videoEndLabel")}
+                                </span>
                               </div>
                             )}
 
@@ -1129,7 +1155,7 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
               value={input}
               onChange={handleMentionChange}
               mentionItems={mentionItems}
-              placeholder={menuState.mode === "image" ? t("chat.typePrompt") : t("chat.typeMessage")}
+              placeholder={menuState.mode === "image" || menuState.mode === "video" ? t("chat.typePrompt") : t("chat.typeMessage")}
               minRows={1}
               maxRows={isExpanded ? 5 : 1}
               onSubmit={onSend}
@@ -1154,17 +1180,38 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
               content={hasUploadingImages ? t("chat.waitForUpload") : ""}
               isDisabled={!hasUploadingImages}
             >
-              <Button
-                isIconOnly
-                color="primary"
-                aria-label={t("chat.send")}
-                onPress={onSend}
-                isLoading={isSending}
-                isDisabled={isRecording || isTranscribing || hasUploadingImages}
-                className="shrink-0"
-              >
-                <Send size={20} />
-              </Button>
+              {menuState.mode === "video" ? (
+                <Button
+                  color="warning"
+                  aria-label={t("chat.send")}
+                  onPress={onSend}
+                  isLoading={isSending}
+                  isDisabled={isRecording || isTranscribing || hasUploadingImages || pendingImages.length === 0}
+                  className="shrink-0"
+                  size="sm"
+                >
+                  <Send size={16} />
+                  {!videoCostLoading && videoCost !== null && videoCost !== undefined && (
+                    <span className="flex items-center gap-0.5 font-semibold ml-1">
+                      <Bean size={14} />
+                      {videoCost.toLocaleString()}
+                    </span>
+                  )}
+                  {videoCostLoading && <Spinner size="sm" />}
+                </Button>
+              ) : (
+                <Button
+                  isIconOnly
+                  color="primary"
+                  aria-label={t("chat.send")}
+                  onPress={onSend}
+                  isLoading={isSending}
+                  isDisabled={isRecording || isTranscribing || hasUploadingImages}
+                  className="shrink-0"
+                >
+                  <Send size={20} />
+                </Button>
+              )}
             </Tooltip>
           </div>
 

@@ -40,6 +40,15 @@ interface VideoConfigCardProps {
     status: AgentVideoPart["status"],
     generationId?: string
   ) => void;
+  /** Callback to send video generation as a user message (when not on desktop) */
+  onSendAsVideoMessage?: (config: {
+    modelId: string;
+    modelName: string;
+    prompt: string;
+    sourceImageId: string;
+    sourceImageUrl?: string;
+    params: Record<string, any>;
+  }) => void;
 }
 
 export default function VideoConfigCard({
@@ -48,6 +57,7 @@ export default function VideoConfigCard({
   desktopId,
   chatId,
   onStatusChange,
+  onSendAsVideoMessage,
 }: VideoConfigCardProps) {
   const t = useTranslations();
   const { monitorGeneration } = useVideo();
@@ -131,6 +141,22 @@ export default function VideoConfigCard({
         description: t("video.noSourceImageDesc"),
         color: "warning",
       });
+      return;
+    }
+
+    // If not on desktop and onSendAsVideoMessage is available,
+    // send as a user message instead of generating directly
+    if (!desktopId && onSendAsVideoMessage) {
+      onSendAsVideoMessage({
+        modelId: part.config.modelId,
+        modelName: part.config.modelName,
+        prompt: part.config.prompt,
+        sourceImageId: selectedSourceImage.imageId,
+        sourceImageUrl: selectedSourceImage.imageUrl,
+        params: part.config.params,
+      });
+      setStatus("created");
+      onStatusChange?.("created");
       return;
     }
 
@@ -220,6 +246,7 @@ export default function VideoConfigCard({
     desktopId,
     chatId,
     onStatusChange,
+    onSendAsVideoMessage,
     t,
   ]);
 

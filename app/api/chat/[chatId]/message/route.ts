@@ -22,7 +22,14 @@ import {
 } from "@/lib/image/service";
 import { ImageSize } from "@/lib/image/types";
 import { calculateCost } from "@/lib/pricing";
-import { deductCredits, getUserBalance, InsufficientCreditsError } from "@/lib/credits";
+import { deductCredits, getUserBalance, refundCharge, InsufficientCreditsError } from "@/lib/credits";
+import {
+  getVideoModel,
+  validateAndMergeParams,
+  DEFAULT_VIDEO_MODEL_ID,
+} from "@/lib/video/models";
+import { submitVideoGeneration } from "@/lib/video/fal-client";
+import { videoGenerations } from "@/lib/db/schema";
 
 /** Maximum number of images allowed per message */
 const MAX_IMAGES_PER_MESSAGE = 5;
@@ -325,8 +332,18 @@ export async function POST(
         title: typeof entry.title === "string" ? entry.title : undefined,
       }));
 
-    // Parse mode (agent or image)
-    const mode: string = json.mode === "image" ? "image" : "agent";
+    // Parse mode (agent, image, or video)
+    const mode: string =
+      json.mode === "image" ? "image" :
+      json.mode === "video" ? "video" : "agent";
+
+    // Parse video-specific fields
+    const videoModelId: string | undefined =
+      typeof json.videoModelId === "string" ? json.videoModelId : undefined;
+    const videoParams: Record<string, any> =
+      json.videoParams && typeof json.videoParams === "object"
+        ? json.videoParams
+        : {};
 
     // Validate: must have content or images
     if (!content && imageIds.length === 0) {
@@ -404,6 +421,8 @@ export async function POST(
       imageQuantity,
       precisionEditing: precisionEditing || undefined,
       referenceImages: referenceImages.length > 0 ? referenceImages : undefined,
+      videoModelId: mode === "video" ? videoModelId : undefined,
+      videoParams: mode === "video" ? videoParams : undefined,
     };
 
     if (imageIds.length > 0) {
@@ -675,6 +694,224 @@ export async function POST(
       );
 
       return new NextResponse(directStream, {
+        headers: { "Content-Type": "text/plain; charset=utf-8" },
+      });
+    }
+
+    if (mode === "video") {
+      // ===== Direct Video Generation Mode =====
+      const encoder = new TextEncoder();
+      const variantId = `variant-0-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+      const modelId = videoModelId || DEFAULT_VIDEO_MODEL_ID;
+      const model = getVideoModel(modelId);
+
+      if (!model) {
+        return NextResponse.json(
+          { error: `Unknown video model: ${modelId}` },
+          { status: 400 }
+        );
+      }
+
+      const sourceImageId = imageIds[0];
+      if (!sourceImageId) {
+        return NextResponse.json(
+          { error: "Source image is required for video generation" },
+          { status: 400 }
+        );
+      }
+
+      const endImageId = imageIds[1] || null;
+
+      // Build full params with signed image URLs
+      const fullParams: Record<string, any> = {
+        prompt: content,
+        ...videoParams,
+        [model.imageParams.sourceImage]: getSignedImageUrl(sourceImageId),
+      };
+      if (endImageId && model.imageParams.endImage) {
+        fullParams[model.imageParams.endImage] = getSignedImageUrl(endImageId);
+      }
+
+      // Validate and merge with defaults
+      let mergedParams: Record<string, any>;
+      try {
+        mergedParams = validateAndMergeParams(modelId, fullParams);
+      } catch (error: any) {
+        return NextResponse.json(
+          { error: error.message || "Invalid parameters" },
+          { status: 400 }
+        );
+      }
+
+      // Calculate cost
+      const cost = await calculateCost(modelId, mergedParams);
+
+      // Promise for post-processing
+      let resolveCompletion: (part: MessageContentPart) => void;
+      const completionPromise = new Promise<MessageContentPart>((resolve) => {
+        resolveCompletion = resolve;
+      });
+
+      const videoStream = new ReadableStream<Uint8Array>({
+        start(controller) {
+          const send = (data: any) => {
+            controller.enqueue(encoder.encode(JSON.stringify(data) + "\n"));
+          };
+
+          send({ type: "message_timestamp", timestamp: messageTimestamp });
+
+          (async () => {
+            let generatedPart: MessageContentPart;
+
+            try {
+              // Create DB record and deduct credits in transaction
+              const generation = await db.transaction(async (tx) => {
+                const [gen] = await tx
+                  .insert(videoGenerations)
+                  .values({
+                    userId: payload.userId,
+                    modelId,
+                    status: "pending",
+                    sourceImageId,
+                    endImageId,
+                    params: mergedParams,
+                  })
+                  .returning();
+
+                await deductCredits(
+                  payload.userId,
+                  cost,
+                  "video_generation",
+                  `Generated video with model ${model.name} (chat)`,
+                  { type: "video_generation", id: gen.id },
+                  tx
+                );
+
+                return gen;
+              });
+
+              // Send initial part with generationId
+              const pendingPart: MessageContentPart = {
+                type: "direct_video",
+                config: {
+                  modelId,
+                  modelName: model.name,
+                  prompt: content,
+                  sourceImageId,
+                  sourceImageUrl: getSignedImageUrl(sourceImageId),
+                  endImageId: endImageId || undefined,
+                  endImageUrl: endImageId ? getSignedImageUrl(endImageId) : undefined,
+                  params: videoParams,
+                },
+                generationId: generation.id,
+                status: "processing",
+                thumbnailUrl: getSignedImageUrl(sourceImageId),
+                createdAt: new Date().toISOString(),
+              };
+              send({ type: "part", part: pendingPart, variantId });
+
+              // Build webhook URL
+              const baseUrl = process.env.NEXT_PUBLIC_APP_URL;
+              if (!baseUrl) {
+                throw new Error("Server configuration error: Missing base URL");
+              }
+              const webhookUrl = `${baseUrl}/api/video/webhook`;
+
+              // Submit to Fal queue
+              const { requestId } = await submitVideoGeneration(
+                modelId,
+                mergedParams,
+                webhookUrl
+              );
+
+              // Update record with Fal request ID
+              await db
+                .update(videoGenerations)
+                .set({
+                  falRequestId: requestId,
+                  status: "processing",
+                })
+                .where(eq(videoGenerations.id, generation.id));
+
+              await recordEvent(
+                "video_generation",
+                payload.userId,
+                {
+                  status: "submitted",
+                  generationId: generation.id,
+                  falRequestId: requestId,
+                  modelId,
+                  sourceImageId,
+                  endImageId,
+                  params: mergedParams,
+                  cost,
+                  source: "chat",
+                },
+                ipAddress
+              );
+
+              generatedPart = pendingPart;
+            } catch (err: any) {
+              console.error("Direct video generation error:", err);
+
+              const isInsufficientCredits =
+                err.message === "INSUFFICIENT_CREDITS" ||
+                err instanceof InsufficientCreditsError;
+
+              generatedPart = {
+                type: "direct_video",
+                config: {
+                  modelId,
+                  modelName: model.name,
+                  prompt: content,
+                  sourceImageId,
+                  sourceImageUrl: getSignedImageUrl(sourceImageId),
+                  params: videoParams,
+                },
+                status: "failed",
+                error: isInsufficientCredits
+                  ? "INSUFFICIENT_CREDITS"
+                  : err.message || "Failed to start video generation",
+                createdAt: new Date().toISOString(),
+              };
+              send({ type: "part", part: generatedPart, variantId });
+            }
+
+            controller.close();
+            resolveCompletion!(generatedPart);
+          })();
+        },
+      });
+
+      // Post-process: save chat history
+      waitUntil(
+        completionPromise
+          .then(async (generatedPart) => {
+            const assistantMessage: Message = {
+              role: "assistant",
+              content: [generatedPart],
+              createdAt: messageTimestamp,
+              agentId: "direct-video",
+              variantId,
+            };
+
+            await postProcessMessages({
+              chatId,
+              chat,
+              history,
+              userMessage,
+              assistantMessages: [assistantMessage],
+              imageSources,
+              userId: payload.userId,
+            });
+          })
+          .catch((err) => {
+            console.error("Direct video post-processing failed:", err);
+          })
+      );
+
+      return new NextResponse(videoStream, {
         headers: { "Content-Type": "text/plain; charset=utf-8" },
       });
     }

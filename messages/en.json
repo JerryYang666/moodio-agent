@@ -161,6 +161,9 @@
     "tooManyImages": "Cannot add {count} images. Maximum is {max} ({current} already attached).",
     "imageAlreadyAdded": "This image is already added",
     "pendingImagesCount": "{count} of {max} images selected",
+    "videoSourceImages": "Video source frames",
+    "videoSourceLabel": "Source",
+    "videoEndLabel": "End",
     "image": "Image",
     "sourceUpload": "Upload",
     "sourceAsset": "Library",
@@ -548,7 +551,9 @@
       "agent": "Agent",
       "agentDesc": "AI-assisted image generation with prompt help",
       "image": "Image",
-      "imageDesc": "Direct image generation from your prompt"
+      "imageDesc": "Direct image generation from your prompt",
+      "video": "Video",
+      "videoDesc": "Direct video generation from your prompt"
     },
     "models": {
       "nano-banana-pro": "Nano-banana Pro",

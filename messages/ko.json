@@ -161,6 +161,9 @@
     "tooManyImages": "이미지 {count}개를 추가할 수 없습니다. 최대 {max}개({current}개 첨부됨).",
     "imageAlreadyAdded": "이 이미지는 이미 추가되었습니다",
     "pendingImagesCount": "{max}개 중 {count}개 이미지 선택됨",
+    "videoSourceImages": "비디오 소스 프레임",
+    "videoSourceLabel": "소스",
+    "videoEndLabel": "끝",
     "image": "이미지",
     "sourceUpload": "업로드",
     "sourceAsset": "라이브러리",
@@ -501,7 +504,9 @@
       "agent": "에이전트",
       "agentDesc": "AI 지원 이미지 생성, 프롬프트 도움",
       "image": "이미지",
-      "imageDesc": "프롬프트에서 직접 이미지 생성"
+      "imageDesc": "프롬프트에서 직접 이미지 생성",
+      "video": "비디오",
+      "videoDesc": "프롬프트에서 직접 비디오 생성"
     },
     "models": {
       "nano-banana-pro": "Nano-banana Pro",

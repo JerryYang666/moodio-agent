@@ -17,6 +17,11 @@ export const MENU_CONFIG = {
           description: "Direct image generation from your prompt",
           icon: "ImageIcon",
         },
+        video: {
+          label: "Video",
+          description: "Direct video generation from your prompt",
+          icon: "Video",
+        },
       },
     },
 
@@ -168,6 +173,16 @@ export const MENU_CONFIG = {
           enabled: true,
           allowed: ["1", "2", "3", "4"],
         },
+      },
+    },
+    video: {
+      defaults: {},
+      availability: {
+        model: { enabled: false },
+        expertise: { enabled: false },
+        aspectRatio: { enabled: false },
+        imageSize: { enabled: false },
+        imageQuantity: { enabled: false },
       },
     },
   },

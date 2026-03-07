@@ -161,6 +161,9 @@
     "tooManyImages": "无法添加 {count} 张图片。最多 {max} 张（已添加 {current} 张）。",
     "imageAlreadyAdded": "该图片已添加",
     "pendingImagesCount": "已选择 {count}/{max} 张图片",
+    "videoSourceImages": "视频源帧",
+    "videoSourceLabel": "起始",
+    "videoEndLabel": "结束",
     "image": "图片",
     "sourceUpload": "上传",
     "sourceAsset": "素材库",
@@ -501,7 +504,9 @@
       "agent": "智能体",
       "agentDesc": "AI辅助图片生成，帮助构思和优化提示词",
       "image": "图片",
-      "imageDesc": "直接根据提示词生成图片"
+      "imageDesc": "直接根据提示词生成图片",
+      "video": "视频",
+      "videoDesc": "通过你的提示直接生成视频"
     },
     "models": {
       "nano-banana-pro": "Nano-banana Pro",
