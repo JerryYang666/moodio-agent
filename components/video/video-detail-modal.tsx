@@ -194,7 +194,7 @@ export default function VideoDetailModal({
         scrollBehavior="inside"
         classNames={{
           base: "max-sm:m-0 max-sm:rounded-none",
-          wrapper: "max-sm:items-end",
+          wrapper: "max-sm:items-end z-[70]",
         }}
       >
         <ModalContent className="max-sm:max-h-[90vh]">
