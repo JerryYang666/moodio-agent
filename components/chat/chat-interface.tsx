@@ -2009,13 +2009,16 @@ export default function ChatInterface({
     (data: VideoRestoreData) => {
       const { prompt, image_url, end_image_url, ...restoredVideoParams } =
         data.params || {};
+      const isSameModel = data.modelId === menuState.videoModelId;
 
       // Keep restored params in a one-shot ref so VideoModeParams model-init
       // can't overwrite them with defaults/localStorage.
-      pendingVideoRestoreRef.current = {
-        modelId: data.modelId,
-        videoParams: restoredVideoParams,
-      };
+      pendingVideoRestoreRef.current = isSameModel
+        ? null
+        : {
+            modelId: data.modelId,
+            videoParams: restoredVideoParams,
+          };
 
       // Switch to video mode and set model + params
       setMenuState((prev) => ({
@@ -2032,6 +2035,20 @@ export default function ChatInterface({
         videoModelId: data.modelId,
         videoParams: restoredVideoParams,
       }));
+
+      // Force-apply restored params on the next microtask/frame to avoid
+      // any late onParamsChange overwrite when already on the same model.
+      queueMicrotask(() => {
+        setMenuState((prev) => {
+          if (prev.mode !== "video" || prev.videoModelId !== data.modelId) {
+            return prev;
+          }
+          return {
+            ...prev,
+            videoParams: restoredVideoParams,
+          };
+        });
+      });
 
       // Set the prompt text
       const restoredPrompt = typeof prompt === "string" ? prompt : "";
