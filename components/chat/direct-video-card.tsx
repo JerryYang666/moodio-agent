@@ -26,7 +26,7 @@ export default function DirectVideoCard({
   part,
   onStatusUpdate,
 }: DirectVideoCardProps) {
-  const t = useTranslations("storyboard");
+  const t = useTranslations("video");
   const { monitorGeneration, onGenerationUpdate, generationStatuses } =
     useVideo();
   const [showModal, setShowModal] = useState(false);

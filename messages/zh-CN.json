@@ -492,7 +492,8 @@
     "noSourceImageDesc": "请先提供或生成图片，然后再创建视频。",
     "noSourceImageInChat": "此对话中未找到源图片。请先生成或上传图片。",
     "generationStarted": "视频生成已开始！",
-    "generationInProgress": "视频正在生成中..."
+    "generationInProgress": "视频正在生成中...",
+    "download": "下载"
   },
   "menu": {
     "mode": "模式",

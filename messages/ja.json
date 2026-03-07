@@ -492,7 +492,8 @@
     "noSourceImageDesc": "動画を作成する前に、画像を提供または生成してください。",
     "noSourceImageInChat": "この会話にソース画像が見つかりません。まず画像を生成またはアップロードしてください。",
     "generationStarted": "動画の生成を開始しました！",
-    "generationInProgress": "動画を生成中..."
+    "generationInProgress": "動画を生成中...",
+    "download": "ダウンロード"
   },
   "menu": {
     "mode": "モード",

@@ -539,7 +539,8 @@
     "noSourceImageDesc": "Please provide or generate an image first before creating a video.",
     "noSourceImageInChat": "No source image found in this conversation. Please generate or upload an image first.",
     "generationStarted": "Video generation started!",
-    "generationInProgress": "Video is being generated..."
+    "generationInProgress": "Video is being generated...",
+    "download": "Download"
   },
   "menu": {
     "mode": "Mode",

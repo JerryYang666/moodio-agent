@@ -67,7 +67,7 @@ export default function VideoModeParams({
   onModelChange,
   onParamsChange,
 }: VideoModeParamsProps) {
-  const t = useTranslations("storyboard");
+  const t = useTranslations("video");
   const [models, setModels] = useState<VideoModelConfig[]>([]);
   const [defaultModelId, setDefaultModelId] = useState<string>("");
   const [loading, setLoading] = useState(true);
