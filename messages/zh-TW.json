@@ -164,6 +164,8 @@
     "videoSourceImages": "影片來源畫面",
     "videoSourceLabel": "起始",
     "videoEndLabel": "結束",
+    "videoAddSource": "新增首幀",
+    "videoAddEnd": "新增末幀（選填）",
     "image": "圖片",
     "sourceUpload": "上傳",
     "sourceAsset": "素材庫",
@@ -378,7 +380,8 @@
   "storyboard": {
     "title": "分鏡腳本",
     "subtitle": "將您的點子製作成分鏡腳本",
-    "goToStoryboard": "前往分鏡腳本"
+    "goToStoryboard": "前往分鏡腳本",
+    "model": "模型"
   },
   "browse": {
     "title": "瀏覽",

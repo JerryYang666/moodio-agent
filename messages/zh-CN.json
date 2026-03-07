@@ -164,6 +164,8 @@
     "videoSourceImages": "视频源帧",
     "videoSourceLabel": "起始",
     "videoEndLabel": "结束",
+    "videoAddSource": "添加首帧",
+    "videoAddEnd": "添加末帧（可选）",
     "image": "图片",
     "sourceUpload": "上传",
     "sourceAsset": "素材库",
@@ -378,7 +380,8 @@
   "storyboard": {
     "title": "故事板",
     "subtitle": "将您的想法可视化",
-    "goToStoryboard": "前往故事板"
+    "goToStoryboard": "前往故事板",
+    "model": "模型"
   },
   "browse": {
     "title": "浏览",

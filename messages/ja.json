@@ -164,6 +164,8 @@
     "videoSourceImages": "ビデオソースフレーム",
     "videoSourceLabel": "ソース",
     "videoEndLabel": "エンド",
+    "videoAddSource": "最初のフレームを追加",
+    "videoAddEnd": "最後のフレームを追加（任意）",
     "image": "画像",
     "sourceUpload": "アップロード",
     "sourceAsset": "ライブラリ",
@@ -378,7 +380,8 @@
   "storyboard": {
     "title": "ストーリーボード",
     "subtitle": "アイデアをストーリーボードに",
-    "goToStoryboard": "ストーリーボードへ移動"
+    "goToStoryboard": "ストーリーボードへ移動",
+    "model": "モデル"
   },
   "browse": {
     "title": "ブラウズ",

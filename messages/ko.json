@@ -164,6 +164,8 @@
     "videoSourceImages": "비디오 소스 프레임",
     "videoSourceLabel": "소스",
     "videoEndLabel": "끝",
+    "videoAddSource": "첫 프레임 추가",
+    "videoAddEnd": "마지막 프레임 추가 (선택)",
     "image": "이미지",
     "sourceUpload": "업로드",
     "sourceAsset": "라이브러리",
@@ -378,7 +380,8 @@
   "storyboard": {
     "title": "스토리보드",
     "subtitle": "아이디어를 스토리보드로",
-    "goToStoryboard": "스토리보드로 이동"
+    "goToStoryboard": "스토리보드로 이동",
+    "model": "모델"
   },
   "browse": {
     "title": "둘러보기",

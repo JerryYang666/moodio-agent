@@ -435,12 +435,12 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
     };
   }, [isRecording, isTranscribing]);
 
-  // Auto-expand if there are attachments or recording
+  // Auto-expand if there are attachments, recording, or video mode
   useEffect(() => {
-    if (pendingImages.length > 0 || isRecording) {
+    if (pendingImages.length > 0 || isRecording || menuState.mode === "video") {
       setIsExpanded(true);
     }
-  }, [pendingImages.length, isRecording]);
+  }, [pendingImages.length, isRecording, menuState.mode]);
 
   // Helper to get source icon for pending image
   const getSourceIcon = (source: PendingImage["source"]) => {
@@ -699,9 +699,158 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
             )}
           </AnimatePresence>
 
-          {/* Previews Area - Unified pending images display */}
+          {/* Video Frames Area - shows frame slots in video mode */}
           <AnimatePresence>
-            {isExpanded && pendingImages.length > 0 && (
+            {isExpanded && menuState.mode === "video" && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="px-4 pt-4 overflow-hidden"
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <Video size={12} className="text-default-500" />
+                  <span className="text-xs text-default-500">{t("chat.videoSourceImages")}</span>
+                </div>
+                <div className="flex gap-3 mb-2">
+                  {/* Source frame slot */}
+                  {pendingImages[0] ? (
+                    <div className="relative w-fit group">
+                      <div className="h-20 w-20 rounded-lg border border-divider overflow-hidden relative">
+                        <img
+                          src={
+                            (pendingImages[0].isUploading || pendingImages[0].isCompressing) && pendingImages[0].localPreviewUrl
+                              ? pendingImages[0].localPreviewUrl
+                              : pendingImages[0].url
+                          }
+                          alt={pendingImages[0].title || t("chat.image")}
+                          className={clsx(
+                            "w-full h-full object-cover",
+                            (pendingImages[0].isUploading || pendingImages[0].isCompressing) && "opacity-50"
+                          )}
+                        />
+                        {pendingImages[0].isUploading && (
+                          <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                            <Spinner size="sm" color="white" />
+                          </div>
+                        )}
+                        {pendingImages[0].isCompressing && (
+                          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/30 gap-1">
+                            <Spinner size="sm" color="white" />
+                            <span className="text-[9px] text-white/90">{t("chat.compressing")}</span>
+                          </div>
+                        )}
+                        {!pendingImages[0].isUploading && !pendingImages[0].isCompressing && (
+                          <div className="absolute top-1 left-1 z-10">
+                            <span className="text-[9px] font-semibold bg-warning/90 text-warning-foreground px-1.5 py-0.5 rounded">
+                              {t("chat.videoSourceLabel")}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onRemovePendingImage(pendingImages[0].imageId);
+                        }}
+                        disabled={pendingImages[0].isUploading || pendingImages[0].isCompressing}
+                        className={clsx(
+                          "absolute -top-2 -right-2 bg-default-100 rounded-full p-1 shadow-sm border border-divider z-10",
+                          pendingImages[0].isUploading || pendingImages[0].isCompressing
+                            ? "opacity-50 cursor-not-allowed"
+                            : "hover:bg-default-200"
+                        )}
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={onOpenAssetPicker}
+                      className="h-20 w-20 rounded-lg border-2 border-dashed border-default-300 hover:border-warning hover:bg-warning/5 flex flex-col items-center justify-center transition-colors gap-1"
+                    >
+                      <ImagePlus size={18} className="text-default-400" />
+                      <span className="text-[9px] text-default-400 text-center leading-tight px-1">
+                        {t("chat.videoAddSource")}
+                      </span>
+                    </button>
+                  )}
+
+                  {/* End frame slot - only when model supports it */}
+                  {videoModelSupportsEndImage && (
+                    <>
+                      {pendingImages[1] ? (
+                        <div className="relative w-fit group">
+                          <div className="h-20 w-20 rounded-lg border border-divider overflow-hidden relative">
+                            <img
+                              src={
+                                (pendingImages[1].isUploading || pendingImages[1].isCompressing) && pendingImages[1].localPreviewUrl
+                                  ? pendingImages[1].localPreviewUrl
+                                  : pendingImages[1].url
+                              }
+                              alt={pendingImages[1].title || t("chat.image")}
+                              className={clsx(
+                                "w-full h-full object-cover",
+                                (pendingImages[1].isUploading || pendingImages[1].isCompressing) && "opacity-50"
+                              )}
+                            />
+                            {pendingImages[1].isUploading && (
+                              <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                                <Spinner size="sm" color="white" />
+                              </div>
+                            )}
+                            {pendingImages[1].isCompressing && (
+                              <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/30 gap-1">
+                                <Spinner size="sm" color="white" />
+                                <span className="text-[9px] text-white/90">{t("chat.compressing")}</span>
+                              </div>
+                            )}
+                            {!pendingImages[1].isUploading && !pendingImages[1].isCompressing && (
+                              <div className="absolute top-1 left-1 z-10">
+                                <span className="text-[9px] font-semibold bg-warning/90 text-warning-foreground px-1.5 py-0.5 rounded">
+                                  {t("chat.videoEndLabel")}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onRemovePendingImage(pendingImages[1].imageId);
+                            }}
+                            disabled={pendingImages[1].isUploading || pendingImages[1].isCompressing}
+                            className={clsx(
+                              "absolute -top-2 -right-2 bg-default-100 rounded-full p-1 shadow-sm border border-divider z-10",
+                              pendingImages[1].isUploading || pendingImages[1].isCompressing
+                                ? "opacity-50 cursor-not-allowed"
+                                : "hover:bg-default-200"
+                            )}
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={onOpenAssetPicker}
+                          className="h-20 w-20 rounded-lg border-2 border-dashed border-default-300 hover:border-warning hover:bg-warning/5 flex flex-col items-center justify-center transition-colors gap-1"
+                        >
+                          <ImagePlus size={18} className="text-default-400" />
+                          <span className="text-[9px] text-default-400 text-center leading-tight px-1">
+                            {t("chat.videoAddEnd")}
+                          </span>
+                        </button>
+                      )}
+                    </>
+                  )}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Previews Area - Pending images display (non-video modes) */}
+          <AnimatePresence>
+            {isExpanded && menuState.mode !== "video" && pendingImages.length > 0 && (
               <motion.div
                 initial={{ height: 0, opacity: 0 }}
                 animate={{ height: "auto", opacity: 1 }}
@@ -710,19 +859,12 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
                 className="px-4 pt-4 overflow-hidden"
               >
                 <div className="flex gap-2 flex-wrap mb-2">
-                  {/* Display count indicator if multiple images */}
-                  {pendingImages.length > 1 && menuState.mode !== "video" && (
+                  {pendingImages.length > 1 && (
                     <div className="text-xs text-default-500 w-full mb-1">
                       {t("chat.pendingImagesCount", {
                         count: pendingImages.length,
                         max: MAX_PENDING_IMAGES,
                       })}
-                    </div>
-                  )}
-                  {menuState.mode === "video" && pendingImages.length > 0 && (
-                    <div className="text-xs text-default-500 w-full mb-1 flex items-center gap-1">
-                      <Video size={12} />
-                      {t("chat.videoSourceImages")}
                     </div>
                   )}
 
@@ -767,15 +909,6 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
                               <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/30 gap-1">
                                 <Spinner size="sm" color="white" />
                                 <span className="text-[9px] text-white/90">{t("chat.compressing")}</span>
-                              </div>
-                            )}
-
-                            {/* Video mode label badge */}
-                            {menuState.mode === "video" && !img.isUploading && !img.isCompressing && (
-                              <div className="absolute top-1 left-1 z-10">
-                                <span className="text-[9px] font-semibold bg-warning/90 text-warning-foreground px-1.5 py-0.5 rounded">
-                                  {pendingImages.indexOf(img) === 0 ? t("chat.videoSourceLabel") : t("chat.videoEndLabel")}
-                                </span>
                               </div>
                             )}
 
@@ -1182,6 +1315,7 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
             >
               {menuState.mode === "video" ? (
                 <Button
+                  key="send-video"
                   color="warning"
                   aria-label={t("chat.send")}
                   onPress={onSend}
@@ -1191,16 +1325,17 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
                   size="sm"
                 >
                   <Send size={16} />
-                  {!videoCostLoading && videoCost !== null && videoCost !== undefined && (
+                  {isExpanded && !videoCostLoading && videoCost !== null && videoCost !== undefined && (
                     <span className="flex items-center gap-0.5 font-semibold ml-1">
                       <Bean size={14} />
                       {videoCost.toLocaleString()}
                     </span>
                   )}
-                  {videoCostLoading && <Spinner size="sm" />}
+                  {isExpanded && videoCostLoading && <Spinner size="sm" />}
                 </Button>
               ) : (
                 <Button
+                  key="send-default"
                   isIconOnly
                   color="primary"
                   aria-label={t("chat.send")}

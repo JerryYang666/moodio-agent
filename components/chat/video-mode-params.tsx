@@ -235,49 +235,82 @@ export default function VideoModeParams({
     }
 
     if (param.type === "number") {
+      const hasFiniteRange =
+        param.min !== undefined &&
+        param.max !== undefined &&
+        param.max - param.min <= 20;
+
+      if (hasFiniteRange) {
+        const min = param.min!;
+        const max = param.max!;
+        const step = max - min <= 1 ? 0.1 : 1;
+        const items: { key: string; label: string }[] = [];
+        for (let i = min; i <= max + Number.EPSILON; i = Math.round((i + step) * 10) / 10) {
+          const label = step < 1 ? i.toFixed(1) : String(i);
+          items.push({ key: label, label });
+        }
+        return (
+          <div key={param.name} className="flex flex-col gap-0.5">
+            <span className="text-[10px] text-default-400 uppercase tracking-wide pl-1">
+              {param.label || param.name}
+            </span>
+            <Dropdown>
+              <DropdownTrigger>
+                <Button
+                  className="capitalize"
+                  variant="bordered"
+                  size="sm"
+                  endContent={<ChevronUp size={14} className="text-default-400" />}
+                >
+                  {String(value)}
+                </Button>
+              </DropdownTrigger>
+              <DropdownMenu
+                disallowEmptySelection
+                aria-label={param.label || param.name}
+                selectedKeys={value !== "" ? new Set([String(value)]) : new Set()}
+                selectionMode="single"
+                variant="flat"
+                onSelectionChange={(keys) => {
+                  const selected = Array.from(keys)[0] as string;
+                  if (selected) {
+                    handleParamChange(param.name, Number(selected));
+                  }
+                }}
+              >
+                {items.map((item) => (
+                  <DropdownItem key={item.key}>{item.label}</DropdownItem>
+                ))}
+              </DropdownMenu>
+            </Dropdown>
+          </div>
+        );
+      }
+
       return (
         <div key={param.name} className="flex flex-col gap-0.5">
           <span className="text-[10px] text-default-400 uppercase tracking-wide pl-1">
             {param.label || param.name}
           </span>
-          <Dropdown>
-            <DropdownTrigger>
-              <Button
-                className="capitalize"
-                variant="bordered"
-                size="sm"
-                endContent={<ChevronUp size={14} className="text-default-400" />}
-              >
-                {String(value)}
-              </Button>
-            </DropdownTrigger>
-            <DropdownMenu
-              disallowEmptySelection
-              aria-label={param.label || param.name}
-              selectedKeys={value !== "" ? new Set([String(value)]) : new Set()}
-              selectionMode="single"
-              variant="flat"
-              onSelectionChange={(keys) => {
-                const selected = Array.from(keys)[0] as string;
-                if (selected) {
-                  handleParamChange(param.name, Number(selected));
-                }
-              }}
-            >
-              {(() => {
-                // Generate options from min/max range
-                const min = param.min ?? 0;
-                const max = param.max ?? 10;
-                const items = [];
-                for (let i = min; i <= max; i++) {
-                  items.push(
-                    <DropdownItem key={String(i)}>{String(i)}</DropdownItem>
-                  );
-                }
-                return items;
-              })()}
-            </DropdownMenu>
-          </Dropdown>
+          <input
+            type="number"
+            className="h-8 w-24 rounded-lg border border-default-200 bg-transparent px-2 text-sm outline-none focus:border-primary"
+            value={value === "" || value === undefined ? "" : value}
+            min={param.min}
+            max={param.max}
+            placeholder={param.description ? String(param.min ?? "") : ""}
+            onChange={(e) => {
+              const raw = e.target.value;
+              if (raw === "" || raw === "-") {
+                handleParamChange(param.name, raw === "-" ? raw : undefined);
+                return;
+              }
+              const num = Number(raw);
+              if (!isNaN(num)) {
+                handleParamChange(param.name, num);
+              }
+            }}
+          />
         </div>
       );
     }

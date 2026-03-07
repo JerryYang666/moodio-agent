@@ -164,6 +164,8 @@
     "videoSourceImages": "Video source frames",
     "videoSourceLabel": "Source",
     "videoEndLabel": "End",
+    "videoAddSource": "Add first frame",
+    "videoAddEnd": "Add last frame (optional)",
     "image": "Image",
     "sourceUpload": "Upload",
     "sourceAsset": "Library",
@@ -425,7 +427,8 @@
   "storyboard": {
     "title": "Storyboard",
     "subtitle": "Storyboard your ideas",
-    "goToStoryboard": "Go to Storyboard"
+    "goToStoryboard": "Go to Storyboard",
+    "model": "Model"
   },
   "browse": {
     "title": "Browse",

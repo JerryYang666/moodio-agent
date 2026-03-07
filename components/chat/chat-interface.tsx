@@ -171,13 +171,16 @@ export default function ChatInterface({
     }
     return false;
   });
-  const [menuState, setMenuState] = useState<MenuState>(() => {
-    // Load saved preferences from localStorage on mount
-    if (typeof window !== "undefined") {
-      return loadMenuState();
-    }
-    return INITIAL_MENU_STATE;
-  });
+  const [menuState, setMenuState] = useState<MenuState>(INITIAL_MENU_STATE);
+
+  // Load saved menu state from localStorage after hydration
+  const menuStateInitialized = useRef(false);
+  useEffect(() => {
+    if (menuStateInitialized.current) return;
+    menuStateInitialized.current = true;
+    const saved = loadMenuState();
+    setMenuState(saved);
+  }, []);
 
   // Video cost estimation state
   const [videoCost, setVideoCost] = useState<number | null>(null);
@@ -2332,6 +2335,9 @@ export default function ChatInterface({
         onUpdateReferenceImageTag={updateReferenceImageTag}
         isReferenceImagesCollapsed={isReferenceImagesCollapsed}
         onToggleReferenceImagesCollapsed={toggleReferenceImagesCollapsed}
+        videoCost={videoCost}
+        videoCostLoading={videoCostLoading}
+        videoModelSupportsEndImage={videoModelSupportsEndImage}
       />
 
       <AssetPickerModal
