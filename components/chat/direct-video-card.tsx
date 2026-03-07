@@ -59,22 +59,31 @@ export default function DirectVideoCard({
   useEffect(() => {
     if (!part.generationId) return;
 
-    const unsubscribe = onGenerationUpdate((update) => {
-      if (update.generationId !== part.generationId) return;
+    const unsubscribe = onGenerationUpdate((generationId, status) => {
+      if (generationId !== part.generationId) return;
 
-      if (update.status === "completed" && onStatusUpdate) {
-        onStatusUpdate({
-          status: "completed",
-          videoId: update.videoId,
-          videoUrl: update.videoUrl,
-          signedVideoUrl: update.signedVideoUrl,
-          thumbnailUrl: update.thumbnailUrl || part.thumbnailUrl,
-          seed: update.seed,
-        });
-      } else if (update.status === "failed" && onStatusUpdate) {
+      if (status === "completed" && onStatusUpdate) {
+        // Fetch full generation details from API
+        fetch(`/api/video/generations/${generationId}`)
+          .then((res) => res.json())
+          .then((data) => {
+            const gen = data.generation;
+            onStatusUpdate({
+              status: "completed",
+              videoId: gen?.id,
+              videoUrl: gen?.videoUrl,
+              signedVideoUrl: gen?.signedVideoUrl,
+              thumbnailUrl: gen?.thumbnailUrl || part.thumbnailUrl,
+              seed: gen?.seed,
+            });
+          })
+          .catch(() => {
+            onStatusUpdate({ status: "completed" });
+          });
+      } else if (status === "failed" && onStatusUpdate) {
         onStatusUpdate({
           status: "failed",
-          error: update.error || "Video generation failed",
+          error: "Video generation failed",
         });
       }
     });
@@ -86,7 +95,7 @@ export default function DirectVideoCard({
   const globalStatus = part.generationId
     ? generationStatuses[part.generationId]
     : null;
-  const effectiveStatus = globalStatus?.status || part.status;
+  const effectiveStatus = globalStatus || part.status;
 
   const handleDownload = useCallback(async () => {
     if (!part.generationId) return;
@@ -211,10 +220,10 @@ export default function DirectVideoCard({
               <ModalBody className="px-3 sm:px-6 pb-6">
                 <div className="space-y-3 sm:space-y-4">
                   <VideoPlayer
-                    videoUrl={part.videoUrl}
-                    signedVideoUrl={part.signedVideoUrl}
-                    thumbnailUrl={part.thumbnailUrl}
-                    fallbackImageUrl={part.config.sourceImageUrl}
+                    videoUrl={part.videoUrl ?? null}
+                    signedVideoUrl={part.signedVideoUrl ?? null}
+                    thumbnailUrl={part.thumbnailUrl ?? null}
+                    fallbackImageUrl={part.config.sourceImageUrl ?? ""}
                     status={effectiveStatus}
                     videoId={part.generationId}
                   />
