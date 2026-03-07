@@ -2344,6 +2344,7 @@ export default function ChatInterface({
                 hideAvatar={hideAvatars}
                 desktopId={desktopId}
                 allMessages={messages}
+                onSendAsVideoMessage={handleSendVideoFromAgent}
               />
             );
           } else {
@@ -2391,6 +2392,7 @@ export default function ChatInterface({
                 allMessages={messages}
                 onDirectVideoStatusUpdate={handleDirectVideoStatusUpdate}
                 onDirectVideoRestore={handleDirectVideoRestore}
+                onSendAsVideoMessage={handleSendVideoFromAgent}
               />
             );
           }

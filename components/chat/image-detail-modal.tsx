@@ -311,7 +311,7 @@ export default function ImageDetailModal({
           ? "h-[100dvh] max-h-[100dvh] m-0 rounded-none"
           : "max-h-[90vh]",
         body: isFullscreen ? "p-0 h-full" : "",
-        wrapper: isFullscreen ? "overflow-hidden" : "",
+        wrapper: isFullscreen ? "overflow-hidden z-[70]" : "z-[70]",
       }}
       onClose={handleClose}
     >

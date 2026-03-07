@@ -50,6 +50,15 @@ interface ParallelMessageProps {
   ) => void;
   /** Callback to restore a direct_video generation's params back into the input */
   onDirectVideoRestore?: (data: import("@/components/video/video-detail-modal").VideoRestoreData) => void;
+  /** Callback to send video generation as a user message (when not on desktop) */
+  onSendAsVideoMessage?: (config: {
+    modelId: string;
+    modelName: string;
+    prompt: string;
+    sourceImageId: string;
+    sourceImageUrl?: string;
+    params: Record<string, any>;
+  }) => void;
 }
 
 export default function ParallelMessage({
@@ -70,6 +79,7 @@ export default function ParallelMessage({
   allMessages,
   onDirectVideoStatusUpdate,
   onDirectVideoRestore,
+  onSendAsVideoMessage,
 }: ParallelMessageProps) {
   const t = useTranslations();
   const [currentVariantIndex, setCurrentVariantIndex] = useState(0);
@@ -158,6 +168,7 @@ export default function ParallelMessage({
           allMessages={allMessages}
           onDirectVideoStatusUpdate={onDirectVideoStatusUpdate}
           onDirectVideoRestore={onDirectVideoRestore}
+          onSendAsVideoMessage={onSendAsVideoMessage}
         />
         {/* Generate Another Option button - only show when not sending */}
         {onGenerateVariant && !isSending && (
@@ -216,6 +227,7 @@ export default function ParallelMessage({
                 allMessages={allMessages}
                 onDirectVideoStatusUpdate={onDirectVideoStatusUpdate}
                 onDirectVideoRestore={onDirectVideoRestore}
+                onSendAsVideoMessage={onSendAsVideoMessage}
               />
             </div>
           ))}
@@ -302,6 +314,7 @@ export default function ParallelMessage({
               allMessages={allMessages}
               onDirectVideoStatusUpdate={onDirectVideoStatusUpdate}
               onDirectVideoRestore={onDirectVideoRestore}
+              onSendAsVideoMessage={onSendAsVideoMessage}
             />
           </div>
         </div>
