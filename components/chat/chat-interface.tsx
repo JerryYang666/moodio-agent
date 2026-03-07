@@ -31,6 +31,7 @@ import {
   INITIAL_MENU_STATE,
   loadMenuState,
   saveMenuState,
+  resolveMenuState,
 } from "./menu-configuration";
 import {
   PendingImage,
@@ -38,6 +39,7 @@ import {
   canAddImage,
   hasUploadingImages,
 } from "./pending-image-types";
+import type { VideoRestoreData } from "@/components/video/video-detail-modal";
 import {
   uploadImage,
   validateFile,
@@ -455,6 +457,12 @@ export default function ChatInterface({
   const lastUserInputRef = useRef<string>("");
   const lastPendingImagesRef = useRef<PendingImage[]>([]);
   const lastEditorContentRef = useRef<JSONContent | null>(null);
+  // One-shot restore params used to prevent VideoModeParams init from
+  // overwriting "put back" values with defaults/localStorage.
+  const pendingVideoRestoreRef = useRef<{
+    modelId: string;
+    videoParams: Record<string, any>;
+  } | null>(null);
 
   // Voice recorder hook
   const handleTranscriptionComplete = useCallback((text: string) => {
@@ -1746,7 +1754,21 @@ export default function ChatInterface({
   // Handle menu state change
   const handleMenuStateChange = useCallback(
     (newState: MenuState) => {
-      setMenuState(newState);
+      setMenuState(() => {
+        const pendingRestore = pendingVideoRestoreRef.current;
+        if (
+          pendingRestore &&
+          newState.mode === "video" &&
+          newState.videoModelId === pendingRestore.modelId
+        ) {
+          pendingVideoRestoreRef.current = null;
+          return {
+            ...newState,
+            videoParams: pendingRestore.videoParams,
+          };
+        }
+        return newState;
+      });
     },
     []
   );
@@ -1978,6 +2000,78 @@ export default function ChatInterface({
         }
         return newMessages;
       });
+    },
+    []
+  );
+
+  // Handle direct video "put back" — restore generation params into the input
+  const handleDirectVideoRestore = useCallback(
+    (data: VideoRestoreData) => {
+      const { prompt, image_url, end_image_url, ...restoredVideoParams } =
+        data.params || {};
+
+      // Keep restored params in a one-shot ref so VideoModeParams model-init
+      // can't overwrite them with defaults/localStorage.
+      pendingVideoRestoreRef.current = {
+        modelId: data.modelId,
+        videoParams: restoredVideoParams,
+      };
+
+      // Switch to video mode and set model + params
+      setMenuState((prev) => ({
+        ...resolveMenuState(
+          {
+            ...prev,
+            mode: "video",
+            videoModelId: data.modelId,
+            videoParams: restoredVideoParams,
+          },
+          "video"
+        ),
+        // Explicitly preserve restored video fields
+        videoModelId: data.modelId,
+        videoParams: restoredVideoParams,
+      }));
+
+      // Set the prompt text
+      const restoredPrompt = typeof prompt === "string" ? prompt : "";
+      setInput(restoredPrompt);
+      // MentionTextbox is TipTap-based; update editor document explicitly.
+      if (chatInputRef.current) {
+        const content: JSONContent = restoredPrompt
+          ? {
+              type: "doc",
+              content: [
+                {
+                  type: "paragraph",
+                  content: [{ type: "text", text: restoredPrompt }],
+                },
+              ],
+            }
+          : {
+              type: "doc",
+              content: [{ type: "paragraph" }],
+            };
+        chatInputRef.current.setEditorContent(content);
+      }
+
+      // Set source image (and optionally end image)
+      const images: PendingImage[] = [];
+      if (data.sourceImageId) {
+        images.push({
+          imageId: data.sourceImageId,
+          url: data.sourceImageUrl,
+          source: "ai_generated",
+        });
+      }
+      if (data.endImageId && data.endImageUrl) {
+        images.push({
+          imageId: data.endImageId,
+          url: data.endImageUrl,
+          source: "ai_generated",
+        });
+      }
+      setPendingImages(images);
     },
     []
   );
@@ -2270,6 +2364,8 @@ export default function ChatInterface({
                 isSending={isSending}
                 desktopId={desktopId}
                 allMessages={messages}
+                onDirectVideoStatusUpdate={handleDirectVideoStatusUpdate}
+                onDirectVideoRestore={handleDirectVideoRestore}
               />
             );
           }

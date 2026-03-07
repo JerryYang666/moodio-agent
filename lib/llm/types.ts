@@ -63,12 +63,14 @@ export type MessageContentPart =
       };
       generationId?: string;
       status: "pending" | "processing" | "completed" | "failed";
+      thumbnailImageId?: string;
       thumbnailUrl?: string;
       videoId?: string;
       videoUrl?: string;
       signedVideoUrl?: string;
       error?: string;
       createdAt: string;
+      completedAt?: string;
       seed?: number;
     }
   | {

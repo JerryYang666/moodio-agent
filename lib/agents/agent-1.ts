@@ -289,6 +289,12 @@ export class Agent1 implements Agent {
                 text: `[Video Configuration: ${p.config.modelName} - "${p.config.prompt}" - Status: ${p.status}${p.generationId ? ` (Generation ID: ${p.generationId})` : ""}]`,
               };
             }
+            if (p.type === "direct_video") {
+              return {
+                type: "text" as const,
+                text: `[Video Generation: ${p.config.modelName} - "${p.config.prompt}" - Status: ${p.status}${p.generationId ? ` (Generation ID: ${p.generationId})` : ""}]`,
+              };
+            }
             if (p.type === "agent_shot_list") {
               const header = p.columns.join(" | ");
               const rows = p.rows

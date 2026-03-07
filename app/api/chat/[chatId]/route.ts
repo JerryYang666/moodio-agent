@@ -2,9 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAccessToken } from "@/lib/auth/cookies";
 import { verifyAccessToken } from "@/lib/auth/jwt";
 import { db } from "@/lib/db";
-import { chats } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
-import { getChatHistory, getImageUrl } from "@/lib/storage/s3";
+import { chats, videoGenerations } from "@/lib/db/schema";
+import { eq, and, inArray } from "drizzle-orm";
+import { getChatHistory, getImageUrl, getVideoUrl, getSignedVideoUrl, saveChatHistory } from "@/lib/storage/s3";
+import { waitUntil } from "@vercel/functions";
+import { Message, MessageContentPart } from "@/lib/llm/types";
 
 export async function GET(
   request: NextRequest,
@@ -41,6 +43,29 @@ export async function GET(
 
     const messages = await getChatHistory(chatId);
 
+    // Collect direct_video generation IDs so we can reconcile with DB state
+    const directVideoGenerationIds: string[] = [];
+    for (const msg of messages) {
+      if (typeof msg.content === "string") continue;
+      for (const part of msg.content) {
+        if (part.type === "direct_video" && part.generationId) {
+          directVideoGenerationIds.push(part.generationId);
+        }
+      }
+    }
+
+    // Batch-query the DB for any direct_video generation records
+    let generationMap: Map<string, typeof videoGenerations.$inferSelect> | undefined;
+    if (directVideoGenerationIds.length > 0) {
+      const generations = await db
+        .select()
+        .from(videoGenerations)
+        .where(inArray(videoGenerations.id, directVideoGenerationIds));
+      generationMap = new Map(generations.map((g) => [g.id, g]));
+    }
+
+    let s3Dirty = false;
+
     // Filter out internal_* for non-admins and add CloudFront URLs for images
     const processedMessages = messages.map((msg) => {
       if (typeof msg.content === "string") return msg;
@@ -62,6 +87,81 @@ export async function GET(
               imageUrl: getImageUrl(part.imageId),
             };
           }
+          // Reconcile direct_video parts with actual DB state
+          if (
+            part.type === "direct_video" &&
+            part.generationId &&
+            generationMap?.has(part.generationId)
+          ) {
+            const gen = generationMap.get(part.generationId)!;
+            if (gen.status === "completed" || gen.status === "failed") {
+              const generationParams =
+                typeof gen.params === "object" && gen.params !== null
+                  ? (gen.params as Record<string, any>)
+                  : {};
+              const mergedModelParams = {
+                ...part.config.params,
+                ...Object.fromEntries(
+                  Object.entries(generationParams).filter(
+                    ([key]) =>
+                      key !== "prompt" &&
+                      key !== "image_url" &&
+                      key !== "end_image_url"
+                  )
+                ),
+              };
+              const dbPrompt =
+                typeof generationParams.prompt === "string"
+                  ? generationParams.prompt
+                  : part.config.prompt;
+              s3Dirty = true;
+              return {
+                ...part,
+                config: {
+                  ...part.config,
+                  sourceImageId: gen.sourceImageId,
+                  sourceImageUrl: getImageUrl(gen.sourceImageId),
+                  endImageId: gen.endImageId ?? undefined,
+                  endImageUrl: gen.endImageId
+                    ? getImageUrl(gen.endImageId)
+                    : undefined,
+                  prompt: dbPrompt,
+                  params: mergedModelParams,
+                },
+                status: gen.status as "completed" | "failed",
+                videoId: gen.videoId ?? undefined,
+                videoUrl: gen.videoId ? getVideoUrl(gen.videoId) : undefined,
+                signedVideoUrl: gen.videoId ? getSignedVideoUrl(gen.videoId) : undefined,
+                thumbnailImageId: gen.thumbnailImageId ?? undefined,
+                thumbnailUrl: gen.thumbnailImageId
+                  ? getImageUrl(gen.thumbnailImageId)
+                  : undefined,
+                seed: gen.seed ?? undefined,
+                error: gen.error ?? undefined,
+                completedAt: gen.completedAt?.toISOString() ?? undefined,
+              };
+            }
+          }
+          // Ensure direct_video URL fields are always derived from IDs at read time
+          if (part.type === "direct_video") {
+            return {
+              ...part,
+              config: {
+                ...part.config,
+                sourceImageUrl: getImageUrl(part.config.sourceImageId),
+                endImageUrl: part.config.endImageId
+                  ? getImageUrl(part.config.endImageId)
+                  : undefined,
+              },
+              videoUrl: part.videoId ? getVideoUrl(part.videoId) : part.videoUrl,
+              signedVideoUrl: part.videoId
+                ? getSignedVideoUrl(part.videoId)
+                : part.signedVideoUrl,
+              thumbnailUrl: part.thumbnailImageId
+                ? getImageUrl(part.thumbnailImageId)
+                : part.thumbnailUrl,
+            };
+          }
           return part;
         });
 
@@ -70,6 +170,76 @@ export async function GET(
         content: processedContent,
       };
     });
+
+    // If any direct_video parts were reconciled, persist the update to S3 in the background
+    if (s3Dirty) {
+      // Build the updated messages for S3 (without display-only URLs, saveChatHistory strips them)
+      const updatedForS3: Message[] = messages.map((msg) => {
+        if (typeof msg.content === "string") return msg;
+        const updatedContent = msg.content.map((part) => {
+          if (
+            part.type === "direct_video" &&
+            part.generationId &&
+            generationMap?.has(part.generationId)
+          ) {
+            const gen = generationMap.get(part.generationId)!;
+            if (gen.status === "completed" || gen.status === "failed") {
+              const generationParams =
+                typeof gen.params === "object" && gen.params !== null
+                  ? (gen.params as Record<string, any>)
+                  : {};
+              const mergedModelParams = {
+                ...part.config.params,
+                ...Object.fromEntries(
+                  Object.entries(generationParams).filter(
+                    ([key]) =>
+                      key !== "prompt" &&
+                      key !== "image_url" &&
+                      key !== "end_image_url"
+                  )
+                ),
+              };
+              const dbPrompt =
+                typeof generationParams.prompt === "string"
+                  ? generationParams.prompt
+                  : part.config.prompt;
+              return {
+                ...part,
+                config: {
+                  ...part.config,
+                  sourceImageId: gen.sourceImageId,
+                  sourceImageUrl: getImageUrl(gen.sourceImageId),
+                  endImageId: gen.endImageId ?? undefined,
+                  endImageUrl: gen.endImageId
+                    ? getImageUrl(gen.endImageId)
+                    : undefined,
+                  prompt: dbPrompt,
+                  params: mergedModelParams,
+                },
+                status: gen.status as "completed" | "failed",
+                videoId: gen.videoId ?? undefined,
+                videoUrl: gen.videoId ? getVideoUrl(gen.videoId) : undefined,
+                thumbnailImageId: gen.thumbnailImageId ?? undefined,
+                thumbnailUrl: gen.thumbnailImageId
+                  ? getImageUrl(gen.thumbnailImageId)
+                  : undefined,
+                seed: gen.seed ?? undefined,
+                error: gen.error ?? undefined,
+                completedAt: gen.completedAt?.toISOString() ?? undefined,
+              };
+            }
+          }
+          return part;
+        }) as MessageContentPart[];
+        return { ...msg, content: updatedContent };
+      });
+
+      waitUntil(
+        saveChatHistory(chatId, updatedForS3).catch((err) => {
+          console.error("[Chat GET] Background S3 update failed:", err);
+        })
+      );
+    }
 
     return NextResponse.json({ chat, messages: processedMessages });
   } catch (error) {

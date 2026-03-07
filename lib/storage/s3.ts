@@ -144,10 +144,10 @@ export async function checkImageExists(
 }
 
 /**
- * Strip imageUrl from message content parts before saving
- * imageUrl contains CloudFront URLs which are derived and should not be persisted
+ * Strip derived URL fields from message content parts before saving.
+ * URLs are display/runtime fields and should always be rebuilt from IDs.
  */
-function stripImageUrls(messages: Message[]): Message[] {
+function stripDerivedUrls(messages: Message[]): Message[] {
   return messages.map((message) => {
     if (typeof message.content === "string") {
       return message;
@@ -162,6 +162,28 @@ function stripImageUrls(messages: Message[]): Message[] {
         const { imageUrl, ...rest } = part;
         return rest;
       }
+      if (part.type === "agent_video") {
+        const { config, ...rest } = part;
+        const { sourceImageUrl, ...cleanConfig } = config;
+        return {
+          ...rest,
+          config: cleanConfig,
+        };
+      }
+      if (part.type === "direct_video") {
+        const {
+          config,
+          thumbnailUrl,
+          videoUrl,
+          signedVideoUrl,
+          ...rest
+        } = part;
+        const { sourceImageUrl, endImageUrl, ...cleanConfig } = config;
+        return {
+          ...rest,
+          config: cleanConfig,
+        };
+      }
       return part;
     });
 
@@ -174,8 +196,8 @@ function stripImageUrls(messages: Message[]): Message[] {
 
 export async function saveChatHistory(chatId: string, messages: Message[]) {
   const key = `chats/${chatId}.json`;
-  // Strip imageUrl from all messages before saving - derived URLs should not be persisted
-  const cleanedMessages = stripImageUrls(messages);
+  // Strip all derived URL fields before saving.
+  const cleanedMessages = stripDerivedUrls(messages);
   const content = JSON.stringify({ messages: cleanedMessages });
 
   await s3Client.send(
@@ -189,10 +211,10 @@ export async function saveChatHistory(chatId: string, messages: Message[]) {
 }
 
 /**
- * Add imageUrl to message content parts on retrieval
- * Generates CloudFront URLs for all image references
+ * Add derived URL fields to message content parts on retrieval.
+ * All URLs are generated from stable IDs and never persisted.
  */
-function addImageUrls(messages: Message[]): Message[] {
+function addDerivedUrls(messages: Message[]): Message[] {
   return messages.map((message) => {
     if (typeof message.content === "string") {
       return message;
@@ -209,6 +231,34 @@ function addImageUrls(messages: Message[]): Message[] {
         return {
           ...part,
           imageUrl: getImageUrl(part.imageId),
+        };
+      }
+      if (part.type === "agent_video") {
+        return {
+          ...part,
+          config: {
+            ...part.config,
+            sourceImageUrl: part.config.sourceImageId
+              ? getImageUrl(part.config.sourceImageId)
+              : undefined,
+          },
+        };
+      }
+      if (part.type === "direct_video") {
+        return {
+          ...part,
+          config: {
+            ...part.config,
+            sourceImageUrl: getImageUrl(part.config.sourceImageId),
+            endImageUrl: part.config.endImageId
+              ? getImageUrl(part.config.endImageId)
+              : undefined,
+          },
+          thumbnailUrl: part.thumbnailImageId
+            ? getImageUrl(part.thumbnailImageId)
+            : undefined,
+          videoUrl: part.videoId ? getVideoUrl(part.videoId) : undefined,
+          signedVideoUrl: part.videoId ? getSignedVideoUrl(part.videoId) : undefined,
         };
       }
       return part;
@@ -238,8 +288,8 @@ export async function getChatHistory(chatId: string): Promise<Message[]> {
 
     const str = await response.Body.transformToString();
     const data = JSON.parse(str) as ChatHistory;
-    // Generate fresh CloudFront URLs for all images on retrieval
-    return addImageUrls(data.messages);
+    // Generate fresh derived URLs on retrieval
+    return addDerivedUrls(data.messages);
   } catch (error: any) {
     if (error.name === "NoSuchKey") {
       return [];

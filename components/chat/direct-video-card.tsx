@@ -1,17 +1,38 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useTranslations } from "next-intl";
+import { hasWriteAccess } from "@/lib/permissions";
 import { Image } from "@heroui/image";
 import { Button } from "@heroui/button";
-import { Modal, ModalContent, ModalHeader, ModalBody } from "@heroui/modal";
-import { Download, Video } from "lucide-react";
+import { Input } from "@heroui/input";
+import {
+  Modal,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
+  useDisclosure,
+} from "@heroui/modal";
+import {
+  Dropdown,
+  DropdownTrigger,
+  DropdownMenu,
+  DropdownItem,
+  DropdownSection,
+} from "@heroui/dropdown";
+import { Download, RotateCcw, FolderPlus, Plus } from "lucide-react";
 import VideoStatusChip from "@/components/video/video-status-chip";
 import FakeProgressBar from "@/components/video/fake-progress-bar";
 import VideoStatusOverlay from "@/components/video/video-status-overlay";
 import VideoPlayOverlay from "@/components/video/video-play-overlay";
-import VideoPlayer from "@/components/video/video-player";
+import VideoDetailModal from "@/components/video/video-detail-modal";
+import type {
+  VideoDetailData,
+  VideoRestoreData,
+} from "@/components/video/video-detail-modal";
 import { useVideo } from "@/components/video-provider";
+import { useCollections } from "@/hooks/use-collections";
 import { getVideoModel } from "@/lib/video/models";
 import type { MessageContentPart } from "@/lib/llm/types";
 
@@ -20,16 +41,35 @@ type DirectVideoPart = Extract<MessageContentPart, { type: "direct_video" }>;
 interface DirectVideoCardProps {
   part: DirectVideoPart;
   onStatusUpdate?: (updates: Partial<DirectVideoPart>) => void;
+  onRestore?: (data: VideoRestoreData) => void;
 }
 
 export default function DirectVideoCard({
   part,
   onStatusUpdate,
+  onRestore,
 }: DirectVideoCardProps) {
   const t = useTranslations("video");
+  const tCollections = useTranslations("collections");
+  const tMenu = useTranslations("imageMenu");
+  const tCommon = useTranslations("common");
   const { monitorGeneration, onGenerationUpdate, generationStatuses } =
     useVideo();
+  const {
+    collections,
+    createCollection,
+    addVideoToCollection,
+    getDefaultCollectionName,
+  } = useCollections();
   const [showModal, setShowModal] = useState(false);
+  const [newCollectionName, setNewCollectionName] = useState("");
+  const [isCreating, setIsCreating] = useState(false);
+
+  const {
+    isOpen: isCreateOpen,
+    onOpen: onCreateOpen,
+    onOpenChange: onCreateOpenChange,
+  } = useDisclosure();
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
@@ -44,7 +84,6 @@ export default function DirectVideoCard({
   const modelLabel =
     getVideoModel(part.config.modelId)?.name ?? part.config.modelId;
 
-  // Monitor generation status when we have a generationId
   useEffect(() => {
     if (
       !part.generationId ||
@@ -55,7 +94,6 @@ export default function DirectVideoCard({
     monitorGeneration(part.generationId);
   }, [part.generationId, part.status, monitorGeneration]);
 
-  // Listen for generation updates
   useEffect(() => {
     if (!part.generationId) return;
 
@@ -63,18 +101,19 @@ export default function DirectVideoCard({
       if (generationId !== part.generationId) return;
 
       if (status === "completed" && onStatusUpdate) {
-        // Fetch full generation details from API
         fetch(`/api/video/generations/${generationId}`)
           .then((res) => res.json())
           .then((data) => {
             const gen = data.generation;
             onStatusUpdate({
               status: "completed",
-              videoId: gen?.id,
+              videoId: gen?.videoId,
               videoUrl: gen?.videoUrl,
               signedVideoUrl: gen?.signedVideoUrl,
+              thumbnailImageId: gen?.thumbnailImageId,
               thumbnailUrl: gen?.thumbnailUrl || part.thumbnailUrl,
               seed: gen?.seed,
+              completedAt: gen?.completedAt,
             });
           })
           .catch(() => {
@@ -91,7 +130,6 @@ export default function DirectVideoCard({
     return unsubscribe;
   }, [part.generationId, part.thumbnailUrl, onGenerationUpdate, onStatusUpdate]);
 
-  // Get effective status (check global cache for latest)
   const globalStatus = part.generationId
     ? generationStatuses[part.generationId]
     : null;
@@ -119,6 +157,74 @@ export default function DirectVideoCard({
     }
   }, [part.generationId]);
 
+  const restoreData: VideoRestoreData | null = {
+    modelId: part.config.modelId,
+    sourceImageId: part.config.sourceImageId,
+    sourceImageUrl: part.config.sourceImageUrl ?? "",
+    endImageId: part.config.endImageId ?? null,
+    endImageUrl: part.config.endImageUrl ?? null,
+    params: { prompt: part.config.prompt, ...part.config.params },
+  };
+
+  const videoDetailData: VideoDetailData | null = part.generationId
+    ? {
+        id: part.generationId,
+        modelId: part.config.modelId,
+        status: effectiveStatus,
+        sourceImageUrl: part.config.sourceImageUrl ?? "",
+        videoId: part.videoId ?? null,
+        videoUrl: part.videoUrl ?? null,
+        signedVideoUrl: part.signedVideoUrl ?? null,
+        thumbnailImageId: part.thumbnailImageId ?? null,
+        thumbnailUrl: part.thumbnailUrl ?? null,
+        params: { prompt: part.config.prompt, ...part.config.params },
+        error: part.error ?? null,
+        seed: part.seed ?? null,
+        createdAt: part.createdAt,
+        completedAt: part.completedAt ?? null,
+      }
+    : null;
+
+  const handleAddToCollection = async (collectionId: string) => {
+    if (!part.videoId || !part.thumbnailImageId) return;
+    await addVideoToCollection(collectionId, part.thumbnailImageId, part.videoId, {
+      title: part.config.prompt?.slice(0, 50) || t("untitledVideo"),
+      prompt: part.config.prompt || "",
+      status: effectiveStatus,
+    });
+  };
+
+  const handleCreateNewCollection = () => {
+    setNewCollectionName(getDefaultCollectionName());
+    onCreateOpen();
+  };
+
+  const handleCreateAndAdd = async () => {
+    if (!newCollectionName.trim() || !part.videoId || !part.thumbnailImageId) return;
+    setIsCreating(true);
+    try {
+      const collection = await createCollection(newCollectionName.trim());
+      if (collection) {
+        await addVideoToCollection(
+          collection.id,
+          part.thumbnailImageId!,
+          part.videoId!,
+          {
+            title: part.config.prompt?.slice(0, 50) || t("untitledVideo"),
+            prompt: part.config.prompt || "",
+            status: effectiveStatus,
+          }
+        );
+        setNewCollectionName("");
+        onCreateOpenChange();
+      }
+    } catch (error) {
+      console.error("Error creating collection:", error);
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
   return (
     <>
       <div className="relative group max-w-sm">
@@ -142,7 +248,6 @@ export default function DirectVideoCard({
                 }}
               />
 
-              {/* Status Overlay */}
               {effectiveStatus !== "completed" && (
                 <VideoStatusOverlay
                   status={effectiveStatus}
@@ -152,11 +257,9 @@ export default function DirectVideoCard({
                 />
               )}
 
-              {/* Play Button Overlay */}
               {effectiveStatus === "completed" && <VideoPlayOverlay />}
             </div>
 
-            {/* Progress Bar */}
             <FakeProgressBar
               status={effectiveStatus}
               createdAt={part.createdAt}
@@ -181,92 +284,147 @@ export default function DirectVideoCard({
         </button>
 
         {/* Quick Actions */}
-        {effectiveStatus === "completed" && part.videoUrl && (
+        {effectiveStatus === "completed" &&
+          (part.videoUrl || onRestore || (part.videoId && part.thumbnailImageId)) && (
           <div className="absolute top-2 right-2 md:opacity-0 md:group-hover:opacity-100 transition-opacity z-10 flex gap-1">
-            <Button
-              isIconOnly
-              size="sm"
-              variant="solid"
-              className="bg-background/80 backdrop-blur-sm"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleDownload();
-              }}
-            >
-              <Download size={16} />
-            </Button>
+            {part.videoUrl && (
+              <Button
+                isIconOnly
+                size="sm"
+                variant="solid"
+                className="bg-background/80 backdrop-blur-sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDownload();
+                }}
+              >
+                <Download size={16} />
+              </Button>
+            )}
+            {onRestore && (
+              <Button
+                isIconOnly
+                size="sm"
+                variant="solid"
+                className="bg-background/80 backdrop-blur-sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onRestore(restoreData);
+                }}
+              >
+                <RotateCcw size={16} />
+              </Button>
+            )}
+            {part.videoId && part.thumbnailImageId && (
+              <Dropdown>
+                <DropdownTrigger>
+                  <Button
+                    isIconOnly
+                    size="sm"
+                    variant="solid"
+                    className="bg-background/80 backdrop-blur-sm"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <FolderPlus size={16} />
+                  </Button>
+                </DropdownTrigger>
+                <DropdownMenu
+                  aria-label={t("videoActions")}
+                  onAction={(key) => {
+                    if (key === "create-new") {
+                      handleCreateNewCollection();
+                    }
+                  }}
+                >
+                  <DropdownSection
+                    title={tMenu("addToCollection")}
+                    showDivider
+                  >
+                    <DropdownItem
+                      key="create-new"
+                      startContent={<Plus size={16} />}
+                      className="font-semibold"
+                    >
+                      {tCollections("createNewCollection")}
+                    </DropdownItem>
+                  </DropdownSection>
+                  <DropdownSection
+                    title={
+                      collections.length > 0
+                        ? tMenu("yourCollections")
+                        : undefined
+                    }
+                  >
+                    {collections.length === 0 ? (
+                      <DropdownItem key="no-collections" isReadOnly>
+                        <span className="text-xs text-default-400">
+                          {tCollections("noCollectionsYet")}
+                        </span>
+                      </DropdownItem>
+                    ) : (
+                      collections
+                        .filter((c) => hasWriteAccess(c.permission))
+                        .map((collection) => (
+                          <DropdownItem
+                            key={collection.id}
+                            startContent={<FolderPlus size={16} />}
+                            onPress={() =>
+                              handleAddToCollection(collection.id)
+                            }
+                          >
+                            {collection.name}
+                          </DropdownItem>
+                        ))
+                    )}
+                  </DropdownSection>
+                </DropdownMenu>
+              </Dropdown>
+            )}
           </div>
         )}
       </div>
 
-      {/* Video Detail Modal */}
-      <Modal
+      <VideoDetailModal
+        video={videoDetailData}
         isOpen={showModal}
-        onOpenChange={setShowModal}
-        size="4xl"
-        scrollBehavior="inside"
-        classNames={{
-          base: "max-sm:m-0 max-sm:rounded-none",
-          wrapper: "max-sm:items-end",
-        }}
-      >
-        <ModalContent className="max-sm:max-h-[90vh]">
-          {() => (
+        onClose={() => setShowModal(false)}
+        onRestore={onRestore}
+        restoreData={restoreData}
+      />
+
+      {/* Create Collection Modal (for card-level quick action) */}
+      <Modal isOpen={isCreateOpen} onOpenChange={onCreateOpenChange}>
+        <ModalContent>
+          {(onModalClose) => (
             <>
-              <ModalHeader className="flex items-center gap-2 text-base sm:text-lg px-3 sm:px-6">
-                <Video size={18} className="sm:w-5 sm:h-5" />
-                {t("videoDetails")}
-              </ModalHeader>
-              <ModalBody className="px-3 sm:px-6 pb-6">
-                <div className="space-y-3 sm:space-y-4">
-                  <VideoPlayer
-                    videoUrl={part.videoUrl ?? null}
-                    signedVideoUrl={part.signedVideoUrl ?? null}
-                    thumbnailUrl={part.thumbnailUrl ?? null}
-                    fallbackImageUrl={part.config.sourceImageUrl ?? ""}
-                    status={effectiveStatus}
-                    videoId={part.generationId}
-                  />
-
-                  <div className="flex flex-wrap items-center gap-2 sm:gap-4">
-                    <VideoStatusChip
-                      status={effectiveStatus}
-                      responsive={false}
-                    />
-                    <span className="text-xs sm:text-sm text-default-500">
-                      {formatDate(part.createdAt)}
-                    </span>
-                  </div>
-
-                  <div>
-                    <div className="text-xs text-default-400 mb-1">
-                      {t("model")}: {modelLabel}
-                    </div>
-                    <p className="text-sm text-default-700">
-                      {part.config.prompt}
-                    </p>
-                  </div>
-
-                  {effectiveStatus === "completed" && (
-                    <div className="flex gap-2">
-                      <Button
-                        size="sm"
-                        variant="flat"
-                        startContent={<Download size={16} />}
-                        onPress={handleDownload}
-                      >
-                        {t("download")}
-                      </Button>
-                    </div>
-                  )}
-
-                  {part.error && (
-                    <div className="text-xs text-danger bg-danger-50 p-2 rounded-lg">
-                      {part.error}
-                    </div>
-                  )}
-                </div>
+              <ModalHeader>{tCollections("createNewCollection")}</ModalHeader>
+              <ModalBody>
+                <Input
+                  label={tCollections("collectionName")}
+                  placeholder={tCollections("enterCollectionName")}
+                  value={newCollectionName}
+                  onValueChange={setNewCollectionName}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      handleCreateAndAdd();
+                    }
+                  }}
+                  autoFocus
+                />
               </ModalBody>
+              <ModalFooter>
+                <Button variant="light" onPress={onModalClose}>
+                  {tCommon("cancel")}
+                </Button>
+                <Button
+                  color="primary"
+                  onPress={handleCreateAndAdd}
+                  isLoading={isCreating}
+                  isDisabled={!newCollectionName.trim()}
+                >
+                  {tMenu("createAndAdd")}
+                </Button>
+              </ModalFooter>
             </>
           )}
         </ModalContent>

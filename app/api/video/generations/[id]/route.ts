@@ -4,7 +4,7 @@ import { verifyAccessToken } from "@/lib/auth/jwt";
 import { db } from "@/lib/db";
 import { videoGenerations } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
-import { getImageUrl, getVideoUrl } from "@/lib/storage/s3";
+import { getImageUrl, getVideoUrl, getSignedVideoUrl } from "@/lib/storage/s3";
 
 /**
  * GET /api/video/generations/[id]
@@ -62,6 +62,9 @@ export async function GET(
       videoId: generation.videoId,
       videoUrl: generation.videoId
         ? getVideoUrl(generation.videoId)
+        : null,
+      signedVideoUrl: generation.videoId
+        ? getSignedVideoUrl(generation.videoId)
         : null,
       thumbnailImageId: generation.thumbnailImageId,
       thumbnailUrl: generation.thumbnailImageId

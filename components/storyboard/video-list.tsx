@@ -30,7 +30,6 @@ import {
   RefreshCw,
   Play,
   Download,
-  ExternalLink,
   RotateCcw,
   FolderPlus,
   Plus,
@@ -43,11 +42,10 @@ import VideoStatusChip from "@/components/video/video-status-chip";
 import { getVideoModel } from "@/lib/video/models";
 import { useCollections } from "@/hooks/use-collections";
 import type { Collection } from "@/components/collections-provider";
-import VideoPlayer from "@/components/video/video-player";
 import FakeProgressBar from "@/components/video/fake-progress-bar";
 import VideoStatusOverlay from "@/components/video/video-status-overlay";
 import VideoPlayOverlay from "@/components/video/video-play-overlay";
-import { getUserFriendlyErrorKey } from "@/lib/video/error-classify";
+import VideoDetailModal from "@/components/video/video-detail-modal";
 
 interface VideoGeneration {
   id: string;
@@ -814,245 +812,46 @@ export default function VideoList({ refreshTrigger, onRestore }: VideoListProps)
       </Card>
 
       {/* Video Detail Modal */}
-      <Modal
+      <VideoDetailModal
+        video={
+          selectedVideo
+            ? {
+                id: selectedVideo.id,
+                modelId: selectedVideo.modelId,
+                status: selectedVideo.status,
+                sourceImageUrl: selectedVideo.sourceImageUrl,
+                videoId: selectedVideo.videoId,
+                videoUrl: selectedVideo.videoUrl,
+                signedVideoUrl: selectedVideo.signedVideoUrl,
+                thumbnailImageId: selectedVideo.thumbnailImageId,
+                thumbnailUrl: selectedVideo.thumbnailUrl,
+                params: selectedVideo.params,
+                error: selectedVideo.error,
+                seed: selectedVideo.seed,
+                createdAt: selectedVideo.createdAt,
+                completedAt: selectedVideo.completedAt,
+              }
+            : null
+        }
         isOpen={!!selectedVideo}
-        onOpenChange={() => setSelectedVideo(null)}
-        size="4xl"
-        scrollBehavior="inside"
-        classNames={{
-          base: "max-sm:m-0 max-sm:rounded-none",
-          wrapper: "max-sm:items-end",
-        }}
-      >
-        <ModalContent className="max-sm:max-h-[90vh]">
-          {(onClose) => (
-            <>
-              <ModalHeader className="flex items-center gap-2 text-base sm:text-lg px-3 sm:px-6">
-                <Video size={18} className="sm:w-5 sm:h-5" />
-                {t("videoDetails")}
-              </ModalHeader>
-              <ModalBody className="px-3 sm:px-6">
-                {selectedVideo && (
-                  <div className="space-y-3 sm:space-y-4">
-                    {/* Video Player / Preview */}
-                    <VideoPlayer
-                      videoUrl={selectedVideo.videoUrl}
-                      signedVideoUrl={selectedVideo.signedVideoUrl}
-                      thumbnailUrl={selectedVideo.thumbnailUrl}
-                      fallbackImageUrl={selectedVideo.sourceImageUrl}
-                      status={selectedVideo.status}
-                      videoId={selectedVideo.id}
-                    />
-
-                    {/* Status & Info - Mobile optimized */}
-                    <div className="flex flex-wrap items-center gap-2 sm:gap-4">
-                      <VideoStatusChip
-                        status={selectedVideo.status}
-                        responsive={false}
-                      />
-                      <span className="text-xs sm:text-sm text-default-500">
-                        {t("created", {
-                          date: formatDate(selectedVideo.createdAt),
-                        })}
-                      </span>
-                      {selectedVideo.completedAt && (
-                        <span className="text-xs sm:text-sm text-default-500">
-                          {t("done", {
-                            date: formatDate(selectedVideo.completedAt),
-                          })}
-                        </span>
-                      )}
-                      {selectedVideo.seed && (
-                        <span className="text-xs sm:text-sm text-default-500">
-                          {t("seed", { seed: selectedVideo.seed })}
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Error */}
-                    {selectedVideo.error && (
-                      <div className="text-xs sm:text-sm text-danger bg-danger-50 p-2 sm:p-3 rounded-lg">
-                        {t(getUserFriendlyErrorKey(selectedVideo.error))}
-                      </div>
-                    )}
-
-                    {/* Prompt */}
-                    <div className="bg-default-100 p-3 sm:p-4 rounded-lg">
-                      <h4 className="font-medium mb-1 sm:mb-2 text-sm sm:text-base">
-                        {t("prompt")}
-                      </h4>
-                      <p className="text-xs sm:text-sm text-default-600 whitespace-pre-wrap">
-                        {selectedVideo.params.prompt || t("noPrompt")}
-                      </p>
-                    </div>
-
-                    {/* Parameters */}
-                    <div className="bg-default-100 p-3 sm:p-4 rounded-lg">
-                      <h4 className="font-medium mb-1 sm:mb-2 text-sm sm:text-base">
-                        {t("parameters")}
-                      </h4>
-                      <div className="grid grid-cols-2 gap-1 sm:gap-2 text-xs sm:text-sm">
-                        {Object.entries(selectedVideo.params)
-                          .filter(
-                            ([key]) =>
-                              key !== "prompt" &&
-                              key !== "image_url" &&
-                              key !== "end_image_url"
-                          )
-                          .map(([key, value]) => (
-                            <div key={key} className="truncate">
-                              <span className="text-default-500">{key}: </span>
-                              <span className="text-default-700">
-                                {String(value)}
-                              </span>
-                            </div>
-                          ))}
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </ModalBody>
-              <ModalFooter className="px-0 py-0 safe-area-bottom">
-                <div className="flex flex-wrap gap-2 px-3 sm:px-6 pt-3 pb-3 w-full justify-end">
-                {/* Put Back button - restore generation parameters */}
-                {selectedVideo && onRestore && (
-                  <Button
-                    variant="flat"
-                    color="secondary"
-                    size="sm"
-                    className="sm:size-md flex-1 sm:flex-none"
-                    startContent={
-                      <RotateCcw size={14} className="sm:w-4 sm:h-4" />
-                    }
-                    onPress={() => handleRestore(selectedVideo)}
-                  >
-                    {t("putBack")}
-                  </Button>
-                )}
-                {selectedVideo?.status === "completed" &&
-                  selectedVideo.videoUrl && (
-                    <>
-                      {/* Add to Collection dropdown */}
-                      {selectedVideo.videoId && selectedVideo.thumbnailImageId && (
-                        <Dropdown>
-                          <DropdownTrigger>
-                            <Button
-                              variant="flat"
-                              size="sm"
-                              className="sm:size-md flex-1 sm:flex-none"
-                              startContent={
-                                <FolderPlus size={14} className="sm:w-4 sm:h-4" />
-                              }
-                            >
-                              {tMenu("addToCollection")}
-                            </Button>
-                          </DropdownTrigger>
-                          <DropdownMenu
-                            aria-label={t("videoActions")}
-                            onAction={(key) => {
-                              if (key === "create-new") {
-                                handleCreateNewCollection(selectedVideo);
-                              }
-                            }}
-                          >
-                            <DropdownSection
-                              title={tCollections("createNewCollection")}
-                              showDivider
-                            >
-                              <DropdownItem
-                                key="create-new"
-                                startContent={<Plus size={16} />}
-                                className="font-semibold"
-                              >
-                                {tCollections("createNewCollection")}
-                              </DropdownItem>
-                            </DropdownSection>
-                            <DropdownSection
-                              title={
-                                collections.length > 0
-                                  ? tMenu("yourCollections")
-                                  : undefined
-                              }
-                            >
-                              {collections.length === 0 ? (
-                                <DropdownItem key="no-collections" isReadOnly>
-                                  <span className="text-xs text-default-400">
-                                    {tCollections("noCollectionsYet")}
-                                  </span>
-                                </DropdownItem>
-                              ) : (
-                                collections
-                                  .filter(
-                                    (c) =>
-                                      hasWriteAccess(c.permission)
-                                  )
-                                  .map((collection) => (
-                                    <DropdownItem
-                                      key={collection.id}
-                                      startContent={<FolderPlus size={16} />}
-                                      onPress={() =>
-                                        handleAddVideoToCollection(
-                                          collection.id,
-                                          selectedVideo
-                                        )
-                                      }
-                                    >
-                                      {collection.name}
-                                    </DropdownItem>
-                                  ))
-                              )}
-                            </DropdownSection>
-                          </DropdownMenu>
-                        </Dropdown>
-                      )}
-                      <Button
-                        variant="flat"
-                        size="sm"
-                        className="sm:size-md flex-1 sm:flex-none"
-                        startContent={
-                          <ExternalLink size={14} className="sm:w-4 sm:h-4" />
-                        }
-                        onPress={() =>
-                          window.open(selectedVideo.videoUrl!, "_blank")
-                        }
-                      >
-                        <span className="hidden sm:inline">
-                          {t("openInNewTab")}
-                        </span>
-                        <span className="sm:hidden">{tCommon("open")}</span>
-                      </Button>
-                      <Button
-                        color="primary"
-                        size="sm"
-                        className="sm:size-md flex-1 sm:flex-none"
-                        startContent={
-                          <Download size={14} className="sm:w-4 sm:h-4" />
-                        }
-                        onPress={() =>
-                          handleDownload(
-                            selectedVideo.id,
-                            `video-${selectedVideo.id}`
-                          )
-                        }
-                      >
-                        {tCommon("download")}
-                      </Button>
-                    </>
-                  )}
-                <Button
-                  variant="light"
-                  size="sm"
-                  className="sm:size-md"
-                  onPress={onClose}
-                >
-                  {tCommon("close")}
-                </Button>
-                </div>
-              </ModalFooter>
-            </>
-          )}
-        </ModalContent>
-      </Modal>
+        onClose={() => setSelectedVideo(null)}
+        onRestore={onRestore ? (data) => {
+          onRestore(data as VideoGenerationRestore);
+          setSelectedVideo(null);
+        } : undefined}
+        restoreData={
+          selectedVideo && onRestore
+            ? {
+                modelId: selectedVideo.modelId,
+                sourceImageId: selectedVideo.sourceImageId,
+                sourceImageUrl: selectedVideo.sourceImageUrl,
+                endImageId: selectedVideo.endImageId,
+                endImageUrl: selectedVideo.endImageUrl,
+                params: selectedVideo.params,
+              }
+            : null
+        }
+      />
 
       {/* Flying Images Animation */}
       <AnimatePresence>
@@ -1068,7 +867,7 @@ export default function VideoList({ refreshTrigger, onRestore }: VideoListProps)
         ))}
       </AnimatePresence>
 
-      {/* Create Collection Modal */}
+      {/* Create Collection Modal (for card-level quick actions) */}
       <Modal isOpen={isCreateOpen} onOpenChange={onCreateOpenChange}>
         <ModalContent>
           {(onClose) => (

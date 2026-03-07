@@ -42,6 +42,14 @@ interface ParallelMessageProps {
   desktopId?: string;
   /** All messages in conversation - used for source images */
   allMessages?: Message[];
+  /** Callback when a direct_video part's status updates */
+  onDirectVideoStatusUpdate?: (
+    messageIndex: number,
+    partIndex: number,
+    updates: any
+  ) => void;
+  /** Callback to restore a direct_video generation's params back into the input */
+  onDirectVideoRestore?: (data: import("@/components/video/video-detail-modal").VideoRestoreData) => void;
 }
 
 export default function ParallelMessage({
@@ -60,6 +68,8 @@ export default function ParallelMessage({
   isSending = false,
   desktopId,
   allMessages,
+  onDirectVideoStatusUpdate,
+  onDirectVideoRestore,
 }: ParallelMessageProps) {
   const t = useTranslations();
   const [currentVariantIndex, setCurrentVariantIndex] = useState(0);
@@ -146,6 +156,8 @@ export default function ParallelMessage({
           hideAvatar={hideAvatars}
           desktopId={desktopId}
           allMessages={allMessages}
+          onDirectVideoStatusUpdate={onDirectVideoStatusUpdate}
+          onDirectVideoRestore={onDirectVideoRestore}
         />
         {/* Generate Another Option button - only show when not sending */}
         {onGenerateVariant && !isSending && (
@@ -202,6 +214,8 @@ export default function ParallelMessage({
                 hideAvatar={idx > 0 || hideAvatars}
                 desktopId={desktopId}
                 allMessages={allMessages}
+                onDirectVideoStatusUpdate={onDirectVideoStatusUpdate}
+                onDirectVideoRestore={onDirectVideoRestore}
               />
             </div>
           ))}
@@ -286,6 +300,8 @@ export default function ParallelMessage({
               hideAvatar={hideAvatars}
               desktopId={desktopId}
               allMessages={allMessages}
+              onDirectVideoStatusUpdate={onDirectVideoStatusUpdate}
+              onDirectVideoRestore={onDirectVideoRestore}
             />
           </div>
         </div>

@@ -63,6 +63,12 @@ export class Agent0 implements Agent {
                 text: `[Image ID: ${p.imageId || "unknown"}] Suggestion: ${p.title}\nPrompt: ${p.prompt}`,
               };
             }
+            if (p.type === "direct_video") {
+              return {
+                type: "text" as const,
+                text: `[Video Generation: ${p.config.modelName} - "${p.config.prompt}" - Status: ${p.status}${p.generationId ? ` (Generation ID: ${p.generationId})` : ""}]`,
+              };
+            }
             return p;
           }),
         };

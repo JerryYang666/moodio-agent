@@ -72,6 +72,8 @@ interface ChatMessageProps {
     partIndex: number,
     updates: any
   ) => void;
+  /** Callback to restore a direct_video generation's params back into the input */
+  onDirectVideoRestore?: (data: import("@/components/video/video-detail-modal").VideoRestoreData) => void;
 }
 
 export default function ChatMessage({
@@ -90,6 +92,7 @@ export default function ChatMessage({
   onVideoStatusChange,
   onSendAsVideoMessage,
   onDirectVideoStatusUpdate,
+  onDirectVideoRestore,
 }: ChatMessageProps) {
   const isUser = message.role === "user";
   const [isForkPopoverOpen, setIsForkPopoverOpen] = useState(false);
@@ -426,6 +429,7 @@ export default function ChatMessage({
                     onDirectVideoStatusUpdate(msgIndex, realPartIndex, updates);
                   }
                 }}
+                onRestore={onDirectVideoRestore}
               />
             );
           })}
