@@ -30,10 +30,10 @@ export function FilterChipBar({
     searchTerm,
     onClearSearch,
 }: FilterChipBarProps) {
-    // Show description when exactly one filter is selected and it has a description
-    const singleFilterDescription =
+    // Show highlight text when exactly one filter is selected and there is no search term
+    const singleSelectedFilter =
         filterChips.length === 1 && !searchTerm
-            ? filterChips[0].description
+            ? filterChips[0]
             : null;
 
     return (
@@ -72,11 +72,18 @@ export function FilterChipBar({
                 )}
             </div>
 
-            {/* Single filter description */}
-            {singleFilterDescription && (
-                <p className="text-sm text-default-400 mt-1 leading-relaxed">
-                    {singleFilterDescription}
-                </p>
+            {/* Single filter highlight */}
+            {singleSelectedFilter && (
+                <div className="mt-2">
+                    <p className="text-2xl font-semibold leading-tight text-foreground">
+                        {singleSelectedFilter.label}
+                    </p>
+                    {singleSelectedFilter.description && (
+                        <p className="mt-1 text-base font-medium text-default-700 leading-relaxed">
+                            {singleSelectedFilter.description}
+                        </p>
+                    )}
+                </div>
             )}
         </div>
     );
