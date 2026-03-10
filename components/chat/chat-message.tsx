@@ -6,7 +6,6 @@ import { Avatar } from "@heroui/avatar";
 import { Image } from "@heroui/image";
 import { Bot, X, Pencil, ChevronDown, ChevronRight, Brain } from "lucide-react";
 import clsx from "clsx";
-import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
 import { Message, MessageContentPart, isGeneratedImagePart } from "@/lib/llm/types";
 import ImageWithMenu from "@/components/collection/image-with-menu";
 import { ImageInfo } from "./image-detail-modal";
@@ -24,7 +23,7 @@ import DirectVideoCard from "./direct-video-card";
 import ShotListCard from "./shot-list-card";
 import ToolCallCard from "./tool-call-card";
 import SearchQueryCard from "./search-query-card";
-import TaxonomyLink from "./taxonomy-link";
+import MarkdownRenderer from "@/components/ui/markdown-renderer";
 
 interface ChatMessageProps {
   message: Message;
@@ -142,12 +141,6 @@ export default function ChatMessage({
     msgIndex?: number,
     messageTimestamp?: number
   ) => {
-    // Custom components for ReactMarkdown to handle video-prompt code blocks
-    const urlTransform = (url: string) => {
-      if (url.startsWith("taxonomy:")) return url;
-      return defaultUrlTransform(url);
-    };
-
     const markdownComponents = {
       code({ node, className, children, ...props }: any) {
         const match = /language-video-prompt/.exec(className || "");
@@ -171,20 +164,11 @@ export default function ChatMessage({
         }
         return <pre>{children}</pre>;
       },
-      a({ href, children, ...props }: any) {
-        if (href?.startsWith("taxonomy:")) {
-          const id = parseInt(href.replace("taxonomy:", ""), 10);
-          if (!isNaN(id)) {
-            return <TaxonomyLink id={id}>{children}</TaxonomyLink>;
-          }
-        }
-        return <a href={href} {...props}>{children}</a>;
-      },
     };
 
     if (typeof content === "string") {
       return (
-        <ReactMarkdown urlTransform={urlTransform} components={markdownComponents}>{content}</ReactMarkdown>
+        <MarkdownRenderer components={markdownComponents}>{content}</MarkdownRenderer>
       );
     }
 
@@ -237,9 +221,9 @@ export default function ChatMessage({
           ))}
 
         {textParts.map((part: any, i) => (
-          <ReactMarkdown key={`text-${i}`} urlTransform={urlTransform} components={markdownComponents}>
+          <MarkdownRenderer key={`text-${i}`} components={markdownComponents}>
             {part.text}
-          </ReactMarkdown>
+          </MarkdownRenderer>
         ))}
 
         {isUser && imageParts.length > 0 && (

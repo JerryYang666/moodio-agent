@@ -3,7 +3,7 @@
 import React from 'react';
 import { Chip } from '@heroui/chip';
 import { X } from 'lucide-react';
-import ReactMarkdown from 'react-markdown';
+import MarkdownRenderer from '@/components/ui/markdown-renderer';
 
 export interface FilterChip {
     id: number;
@@ -81,26 +81,18 @@ export function FilterChipBar({
                     </p>
                     {singleSelectedFilter.description && (
                         <div className="mt-1 text-base font-medium text-default-700 leading-relaxed">
-                            <ReactMarkdown
+                            <MarkdownRenderer
+                                externalLinksNewTab
+                                linkClassName="text-primary underline underline-offset-2"
                                 components={{
-                                    p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
-                                    ul: ({ children }) => <ul className="list-disc pl-5 mb-2 last:mb-0">{children}</ul>,
-                                    ol: ({ children }) => <ol className="list-decimal pl-5 mb-2 last:mb-0">{children}</ol>,
-                                    li: ({ children }) => <li className="mb-1 last:mb-0">{children}</li>,
-                                    a: ({ children, href }) => (
-                                        <a
-                                            href={href}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="text-primary underline underline-offset-2"
-                                        >
-                                            {children}
-                                        </a>
-                                    ),
+                                    p: ({ children }: { children?: React.ReactNode }) => <p className="mb-2 last:mb-0">{children}</p>,
+                                    ul: ({ children }: { children?: React.ReactNode }) => <ul className="list-disc pl-5 mb-2 last:mb-0">{children}</ul>,
+                                    ol: ({ children }: { children?: React.ReactNode }) => <ol className="list-decimal pl-5 mb-2 last:mb-0">{children}</ol>,
+                                    li: ({ children }: { children?: React.ReactNode }) => <li className="mb-1 last:mb-0">{children}</li>,
                                 }}
                             >
                                 {singleSelectedFilter.description}
-                            </ReactMarkdown>
+                            </MarkdownRenderer>
                         </div>
                     )}
                 </div>
