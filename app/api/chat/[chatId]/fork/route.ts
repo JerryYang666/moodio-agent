@@ -5,6 +5,8 @@ import { db } from "@/lib/db";
 import { chats } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getChatHistory, saveChatHistory } from "@/lib/storage/s3";
+import { isFeatureFlagEnabled } from "@/lib/feature-flags/server";
+import { recordResearchEvent } from "@/lib/research-telemetry";
 
 export async function POST(
   request: NextRequest,
@@ -89,6 +91,17 @@ export async function POST(
     // Save truncated history to new chat
     if (newHistory.length > 0) {
       await saveChatHistory(newChat.id, newHistory);
+    }
+
+    // Research telemetry
+    if (await isFeatureFlagEnabled(payload.userId, "res_telemetry")) {
+      recordResearchEvent({
+        userId: payload.userId,
+        chatId,
+        eventType: "chat_forked",
+        turnIndex: messageIndex,
+        metadata: { newChatId: newChat.id },
+      });
     }
 
     return NextResponse.json({

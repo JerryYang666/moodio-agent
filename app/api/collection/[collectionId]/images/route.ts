@@ -6,6 +6,8 @@ import { verifyAccessToken } from "@/lib/auth/jwt";
 import { eq, and } from "drizzle-orm";
 import { getUserPermission } from "@/lib/collection-utils";
 import { hasWriteAccess } from "@/lib/permissions";
+import { isFeatureFlagEnabled } from "@/lib/feature-flags/server";
+import { recordResearchEvent } from "@/lib/research-telemetry";
 
 /**
  * POST /api/collection/[collectionId]/images
@@ -121,6 +123,31 @@ export async function POST(
       .update(collections)
       .set({ updatedAt: new Date() })
       .where(eq(collections.id, collectionId));
+
+    // Research telemetry
+    if (await isFeatureFlagEnabled(userId, "res_telemetry")) {
+      if (resolvedAssetType === "video") {
+        recordResearchEvent({
+          userId,
+          chatId: chatId || undefined,
+          eventType: "video_saved_to_collection",
+          imageId,
+          metadata: {
+            videoId: resolvedAssetId,
+            collectionId,
+            generationId: generationDetails?.generationId,
+          },
+        });
+      } else {
+        recordResearchEvent({
+          userId,
+          chatId: chatId || undefined,
+          eventType: "image_saved_to_collection",
+          imageId,
+          metadata: { collectionId },
+        });
+      }
+    }
 
     return NextResponse.json({
       image: newAsset,

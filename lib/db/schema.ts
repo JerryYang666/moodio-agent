@@ -10,6 +10,8 @@ import {
   unique,
   doublePrecision,
   integer,
+  smallint,
+  index,
 } from "drizzle-orm/pg-core";
 
 /**
@@ -412,6 +414,48 @@ export type NewFeatureFlag = typeof featureFlags.$inferInsert;
 
 export type GroupFlagOverride = typeof groupFlagOverrides.$inferSelect;
 export type NewGroupFlagOverride = typeof groupFlagOverrides.$inferInsert;
+
+/**
+ * Research Events table
+ * Captures implicit preference signals from user behavior during creative AI sessions.
+ * Separate from operational telemetry (events table) — used for research analysis only.
+ */
+export const researchEvents = pgTable(
+  "research_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    chatId: uuid("chat_id").references(() => chats.id, { onDelete: "set null" }),
+    sessionId: varchar("session_id", { length: 255 }),
+    eventType: varchar("event_type", { length: 50 }).notNull(),
+    turnIndex: integer("turn_index"),
+    imageId: varchar("image_id", { length: 255 }),
+    imagePosition: smallint("image_position"),
+    variantId: varchar("variant_id", { length: 255 }),
+    metadata: jsonb("metadata").notNull().default({}),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    userChatCreatedIdx: index("research_events_user_chat_created_idx").on(
+      table.userId,
+      table.chatId,
+      table.createdAt
+    ),
+    eventTypeCreatedIdx: index("research_events_event_type_created_idx").on(
+      table.eventType,
+      table.createdAt
+    ),
+    chatCreatedIdx: index("research_events_chat_created_idx").on(
+      table.chatId,
+      table.createdAt
+    ),
+  })
+);
+
+export type ResearchEvent = typeof researchEvents.$inferSelect;
+export type NewResearchEvent = typeof researchEvents.$inferInsert;
 
 /**
  * Desktops table

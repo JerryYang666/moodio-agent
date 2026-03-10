@@ -68,6 +68,7 @@ import {
 } from "./reference-image-utils";
 import { getPreselectImages } from "./preselect-images-utils";
 import type { JSONContent } from "@tiptap/react";
+import { useResearchTelemetry } from "@/hooks/use-research-telemetry";
 
 // Helper to group consecutive assistant messages with the same timestamp as variants
 interface MessageGroup {
@@ -105,6 +106,7 @@ export default function ChatInterface({
   const { refreshBalance } = useCredits();
   const { monitorChat, cancelMonitorChat } = useChat();
   const router = useRouter();
+  const { track: trackResearch, beacon: beaconResearch, enabled: researchEnabled } = useResearchTelemetry();
   const [chatId, setChatId] = useState<string | undefined>(initialChatId);
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [input, setInput] = useState("");
@@ -263,8 +265,23 @@ export default function ChatInterface({
     saveChatDraft(chatId, editorContent, input, pendingImages);
   }, [chatId, input, pendingImages, isDraftLoaded]);
 
-  // Save draft on visibility change (tab switch, minimize, etc.)
+  // Save draft on visibility change (tab switch, minimize, etc.) + research session_end
   useEffect(() => {
+    const sendSessionEnd = (trigger: "page_leave" | "inactivity") => {
+      if (sessionEndSentRef.current || !chatId || sessionTurnCountRef.current === 0) return;
+      sessionEndSentRef.current = true;
+      const durationSeconds = Math.round((Date.now() - sessionStartRef.current) / 1000);
+      beaconResearch({
+        chatId,
+        eventType: "session_end",
+        metadata: {
+          turns: sessionTurnCountRef.current,
+          durationSeconds,
+          trigger,
+        },
+      });
+    };
+
     const handleVisibilityChange = () => {
       if (document.visibilityState === "hidden") {
         saveDraft();
@@ -273,6 +290,7 @@ export default function ChatInterface({
 
     const handleBeforeUnload = () => {
       saveDraft();
+      sendSessionEnd("page_leave");
     };
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
@@ -282,7 +300,47 @@ export default function ChatInterface({
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("beforeunload", handleBeforeUnload);
     };
-  }, [saveDraft]);
+  }, [saveDraft, chatId, beaconResearch]);
+
+  // Research telemetry: reset session tracking when chatId changes
+  useEffect(() => {
+    sessionStartRef.current = Date.now();
+    sessionTurnCountRef.current = 0;
+    sessionEndSentRef.current = false;
+  }, [chatId]);
+
+  // Research telemetry: inactivity timeout for session_end
+  useEffect(() => {
+    if (!researchEnabled || !chatId) return;
+
+    const resetInactivityTimer = () => {
+      if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
+      inactivityTimerRef.current = setTimeout(() => {
+        if (!sessionEndSentRef.current && sessionTurnCountRef.current > 0) {
+          sessionEndSentRef.current = true;
+          const durationSeconds = Math.round((Date.now() - sessionStartRef.current) / 1000);
+          trackResearch({
+            chatId,
+            eventType: "session_end",
+            metadata: {
+              turns: sessionTurnCountRef.current,
+              durationSeconds,
+              trigger: "inactivity",
+            },
+          });
+        }
+      }, INACTIVITY_TIMEOUT_MS);
+    };
+
+    const events = ["mousedown", "keydown", "scroll", "touchstart"];
+    events.forEach((e) => document.addEventListener(e, resetInactivityTimer, { passive: true }));
+    resetInactivityTimer();
+
+    return () => {
+      events.forEach((e) => document.removeEventListener(e, resetInactivityTimer));
+      if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
+    };
+  }, [researchEnabled, chatId, trackResearch]);
 
   // Listen for reset-chat event (triggered when clicking New Chat button while technically already on /chat)
   useEffect(() => {
@@ -463,6 +521,13 @@ export default function ChatInterface({
     modelId: string;
     videoParams: Record<string, any>;
   } | null>(null);
+
+  // Research telemetry: session tracking
+  const sessionStartRef = useRef<number>(Date.now());
+  const sessionTurnCountRef = useRef<number>(0);
+  const sessionEndSentRef = useRef<boolean>(false);
+  const inactivityTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const INACTIVITY_TIMEOUT_MS = 5 * 60 * 1000;
 
   // Voice recorder hook
   const handleTranscriptionComplete = useCallback((text: string) => {
@@ -752,7 +817,7 @@ export default function ChatInterface({
       imageId: string;
       url: string;
       title?: string;
-    }, tag: ReferenceImageTag = "none") => {
+    }, tag: ReferenceImageTag = "none", source: "library" | "upload" | "ai_generated" = "library") => {
       if (!canAddReferenceImage(referenceImages)) {
         addToast({
           title: t("chat.maxImagesReached", { max: MAX_REFERENCE_IMAGES }),
@@ -761,7 +826,6 @@ export default function ChatInterface({
         return;
       }
 
-      // Check if this image is already in the reference list
       if (referenceImages.some((img) => img.imageId === asset.imageId)) {
         addToast({
           title: t("chat.imageAlreadyAdded"),
@@ -778,8 +842,15 @@ export default function ChatInterface({
       };
 
       setReferenceImages((prev) => [...prev, newImage]);
+
+      trackResearch({
+        chatId,
+        eventType: "reference_image_added",
+        imageId: asset.imageId,
+        metadata: { tag, source },
+      });
     },
-    [referenceImages, t]
+    [referenceImages, t, chatId, trackResearch]
   );
 
   // Remove a reference image
@@ -1263,6 +1334,7 @@ export default function ChatInterface({
     setDraftHadImages(false);
 
     setIsSending(true);
+    sessionTurnCountRef.current += 1;
 
     try {
       // Check for notification permission when user sends a message
@@ -1818,7 +1890,6 @@ export default function ChatInterface({
   ) => {
     if (part.status === "generated" && part.imageId) {
       const url = part.imageUrl || "";
-      // Use addAgentImage which handles toggle logic internally
       addAgentImage({
         imageId: part.imageId,
         url,
@@ -1826,6 +1897,34 @@ export default function ChatInterface({
         messageIndex,
         partIndex,
         variantId,
+      });
+
+      // Find the user's message that preceded this assistant response
+      let userMessage: string | undefined;
+      for (let i = messageIndex - 1; i >= 0; i--) {
+        if (messages[i]?.role === "user") {
+          const content = messages[i].content;
+          userMessage = typeof content === "string"
+            ? content
+            : Array.isArray(content)
+              ? content.filter((p) => p.type === "text").map((p) => (p as any).text).join(" ")
+              : undefined;
+          break;
+        }
+      }
+
+      trackResearch({
+        chatId,
+        eventType: "image_selected",
+        turnIndex: messageIndex,
+        imageId: part.imageId,
+        imagePosition: partIndex,
+        variantId,
+        metadata: {
+          prompt: part.prompt,
+          aspectRatio: part.aspectRatio,
+          userMessage,
+        },
       });
     }
   };

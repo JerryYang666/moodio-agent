@@ -373,6 +373,8 @@ export default function ImageDetailModal({
                                 title={selectedImage.title || "image"}
                                 url={selectedImage.url}
                                 iconSize={20}
+                                chatId={chatId}
+                                downloadSource="detail_view"
                               />
                               {/* Collection menu dropdown */}
                               {canAddToCollection && (
@@ -603,6 +605,8 @@ export default function ImageDetailModal({
                                 title={selectedImage.title || "image"}
                                 url={selectedImage.url}
                                 iconSize={16}
+                                chatId={chatId}
+                                downloadSource="detail_view"
                               />
                               {/* Collection menu dropdown */}
                               {canAddToCollection && (
