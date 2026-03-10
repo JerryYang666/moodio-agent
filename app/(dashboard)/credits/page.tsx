@@ -35,8 +35,7 @@ interface CheckinStatus {
 
 export default function CreditsPage() {
   const t = useTranslations("credits");
-  const { refreshBalance } = useCredits();
-  const [balance, setBalance] = useState<number | null>(null);
+  const { balance, loading: balanceLoading, refreshBalance } = useCredits();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [checkinStatus, setCheckinStatus] = useState<CheckinStatus | null>(null);
@@ -45,7 +44,6 @@ export default function CreditsPage() {
   const fetchCredits = useCallback(async () => {
     try {
       const data = await api.get("/api/users/credits");
-      setBalance(data.balance);
       setTransactions(data.transactions);
     } catch (error) {
       console.error("Failed to fetch credits:", error);
@@ -73,7 +71,6 @@ export default function CreditsPage() {
     try {
       const data = await api.post("/api/users/credits/daily-checkin", {});
       if (data.success) {
-        setBalance(data.balance);
         setCheckinStatus({ available: false, amount: data.amount, nextAvailable: null });
         addToast({
           title: t("dailyCheckin.success", { amount: data.amount }),
@@ -111,7 +108,7 @@ export default function CreditsPage() {
     return transactionTypes[type] || type;
   };
 
-  if (loading) {
+  if (loading || balanceLoading) {
     return (
       <div className="flex justify-center items-center h-64">
         <Spinner size="lg" />

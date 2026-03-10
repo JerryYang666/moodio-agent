@@ -646,7 +646,7 @@ export async function POST(
                     aspectRatio: "1:1",
                     prompt: content,
                     status: "error",
-                    reason: isInsufficientCredits ? "insufficient_credits" : "generation_failed",
+                    reason: isInsufficientCredits ? "INSUFFICIENT_CREDITS" : "generation_failed",
                   };
                   send({ type: "part_update", imageId: trackingImageId, part: errorPart, variantId });
                   return errorPart;
