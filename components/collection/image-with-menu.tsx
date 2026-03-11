@@ -46,6 +46,8 @@ interface ImageWithMenuProps {
   };
   onViewDetails: () => void;
   children?: React.ReactNode;
+  /** Extra top-right action buttons shown left of the 3-dot menu */
+  topRightActions?: React.ReactNode;
   /** When set, skip desktop picker and send directly to this desktop */
   desktopId?: string;
 }
@@ -106,6 +108,7 @@ export default function ImageWithMenu({
   generationDetails,
   onViewDetails,
   children,
+  topRightActions,
   desktopId,
 }: ImageWithMenuProps) {
   const tMenu = useTranslations("imageMenu");
@@ -236,7 +239,8 @@ export default function ImageWithMenu({
       <div ref={imageRef} className="relative group">
         {children}
 
-        <div className="absolute top-2 right-2 md:opacity-0 md:group-hover:opacity-100 transition-opacity z-10">
+        <div className="absolute top-2 right-2 md:opacity-0 md:group-hover:opacity-100 transition-opacity z-10 flex items-center gap-2">
+          {topRightActions}
           <Dropdown isOpen={isMenuOpen} onOpenChange={setIsMenuOpen}>
             <DropdownTrigger>
               <Button

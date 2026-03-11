@@ -306,6 +306,23 @@ export default function ChatMessage({
                     status: effectiveStatus,
                   }}
                   onViewDetails={() => onAgentTitleClick(part)}
+                  topRightActions={
+                    effectiveStatus === "generated" && onAgentExpandClick ? (
+                      <button
+                        type="button"
+                        aria-label={t("imageDetail.viewFullSize")}
+                        title={t("imageDetail.viewFullSize")}
+                        className="h-8 w-8 inline-flex items-center justify-center rounded-medium bg-background/80 backdrop-blur-sm text-foreground hover:bg-background/90 focus:outline-none focus:ring-2 focus:ring-primary"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          onAgentExpandClick(part);
+                        }}
+                      >
+                        <Maximize2 size={16} />
+                      </button>
+                    ) : null
+                  }
                 >
                   <ImageHoverPreview
                     src={url}
@@ -368,21 +385,6 @@ export default function ChatMessage({
                           />
                         )}
                         </div>
-                        {effectiveStatus === "generated" && onAgentExpandClick && (
-                          <button
-                            type="button"
-                            aria-label={t("imageDetail.viewFullSize")}
-                            title={t("imageDetail.viewFullSize")}
-                            className="absolute top-2 right-2 z-20 rounded-md bg-black/50 text-white p-1.5 opacity-100 md:opacity-0 md:group-hover/image:opacity-100 transition-opacity hover:bg-black/70 focus:outline-none focus:ring-2 focus:ring-white/70"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              onAgentExpandClick(part);
-                            }}
-                          >
-                            <Maximize2 size={14} />
-                          </button>
-                        )}
                         {(effectiveStatus === "generated" ||
                           effectiveStatus === "error") && (
                           <div className="absolute bottom-0 left-0 right-0 bg-white/90 dark:bg-black/60 text-black dark:text-white p-2 text-xs truncate md:opacity-0 md:group-hover/image:opacity-100 transition-opacity z-10 pointer-events-none">
