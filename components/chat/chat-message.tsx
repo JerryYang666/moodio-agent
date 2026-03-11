@@ -308,11 +308,13 @@ export default function ChatMessage({
                   onViewDetails={() => onAgentTitleClick(part)}
                   topRightActions={
                     effectiveStatus === "generated" && onAgentExpandClick ? (
-                      <button
-                        type="button"
+                      <Button
+                        isIconOnly
+                        size="sm"
+                        variant="solid"
                         aria-label={t("imageDetail.viewFullSize")}
                         title={t("imageDetail.viewFullSize")}
-                        className="h-8 w-8 inline-flex items-center justify-center rounded-medium bg-background/80 backdrop-blur-sm text-foreground hover:bg-background/90 focus:outline-none focus:ring-2 focus:ring-primary"
+                        className="bg-background/80 backdrop-blur-sm"
                         onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
@@ -320,7 +322,7 @@ export default function ChatMessage({
                         }}
                       >
                         <Maximize2 size={16} />
-                      </button>
+                      </Button>
                     ) : null
                   }
                 >
