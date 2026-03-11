@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { useTranslations } from "next-intl";
 import {
   Modal,
@@ -138,6 +139,119 @@ const AssetGridItem = React.memo(function AssetGridItem({
     </div>
   );
 });
+
+const GRID_GAP = 12; // gap-3 = 0.75rem = 12px
+const COL_BREAKPOINTS = [
+  { minWidth: 768, cols: 4 },  // md
+  { minWidth: 640, cols: 3 },  // sm
+  { minWidth: 0, cols: 2 },
+];
+
+/** Virtualised grid – only renders rows visible in the scroll viewport. */
+function VirtualAssetGrid({
+  assets,
+  selectedIds,
+  multiSelect,
+  onClick,
+  onExpand,
+  untitledLabel,
+  viewFullLabel,
+  assetAltLabel,
+}: {
+  assets: AssetSummary[];
+  selectedIds: Set<string>;
+  multiSelect: boolean;
+  onClick: (asset: AssetSummary, index: number, e: React.MouseEvent) => void;
+  onExpand: (asset: AssetSummary) => void;
+  untitledLabel: string;
+  viewFullLabel: string;
+  assetAltLabel: string;
+}) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [columnCount, setColumnCount] = useState(4);
+  const [containerWidth, setContainerWidth] = useState(0);
+
+  useLayoutEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([entry]) => {
+      const w = entry.contentRect.width;
+      setContainerWidth(w);
+      const cols = COL_BREAKPOINTS.find((bp) => w >= bp.minWidth)!.cols;
+      setColumnCount(cols);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const rowCount = Math.ceil(assets.length / columnCount);
+
+  // Each cell is aspect-square, so cell height = cell width.
+  // Row height = cell height + gap (spacing to next row).
+  const rowHeight = useMemo(() => {
+    if (containerWidth === 0) return 180;
+    const cellWidth = (containerWidth - (columnCount - 1) * GRID_GAP) / columnCount;
+    return cellWidth + GRID_GAP;
+  }, [containerWidth, columnCount]);
+
+  const virtualizer = useVirtualizer({
+    count: rowCount,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => rowHeight,
+    overscan: 2,
+  });
+
+  // Re-measure all rows when rowHeight changes (e.g. resize)
+  useEffect(() => {
+    virtualizer.measure();
+  }, [rowHeight, virtualizer]);
+
+  return (
+    <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto pr-1">
+      <div
+        className="relative w-full"
+        style={{ height: virtualizer.getTotalSize() }}
+      >
+        {virtualizer.getVirtualItems().map((vRow) => {
+          const startIdx = vRow.index * columnCount;
+          return (
+            <div
+              key={vRow.key}
+              className="absolute left-0 w-full"
+              style={{
+                top: vRow.start,
+                height: rowHeight - GRID_GAP,
+                display: "grid",
+                gridTemplateColumns: `repeat(${columnCount}, 1fr)`,
+                gap: GRID_GAP,
+              }}
+            >
+              {Array.from({ length: columnCount }, (_, col) => {
+                const idx = startIdx + col;
+                if (idx >= assets.length) return <div key={col} />;
+                const a = assets[idx];
+                return (
+                  <AssetGridItem
+                    key={a.id}
+                    asset={a}
+                    index={idx}
+                    isSelected={selectedIds.has(a.id)}
+                    multiSelect={multiSelect}
+                    onClick={onClick}
+                    onExpand={onExpand}
+                    untitledLabel={untitledLabel}
+                    viewFullLabel={viewFullLabel}
+                    assetAltLabel={assetAltLabel}
+                  />
+                );
+              })}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 export default function AssetPickerModal({
   isOpen,
@@ -681,24 +795,16 @@ export default function AssetPickerModal({
                         {t("assetPicker.noAssetsFound")}
                       </div>
                     ) : (
-                      <div className="flex-1 min-h-0 overflow-y-auto pr-1">
-                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                          {filteredAssets.map((a, index) => (
-                            <AssetGridItem
-                              key={a.id}
-                              asset={a}
-                              index={index}
-                              isSelected={selectedIds.has(a.id)}
-                              multiSelect={multiSelect}
-                              onClick={handleAssetClick}
-                              onExpand={setPreviewAsset}
-                              untitledLabel={t("assetPicker.untitled")}
-                              viewFullLabel={t("assetPicker.viewFull")}
-                              assetAltLabel={t("assetPicker.assetAlt")}
-                            />
-                          ))}
-                        </div>
-                      </div>
+                      <VirtualAssetGrid
+                        assets={filteredAssets}
+                        selectedIds={selectedIds}
+                        multiSelect={multiSelect}
+                        onClick={handleAssetClick}
+                        onExpand={setPreviewAsset}
+                        untitledLabel={t("assetPicker.untitled")}
+                        viewFullLabel={t("assetPicker.viewFull")}
+                        assetAltLabel={t("assetPicker.assetAlt")}
+                      />
                     )}
                   </div>
                 )}
