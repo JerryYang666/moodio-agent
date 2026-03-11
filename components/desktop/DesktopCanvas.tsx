@@ -8,6 +8,7 @@ import type { EnrichedDesktopAsset } from "./assets";
 import { ImageAsset, VideoAsset, TextAsset, LinkAsset } from "./assets";
 import TableAsset from "./assets/TableAsset";
 import { hasWriteAccess, type Permission } from "@/lib/permissions";
+import type { CanvasMode } from "./DesktopToolbar";
 import { AI_IMAGE_DRAG_MIME } from "@/components/chat/asset-dnd";
 import {
   Trash2,
@@ -20,7 +21,7 @@ import {
 
 const MIN_ZOOM = 0.1;
 const MAX_ZOOM = 5;
-const ZOOM_SENSITIVITY = 0.001;
+const ZOOM_SENSITIVITY = 0.005;
 const DEFAULT_ASSET_WIDTH = 300;
 const MIN_ASSET_SIZE = 50;
 const CULL_PADDING = 200;
@@ -30,6 +31,7 @@ interface DesktopCanvasProps {
   assets: EnrichedDesktopAsset[];
   camera: CameraState;
   permission: Permission;
+  canvasMode: CanvasMode;
   onCameraChange: (camera: CameraState) => void;
   onAssetMove: (assetId: string, posX: number, posY: number) => void;
   onAssetBatchMove?: (moves: Array<{ id: string; posX: number; posY: number }>) => void;
@@ -99,6 +101,7 @@ export default function DesktopCanvas({
   assets,
   camera,
   permission,
+  canvasMode,
   onCameraChange,
   onAssetMove,
   onAssetBatchMove,
@@ -322,12 +325,20 @@ export default function DesktopCanvas({
       const target = e.target as HTMLElement;
       if (target.closest("[data-asset-card]")) return;
 
-      // Shift+click on background = start marquee
-      if (e.shiftKey) {
+      // In "select" mode or with Shift key: drag on background = start marquee
+      if (canvasMode === "select" || e.shiftKey) {
         const world = screenToWorld(e.clientX, e.clientY);
         marqueeStart.current = world;
         setMarquee({ startX: world.x, startY: world.y, endX: world.x, endY: world.y });
         (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+
+        // Clear selection unless holding Ctrl/Cmd (additive marquee)
+        if (!e.ctrlKey && !e.metaKey) {
+          Array.from(selectedIds).forEach((id) => {
+            sendEvent?.("asset_deselected", { assetId: id });
+          });
+          setSelectedIds(new Set());
+        }
         return;
       }
 
@@ -342,7 +353,7 @@ export default function DesktopCanvas({
       cameraAtPanStart.current = { x: camera.x, y: camera.y };
       (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     },
-    [camera, screenToWorld, selectedIds, sendEvent]
+    [camera, screenToWorld, selectedIds, sendEvent, canvasMode]
   );
 
   const handlePointerMove = useCallback(
@@ -452,7 +463,10 @@ export default function DesktopCanvas({
         const minY = Math.min(marquee.startY, marquee.endY);
         const maxY = Math.max(marquee.startY, marquee.endY);
 
-        const selected = new Set<string>();
+        // Start with existing selection if Ctrl/Cmd held (additive marquee)
+        const selected = new Set<string>(
+          (e.ctrlKey || e.metaKey) ? selectedIds : []
+        );
         for (const a of assets) {
           const { w, h } = getAssetDimensions(a, naturalDims.get(a.id));
           if (
@@ -551,8 +565,8 @@ export default function DesktopCanvas({
       e.preventDefault(); // prevent native image drag
       setContextMenu(null);
 
-      // Shift+click toggles selection
-      if (e.shiftKey) {
+      // Shift+click or Ctrl/Cmd+click toggles selection
+      if (e.shiftKey || e.ctrlKey || e.metaKey) {
         setSelectedIds((prev) => {
           const next = new Set(prev);
           if (next.has(asset.id)) {
@@ -667,7 +681,11 @@ export default function DesktopCanvas({
   return (
     <div
       ref={containerRef}
-      className="relative w-full h-full overflow-hidden bg-default-100 cursor-grab active:cursor-grabbing select-none"
+      className={`relative w-full h-full overflow-hidden bg-default-100 select-none ${
+        canvasMode === "move"
+          ? "cursor-grab active:cursor-grabbing"
+          : "cursor-crosshair"
+      }`}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
@@ -874,70 +892,84 @@ export default function DesktopCanvas({
           style={{ left: contextMenu.x, top: contextMenu.y }}
           onPointerDown={(e) => e.stopPropagation()}
         >
-          {contextChatId && onOpenChat && (
+          {selectedIds.size > 1 ? (
+            /* Multi-select context menu: only delete option */
             <button
-              className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-default-100 transition-colors text-left"
-              onClick={() => {
-                onOpenChat(contextChatId as string);
-                setContextMenu(null);
-              }}
+              className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-danger-50 text-danger transition-colors text-left"
+              onClick={handleDeleteSelected}
             >
-              <MessageSquare size={14} />
-              Open in Chat
+              <Trash2 size={14} />
+              Delete all {selectedIds.size} selected
             </button>
+          ) : (
+            /* Single-select context menu: full options */
+            <>
+              {contextChatId && onOpenChat && (
+                <button
+                  className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-default-100 transition-colors text-left"
+                  onClick={() => {
+                    onOpenChat(contextChatId as string);
+                    setContextMenu(null);
+                  }}
+                >
+                  <MessageSquare size={14} />
+                  Open in Chat
+                </button>
+              )}
+              {contextImageInfo?.imageId && contextImageInfo.url && (
+                <button
+                  className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-default-100 transition-colors text-left"
+                  onClick={() => {
+                    window.dispatchEvent(
+                      new CustomEvent("moodio-asset-selected", {
+                        detail: {
+                          assetId: contextImageInfo.assetId,
+                          imageId: contextImageInfo.imageId,
+                          url: contextImageInfo.url,
+                          title: contextImageInfo.title,
+                        },
+                      })
+                    );
+                    setContextMenu(null);
+                  }}
+                >
+                  <SendHorizontal size={14} />
+                  Send to Chat
+                </button>
+              )}
+              {contextAsset && onCopyToCollection && (
+                <button
+                  className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-default-100 transition-colors text-left"
+                  onClick={() => {
+                    onCopyToCollection(contextAsset);
+                    setContextMenu(null);
+                  }}
+                >
+                  <FolderPlus size={14} />
+                  Copy to Collection
+                </button>
+              )}
+              {contextAsset?.assetType === "video" && onSendToTimeline && (
+                <button
+                  className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-default-100 transition-colors text-left"
+                  onClick={() => {
+                    onSendToTimeline(contextAsset);
+                    setContextMenu(null);
+                  }}
+                >
+                  <Film size={14} />
+                  Send to Timeline
+                </button>
+              )}
+              <button
+                className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-danger-50 text-danger transition-colors text-left"
+                onClick={handleDeleteSelected}
+              >
+                <Trash2 size={14} />
+                Delete
+              </button>
+            </>
           )}
-          {contextImageInfo?.imageId && contextImageInfo.url && (
-            <button
-              className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-default-100 transition-colors text-left"
-              onClick={() => {
-                window.dispatchEvent(
-                  new CustomEvent("moodio-asset-selected", {
-                    detail: {
-                      assetId: contextImageInfo.assetId,
-                      imageId: contextImageInfo.imageId,
-                      url: contextImageInfo.url,
-                      title: contextImageInfo.title,
-                    },
-                  })
-                );
-                setContextMenu(null);
-              }}
-            >
-              <SendHorizontal size={14} />
-              Send to Chat
-            </button>
-          )}
-          {contextAsset && onCopyToCollection && (
-            <button
-              className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-default-100 transition-colors text-left"
-              onClick={() => {
-                onCopyToCollection(contextAsset);
-                setContextMenu(null);
-              }}
-            >
-              <FolderPlus size={14} />
-              Copy to Collection
-            </button>
-          )}
-          {contextAsset?.assetType === "video" && onSendToTimeline && (
-            <button
-              className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-default-100 transition-colors text-left"
-              onClick={() => {
-                onSendToTimeline(contextAsset);
-                setContextMenu(null);
-              }}
-            >
-              <Film size={14} />
-              Send to Timeline
-            </button>
-          )}
-          <button
-            className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-danger-50 text-danger transition-colors text-left"
-            onClick={handleDeleteSelected}
-          >
-            <Trash2 size={14} />
-            Delete{selectedIds.size > 1 ? ` (${selectedIds.size})` : ""}
-          </button>
         </div>
       )}
 
