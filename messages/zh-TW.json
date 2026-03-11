@@ -247,6 +247,7 @@
     "projectName": "專案名稱",
     "enterProjectName": "輸入專案名稱",
     "sharedCollections": "共享集合",
+    "videoGenerations": "影片生成",
     "default": "預設",
     "manageProjectsHere": "在此管理您的專案",
     "goToProjects": "前往專案",
@@ -495,7 +496,16 @@
     "noSourceImageInChat": "此對話中未找到來源圖片。請先生成或上傳圖片。",
     "generationStarted": "影片生成已開始！",
     "generationInProgress": "影片正在生成中...",
-    "download": "下載"
+    "download": "下載",
+    "filterStatus": "狀態",
+    "filterModel": "模型",
+    "filterAllModels": "所有模型",
+    "filterDate": "日期",
+    "filterAllTime": "所有時間",
+    "filterToday": "今天",
+    "filterLast7Days": "最近7天",
+    "filterLast30Days": "最近30天",
+    "filterDuration": "時長"
   },
   "menu": {
     "mode": "模式",

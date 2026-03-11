@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { hasWriteAccess } from "@/lib/permissions";
 import { useTranslations } from "next-intl";
 import { Card, CardBody, CardHeader } from "@heroui/card";
@@ -10,6 +10,9 @@ import { Chip } from "@heroui/chip";
 import { Image } from "@heroui/image";
 import { Input } from "@heroui/input";
 import { Tabs, Tab } from "@heroui/tabs";
+import { Select, SelectItem } from "@heroui/select";
+import { Slider } from "@heroui/slider";
+import { CheckboxGroup, Checkbox } from "@heroui/checkbox";
 import {
   Modal,
   ModalContent,
@@ -35,6 +38,7 @@ import {
   Plus,
   Folder,
   ArrowLeft,
+  Filter,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { VideoGenerationRestore } from "./video-generation-panel";
@@ -153,6 +157,91 @@ export default function VideoList({ refreshTrigger, onRestore }: VideoListProps)
   const [collectionsWithVideos, setCollectionsWithVideos] = useState<CollectionWithVideos[]>([]);
   const [collectionsLoading, setCollectionsLoading] = useState(false);
   const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(null);
+
+  // Filter state (for "all" view)
+  const [showFilters, setShowFilters] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<string[]>(["completed", "pending", "processing", "failed"]);
+  const [modelFilter, setModelFilter] = useState<string>("all");
+  const [durationRange, setDurationRange] = useState<[number, number]>([0, 30]);
+  const [durationInitialized, setDurationInitialized] = useState(false);
+  const [dateFilter, setDateFilter] = useState<string>("all");
+
+  // Derive unique models and duration range from data
+  const uniqueModels = useMemo(() => {
+    const models = new Map<string, string>();
+    for (const gen of generations) {
+      if (!models.has(gen.modelId)) {
+        models.set(gen.modelId, getVideoModel(gen.modelId)?.name ?? gen.modelId);
+      }
+    }
+    return Array.from(models.entries()).map(([id, name]) => ({ id, name }));
+  }, [generations]);
+
+  // Parse duration in seconds from params (handles "5", "5s", 5, etc.)
+  const parseDuration = (gen: VideoGeneration): number | null => {
+    const raw = gen.params?.duration;
+    if (raw == null) return null;
+    const str = String(raw).replace(/s$/i, "");
+    const num = parseFloat(str);
+    return isNaN(num) ? null : num;
+  };
+
+  const durationBounds = useMemo(() => {
+    let min = Infinity;
+    let max = -Infinity;
+    for (const gen of generations) {
+      const d = parseDuration(gen);
+      if (d != null) {
+        if (d < min) min = d;
+        if (d > max) max = d;
+      }
+    }
+    if (min === Infinity) return { min: 0, max: 30 };
+    return { min, max };
+  }, [generations]);
+
+  // Initialize duration range when data loads
+  useEffect(() => {
+    if (!durationInitialized && generations.length > 0) {
+      setDurationRange([durationBounds.min, durationBounds.max]);
+      setDurationInitialized(true);
+    }
+  }, [generations, durationBounds, durationInitialized]);
+
+  // Apply filters
+  const filteredGenerations = useMemo(() => {
+    return generations.filter((gen) => {
+      // Status filter
+      if (!statusFilter.includes(gen.status)) return false;
+
+      // Model filter
+      if (modelFilter !== "all" && gen.modelId !== modelFilter) return false;
+
+      // Duration filter
+      const d = parseDuration(gen);
+      if (d != null) {
+        if (d < durationRange[0] || d > durationRange[1]) return false;
+      }
+
+      // Date filter
+      if (dateFilter !== "all") {
+        const genDate = new Date(gen.createdAt);
+        const now = new Date();
+        if (dateFilter === "today") {
+          const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+          if (genDate < startOfDay) return false;
+        } else if (dateFilter === "7days") {
+          const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+          if (genDate < weekAgo) return false;
+        } else if (dateFilter === "30days") {
+          const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+          if (genDate < monthAgo) return false;
+        }
+      }
+
+      return true;
+    });
+  }, [generations, statusFilter, modelFilter, durationRange, dateFilter]);
 
   // Collection-related state
   const {
@@ -410,18 +499,32 @@ export default function VideoList({ refreshTrigger, onRestore }: VideoListProps)
               </h2>
               {viewMode === "all" && (
                 <Chip size="sm" variant="flat">
-                  {t("videoCount", { count: generations.length })}
+                  {showFilters && filteredGenerations.length !== generations.length
+                    ? `${filteredGenerations.length} / ${generations.length}`
+                    : t("videoCount", { count: generations.length })}
                 </Chip>
               )}
             </div>
-            <Button
-              isIconOnly
-              size="sm"
-              variant="light"
-              onPress={viewMode === "all" ? fetchGenerations : fetchCollectionsWithVideos}
-            >
-              <RefreshCw size={16} />
-            </Button>
+            <div className="flex items-center gap-1">
+              {viewMode === "all" && (
+                <Button
+                  isIconOnly
+                  size="sm"
+                  variant={showFilters ? "flat" : "light"}
+                  onPress={() => setShowFilters(!showFilters)}
+                >
+                  <Filter size={16} />
+                </Button>
+              )}
+              <Button
+                isIconOnly
+                size="sm"
+                variant="light"
+                onPress={viewMode === "all" ? fetchGenerations : fetchCollectionsWithVideos}
+              >
+                <RefreshCw size={16} />
+              </Button>
+            </div>
           </div>
 
           {/* Tabs for view mode */}
@@ -439,6 +542,92 @@ export default function VideoList({ refreshTrigger, onRestore }: VideoListProps)
               <Tab key="all" title={t("allVideos")} />
               <Tab key="by-collection" title={t("byCollection")} />
             </Tabs>
+          )}
+
+          {/* Filters for All Videos view */}
+          {viewMode === "all" && showFilters && (
+            <div className="flex flex-col gap-3 pt-2 pb-1">
+              {/* Status filter */}
+              <CheckboxGroup
+                label={t("filterStatus")}
+                orientation="horizontal"
+                value={statusFilter}
+                onValueChange={setStatusFilter}
+                size="sm"
+                classNames={{
+                  label: "text-xs text-default-500",
+                  wrapper: "gap-2",
+                }}
+              >
+                <Checkbox value="completed">
+                  <span className="text-xs">{t("statusCompleted")}</span>
+                </Checkbox>
+                <Checkbox value="processing">
+                  <span className="text-xs">{t("statusGenerating")}</span>
+                </Checkbox>
+                <Checkbox value="pending">
+                  <span className="text-xs">{t("statusQueued")}</span>
+                </Checkbox>
+                <Checkbox value="failed">
+                  <span className="text-xs">{t("statusFailed")}</span>
+                </Checkbox>
+              </CheckboxGroup>
+
+              {/* Model and Date filters */}
+              <div className="flex gap-2">
+                <Select
+                  label={t("filterModel")}
+                  size="sm"
+                  selectedKeys={[modelFilter]}
+                  onSelectionChange={(keys) => {
+                    const val = Array.from(keys)[0] as string;
+                    if (val) setModelFilter(val);
+                  }}
+                  classNames={{ base: "flex-1", label: "text-xs" }}
+                  popoverProps={{ classNames: { content: "min-w-[220px]" } }}
+                >
+                  {[
+                    <SelectItem key="all">{t("filterAllModels")}</SelectItem>,
+                    ...uniqueModels.map((m) => (
+                      <SelectItem key={m.id}>{m.name}</SelectItem>
+                    )),
+                  ]}
+                </Select>
+
+                <Select
+                  label={t("filterDate")}
+                  size="sm"
+                  selectedKeys={[dateFilter]}
+                  onSelectionChange={(keys) => {
+                    const val = Array.from(keys)[0] as string;
+                    if (val) setDateFilter(val);
+                  }}
+                  classNames={{ base: "flex-1", label: "text-xs" }}
+                >
+                  <SelectItem key="all">{t("filterAllTime")}</SelectItem>
+                  <SelectItem key="today">{t("filterToday")}</SelectItem>
+                  <SelectItem key="7days">{t("filterLast7Days")}</SelectItem>
+                  <SelectItem key="30days">{t("filterLast30Days")}</SelectItem>
+                </Select>
+              </div>
+
+              {/* Duration slider */}
+              {durationBounds.min < durationBounds.max && (
+                <Slider
+                  label={t("filterDuration")}
+                  size="sm"
+                  step={1}
+                  minValue={durationBounds.min}
+                  maxValue={durationBounds.max}
+                  value={durationRange}
+                  onChange={(val) => setDurationRange(val as [number, number])}
+                  formatOptions={{ style: "unit", unit: "second" }}
+                  classNames={{
+                    label: "text-xs text-default-500",
+                  }}
+                />
+              )}
+            </div>
           )}
 
           {/* Back button when viewing a collection */}
@@ -484,9 +673,22 @@ export default function VideoList({ refreshTrigger, onRestore }: VideoListProps)
                     {t("generateFirstVideo")}
                   </p>
                 </div>
+              ) : filteredGenerations.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-48 sm:h-64 text-center px-4">
+                  <Filter
+                    size={40}
+                    className="sm:w-12 sm:h-12 text-default-300 mb-3 sm:mb-4"
+                  />
+                  <p className="text-default-500 text-sm sm:text-base">
+                    {t("noVideosFound")}
+                  </p>
+                  <p className="text-xs sm:text-sm text-default-400">
+                    {t("noVideosFoundDesc")}
+                  </p>
+                </div>
               ) : (
                 <div className="grid grid-cols-2 @3xl:grid-cols-3 gap-2 @sm:gap-4">
-                  {generations.map((gen) => (
+                  {filteredGenerations.map((gen) => (
                     <div
                       key={gen.id}
                       ref={(el) => {
