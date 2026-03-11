@@ -9,6 +9,7 @@ import { Input } from "@heroui/input";
 import { Spinner } from "@heroui/spinner";
 import { Chip } from "@heroui/chip";
 import { Image } from "@heroui/image";
+import { Tabs, Tab } from "@heroui/tabs";
 import {
   Modal,
   ModalContent,
@@ -25,6 +26,7 @@ import {
 } from "@heroui/dropdown";
 import { Folder, Plus, Share2, FolderOpen, MoreVertical, Pencil } from "lucide-react";
 import { useGetCollectionsQuery } from "@/lib/redux/services/next-api";
+import VideoList from "@/components/storyboard/video-list";
 
 type Project = {
   id: string;
@@ -45,6 +47,7 @@ type SharedProject = Project & {
 export default function ProjectsPage() {
   const router = useRouter();
   const t = useTranslations();
+  const [activeTab, setActiveTab] = useState<string>("projects");
   const { isOpen, onOpen, onOpenChange } = useDisclosure();
   const {
     isOpen: isRenameOpen,
@@ -141,218 +144,237 @@ export default function ProjectsPage() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <Spinner size="lg" />
-      </div>
-    );
-  }
-
   return (
     <div className="container mx-auto px-4 py-8 max-w-7xl">
-      <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 sm:gap-0 mb-8">
-        <div>
-          <h1 className="text-3xl font-bold">{t("projects.title")}</h1>
-          <p className="text-default-500 mt-1">
-            {t("projects.subtitle")}
-          </p>
-        </div>
-        <Button
-          color="primary"
-          startContent={<Plus size={20} />}
-          onPress={() => {
-            setNewProjectName("My Project");
-            onOpen();
-          }}
-          className="w-full sm:w-auto"
-        >
-          {t("projects.newProject")}
-        </Button>
-      </div>
+      <Tabs
+        selectedKey={activeTab}
+        onSelectionChange={(key) => setActiveTab(key as string)}
+        variant="underlined"
+        classNames={{
+          tabList: "gap-6 w-full relative rounded-none p-0 border-b border-divider",
+          tab: "max-w-fit px-0 h-12",
+          cursor: "w-full",
+        }}
+      >
+        <Tab key="projects" title={t("projects.title")}>
+          <div className="pt-6">
+            {loading ? (
+              <div className="flex items-center justify-center min-h-[60vh]">
+                <Spinner size="lg" />
+              </div>
+            ) : (
+              <>
+                <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 sm:gap-0 mb-8">
+                  <div>
+                    <p className="text-default-500 mt-1">
+                      {t("projects.subtitle")}
+                    </p>
+                  </div>
+                  <Button
+                    color="primary"
+                    startContent={<Plus size={20} />}
+                    onPress={() => {
+                      setNewProjectName("My Project");
+                      onOpen();
+                    }}
+                    className="w-full sm:w-auto"
+                  >
+                    {t("projects.newProject")}
+                  </Button>
+                </div>
 
-      {projects.length === 0 ? (
-        <div className="text-center py-20">
-          <FolderOpen size={64} className="mx-auto mb-4 text-default-300" />
-          <h2 className="text-xl font-semibold mb-2">{t("projects.noProjectsYet")}</h2>
-          <p className="text-default-500 mb-6">
-            {t("projects.createFirstProject")}
-          </p>
-          <Button
-            color="primary"
-            startContent={<Plus size={20} />}
-            onPress={() => {
-              setNewProjectName("My Project");
-              onOpen();
-            }}
-          >
-            {t("projects.createProject")}
-          </Button>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {projects.map((project) => (
-            <Card
-              key={project.id}
-              isPressable
-              onPress={() => router.push(`/projects/${project.id}`)}
-              className="hover:scale-105 transition-transform group"
-            >
-              <CardBody className="p-3 pb-1 relative">
-                <div className="w-full h-40 bg-default-100 rounded-lg overflow-hidden">
-                  {project.coverImageUrl ? (
-                    <Image
-                      src={project.coverImageUrl}
-                      alt={project.name}
-                      radius="none"
-                      classNames={{
-                        wrapper: "w-full h-full !max-w-full",
-                        img: "w-full h-full object-cover",
+                {projects.length === 0 ? (
+                  <div className="text-center py-20">
+                    <FolderOpen size={64} className="mx-auto mb-4 text-default-300" />
+                    <h2 className="text-xl font-semibold mb-2">{t("projects.noProjectsYet")}</h2>
+                    <p className="text-default-500 mb-6">
+                      {t("projects.createFirstProject")}
+                    </p>
+                    <Button
+                      color="primary"
+                      startContent={<Plus size={20} />}
+                      onPress={() => {
+                        setNewProjectName("My Project");
+                        onOpen();
                       }}
-                    />
-                  ) : (
-                    <div className="flex items-center justify-center w-full h-full">
-                      <Folder size={48} className="text-default-400" />
+                    >
+                      {t("projects.createProject")}
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    {projects.map((project) => (
+                      <Card
+                        key={project.id}
+                        isPressable
+                        onPress={() => router.push(`/projects/${project.id}`)}
+                        className="hover:scale-105 transition-transform group"
+                      >
+                        <CardBody className="p-3 pb-1 relative">
+                          <div className="w-full h-40 bg-default-100 rounded-lg overflow-hidden">
+                            {project.coverImageUrl ? (
+                              <Image
+                                src={project.coverImageUrl}
+                                alt={project.name}
+                                radius="none"
+                                classNames={{
+                                  wrapper: "w-full h-full !max-w-full",
+                                  img: "w-full h-full object-cover",
+                                }}
+                              />
+                            ) : (
+                              <div className="flex items-center justify-center w-full h-full">
+                                <Folder size={48} className="text-default-400" />
+                              </div>
+                            )}
+                          </div>
+                          <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity z-10" onClick={(e) => e.stopPropagation()}>
+                            <Dropdown>
+                              <DropdownTrigger>
+                                <Button
+                                  isIconOnly
+                                  size="sm"
+                                  variant="solid"
+                                  className="bg-background/80 backdrop-blur-sm"
+                                >
+                                  <MoreVertical size={16} />
+                                </Button>
+                              </DropdownTrigger>
+                              <DropdownMenu aria-label="Project actions">
+                                <DropdownItem
+                                  key="rename"
+                                  startContent={<Pencil size={16} />}
+                                  onPress={() => {
+                                    setProjectToRename(project);
+                                    setRenameValue(project.name);
+                                    onRenameOpen();
+                                  }}
+                                >
+                                  {t("common.rename")}
+                                </DropdownItem>
+                              </DropdownMenu>
+                            </Dropdown>
+                          </div>
+                        </CardBody>
+                        <CardFooter className="flex flex-col items-start gap-1 px-3 pt-1 pb-3">
+                          <h3 className="font-semibold text-base truncate w-full">
+                            {project.name}
+                          </h3>
+                          <div className="flex items-center gap-2">
+                            {project.isDefault && (
+                              <Chip size="sm" variant="flat" color="primary">
+                                {t("projects.default")}
+                              </Chip>
+                            )}
+                          </div>
+                        </CardFooter>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+
+                {sharedProjects.length > 0 && (
+                  <div className="mt-10">
+                    <div className="flex items-center gap-2 mb-4">
+                      <Share2 size={18} className="text-default-500" />
+                      <h2 className="text-lg font-semibold">{t("projects.sharedProjects")}</h2>
                     </div>
-                  )}
-                </div>
-                <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity z-10" onClick={(e) => e.stopPropagation()}>
-                  <Dropdown>
-                    <DropdownTrigger>
-                      <Button
-                        isIconOnly
-                        size="sm"
-                        variant="solid"
-                        className="bg-background/80 backdrop-blur-sm"
-                      >
-                        <MoreVertical size={16} />
-                      </Button>
-                    </DropdownTrigger>
-                    <DropdownMenu aria-label="Project actions">
-                      <DropdownItem
-                        key="rename"
-                        startContent={<Pencil size={16} />}
-                        onPress={() => {
-                          setProjectToRename(project);
-                          setRenameValue(project.name);
-                          onRenameOpen();
-                        }}
-                      >
-                        {t("common.rename")}
-                      </DropdownItem>
-                    </DropdownMenu>
-                  </Dropdown>
-                </div>
-              </CardBody>
-              <CardFooter className="flex flex-col items-start gap-1 px-3 pt-1 pb-3">
-                <h3 className="font-semibold text-base truncate w-full">
-                  {project.name}
-                </h3>
-                <div className="flex items-center gap-2">
-                  {project.isDefault && (
-                    <Chip size="sm" variant="flat" color="primary">
-                      {t("projects.default")}
-                    </Chip>
-                  )}
-                </div>
-              </CardFooter>
-            </Card>
-          ))}
-        </div>
-      )}
-
-      {sharedProjects.length > 0 && (
-        <div className="mt-10">
-          <div className="flex items-center gap-2 mb-4">
-            <Share2 size={18} className="text-default-500" />
-            <h2 className="text-lg font-semibold">{t("projects.sharedProjects")}</h2>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {sharedProjects.map((project) => (
-              <Card
-                key={project.id}
-                isPressable
-                onPress={() => router.push(`/projects/${project.id}`)}
-                className="hover:scale-105 transition-transform"
-              >
-                <CardBody className="p-3 pb-1">
-                  <div className="w-full h-40 bg-default-100 rounded-lg overflow-hidden">
-                    {project.coverImageUrl ? (
-                      <Image
-                        src={project.coverImageUrl}
-                        alt={project.name}
-                        radius="none"
-                        classNames={{
-                          wrapper: "w-full h-full !max-w-full",
-                          img: "w-full h-full object-cover",
-                        }}
-                      />
-                    ) : (
-                      <div className="flex items-center justify-center w-full h-full">
-                        <Folder size={48} className="text-default-400" />
-                      </div>
-                    )}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                      {sharedProjects.map((project) => (
+                        <Card
+                          key={project.id}
+                          isPressable
+                          onPress={() => router.push(`/projects/${project.id}`)}
+                          className="hover:scale-105 transition-transform"
+                        >
+                          <CardBody className="p-3 pb-1">
+                            <div className="w-full h-40 bg-default-100 rounded-lg overflow-hidden">
+                              {project.coverImageUrl ? (
+                                <Image
+                                  src={project.coverImageUrl}
+                                  alt={project.name}
+                                  radius="none"
+                                  classNames={{
+                                    wrapper: "w-full h-full !max-w-full",
+                                    img: "w-full h-full object-cover",
+                                  }}
+                                />
+                              ) : (
+                                <div className="flex items-center justify-center w-full h-full">
+                                  <Folder size={48} className="text-default-400" />
+                                </div>
+                              )}
+                            </div>
+                          </CardBody>
+                          <CardFooter className="flex flex-col items-start gap-1 px-3 pt-1 pb-3">
+                            <h3 className="font-semibold text-base truncate w-full">
+                              {project.name}
+                            </h3>
+                            <Chip size="sm" variant="flat" color="secondary">
+                              {project.permission}
+                            </Chip>
+                          </CardFooter>
+                        </Card>
+                      ))}
+                    </div>
                   </div>
-                </CardBody>
-                <CardFooter className="flex flex-col items-start gap-1 px-3 pt-1 pb-3">
-                  <h3 className="font-semibold text-base truncate w-full">
-                    {project.name}
-                  </h3>
-                  <Chip size="sm" variant="flat" color="secondary">
-                    {project.permission}
-                  </Chip>
-                </CardFooter>
-              </Card>
-            ))}
-          </div>
-        </div>
-      )}
+                )}
 
-      {sharedCollections.length > 0 && (
-        <div className="mt-10">
-          <div className="flex items-center gap-2 mb-4">
-            <Share2 size={18} className="text-default-500" />
-            <h2 className="text-lg font-semibold">{t("projects.sharedCollections")}</h2>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {sharedCollections.map((c) => (
-              <Card
-                key={c.id}
-                isPressable
-                onPress={() => router.push(`/collection/${c.id}`)}
-              >
-                <CardBody className="p-3 pb-1">
-                  <div className="w-full h-36 bg-default-100 rounded-lg overflow-hidden">
-                    {c.coverImageUrl ? (
-                      <Image
-                        src={c.coverImageUrl}
-                        alt={c.name}
-                        radius="none"
-                        classNames={{
-                          wrapper: "w-full h-full !max-w-full",
-                          img: "w-full h-full object-cover",
-                        }}
-                      />
-                    ) : (
-                      <div className="flex items-center justify-center w-full h-full">
-                        <Folder size={40} className="text-default-400" />
-                      </div>
-                    )}
+                {sharedCollections.length > 0 && (
+                  <div className="mt-10">
+                    <div className="flex items-center gap-2 mb-4">
+                      <Share2 size={18} className="text-default-500" />
+                      <h2 className="text-lg font-semibold">{t("projects.sharedCollections")}</h2>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                      {sharedCollections.map((c) => (
+                        <Card
+                          key={c.id}
+                          isPressable
+                          onPress={() => router.push(`/collection/${c.id}`)}
+                        >
+                          <CardBody className="p-3 pb-1">
+                            <div className="w-full h-36 bg-default-100 rounded-lg overflow-hidden">
+                              {c.coverImageUrl ? (
+                                <Image
+                                  src={c.coverImageUrl}
+                                  alt={c.name}
+                                  radius="none"
+                                  classNames={{
+                                    wrapper: "w-full h-full !max-w-full",
+                                    img: "w-full h-full object-cover",
+                                  }}
+                                />
+                              ) : (
+                                <div className="flex items-center justify-center w-full h-full">
+                                  <Folder size={40} className="text-default-400" />
+                                </div>
+                              )}
+                            </div>
+                          </CardBody>
+                          <CardFooter className="flex flex-col items-start gap-1 px-3 pt-1 pb-3">
+                            <h3 className="font-semibold text-base truncate w-full">
+                              {c.name}
+                            </h3>
+                            <Chip size="sm" variant="flat" color="secondary">
+                              {c.permission}
+                            </Chip>
+                          </CardFooter>
+                        </Card>
+                      ))}
+                    </div>
                   </div>
-                </CardBody>
-                <CardFooter className="flex flex-col items-start gap-1 px-3 pt-1 pb-3">
-                  <h3 className="font-semibold text-base truncate w-full">
-                    {c.name}
-                  </h3>
-                  <Chip size="sm" variant="flat" color="secondary">
-                    {c.permission}
-                  </Chip>
-                </CardFooter>
-              </Card>
-            ))}
+                )}
+              </>
+            )}
           </div>
-        </div>
-      )}
+        </Tab>
+        <Tab key="video-generations" title={t("projects.videoGenerations")}>
+          <div className="pt-6">
+            <VideoList />
+          </div>
+        </Tab>
+      </Tabs>
 
       <Modal isOpen={isOpen} onOpenChange={onOpenChange}>
         <ModalContent>
