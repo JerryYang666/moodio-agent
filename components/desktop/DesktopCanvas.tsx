@@ -9,6 +9,7 @@ import { ImageAsset, VideoAsset, TextAsset, LinkAsset } from "./assets";
 import TableAsset from "./assets/TableAsset";
 import { hasWriteAccess, type Permission } from "@/lib/permissions";
 import type { CanvasMode } from "./DesktopToolbar";
+import { AI_IMAGE_DRAG_MIME } from "@/components/chat/asset-dnd";
 import {
   Trash2,
   MessageSquare,
@@ -49,6 +50,17 @@ interface DesktopCanvasProps {
   currentUserId?: string;
   cellLocks?: Map<string, { userId: string; sessionId: string; firstName: string }>;
   onCellCommit?: (assetId: string, rowId: string, colIndex: number, value: string) => void;
+  onExternalImageDrop?: (
+    payload: {
+      imageId: string;
+      url: string;
+      title?: string;
+      prompt?: string;
+      status?: "loading" | "generated" | "error";
+      chatId?: string | null;
+    },
+    position: { x: number; y: number }
+  ) => void;
 }
 
 interface ContextMenuState {
@@ -107,6 +119,7 @@ export default function DesktopCanvas({
   currentUserId,
   cellLocks,
   onCellCommit,
+  onExternalImageDrop,
 }: DesktopCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const isPanning = useRef(false);
@@ -242,6 +255,66 @@ export default function DesktopCanvas({
       };
     },
     [camera]
+  );
+
+  const parseAiImageDropPayload = useCallback((e: React.DragEvent) => {
+    try {
+      const json = e.dataTransfer.getData(AI_IMAGE_DRAG_MIME);
+      if (!json) return null;
+      const parsed = JSON.parse(json) as {
+        imageId?: unknown;
+        url?: unknown;
+        title?: unknown;
+        prompt?: unknown;
+        status?: unknown;
+        chatId?: unknown;
+      };
+      if (typeof parsed.imageId !== "string" || typeof parsed.url !== "string") {
+        return null;
+      }
+      return {
+        imageId: parsed.imageId,
+        url: parsed.url,
+        title: typeof parsed.title === "string" ? parsed.title : undefined,
+        prompt: typeof parsed.prompt === "string" ? parsed.prompt : undefined,
+        status:
+          parsed.status === "loading" ||
+          parsed.status === "generated" ||
+          parsed.status === "error"
+            ? parsed.status
+            : undefined,
+        chatId:
+          typeof parsed.chatId === "string" || parsed.chatId === null
+            ? parsed.chatId
+            : undefined,
+      };
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const handleDragOver = useCallback(
+    (e: React.DragEvent) => {
+      if (!canEdit || !onExternalImageDrop) return;
+      if (Array.from(e.dataTransfer.types).includes(AI_IMAGE_DRAG_MIME)) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "copy";
+      }
+    },
+    [canEdit, onExternalImageDrop]
+  );
+
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      if (!canEdit || !onExternalImageDrop) return;
+      const payload = parseAiImageDropPayload(e);
+      if (!payload) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const world = screenToWorld(e.clientX, e.clientY);
+      onExternalImageDrop(payload, world);
+    },
+    [canEdit, onExternalImageDrop, parseAiImageDropPayload, screenToWorld]
   );
 
   const handlePointerDown = useCallback(
@@ -618,6 +691,8 @@ export default function DesktopCanvas({
       onPointerUp={handlePointerUp}
       onPointerLeave={() => sendEvent?.("cursor_leave", {})}
       onContextMenu={handleBackgroundContextMenu}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
     >
       {/* Dot grid pattern */}
       <div

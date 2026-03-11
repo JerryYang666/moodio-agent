@@ -233,3 +233,25 @@ export function getViewportCenterPosition(newW = 400, newH = 300): { x: number; 
     y: clusterMidY - newH / 2,
   };
 }
+
+/**
+ * Place an asset at the exact visual center of the current viewport.
+ *
+ * Unlike `getViewportCenterPosition`, this ignores existing asset clusters and
+ * always returns the user's current view center so newly sent assets appear
+ * immediately in front of the user.
+ */
+export function getViewportVisibleCenterPosition(
+  newW = 400,
+  newH = 300
+): { x: number; y: number } {
+  const vp = typeof window !== "undefined" ? window.__desktopViewport : undefined;
+  if (!vp) {
+    return { x: Math.random() * 200, y: Math.random() * 200 };
+  }
+
+  const { camera, width, height } = vp;
+  const centerX = (-camera.x + width / 2) / camera.zoom;
+  const centerY = (-camera.y + height / 2) / camera.zoom;
+  return { x: centerX - newW / 2, y: centerY - newH / 2 };
+}

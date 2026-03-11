@@ -367,6 +367,61 @@ export default function DesktopDetailPage({
     [removeAsset, sendEvent]
   );
 
+  const handleExternalImageDrop = useCallback(
+    async (
+      payload: {
+        imageId: string;
+        title?: string;
+        prompt?: string;
+        status?: "loading" | "generated" | "error";
+        chatId?: string | null;
+      },
+      position: { x: number; y: number }
+    ) => {
+      try {
+        const res = await fetch(`/api/desktop/${desktopId}/assets`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            assets: [
+              {
+                assetType: "image",
+                metadata: {
+                  imageId: payload.imageId,
+                  chatId: payload.chatId ?? undefined,
+                  title: payload.title || "Image",
+                  prompt: payload.prompt || "",
+                  status: payload.status || "generated",
+                },
+                posX: position.x,
+                posY: position.y,
+              },
+            ],
+          }),
+        });
+
+        if (!res.ok) {
+          throw new Error("Failed to add dropped image to desktop");
+        }
+
+        const data = await res.json();
+        window.dispatchEvent(
+          new CustomEvent("desktop-asset-added", {
+            detail: { assets: data.assets, desktopId },
+          })
+        );
+      } catch (error) {
+        console.error("Failed to drop image onto desktop:", error);
+        addToast({
+          title: "Failed to add image",
+          description: "Please try dragging the image again.",
+          color: "danger",
+        });
+      }
+    },
+    [desktopId]
+  );
+
   const handleCellCommit = useCallback(
     (assetId: string, rowId: string, colIndex: number, value: string) => {
       applyRemoteEvent({
@@ -565,6 +620,7 @@ export default function DesktopDetailPage({
           cellLocks={cellLocks}
           onCellCommit={handleCellCommit}
           onSendToTimeline={canEdit ? handleSendToTimeline : undefined}
+          onExternalImageDrop={canEdit ? handleExternalImageDrop : undefined}
         />
         <DesktopToolbar
           camera={camera}

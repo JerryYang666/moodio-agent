@@ -12,7 +12,7 @@ import { Select, SelectItem } from "@heroui/select";
 import { Button } from "@heroui/button";
 import { Spinner } from "@heroui/spinner";
 import { addToast } from "@heroui/toast";
-import { getViewportCenterPosition } from "@/lib/desktop/types";
+import { getViewportVisibleCenterPosition } from "@/lib/desktop/types";
 import { hasWriteAccess, type Permission } from "@/lib/permissions";
 
 interface SendToDesktopModalProps {
@@ -47,7 +47,13 @@ async function sendAssetsToDesktop(
     body: JSON.stringify({
       assets: assets.map((a, i) => {
         if (useViewportPlacement) {
-          const pos = getViewportCenterPosition();
+          const sizeByType =
+            a.assetType === "image"
+              ? { w: 300, h: 300 }
+              : a.assetType === "video"
+                ? { w: 300, h: 300 }
+                : { w: 400, h: 300 };
+          const pos = getViewportVisibleCenterPosition(sizeByType.w, sizeByType.h);
           return { ...a, posX: pos.x + i * 280, posY: pos.y };
         }
         return {
