@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
   Modal,
   ModalContent,
@@ -32,6 +32,8 @@ interface DesktopOption {
   permission: Permission;
   isOwner: boolean;
 }
+
+const SEND_DEBOUNCE_MS = 2000;
 
 async function sendAssetsToDesktop(
   targetDesktopId: string,
@@ -85,29 +87,69 @@ export default function SendToDesktopModal({
   const [selectedDesktopId, setSelectedDesktopId] = useState("");
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
+  const inFlightRef = useRef(false);
+  const lastSendAtRef = useRef(0);
+  const directSendKeyRef = useRef<string | null>(null);
+  const assetsSignature = useMemo(() => JSON.stringify(assets), [assets]);
+
+  const guardedSend = useCallback(
+    async (
+      targetDesktopId: string,
+      useViewportPlacement: boolean
+    ): Promise<boolean> => {
+      if (!targetDesktopId || assets.length === 0) return false;
+
+      const now = Date.now();
+      if (
+        inFlightRef.current ||
+        now - lastSendAtRef.current < SEND_DEBOUNCE_MS
+      ) {
+        return false;
+      }
+
+      inFlightRef.current = true;
+      lastSendAtRef.current = now;
+      setSending(true);
+
+      try {
+        await sendAssetsToDesktop(
+          targetDesktopId,
+          assets,
+          onOpenChange,
+          useViewportPlacement
+        );
+        return true;
+      } finally {
+        inFlightRef.current = false;
+        setSending(false);
+      }
+    },
+    [assets, onOpenChange]
+  );
 
   // When a desktopId is provided, send immediately without showing a picker
   useEffect(() => {
     if (!isOpen || !desktopId || assets.length === 0) return;
+    const directSendKey = `${desktopId}:${assetsSignature}`;
+    if (directSendKeyRef.current === directSendKey) return;
+    directSendKeyRef.current = directSendKey;
 
-    let cancelled = false;
-    setSending(true);
-    sendAssetsToDesktop(desktopId, assets, onOpenChange, true)
+    guardedSend(desktopId, true)
       .catch(() => {
-        if (!cancelled) {
-          addToast({
-            title: "Error",
-            description: "Failed to send to desktop",
-            color: "danger",
-          });
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setSending(false);
+        addToast({
+          title: "Error",
+          description: "Failed to send to desktop",
+          color: "danger",
+        });
       });
+  }, [isOpen, desktopId, assets.length, assetsSignature, guardedSend]);
 
-    return () => { cancelled = true; };
-  }, [isOpen, desktopId, assets, onOpenChange]);
+  // Reset per-open-session direct-send key.
+  useEffect(() => {
+    if (!isOpen) {
+      directSendKeyRef.current = null;
+    }
+  }, [isOpen]);
 
   // Only fetch desktop list when no desktopId is provided (picker mode)
   useEffect(() => {
@@ -128,19 +170,16 @@ export default function SendToDesktopModal({
 
   const handleSend = useCallback(async () => {
     if (!selectedDesktopId || assets.length === 0) return;
-    setSending(true);
     try {
-      await sendAssetsToDesktop(selectedDesktopId, assets, onOpenChange, false);
+      await guardedSend(selectedDesktopId, false);
     } catch {
       addToast({
         title: "Error",
         description: "Failed to send to desktop",
         color: "danger",
       });
-    } finally {
-      setSending(false);
     }
-  }, [selectedDesktopId, assets, onOpenChange]);
+  }, [selectedDesktopId, assets.length, guardedSend]);
 
   // Direct-send mode: render nothing visible (the effect handles everything)
   if (desktopId) {
