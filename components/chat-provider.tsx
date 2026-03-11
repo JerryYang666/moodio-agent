@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useEffect, useState, useRef } from "react";
 import { useAuth } from "@/hooks/use-auth";
+import { useCredits } from "@/hooks/use-credits";
 import { usePathname, useRouter } from "next/navigation";
 import { addToast } from "@heroui/toast";
 
@@ -31,6 +32,7 @@ export const ChatContext = createContext<ChatContextType | undefined>(
 
 export function ChatProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
+  const { refreshBalance } = useCredits();
   const pathname = usePathname();
   const router = useRouter();
   const [chats, setChats] = useState<Chat[]>([]);
@@ -255,8 +257,9 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                 return newState;
               });
 
-              // Refresh chat list as well since something changed
+              // Refresh chat list and credit balance since generation finished
               fetchChats();
+              refreshBalance();
             }
           }
         } catch (e) {
