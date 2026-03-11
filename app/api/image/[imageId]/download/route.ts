@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAccessToken } from "@/lib/auth/cookies";
 import { verifyAccessToken } from "@/lib/auth/jwt";
 import { downloadImage } from "@/lib/storage/s3";
+import {
+  buildAttachmentContentDisposition,
+  buildDownloadFilename,
+  normalizeDownloadBasename,
+} from "@/lib/download-filename";
 import sharp from "sharp";
 
 type ImageFormat = "webp" | "png" | "jpeg";
@@ -118,14 +123,8 @@ export async function GET(
       extension = sourceInfo.extension;
     }
 
-    // Sanitize filename
-    const safeFilename =
-      filename
-        .replace(/[^a-z0-9\s-]/gi, "")
-        .replace(/\s+/g, "_")
-        .substring(0, 100) || "image";
-
-    const finalFilename = `${safeFilename}${extension}`;
+    const basename = normalizeDownloadBasename(filename, "image");
+    const finalFilename = buildDownloadFilename(basename, extension);
 
     // Convert Buffer to Uint8Array for NextResponse compatibility
     const uint8Array = new Uint8Array(outputBuffer);
@@ -134,7 +133,7 @@ export async function GET(
       status: 200,
       headers: {
         "Content-Type": contentType,
-        "Content-Disposition": `attachment; filename="${finalFilename}"`,
+        "Content-Disposition": buildAttachmentContentDisposition(finalFilename),
         "Content-Length": outputBuffer.length.toString(),
         "Cache-Control": "private, max-age=3600",
       },

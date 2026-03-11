@@ -1,5 +1,10 @@
 // Helper constants and functions for chat components
 
+import {
+  buildDownloadFilename,
+  normalizeDownloadBasename,
+} from "@/lib/download-filename";
+
 export const AWS_S3_PUBLIC_URL =
   process.env.NEXT_PUBLIC_AWS_S3_PUBLIC_URL || "";
 
@@ -69,6 +74,20 @@ export const formatTime = (timestamp?: number) => {
 
 export type ImageDownloadFormat = "webp" | "png" | "jpeg";
 
+const IMAGE_EXTENSION_BY_FORMAT: Record<ImageDownloadFormat, string> = {
+  webp: ".webp",
+  png: ".png",
+  jpeg: ".jpg",
+};
+
+const IMAGE_EXTENSION_BY_CONTENT_TYPE: Record<string, string> = {
+  "image/webp": ".webp",
+  "image/png": ".png",
+  "image/jpeg": ".jpg",
+  "image/jpg": ".jpg",
+  "image/gif": ".gif",
+};
+
 // Helper to trigger image download via backend API
 // Uses the backend endpoint which sets Content-Disposition header to force download
 // Optionally accepts a format parameter to convert the image before download
@@ -83,12 +102,7 @@ export const downloadImage = async (
     return;
   }
 
-  // Sanitize filename
-  const filename =
-    title
-      .replace(/[^a-z0-9\s-]/gi, "")
-      .replace(/\s+/g, "_")
-      .substring(0, 100) || "image";
+  const baseFilename = normalizeDownloadBasename(title, "image");
 
   // Helper to trigger download from blob
   const downloadBlob = (blob: Blob, name: string) => {
@@ -109,7 +123,16 @@ export const downloadImage = async (
       const response = await fetch(url);
       if (response.ok) {
         const blob = await response.blob();
-        downloadBlob(blob, filename);
+        const extension =
+          IMAGE_EXTENSION_BY_CONTENT_TYPE[
+            (response.headers.get("content-type") || "")
+              .split(";")[0]
+              .toLowerCase()
+          ];
+        const finalFilename = extension
+          ? buildDownloadFilename(baseFilename, extension)
+          : baseFilename;
+        downloadBlob(blob, finalFilename);
         return;
       }
     } catch (error) {
@@ -121,7 +144,7 @@ export const downloadImage = async (
   }
 
   // Sanitize filename for URL
-  const safeFilename = encodeURIComponent(filename);
+  const safeFilename = encodeURIComponent(baseFilename);
 
   // Build the backend download URL with optional format parameter
   let downloadUrl = `/api/image/${imageId}/download?filename=${safeFilename}`;
@@ -137,7 +160,13 @@ export const downloadImage = async (
       // Ensure we actually got an image and not an HTML error page
       if (contentType && contentType.startsWith("image/")) {
         const blob = await response.blob();
-        downloadBlob(blob, filename);
+        const extension =
+          IMAGE_EXTENSION_BY_CONTENT_TYPE[contentType.split(";")[0].toLowerCase()] ||
+          (format ? IMAGE_EXTENSION_BY_FORMAT[format] : undefined);
+        const finalFilename = extension
+          ? buildDownloadFilename(baseFilename, extension)
+          : baseFilename;
+        downloadBlob(blob, finalFilename);
         return;
       }
     }
