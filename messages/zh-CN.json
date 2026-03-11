@@ -830,7 +830,18 @@
     "selectFromChat": "从对话中选择",
     "selectFromCollection": "从集合中选择",
     "viewFull": "查看大图",
-    "selectThisImage": "选择此图片"
+    "selectThisImage": "选择此图片",
+    "deselectThisImage": "取消选择此图片",
+    "cameraTab": "相机",
+    "startCamera": "启动相机",
+    "takePhoto": "拍照",
+    "capturedPhoto": "已拍摄的照片",
+    "retakePhoto": "重拍",
+    "usePhoto": "使用照片",
+    "cameraAccessDenied": "无法访问相机，请检查浏览器权限。",
+    "filterByRating": "星级",
+    "selectedCount": "已选择 {count} 项",
+    "confirmSelection": "确认选择"
   },
   "assetsSidebar": {
     "title": "素材",

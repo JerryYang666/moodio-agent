@@ -830,7 +830,18 @@
     "selectFromChat": "從對話中選擇",
     "selectFromCollection": "從集合中選擇",
     "viewFull": "檢視完整圖片",
-    "selectThisImage": "選擇此圖片"
+    "selectThisImage": "選擇此圖片",
+    "deselectThisImage": "取消選擇此圖片",
+    "cameraTab": "相機",
+    "startCamera": "啟動相機",
+    "takePhoto": "拍照",
+    "capturedPhoto": "已拍攝的照片",
+    "retakePhoto": "重拍",
+    "usePhoto": "使用照片",
+    "cameraAccessDenied": "無法存取相機，請檢查瀏覽器權限。",
+    "filterByRating": "星級",
+    "selectedCount": "已選擇 {count} 項",
+    "confirmSelection": "確認選擇"
   },
   "assetsSidebar": {
     "title": "素材",

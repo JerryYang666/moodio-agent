@@ -877,7 +877,18 @@
     "selectFromChat": "Select from chat",
     "selectFromCollection": "Select from collection",
     "viewFull": "View full image",
-    "selectThisImage": "Select this image"
+    "selectThisImage": "Select this image",
+    "deselectThisImage": "Deselect this image",
+    "cameraTab": "Camera",
+    "startCamera": "Start Camera",
+    "takePhoto": "Take Photo",
+    "capturedPhoto": "Captured photo",
+    "retakePhoto": "Retake",
+    "usePhoto": "Use Photo",
+    "cameraAccessDenied": "Unable to access camera. Please check your browser permissions.",
+    "filterByRating": "Stars",
+    "selectedCount": "{count} selected",
+    "confirmSelection": "Confirm Selection"
   },
   "assetsSidebar": {
     "title": "Assets",
