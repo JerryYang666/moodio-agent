@@ -82,6 +82,75 @@ interface StreamingChatState {
   isSending: boolean;
 }
 const streamingChatCache = new Map<string, StreamingChatState>();
+const STREAMING_CHAT_CACHE_EVENT = "streaming-chat-cache-update";
+
+function emitStreamingChatCacheUpdate(chatId: string) {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(
+    new CustomEvent(STREAMING_CHAT_CACHE_EVENT, {
+      detail: { chatId },
+    })
+  );
+}
+
+function setStreamingChatState(chatId: string, state: StreamingChatState) {
+  streamingChatCache.set(chatId, state);
+  emitStreamingChatCacheUpdate(chatId);
+}
+
+function deleteStreamingChatState(chatId: string) {
+  streamingChatCache.delete(chatId);
+  emitStreamingChatCacheUpdate(chatId);
+}
+
+function serializeMessageContent(content: Message["content"]): string {
+  return typeof content === "string" ? content : JSON.stringify(content);
+}
+
+function mergeFetchedAndCachedMessages(
+  fetchedMessages: Message[],
+  cachedMessages: Message[]
+): Message[] {
+  const merged = [...fetchedMessages];
+
+  for (const cachedMessage of cachedMessages) {
+    const matchIndex = merged.findIndex(
+      (message) =>
+        message.role === cachedMessage.role &&
+        (cachedMessage.role === "assistant"
+          ? message.createdAt === cachedMessage.createdAt &&
+            message.variantId === cachedMessage.variantId
+          : message.createdAt !== undefined &&
+            cachedMessage.createdAt !== undefined &&
+            message.createdAt === cachedMessage.createdAt)
+    );
+
+    if (matchIndex !== -1) {
+      merged[matchIndex] = cachedMessage;
+      continue;
+    }
+
+    // Fallback for rare cases where createdAt is missing.
+    const fallbackMatchIndex =
+      cachedMessage.createdAt === undefined
+        ? merged.findIndex(
+            (message) =>
+              message.role === cachedMessage.role &&
+              serializeMessageContent(message.content) ===
+                serializeMessageContent(cachedMessage.content)
+          )
+        : -1;
+
+    if (fallbackMatchIndex !== -1) {
+      merged[fallbackMatchIndex] = cachedMessage;
+      continue;
+    }
+
+    merged.push(cachedMessage);
+  }
+
+  return merged;
+}
 
 interface ChatInterfaceProps {
   chatId?: string;
@@ -139,12 +208,13 @@ export default function ChatInterface({
       );
       if (urlChatId && urlChatId !== chatId) {
         console.log(`[ChatInterface] Syncing chatId to "${urlChatId}" from URL`);
+        chatIdRef.current = urlChatId;
         setChatId(urlChatId);
         const cached = streamingChatCache.get(urlChatId);
         if (cached) {
           setMessages(cached.messages);
           setIsSending(cached.isSending);
-          setIsLoading(false);
+          setIsLoading(true);
         } else {
           setMessages([]);
           setIsSending(false);
@@ -166,12 +236,13 @@ export default function ChatInterface({
       console.log(
         `[ChatInterface] Prop sync — initialChatId: ${initialChatId ?? "none"}, current chatId: ${chatId ?? "none"}`
       );
+      chatIdRef.current = initialChatId;
       setChatId(initialChatId);
       const cached = initialChatId ? streamingChatCache.get(initialChatId) : null;
       if (cached) {
         setMessages(cached.messages);
         setIsSending(cached.isSending);
-        setIsLoading(false);
+        setIsLoading(!!initialChatId);
       } else {
         setMessages(initialMessages);
         setIsSending(false);
@@ -370,6 +441,7 @@ export default function ChatInterface({
   // Listen for reset-chat event (triggered when clicking New Chat button while technically already on /chat)
   useEffect(() => {
     const handleReset = () => {
+      chatIdRef.current = undefined;
       setChatId(undefined);
       setMessages([]);
       setInput("");
@@ -583,30 +655,71 @@ export default function ChatInterface({
   }, [messages]);
 
   useEffect(() => {
+    const handleStreamingCacheUpdate = (event: Event) => {
+      const customEvent = event as CustomEvent<{ chatId?: string }>;
+      const updatedChatId = customEvent.detail?.chatId;
+      if (!updatedChatId || updatedChatId !== chatIdRef.current) return;
+
+      const cached = streamingChatCache.get(updatedChatId);
+      if (cached) {
+        setMessages(cached.messages);
+        setIsSending(cached.isSending);
+      } else {
+        setIsSending(false);
+      }
+    };
+
+    window.addEventListener(
+      STREAMING_CHAT_CACHE_EVENT,
+      handleStreamingCacheUpdate as EventListener
+    );
+    return () =>
+      window.removeEventListener(
+        STREAMING_CHAT_CACHE_EVENT,
+        handleStreamingCacheUpdate as EventListener
+      );
+  }, []);
+
+  useEffect(() => {
     const fetchChat = async () => {
       if (!chatId) return;
-      if (messages.length > 0) {
-        setIsLoading(false);
-        return;
-      }
-      if (streamingChatCache.has(chatId)) {
-        setIsLoading(false);
-        return;
-      }
+      const requestedChatId = chatId;
 
       setIsLoading(true);
       try {
-        const res = await fetch(`/api/chat/${chatId}`);
+        const res = await fetch(`/api/chat/${requestedChatId}`);
         if (res.ok) {
           const data = await res.json();
-          setMessages(data.messages);
+          if (chatIdRef.current !== requestedChatId) return;
+          const cached = streamingChatCache.get(requestedChatId);
+          const hydratedMessages = cached
+            ? mergeFetchedAndCachedMessages(data.messages, cached.messages)
+            : data.messages;
+          if (cached) {
+            setStreamingChatState(requestedChatId, {
+              messages: hydratedMessages,
+              isSending: cached.isSending,
+            });
+          }
+          setMessages(hydratedMessages);
+          setIsSending(cached?.isSending ?? false);
+          if (cached?.isSending) {
+            setTimeout(() => {
+              if (chatIdRef.current !== requestedChatId) return;
+              if (!streamingChatCache.has(requestedChatId)) {
+                setIsSending(false);
+              }
+            }, 0);
+          }
           // Pre-select images from the last user message on page load
-          applyPreselectImages(data.messages);
+          applyPreselectImages(hydratedMessages);
         }
       } catch (error) {
         console.error("Failed to fetch chat", error);
       } finally {
-        setIsLoading(false);
+        if (chatIdRef.current === requestedChatId) {
+          setIsLoading(false);
+        }
       }
     };
 
@@ -1336,53 +1449,46 @@ export default function ChatInterface({
       (img) => img.source === "ai_generated" && img.messageIndex !== undefined
     );
 
-    if (agentImageSelections.length > 0) {
-      setMessages((prev) => {
-        const newMessages = [...prev];
+    const optimisticMessages = (() => {
+      const newMessages = [...messages];
 
-        for (const selection of agentImageSelections) {
-          // Find the correct message
-          let msgIndex = selection.messageIndex!;
-          if (selection.variantId) {
-            const variantIndex = newMessages.findIndex(
-              (m) => m.variantId === selection.variantId
-            );
-            if (variantIndex !== -1) {
-              msgIndex = variantIndex;
-            }
+      for (const selection of agentImageSelections) {
+        let msgIndex = selection.messageIndex!;
+        if (selection.variantId) {
+          const variantIndex = newMessages.findIndex(
+            (m) => m.variantId === selection.variantId
+          );
+          if (variantIndex !== -1) {
+            msgIndex = variantIndex;
           }
+        }
 
-          if (newMessages[msgIndex]) {
-            const msg = newMessages[msgIndex];
-            if (Array.isArray(msg.content)) {
-              const newContent = [...msg.content];
-              // Find the part by imageId
-              const imgIndex = newContent.findIndex(
-                (p) =>
-                  isGeneratedImagePart(p) && p.imageId === selection.imageId
-              );
-              if (
-                imgIndex !== -1 &&
-                isGeneratedImagePart(newContent[imgIndex])
-              ) {
-                const agentImagePart = newContent[imgIndex] as Extract<
-                  MessageContentPart,
-                  { type: "agent_image" } | { type: "direct_image" }
-                >;
-                newContent[imgIndex] = {
-                  ...agentImagePart,
-                  isSelected: true,
-                };
-                newMessages[msgIndex] = { ...msg, content: newContent };
-              }
+        if (newMessages[msgIndex]) {
+          const msg = newMessages[msgIndex];
+          if (Array.isArray(msg.content)) {
+            const newContent = [...msg.content];
+            const imgIndex = newContent.findIndex(
+              (p) => isGeneratedImagePart(p) && p.imageId === selection.imageId
+            );
+            if (imgIndex !== -1 && isGeneratedImagePart(newContent[imgIndex])) {
+              const agentImagePart = newContent[imgIndex] as Extract<
+                MessageContentPart,
+                { type: "agent_image" } | { type: "direct_image" }
+              >;
+              newContent[imgIndex] = {
+                ...agentImagePart,
+                isSelected: true,
+              };
+              newMessages[msgIndex] = { ...msg, content: newContent };
             }
           }
         }
-        return [...newMessages, userMessage];
-      });
-    } else {
-      setMessages((prev) => [...prev, userMessage]);
-    }
+      }
+
+      return [...newMessages, userMessage];
+    })();
+
+    setMessages(optimisticMessages);
 
     // Clear input and pending images
     setInput("");
@@ -1410,6 +1516,7 @@ export default function ChatInterface({
         if (!createRes.ok) throw new Error("Failed to create chat");
         const createData = await createRes.json();
         currentChatId = createData.chat.id as string;
+        chatIdRef.current = currentChatId;
         setChatId(currentChatId);
         window.dispatchEvent(new Event("refresh-chats"));
         if (!disableActiveChatPersistence) {
@@ -1426,17 +1533,17 @@ export default function ChatInterface({
       }
 
       streamingChatId = currentChatId!;
-      streamingChatCache.set(streamingChatId, {
-        messages: [...messages, userMessage],
+      setStreamingChatState(streamingChatId, {
+        messages: optimisticMessages,
         isSending: true,
       });
       const updateStreamMessages = (updater: SetStateAction<Message[]>) => {
         const cached = streamingChatCache.get(streamingChatId);
         const prev = cached?.messages ?? [];
         const next = typeof updater === "function" ? updater(prev) : updater;
-        streamingChatCache.set(streamingChatId, { messages: next, isSending: true });
+        setStreamingChatState(streamingChatId, { messages: next, isSending: true });
         if (chatIdRef.current === streamingChatId) {
-          setMessages(updater);
+          setMessages(next);
         }
       };
 
@@ -1902,7 +2009,7 @@ export default function ChatInterface({
     } catch (error) {
       console.error("Error sending message", error);
       if (streamingChatId) {
-        streamingChatCache.delete(streamingChatId);
+        deleteStreamingChatState(streamingChatId);
       }
       if (!streamingChatId || chatIdRef.current === streamingChatId) {
         setInput(lastUserInputRef.current);
@@ -1916,7 +2023,7 @@ export default function ChatInterface({
       }
     } finally {
       if (streamingChatId) {
-        streamingChatCache.delete(streamingChatId);
+        deleteStreamingChatState(streamingChatId);
       }
       if (!streamingChatId || chatIdRef.current === streamingChatId) {
         setIsSending(false);
@@ -2085,7 +2192,8 @@ export default function ChatInterface({
         createdAt: Date.now(),
       };
 
-      setMessages((prev) => [...prev, userMessage]);
+      const optimisticMessages = [...messages, userMessage];
+      setMessages(optimisticMessages);
       setIsSending(true);
 
       let streamingChatId = "";
@@ -2098,6 +2206,7 @@ export default function ChatInterface({
           if (!createRes.ok) throw new Error("Failed to create chat");
           const createData = await createRes.json();
           currentChatId = createData.chat.id as string;
+          chatIdRef.current = currentChatId;
           setChatId(currentChatId);
           window.dispatchEvent(new Event("refresh-chats"));
           if (!disableActiveChatPersistence) {
@@ -2108,17 +2217,17 @@ export default function ChatInterface({
         }
 
         streamingChatId = currentChatId!;
-        streamingChatCache.set(streamingChatId, {
-          messages: [...messages, userMessage],
+        setStreamingChatState(streamingChatId, {
+          messages: optimisticMessages,
           isSending: true,
         });
         const updateStreamMessages = (updater: SetStateAction<Message[]>) => {
           const cached = streamingChatCache.get(streamingChatId);
           const prev = cached?.messages ?? [];
           const next = typeof updater === "function" ? updater(prev) : updater;
-          streamingChatCache.set(streamingChatId, { messages: next, isSending: true });
+          setStreamingChatState(streamingChatId, { messages: next, isSending: true });
           if (chatIdRef.current === streamingChatId) {
-            setMessages(updater);
+            setMessages(next);
           }
         };
 
@@ -2216,13 +2325,13 @@ export default function ChatInterface({
         }
       } catch (e: any) {
         console.error("Failed to send video from agent:", e);
-        if (streamingChatId) streamingChatCache.delete(streamingChatId);
+        if (streamingChatId) deleteStreamingChatState(streamingChatId);
         addToast({
           title: t("chat.sendFailed"),
           color: "danger",
         });
       } finally {
-        if (streamingChatId) streamingChatCache.delete(streamingChatId);
+        if (streamingChatId) deleteStreamingChatState(streamingChatId);
         if (!streamingChatId || chatIdRef.current === streamingChatId) {
           setIsSending(false);
         }
@@ -2394,7 +2503,7 @@ export default function ChatInterface({
     setGeneratingVariantTimestamp(messageTimestamp);
 
     const streamingChatId = chatId;
-    streamingChatCache.set(streamingChatId, {
+    setStreamingChatState(streamingChatId, {
       messages: [...messages],
       isSending: true,
     });
@@ -2402,9 +2511,9 @@ export default function ChatInterface({
       const cached = streamingChatCache.get(streamingChatId);
       const prev = cached?.messages ?? [];
       const next = typeof updater === "function" ? updater(prev) : updater;
-      streamingChatCache.set(streamingChatId, { messages: next, isSending: true });
+      setStreamingChatState(streamingChatId, { messages: next, isSending: true });
       if (chatIdRef.current === streamingChatId) {
-        setMessages(updater);
+        setMessages(next);
       }
     };
 
@@ -2561,13 +2670,13 @@ export default function ChatInterface({
       });
     } catch (error) {
       console.error("Error generating variant:", error);
-      streamingChatCache.delete(streamingChatId);
+      deleteStreamingChatState(streamingChatId);
       addToast({
         title: t("chat.failedToGenerateVariant"),
         color: "danger",
       });
     } finally {
-      streamingChatCache.delete(streamingChatId);
+      deleteStreamingChatState(streamingChatId);
       if (chatIdRef.current === streamingChatId) {
         setGeneratingVariantTimestamp(null);
       }
