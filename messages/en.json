@@ -576,7 +576,16 @@
     "noSourceImageInChat": "No source image found in this conversation. Please generate or upload an image first.",
     "generationStarted": "Video generation started!",
     "generationInProgress": "Video is being generated...",
-    "download": "Download"
+    "download": "Download",
+    "filterStatus": "Status",
+    "filterModel": "Model",
+    "filterAllModels": "All Models",
+    "filterDate": "Date",
+    "filterAllTime": "All Time",
+    "filterToday": "Today",
+    "filterLast7Days": "Last 7 Days",
+    "filterLast30Days": "Last 30 Days",
+    "filterDuration": "Duration"
   },
   "menu": {
     "mode": "Mode",

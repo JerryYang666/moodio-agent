@@ -496,7 +496,16 @@
     "noSourceImageInChat": "此对话中未找到源图片。请先生成或上传图片。",
     "generationStarted": "视频生成已开始！",
     "generationInProgress": "视频正在生成中...",
-    "download": "下载"
+    "download": "下载",
+    "filterStatus": "状态",
+    "filterModel": "模型",
+    "filterAllModels": "所有模型",
+    "filterDate": "日期",
+    "filterAllTime": "所有时间",
+    "filterToday": "今天",
+    "filterLast7Days": "最近7天",
+    "filterLast30Days": "最近30天",
+    "filterDuration": "时长"
   },
   "menu": {
     "mode": "模式",
