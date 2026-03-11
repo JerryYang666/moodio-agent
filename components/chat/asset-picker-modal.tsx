@@ -79,13 +79,14 @@ const AssetGridItem = React.memo(function AssetGridItem({
           className="w-full h-full"
           onClick={(e) => onClick(asset, index, e)}
         >
-          {/* Use native img for performance – avoids HeroUI Image overhead on 80+ items */}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
+          <Image
             src={asset.imageUrl}
             alt={asset.generationDetails?.title || assetAltLabel}
-            className={`w-full h-full object-cover ${multiSelect && isSelected ? "opacity-80" : ""}`}
-            loading="lazy"
+            radius="none"
+            classNames={{
+              wrapper: "w-full h-full !max-w-full",
+              img: `w-full h-full object-cover ${multiSelect && isSelected ? "opacity-80" : ""}`,
+            }}
           />
         </button>
 
