@@ -2,9 +2,11 @@
 
 import { Button } from "@heroui/button";
 import { Tooltip } from "@heroui/tooltip";
-import { ZoomIn, ZoomOut, Maximize, Grid3X3 } from "lucide-react";
+import { ZoomIn, ZoomOut, Maximize, Hand, MousePointer2 } from "lucide-react";
 import type { CameraState } from "@/hooks/use-desktop";
 import type { DesktopAsset } from "@/lib/db/schema";
+
+export type CanvasMode = "move" | "select";
 
 const MIN_ZOOM = 0.1;
 const MAX_ZOOM = 5;
@@ -14,12 +16,16 @@ interface DesktopToolbarProps {
   camera: CameraState;
   assets: DesktopAsset[];
   onCameraChange: (camera: CameraState) => void;
+  canvasMode: CanvasMode;
+  onCanvasModeChange: (mode: CanvasMode) => void;
 }
 
 export default function DesktopToolbar({
   camera,
   assets,
   onCameraChange,
+  canvasMode,
+  onCanvasModeChange,
 }: DesktopToolbarProps) {
   const zoomIn = () => {
     const newZoom = Math.min(MAX_ZOOM, camera.zoom * 1.25);
@@ -77,6 +83,20 @@ export default function DesktopToolbar({
 
   return (
     <div className="absolute bottom-4 right-4 flex items-center gap-1 bg-background/80 backdrop-blur-sm rounded-xl border border-divider p-1 shadow-sm z-10">
+      <Tooltip content={canvasMode === "move" ? "Move canvas (drag)" : "Select assets (drag)"} closeDelay={0}>
+        <Button
+          isIconOnly
+          size="sm"
+          variant={canvasMode === "move" ? "flat" : "flat"}
+          color={canvasMode === "select" ? "primary" : "default"}
+          onPress={() => onCanvasModeChange(canvasMode === "move" ? "select" : "move")}
+        >
+          {canvasMode === "move" ? <Hand size={16} /> : <MousePointer2 size={16} />}
+        </Button>
+      </Tooltip>
+
+      <div className="w-px h-5 bg-divider mx-0.5" />
+
       <Tooltip content="Zoom out" closeDelay={0}>
         <Button isIconOnly size="sm" variant="light" onPress={zoomOut}>
           <ZoomOut size={16} />

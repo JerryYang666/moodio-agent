@@ -12,7 +12,7 @@ import { Tooltip } from "@heroui/tooltip";
 import { ArrowLeft, Share2, Pencil, Wifi, WifiOff } from "lucide-react";
 import DesktopCanvas from "@/components/desktop/DesktopCanvas";
 import type { EnrichedDesktopAsset } from "@/components/desktop/assets";
-import DesktopToolbar from "@/components/desktop/DesktopToolbar";
+import DesktopToolbar, { type CanvasMode } from "@/components/desktop/DesktopToolbar";
 import ChatSidePanel from "@/components/chat/chat-side-panel";
 import { siteConfig } from "@/config/site";
 import {
@@ -160,6 +160,7 @@ export default function DesktopDetailPage({
   handleVideoRemoteEventRef.current = handleVideoRemoteEvent;
 
   const [camera, setCamera] = useState<CameraState>(DEFAULT_CAMERA);
+  const [canvasMode, setCanvasMode] = useState<CanvasMode>("move");
   const viewportSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cameraRef = useRef(camera);
   cameraRef.current = camera;
@@ -547,6 +548,7 @@ export default function DesktopDetailPage({
           assets={assets}
           camera={camera}
           permission={desktop.permission}
+          canvasMode={canvasMode}
           onCameraChange={handleCameraChange}
           onAssetMove={handleAssetMove}
           onAssetBatchMove={handleAssetBatchMove}
@@ -568,6 +570,8 @@ export default function DesktopDetailPage({
           camera={camera}
           assets={assets}
           onCameraChange={handleCameraChange}
+          canvasMode={canvasMode}
+          onCanvasModeChange={setCanvasMode}
         />
       </div>
 
