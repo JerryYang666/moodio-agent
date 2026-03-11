@@ -619,7 +619,7 @@ export default function AssetPickerModal({
         onOpenChange={onOpenChange}
         size="4xl"
         scrollBehavior="inside"
-        classNames={{ base: "max-h-[90dvh]" }}
+        classNames={{ base: "max-h-[90dvh]", wrapper: "z-[120]" }}
       >
         <ModalContent>
           {(onClose) => (
@@ -937,6 +937,7 @@ export default function AssetPickerModal({
         onOpenChange={() => setPreviewAsset(null)}
         size="5xl"
         classNames={{
+          wrapper: "z-[120]",
           base: "bg-black/95",
           closeButton: "text-white hover:bg-white/20",
         }}
