@@ -422,7 +422,10 @@
     "zoomOut": "Zoom out",
     "resetZoom": "Reset zoom",
     "fitToView": "Fit to view",
-    "desktopNotFound": "Desktop not found"
+    "desktopNotFound": "Desktop not found",
+    "addAsset": "Add Asset",
+    "failedToAddAsset": "Failed to add asset",
+    "uploadFailed": "Upload failed"
   },
   "storyboard": {
     "title": "Storyboard",

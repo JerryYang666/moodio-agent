@@ -17,6 +17,7 @@ import {
   MousePointer2,
   SendHorizontal,
   Film,
+  Plus,
 } from "lucide-react";
 
 const MIN_ZOOM = 0.1;
@@ -61,12 +62,15 @@ interface DesktopCanvasProps {
     },
     position: { x: number; y: number }
   ) => void;
+  onAddAssetAtPosition?: (worldPos: { x: number; y: number }) => void;
 }
 
 interface ContextMenuState {
   x: number;
   y: number;
   assetId: string | null;
+  worldX: number;
+  worldY: number;
 }
 
 function isAiImageStatus(
@@ -126,6 +130,7 @@ export default function DesktopCanvas({
   cellLocks,
   onCellCommit,
   onExternalImageDrop,
+  onAddAssetAtPosition,
 }: DesktopCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const isPanning = useRef(false);
@@ -617,15 +622,21 @@ export default function DesktopCanvas({
       if (!selectedIds.has(asset.id)) {
         setSelectedIds(new Set([asset.id]));
       }
-      setContextMenu({ x: e.clientX, y: e.clientY, assetId: asset.id });
+      const world = screenToWorld(e.clientX, e.clientY);
+      setContextMenu({ x: e.clientX, y: e.clientY, assetId: asset.id, worldX: world.x, worldY: world.y });
     },
-    [selectedIds]
+    [selectedIds, screenToWorld]
   );
 
   const handleBackgroundContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
-    setContextMenu(null);
-  }, []);
+    if (!canEdit || !onAddAssetAtPosition) {
+      setContextMenu(null);
+      return;
+    }
+    const world = screenToWorld(e.clientX, e.clientY);
+    setContextMenu({ x: e.clientX, y: e.clientY, assetId: null, worldX: world.x, worldY: world.y });
+  }, [canEdit, onAddAssetAtPosition, screenToWorld]);
 
   const handleDeleteSelected = useCallback(() => {
     if (selectedIds.size === 0) return;
@@ -894,7 +905,19 @@ export default function DesktopCanvas({
           style={{ left: contextMenu.x, top: contextMenu.y }}
           onPointerDown={(e) => e.stopPropagation()}
         >
-          {selectedIds.size > 1 ? (
+          {contextMenu.assetId === null ? (
+            /* Background context menu: add asset */
+            <button
+              className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-default-100 transition-colors text-left"
+              onClick={() => {
+                onAddAssetAtPosition?.({ x: contextMenu.worldX, y: contextMenu.worldY });
+                setContextMenu(null);
+              }}
+            >
+              <Plus size={14} />
+              Add Asset
+            </button>
+          ) : selectedIds.size > 1 ? (
             /* Multi-select context menu: only delete option */
             <button
               className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-danger-50 text-danger transition-colors text-left"

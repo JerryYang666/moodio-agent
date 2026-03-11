@@ -10,6 +10,8 @@ import { useDisclosure } from "@heroui/modal";
 import { addToast } from "@heroui/toast";
 import { Tooltip } from "@heroui/tooltip";
 import { ArrowLeft, Share2, Pencil, Wifi, WifiOff } from "lucide-react";
+import AssetPickerModal, { type AssetSummary } from "@/components/chat/asset-picker-modal";
+import { uploadImage } from "@/lib/upload/client";
 import DesktopCanvas from "@/components/desktop/DesktopCanvas";
 import type { EnrichedDesktopAsset } from "@/components/desktop/assets";
 import DesktopToolbar, { type CanvasMode } from "@/components/desktop/DesktopToolbar";
@@ -497,6 +499,99 @@ export default function DesktopDetailPage({
     [addTimelineClip]
   );
 
+  // Asset picker state for right-click "Add Asset"
+  const [isAssetPickerOpen, setIsAssetPickerOpen] = useState(false);
+  const addAssetPositionRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+
+  const handleAddAssetAtPosition = useCallback((worldPos: { x: number; y: number }) => {
+    addAssetPositionRef.current = worldPos;
+    setIsAssetPickerOpen(true);
+  }, []);
+
+  const handleAssetPickerSelect = useCallback(
+    async (asset: AssetSummary) => {
+      const pos = addAssetPositionRef.current;
+      try {
+        const res = await fetch(`/api/desktop/${desktopId}/assets`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            assets: [
+              {
+                assetType: "image",
+                metadata: {
+                  imageId: asset.imageId,
+                  chatId: asset.chatId ?? undefined,
+                  title: asset.generationDetails?.title || "Image",
+                  prompt: asset.generationDetails?.prompt || "",
+                  status: asset.generationDetails?.status || "generated",
+                },
+                posX: pos.x,
+                posY: pos.y,
+              },
+            ],
+          }),
+        });
+        if (!res.ok) throw new Error("Failed to add asset to desktop");
+        const data = await res.json();
+        window.dispatchEvent(
+          new CustomEvent("desktop-asset-added", {
+            detail: { assets: data.assets, desktopId },
+          })
+        );
+      } catch (error) {
+        console.error("Failed to add picked asset to desktop:", error);
+        addToast({ title: "Failed to add asset", color: "danger" });
+      }
+    },
+    [desktopId]
+  );
+
+  const handleAssetPickerUpload = useCallback(
+    async (files: File[]) => {
+      const pos = addAssetPositionRef.current;
+      for (const file of files) {
+        const result = await uploadImage(file);
+        if (!result.success) {
+          addToast({ title: "Upload failed", description: result.error.message, color: "danger" });
+          continue;
+        }
+        try {
+          const res = await fetch(`/api/desktop/${desktopId}/assets`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              assets: [
+                {
+                  assetType: "image",
+                  metadata: {
+                    imageId: result.data.imageId,
+                    title: file.name,
+                    prompt: "",
+                    status: "generated",
+                  },
+                  posX: pos.x,
+                  posY: pos.y,
+                },
+              ],
+            }),
+          });
+          if (!res.ok) throw new Error("Failed to add uploaded asset to desktop");
+          const data = await res.json();
+          window.dispatchEvent(
+            new CustomEvent("desktop-asset-added", {
+              detail: { assets: data.assets, desktopId },
+            })
+          );
+        } catch (error) {
+          console.error("Failed to add uploaded asset to desktop:", error);
+          addToast({ title: "Failed to add asset", color: "danger" });
+        }
+      }
+    },
+    [desktopId]
+  );
+
   if (loading && !detail) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -621,6 +716,7 @@ export default function DesktopDetailPage({
           onCellCommit={handleCellCommit}
           onSendToTimeline={canEdit ? handleSendToTimeline : undefined}
           onExternalImageDrop={canEdit ? handleExternalImageDrop : undefined}
+          onAddAssetAtPosition={canEdit ? handleAddAssetAtPosition : undefined}
         />
         <DesktopToolbar
           camera={camera}
@@ -666,6 +762,14 @@ export default function DesktopDetailPage({
         ownerId={desktop.userId}
         shares={shares}
         share={shareModal}
+      />
+
+      {/* Asset Picker for right-click "Add Asset" */}
+      <AssetPickerModal
+        isOpen={isAssetPickerOpen}
+        onOpenChange={() => setIsAssetPickerOpen((v) => !v)}
+        onSelect={handleAssetPickerSelect}
+        onUpload={handleAssetPickerUpload}
       />
     </div>
   );
