@@ -1,6 +1,7 @@
 import { createApi } from "@reduxjs/toolkit/query/react";
 import { createBaseQueryWithReauth } from "./base-query";
 import type { FeatureFlagsResponse } from "@/lib/feature-flags/types";
+import type { Permission } from "@/lib/permissions";
 
 // Types for credits
 export interface CreditsBalanceResponse {
@@ -27,6 +28,20 @@ export interface GenerateVideoError {
   cost?: number;
 }
 
+// Types for collections
+export interface CollectionItem {
+  id: string;
+  userId: string;
+  projectId: string;
+  name: string;
+  createdAt: Date;
+  updatedAt: Date;
+  permission: Permission;
+  isOwner: boolean;
+  sharedAt?: Date;
+  coverImageUrl?: string | null;
+}
+
 /**
  * Next.js API slice
  *
@@ -36,32 +51,71 @@ export interface GenerateVideoError {
 export const nextApi = createApi({
   reducerPath: "nextApi",
   baseQuery: createBaseQueryWithReauth(""),
-  tagTypes: ["FeatureFlags", "Credits"],
+  tagTypes: ["FeatureFlags", "Credits", "Collections"],
 
   endpoints: (builder) => ({
     getFeatureFlags: builder.query<FeatureFlagsResponse, void>({
       query: () => "/api/users/feature-flags",
-      // Cache for 5 minutes
       keepUnusedDataFor: 300,
       providesTags: ["FeatureFlags"],
     }),
 
-    // Credits balance endpoint
     getCreditsBalance: builder.query<CreditsBalanceResponse, void>({
       query: () => "/api/users/credits/balance",
       providesTags: ["Credits"],
     }),
 
-    // Video generation mutation - invalidates Credits cache on success
     generateVideo: builder.mutation<GenerateVideoResponse, GenerateVideoRequest>({
       query: (body) => ({
         url: "/api/video/generate",
         method: "POST",
         body,
       }),
-      // Invalidate credits cache when video generation succeeds
-      // This triggers automatic refetch of credits balance
       invalidatesTags: ["Credits"],
+    }),
+
+    getCollections: builder.query<CollectionItem[], void>({
+      query: () => "/api/collection",
+      transformResponse: (response: { collections: CollectionItem[] }) =>
+        response.collections ?? [],
+      providesTags: ["Collections"],
+      keepUnusedDataFor: 120,
+    }),
+
+    createCollection: builder.mutation<
+      CollectionItem,
+      { name: string; projectId?: string }
+    >({
+      query: (body) => ({
+        url: "/api/collection",
+        method: "POST",
+        body,
+      }),
+      transformResponse: (response: { collection: CollectionItem }) =>
+        response.collection,
+      invalidatesTags: ["Collections"],
+    }),
+
+    renameCollection: builder.mutation<
+      CollectionItem,
+      { collectionId: string; name: string }
+    >({
+      query: ({ collectionId, name }) => ({
+        url: `/api/collection/${collectionId}`,
+        method: "PATCH",
+        body: { name },
+      }),
+      transformResponse: (response: { collection: CollectionItem }) =>
+        response.collection,
+      invalidatesTags: ["Collections"],
+    }),
+
+    deleteCollection: builder.mutation<void, string>({
+      query: (collectionId) => ({
+        url: `/api/collection/${collectionId}`,
+        method: "DELETE",
+      }),
+      invalidatesTags: ["Collections"],
     }),
   }),
 });
@@ -70,4 +124,8 @@ export const {
   useGetFeatureFlagsQuery,
   useGetCreditsBalanceQuery,
   useGenerateVideoMutation,
+  useGetCollectionsQuery,
+  useCreateCollectionMutation,
+  useRenameCollectionMutation,
+  useDeleteCollectionMutation,
 } = nextApi;

@@ -1,41 +1,38 @@
 "use client";
 
-import React, { createContext, useState, useEffect, useCallback } from "react";
+import React, { createContext, useCallback } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { addToast } from "@heroui/toast";
-import { type Permission, type SharePermission } from "@/lib/permissions";
+import { type SharePermission } from "@/lib/permissions";
+import {
+  useGetCollectionsQuery,
+  useCreateCollectionMutation,
+  useRenameCollectionMutation,
+  useDeleteCollectionMutation,
+  nextApi,
+} from "@/lib/redux/services/next-api";
+import type { CollectionItem } from "@/lib/redux/services/next-api";
+import { useDispatch } from "react-redux";
+import type { AppDispatch } from "@/lib/redux/store";
 
-// Custom event names for real-time sync
 export const ASSETS_UPDATED_EVENT = "moodio-assets-updated";
-export const COLLECTIONS_UPDATED_EVENT = "moodio-collections-updated";
 
-export interface Collection {
-  id: string;
-  userId: string;
-  projectId: string;
-  name: string;
-  createdAt: Date;
-  updatedAt: Date;
-  permission: Permission;
-  isOwner: boolean;
-  sharedAt?: Date;
-  coverImageUrl?: string | null;
-}
+export type Collection = CollectionItem;
 
 export interface CollectionImage {
   id: string;
   projectId: string;
   collectionId: string | null;
-  imageId: string; // Thumbnail/display image ID (for both images and videos)
-  assetId: string; // Actual asset ID (same as imageId for images, video ID for videos)
+  imageId: string;
+  assetId: string;
   assetType: "image" | "video";
   chatId: string | null;
   generationDetails: {
     title: string;
     prompt: string;
     status: "loading" | "generated" | "error" | "pending" | "processing" | "completed" | "failed";
-    imageUrl?: string; // Resolved thumbnail URL
-    videoUrl?: string; // Resolved video URL (for videos only)
+    imageUrl?: string;
+    videoUrl?: string;
   };
   addedAt: Date;
 }
@@ -91,139 +88,99 @@ export function CollectionsProvider({
   children: React.ReactNode;
 }) {
   const { user } = useAuth();
-  const [collections, setCollections] = useState<Collection[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const dispatch = useDispatch<AppDispatch>();
+
+  const {
+    data: collections = [],
+    isLoading,
+    error: queryError,
+    refetch,
+  } = useGetCollectionsQuery(undefined, { skip: !user });
+
+  const [createCollectionMutation] = useCreateCollectionMutation();
+  const [renameCollectionMutation] = useRenameCollectionMutation();
+  const [deleteCollectionMutation] = useDeleteCollectionMutation();
+
+  const loading = isLoading;
+  const error = queryError
+    ? "status" in queryError
+      ? "Failed to fetch collections"
+      : queryError.message ?? ""
+    : "";
 
   const getDefaultCollectionName = useCallback(() => {
     if (!user) return "My Collection";
-    
+
     let baseName = "";
     if (user.firstName) {
-      baseName = user.firstName.length > 32 
-        ? user.firstName.substring(0, 32) 
+      baseName = user.firstName.length > 32
+        ? user.firstName.substring(0, 32)
         : user.firstName;
     } else {
       const emailPrefix = user.email.split("@")[0];
-      baseName = emailPrefix.length > 32 
-        ? emailPrefix.substring(0, 32) 
+      baseName = emailPrefix.length > 32
+        ? emailPrefix.substring(0, 32)
         : emailPrefix;
     }
-    
+
     return `${baseName}'s Collection`;
   }, [user]);
 
   const refreshCollections = useCallback(async () => {
-    if (!user) {
-      setCollections([]);
-      return;
-    }
-
-    setLoading(true);
-    setError("");
-
-    try {
-      const res = await fetch("/api/collection");
-      if (!res.ok) {
-        throw new Error("Failed to fetch collections");
-      }
-
-      const data = await res.json();
-      setCollections(data.collections || []);
-    } catch (err) {
-      console.error("Error fetching collections:", err);
-      setError(err instanceof Error ? err.message : "Failed to fetch collections");
-    } finally {
-      setLoading(false);
-    }
-  }, [user]);
-
-  useEffect(() => {
-    refreshCollections();
-  }, [refreshCollections]);
+    if (!user) return;
+    refetch();
+  }, [user, refetch]);
 
   const createCollection = useCallback(
     async (name: string, projectId?: string) => {
       try {
-        const payload: any = { name };
+        const payload: { name: string; projectId?: string } = { name };
         if (projectId) payload.projectId = projectId;
-        const res = await fetch("/api/collection", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-
-        if (!res.ok) {
-          throw new Error("Failed to create collection");
-        }
-
-        const data = await res.json();
-        setCollections((prev) => [data.collection, ...prev]);
-        
-        // Dispatch event for real-time sync (e.g., assets sidebar)
-        window.dispatchEvent(new CustomEvent(COLLECTIONS_UPDATED_EVENT));
-        
-        return data.collection;
+        const result = await createCollectionMutation(payload).unwrap();
+        return result;
       } catch (err) {
         console.error("Error creating collection:", err);
         return null;
       }
     },
-    []
+    [createCollectionMutation]
   );
 
-  const renameCollection = useCallback(async (collectionId: string, name: string) => {
-    try {
-      const res = await fetch(`/api/collection/${collectionId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name }),
-      });
-
-      if (!res.ok) {
-        throw new Error("Failed to rename collection");
+  const renameCollection = useCallback(
+    async (collectionId: string, name: string) => {
+      try {
+        await renameCollectionMutation({ collectionId, name }).unwrap();
+        addToast({
+          title: "Collection renamed",
+          description: "The collection has been renamed successfully",
+          color: "success",
+        });
+        return true;
+      } catch (err) {
+        console.error("Error renaming collection:", err);
+        addToast({
+          title: "Error",
+          description: "Failed to rename collection",
+          color: "danger",
+        });
+        return false;
       }
+    },
+    [renameCollectionMutation]
+  );
 
-      const data = await res.json();
-      setCollections((prev) =>
-        prev.map((col) =>
-          col.id === collectionId ? { ...col, name: data.collection.name, updatedAt: data.collection.updatedAt } : col
-        )
-      );
-      addToast({
-        title: "Collection renamed",
-        description: "The collection has been renamed successfully",
-        color: "success",
-      });
-      return true;
-    } catch (err) {
-      console.error("Error renaming collection:", err);
-      addToast({
-        title: "Error",
-        description: "Failed to rename collection",
-        color: "danger",
-      });
-      return false;
-    }
-  }, []);
-
-  const deleteCollection = useCallback(async (collectionId: string) => {
-    try {
-      const res = await fetch(`/api/collection/${collectionId}`, {
-        method: "DELETE",
-      });
-
-      if (!res.ok) {
-        throw new Error("Failed to delete collection");
+  const deleteCollection = useCallback(
+    async (collectionId: string) => {
+      try {
+        await deleteCollectionMutation(collectionId).unwrap();
+        return true;
+      } catch (err) {
+        console.error("Error deleting collection:", err);
+        return false;
       }
-
-      setCollections((prev) => prev.filter((col) => col.id !== collectionId));
-      return true;
-    } catch (err) {
-      console.error("Error deleting collection:", err);
-      return false;
-    }
-  }, []);
+    },
+    [deleteCollectionMutation]
+  );
 
   const addImageToCollection = useCallback(
     async (
@@ -244,25 +201,26 @@ export function CollectionsProvider({
           throw new Error(data.error || "Failed to add image to collection");
         }
 
-        // Update collection's updatedAt
-        setCollections((prev) =>
-          prev.map((col) =>
-            col.id === collectionId ? { ...col, updatedAt: new Date() } : col
-          )
+        dispatch(
+          nextApi.util.updateQueryData("getCollections", undefined, (draft) => {
+            const col = draft.find((c) => c.id === collectionId);
+            if (col) col.updatedAt = new Date();
+          })
         );
-        
-        // Dispatch event for real-time sync (e.g., assets sidebar)
-        window.dispatchEvent(new CustomEvent(ASSETS_UPDATED_EVENT, { 
-          detail: { collectionId } 
-        }));
-        
+
+        window.dispatchEvent(
+          new CustomEvent(ASSETS_UPDATED_EVENT, {
+            detail: { collectionId },
+          })
+        );
+
         return true;
       } catch (err) {
         console.error("Error adding image to collection:", err);
         return false;
       }
     },
-    []
+    [dispatch]
   );
 
   const addVideoToCollection = useCallback(
@@ -277,10 +235,10 @@ export function CollectionsProvider({
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            imageId: thumbnailImageId, // Thumbnail for display
-            assetId: videoId, // Actual video asset
+            imageId: thumbnailImageId,
+            assetId: videoId,
             assetType: "video",
-            chatId: null, // Videos don't come from chats
+            chatId: null,
             generationDetails,
           }),
         });
@@ -290,14 +248,13 @@ export function CollectionsProvider({
           throw new Error(data.error || "Failed to add video to collection");
         }
 
-        // Update collection's updatedAt
-        setCollections((prev) =>
-          prev.map((col) =>
-            col.id === collectionId ? { ...col, updatedAt: new Date() } : col
-          )
+        dispatch(
+          nextApi.util.updateQueryData("getCollections", undefined, (draft) => {
+            const col = draft.find((c) => c.id === collectionId);
+            if (col) col.updatedAt = new Date();
+          })
         );
 
-        // Dispatch event for real-time sync (e.g., assets sidebar)
         window.dispatchEvent(
           new CustomEvent(ASSETS_UPDATED_EVENT, {
             detail: { collectionId },
@@ -310,7 +267,7 @@ export function CollectionsProvider({
         return false;
       }
     },
-    []
+    [dispatch]
   );
 
   const removeItemFromCollection = useCallback(
@@ -318,9 +275,7 @@ export function CollectionsProvider({
       try {
         const res = await fetch(
           `/api/collection/${collectionId}/images/${itemId}`,
-          {
-            method: "DELETE",
-          }
+          { method: "DELETE" }
         );
 
         if (!res.ok) {
@@ -367,9 +322,7 @@ export function CollectionsProvider({
       try {
         const res = await fetch(
           `/api/collection/${collectionId}/share/${userId}`,
-          {
-            method: "DELETE",
-          }
+          { method: "DELETE" }
         );
 
         if (!res.ok) {

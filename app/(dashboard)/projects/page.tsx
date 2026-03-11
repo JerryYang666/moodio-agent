@@ -8,7 +8,6 @@ import { Button } from "@heroui/button";
 import { Input } from "@heroui/input";
 import { Spinner } from "@heroui/spinner";
 import { Chip } from "@heroui/chip";
-import { type Permission } from "@/lib/permissions";
 import { Image } from "@heroui/image";
 import {
   Modal,
@@ -25,6 +24,7 @@ import {
   DropdownItem,
 } from "@heroui/dropdown";
 import { Folder, Plus, Share2, FolderOpen, MoreVertical, Pencil } from "lucide-react";
+import { useGetCollectionsQuery } from "@/lib/redux/services/next-api";
 
 type Project = {
   id: string;
@@ -42,19 +42,6 @@ type SharedProject = Project & {
   sharedAt?: Date;
 };
 
-type Collection = {
-  id: string;
-  userId: string;
-  projectId: string;
-  name: string;
-  createdAt: Date;
-  updatedAt: Date;
-  permission: Permission;
-  isOwner: boolean;
-  sharedAt?: Date;
-  coverImageUrl: string | null;
-};
-
 export default function ProjectsPage() {
   const router = useRouter();
   const t = useTranslations();
@@ -64,42 +51,38 @@ export default function ProjectsPage() {
     onOpen: onRenameOpen,
     onOpenChange: onRenameOpenChange,
   } = useDisclosure();
-  const [loading, setLoading] = useState(true);
+  const [projectsLoading, setProjectsLoading] = useState(true);
   const [projects, setProjects] = useState<Project[]>([]);
   const [sharedProjects, setSharedProjects] = useState<SharedProject[]>([]);
-  const [collections, setCollections] = useState<Collection[]>([]);
   const [newProjectName, setNewProjectName] = useState("");
   const [isCreating, setIsCreating] = useState(false);
   const [projectToRename, setProjectToRename] = useState<Project | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [isRenaming, setIsRenaming] = useState(false);
 
+  const { data: collections = [], isLoading: collectionsLoading } = useGetCollectionsQuery();
+
   const sharedCollections = useMemo(
     () => collections.filter((c) => !c.isOwner),
     [collections]
   );
 
+  const loading = projectsLoading || collectionsLoading;
+
   useEffect(() => {
     const load = async () => {
-      setLoading(true);
+      setProjectsLoading(true);
       try {
-        const [projectsRes, collectionsRes] = await Promise.all([
-          fetch("/api/projects"),
-          fetch("/api/collection"),
-        ]);
+        const projectsRes = await fetch("/api/projects");
         if (projectsRes.ok) {
           const data = await projectsRes.json();
           setProjects(data.projects || []);
           setSharedProjects(data.sharedProjects || []);
         }
-        if (collectionsRes.ok) {
-          const data = await collectionsRes.json();
-          setCollections(data.collections || []);
-        }
       } catch (e) {
-        console.error("Failed to load projects/collections", e);
+        console.error("Failed to load projects", e);
       } finally {
-        setLoading(false);
+        setProjectsLoading(false);
       }
     };
     load();

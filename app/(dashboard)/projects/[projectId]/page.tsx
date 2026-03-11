@@ -28,6 +28,10 @@ import { ArrowLeft, Folder, Plus, MoreVertical, Pencil, Share2 } from "lucide-re
 import ImageDetailModal, { ImageInfo } from "@/components/chat/image-detail-modal";
 import { useShareModal, type ShareEntry } from "@/hooks/use-share-modal";
 import ShareModal from "@/components/share-modal";
+import {
+  useCreateCollectionMutation,
+  useRenameCollectionMutation,
+} from "@/lib/redux/services/next-api";
 
 type Project = {
   id: string;
@@ -112,10 +116,13 @@ export default function ProjectDetailPage({
   });
 
   const [newCollectionName, setNewCollectionName] = useState("");
-  const [isCreatingCollection, setIsCreatingCollection] = useState(false);
   const [collectionToRename, setCollectionToRename] = useState<Collection | null>(null);
   const [renameCollectionValue, setRenameCollectionValue] = useState("");
-  const [isRenamingCollection, setIsRenamingCollection] = useState(false);
+
+  const [createCollectionMutation, { isLoading: isCreatingCollection }] =
+    useCreateCollectionMutation();
+  const [renameCollectionMutation, { isLoading: isRenamingCollection }] =
+    useRenameCollectionMutation();
 
   const [selectedImage, setSelectedImage] = useState<ImageInfo | null>(null);
   const [allImages, setAllImages] = useState<ImageInfo[]>([]);
@@ -147,44 +154,33 @@ export default function ProjectDetailPage({
 
   const handleCreateCollection = async () => {
     if (!newCollectionName.trim()) return;
-    setIsCreatingCollection(true);
     try {
-      const res = await fetch("/api/collection", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: newCollectionName.trim(), projectId }),
-      });
-      if (!res.ok) return;
-      const data = await res.json();
-      const collection: any = data.collection;
+      const collection = await createCollectionMutation({
+        name: newCollectionName.trim(),
+        projectId,
+      }).unwrap();
       if (collection) {
-        setCollections((prev) => [collection, ...prev]);
+        setCollections((prev) => [collection as unknown as Collection, ...prev]);
         setNewCollectionName("");
         onCreateCollectionOpenChange();
         router.push(`/collection/${collection.id}`);
       }
     } catch (e) {
       console.error("Error creating collection", e);
-    } finally {
-      setIsCreatingCollection(false);
     }
   };
 
   const handleRenameCollection = async () => {
     if (!collectionToRename || !renameCollectionValue.trim()) return;
-    setIsRenamingCollection(true);
     try {
-      const res = await fetch(`/api/collection/${collectionToRename.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: renameCollectionValue.trim() }),
-      });
-      if (!res.ok) return;
-      const data = await res.json();
-      if (data.collection) {
+      const updated = await renameCollectionMutation({
+        collectionId: collectionToRename.id,
+        name: renameCollectionValue.trim(),
+      }).unwrap();
+      if (updated) {
         setCollections((prev) =>
           prev.map((c) =>
-            c.id === collectionToRename.id ? { ...c, name: data.collection.name } : c
+            c.id === collectionToRename.id ? { ...c, name: updated.name } : c
           )
         );
         onRenameCollectionOpenChange();
@@ -193,8 +189,6 @@ export default function ProjectDetailPage({
       }
     } catch (e) {
       console.error("Error renaming collection", e);
-    } finally {
-      setIsRenamingCollection(false);
     }
   };
 

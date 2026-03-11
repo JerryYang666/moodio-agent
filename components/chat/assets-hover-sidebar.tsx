@@ -12,7 +12,7 @@ import clsx from "clsx";
 import { addToast } from "@heroui/toast";
 import { ASSET_DRAG_MIME, AI_IMAGE_DRAG_MIME } from "./asset-dnd";
 import { useCollections } from "@/hooks/use-collections";
-import { ASSETS_UPDATED_EVENT, COLLECTIONS_UPDATED_EVENT } from "@/components/collections-provider";
+import { ASSETS_UPDATED_EVENT } from "@/components/collections-provider";
 import { PERMISSION_VIEWER, type Permission } from "@/lib/permissions";
 
 type Project = {
@@ -154,19 +154,6 @@ export default function AssetsHoverSidebar() {
     };
   }, [loadAssets]);
 
-  // Listen for collections updates
-  useEffect(() => {
-    const handleCollectionsUpdated = () => {
-      // Collections are already managed by useCollections hook,
-      // but we refresh to ensure sync
-      refreshCollections();
-    };
-
-    window.addEventListener(COLLECTIONS_UPDATED_EVENT, handleCollectionsUpdated);
-    return () => {
-      window.removeEventListener(COLLECTIONS_UPDATED_EVENT, handleCollectionsUpdated);
-    };
-  }, [refreshCollections]);
 
   const handlePick = (asset: Asset) => {
     const payload: AssetDragPayload = {

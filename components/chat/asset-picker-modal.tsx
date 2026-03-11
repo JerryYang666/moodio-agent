@@ -2,7 +2,6 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
-import { type Permission } from "@/lib/permissions";
 import {
   Modal,
   ModalContent,
@@ -18,6 +17,7 @@ import { Image } from "@heroui/image";
 import { Tab, Tabs } from "@heroui/tabs";
 import { Search, Expand, Camera, Star, X, Check } from "lucide-react";
 import { siteConfig } from "@/config/site";
+import { useGetCollectionsQuery } from "@/lib/redux/services/next-api";
 
 export type AssetSummary = {
   id: string;
@@ -39,14 +39,6 @@ type Project = {
   id: string;
   name: string;
   isDefault: boolean;
-};
-
-type Collection = {
-  id: string;
-  name: string;
-  projectId: string;
-  isOwner: boolean;
-  permission: Permission;
 };
 
 /** Memoized grid item – only re-renders when its own selection state or asset changes */
@@ -124,7 +116,7 @@ const AssetGridItem = React.memo(function AssetGridItem({
         </button>
 
         {/* Bottom overlay: title + star rating (collection style) */}
-        <div className="absolute bottom-0 left-0 right-0 z-10 bg-gradient-to-t from-black/70 to-transparent pt-6 pb-1.5 px-2 pointer-events-none">
+        <div className="absolute bottom-0 left-0 right-0 z-10 bg-linear-to-t from-black/70 to-transparent pt-6 pb-1.5 px-2 pointer-events-none">
           <p className="text-xs text-white truncate">
             {asset.generationDetails?.title || untitledLabel}
           </p>
@@ -173,7 +165,7 @@ export default function AssetPickerModal({
   const t = useTranslations();
   const [loading, setLoading] = useState(false);
   const [projects, setProjects] = useState<Project[]>([]);
-  const [collections, setCollections] = useState<Collection[]>([]);
+  const { data: collections = [] } = useGetCollectionsQuery();
   const [assets, setAssets] = useState<AssetSummary[]>([]);
   const [projectId, setProjectId] = useState<string>("recent");
   const [collectionId, setCollectionId] = useState<string>("all");
@@ -213,17 +205,10 @@ export default function AssetPickerModal({
     const load = async () => {
       setLoading(true);
       try {
-        const [projectsRes, collectionsRes] = await Promise.all([
-          fetch("/api/projects"),
-          fetch("/api/collection"),
-        ]);
+        const projectsRes = await fetch("/api/projects");
         if (projectsRes.ok) {
           const data = await projectsRes.json();
           setProjects(data.projects || []);
-        }
-        if (collectionsRes.ok) {
-          const data = await collectionsRes.json();
-          setCollections(data.collections || []);
         }
       } catch (e) {
         console.error("Failed to load picker metadata", e);
