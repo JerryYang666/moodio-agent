@@ -171,7 +171,7 @@ export default function VideoList({ refreshTrigger, onRestore }: VideoListProps)
     const models = new Map<string, string>();
     for (const gen of generations) {
       if (!models.has(gen.modelId)) {
-        models.set(gen.modelId, getModelLabel(gen.modelId));
+        models.set(gen.modelId, getVideoModel(gen.modelId)?.name ?? gen.modelId);
       }
     }
     return Array.from(models.entries()).map(([id, name]) => ({ id, name }));
