@@ -160,7 +160,7 @@ export default function VideoList({ refreshTrigger, onRestore }: VideoListProps)
 
   // Filter state (for "all" view)
   const [showFilters, setShowFilters] = useState(false);
-  const [statusFilter, setStatusFilter] = useState<string[]>(["completed", "pending", "processing"]);
+  const [statusFilter, setStatusFilter] = useState<string[]>(["completed", "pending", "processing", "failed"]);
   const [modelFilter, setModelFilter] = useState<string>("all");
   const [durationRange, setDurationRange] = useState<[number, number]>([0, 30]);
   const [durationInitialized, setDurationInitialized] = useState(false);
