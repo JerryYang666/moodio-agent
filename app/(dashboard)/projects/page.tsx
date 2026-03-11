@@ -238,6 +238,9 @@ export default function ProjectsPage() {
                             <Dropdown>
                               <DropdownTrigger>
                                 <Button
+                                  as="div"
+                                  role="button"
+                                  tabIndex={0}
                                   isIconOnly
                                   size="sm"
                                   variant="solid"
