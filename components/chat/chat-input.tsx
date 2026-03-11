@@ -1337,7 +1337,7 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
                 <Button
                   key="send-default"
                   isIconOnly
-                  color="primary"
+                  color={menuState.mode === "image" ? "secondary" : "primary"}
                   aria-label={t("chat.send")}
                   onPress={onSend}
                   isLoading={isSending}
