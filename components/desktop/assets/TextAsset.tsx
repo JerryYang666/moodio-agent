@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect } from "react";
 import { useTranslations } from "next-intl";
+import { Pencil } from "lucide-react";
 import type { TextAssetMeta } from "@/lib/desktop/types";
 import type { EnrichedDesktopAsset } from "./types";
 
@@ -48,14 +49,12 @@ export default function TextAsset({
   const lastBroadcast = useRef(0);
   const pendingBroadcast = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Sync editValue with incoming prop changes when not editing
   useEffect(() => {
     if (!isEditing) {
       setEditValue(meta.content || "");
     }
   }, [meta.content, isEditing]);
 
-  // Focus textarea when entering edit mode
   useEffect(() => {
     if (isEditing && textareaRef.current) {
       textareaRef.current.focus();
@@ -63,14 +62,12 @@ export default function TextAsset({
     }
   }, [isEditing]);
 
-  // Cleanup pending broadcast on unmount
   useEffect(() => {
     return () => {
       if (pendingBroadcast.current) clearTimeout(pendingBroadcast.current);
     };
   }, []);
 
-  // Heartbeat: re-broadcast text_selected while editing
   useEffect(() => {
     if (!isEditing || !sendEvent) return;
     const interval = setInterval(() => {
@@ -97,12 +94,17 @@ export default function TextAsset({
     [sendEvent, asset.id]
   );
 
-  const startEditing = useCallback(() => {
-    if (isLockedByOther) return;
-    setIsEditing(true);
-    setEditValue(meta.content || "");
-    sendEvent?.("text_selected", { assetId: asset.id });
-  }, [isLockedByOther, meta.content, sendEvent, asset.id]);
+  const startEditing = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      e.preventDefault();
+      if (isLockedByOther) return;
+      setIsEditing(true);
+      setEditValue(meta.content || "");
+      sendEvent?.("text_selected", { assetId: asset.id });
+    },
+    [isLockedByOther, meta.content, sendEvent, asset.id]
+  );
 
   const commitEdit = useCallback(() => {
     if (!isEditing) return;
@@ -128,7 +130,6 @@ export default function TextAsset({
       if (e.key === "Escape") {
         commitEdit();
       }
-      // Prevent canvas-level keyboard shortcuts while editing
       e.stopPropagation();
     },
     [commitEdit]
@@ -139,7 +140,7 @@ export default function TextAsset({
 
   return (
     <div
-      className="relative w-full h-full bg-background"
+      className="relative w-full h-full bg-background group/text"
       style={
         isLockedByOther
           ? { boxShadow: `inset 0 0 0 2px hsl(${lockHue}, 70%, 60%)` }
@@ -147,7 +148,6 @@ export default function TextAsset({
             ? { boxShadow: "inset 0 0 0 2px hsl(var(--heroui-primary))" }
             : undefined
       }
-      onDoubleClick={startEditing}
     >
       {isLockedByOther && lockInfo && (
         <span
@@ -156,6 +156,17 @@ export default function TextAsset({
         >
           {t("editingLockedByUser", { name: lockInfo.firstName })}
         </span>
+      )}
+
+      {/* Edit button — shown on hover, top-right */}
+      {!isEditing && !isLockedByOther && (
+        <button
+          className="absolute top-1.5 right-1.5 z-10 p-1 rounded bg-default-100 hover:bg-default-200 text-default-600 opacity-0 group-hover/text:opacity-100 transition-opacity"
+          onClick={startEditing}
+          onPointerDown={(e) => e.stopPropagation()}
+        >
+          <Pencil size={12} />
+        </button>
       )}
 
       {isEditing ? (
