@@ -42,6 +42,12 @@ type Project = {
   isDefault: boolean;
 };
 
+type AssetsPageResponse = {
+  assets?: AssetSummary[];
+  hasMore?: boolean;
+  nextOffset?: number | null;
+};
+
 /** Memoized grid item – only re-renders when its own selection state or asset changes */
 const AssetGridItem = React.memo(function AssetGridItem({
   asset,
@@ -141,6 +147,8 @@ const AssetGridItem = React.memo(function AssetGridItem({
 });
 
 const GRID_GAP = 12; // gap-3 = 0.75rem = 12px
+const ASSET_PAGE_SIZE = 40;
+const LOAD_MORE_THRESHOLD_PX = 320;
 const COL_BREAKPOINTS = [
   { minWidth: 768, cols: 4 },  // md
   { minWidth: 640, cols: 3 },  // sm
@@ -152,6 +160,9 @@ function VirtualAssetGrid({
   assets,
   selectedIds,
   multiSelect,
+  hasMore,
+  isLoadingMore,
+  onLoadMore,
   onClick,
   onExpand,
   untitledLabel,
@@ -161,6 +172,9 @@ function VirtualAssetGrid({
   assets: AssetSummary[];
   selectedIds: Set<string>;
   multiSelect: boolean;
+  hasMore: boolean;
+  isLoadingMore: boolean;
+  onLoadMore: () => void;
   onClick: (asset: AssetSummary, index: number, e: React.MouseEvent) => void;
   onExpand: (asset: AssetSummary) => void;
   untitledLabel: string;
@@ -201,13 +215,38 @@ function VirtualAssetGrid({
     overscan: 2,
   });
 
-  // Re-measure all rows when rowHeight changes (e.g. resize)
+  const virtualizerRef = useRef(virtualizer);
+  virtualizerRef.current = virtualizer;
+  const prevRowHeightRef = useRef<number | null>(null);
+  // Re-measure only when row height actually changes (usually on resize).
+  // Avoid re-measuring during selection updates.
   useEffect(() => {
-    virtualizer.measure();
-  }, [rowHeight, virtualizer]);
+    if (prevRowHeightRef.current === rowHeight) return;
+    prevRowHeightRef.current = rowHeight;
+    virtualizerRef.current.measure();
+  }, [rowHeight]);
+
+  const maybeLoadMore = useCallback(() => {
+    if (!hasMore || isLoadingMore) return;
+    const el = scrollRef.current;
+    if (!el) return;
+    const remaining = el.scrollHeight - (el.scrollTop + el.clientHeight);
+    if (remaining <= LOAD_MORE_THRESHOLD_PX) {
+      onLoadMore();
+    }
+  }, [hasMore, isLoadingMore, onLoadMore]);
+
+  // Ensure we fetch more if the viewport isn't filled yet.
+  useEffect(() => {
+    maybeLoadMore();
+  }, [assets.length, maybeLoadMore]);
 
   return (
-    <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto pr-1">
+    <div
+      ref={scrollRef}
+      className="flex-1 min-h-0 overflow-y-auto p-2 pr-3"
+      onScroll={maybeLoadMore}
+    >
       <div
         className="relative w-full"
         style={{ height: virtualizer.getTotalSize() }}
@@ -249,6 +288,11 @@ function VirtualAssetGrid({
           );
         })}
       </div>
+      {isLoadingMore && (
+        <div className="flex items-center justify-center py-2">
+          <Spinner size="sm" />
+        </div>
+      )}
     </div>
   );
 }
@@ -281,6 +325,9 @@ export default function AssetPickerModal({
   const [projects, setProjects] = useState<Project[]>([]);
   const { data: collections = [] } = useGetCollectionsQuery();
   const [assets, setAssets] = useState<AssetSummary[]>([]);
+  const [hasMoreAssets, setHasMoreAssets] = useState(false);
+  const [nextAssetsOffset, setNextAssetsOffset] = useState(0);
+  const [loadingMoreAssets, setLoadingMoreAssets] = useState(false);
   const [projectId, setProjectId] = useState<string>("recent");
   const [collectionId, setCollectionId] = useState<string>("all");
   const [query, setQuery] = useState("");
@@ -321,6 +368,9 @@ export default function AssetPickerModal({
       setSelectedIds(new Set());
       lastClickedIndexRef.current = null;
       setFilterRating(null);
+      setHasMoreAssets(false);
+      setNextAssetsOffset(0);
+      setLoadingMoreAssets(false);
       stopCamera();
       setCapturedPhoto(null);
       return;
@@ -358,13 +408,17 @@ export default function AssetPickerModal({
     return all.filter((c) => c.projectId === projectId);
   }, [collections, projectId]);
 
-  useEffect(() => {
-    if (!isOpen) return;
-    const loadAssets = async () => {
-      setLoading(true);
+  const loadAssetsPage = useCallback(
+    async ({ offset, append }: { offset: number; append: boolean }) => {
+      if (append) {
+        setLoadingMoreAssets(true);
+      } else {
+        setLoading(true);
+      }
       try {
         const params = new URLSearchParams();
-        params.set("limit", "80");
+        params.set("limit", String(ASSET_PAGE_SIZE));
+        params.set("offset", String(offset));
         if (collectionId !== "all") {
           params.set("collectionId", collectionId);
         } else if (projectId !== "recent") {
@@ -372,16 +426,50 @@ export default function AssetPickerModal({
         }
         const res = await fetch(`/api/assets?${params.toString()}`);
         if (!res.ok) return;
-        const data = await res.json();
-        setAssets(data.assets || []);
+        const data = (await res.json()) as AssetsPageResponse;
+        const incoming = data.assets || [];
+
+        setAssets((prev) => {
+          if (!append) return incoming;
+          // De-dupe by id in case upstream data changed while paginating.
+          const byId = new Map<string, AssetSummary>();
+          for (const a of prev) byId.set(a.id, a);
+          for (const a of incoming) byId.set(a.id, a);
+          return Array.from(byId.values());
+        });
+        const hasMore = Boolean(data.hasMore);
+        setHasMoreAssets(hasMore);
+        setNextAssetsOffset(
+          typeof data.nextOffset === "number"
+            ? data.nextOffset
+            : offset + incoming.length
+        );
       } catch (e) {
         console.error("Failed to load assets", e);
       } finally {
-        setLoading(false);
+        if (append) {
+          setLoadingMoreAssets(false);
+        } else {
+          setLoading(false);
+        }
       }
-    };
-    loadAssets();
-  }, [isOpen, projectId, collectionId]);
+    },
+    [collectionId, projectId]
+  );
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setAssets([]);
+    setHasMoreAssets(false);
+    setNextAssetsOffset(0);
+    setLoadingMoreAssets(false);
+    void loadAssetsPage({ offset: 0, append: false });
+  }, [isOpen, projectId, collectionId, loadAssetsPage]);
+
+  const handleLoadMoreAssets = useCallback(() => {
+    if (loading || loadingMoreAssets || !hasMoreAssets) return;
+    void loadAssetsPage({ offset: nextAssetsOffset, append: true });
+  }, [hasMoreAssets, loadAssetsPage, loading, loadingMoreAssets, nextAssetsOffset]);
 
   const filteredAssets = useMemo(() => {
     let result = assets;
@@ -799,6 +887,9 @@ export default function AssetPickerModal({
                         assets={filteredAssets}
                         selectedIds={selectedIds}
                         multiSelect={multiSelect}
+                        hasMore={hasMoreAssets}
+                        isLoadingMore={loadingMoreAssets}
+                        onLoadMore={handleLoadMoreAssets}
                         onClick={handleAssetClick}
                         onExpand={setPreviewAsset}
                         untitledLabel={t("assetPicker.untitled")}

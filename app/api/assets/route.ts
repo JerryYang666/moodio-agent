@@ -8,7 +8,7 @@ import {
 } from "@/lib/db/schema";
 import { getAccessToken } from "@/lib/auth/cookies";
 import { verifyAccessToken } from "@/lib/auth/jwt";
-import { and, desc, eq, inArray, isNull } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, or } from "drizzle-orm";
 import { getImageUrl } from "@/lib/storage/s3";
 import { ensureDefaultProject } from "@/lib/db/projects";
 
@@ -16,6 +16,12 @@ function parseLimit(value: string | null, fallback: number) {
   const n = value ? Number(value) : NaN;
   if (!Number.isFinite(n) || n <= 0) return fallback;
   return Math.min(Math.floor(n), 200);
+}
+
+function parseOffset(value: string | null) {
+  const n = value ? Number(value) : NaN;
+  if (!Number.isFinite(n) || n < 0) return 0;
+  return Math.floor(n);
 }
 
 /**
@@ -27,6 +33,7 @@ function parseLimit(value: string | null, fallback: number) {
  * - projectId? (owned only)
  * - collectionId? (owned or shared)
  * - limit?
+ * - offset?
  */
 export async function GET(req: NextRequest) {
   try {
@@ -45,6 +52,7 @@ export async function GET(req: NextRequest) {
     const projectId = url.searchParams.get("projectId") || undefined;
     const collectionId = url.searchParams.get("collectionId") || undefined;
     const limit = parseLimit(url.searchParams.get("limit"), 60);
+    const offset = parseOffset(url.searchParams.get("offset"));
 
     // If filtering by a specific collection, verify access first.
     if (collectionId) {
@@ -78,15 +86,23 @@ export async function GET(req: NextRequest) {
         .select()
         .from(collectionImages)
         .where(eq(collectionImages.collectionId, collectionId))
-        .orderBy(desc(collectionImages.addedAt))
-        .limit(limit);
+        .orderBy(desc(collectionImages.addedAt), desc(collectionImages.id))
+        .offset(offset)
+        .limit(limit + 1);
 
-      const assets = rows.map((a) => ({
+      const hasMore = rows.length > limit;
+      const pageRows = hasMore ? rows.slice(0, limit) : rows;
+
+      const assets = pageRows.map((a) => ({
         ...a,
         imageUrl: getImageUrl(a.imageId),
       }));
 
-      return NextResponse.json({ assets });
+      return NextResponse.json({
+        assets,
+        hasMore,
+        nextOffset: hasMore ? offset + pageRows.length : null,
+      });
     }
 
     // If filtering by projectId, enforce owner-only (projects are not shareable yet).
@@ -108,64 +124,73 @@ export async function GET(req: NextRequest) {
         .select()
         .from(collectionImages)
         .where(eq(collectionImages.projectId, projectId))
-        .orderBy(desc(collectionImages.addedAt))
-        .limit(limit);
+        .orderBy(desc(collectionImages.addedAt), desc(collectionImages.id))
+        .offset(offset)
+        .limit(limit + 1);
 
-      const assets = rows.map((a) => ({
+      const hasMore = rows.length > limit;
+      const pageRows = hasMore ? rows.slice(0, limit) : rows;
+
+      const assets = pageRows.map((a) => ({
         ...a,
         imageUrl: getImageUrl(a.imageId),
       }));
 
-      return NextResponse.json({ assets });
+      return NextResponse.json({
+        assets,
+        hasMore,
+        nextOffset: hasMore ? offset + pageRows.length : null,
+      });
     }
 
     // No filters: return recent accessible assets (owned + shared).
-    const ownedRows = await db
-      .select({
-        asset: collectionImages,
-      })
-      .from(collectionImages)
-      .innerJoin(projects, eq(collectionImages.projectId, projects.id))
-      .where(eq(projects.userId, userId))
-      .orderBy(desc(collectionImages.addedAt))
-      .limit(limit);
+    const ownedProjectIdsRows = await db
+      .select({ projectId: projects.id })
+      .from(projects)
+      .where(eq(projects.userId, userId));
+    const ownedProjectIds = ownedProjectIdsRows.map((r) => r.projectId);
 
     const sharedCollectionIdsRows = await db
       .select({ collectionId: collectionShares.collectionId })
       .from(collectionShares)
       .where(eq(collectionShares.sharedWithUserId, userId));
-
     const sharedCollectionIds = sharedCollectionIdsRows.map((r) => r.collectionId);
 
-    const sharedRows =
-      sharedCollectionIds.length === 0
-        ? []
-        : await db
-            .select()
-            .from(collectionImages)
-            .where(inArray(collectionImages.collectionId, sharedCollectionIds))
-            .orderBy(desc(collectionImages.addedAt))
-            .limit(limit);
+    const hasOwnedAccess = ownedProjectIds.length > 0;
+    const hasSharedAccess = sharedCollectionIds.length > 0;
 
-    const merged = [
-      ...ownedRows.map((r) => r.asset),
-      ...sharedRows,
-    ];
-
-    // Deduplicate by asset id and sort by addedAt desc.
-    const byId = new Map<string, any>();
-    for (const a of merged) {
-      byId.set(a.id, a);
+    if (!hasOwnedAccess && !hasSharedAccess) {
+      return NextResponse.json({ assets: [], hasMore: false, nextOffset: null });
     }
-    const assets = Array.from(byId.values())
-      .sort((a, b) => new Date(b.addedAt).getTime() - new Date(a.addedAt).getTime())
-      .slice(0, limit)
-      .map((a) => ({
-        ...a,
-        imageUrl: getImageUrl(a.imageId),
-      }));
 
-    return NextResponse.json({ assets });
+    const whereClause = hasOwnedAccess && hasSharedAccess
+      ? or(
+          inArray(collectionImages.projectId, ownedProjectIds),
+          inArray(collectionImages.collectionId, sharedCollectionIds)
+        )
+      : hasOwnedAccess
+        ? inArray(collectionImages.projectId, ownedProjectIds)
+        : inArray(collectionImages.collectionId, sharedCollectionIds);
+    const rows = await db
+      .select()
+      .from(collectionImages)
+      .where(whereClause)
+      .orderBy(desc(collectionImages.addedAt), desc(collectionImages.id))
+      .offset(offset)
+      .limit(limit + 1);
+
+    const hasMore = rows.length > limit;
+    const pageRows = hasMore ? rows.slice(0, limit) : rows;
+    const assets = pageRows.map((a) => ({
+      ...a,
+      imageUrl: getImageUrl(a.imageId),
+    }));
+
+    return NextResponse.json({
+      assets,
+      hasMore,
+      nextOffset: hasMore ? offset + pageRows.length : null,
+    });
   } catch (error) {
     console.error("Error fetching assets:", error);
     return NextResponse.json(
