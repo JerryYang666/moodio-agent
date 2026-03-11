@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo, SetStateAction } from "react";
 import { useTranslations } from "next-intl";
 import { useAuth } from "@/hooks/use-auth";
 import { useCredits } from "@/hooks/use-credits";
@@ -77,6 +77,12 @@ interface MessageGroup {
   originalIndex: number; // Index of the first message in this group
 }
 
+interface StreamingChatState {
+  messages: Message[];
+  isSending: boolean;
+}
+const streamingChatCache = new Map<string, StreamingChatState>();
+
 interface ChatInterfaceProps {
   chatId?: string;
   initialMessages?: Message[];
@@ -108,6 +114,8 @@ export default function ChatInterface({
   const router = useRouter();
   const { track: trackResearch, beacon: beaconResearch, enabled: researchEnabled } = useResearchTelemetry();
   const [chatId, setChatId] = useState<string | undefined>(initialChatId);
+  const chatIdRef = useRef(chatId);
+  useEffect(() => { chatIdRef.current = chatId; }, [chatId]);
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(
@@ -132,8 +140,16 @@ export default function ChatInterface({
       if (urlChatId && urlChatId !== chatId) {
         console.log(`[ChatInterface] Syncing chatId to "${urlChatId}" from URL`);
         setChatId(urlChatId);
-        setMessages([]);
-        setIsLoading(true);
+        const cached = streamingChatCache.get(urlChatId);
+        if (cached) {
+          setMessages(cached.messages);
+          setIsSending(cached.isSending);
+          setIsLoading(false);
+        } else {
+          setMessages([]);
+          setIsSending(false);
+          setIsLoading(true);
+        }
       }
     };
 
@@ -151,8 +167,16 @@ export default function ChatInterface({
         `[ChatInterface] Prop sync — initialChatId: ${initialChatId ?? "none"}, current chatId: ${chatId ?? "none"}`
       );
       setChatId(initialChatId);
-      setMessages(initialMessages);
-      setIsLoading(!!initialChatId && initialMessages.length === 0);
+      const cached = initialChatId ? streamingChatCache.get(initialChatId) : null;
+      if (cached) {
+        setMessages(cached.messages);
+        setIsSending(cached.isSending);
+        setIsLoading(false);
+      } else {
+        setMessages(initialMessages);
+        setIsSending(false);
+        setIsLoading(!!initialChatId && initialMessages.length === 0);
+      }
     }
   }, [initialChatId]);
   const [isSending, setIsSending] = useState(false);
@@ -562,6 +586,10 @@ export default function ChatInterface({
     const fetchChat = async () => {
       if (!chatId) return;
       if (messages.length > 0) {
+        setIsLoading(false);
+        return;
+      }
+      if (streamingChatCache.has(chatId)) {
         setIsLoading(false);
         return;
       }
@@ -1369,6 +1397,8 @@ export default function ChatInterface({
     setIsSending(true);
     sessionTurnCountRef.current += 1;
 
+    let streamingChatId = "";
+
     try {
       // Check for notification permission when user sends a message
       notificationModalRef.current?.checkPermission();
@@ -1394,6 +1424,21 @@ export default function ChatInterface({
       if (currentChatId) {
         monitorChat(currentChatId, messages.length + 1);
       }
+
+      streamingChatId = currentChatId!;
+      streamingChatCache.set(streamingChatId, {
+        messages: [...messages, userMessage],
+        isSending: true,
+      });
+      const updateStreamMessages = (updater: SetStateAction<Message[]>) => {
+        const cached = streamingChatCache.get(streamingChatId);
+        const prev = cached?.messages ?? [];
+        const next = typeof updater === "function" ? updater(prev) : updater;
+        streamingChatCache.set(streamingChatId, { messages: next, isSending: true });
+        if (chatIdRef.current === streamingChatId) {
+          setMessages(updater);
+        }
+      };
 
       // Build the unified JSON payload with imageIds array
       const payload: any = {
@@ -1545,7 +1590,7 @@ export default function ChatInterface({
               isFirstChunkByVariant[variantId] = true;
 
               // Update the messages state to clear this variant
-              setMessages((prev) => {
+              updateStreamMessages((prev) => {
                 const newMessages = [...prev];
                 // Find and update the variant message
                 for (let i = newMessages.length - 1; i >= 0; i--) {
@@ -1610,7 +1655,7 @@ export default function ChatInterface({
                 }
 
                 // Remove all variant messages and user message
-                setMessages((prev) => {
+                updateStreamMessages((prev) => {
                   return prev.filter(
                     (msg) =>
                       !(
@@ -1627,7 +1672,7 @@ export default function ChatInterface({
             if (isFirstChunkByVariant[variantId]) {
               // Use backend timestamp, fallback to current time if not received yet
               const timestamp = variantTimestamp || Date.now();
-              setMessages((prev) => [
+              updateStreamMessages((prev) => [
                 ...prev,
                 {
                   role: "assistant",
@@ -1798,7 +1843,7 @@ export default function ChatInterface({
             }
 
             // Update the specific variant message
-            setMessages((prev) => {
+            updateStreamMessages((prev) => {
               const newMessages = [...prev];
               // Find the variant message to update
               for (let i = newMessages.length - 1; i >= 0; i--) {
@@ -1856,16 +1901,26 @@ export default function ChatInterface({
       lastEditorContentRef.current = null;
     } catch (error) {
       console.error("Error sending message", error);
-      setInput(lastUserInputRef.current);
-      setPendingImages(lastPendingImagesRef.current);
-      if (lastEditorContentRef.current && chatInputRef.current) {
-        chatInputRef.current.setEditorContent(lastEditorContentRef.current);
+      if (streamingChatId) {
+        streamingChatCache.delete(streamingChatId);
       }
-      setMessages((prev) =>
-        prev.filter((msg) => !(msg.role === "user" && msg === userMessage))
-      );
+      if (!streamingChatId || chatIdRef.current === streamingChatId) {
+        setInput(lastUserInputRef.current);
+        setPendingImages(lastPendingImagesRef.current);
+        if (lastEditorContentRef.current && chatInputRef.current) {
+          chatInputRef.current.setEditorContent(lastEditorContentRef.current);
+        }
+        setMessages((prev) =>
+          prev.filter((msg) => !(msg.role === "user" && msg === userMessage))
+        );
+      }
     } finally {
-      setIsSending(false);
+      if (streamingChatId) {
+        streamingChatCache.delete(streamingChatId);
+      }
+      if (!streamingChatId || chatIdRef.current === streamingChatId) {
+        setIsSending(false);
+      }
     }
   };
 
@@ -2033,6 +2088,8 @@ export default function ChatInterface({
       setMessages((prev) => [...prev, userMessage]);
       setIsSending(true);
 
+      let streamingChatId = "";
+
       try {
         let currentChatId = chatId;
 
@@ -2049,6 +2106,21 @@ export default function ChatInterface({
           }
           onChatCreated?.(currentChatId);
         }
+
+        streamingChatId = currentChatId!;
+        streamingChatCache.set(streamingChatId, {
+          messages: [...messages, userMessage],
+          isSending: true,
+        });
+        const updateStreamMessages = (updater: SetStateAction<Message[]>) => {
+          const cached = streamingChatCache.get(streamingChatId);
+          const prev = cached?.messages ?? [];
+          const next = typeof updater === "function" ? updater(prev) : updater;
+          streamingChatCache.set(streamingChatId, { messages: next, isSending: true });
+          if (chatIdRef.current === streamingChatId) {
+            setMessages(updater);
+          }
+        };
 
         const payload = {
           content: config.prompt,
@@ -2105,7 +2177,7 @@ export default function ChatInterface({
 
               if (!hasInitialized) {
                 const timestamp = variantTimestamp || Date.now();
-                setMessages((prev) => [
+                updateStreamMessages((prev) => [
                   ...prev,
                   {
                     role: "assistant",
@@ -2121,7 +2193,7 @@ export default function ChatInterface({
                 variantContents.push(event.part);
               }
 
-              setMessages((prev) => {
+              updateStreamMessages((prev) => {
                 const newMessages = [...prev];
                 for (let i = newMessages.length - 1; i >= 0; i--) {
                   if (
@@ -2144,12 +2216,16 @@ export default function ChatInterface({
         }
       } catch (e: any) {
         console.error("Failed to send video from agent:", e);
+        if (streamingChatId) streamingChatCache.delete(streamingChatId);
         addToast({
           title: t("chat.sendFailed"),
           color: "danger",
         });
       } finally {
-        setIsSending(false);
+        if (streamingChatId) streamingChatCache.delete(streamingChatId);
+        if (!streamingChatId || chatIdRef.current === streamingChatId) {
+          setIsSending(false);
+        }
       }
     },
     [chatId, isSending, disableActiveChatPersistence, onChatCreated, t]
@@ -2317,6 +2393,21 @@ export default function ChatInterface({
 
     setGeneratingVariantTimestamp(messageTimestamp);
 
+    const streamingChatId = chatId;
+    streamingChatCache.set(streamingChatId, {
+      messages: [...messages],
+      isSending: true,
+    });
+    const updateStreamMessages = (updater: SetStateAction<Message[]>) => {
+      const cached = streamingChatCache.get(streamingChatId);
+      const prev = cached?.messages ?? [];
+      const next = typeof updater === "function" ? updater(prev) : updater;
+      streamingChatCache.set(streamingChatId, { messages: next, isSending: true });
+      if (chatIdRef.current === streamingChatId) {
+        setMessages(updater);
+      }
+    };
+
     try {
       const res = await fetch(`/api/chat/${chatId}/variant`, {
         method: "POST",
@@ -2377,7 +2468,7 @@ export default function ChatInterface({
 
             // Initialize the new variant message on first chunk
             if (isFirstChunk) {
-              setMessages((prev) => [
+              updateStreamMessages((prev) => [
                 ...prev,
                 {
                   role: "assistant",
@@ -2443,7 +2534,7 @@ export default function ChatInterface({
             }
 
             // Update the message in state
-            setMessages((prev) => {
+            updateStreamMessages((prev) => {
               const newMessages = [...prev];
               for (let i = newMessages.length - 1; i >= 0; i--) {
                 const msg = newMessages[i];
@@ -2470,12 +2561,16 @@ export default function ChatInterface({
       });
     } catch (error) {
       console.error("Error generating variant:", error);
+      streamingChatCache.delete(streamingChatId);
       addToast({
         title: t("chat.failedToGenerateVariant"),
         color: "danger",
       });
     } finally {
-      setGeneratingVariantTimestamp(null);
+      streamingChatCache.delete(streamingChatId);
+      if (chatIdRef.current === streamingChatId) {
+        setGeneratingVariantTimestamp(null);
+      }
     }
   };
 
