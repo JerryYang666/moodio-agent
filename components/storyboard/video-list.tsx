@@ -584,6 +584,7 @@ export default function VideoList({ refreshTrigger, onRestore }: VideoListProps)
                     if (val) setModelFilter(val);
                   }}
                   classNames={{ base: "flex-1", label: "text-xs" }}
+                  popoverProps={{ classNames: { content: "min-w-[220px]" } }}
                 >
                   {[
                     <SelectItem key="all">{t("filterAllModels")}</SelectItem>,
