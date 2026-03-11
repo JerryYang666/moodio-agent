@@ -63,6 +63,8 @@ interface ImageDetailModalProps {
   chatId?: string;
   /** When set, skip desktop picker and send directly to this desktop */
   desktopId?: string;
+  /** If true, open directly in fullscreen mode */
+  openInFullscreen?: boolean;
 }
 
 // Flying image animation component (same as ImageWithMenu)
@@ -125,6 +127,7 @@ export default function ImageDetailModal({
   onClose,
   chatId,
   desktopId,
+  openInFullscreen = false,
 }: ImageDetailModalProps) {
   const t = useTranslations("imageDetail");
   const tMenu = useTranslations("imageMenu");
@@ -286,12 +289,12 @@ export default function ImageDetailModal({
     if (!isOpen) setIsFullscreen(false);
   }, [isOpen]);
 
-  // Auto-enter fullscreen for images without prompts (user uploads)
+  // Auto-enter fullscreen when requested or for images without prompts (user uploads)
   useEffect(() => {
-    if (isOpen && !hasPrompt) {
+    if (isOpen && (openInFullscreen || !hasPrompt)) {
       setIsFullscreen(true);
     }
-  }, [isOpen, hasPrompt]);
+  }, [isOpen, hasPrompt, openInFullscreen]);
 
   const handleClose = () => {
     setIsFullscreen(false);

@@ -4,7 +4,7 @@ import { Card, CardBody } from "@heroui/card";
 import { Spinner } from "@heroui/spinner";
 import { Avatar } from "@heroui/avatar";
 import { Image } from "@heroui/image";
-import { Bot, X, Pencil, ChevronDown, ChevronRight, Brain } from "lucide-react";
+import { Bot, X, Pencil, ChevronDown, ChevronRight, Brain, Maximize2 } from "lucide-react";
 import clsx from "clsx";
 import { Message, MessageContentPart, isGeneratedImagePart } from "@/lib/llm/types";
 import ImageWithMenu from "@/components/collection/image-with-menu";
@@ -42,6 +42,7 @@ interface ChatMessageProps {
     variantId?: string
   ) => void;
   onAgentTitleClick: (part: any) => void;
+  onAgentExpandClick?: (part: any) => void;
   onUserImageClick?: (images: ImageInfo[], index: number) => void;
   onForkChat?: (messageIndex: number) => void;
   hideAvatar?: boolean;
@@ -83,6 +84,7 @@ export default function ChatMessage({
   selectedImageIds,
   onAgentImageSelect,
   onAgentTitleClick,
+  onAgentExpandClick,
   onUserImageClick,
   onForkChat,
   hideAvatar = false,
@@ -366,6 +368,21 @@ export default function ChatMessage({
                           />
                         )}
                         </div>
+                        {effectiveStatus === "generated" && onAgentExpandClick && (
+                          <button
+                            type="button"
+                            aria-label={t("imageDetail.viewFullSize")}
+                            title={t("imageDetail.viewFullSize")}
+                            className="absolute top-2 right-2 z-20 rounded-md bg-black/50 text-white p-1.5 opacity-100 md:opacity-0 md:group-hover/image:opacity-100 transition-opacity hover:bg-black/70 focus:outline-none focus:ring-2 focus:ring-white/70"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              onAgentExpandClick(part);
+                            }}
+                          >
+                            <Maximize2 size={14} />
+                          </button>
+                        )}
                         {(effectiveStatus === "generated" ||
                           effectiveStatus === "error") && (
                           <div className="absolute bottom-0 left-0 right-0 bg-white/90 dark:bg-black/60 text-black dark:text-white p-2 text-xs truncate md:opacity-0 md:group-hover/image:opacity-100 transition-opacity z-10 pointer-events-none">

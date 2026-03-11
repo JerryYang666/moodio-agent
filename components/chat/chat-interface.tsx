@@ -429,6 +429,7 @@ export default function ChatInterface({
   const [selectedImage, setSelectedImage] = useState<ImageInfo | null>(null);
   const [allImages, setAllImages] = useState<ImageInfo[]>([]);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [openImageInFullscreen, setOpenImageInFullscreen] = useState(false);
 
   // Group messages for rendering (group assistant variants together)
   const groupedMessages = useMemo((): MessageGroup[] => {
@@ -1892,8 +1893,10 @@ export default function ChatInterface({
     []
   );
 
-  const handleAgentTitleClick = (part: any) => {
-    if (part.status === "generated" || part.status === "error") {
+  const openAgentImageDetail = useCallback(
+    (part: any, openInFullscreen = false) => {
+      if (part.status !== "generated" && part.status !== "error") return;
+
       const images = collectAllImages();
       const url = part.imageUrl || "";
       const index = images.findIndex((img) => img.url === url);
@@ -1907,11 +1910,27 @@ export default function ChatInterface({
         imageId: part.imageId,
         status: part.status,
       });
+      setOpenImageInFullscreen(openInFullscreen);
       onOpen();
-    }
+    },
+    [collectAllImages, onOpen]
+  );
+
+  const handleAgentTitleClick = (part: any) => {
+    openAgentImageDetail(part, false);
   };
 
+  const handleAgentExpandClick = (part: any) => {
+    openAgentImageDetail(part, true);
+  };
+
+  const handleImageModalClose = useCallback(() => {
+    setOpenImageInFullscreen(false);
+    onClose();
+  }, [onClose]);
+
   const handleUserImageClick = (images: ImageInfo[], index: number) => {
+    setOpenImageInFullscreen(false);
     if (!images.length || index < 0 || index >= images.length) return;
     setAllImages(images);
     setCurrentImageIndex(index);
@@ -1936,10 +1955,9 @@ export default function ChatInterface({
     variantId?: string
   ) => {
     if (part.status === "generated" && part.imageId) {
-      const url = part.imageUrl || "";
       addAgentImage({
         imageId: part.imageId,
-        url,
+        url: part.imageUrl || "",
         title: part.title,
         messageIndex,
         partIndex,
@@ -2485,6 +2503,7 @@ export default function ChatInterface({
                 selectedImageIds={pendingImages.map((img) => img.imageId)}
                 onAgentImageSelect={handleAgentImageSelect}
                 onAgentTitleClick={handleAgentTitleClick}
+                onAgentExpandClick={handleAgentExpandClick}
                 onUserImageClick={handleUserImageClick}
                 onForkChat={handleForkChat}
                 hideAvatar={hideAvatars}
@@ -2522,6 +2541,7 @@ export default function ChatInterface({
                 selectedImageIds={pendingImages.map((img) => img.imageId)}
                 onAgentImageSelect={handleAgentImageSelect}
                 onAgentTitleClick={handleAgentTitleClick}
+                onAgentExpandClick={handleAgentExpandClick}
                 onForkChat={handleForkChat}
                 compactMode={compactMode}
                 hideAvatars={hideAvatars}
@@ -2630,9 +2650,10 @@ export default function ChatInterface({
         allImages={allImages}
         currentIndex={currentImageIndex}
         onNavigate={handleImageNavigate}
-        onClose={onClose}
+        onClose={handleImageModalClose}
         chatId={chatId}
         desktopId={desktopId}
+        openInFullscreen={openImageInFullscreen}
       />
 
       {/* Drawing modal for "circle to change" feature (局部重绘) */}

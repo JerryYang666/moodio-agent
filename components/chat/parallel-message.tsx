@@ -27,6 +27,7 @@ interface ParallelMessageProps {
     variantId?: string
   ) => void;
   onAgentTitleClick: (part: any) => void;
+  onAgentExpandClick?: (part: any) => void;
   onForkChat?: (messageIndex: number) => void;
   /** Force compact/mobile view regardless of viewport width */
   compactMode?: boolean;
@@ -69,6 +70,7 @@ export default function ParallelMessage({
   selectedImageIds,
   onAgentImageSelect,
   onAgentTitleClick,
+  onAgentExpandClick,
   onForkChat,
   compactMode = false,
   hideAvatars = false,
@@ -162,6 +164,7 @@ export default function ParallelMessage({
           selectedImageIds={selectedImageIds}
           onAgentImageSelect={onAgentImageSelect}
           onAgentTitleClick={onAgentTitleClick}
+          onAgentExpandClick={onAgentExpandClick}
           onForkChat={onForkChat}
           hideAvatar={hideAvatars}
           desktopId={desktopId}
@@ -221,6 +224,7 @@ export default function ParallelMessage({
                   onAgentImageSelect(part, msgIdx, partIdx, variant.variantId)
                 }
                 onAgentTitleClick={onAgentTitleClick}
+                onAgentExpandClick={onAgentExpandClick}
                 onForkChat={onForkChat}
                 hideAvatar={idx > 0 || hideAvatars}
                 desktopId={desktopId}
@@ -308,6 +312,7 @@ export default function ParallelMessage({
               selectedImageIds={selectedImageIds}
               onAgentImageSelect={handleAgentImageSelect}
               onAgentTitleClick={onAgentTitleClick}
+              onAgentExpandClick={onAgentExpandClick}
               onForkChat={onForkChat}
               hideAvatar={hideAvatars}
               desktopId={desktopId}
