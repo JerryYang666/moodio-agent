@@ -101,6 +101,41 @@ export async function PATCH(
       return NextResponse.json({ asset: enrichAsset(updated) });
     }
 
+    // Text content patch for text assets (read-modify-write the content field)
+    if (body.textPatch && typeof body.textPatch === "object") {
+      const { content } = body.textPatch;
+      if (typeof content !== "string") {
+        return NextResponse.json({ error: "textPatch requires content (string)" }, { status: 400 });
+      }
+
+      const [existing] = await db
+        .select()
+        .from(desktopAssets)
+        .where(and(eq(desktopAssets.id, assetId), eq(desktopAssets.desktopId, id)));
+
+      if (!existing) {
+        return NextResponse.json({ error: "Asset not found" }, { status: 404 });
+      }
+
+      if (existing.assetType !== "text") {
+        return NextResponse.json({ error: "textPatch is only supported for text assets" }, { status: 400 });
+      }
+
+      const patchedMetadata = { ...(existing.metadata as Record<string, unknown>), content };
+
+      const [updated] = await db
+        .update(desktopAssets)
+        .set({ metadata: patchedMetadata })
+        .where(and(eq(desktopAssets.id, assetId), eq(desktopAssets.desktopId, id)))
+        .returning();
+
+      if (!updated) {
+        return NextResponse.json({ error: "Asset not found" }, { status: 404 });
+      }
+
+      return NextResponse.json({ asset: enrichAsset(updated) });
+    }
+
     const updates: Record<string, unknown> = {};
 
     if (typeof body.posX === "number") updates.posX = body.posX;

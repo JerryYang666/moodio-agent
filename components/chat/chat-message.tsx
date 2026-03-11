@@ -4,7 +4,7 @@ import { Card, CardBody } from "@heroui/card";
 import { Spinner } from "@heroui/spinner";
 import { Avatar } from "@heroui/avatar";
 import { Image } from "@heroui/image";
-import { Bot, X, Pencil, ChevronDown, ChevronRight, Brain, Maximize2 } from "lucide-react";
+import { Bot, X, Pencil, ChevronDown, ChevronRight, Brain, Maximize2, Monitor } from "lucide-react";
 import clsx from "clsx";
 import { Message, MessageContentPart, isGeneratedImagePart } from "@/lib/llm/types";
 import ImageWithMenu from "@/components/collection/image-with-menu";
@@ -13,10 +13,13 @@ import ImageHoverPreview from "./image-hover-preview";
 import { formatTime } from "./utils";
 import { Button } from "@heroui/button";
 import { Popover, PopoverTrigger, PopoverContent } from "@heroui/popover";
-import { useState, useMemo } from "react";
+import { addToast } from "@heroui/toast";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { useTranslations } from "next-intl";
 import { useAuth } from "@/hooks/use-auth";
-import { AI_IMAGE_DRAG_MIME } from "./asset-dnd";
+import { AI_IMAGE_DRAG_MIME, AI_TEXT_DRAG_MIME } from "./asset-dnd";
+import SendToDesktopModal from "@/components/desktop/SendToDesktopModal";
+import { getViewportVisibleCenterPosition } from "@/lib/desktop/types";
 import VideoPromptBlock from "./video-prompt-block";
 import VideoConfigCard from "./video-config-card";
 import DirectVideoCard from "./direct-video-card";
@@ -101,6 +104,96 @@ export default function ChatMessage({
   const { user: currentUser } = useAuth();
   const isAdmin = currentUser?.roles?.includes("admin");
   const t = useTranslations();
+
+  // --- Send-text-to-desktop state ---
+  const [textContextMenu, setTextContextMenu] = useState<{
+    x: number;
+    y: number;
+    selectedText: string;
+  } | null>(null);
+  const [sendToDesktopOpen, setSendToDesktopOpen] = useState(false);
+  const [pendingTextForDesktop, setPendingTextForDesktop] = useState("");
+
+  // Close context menu on click outside or Escape
+  useEffect(() => {
+    if (!textContextMenu) return;
+    const dismiss = () => setTextContextMenu(null);
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") dismiss(); };
+    window.addEventListener("click", dismiss);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("click", dismiss);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [textContextMenu]);
+
+  const handleTextContextMenu = useCallback(
+    (e: React.MouseEvent) => {
+      if (isUser) return;
+      const selection = window.getSelection();
+      const selectedText = selection?.toString().trim();
+      if (!selectedText) return;
+      e.preventDefault();
+      setTextContextMenu({ x: e.clientX, y: e.clientY, selectedText });
+    },
+    [isUser]
+  );
+
+  const handleSendTextToDesktop = useCallback(async () => {
+    if (!textContextMenu?.selectedText) return;
+    const selectedText = textContextMenu.selectedText;
+    setTextContextMenu(null);
+
+    if (desktopId) {
+      try {
+        const pos = getViewportVisibleCenterPosition(300, 200);
+        const res = await fetch(`/api/desktop/${desktopId}/assets`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            assets: [{
+              assetType: "text",
+              metadata: { content: selectedText, chatId: chatId || undefined },
+              posX: pos.x,
+              posY: pos.y,
+            }],
+          }),
+        });
+        if (!res.ok) throw new Error("Failed to send text");
+        const data = await res.json();
+        window.dispatchEvent(
+          new CustomEvent("desktop-asset-added", {
+            detail: { assets: data.assets, desktopId },
+          })
+        );
+        addToast({ title: t("desktop.textSentToDesktop"), color: "success" });
+      } catch {
+        addToast({ title: t("desktop.failedToSendText"), color: "danger" });
+      }
+    } else {
+      setPendingTextForDesktop(selectedText);
+      setSendToDesktopOpen(true);
+    }
+  }, [textContextMenu, desktopId, chatId, t]);
+
+  const handleTextDragStart = useCallback(
+    (e: React.DragEvent) => {
+      if (isUser || !desktopId) return;
+      const selection = window.getSelection();
+      const selectedText = selection?.toString().trim();
+      if (!selectedText) return;
+      try {
+        e.dataTransfer.setData(
+          AI_TEXT_DRAG_MIME,
+          JSON.stringify({ content: selectedText, chatId: chatId || null })
+        );
+        e.dataTransfer.effectAllowed = "copy";
+      } catch {
+        // ignore
+      }
+    },
+    [isUser, desktopId, chatId]
+  );
 
   // Collect source images from all messages for video config card
   const sourceImagesForVideo = useMemo(() => {
@@ -491,11 +584,42 @@ export default function ChatMessage({
                 isUser &&
                   "prose-headings:text-primary-foreground prose-p:text-primary-foreground prose-strong:text-primary-foreground prose-code:text-primary-foreground"
               )}
+              onContextMenu={handleTextContextMenu}
+              onDragStart={handleTextDragStart}
             >
               {renderContent(message.content, messageIndex, message.createdAt)}
             </div>
           </CardBody>
         </Card>
+
+        {/* Context menu: Send selected text to Desktop */}
+        {textContextMenu && (
+          <div
+            className="fixed z-50 min-w-[180px] rounded-lg border border-divider bg-background shadow-lg py-1"
+            style={{ left: textContextMenu.x, top: textContextMenu.y }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-default-100 transition-colors text-left"
+              onClick={handleSendTextToDesktop}
+            >
+              <Monitor size={14} />
+              {t("chat.sendSelectionToDesktop")}
+            </button>
+          </div>
+        )}
+
+        {/* Desktop picker modal for text (when not on desktop page) */}
+        <SendToDesktopModal
+          isOpen={sendToDesktopOpen}
+          onOpenChange={setSendToDesktopOpen}
+          assets={
+            pendingTextForDesktop
+              ? [{ assetType: "text", metadata: { content: pendingTextForDesktop, chatId: chatId || undefined } }]
+              : []
+          }
+          desktopId={desktopId}
+        />
         {message.createdAt && (
           <div
             className={clsx(

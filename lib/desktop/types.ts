@@ -23,6 +23,7 @@ export type TextAssetMeta = {
   content: string;
   fontSize?: number;
   color?: string;
+  chatId?: string;
 };
 
 export type LinkAssetMeta = {

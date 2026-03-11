@@ -76,6 +76,11 @@ export default function DesktopDetailPage({
     () => new Map()
   );
 
+  // Whole-asset locks for text assets (managed via WS events)
+  const [textLocks, setTextLocks] = useState<Map<string, { userId: string; sessionId: string; firstName: string }>>(
+    () => new Map()
+  );
+
   // Stable ref for the video-sync remote-event handler (defined after the hook below)
   const handleVideoRemoteEventRef = useRef<(event: RemoteEvent) => void>(() => {});
 
@@ -104,6 +109,32 @@ export default function DesktopDetailPage({
             return next;
           });
         }
+      } else if (event.type === "text_selected") {
+        const { assetId } = event.payload || {};
+        if (assetId) {
+          setTextLocks((prev) => {
+            const next = new Map(prev);
+            next.set(assetId as string, { userId: event.userId, sessionId: event.sessionId, firstName: event.firstName });
+            return next;
+          });
+        }
+      } else if (event.type === "text_deselected") {
+        const { assetId } = event.payload || {};
+        if (assetId) {
+          setTextLocks((prev) => {
+            const next = new Map(prev);
+            next.delete(assetId as string);
+            return next;
+          });
+        }
+      } else if (event.type === "text_updated") {
+        const { assetId, content } = event.payload || {};
+        if (assetId && typeof content === "string") {
+          applyRemoteEvent({
+            type: "asset_updated",
+            payload: { assetId, metadata: { content } },
+          });
+        }
       } else if (event.type === "table_generating") {
         const posX = typeof event.payload?.posX === "number" ? event.payload.posX : 0;
         const posY = typeof event.payload?.posY === "number" ? event.payload.posY : 0;
@@ -129,6 +160,13 @@ export default function DesktopDetailPage({
         const { sessionId } = event.payload || {};
         if (sessionId) {
           setCellLocks((prev) => {
+            const next = new Map(prev);
+            Array.from(next.entries()).forEach(([k, v]) => {
+              if (v.sessionId === sessionId) next.delete(k);
+            });
+            return next.size === prev.size ? prev : next;
+          });
+          setTextLocks((prev) => {
             const next = new Map(prev);
             Array.from(next.entries()).forEach(([k, v]) => {
               if (v.sessionId === sessionId) next.delete(k);
@@ -425,6 +463,50 @@ export default function DesktopDetailPage({
     [desktopId]
   );
 
+  const handleExternalTextDrop = useCallback(
+    async (
+      payload: { content: string; chatId?: string | null },
+      position: { x: number; y: number }
+    ) => {
+      try {
+        const res = await fetch(`/api/desktop/${desktopId}/assets`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            assets: [
+              {
+                assetType: "text",
+                metadata: {
+                  content: payload.content,
+                  chatId: payload.chatId ?? undefined,
+                },
+                posX: position.x,
+                posY: position.y,
+                width: 300,
+                height: 200,
+              },
+            ],
+          }),
+        });
+        if (!res.ok) throw new Error("Failed to add dropped text to desktop");
+        const data = await res.json();
+        window.dispatchEvent(
+          new CustomEvent("desktop-asset-added", {
+            detail: { assets: data.assets, desktopId },
+          })
+        );
+      } catch (error) {
+        console.error("Failed to drop text onto desktop:", error);
+        addToast({
+          title: t("failedToAddText"),
+          description: t("retryDragText"),
+          color: "danger",
+        });
+      }
+    },
+    [desktopId, t]
+  );
+
   const handleCellCommit = useCallback(
     (assetId: string, rowId: string, colIndex: number, value: string) => {
       applyRemoteEvent({
@@ -433,6 +515,25 @@ export default function DesktopDetailPage({
       });
     },
     [applyRemoteEvent]
+  );
+
+  const handleTextCommit = useCallback(
+    async (assetId: string, content: string) => {
+      applyRemoteEvent({
+        type: "asset_updated",
+        payload: { assetId, metadata: { content } },
+      });
+      try {
+        await fetch(`/api/desktop/${desktopId}/assets/${assetId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ textPatch: { content } }),
+        });
+      } catch (error) {
+        console.error("Failed to save text content:", error);
+      }
+    },
+    [desktopId, applyRemoteEvent]
   );
 
   const handleOpenChat = useCallback(
@@ -715,9 +816,12 @@ export default function DesktopDetailPage({
           remoteSelections={remoteSelections}
           currentUserId={user?.id}
           cellLocks={cellLocks}
+          textLocks={textLocks}
           onCellCommit={handleCellCommit}
+          onTextCommit={handleTextCommit}
           onSendToTimeline={canEdit ? handleSendToTimeline : undefined}
           onExternalImageDrop={canEdit ? handleExternalImageDrop : undefined}
+          onExternalTextDrop={canEdit ? handleExternalTextDrop : undefined}
           onAddAssetAtPosition={canEdit ? handleAddAssetAtPosition : undefined}
         />
         <DesktopToolbar

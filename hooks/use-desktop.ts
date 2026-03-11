@@ -354,6 +354,23 @@ export function useDesktopDetail(desktopId: string) {
           });
           break;
         }
+        case "asset_updated": {
+          const { assetId, metadata } = event.payload || {};
+          if (!assetId || !metadata) return;
+          setDetail((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  assets: prev.assets.map((a) =>
+                    a.id === assetId
+                      ? { ...a, metadata: { ...(a.metadata as Record<string, unknown>), ...metadata } }
+                      : a
+                  ),
+                }
+              : null
+          );
+          break;
+        }
       }
     },
     []

@@ -10,7 +10,7 @@ import { ImageAsset, VideoAsset, TextAsset, LinkAsset } from "./assets";
 import TableAsset from "./assets/TableAsset";
 import { hasWriteAccess, type Permission } from "@/lib/permissions";
 import type { CanvasMode } from "./DesktopToolbar";
-import { AI_IMAGE_DRAG_MIME } from "@/components/chat/asset-dnd";
+import { AI_IMAGE_DRAG_MIME, AI_TEXT_DRAG_MIME } from "@/components/chat/asset-dnd";
 import {
   Trash2,
   MessageSquare,
@@ -63,6 +63,12 @@ interface DesktopCanvasProps {
     },
     position: { x: number; y: number }
   ) => void;
+  onExternalTextDrop?: (
+    payload: { content: string; chatId?: string | null },
+    position: { x: number; y: number }
+  ) => void;
+  textLocks?: Map<string, { userId: string; sessionId: string; firstName: string }>;
+  onTextCommit?: (assetId: string, content: string) => void;
   onAddAssetAtPosition?: (worldPos: { x: number; y: number }) => void;
 }
 
@@ -131,6 +137,9 @@ export default function DesktopCanvas({
   cellLocks,
   onCellCommit,
   onExternalImageDrop,
+  onExternalTextDrop,
+  textLocks,
+  onTextCommit,
   onAddAssetAtPosition,
 }: DesktopCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -302,28 +311,59 @@ export default function DesktopCanvas({
     }
   }, []);
 
+  const parseAiTextDropPayload = useCallback((e: React.DragEvent) => {
+    try {
+      const json = e.dataTransfer.getData(AI_TEXT_DRAG_MIME);
+      if (!json) return null;
+      const parsed = JSON.parse(json) as { content?: unknown; chatId?: unknown };
+      if (typeof parsed.content !== "string" || !parsed.content) return null;
+      return {
+        content: parsed.content,
+        chatId: typeof parsed.chatId === "string" || parsed.chatId === null ? parsed.chatId : undefined,
+      };
+    } catch {
+      return null;
+    }
+  }, []);
+
   const handleDragOver = useCallback(
     (e: React.DragEvent) => {
-      if (!canEdit || !onExternalImageDrop) return;
-      if (Array.from(e.dataTransfer.types).includes(AI_IMAGE_DRAG_MIME)) {
+      if (!canEdit) return;
+      const types = Array.from(e.dataTransfer.types);
+      if (
+        (onExternalImageDrop && types.includes(AI_IMAGE_DRAG_MIME)) ||
+        (onExternalTextDrop && types.includes(AI_TEXT_DRAG_MIME))
+      ) {
         e.preventDefault();
         e.dataTransfer.dropEffect = "copy";
       }
     },
-    [canEdit, onExternalImageDrop]
+    [canEdit, onExternalImageDrop, onExternalTextDrop]
   );
 
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
-      if (!canEdit || !onExternalImageDrop) return;
-      const payload = parseAiImageDropPayload(e);
-      if (!payload) return;
-      e.preventDefault();
-      e.stopPropagation();
-      const world = screenToWorld(e.clientX, e.clientY);
-      onExternalImageDrop(payload, world);
+      if (!canEdit) return;
+
+      const imagePayload = onExternalImageDrop ? parseAiImageDropPayload(e) : null;
+      if (imagePayload) {
+        e.preventDefault();
+        e.stopPropagation();
+        const world = screenToWorld(e.clientX, e.clientY);
+        onExternalImageDrop!(imagePayload, world);
+        return;
+      }
+
+      const textPayload = onExternalTextDrop ? parseAiTextDropPayload(e) : null;
+      if (textPayload) {
+        e.preventDefault();
+        e.stopPropagation();
+        const world = screenToWorld(e.clientX, e.clientY);
+        onExternalTextDrop!(textPayload, world);
+        return;
+      }
     },
-    [canEdit, onExternalImageDrop, parseAiImageDropPayload, screenToWorld]
+    [canEdit, onExternalImageDrop, onExternalTextDrop, parseAiImageDropPayload, parseAiTextDropPayload, screenToWorld]
   );
 
   const handlePointerDown = useCallback(
@@ -799,8 +839,10 @@ export default function DesktopCanvas({
                 onImageLoad={handleImageLoad}
                 sendEvent={sendEvent}
                 cellLocks={cellLocks}
+                textLocks={textLocks}
                 currentUserId={currentUserId}
                 onCellCommit={onCellCommit}
+                onTextCommit={onTextCommit}
               />
               </div>
               {/* Resize handles — visible when selected */}
@@ -1022,8 +1064,10 @@ function AssetCardContent({
   onImageLoad,
   sendEvent,
   cellLocks,
+  textLocks,
   currentUserId,
   onCellCommit,
+  onTextCommit,
 }: {
   asset: EnrichedDesktopAsset;
   playing?: boolean;
@@ -1031,16 +1075,30 @@ function AssetCardContent({
   onImageLoad: (assetId: string, naturalWidth: number, naturalHeight: number) => void;
   sendEvent?: (type: string, payload: Record<string, unknown>) => void;
   cellLocks?: Map<string, { userId: string; sessionId: string; firstName: string }>;
+  textLocks?: Map<string, { userId: string; sessionId: string; firstName: string }>;
   currentUserId?: string;
   onCellCommit?: (assetId: string, rowId: string, colIndex: number, value: string) => void;
+  onTextCommit?: (assetId: string, content: string) => void;
 }) {
   switch (asset.assetType) {
     case "image":
       return <ImageAsset asset={asset} onImageLoad={onImageLoad} />;
     case "video":
       return <VideoAsset asset={asset} playing={playing} onPlayToggle={onPlayToggle} onImageLoad={onImageLoad} />;
-    case "text":
-      return <TextAsset asset={asset} />;
+    case "text": {
+      const textLock = textLocks?.get(asset.id);
+      const isTextLockedByOther = !!textLock && textLock.userId !== currentUserId;
+      return (
+        <TextAsset
+          asset={asset}
+          sendEvent={sendEvent}
+          currentUserId={currentUserId}
+          isLockedByOther={isTextLockedByOther}
+          lockInfo={isTextLockedByOther ? textLock : undefined}
+          onTextCommit={onTextCommit}
+        />
+      );
+    }
     case "link":
       return <LinkAsset asset={asset} />;
     case "table": {
