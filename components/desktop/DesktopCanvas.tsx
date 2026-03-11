@@ -69,6 +69,12 @@ interface ContextMenuState {
   assetId: string | null;
 }
 
+function isAiImageStatus(
+  value: unknown
+): value is "loading" | "generated" | "error" {
+  return value === "loading" || value === "generated" || value === "error";
+}
+
 function userIdToColor(userId: string): string {
   let hash = 0;
   for (let i = 0; i < userId.length; i++) {
@@ -272,17 +278,13 @@ export default function DesktopCanvas({
       if (typeof parsed.imageId !== "string" || typeof parsed.url !== "string") {
         return null;
       }
+      const status = isAiImageStatus(parsed.status) ? parsed.status : undefined;
       return {
         imageId: parsed.imageId,
         url: parsed.url,
         title: typeof parsed.title === "string" ? parsed.title : undefined,
         prompt: typeof parsed.prompt === "string" ? parsed.prompt : undefined,
-        status:
-          parsed.status === "loading" ||
-          parsed.status === "generated" ||
-          parsed.status === "error"
-            ? parsed.status
-            : undefined,
+        status,
         chatId:
           typeof parsed.chatId === "string" || parsed.chatId === null
             ? parsed.chatId
