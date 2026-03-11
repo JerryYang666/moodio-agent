@@ -33,10 +33,17 @@ export function useCredits(): UseCreditsReturn {
     skip: !user,
   });
 
-  // Provide a manual refresh function for edge cases
+  // Provide a manual refresh function for edge cases.
+  // Wrapped in try-catch because refetch() throws if the query was skipped
+  // (e.g., during auth state transitions or when called from a background
+  // streaming loop after the user navigated away).
   const refreshBalance = useCallback(() => {
     if (user) {
-      refetch();
+      try {
+        refetch();
+      } catch {
+        // Query not started yet — safe to ignore
+      }
     }
   }, [user, refetch]);
 
