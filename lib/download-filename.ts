@@ -1,7 +1,52 @@
 const INVALID_FILENAME_CHARS = /[<>:"/\\|?*\u0000-\u001f]/g;
-const TRAILING_DOT_OR_SPACE = /[. ]+$/g;
-const EXTENSION_SUFFIX = /\.[^./\\]+$/;
+const MAX_BASENAME_INPUT_LENGTH = 2000;
 const MAX_FILENAME_BYTES = 180;
+
+function stripTrailingDotOrSpace(value: string): string {
+  let end = value.length;
+  while (end > 0) {
+    const char = value[end - 1];
+    if (char === "." || char === " ") {
+      end -= 1;
+      continue;
+    }
+    break;
+  }
+
+  return end === value.length ? value : value.slice(0, end);
+}
+
+function collapseWhitespace(value: string): string {
+  let result = "";
+  let previousWasWhitespace = false;
+
+  for (const char of value) {
+    const isWhitespace = char.trim().length === 0;
+    if (isWhitespace) {
+      if (!previousWasWhitespace && result.length > 0) {
+        result += " ";
+      }
+      previousWasWhitespace = true;
+      continue;
+    }
+
+    result += char;
+    previousWasWhitespace = false;
+  }
+
+  return result;
+}
+
+function stripExtensionSuffix(value: string): string {
+  const slashIndex = Math.max(value.lastIndexOf("/"), value.lastIndexOf("\\"));
+  const dotIndex = value.lastIndexOf(".");
+
+  if (dotIndex <= slashIndex || dotIndex <= 0 || dotIndex === value.length - 1) {
+    return value;
+  }
+
+  return value.slice(0, dotIndex);
+}
 
 function truncateUtf8(value: string, maxBytes: number): string {
   const encoder = new TextEncoder();
@@ -21,16 +66,19 @@ export function normalizeDownloadBasename(
   value: string | null | undefined,
   fallback: string
 ): string {
-  const candidate = (value ?? "").trim().replace(EXTENSION_SUFFIX, "");
+  const raw = (value ?? "").slice(0, MAX_BASENAME_INPUT_LENGTH);
+  const candidate = stripExtensionSuffix(raw.trim());
   const cleaned = candidate
     .replace(INVALID_FILENAME_CHARS, "")
-    .replace(/\s+/g, " ")
-    .replace(TRAILING_DOT_OR_SPACE, "")
+    .trim();
+  const normalizedWhitespace = collapseWhitespace(cleaned);
+  const withoutTrailingChars = stripTrailingDotOrSpace(normalizedWhitespace)
     .trim();
 
-  const withFallback = cleaned || fallback;
-  const truncated = truncateUtf8(withFallback, MAX_FILENAME_BYTES)
-    .replace(TRAILING_DOT_OR_SPACE, "")
+  const withFallback = withoutTrailingChars || fallback;
+  const truncated = stripTrailingDotOrSpace(
+    truncateUtf8(withFallback, MAX_FILENAME_BYTES)
+  )
     .trim();
 
   return truncated || fallback;
