@@ -1445,6 +1445,17 @@ export default function ChatInterface({
       const variantContents: Record<string, MessageContentPart[]> = {};
       // Will be set from backend's message_timestamp event
       let variantTimestamp: number | null = null;
+      // Track already-refreshed image updates to avoid duplicate balance refetches.
+      const refreshedImageKeys = new Set<string>();
+      const refreshBalanceForGeneratedImage = (
+        part: MessageContentPart,
+        refreshKey: string
+      ) => {
+        if (!isGeneratedImagePart(part) || part.status !== "generated") return;
+        if (refreshedImageKeys.has(refreshKey)) return;
+        refreshedImageKeys.add(refreshKey);
+        refreshBalance();
+      };
 
       while (true) {
         const { done, value } = await reader.read();
@@ -1650,6 +1661,11 @@ export default function ChatInterface({
                 currentContent.push(event.part);
               }
 
+              const partRefreshKey = event.part?.imageId
+                ? `part:${variantId}:${event.part.imageId}`
+                : `part:${variantId}:${currentContent.length}`;
+              refreshBalanceForGeneratedImage(event.part, partRefreshKey);
+
               // Auto-create desktop asset for shot lists
               if (event.part.type === "agent_shot_list" && desktopId) {
                 (async () => {
@@ -1739,6 +1755,13 @@ export default function ChatInterface({
                   currentContent[event.index + offset] = event.part;
                 }
               }
+
+              const partUpdateRefreshKey = event.imageId
+                ? `part_update:${variantId}:${event.imageId}`
+                : event.part?.imageId
+                  ? `part_update:${variantId}:${event.part.imageId}`
+                  : `part_update:${variantId}:${event.index ?? "unknown"}`;
+              refreshBalanceForGeneratedImage(event.part, partUpdateRefreshKey);
             }
 
             // Update the specific variant message
@@ -1766,12 +1789,13 @@ export default function ChatInterface({
       // Check if any images had insufficient credits and show toast
       const allVariantContents = Object.values(variantContents);
       let hasInsufficientCredits = false;
-      let hasAnyImages = false;
       for (const content of allVariantContents) {
         for (const part of content) {
           if (isGeneratedImagePart(part)) {
-            hasAnyImages = true;
-            if (part.status === "error" && part.reason === "INSUFFICIENT_CREDITS") {
+            if (
+              part.status === "error" &&
+              part.reason?.toUpperCase() === "INSUFFICIENT_CREDITS"
+            ) {
               hasInsufficientCredits = true;
             }
           }
@@ -1782,9 +1806,6 @@ export default function ChatInterface({
           title: t("credits.insufficientCredits"),
           color: "danger",
         });
-      }
-      if (hasAnyImages) {
-        refreshBalance();
       }
 
       if (messages.length <= 1) {

@@ -7,6 +7,11 @@ import { eq, and } from "drizzle-orm";
 import { downloadVideo } from "@/lib/storage/s3";
 import { isFeatureFlagEnabled } from "@/lib/feature-flags/server";
 import { recordResearchEvent } from "@/lib/research-telemetry";
+import {
+  buildAttachmentContentDisposition,
+  buildDownloadFilename,
+  normalizeDownloadBasename,
+} from "@/lib/download-filename";
 
 /**
  * GET /api/video/generations/[id]/download
@@ -94,14 +99,8 @@ export async function GET(
       extension = ".webm";
     }
 
-    // Sanitize filename
-    const safeFilename =
-      filename
-        .replace(/[^a-z0-9\s-]/gi, "")
-        .replace(/\s+/g, "_")
-        .substring(0, 100) || "video";
-
-    const finalFilename = `${safeFilename}${extension}`;
+    const basename = normalizeDownloadBasename(filename, "video");
+    const finalFilename = buildDownloadFilename(basename, extension);
 
     // Research telemetry
     if (await isFeatureFlagEnabled(payload.userId, "res_telemetry")) {
@@ -122,7 +121,7 @@ export async function GET(
       status: 200,
       headers: {
         "Content-Type": contentType,
-        "Content-Disposition": `attachment; filename="${finalFilename}"`,
+        "Content-Disposition": buildAttachmentContentDisposition(finalFilename),
         "Content-Length": videoBuffer.length.toString(),
         "Cache-Control": "private, max-age=3600",
       },
