@@ -107,6 +107,9 @@ function getAssetDimensions(
     const rows = Array.isArray(meta.rows) ? meta.rows : [];
     return { w: 700, h: 40 + rows.length * 36 + 40 };
   }
+  if (asset.assetType === "text") {
+    return { w: DEFAULT_ASSET_WIDTH, h: 200 };
+  }
   if (naturalDims) {
     const scale = DEFAULT_ASSET_WIDTH / naturalDims.w;
     return { w: DEFAULT_ASSET_WIDTH, h: naturalDims.h * scale };

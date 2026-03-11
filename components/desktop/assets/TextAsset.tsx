@@ -148,7 +148,6 @@ export default function TextAsset({
             : undefined
       }
       onDoubleClick={startEditing}
-      onPointerDown={(e) => e.stopPropagation()}
     >
       {isLockedByOther && lockInfo && (
         <span
@@ -168,10 +167,11 @@ export default function TextAsset({
           onChange={handleChange}
           onBlur={commitEdit}
           onKeyDown={handleKeyDown}
+          onPointerDown={(e) => e.stopPropagation()}
         />
       ) : (
         <div
-          className="w-full h-full p-3 overflow-auto text-foreground whitespace-pre-wrap cursor-text"
+          className="w-full h-full p-3 overflow-auto text-foreground whitespace-pre-wrap"
           style={{ fontSize: meta.fontSize || 14, color: meta.color }}
         >
           {meta.content || (
