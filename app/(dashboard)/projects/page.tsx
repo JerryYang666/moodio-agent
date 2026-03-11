@@ -24,7 +24,7 @@ import {
   DropdownMenu,
   DropdownItem,
 } from "@heroui/dropdown";
-import { Folder, Plus, Share2, FolderOpen, MoreVertical, Pencil } from "lucide-react";
+import { Folder, Plus, Share2, FolderOpen, MoreVertical, Pencil, Video } from "lucide-react";
 import { useGetCollectionsQuery } from "@/lib/redux/services/next-api";
 import VideoList from "@/components/storyboard/video-list";
 
@@ -149,14 +149,20 @@ export default function ProjectsPage() {
       <Tabs
         selectedKey={activeTab}
         onSelectionChange={(key) => setActiveTab(key as string)}
-        variant="underlined"
+        variant="solid"
         classNames={{
-          tabList: "gap-6 w-full relative rounded-none p-0 border-b border-divider",
-          tab: "max-w-fit px-0 h-12",
-          cursor: "w-full",
+          tabList: "gap-2",
         }}
       >
-        <Tab key="projects" title={t("projects.title")}>
+        <Tab
+          key="projects"
+          title={
+            <div className="flex items-center gap-2">
+              <Folder size={16} />
+              <span>{t("projects.title")}</span>
+            </div>
+          }
+        >
           <div className="pt-6">
             {loading ? (
               <div className="flex items-center justify-center min-h-[60vh]">
@@ -369,7 +375,15 @@ export default function ProjectsPage() {
             )}
           </div>
         </Tab>
-        <Tab key="video-generations" title={t("projects.videoGenerations")}>
+        <Tab
+          key="video-generations"
+          title={
+            <div className="flex items-center gap-2">
+              <Video size={16} />
+              <span>{t("projects.videoGenerations")}</span>
+            </div>
+          }
+        >
           <div className="pt-6">
             <VideoList />
           </div>
