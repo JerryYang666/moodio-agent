@@ -1057,6 +1057,32 @@ export default function ChatInterface({
     [addAssetImage, addReferenceImage, assetPickerMode, t]
   );
 
+  const handleAssetPickedMultiple = useCallback(
+    (assets: AssetSummary[]) => {
+      if (assetPickerMode === "reference") {
+        for (const asset of assets) {
+          if (!canAddReferenceImage(referenceImages)) break;
+          addReferenceImage({
+            imageId: asset.imageId,
+            url: asset.imageUrl,
+            title: asset.generationDetails?.title || t("chat.selectedAsset"),
+          }, "subject");
+        }
+      } else {
+        for (const asset of assets) {
+          if (!canAddImage(pendingImages)) break;
+          addAssetImage({
+            assetId: asset.id,
+            url: asset.imageUrl,
+            title: asset.generationDetails?.title || t("chat.selectedAsset"),
+            imageId: asset.imageId,
+          });
+        }
+      }
+    },
+    [addAssetImage, addReferenceImage, assetPickerMode, pendingImages, referenceImages, t]
+  );
+
   // Handler to open drawing modal for an image
   const handleDrawImage = useCallback(
     (imageId: string, imageUrl: string, imageTitle?: string) => {
@@ -2587,7 +2613,14 @@ export default function ChatInterface({
         isOpen={isAssetPickerOpen}
         onOpenChange={() => setIsAssetPickerOpen((v) => !v)}
         onSelect={handleAssetPicked}
+        onSelectMultiple={handleAssetPickedMultiple}
         onUpload={handleAssetUpload}
+        multiSelect
+        maxSelectCount={
+          assetPickerMode === "reference"
+            ? MAX_REFERENCE_IMAGES - referenceImages.length
+            : MAX_PENDING_IMAGES - pendingImages.length
+        }
       />
 
       <ImageDetailModal

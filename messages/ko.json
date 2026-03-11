@@ -830,7 +830,18 @@
     "selectFromChat": "채팅에서 선택",
     "selectFromCollection": "컬렉션에서 선택",
     "viewFull": "전체 이미지 보기",
-    "selectThisImage": "이 이미지 선택"
+    "selectThisImage": "이 이미지 선택",
+    "deselectThisImage": "이 이미지 선택 해제",
+    "cameraTab": "카메라",
+    "startCamera": "카메라 시작",
+    "takePhoto": "사진 촬영",
+    "capturedPhoto": "촬영된 사진",
+    "retakePhoto": "다시 촬영",
+    "usePhoto": "사진 사용",
+    "cameraAccessDenied": "카메라에 접근할 수 없습니다. 브라우저 권한을 확인해주세요.",
+    "filterByRating": "별점",
+    "selectedCount": "{count}개 선택됨",
+    "confirmSelection": "선택 확인"
   },
   "assetsSidebar": {
     "title": "애셋",

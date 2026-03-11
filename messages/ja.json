@@ -830,7 +830,18 @@
     "selectFromChat": "チャットから選択",
     "selectFromCollection": "コレクションから選択",
     "viewFull": "フルサイズで表示",
-    "selectThisImage": "この画像を選択"
+    "selectThisImage": "この画像を選択",
+    "deselectThisImage": "この画像の選択を解除",
+    "cameraTab": "カメラ",
+    "startCamera": "カメラを起動",
+    "takePhoto": "撮影",
+    "capturedPhoto": "撮影した写真",
+    "retakePhoto": "撮り直す",
+    "usePhoto": "写真を使用",
+    "cameraAccessDenied": "カメラにアクセスできません。ブラウザの権限を確認してください。",
+    "filterByRating": "星",
+    "selectedCount": "{count}件選択中",
+    "confirmSelection": "選択を確定"
   },
   "assetsSidebar": {
     "title": "アセット",
