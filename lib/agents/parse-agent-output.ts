@@ -6,6 +6,7 @@
  */
 
 import { MessageContentPart } from "@/lib/llm/types";
+import { siteConfig } from "@/config/site";
 
 export const VALID_TAGS = [
   "TEXT",
@@ -167,7 +168,7 @@ export function parseSuggestions(
     const suggestion = JSON.parse(result.content);
     suggestions.push(suggestion);
 
-    if (state.suggestionIndex < 8) {
+    if (state.suggestionIndex < siteConfig.imageLimits.maxSuggestionsHardCap) {
       const placeholder: MessageContentPart = {
         type: "agent_image",
         imageId: `test-image-${state.suggestionIndex}`,

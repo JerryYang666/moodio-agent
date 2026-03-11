@@ -37,25 +37,25 @@ describe("parseSuggestions (JSON/image schema)", () => {
     expect(suggestions.map((s) => s.title)).toEqual(["A", "B", "C"]);
   });
 
-  it("respects the 8-suggestion limit", () => {
+  it("respects the 6-suggestion limit", () => {
     let buf = "";
     for (let i = 0; i < 10; i++) buf += makeSuggestion(`S${i}`, "1:1", `p${i}`);
     const state = createParseState(buf);
     const events: ParseEvent[] = [];
     const suggestions = parseSuggestions(state, events);
     expect(suggestions).toHaveLength(10);
-    expect(events).toHaveLength(8); // only 8 placeholder events
-    expect(state.suggestionIndex).toBe(8);
+    expect(events).toHaveLength(6); // only 6 placeholder events (maxSuggestionsHardCap)
+    expect(state.suggestionIndex).toBe(6);
   });
 
   it("handles suggestion with all supported aspect ratios", () => {
-    const ratios = ["1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16"];
+    const ratios = ["1:1", "2:3", "3:2", "3:4", "4:3", "9:16"];
     let buf = "";
     for (const ar of ratios) buf += makeSuggestion("T", ar, "p");
     const state = createParseState(buf);
     const events: ParseEvent[] = [];
     const suggestions = parseSuggestions(state, events);
-    expect(suggestions).toHaveLength(8);
+    expect(suggestions).toHaveLength(6);
     expect(suggestions.map((s) => s.aspectRatio)).toEqual(ratios);
   });
 

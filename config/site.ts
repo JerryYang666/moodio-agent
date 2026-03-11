@@ -88,6 +88,16 @@ export const siteConfig = {
     enableInstallPrompt: false, // Set to true when icons are ready in /public/icons/
   },
 
+  // Image Limits Configuration
+  imageLimits: {
+    // Input side: how many images a user can attach
+    maxPendingImages: 10,
+    maxReferenceImages: 4,
+    maxImagesPerMessage: 14,
+    // Output side: how many images the agent/system can generate
+    maxSuggestionsHardCap: 6,
+  },
+
   // Upload Configuration
   upload: {
     maxFileSizeMB: 20,

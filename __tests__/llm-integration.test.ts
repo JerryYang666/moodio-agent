@@ -198,7 +198,7 @@ describe("LLM integration: TEXT + JSON (image suggestions)", () => {
 
       const images = finalContent.filter((p) => p.type === "agent_image");
       expect(images.length).toBeGreaterThanOrEqual(1);
-      expect(images.length).toBeLessThanOrEqual(8);
+      expect(images.length).toBeLessThanOrEqual(6);
       for (const img of images) assertValidAgentImagePart(img);
     },
     LLM_TIMEOUT

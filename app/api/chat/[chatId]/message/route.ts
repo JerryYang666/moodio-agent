@@ -30,9 +30,10 @@ import {
 } from "@/lib/video/models";
 import { submitVideoGeneration } from "@/lib/video/fal-client";
 import { videoGenerations } from "@/lib/db/schema";
+import { siteConfig } from "@/config/site";
 
-/** Maximum number of images allowed per message */
-const MAX_IMAGES_PER_MESSAGE = 5;
+const MAX_IMAGES_PER_MESSAGE = siteConfig.imageLimits.maxImagesPerMessage;
+const MAX_SUGGESTIONS_HARD_CAP = siteConfig.imageLimits.maxSuggestionsHardCap;
 
 type ImageSourceEntry = {
   imageId: string;
@@ -306,11 +307,11 @@ export async function POST(
       typeof json.variantCount === "number" && json.variantCount >= 1
         ? Math.min(json.variantCount, 4) // Cap at 4 variants max
         : 1;
-    // Accept optional imageQuantity parameter (1-6, undefined = smart/agent decides)
+    // Accept optional imageQuantity parameter (1-MAX, undefined = smart/agent decides)
     const imageQuantity: number | undefined =
       typeof json.imageQuantity === "number" &&
       json.imageQuantity >= 1 &&
-      json.imageQuantity <= 6
+      json.imageQuantity <= MAX_SUGGESTIONS_HARD_CAP
         ? json.imageQuantity
         : undefined;
     // Parse reference images with their tags

@@ -387,7 +387,7 @@ The platform uses a sophisticated AI agent system (`Agent1`) that processes user
 
 1. **Message Preparation**: Filters conversation history, prepares images, and constructs the prompt
 2. **LLM Processing**: Streams response from GPT-5.2 with structured output parsing
-3. **Image Generation**: Parallel generation of up to 8 image suggestions
+3. **Image Generation**: Parallel generation of up to 6 image suggestions
 4. **Response Assembly**: Combines text response with generated images
 
 ### Structured Thinking Process

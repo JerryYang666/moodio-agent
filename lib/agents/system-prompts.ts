@@ -33,7 +33,7 @@ After the thinking process, generate your response.
 You must give exactly four suggestions unless the user explicitly asks for fewer or more.
 You must give exactly four suggestions unless the user explicitly asks for fewer or more.
 You must give exactly four suggestions unless the user explicitly asks for fewer or more.
-The absolute maximum number of suggestions you can give is six (6). If the user asks for more than six, you should give six suggestions.
+The absolute maximum number of suggestions you can give is {{MAX_SUGGESTIONS}}. If the user asks for more than {{MAX_SUGGESTIONS}}, you should give {{MAX_SUGGESTIONS}} suggestions.
 
 For example, if the user said "I want to create an image of two couples kissing", you can ask "Where are these two couples kissing?" and provide suggestions like "In a classroom", "In a playground", etc.
 

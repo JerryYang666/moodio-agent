@@ -36,8 +36,10 @@ export interface PendingImage {
   markedFromImageId?: string;
 }
 
+import { siteConfig } from "@/config/site";
+
 /** Maximum number of images that can be added to a single message */
-export const MAX_PENDING_IMAGES = 5;
+export const MAX_PENDING_IMAGES = siteConfig.imageLimits.maxPendingImages;
 
 /**
  * Check if more images can be added

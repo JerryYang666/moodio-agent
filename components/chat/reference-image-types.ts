@@ -33,8 +33,10 @@ export interface ReferenceImage {
   tag: ReferenceImageTag;
 }
 
+import { siteConfig } from "@/config/site";
+
 /** Maximum number of reference images that can be added */
-export const MAX_REFERENCE_IMAGES = 5;
+export const MAX_REFERENCE_IMAGES = siteConfig.imageLimits.maxReferenceImages;
 
 /**
  * Check if more reference images can be added

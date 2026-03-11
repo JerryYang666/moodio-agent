@@ -33,6 +33,7 @@ import {
   extractTag,
   VALID_TAGS,
 } from "./parse-agent-output";
+import { siteConfig } from "@/config/site";
 
 // Maximum number of retries for failed operations
 const MAX_RETRY = 2;
@@ -100,7 +101,7 @@ interface ParseState {
 }
 
 /** Hard cap on the number of image suggestions the agent can generate. */
-const MAX_SUGGESTIONS_HARD_CAP = 6;
+const MAX_SUGGESTIONS_HARD_CAP = siteConfig.imageLimits.maxSuggestionsHardCap;
 
 /** Immutable context passed to all parsing helpers. */
 interface ParseContext {
@@ -268,7 +269,8 @@ export class Agent1 implements Agent {
     const rawSystemPrompt = systemPromptOverride || getSystemPrompt(this.id);
     const systemPrompt = rawSystemPrompt
       .replace("{{SUPPORTED_ASPECT_RATIOS}}", SUPPORTED_ASPECT_RATIOS.join(", "))
-      .replace("{{VIDEO_MODELS_INFO}}", getVideoModelsPromptText());
+      .replace("{{VIDEO_MODELS_INFO}}", getVideoModelsPromptText())
+      .replace(/\{\{MAX_SUGGESTIONS\}\}/g, String(MAX_SUGGESTIONS_HARD_CAP));
 
     // Convert previous agent_image and agent_video parts to text in history
     const cleanHistory = history.map((m) => {
