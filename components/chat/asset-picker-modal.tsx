@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { type Permission } from "@/lib/permissions";
 import {
@@ -15,7 +15,6 @@ import { Spinner } from "@heroui/spinner";
 import { Select, SelectItem } from "@heroui/select";
 import { Input } from "@heroui/input";
 import { Image } from "@heroui/image";
-import { Card, CardBody } from "@heroui/card";
 import { Tab, Tabs } from "@heroui/tabs";
 import { Search, Expand, Camera, Star, X, Check } from "lucide-react";
 import { siteConfig } from "@/config/site";
@@ -49,6 +48,104 @@ type Collection = {
   isOwner: boolean;
   permission: Permission;
 };
+
+/** Memoized grid item – only re-renders when its own selection state or asset changes */
+const AssetGridItem = React.memo(function AssetGridItem({
+  asset,
+  index,
+  isSelected,
+  multiSelect,
+  onClick,
+  onExpand,
+  untitledLabel,
+  viewFullLabel,
+  assetAltLabel,
+}: {
+  asset: AssetSummary;
+  index: number;
+  isSelected: boolean;
+  multiSelect: boolean;
+  onClick: (asset: AssetSummary, index: number, e: React.MouseEvent) => void;
+  onExpand: (asset: AssetSummary) => void;
+  untitledLabel: string;
+  viewFullLabel: string;
+  assetAltLabel: string;
+}) {
+  return (
+    <div
+      className={`group relative rounded-lg overflow-hidden border border-divider bg-default-100 ${multiSelect && isSelected ? "ring-2 ring-primary ring-offset-2 ring-offset-background" : ""}`}
+    >
+      <div className="aspect-square relative">
+        <button
+          className="w-full h-full"
+          onClick={(e) => onClick(asset, index, e)}
+        >
+          {/* Use native img for performance – avoids HeroUI Image overhead on 80+ items */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={asset.imageUrl}
+            alt={asset.generationDetails?.title || assetAltLabel}
+            className={`w-full h-full object-cover ${multiSelect && isSelected ? "opacity-80" : ""}`}
+            loading="lazy"
+          />
+        </button>
+
+        {/* Selection checkbox overlay */}
+        {multiSelect && (
+          <div
+            className="absolute top-2 left-2 z-20 cursor-pointer"
+            onClick={(e) => {
+              e.stopPropagation();
+              onClick(asset, index, e as unknown as React.MouseEvent);
+            }}
+          >
+            <div
+              className={`w-6 h-6 rounded-md flex items-center justify-center transition-colors ${
+                isSelected
+                  ? "bg-primary text-white"
+                  : "bg-background/80 backdrop-blur-sm border border-default-300"
+              }`}
+            >
+              {isSelected && <Check size={14} />}
+            </div>
+          </div>
+        )}
+
+        {/* Expand button */}
+        <button
+          className="absolute top-2 right-2 p-1.5 rounded-md bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70 z-10"
+          onClick={(e) => {
+            e.stopPropagation();
+            onExpand(asset);
+          }}
+          title={viewFullLabel}
+        >
+          <Expand size={14} />
+        </button>
+
+        {/* Bottom overlay: title + star rating (collection style) */}
+        <div className="absolute bottom-0 left-0 right-0 z-10 bg-gradient-to-t from-black/70 to-transparent pt-6 pb-1.5 px-2 pointer-events-none">
+          <p className="text-xs text-white truncate">
+            {asset.generationDetails?.title || untitledLabel}
+          </p>
+          <div className="flex gap-0.5 mt-0.5">
+            {[1, 2, 3, 4, 5].map((star) => (
+              <Star
+                key={star}
+                size={12}
+                className={
+                  star <= (asset.rating ?? 0)
+                    ? "text-yellow-400 fill-yellow-400"
+                    : "text-white/50"
+                }
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+});
 
 export default function AssetPickerModal({
   isOpen,
@@ -258,7 +355,11 @@ export default function AssetPickerModal({
     [capturedPhoto, onUpload]
   );
 
-  // Multiselect handlers
+  // Keep filteredAssets in a ref so handleAssetClick doesn't depend on it
+  const filteredAssetsRef = useRef(filteredAssets);
+  filteredAssetsRef.current = filteredAssets;
+
+  // Multiselect handlers – stable callback (no filteredAssets in deps)
   const handleAssetClick = useCallback(
     (asset: AssetSummary, index: number, e: React.MouseEvent) => {
       if (!multiSelect) {
@@ -271,7 +372,7 @@ export default function AssetPickerModal({
       if (e.shiftKey && lastClickedIndexRef.current !== null) {
         const start = Math.min(lastClickedIndexRef.current, index);
         const end = Math.max(lastClickedIndexRef.current, index);
-        const rangeIds = filteredAssets.slice(start, end + 1).map((a) => a.id);
+        const rangeIds = filteredAssetsRef.current.slice(start, end + 1).map((a) => a.id);
         setSelectedIds((prev) => {
           const next = new Set(prev);
           for (const id of rangeIds) {
@@ -297,7 +398,7 @@ export default function AssetPickerModal({
       });
       lastClickedIndexRef.current = index;
     },
-    [multiSelect, filteredAssets, maxSelectCount, onSelect, onOpenChange]
+    [multiSelect, maxSelectCount, onSelect, onOpenChange]
   );
 
   const handleConfirmSelection = useCallback(
@@ -589,93 +690,20 @@ export default function AssetPickerModal({
                     ) : (
                       <div className="flex-1 min-h-0 overflow-y-auto pr-1">
                         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                          {filteredAssets.map((a, index) => {
-                            const isSelected = selectedIds.has(a.id);
-                            return (
-                              <Card
-                                key={a.id}
-                                className={`group relative ${multiSelect && isSelected ? "ring-2 ring-primary ring-offset-2 ring-offset-background" : ""}`}
-                              >
-                                <CardBody className="p-0 overflow-hidden aspect-square relative rounded-lg">
-                                  <button
-                                    className="w-full h-full"
-                                    onClick={(e) => handleAssetClick(a, index, e)}
-                                  >
-                                    <Image
-                                      src={a.imageUrl}
-                                      alt={
-                                        a.generationDetails?.title ||
-                                        t("assetPicker.assetAlt")
-                                      }
-                                      radius="none"
-                                      classNames={{
-                                        wrapper: "w-full h-full !max-w-full",
-                                        img: `w-full h-full object-cover transition-opacity ${multiSelect && isSelected ? "opacity-80" : ""}`,
-                                      }}
-                                    />
-                                  </button>
-
-                                  {/* Selection checkbox overlay */}
-                                  {multiSelect && (
-                                    <div
-                                      className="absolute top-2 left-2 z-20 cursor-pointer"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleAssetClick(a, index, e as unknown as React.MouseEvent);
-                                      }}
-                                    >
-                                      <div
-                                        className={`w-6 h-6 rounded-md flex items-center justify-center transition-colors ${
-                                          isSelected
-                                            ? "bg-primary text-white"
-                                            : "bg-background/80 backdrop-blur-sm border border-default-300"
-                                        }`}
-                                      >
-                                        {isSelected && <Check size={14} />}
-                                      </div>
-                                    </div>
-                                  )}
-
-                                  {/* Expand button */}
-                                  <button
-                                    className="absolute top-2 right-2 p-1.5 rounded-md bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70 z-10"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setPreviewAsset(a);
-                                    }}
-                                    title={t("assetPicker.viewFull")}
-                                  >
-                                    <Expand size={14} />
-                                  </button>
-
-                                  {/* Bottom overlay: title + star rating (collection style) */}
-                                  <div className="absolute bottom-0 left-0 right-0 z-10 bg-linear-to-t from-black/70 to-transparent pt-6 pb-1.5 px-2 pointer-events-none">
-                                    <p className="text-xs text-white truncate">
-                                      {a.generationDetails?.title ||
-                                        t("assetPicker.untitled")}
-                                    </p>
-                                    <div className="flex gap-0.5 mt-0.5">
-                                      {[1, 2, 3, 4, 5].map((star) => {
-                                        const filled =
-                                          star <= (a.rating ?? 0);
-                                        return (
-                                          <Star
-                                            key={star}
-                                            size={12}
-                                            className={
-                                              filled
-                                                ? "text-yellow-400 fill-yellow-400"
-                                                : "text-white/50"
-                                            }
-                                          />
-                                        );
-                                      })}
-                                    </div>
-                                  </div>
-                                </CardBody>
-                              </Card>
-                            );
-                          })}
+                          {filteredAssets.map((a, index) => (
+                            <AssetGridItem
+                              key={a.id}
+                              asset={a}
+                              index={index}
+                              isSelected={selectedIds.has(a.id)}
+                              multiSelect={multiSelect}
+                              onClick={handleAssetClick}
+                              onExpand={setPreviewAsset}
+                              untitledLabel={t("assetPicker.untitled")}
+                              viewFullLabel={t("assetPicker.viewFull")}
+                              assetAltLabel={t("assetPicker.assetAlt")}
+                            />
+                          ))}
                         </div>
                       </div>
                     )}
