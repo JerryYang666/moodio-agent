@@ -5,6 +5,8 @@ import { db } from "@/lib/db";
 import { videoGenerations } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { downloadVideo } from "@/lib/storage/s3";
+import { isFeatureFlagEnabled } from "@/lib/feature-flags/server";
+import { recordResearchEvent } from "@/lib/research-telemetry";
 import {
   buildAttachmentContentDisposition,
   buildDownloadFilename,
@@ -99,6 +101,18 @@ export async function GET(
 
     const basename = normalizeDownloadBasename(filename, "video");
     const finalFilename = buildDownloadFilename(basename, extension);
+
+    // Research telemetry
+    if (await isFeatureFlagEnabled(payload.userId, "res_telemetry")) {
+      recordResearchEvent({
+        userId: payload.userId,
+        eventType: "video_downloaded",
+        metadata: {
+          generationId: id,
+          modelId: generation.modelId,
+        },
+      });
+    }
 
     // Convert Buffer to Uint8Array for NextResponse compatibility
     const uint8Array = new Uint8Array(videoBuffer);

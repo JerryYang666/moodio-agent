@@ -43,5 +43,8 @@ yarn-error.log*
 
 next-env.d.ts
 
+# drizzle migrations (managed via db:push)
+drizzle/
+
 # go build output
 realtime/moodio-realtime

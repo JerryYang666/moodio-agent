@@ -5,6 +5,8 @@ import { getAccessToken } from "@/lib/auth/cookies";
 import { verifyAccessToken } from "@/lib/auth/jwt";
 import { eq, and } from "drizzle-orm";
 import { isValidSharePermission } from "@/lib/permissions";
+import { isFeatureFlagEnabled } from "@/lib/feature-flags/server";
+import { recordResearchEvent } from "@/lib/research-telemetry";
 
 // Helper to check if user is owner
 async function isOwner(collectionId: string, userId: string): Promise<boolean> {
@@ -121,6 +123,15 @@ export async function POST(
         permission,
       })
       .returning();
+
+    // Research telemetry (only on new share creation)
+    if (await isFeatureFlagEnabled(userId, "res_telemetry")) {
+      recordResearchEvent({
+        userId,
+        eventType: "image_shared",
+        metadata: { collectionId, shareType: "collection" },
+      });
+    }
 
     return NextResponse.json({
       share: newShare,

@@ -14,6 +14,8 @@ import { calculateCost } from "@/lib/pricing";
 import { submitVideoGeneration } from "@/lib/video/fal-client";
 import { getSignedImageUrl } from "@/lib/storage/s3";
 import { recordEvent } from "@/lib/telemetry";
+import { isFeatureFlagEnabled } from "@/lib/feature-flags/server";
+import { recordResearchEvent } from "@/lib/research-telemetry";
 
 /**
  * POST /api/video/generate
@@ -215,6 +217,21 @@ export async function POST(request: NextRequest) {
         },
         ipAddress
       );
+
+      // Research telemetry
+      if (await isFeatureFlagEnabled(payload.userId, "res_telemetry")) {
+        recordResearchEvent({
+          userId: payload.userId,
+          eventType: "video_generation_started",
+          imageId: sourceImageId,
+          metadata: {
+            modelId,
+            modelName: model.name,
+            prompt: params.prompt,
+            cost,
+          },
+        });
+      }
 
       return NextResponse.json({
         success: true,
