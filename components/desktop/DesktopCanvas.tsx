@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, useCallback, useMemo, useEffect } from "react";
+import { useTranslations } from "next-intl";
 import type { DesktopAsset } from "@/lib/db/schema";
 import type { CameraState } from "@/hooks/use-desktop";
 import type { RemoteCursor } from "@/hooks/use-desktop-ws";
@@ -159,6 +160,7 @@ export default function DesktopCanvas({
   const [resizeDims, setResizeDims] = useState<{ w: number; h: number; posX: number; posY: number } | null>(null);
   const lastResizeSend = useRef(0);
 
+  const t = useTranslations("desktop");
   const canEdit = hasWriteAccess(permission);
 
   const handleImageLoad = useCallback(
@@ -666,7 +668,7 @@ export default function DesktopCanvas({
           assetId: contextAsset.id,
           imageId: (contextAsset.metadata as Record<string, unknown>)?.imageId as string | undefined,
           url: contextAsset.imageUrl,
-          title: ((contextAsset.metadata as Record<string, unknown>)?.title as string) || "Image",
+          title: ((contextAsset.metadata as Record<string, unknown>)?.title as string) || t("videoTitle"),
         }
       : null;
 
@@ -915,7 +917,7 @@ export default function DesktopCanvas({
               }}
             >
               <Plus size={14} />
-              Add Asset
+              {t("addAsset")}
             </button>
           ) : selectedIds.size > 1 ? (
             /* Multi-select context menu: only delete option */
@@ -924,7 +926,7 @@ export default function DesktopCanvas({
               onClick={handleDeleteSelected}
             >
               <Trash2 size={14} />
-              Delete all {selectedIds.size} selected
+              {t("deleteAllSelected", { count: selectedIds.size })}
             </button>
           ) : (
             /* Single-select context menu: full options */
@@ -938,7 +940,7 @@ export default function DesktopCanvas({
                   }}
                 >
                   <MessageSquare size={14} />
-                  Open in Chat
+                  {t("openInChat")}
                 </button>
               )}
               {contextImageInfo?.imageId && contextImageInfo.url && (
@@ -959,7 +961,7 @@ export default function DesktopCanvas({
                   }}
                 >
                   <SendHorizontal size={14} />
-                  Send to Chat
+                  {t("sendToChat")}
                 </button>
               )}
               {contextAsset && onCopyToCollection && (
@@ -971,7 +973,7 @@ export default function DesktopCanvas({
                   }}
                 >
                   <FolderPlus size={14} />
-                  Copy to Collection
+                  {t("copyToCollection")}
                 </button>
               )}
               {contextAsset?.assetType === "video" && onSendToTimeline && (
@@ -983,7 +985,7 @@ export default function DesktopCanvas({
                   }}
                 >
                   <Film size={14} />
-                  Send to Timeline
+                  {t("sendToTimeline")}
                 </button>
               )}
               <button
@@ -991,7 +993,7 @@ export default function DesktopCanvas({
                 onClick={handleDeleteSelected}
               >
                 <Trash2 size={14} />
-                Delete
+                {t("delete")}
               </button>
             </>
           )}
@@ -1001,7 +1003,7 @@ export default function DesktopCanvas({
       {/* Selection count indicator */}
       {selectedIds.size > 1 && (
         <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground px-3 py-1 rounded-full text-xs font-medium shadow z-10">
-          {selectedIds.size} selected
+          {t("selected", { count: selectedIds.size })}
         </div>
       )}
 

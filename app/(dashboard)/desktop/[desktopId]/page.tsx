@@ -58,6 +58,7 @@ export default function DesktopDetailPage({
   const { desktopId } = use(params);
   const router = useRouter();
   const t = useTranslations("desktop");
+  const tCommon = useTranslations("common");
   const { user } = useAuth();
   const {
     detail,
@@ -391,7 +392,7 @@ export default function DesktopDetailPage({
                 metadata: {
                   imageId: payload.imageId,
                   chatId: payload.chatId ?? undefined,
-                  title: payload.title || "Image",
+                  title: payload.title || t("videoTitle"),
                   prompt: payload.prompt || "",
                   status: payload.status || "generated",
                 },
@@ -415,8 +416,8 @@ export default function DesktopDetailPage({
       } catch (error) {
         console.error("Failed to drop image onto desktop:", error);
         addToast({
-          title: "Failed to add image",
-          description: "Please try dragging the image again.",
+          title: t("failedToAddImage"),
+          description: t("retryDragImage"),
           color: "danger",
         });
       }
@@ -483,7 +484,7 @@ export default function DesktopDetailPage({
       addTimelineClip({
         id: `clip-${asset.id}-${Date.now()}`,
         assetId: asset.id,
-        title: meta.title || "Untitled video",
+        title: meta.title || t("untitledVideo"),
         thumbnailUrl: asset.imageUrl || null,
         videoUrl: asset.videoUrl || null,
         duration: meta.duration || 0,
@@ -491,8 +492,8 @@ export default function DesktopDetailPage({
       // Dispatch event so TimelinePanel auto-expands
       window.dispatchEvent(new CustomEvent("timeline-clip-added"));
       addToast({
-        title: "Added to Timeline",
-        description: meta.title || "Video clip added",
+        title: t("addedToTimeline"),
+        description: meta.title || t("videoClipAdded"),
         color: "success",
       });
     },
@@ -501,6 +502,7 @@ export default function DesktopDetailPage({
 
   // Asset picker state for right-click "Add Asset"
   const [isAssetPickerOpen, setIsAssetPickerOpen] = useState(false);
+  const toggleAssetPicker = useCallback(() => setIsAssetPickerOpen((v) => !v), []);
   const addAssetPositionRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
   const handleAddAssetAtPosition = useCallback((worldPos: { x: number; y: number }) => {
@@ -541,7 +543,7 @@ export default function DesktopDetailPage({
         );
       } catch (error) {
         console.error("Failed to add picked asset to desktop:", error);
-        addToast({ title: "Failed to add asset", color: "danger" });
+        addToast({ title: t("failedToAddAsset"), color: "danger" });
       }
     },
     [desktopId]
@@ -553,7 +555,7 @@ export default function DesktopDetailPage({
       for (const file of files) {
         const result = await uploadImage(file);
         if (!result.success) {
-          addToast({ title: "Upload failed", description: result.error.message, color: "danger" });
+          addToast({ title: t("uploadFailed"), description: result.error.message, color: "danger" });
           continue;
         }
         try {
@@ -585,7 +587,7 @@ export default function DesktopDetailPage({
           );
         } catch (error) {
           console.error("Failed to add uploaded asset to desktop:", error);
-          addToast({ title: "Failed to add asset", color: "danger" });
+          addToast({ title: t("failedToAddAsset"), color: "danger" });
         }
       }
     },
@@ -603,7 +605,7 @@ export default function DesktopDetailPage({
   if (!detail) {
     return (
       <div className="flex items-center justify-center h-full">
-        <p className="text-default-500">Desktop not found</p>
+        <p className="text-default-500">{t("desktopNotFound")}</p>
       </div>
     );
   }
@@ -638,7 +640,7 @@ export default function DesktopDetailPage({
                     {user.firstName && <div className="font-semibold">{user.firstName}</div>}
                     <div className="text-default-400">{user.email}</div>
                     {user.sessionCount > 1 && (
-                      <div className="text-default-500 mt-0.5">{user.sessionCount} tabs open</div>
+                      <div className="text-default-500 mt-0.5">{t("tabsOpen", { count: user.sessionCount })}</div>
                     )}
                   </div>
                 }
@@ -662,7 +664,7 @@ export default function DesktopDetailPage({
 
         {/* Connection state indicator */}
         {connectionState === "connected" && (
-          <div className="text-success" title="Live sync active">
+          <div className="text-success" title={t("liveSyncActive")}>
             <Wifi size={16} />
           </div>
         )}
@@ -677,7 +679,7 @@ export default function DesktopDetailPage({
             startContent={<Share2 size={14} />}
             onPress={onShareOpen}
           >
-            Share
+            {tCommon("share")}
           </Button>
         )}
       </div>
@@ -687,8 +689,8 @@ export default function DesktopDetailPage({
         <div className="flex items-center gap-2 px-4 py-1.5 bg-warning-50 border-b border-warning-200 text-warning-700 text-xs z-20 shrink-0">
           <WifiOff size={14} />
           {connectionState === "polling"
-            ? "Live sync unavailable \u2014 updates every 10s"
-            : "Reconnecting to live sync\u2026"}
+            ? t("liveSyncUnavailable")
+            : t("reconnecting")}
         </div>
       )}
 
@@ -767,7 +769,7 @@ export default function DesktopDetailPage({
       {/* Asset Picker for right-click "Add Asset" */}
       <AssetPickerModal
         isOpen={isAssetPickerOpen}
-        onOpenChange={() => setIsAssetPickerOpen((v) => !v)}
+        onOpenChange={toggleAssetPicker}
         onSelect={handleAssetPickerSelect}
         onUpload={handleAssetPickerUpload}
       />

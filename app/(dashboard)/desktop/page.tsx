@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { Card, CardBody } from "@heroui/card";
 import { Button } from "@heroui/button";
 import { Input } from "@heroui/input";
@@ -33,6 +34,8 @@ import { useDesktops } from "@/hooks/use-desktop";
 
 export default function DesktopListPage() {
   const router = useRouter();
+  const t = useTranslations("desktop");
+  const tCommon = useTranslations("common");
   const { desktops, loading, fetchDesktops, createDesktop, deleteDesktop, renameDesktop } =
     useDesktops();
 
@@ -77,8 +80,8 @@ export default function DesktopListPage() {
       router.push(`/desktop/${desktop.id}`);
     } catch {
       addToast({
-        title: "Error",
-        description: "Failed to create desktop",
+        title: tCommon("error"),
+        description: t("failedToCreate"),
         color: "danger",
       });
     } finally {
@@ -94,8 +97,8 @@ export default function DesktopListPage() {
       setDesktopToDelete(null);
     } catch {
       addToast({
-        title: "Error",
-        description: "Failed to delete desktop",
+        title: tCommon("error"),
+        description: t("failedToDelete"),
         color: "danger",
       });
     }
@@ -110,8 +113,8 @@ export default function DesktopListPage() {
       setDesktopToRename(null);
     } catch {
       addToast({
-        title: "Error",
-        description: "Failed to rename desktop",
+        title: tCommon("error"),
+        description: t("failedToRename"),
         color: "danger",
       });
     } finally {
@@ -131,17 +134,15 @@ export default function DesktopListPage() {
     <div className="container mx-auto px-4 py-8 max-w-5xl">
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-3xl font-bold">Desktops</h1>
-          <p className="text-default-500 mt-1">
-            Infinite canvases for arranging your generated assets
-          </p>
+          <h1 className="text-3xl font-bold">{t("title")}</h1>
+          <p className="text-default-500 mt-1">{t("subtitle")}</p>
         </div>
         <Button
           color="primary"
           startContent={<Plus size={18} />}
           onPress={onCreateOpen}
         >
-          New Desktop
+          {t("newDesktop")}
         </Button>
       </div>
 
@@ -151,11 +152,9 @@ export default function DesktopListPage() {
             size={48}
             className="mx-auto text-default-300 mb-4"
           />
-          <p className="text-default-500 mb-4">
-            You don&apos;t have any desktops yet
-          </p>
+          <p className="text-default-500 mb-4">{t("noDesktopsYet")}</p>
           <Button color="primary" onPress={onCreateOpen}>
-            Create your first desktop
+            {t("createFirst")}
           </Button>
         </div>
       ) : (
@@ -204,7 +203,7 @@ export default function DesktopListPage() {
                             <MoreVertical size={16} />
                           </Button>
                         </DropdownTrigger>
-                        <DropdownMenu aria-label="Desktop actions">
+                        <DropdownMenu aria-label={t("desktopActions")}>
                           <DropdownItem
                             key="rename"
                             startContent={<Pencil size={16} />}
@@ -217,7 +216,7 @@ export default function DesktopListPage() {
                               onRenameOpen();
                             }}
                           >
-                            Rename
+                            {tCommon("rename")}
                           </DropdownItem>
                           <DropdownItem
                             key="delete"
@@ -229,7 +228,7 @@ export default function DesktopListPage() {
                               onDeleteOpen();
                             }}
                           >
-                            Delete
+                            {tCommon("delete")}
                           </DropdownItem>
                         </DropdownMenu>
                       </Dropdown>
@@ -247,11 +246,11 @@ export default function DesktopListPage() {
         <ModalContent>
           {(onClose) => (
             <>
-              <ModalHeader>Create New Desktop</ModalHeader>
+              <ModalHeader>{t("createDesktop")}</ModalHeader>
               <ModalBody>
                 <Input
-                  label="Desktop name"
-                  placeholder="My Canvas"
+                  label={t("desktopName")}
+                  placeholder={t("desktopNamePlaceholder")}
                   value={newName}
                   onValueChange={setNewName}
                   onKeyDown={(e) => {
@@ -262,7 +261,7 @@ export default function DesktopListPage() {
               </ModalBody>
               <ModalFooter>
                 <Button variant="light" onPress={onClose}>
-                  Cancel
+                  {tCommon("cancel")}
                 </Button>
                 <Button
                   color="primary"
@@ -270,7 +269,7 @@ export default function DesktopListPage() {
                   isLoading={isCreating}
                   isDisabled={!newName.trim()}
                 >
-                  Create
+                  {tCommon("create")}
                 </Button>
               </ModalFooter>
             </>
@@ -283,19 +282,16 @@ export default function DesktopListPage() {
         <ModalContent>
           {(onClose) => (
             <>
-              <ModalHeader>Delete Desktop</ModalHeader>
+              <ModalHeader>{t("deleteDesktop")}</ModalHeader>
               <ModalBody>
-                <p>
-                  Are you sure you want to delete this desktop? All assets on it
-                  will be removed. This action cannot be undone.
-                </p>
+                <p>{t("deleteDesktopConfirm")}</p>
               </ModalBody>
               <ModalFooter>
                 <Button variant="light" onPress={onClose}>
-                  Cancel
+                  {tCommon("cancel")}
                 </Button>
                 <Button color="danger" onPress={handleDelete}>
-                  Delete
+                  {tCommon("delete")}
                 </Button>
               </ModalFooter>
             </>
@@ -308,10 +304,10 @@ export default function DesktopListPage() {
         <ModalContent>
           {(onClose) => (
             <>
-              <ModalHeader>Rename Desktop</ModalHeader>
+              <ModalHeader>{t("renameDesktop")}</ModalHeader>
               <ModalBody>
                 <Input
-                  label="Desktop name"
+                  label={t("desktopName")}
                   value={renameValue}
                   onValueChange={setRenameValue}
                   onKeyDown={(e) => {
@@ -322,7 +318,7 @@ export default function DesktopListPage() {
               </ModalBody>
               <ModalFooter>
                 <Button variant="light" onPress={onClose}>
-                  Cancel
+                  {tCommon("cancel")}
                 </Button>
                 <Button
                   color="primary"
@@ -330,7 +326,7 @@ export default function DesktopListPage() {
                   isLoading={isRenaming}
                   isDisabled={!renameValue.trim()}
                 >
-                  Rename
+                  {tCommon("rename")}
                 </Button>
               </ModalFooter>
             </>

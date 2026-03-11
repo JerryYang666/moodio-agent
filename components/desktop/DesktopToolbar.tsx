@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { Button } from "@heroui/button";
 import { Tooltip } from "@heroui/tooltip";
 import { ZoomIn, ZoomOut, Maximize, Hand, MousePointer2 } from "lucide-react";
@@ -27,6 +28,8 @@ export default function DesktopToolbar({
   canvasMode,
   onCanvasModeChange,
 }: DesktopToolbarProps) {
+  const t = useTranslations("desktop");
+
   const zoomIn = () => {
     const newZoom = Math.min(MAX_ZOOM, camera.zoom * 1.25);
     onCameraChange({ ...camera, zoom: newZoom });
@@ -83,7 +86,10 @@ export default function DesktopToolbar({
 
   return (
     <div className="absolute bottom-4 right-4 flex items-center gap-1 bg-background/80 backdrop-blur-sm rounded-xl border border-divider p-1 shadow-sm z-10">
-      <Tooltip content={canvasMode === "move" ? "Move canvas (drag)" : "Select assets (drag)"} closeDelay={0}>
+      <Tooltip
+        content={canvasMode === "move" ? t("moveModeTooltip") : t("selectModeTooltip")}
+        closeDelay={0}
+      >
         <Button
           isIconOnly
           size="sm"
@@ -97,13 +103,13 @@ export default function DesktopToolbar({
 
       <div className="w-px h-5 bg-divider mx-0.5" />
 
-      <Tooltip content="Zoom out" closeDelay={0}>
+      <Tooltip content={t("zoomOut")} closeDelay={0}>
         <Button isIconOnly size="sm" variant="light" onPress={zoomOut}>
           <ZoomOut size={16} />
         </Button>
       </Tooltip>
 
-      <Tooltip content="Reset zoom" closeDelay={0}>
+      <Tooltip content={t("resetZoom")} closeDelay={0}>
         <Button
           size="sm"
           variant="light"
@@ -114,7 +120,7 @@ export default function DesktopToolbar({
         </Button>
       </Tooltip>
 
-      <Tooltip content="Zoom in" closeDelay={0}>
+      <Tooltip content={t("zoomIn")} closeDelay={0}>
         <Button isIconOnly size="sm" variant="light" onPress={zoomIn}>
           <ZoomIn size={16} />
         </Button>
@@ -122,7 +128,7 @@ export default function DesktopToolbar({
 
       <div className="w-px h-5 bg-divider mx-0.5" />
 
-      <Tooltip content="Fit to view" closeDelay={0}>
+      <Tooltip content={t("fitToView")} closeDelay={0}>
         <Button isIconOnly size="sm" variant="light" onPress={fitToView}>
           <Maximize size={16} />
         </Button>

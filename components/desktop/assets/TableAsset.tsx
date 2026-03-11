@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useRef, useEffect } from "react";
+import { useTranslations } from "next-intl";
 import { Spinner } from "@heroui/spinner";
 import { Clapperboard } from "lucide-react";
 import type { TableAssetMeta } from "@/lib/desktop/types";
@@ -28,6 +29,7 @@ const TYPING_BROADCAST_INTERVAL_MS = 100;
 const SELECTION_HEARTBEAT_MS = 1000;
 
 export default function TableAsset({ asset, sendEvent, cellLocks, currentUserId, onCellCommit }: TableAssetProps) {
+  const t = useTranslations("desktop");
   const meta = asset.metadata as unknown as TableAssetMeta;
   const isStreaming = meta.status === "streaming";
 
@@ -207,7 +209,7 @@ export default function TableAsset({ asset, sendEvent, cellLocks, currentUserId,
       <div className="w-full h-full flex flex-col items-center justify-center gap-3 bg-background p-4">
         <Clapperboard size={24} className="text-secondary/60" />
         <Spinner size="sm" />
-        <span className="text-xs text-default-400">Generating shot list...</span>
+        <span className="text-xs text-default-400">{t("generatingShotList")}</span>
       </div>
     );
   }
@@ -218,10 +220,10 @@ export default function TableAsset({ asset, sendEvent, cellLocks, currentUserId,
       <div className="sticky top-0 z-10 flex items-center gap-2 px-3 py-2 bg-background border-b border-divider">
         <Clapperboard size={14} className="text-secondary shrink-0" />
         <span className="text-xs font-semibold text-default-700 truncate">
-          {meta.title || "Shot List"}
+          {meta.title || t("shotList")}
         </span>
         <span className="text-[10px] text-default-400 ml-auto shrink-0">
-          {meta.rows.length} shots
+          {t("shotCount", { count: meta.rows.length })}
         </span>
       </div>
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useCallback } from "react";
+import { useTranslations } from "next-intl";
 import type { VideoAssetMeta } from "@/lib/desktop/types";
 import type { EnrichedDesktopAsset } from "./types";
 import { Play, Pause, Loader2, Clock, AlertCircle, Video } from "lucide-react";
@@ -26,6 +27,7 @@ export default function VideoAsset({
   onPlayToggle,
   onImageLoad,
 }: VideoAssetProps) {
+  const t = useTranslations("desktop");
   const meta = asset.metadata as unknown as VideoAssetMeta;
   const src = asset.imageUrl;
   const videoUrl = asset.videoUrl;
@@ -55,20 +57,20 @@ export default function VideoAsset({
         {isProcessing && (
           <>
             <Loader2 size={24} className="text-primary animate-spin" />
-            <span className="text-xs text-default-500">Generating...</span>
+            <span className="text-xs text-default-500">{t("videoGenerating")}</span>
           </>
         )}
         {isFailed && (
           <>
             <AlertCircle size={24} className="text-danger" />
-            <span className="text-xs text-danger">Failed</span>
+            <span className="text-xs text-danger">{t("videoFailed")}</span>
           </>
         )}
         {!isProcessing && !isFailed && (
           <>
             <Video size={24} className="text-default-400" />
             <span className="text-xs text-default-400">
-              {meta.title || "Video"}
+              {meta.title || t("videoTitle")}
             </span>
           </>
         )}
@@ -110,7 +112,7 @@ export default function VideoAsset({
     <>
       <img
         src={src!}
-        alt={meta.title || "Video"}
+        alt={meta.title || t("videoTitle")}
         draggable={false}
         className="w-full h-full object-contain"
         onLoad={(e) => {
@@ -133,13 +135,13 @@ export default function VideoAsset({
           <div className="bg-primary/80 text-white rounded-full p-1.5 flex items-center gap-1">
             <Loader2 size={10} className="animate-spin" />
             <span className="text-[9px] font-medium pr-0.5">
-              {genStatus === "pending" ? "Queued" : "Processing"}
+              {genStatus === "pending" ? t("videoQueued") : t("videoProcessing")}
             </span>
           </div>
         ) : isFailed ? (
           <div className="bg-danger/80 text-white rounded-full p-1.5 flex items-center gap-1">
             <AlertCircle size={10} />
-            <span className="text-[9px] font-medium pr-0.5">Failed</span>
+            <span className="text-[9px] font-medium pr-0.5">{t("videoFailed")}</span>
           </div>
         ) : isCompleted ? (
           <div className="bg-black/70 text-white rounded-full p-1 flex items-center gap-1">
@@ -148,7 +150,7 @@ export default function VideoAsset({
         ) : (
           <div className="bg-default-500/70 text-white rounded-full p-1.5 flex items-center gap-1">
             <Clock size={10} />
-            <span className="text-[9px] font-medium pr-0.5">Pending</span>
+            <span className="text-[9px] font-medium pr-0.5">{t("videoPending")}</span>
           </div>
         )}
       </div>
@@ -164,7 +166,7 @@ export default function VideoAsset({
 
       {/* Title on hover */}
       <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white p-1.5 text-xs truncate opacity-0 group-hover:opacity-100 transition-opacity">
-        {meta.title || "Untitled video"}
+        {meta.title || t("untitledVideo")}
       </div>
 
       {/* Progress bar */}

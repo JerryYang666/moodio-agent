@@ -102,6 +102,8 @@ interface CollectionData {
   }>;
 }
 
+const noop = () => {};
+
 export default function CollectionPage({
   params,
 }: {
@@ -199,6 +201,7 @@ export default function CollectionPage({
 
   // Upload state
   const [isUploadPickerOpen, setIsUploadPickerOpen] = useState(false);
+  const toggleUploadPicker = useCallback(() => setIsUploadPickerOpen((v) => !v), []);
   const [isDraggingExternalFile, setIsDraggingExternalFile] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isCompressing, setIsCompressing] = useState(false);
@@ -1855,11 +1858,9 @@ export default function CollectionPage({
       {/* Upload picker modal (upload-only, no library tab) */}
       <AssetPickerModal
         isOpen={isUploadPickerOpen}
-        onOpenChange={() => setIsUploadPickerOpen((v) => !v)}
-        onSelect={() => {}}
-        onUpload={(files) => {
-          uploadFilesToCollection(files);
-        }}
+        onOpenChange={toggleUploadPicker}
+        onSelect={noop}
+        onUpload={uploadFilesToCollection}
         hideLibraryTab
       />
     </div>

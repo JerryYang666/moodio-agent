@@ -182,6 +182,17 @@ export default function AssetPickerModal({
   // Star filter state
   const [filterRating, setFilterRating] = useState<number | null>(null);
 
+  // Stabilize callback props in refs so handleAssetClick never changes due to
+  // parent re-renders passing new inline functions (e.g. onOpenChange, onSelect).
+  const onSelectRef = useRef(onSelect);
+  onSelectRef.current = onSelect;
+  const onOpenChangeRef = useRef(onOpenChange);
+  onOpenChangeRef.current = onOpenChange;
+  const onSelectMultipleRef = useRef(onSelectMultiple);
+  onSelectMultipleRef.current = onSelectMultiple;
+  const maxSelectCountRef = useRef(maxSelectCount);
+  maxSelectCountRef.current = maxSelectCount;
+
   // Camera state
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -274,10 +285,6 @@ export default function AssetPickerModal({
     return result;
   }, [assets, query, filterRating]);
 
-  const selectedAssets = useMemo(() => {
-    return assets.filter((a) => selectedIds.has(a.id));
-  }, [assets, selectedIds]);
-
   // Camera functions
   const startCamera = useCallback(async () => {
     setCameraError(null);
@@ -344,12 +351,13 @@ export default function AssetPickerModal({
   const filteredAssetsRef = useRef(filteredAssets);
   filteredAssetsRef.current = filteredAssets;
 
-  // Multiselect handlers – stable callback (no filteredAssets in deps)
+  // Multiselect handlers – stable callback using refs for props that change
+  // on parent re-renders (onSelect, onOpenChange, maxSelectCount).
   const handleAssetClick = useCallback(
     (asset: AssetSummary, index: number, e: React.MouseEvent) => {
       if (!multiSelect) {
-        onSelect(asset);
-        onOpenChange();
+        onSelectRef.current(asset);
+        onOpenChangeRef.current();
         return;
       }
 
@@ -361,7 +369,7 @@ export default function AssetPickerModal({
         setSelectedIds((prev) => {
           const next = new Set(prev);
           for (const id of rangeIds) {
-            if (maxSelectCount && next.size >= maxSelectCount && !next.has(id)) continue;
+            if (maxSelectCountRef.current && next.size >= maxSelectCountRef.current && !next.has(id)) continue;
             next.add(id);
           }
           return next;
@@ -376,29 +384,29 @@ export default function AssetPickerModal({
         if (next.has(asset.id)) {
           next.delete(asset.id);
         } else {
-          if (maxSelectCount && next.size >= maxSelectCount) return prev;
+          if (maxSelectCountRef.current && next.size >= maxSelectCountRef.current) return prev;
           next.add(asset.id);
         }
         return next;
       });
       lastClickedIndexRef.current = index;
     },
-    [multiSelect, maxSelectCount, onSelect, onOpenChange]
+    [multiSelect]
   );
 
   const handleConfirmSelection = useCallback(
     (onClose: () => void) => {
-      if (onSelectMultiple) {
-        onSelectMultiple(selectedAssets);
+      const selected = assets.filter((a) => selectedIds.has(a.id));
+      if (onSelectMultipleRef.current) {
+        onSelectMultipleRef.current(selected);
       } else {
-        // Fallback: call onSelect for each
-        for (const asset of selectedAssets) {
-          onSelect(asset);
+        for (const asset of selected) {
+          onSelectRef.current(asset);
         }
       }
       onClose();
     },
-    [selectedAssets, onSelect, onSelectMultiple]
+    [assets, selectedIds]
   );
 
   return (
@@ -777,16 +785,16 @@ export default function AssetPickerModal({
                           if (next.has(previewAsset.id)) {
                             next.delete(previewAsset.id);
                           } else {
-                            if (maxSelectCount && next.size >= maxSelectCount) return prev;
+                            if (maxSelectCountRef.current && next.size >= maxSelectCountRef.current) return prev;
                             next.add(previewAsset.id);
                           }
                           return next;
                         });
                         setPreviewAsset(null);
                       } else {
-                        onSelect(previewAsset);
+                        onSelectRef.current(previewAsset);
                         setPreviewAsset(null);
-                        onOpenChange();
+                        onOpenChangeRef.current();
                       }
                     }
                   }}

@@ -26,7 +26,8 @@
     "share": "Share",
     "remove": "Remove",
     "on": "On",
-    "off": "Off"
+    "off": "Off",
+    "send": "Send"
   },
   "share": {
     "searchUser": "Search User",
@@ -425,7 +426,31 @@
     "desktopNotFound": "Desktop not found",
     "addAsset": "Add Asset",
     "failedToAddAsset": "Failed to add asset",
-    "uploadFailed": "Upload failed"
+    "uploadFailed": "Upload failed",
+    "sendToChat": "Send to Chat",
+    "sendToTimeline": "Send to Timeline",
+    "deleteAllSelected": "Delete all {count} selected",
+    "moveModeTooltip": "Move canvas (drag)",
+    "selectModeTooltip": "Select assets (drag)",
+    "liveSyncActive": "Live sync active",
+    "liveSyncUnavailable": "Live sync unavailable — updates every 10s",
+    "reconnecting": "Reconnecting to live sync…",
+    "tabsOpen": "{count} tabs open",
+    "failedToAddImage": "Failed to add image",
+    "retryDragImage": "Please try dragging the image again.",
+    "addedToTimeline": "Added to Timeline",
+    "videoClipAdded": "Video clip added",
+    "videoGenerating": "Generating...",
+    "videoFailed": "Failed",
+    "videoQueued": "Queued",
+    "videoProcessing": "Processing",
+    "videoPending": "Pending",
+    "untitledVideo": "Untitled video",
+    "videoTitle": "Video",
+    "generatingShotList": "Generating shot list...",
+    "shotList": "Shot List",
+    "shotCount": "{count} shots",
+    "desktopActions": "Desktop actions"
   },
   "storyboard": {
     "title": "Storyboard",

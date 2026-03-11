@@ -387,7 +387,7 @@ export default function VideoGenerationPanel({
     setPickerOpen(true);
   };
 
-  const handleAssetSelect = (asset: AssetSummary) => {
+  const handleAssetSelect = useCallback((asset: AssetSummary) => {
     if (pickerTarget === "source") {
       setSourceImageId(asset.imageId);
       setSourceImageUrl(asset.imageUrl);
@@ -395,9 +395,9 @@ export default function VideoGenerationPanel({
       setEndImageId(asset.imageId);
       setEndImageUrl(asset.imageUrl);
     }
-  };
+  }, [pickerTarget]);
 
-  const handleUpload = async (files: File[]) => {
+  const handleUpload = useCallback(async (files: File[]) => {
     const file = files[0];
     if (!file) return;
     // Create local preview and show uploading state
@@ -429,7 +429,9 @@ export default function VideoGenerationPanel({
     URL.revokeObjectURL(localPreview);
     setUploadPreviewUrl(null);
     setUploadingTarget(null);
-  };
+  }, [pickerTarget, uploadImage, t, tChat]);
+
+  const closePicker = useCallback(() => setPickerOpen(false), []);
 
   const handleGenerate = async () => {
     if (isUploading) {
@@ -924,7 +926,7 @@ export default function VideoGenerationPanel({
       {/* Asset Picker Modal */}
       <AssetPickerModal
         isOpen={pickerOpen}
-        onOpenChange={() => setPickerOpen(false)}
+        onOpenChange={closePicker}
         onSelect={handleAssetSelect}
         onUpload={handleUpload}
       />

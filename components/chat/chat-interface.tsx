@@ -163,6 +163,7 @@ export default function ChatInterface({
   // Unified pending images array - replaces selectedFile, previewUrl, selectedAsset, selectedAgentPart
   const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
   const [isAssetPickerOpen, setIsAssetPickerOpen] = useState(false);
+  const toggleAssetPicker = useCallback(() => setIsAssetPickerOpen((v) => !v), []);
   // Track which picker mode is active: "pending" for regular images, "reference" for reference images
   const [assetPickerMode, setAssetPickerMode] = useState<"pending" | "reference">("pending");
   const [precisionEditing, setPrecisionEditing] = useState(false);
@@ -1058,11 +1059,16 @@ export default function ChatInterface({
     [addAssetImage, addReferenceImage, assetPickerMode, t]
   );
 
+  const pendingImagesRef = useRef(pendingImages);
+  pendingImagesRef.current = pendingImages;
+  const referenceImagesRef = useRef(referenceImages);
+  referenceImagesRef.current = referenceImages;
+
   const handleAssetPickedMultiple = useCallback(
     (assets: AssetSummary[]) => {
       if (assetPickerMode === "reference") {
         for (const asset of assets) {
-          if (!canAddReferenceImage(referenceImages)) break;
+          if (!canAddReferenceImage(referenceImagesRef.current)) break;
           addReferenceImage({
             imageId: asset.imageId,
             url: asset.imageUrl,
@@ -1071,7 +1077,7 @@ export default function ChatInterface({
         }
       } else {
         for (const asset of assets) {
-          if (!canAddImage(pendingImages)) break;
+          if (!canAddImage(pendingImagesRef.current)) break;
           addAssetImage({
             assetId: asset.id,
             url: asset.imageUrl,
@@ -1081,7 +1087,7 @@ export default function ChatInterface({
         }
       }
     },
-    [addAssetImage, addReferenceImage, assetPickerMode, pendingImages, referenceImages, t]
+    [addAssetImage, addReferenceImage, assetPickerMode, t]
   );
 
   // Handler to open drawing modal for an image
@@ -2631,15 +2637,15 @@ export default function ChatInterface({
 
       <AssetPickerModal
         isOpen={isAssetPickerOpen}
-        onOpenChange={() => setIsAssetPickerOpen((v) => !v)}
+        onOpenChange={toggleAssetPicker}
         onSelect={handleAssetPicked}
         onSelectMultiple={handleAssetPickedMultiple}
         onUpload={handleAssetUpload}
         multiSelect
         maxSelectCount={
           assetPickerMode === "reference"
-            ? MAX_REFERENCE_IMAGES - referenceImages.length
-            : MAX_PENDING_IMAGES - pendingImages.length
+            ? MAX_REFERENCE_IMAGES - referenceImagesRef.current.length
+            : MAX_PENDING_IMAGES - pendingImagesRef.current.length
         }
       />
 

@@ -12,6 +12,7 @@ import { Select, SelectItem } from "@heroui/select";
 import { Button } from "@heroui/button";
 import { Spinner } from "@heroui/spinner";
 import { addToast } from "@heroui/toast";
+import { useTranslations } from "next-intl";
 import { getViewportVisibleCenterPosition } from "@/lib/desktop/types";
 import { hasWriteAccess, type Permission } from "@/lib/permissions";
 
@@ -40,6 +41,8 @@ async function sendAssetsToDesktop(
   assets: SendToDesktopModalProps["assets"],
   onOpenChange: (isOpen: boolean) => void,
   useViewportPlacement: boolean,
+  addedToDesktopMsg: string,
+  assetsSentMsg: (count: number) => string,
 ) {
   const res = await fetch(`/api/desktop/${targetDesktopId}/assets`, {
     method: "POST",
@@ -76,8 +79,8 @@ async function sendAssetsToDesktop(
   }
 
   addToast({
-    title: "Added to desktop",
-    description: `${assets.length} asset(s) sent to desktop`,
+    title: addedToDesktopMsg,
+    description: assetsSentMsg(assets.length),
     color: "success",
   });
   onOpenChange(false);
@@ -89,6 +92,9 @@ export default function SendToDesktopModal({
   assets,
   desktopId,
 }: SendToDesktopModalProps) {
+  const t = useTranslations("desktop");
+  const tCommon = useTranslations("common");
+
   const [desktops, setDesktops] = useState<DesktopOption[]>([]);
   const [selectedDesktopId, setSelectedDesktopId] = useState("");
   const [loading, setLoading] = useState(false);
@@ -122,7 +128,9 @@ export default function SendToDesktopModal({
           targetDesktopId,
           assets,
           onOpenChange,
-          useViewportPlacement
+          useViewportPlacement,
+          t("addedToDesktop"),
+          (count) => t("assetsSent", { count }),
         );
         return true;
       } finally {
@@ -130,7 +138,7 @@ export default function SendToDesktopModal({
         setSending(false);
       }
     },
-    [assets, onOpenChange]
+    [assets, onOpenChange, t]
   );
 
   // When a desktopId is provided, send immediately without showing a picker
@@ -143,12 +151,12 @@ export default function SendToDesktopModal({
     guardedSend(desktopId, true)
       .catch(() => {
         addToast({
-          title: "Error",
-          description: "Failed to send to desktop",
+          title: tCommon("error"),
+          description: t("failedToSend"),
           color: "danger",
         });
       });
-  }, [isOpen, desktopId, assets.length, assetsSignature, guardedSend]);
+  }, [isOpen, desktopId, assets.length, assetsSignature, guardedSend, t, tCommon]);
 
   // Reset per-open-session direct-send key.
   useEffect(() => {
@@ -180,12 +188,12 @@ export default function SendToDesktopModal({
       await guardedSend(selectedDesktopId, false);
     } catch {
       addToast({
-        title: "Error",
-        description: "Failed to send to desktop",
+        title: tCommon("error"),
+        description: t("failedToSend"),
         color: "danger",
       });
     }
-  }, [selectedDesktopId, assets.length, guardedSend]);
+  }, [selectedDesktopId, assets.length, guardedSend, t, tCommon]);
 
   // Direct-send mode: render nothing visible (the effect handles everything)
   if (desktopId) {
@@ -197,7 +205,7 @@ export default function SendToDesktopModal({
       <ModalContent>
         {(onClose) => (
           <>
-            <ModalHeader>Send to Desktop</ModalHeader>
+            <ModalHeader>{t("sendToDesktop")}</ModalHeader>
             <ModalBody>
               {loading ? (
                 <div className="flex justify-center py-4">
@@ -205,12 +213,12 @@ export default function SendToDesktopModal({
                 </div>
               ) : desktops.length === 0 ? (
                 <p className="text-default-500">
-                  No desktops available. Create one first.
+                  {t("noDesktopsAvailable")}
                 </p>
               ) : (
                 <Select
-                  label="Select desktop"
-                  placeholder="Choose a desktop"
+                  label={t("selectDesktop")}
+                  placeholder={t("chooseDesktop")}
                   selectedKeys={selectedDesktopId ? [selectedDesktopId] : []}
                   onChange={(e) => setSelectedDesktopId(e.target.value)}
                 >
@@ -222,7 +230,7 @@ export default function SendToDesktopModal({
             </ModalBody>
             <ModalFooter>
               <Button variant="light" onPress={onClose}>
-                Cancel
+                {tCommon("cancel")}
               </Button>
               <Button
                 color="primary"
@@ -230,7 +238,7 @@ export default function SendToDesktopModal({
                 isLoading={sending}
                 isDisabled={!selectedDesktopId || desktops.length === 0}
               >
-                Send
+                {tCommon("send")}
               </Button>
             </ModalFooter>
           </>
