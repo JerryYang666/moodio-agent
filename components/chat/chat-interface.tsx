@@ -684,9 +684,11 @@ export default function ChatInterface({
     const fetchChat = async () => {
       if (!chatId) return;
       const requestedChatId = chatId;
+      if (requestedChatId !== chatIdRef.current) return;
 
       setIsLoading(true);
       try {
+        if (requestedChatId !== chatIdRef.current) return;
         const res = await fetch(`/api/chat/${requestedChatId}`);
         if (res.ok) {
           const data = await res.json();
