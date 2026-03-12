@@ -50,8 +50,9 @@ interface CollectionsContextValue {
   loading: boolean;
   error: string;
   refreshCollections: () => Promise<void>;
-  createCollection: (name: string, projectId?: string) => Promise<Collection | null>;
+  createCollection: (name: string, projectId?: string, tags?: { label: string; color: string }[]) => Promise<Collection | null>;
   renameCollection: (collectionId: string, name: string) => Promise<boolean>;
+  updateCollectionTags: (collectionId: string, tags: { label: string; color: string }[]) => Promise<boolean>;
   deleteCollection: (collectionId: string) => Promise<boolean>;
   addImageToCollection: (
     collectionId: string,
@@ -132,10 +133,11 @@ export function CollectionsProvider({
   }, [user, refetch]);
 
   const createCollection = useCallback(
-    async (name: string, projectId?: string) => {
+    async (name: string, projectId?: string, tags?: { label: string; color: string }[]) => {
       try {
-        const payload: { name: string; projectId?: string } = { name };
+        const payload: { name: string; projectId?: string; tags?: { label: string; color: string }[] } = { name };
         if (projectId) payload.projectId = projectId;
+        if (tags && tags.length > 0) payload.tags = tags;
         const result = await createCollectionMutation(payload).unwrap();
         return result;
       } catch (err) {
@@ -163,6 +165,19 @@ export function CollectionsProvider({
           description: "Failed to rename collection",
           color: "danger",
         });
+        return false;
+      }
+    },
+    [renameCollectionMutation]
+  );
+
+  const updateCollectionTags = useCallback(
+    async (collectionId: string, tags: { label: string; color: string }[]) => {
+      try {
+        await renameCollectionMutation({ collectionId, tags }).unwrap();
+        return true;
+      } catch (err) {
+        console.error("Error updating collection tags:", err);
         return false;
       }
     },
@@ -345,6 +360,7 @@ export function CollectionsProvider({
     refreshCollections,
     createCollection,
     renameCollection,
+    updateCollectionTags,
     deleteCollection,
     addImageToCollection,
     addVideoToCollection,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, use } from "react";
+import { useCallback, useEffect, useMemo, useState, use } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Card, CardBody, CardFooter } from "@heroui/card";
@@ -24,7 +24,7 @@ import {
   DropdownMenu,
   DropdownItem,
 } from "@heroui/dropdown";
-import { ArrowLeft, Folder, Plus, MoreVertical, Pencil, Share2 } from "lucide-react";
+import { ArrowLeft, Folder, Plus, MoreVertical, Pencil, Share2, Tags } from "lucide-react";
 import ImageDetailModal, { ImageInfo } from "@/components/chat/image-detail-modal";
 import { useShareModal, type ShareEntry } from "@/hooks/use-share-modal";
 import ShareModal from "@/components/share-modal";
@@ -32,6 +32,9 @@ import {
   useCreateCollectionMutation,
   useRenameCollectionMutation,
 } from "@/lib/redux/services/next-api";
+import CollectionTags from "@/components/collection/collection-tags";
+import TagInput, { type TagValue } from "@/components/collection/tag-input";
+import { getTagColor } from "@/lib/tag-colors";
 
 type Project = {
   id: string;
@@ -52,6 +55,7 @@ type Collection = {
   createdAt: Date;
   updatedAt: Date;
   coverImageUrl?: string | null;
+  tags?: { id: string; label: string; color: string }[];
 };
 
 type Asset = {
@@ -123,6 +127,17 @@ export default function ProjectDetailPage({
     useCreateCollectionMutation();
   const [renameCollectionMutation, { isLoading: isRenamingCollection }] =
     useRenameCollectionMutation();
+
+  const {
+    isOpen: isEditTagsOpen,
+    onOpen: onEditTagsOpen,
+    onOpenChange: onEditTagsOpenChange,
+  } = useDisclosure();
+
+  const [collectionToEditTags, setCollectionToEditTags] = useState<Collection | null>(null);
+  const [editTagsValue, setEditTagsValue] = useState<TagValue[]>([]);
+  const [isSavingTags, setIsSavingTags] = useState(false);
+  const [selectedFilterTags, setSelectedFilterTags] = useState<string[]>([]);
 
   const [selectedImage, setSelectedImage] = useState<ImageInfo | null>(null);
   const [allImages, setAllImages] = useState<ImageInfo[]>([]);
@@ -222,6 +237,58 @@ export default function ProjectDetailPage({
     },
     [allImages]
   );
+
+  // Unique tags for filter bar
+  const allUniqueTags = useMemo(() => {
+    const tagMap = new Map<string, { label: string; color: string }>();
+    for (const col of collections) {
+      for (const tag of col.tags ?? []) {
+        if (!tagMap.has(tag.label)) {
+          tagMap.set(tag.label, { label: tag.label, color: tag.color });
+        }
+      }
+    }
+    return Array.from(tagMap.values());
+  }, [collections]);
+
+  const filteredCollections = useMemo(() => {
+    if (selectedFilterTags.length === 0) return collections;
+    return collections.filter((col) => {
+      const colTagLabels = new Set((col.tags ?? []).map((t) => t.label));
+      return selectedFilterTags.every((ft) => colTagLabels.has(ft));
+    });
+  }, [collections, selectedFilterTags]);
+
+  const toggleFilterTag = (label: string) => {
+    setSelectedFilterTags((prev) =>
+      prev.includes(label) ? prev.filter((t) => t !== label) : [...prev, label]
+    );
+  };
+
+  const handleSaveEditTags = async () => {
+    if (!collectionToEditTags) return;
+    setIsSavingTags(true);
+    try {
+      await renameCollectionMutation({
+        collectionId: collectionToEditTags.id,
+        tags: editTagsValue,
+      }).unwrap();
+      setCollections((prev) =>
+        prev.map((c) =>
+          c.id === collectionToEditTags.id
+            ? { ...c, tags: editTagsValue.map((t, i) => ({ id: `temp-${i}`, ...t })) }
+            : c
+        )
+      );
+      onEditTagsOpenChange();
+      setCollectionToEditTags(null);
+      setEditTagsValue([]);
+    } catch (error) {
+      console.error("Error updating tags:", error);
+    } finally {
+      setIsSavingTags(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -336,13 +403,54 @@ export default function ProjectDetailPage({
       {/* Collections grid */}
       <div>
         <h2 className="text-lg font-semibold mb-3">{tCollections("title")}</h2>
-        {collections.length === 0 ? (
+
+        {/* Tag filter bar */}
+        {allUniqueTags.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 mb-4">
+            <span className="text-sm text-default-500 mr-1">{tCollections("filterByTag")}:</span>
+            {allUniqueTags.map((tag) => {
+              const isSelected = selectedFilterTags.includes(tag.label);
+              const color = getTagColor(tag.color);
+              return (
+                <button
+                  key={tag.label}
+                  type="button"
+                  onClick={() => toggleFilterTag(tag.label)}
+                  className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium transition-all ${
+                    isSelected
+                      ? `${color.bg} ${color.text} ring-2 ring-primary ring-offset-1`
+                      : `${color.bg} ${color.text} opacity-60 hover:opacity-100`
+                  }`}
+                >
+                  {tag.label}
+                </button>
+              );
+            })}
+            {selectedFilterTags.length > 0 && (
+              <Button
+                size="sm"
+                variant="light"
+                onPress={() => setSelectedFilterTags([])}
+                className="text-xs h-6"
+              >
+                {tCollections("clearFilter")}
+              </Button>
+            )}
+          </div>
+        )}
+
+        {filteredCollections.length === 0 && collections.length === 0 ? (
           <div className="text-center py-12">
             <p className="text-default-500">{t("noCollectionsInProject")}</p>
           </div>
+        ) : filteredCollections.length === 0 ? (
+          <div className="text-center py-12">
+            <Tags size={36} className="mx-auto mb-3 text-default-300" />
+            <p className="text-default-500">{tCollections("noCollectionsMatchFilter")}</p>
+          </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {collections.map((collection) => (
+            {filteredCollections.map((collection) => (
               <Card
                 key={collection.id}
                 isPressable
@@ -350,7 +458,7 @@ export default function ProjectDetailPage({
                 className="group"
               >
                 <CardBody className="p-3 pb-1 relative">
-                  <div className="w-full h-36 bg-default-100 rounded-lg overflow-hidden">
+                  <div className="w-full h-36 bg-default-100 rounded-lg overflow-hidden relative">
                     {collection.coverImageUrl ? (
                       <Image
                         src={collection.coverImageUrl}
@@ -364,6 +472,12 @@ export default function ProjectDetailPage({
                     ) : (
                       <div className="flex items-center justify-center w-full h-full">
                         <Folder size={40} className="text-default-400" />
+                      </div>
+                    )}
+                    {/* Tags overlay on cover */}
+                    {(collection.tags ?? []).length > 0 && (
+                      <div className="absolute bottom-1.5 left-1.5 right-1.5">
+                        <CollectionTags tags={collection.tags ?? []} maxVisible={3} />
                       </div>
                     )}
                   </div>
@@ -390,6 +504,22 @@ export default function ProjectDetailPage({
                           }}
                         >
                           {tCommon("rename")}
+                        </DropdownItem>
+                        <DropdownItem
+                          key="editTags"
+                          startContent={<Tags size={16} />}
+                          onPress={() => {
+                            setCollectionToEditTags(collection);
+                            setEditTagsValue(
+                              (collection.tags ?? []).map((t) => ({
+                                label: t.label,
+                                color: t.color,
+                              }))
+                            );
+                            onEditTagsOpen();
+                          }}
+                        >
+                          {tCollections("editTags")}
                         </DropdownItem>
                       </DropdownMenu>
                     </Dropdown>
@@ -487,6 +617,34 @@ export default function ProjectDetailPage({
         shares={shares}
         share={shareModal}
       />
+
+      {/* Edit Tags Modal */}
+      <Modal isOpen={isEditTagsOpen} onOpenChange={onEditTagsOpenChange}>
+        <ModalContent>
+          {(onClose) => (
+            <>
+              <ModalHeader>
+                {tCollections("editTags")} - {collectionToEditTags?.name}
+              </ModalHeader>
+              <ModalBody>
+                <TagInput tags={editTagsValue} onChange={setEditTagsValue} />
+              </ModalBody>
+              <ModalFooter>
+                <Button variant="light" onPress={onClose}>
+                  {tCommon("cancel")}
+                </Button>
+                <Button
+                  color="primary"
+                  onPress={handleSaveEditTags}
+                  isLoading={isSavingTags}
+                >
+                  {tCommon("save")}
+                </Button>
+              </ModalFooter>
+            </>
+          )}
+        </ModalContent>
+      </Modal>
 
       <ImageDetailModal
         isOpen={isImageDetailOpen}

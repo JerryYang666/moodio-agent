@@ -323,8 +323,25 @@ export type NewChat = typeof chats.$inferInsert;
 export type Project = typeof projects.$inferSelect;
 export type NewProject = typeof projects.$inferInsert;
 
+/**
+ * Collection Tags table
+ * Stores user-defined tags on collections with preset colors
+ */
+export const collectionTags = pgTable("collection_tags", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  collectionId: uuid("collection_id")
+    .notNull()
+    .references(() => collections.id, { onDelete: "cascade" }),
+  label: varchar("label", { length: 50 }).notNull(),
+  color: varchar("color", { length: 20 }).notNull(), // Preset color key (e.g. "red", "blue", "green")
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 export type Collection = typeof collections.$inferSelect;
 export type NewCollection = typeof collections.$inferInsert;
+
+export type CollectionTag = typeof collectionTags.$inferSelect;
+export type NewCollectionTag = typeof collectionTags.$inferInsert;
 
 export type CollectionImage = typeof collectionImages.$inferSelect;
 export type NewCollectionImage = typeof collectionImages.$inferInsert;

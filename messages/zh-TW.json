@@ -378,7 +378,15 @@
     "bulkDeletedDesc": "{count} 項已從合集中移除",
     "failedToBulkMove": "移動項目失敗",
     "failedToBulkCopy": "複製項目失敗",
-    "failedToBulkDelete": "刪除項目失敗"
+    "failedToBulkDelete": "刪除項目失敗",
+    "tags": "標籤",
+    "addTag": "新增標籤",
+    "add": "新增",
+    "editTags": "編輯標籤",
+    "tagPlaceholder": "標籤名稱",
+    "filterByTag": "依標籤篩選",
+    "clearFilter": "清除",
+    "noCollectionsMatchFilter": "沒有與所選標籤相符的收藏集"
   },
   "storyboard": {
     "title": "分鏡腳本",

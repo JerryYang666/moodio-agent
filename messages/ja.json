@@ -378,7 +378,15 @@
     "bulkDeletedDesc": "コレクションから{count}件を削除しました",
     "failedToBulkMove": "アイテムの移動に失敗しました",
     "failedToBulkCopy": "アイテムのコピーに失敗しました",
-    "failedToBulkDelete": "アイテムの削除に失敗しました"
+    "failedToBulkDelete": "アイテムの削除に失敗しました",
+    "tags": "タグ",
+    "addTag": "タグを追加",
+    "add": "追加",
+    "editTags": "タグを編集",
+    "tagPlaceholder": "タグ名",
+    "filterByTag": "タグで絞り込む",
+    "clearFilter": "クリア",
+    "noCollectionsMatchFilter": "選択したタグに一致するコレクションはありません"
   },
   "storyboard": {
     "title": "ストーリーボード",

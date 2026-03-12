@@ -378,7 +378,15 @@
     "bulkDeletedDesc": "{count} 项已从合集中移除",
     "failedToBulkMove": "移动项目失败",
     "failedToBulkCopy": "复制项目失败",
-    "failedToBulkDelete": "删除项目失败"
+    "failedToBulkDelete": "删除项目失败",
+    "tags": "标签",
+    "addTag": "添加标签",
+    "add": "添加",
+    "editTags": "编辑标签",
+    "tagPlaceholder": "标签名称",
+    "filterByTag": "按标签筛选",
+    "clearFilter": "清除",
+    "noCollectionsMatchFilter": "没有与所选标签匹配的收藏集"
   },
   "storyboard": {
     "title": "故事板",

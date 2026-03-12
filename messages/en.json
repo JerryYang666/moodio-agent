@@ -378,7 +378,15 @@
     "bulkDeletedDesc": "{count, plural, one {# item} other {# items}} removed from collection",
     "failedToBulkMove": "Failed to move items",
     "failedToBulkCopy": "Failed to copy items",
-    "failedToBulkDelete": "Failed to delete items"
+    "failedToBulkDelete": "Failed to delete items",
+    "tags": "Tags",
+    "addTag": "Add Tag",
+    "add": "Add",
+    "editTags": "Edit Tags",
+    "tagPlaceholder": "Tag name",
+    "filterByTag": "Filter by tag",
+    "clearFilter": "Clear",
+    "noCollectionsMatchFilter": "No collections match the selected tags"
   },
   "desktop": {
     "title": "Desktops",
