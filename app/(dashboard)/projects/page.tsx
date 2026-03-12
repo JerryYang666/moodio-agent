@@ -24,9 +24,10 @@ import {
   DropdownMenu,
   DropdownItem,
 } from "@heroui/dropdown";
-import { Folder, Plus, Share2, FolderOpen, MoreVertical, Pencil, Video } from "lucide-react";
+import { Folder, Plus, Share2, FolderOpen, MoreVertical, Pencil, Video, LayoutGrid } from "lucide-react";
 import { useGetCollectionsQuery } from "@/lib/redux/services/next-api";
 import VideoList from "@/components/storyboard/video-list";
+import CollectionsContent from "@/components/collection/collections-content";
 
 type Project = {
   id: string;
@@ -376,6 +377,19 @@ export default function ProjectsPage() {
                 )}
               </>
             )}
+          </div>
+        </Tab>
+        <Tab
+          key="collections"
+          title={
+            <div className="flex items-center gap-2">
+              <LayoutGrid size={16} />
+              <span>{t("projects.collections")}</span>
+            </div>
+          }
+        >
+          <div className="pt-6">
+            <CollectionsContent showHeader={false} />
           </div>
         </Tab>
         <Tab
