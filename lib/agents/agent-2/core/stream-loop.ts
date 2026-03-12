@@ -219,20 +219,12 @@ export class StreamLoop {
               ctx,
             );
 
-            if (result.success && result.contentParts?.[0]) {
+            if (result.contentParts?.[0]) {
               const part = result.contentParts[0];
-              ctx.send({ type: "part_update", imageId: trackingImageId, part });
               const idx = state.finalContent.findIndex(
                 (p) => p.type === "agent_image" && (p as any).imageId === trackingImageId
               );
               if (idx !== -1) state.finalContent[idx] = part;
-            } else if (!result.success && result.contentParts?.[0]) {
-              const errorPart = result.contentParts[0];
-              ctx.send({ type: "part_update", imageId: trackingImageId, part: errorPart });
-              const idx = state.finalContent.findIndex(
-                (p) => p.type === "agent_image" && (p as any).imageId === trackingImageId
-              );
-              if (idx !== -1) state.finalContent[idx] = errorPart;
             }
           } catch (err) {
             console.error(`Image gen error for imageId ${trackingImageId}`, err);
