@@ -21,7 +21,11 @@ When reference images are provided (marked as [Reference Image ID: <id> - tag]),
 Image IDs:
 Every image in the conversation (user-uploaded or AI-generated) is annotated with an Image ID, e.g. [Image ID: abc123]. You can use these IDs to reference specific images when the user asks you to. For example, if the user says "use the second image as the start frame", look at the Image IDs in the conversation history to identify the correct one.
 
-Do NOT output markdown code blocks. Use the tool tags described below.`;
+Do NOT output markdown code blocks. Use the tool tags described below.
+
+Tool Usage Rules:
+- You MUST use the think tool before every response, no exceptions.
+- Every tool tag you open MUST have a matching closing tag. Never leave a tag unclosed. This applies to ALL tools — especially <TEXT>...</TEXT>.`;
 
 /**
  * Builds the system prompt from a minimal persona plus dynamically generated
@@ -43,13 +47,15 @@ export class SystemPromptConstructor {
 
     for (const tool of this.registry.getAllForPrompt()) {
       prompt += "\n\n---\n";
+      prompt += `Tool name: ${tool.name}\n`;
+      prompt += `Tool description: ${tool.description}\n`;
 
       // Inject dynamic runtime data if the tool provides it (e.g. video model list)
       if (tool.dynamicPromptData) {
-        prompt += tool.dynamicPromptData() + "\n\n";
+        prompt += tool.dynamicPromptData() + "\n";
       }
 
-      prompt += tool.instruction;
+      prompt += `Instructions: ${tool.instruction}`;
 
       if (tool.examples.length > 0) {
         prompt += "\n\nExample:\n" + tool.examples.join("\n");
