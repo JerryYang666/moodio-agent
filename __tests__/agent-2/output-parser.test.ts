@@ -41,7 +41,7 @@ describe("OutputParser", () => {
 
     it("accepts whitespace between tags", () => {
       const parser = createParser();
-      parser.feed("<TEXT>Hi</TEXT>\n<JSON>{}</JSON>");
+      parser.feed("<TEXT>Hi</TEXT>\n<IMAGE>{}</IMAGE>");
       expect(() => parser.validateBuffer()).not.toThrow();
     });
 
@@ -72,9 +72,9 @@ describe("OutputParser", () => {
       expect(tags[0].parsedContent).toBe("What setting do you prefer?");
     });
 
-    it("extracts a JSON (image_suggest) tag", () => {
+    it("extracts an IMAGE (image_suggest) tag", () => {
       const parser = createParser();
-      parser.feed('<JSON>{"title": "Sunset", "aspectRatio": "16:9", "prompt": "A sunset"}</JSON>');
+      parser.feed('<IMAGE>{"title": "Sunset", "aspectRatio": "16:9", "prompt": "A sunset"}</IMAGE>');
       const tags = parser.extractCompleteTags();
       expect(tags).toHaveLength(1);
       expect(tags[0].toolName).toBe("image_suggest");
@@ -85,11 +85,11 @@ describe("OutputParser", () => {
       });
     });
 
-    it("extracts multiple JSON tags", () => {
+    it("extracts multiple IMAGE tags", () => {
       const parser = createParser();
       parser.feed(
-        '<JSON>{"title": "A", "aspectRatio": "1:1", "prompt": "a"}</JSON>' +
-        '<JSON>{"title": "B", "aspectRatio": "1:1", "prompt": "b"}</JSON>'
+        '<IMAGE>{"title": "A", "aspectRatio": "1:1", "prompt": "a"}</IMAGE>' +
+        '<IMAGE>{"title": "B", "aspectRatio": "1:1", "prompt": "b"}</IMAGE>'
       );
       const tags = parser.extractCompleteTags();
       expect(tags).toHaveLength(2);
