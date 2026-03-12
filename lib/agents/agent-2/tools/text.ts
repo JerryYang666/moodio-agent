@@ -34,9 +34,14 @@ Gentle camera push-in on the woman's face as her hair flows softly in the breeze
 You can use this prompt in the video generation panel to animate your image.</TEXT>`,
   ],
   waitForOutput: false,
+  maxOccurrences: 1,
   parseContent: (raw: string) => raw.trim(),
   createPart: (parsed: any) => ({
     type: "text" as const,
     text: parsed as string,
   }),
+  createEvent: (part) =>
+    part?.type === "text"
+      ? { type: "text", content: (part as any).text }
+      : null,
 };

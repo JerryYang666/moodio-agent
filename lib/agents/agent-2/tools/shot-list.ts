@@ -22,6 +22,10 @@ Rules for shot list creation:
     `<SHOTLIST>{"title": "Night Agent - Hotel Infiltration", "columns": ["Shot #", "Description", "Framing", "Camera Movement", "Location", "Notes"], "rows": [{"id": "row-1", "cells": [{"value": "1"}, {"value": "Agent approaches hotel exterior at night"}, {"value": "Wide shot"}, {"value": "Slow dolly in"}, {"value": "Hotel exterior"}, {"value": "Establish mood, dark atmosphere"}]}, {"id": "row-2", "cells": [{"value": "2"}, {"value": "Agent enters through side door"}, {"value": "Medium shot"}, {"value": "Handheld follow"}, {"value": "Hotel side entrance"}, {"value": "Tension building"}]}]}</SHOTLIST>`,
   ],
   waitForOutput: false,
+  onOpenTag: (ctx) => {
+    ctx.send({ type: "shot_list_start" });
+    console.log("[Perf] Agent shot list generation started", `[${Date.now() - ctx.requestStartTime}ms]`);
+  },
   createPart: (parsed: any) => ({
     type: "agent_shot_list" as const,
     title: parsed.title || "Shot List",

@@ -22,31 +22,29 @@ function createConstructor(): SystemPromptConstructor {
 }
 
 describe("SystemPromptConstructor", () => {
-  it("builds a prompt containing the base template sections", () => {
+  it("builds a prompt containing the base persona and tool sections", () => {
     const constructor = createConstructor();
     const prompt = constructor.build();
 
     expect(prompt).toContain("You are a creative assistant");
-    expect(prompt).toContain("Thinking Process:");
+    // Think tool instruction is injected dynamically
     expect(prompt).toContain("belief_prompt");
     expect(prompt).toContain("user_intention");
   });
 
-  it("replaces {{SUPPORTED_ASPECT_RATIOS}} placeholder", () => {
+  it("includes aspect ratios from image_suggest tool instruction", () => {
     const constructor = createConstructor();
     const prompt = constructor.build();
 
-    expect(prompt).not.toContain("{{SUPPORTED_ASPECT_RATIOS}}");
     expect(prompt).toContain("1:1");
     expect(prompt).toContain("16:9");
   });
 
-  it("replaces {{MAX_SUGGESTIONS}} placeholder", () => {
+  it("includes max suggestions from image_suggest tool instruction", () => {
     const constructor = createConstructor();
     const prompt = constructor.build();
 
-    expect(prompt).not.toContain("{{MAX_SUGGESTIONS}}");
-    // Should contain a number (the hard cap)
+    // Max suggestions is now baked into the image_suggest instruction via template literal
     expect(prompt).toMatch(/The absolute maximum number of suggestions you can give is \d+/);
   });
 
@@ -96,11 +94,10 @@ describe("SystemPromptConstructor", () => {
   it("uses system prompt override when provided", () => {
     const constructor = createConstructor();
     const prompt = constructor.build({
-      systemPromptOverride: "Custom override with {{MAX_SUGGESTIONS}} suggestions",
+      systemPromptOverride: "Custom override prompt for testing",
     });
 
     expect(prompt).not.toContain("You are a creative assistant");
-    expect(prompt).toContain("Custom override with");
-    expect(prompt).not.toContain("{{MAX_SUGGESTIONS}}");
+    expect(prompt).toBe("Custom override prompt for testing");
   });
 });

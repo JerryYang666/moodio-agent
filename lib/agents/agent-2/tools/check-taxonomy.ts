@@ -26,4 +26,6 @@ Choose the "lang" parameter based on the conversation language:
     tool: "check_taxonomy",
     status: "loading" as const,
   }),
+  buildContinuationMessage: (resultData: any) =>
+    `[System: Tool call result for CHECK_TAXONOMY]\n\nHere is the taxonomy tree. Each selectable item has an [id:NUMBER] prefix. Use these IDs in your <SEARCH> filters and taxonomy: links.\n\n${resultData.serializedTaxonomy}`,
 };

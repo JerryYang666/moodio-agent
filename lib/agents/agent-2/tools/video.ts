@@ -1,5 +1,10 @@
 import { ToolDefinition } from "./types";
-import { getVideoModelsPromptText } from "@/lib/video/models";
+import {
+  getVideoModelsPromptText,
+  DEFAULT_VIDEO_MODEL_ID,
+  getVideoModel,
+  getModelConfigForApi,
+} from "@/lib/video/models";
 
 export const videoTool: ToolDefinition = {
   name: "video",
@@ -26,5 +31,42 @@ Rules for video creation:
     `<VIDEO>{"modelId": "fal-ai/bytedance/seedance/v1.5/pro/image-to-video", "prompt": "Gentle camera push-in on the scene. Soft ambient movement with natural swaying of elements. Subtle lighting shifts create a dreamy atmosphere. Cinematic slow motion feel with smooth transitions.", "duration": "5", "aspect_ratio": "16:9", "resolution": "720p", "generate_audio": true, "camera_fixed": false}</VIDEO>`,
   ],
   waitForOutput: false,
+  maxOccurrences: 1,
   dynamicPromptData: () => getVideoModelsPromptText(),
+  createPart: (parsed: any) => {
+    const modelId =
+      typeof parsed.modelId === "string" && getVideoModel(parsed.modelId)
+        ? parsed.modelId
+        : DEFAULT_VIDEO_MODEL_ID;
+    const model = getVideoModel(modelId);
+    const modelApiConfig = getModelConfigForApi(modelId);
+
+    if (!model || !modelApiConfig) return null;
+
+    const videoParams: Record<string, any> = {};
+    for (const param of modelApiConfig.params) {
+      if (
+        param.name === "prompt" ||
+        param.name === model.imageParams.sourceImage ||
+        param.name === model.imageParams.endImage
+      ) continue;
+      if (parsed[param.name] !== undefined) {
+        videoParams[param.name] = parsed[param.name];
+      } else if (param.default !== undefined) {
+        videoParams[param.name] = param.default;
+      }
+    }
+
+    return {
+      type: "agent_video" as const,
+      config: {
+        modelId,
+        modelName: model.name,
+        prompt: parsed.prompt || "",
+        sourceImageId: typeof parsed.sourceImageId === "string" ? parsed.sourceImageId : undefined,
+        params: videoParams,
+      },
+      status: "pending" as const,
+    };
+  },
 };

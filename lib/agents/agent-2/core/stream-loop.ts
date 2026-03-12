@@ -2,36 +2,32 @@ import OpenAI from "openai";
 import { MessageContentPart, DEFAULT_LLM_MODEL } from "@/lib/llm/types";
 import { RequestContext } from "../context";
 import { OutputParser, ParsedTag } from "./output-parser";
-import { ToolExecutor, ToolResult } from "../executor/tool-executor";
+import { ToolExecutor } from "../executor/tool-executor";
 import { ToolRegistry } from "../tools/registry";
-import {
-  DEFAULT_VIDEO_MODEL_ID,
-  getVideoModel,
-  getModelConfigForApi,
-} from "@/lib/video/models";
+import { ToolDefinition } from "../tools/types";
 import { siteConfig } from "@/config/site";
-import { generateImageId } from "@/lib/storage/s3";
-import { InsufficientCreditsError } from "@/lib/credits";
 
 const MAX_SUGGESTIONS_HARD_CAP = siteConfig.imageLimits.maxSuggestionsHardCap;
 
 /** Mutable state shared across the stream parsing pipeline. */
 interface StreamState {
   fullLlmResponse: string;
-  thoughtSent: boolean;
-  questionSent: boolean;
-  suggestionIndex: number;
-  shotListStartSent: boolean;
-  imageTasks: Promise<void>[];
+  /** Per-tool occurrence counts for enforcing maxOccurrences / maxSuggestions. */
+  occurrences: Map<string, number>;
+  /** Tracks which tools have already fired their onOpenTag callback. */
+  openTagsFired: Set<string>;
+  /** Background tasks from fireAndForget tools (awaited at the end). */
+  asyncTasks: Promise<void>[];
   finalContent: MessageContentPart[];
 }
 
 /**
  * Orchestrates the streaming flow: consumes the LLM stream, feeds chunks
- * to the OutputParser, dispatches tool calls via the ToolExecutor, and
- * emits events to the frontend.
+ * to the OutputParser, and dispatches to tools using only the declarative
+ * fields on ToolDefinition (waitForOutput, fireAndForget, createPart, etc.).
  *
- * Replaces Agent 1's consumeLLMStream() method.
+ * The StreamLoop has ZERO tool-specific code. To add a new tool, create a
+ * ToolDefinition and register it — no changes here are needed.
  */
 export class StreamLoop {
   constructor(
@@ -52,18 +48,16 @@ export class StreamLoop {
   ): Promise<MessageContentPart[]> {
     const state: StreamState = {
       fullLlmResponse: "",
-      thoughtSent: false,
-      questionSent: false,
-      suggestionIndex: 0,
-      shotListStartSent: false,
-      imageTasks: [],
+      occurrences: new Map(),
+      openTagsFired: new Set(),
+      asyncTasks: [],
       finalContent: [],
     };
 
     await this.consumeStream(llmStream, state, ctx, preparedMessages, maxSuggestions);
 
-    // Wait for all image generation tasks to complete
-    await Promise.all(state.imageTasks);
+    // Wait for all background tasks (e.g. image generation) to complete
+    await Promise.all(state.asyncTasks);
 
     console.log("=== FINAL AI LLM RESPONSE ===");
     console.log(state.fullLlmResponse);
@@ -107,18 +101,28 @@ export class StreamLoop {
         }
       }
 
-      // Check for shot list start event (tag opened but not yet closed)
-      if (!state.shotListStartSent && this.outputParser.hasOpenTag("SHOTLIST")) {
-        state.shotListStartSent = true;
-        ctx.send({ type: "shot_list_start" });
-        console.log("[Perf] Agent shot list generation started", `[${Date.now() - ctx.requestStartTime}ms]`);
+      // Fire onOpenTag callbacks for tools with open (not yet closed) tags
+      this.checkOpenTags(state, ctx);
+    }
+  }
+
+  /**
+   * Fire onOpenTag callbacks for tools that have an open tag in the buffer.
+   */
+  private checkOpenTags(state: StreamState, ctx: RequestContext): void {
+    for (const tool of this.registry.getAllForPrompt()) {
+      if (tool.onOpenTag && !state.openTagsFired.has(tool.name)) {
+        if (this.outputParser.hasOpenTag(tool.tag)) {
+          state.openTagsFired.add(tool.name);
+          tool.onOpenTag(ctx);
+        }
       }
     }
   }
 
   /**
-   * Handle a single parsed tag. Returns "restart" if the stream needs to be
-   * restarted (e.g. after a waitForOutput tool call).
+   * Handle a single parsed tag generically using ToolDefinition fields.
+   * Returns "restart" if the stream needs to be restarted (waitForOutput tools).
    */
   private async handleTag(
     tag: ParsedTag,
@@ -130,278 +134,178 @@ export class StreamLoop {
     const toolDef = this.registry.getByName(tag.toolName);
     if (!toolDef) return "handled";
 
-    switch (tag.toolName) {
-      case "think":
-        return this.handleThink(tag, state, ctx);
-      case "text":
-        return this.handleText(tag, state, ctx);
-      case "image_suggest":
-        return this.handleImageSuggest(tag, state, ctx, maxSuggestions);
-      case "video":
-        return this.handleVideo(tag, state, ctx);
-      case "shot_list":
-        return this.handleShotList(tag, state, ctx);
-      case "search":
-        return this.handleSearch(tag, state, ctx);
-      case "check_taxonomy":
-        return await this.handleCheckTaxonomy(tag, state, ctx, preparedMessages, maxSuggestions);
-      default:
-        return "handled";
+    // Check occurrence limits:
+    // - fireAndForget tools use maxSuggestions as their runtime limit
+    // - other tools use their static maxOccurrences
+    const count = state.occurrences.get(tag.toolName) || 0;
+    const limit = toolDef.fireAndForget ? maxSuggestions : toolDef.maxOccurrences;
+    if (limit !== undefined && count >= limit) {
+      console.log(`[Agent-2] Skipping ${tag.toolName} beyond limit of ${limit}`);
+      return "handled";
     }
-  }
+    state.occurrences.set(tag.toolName, count + 1);
 
-  private handleThink(tag: ParsedTag, state: StreamState, ctx: RequestContext): "handled" {
-    if (state.thoughtSent) return "handled";
-
-    const thoughtText = typeof tag.parsedContent === "string"
-      ? tag.parsedContent
-      : String(tag.parsedContent);
-
-    ctx.send({ type: "internal_think", content: thoughtText });
-    console.log("[Perf] Agent thought sent", `[${Date.now() - ctx.requestStartTime}ms]`);
-    state.finalContent.push({ type: "internal_think", text: thoughtText });
-    state.thoughtSent = true;
-    return "handled";
-  }
-
-  private handleText(tag: ParsedTag, state: StreamState, ctx: RequestContext): "handled" {
-    if (state.questionSent) return "handled";
-
-    const questionText = typeof tag.parsedContent === "string"
-      ? tag.parsedContent
-      : String(tag.parsedContent);
-
-    ctx.send({ type: "text", content: questionText });
-    console.log("[Perf] Agent question sent", `[${Date.now() - ctx.requestStartTime}ms]`);
-    state.finalContent.push({ type: "text", text: questionText });
-    state.questionSent = true;
-    return "handled";
-  }
-
-  private handleImageSuggest(
-    tag: ParsedTag,
-    state: StreamState,
-    ctx: RequestContext,
-    maxSuggestions: number,
-  ): "handled" {
-    try {
-      const suggestion = tag.parsedContent;
-
-      if (state.suggestionIndex < maxSuggestions) {
-        const currentIndex = state.suggestionIndex;
-        state.suggestionIndex++;
-        const trackingImageId = generateImageId();
-
-        // Create a placeholder immediately
-        const placeholder: MessageContentPart = {
-          type: "agent_image",
-          imageId: trackingImageId,
-          title: "Loading...",
-          aspectRatio: suggestion.aspectRatio,
-          prompt: suggestion.prompt,
-          status: "loading",
-        };
-        ctx.send({ type: "part", part: placeholder });
-        state.finalContent.push(placeholder);
-
-        console.log(
-          "[Perf] Agent image generation start",
-          `[${Date.now() - ctx.requestStartTime}ms]`,
-          `imageId=${trackingImageId}`
-        );
-
-        // Fire-and-forget image generation task
-        const task = (async () => {
-          try {
-            // Construct a parsedTag with the tracking ID for the handler
-            const result = await this.toolExecutor.execute(
-              { ...tag, parsedContent: { ...suggestion, _trackingImageId: trackingImageId } },
-              ctx,
-            );
-
-            if (result.contentParts?.[0]) {
-              const part = result.contentParts[0];
-              const idx = state.finalContent.findIndex(
-                (p) => p.type === "agent_image" && (p as any).imageId === trackingImageId
-              );
-              if (idx !== -1) state.finalContent[idx] = part;
-            }
-          } catch (err) {
-            console.error(`Image gen error for imageId ${trackingImageId}`, err);
-            const isInsufficientCredits = err instanceof InsufficientCreditsError;
-            const errorPart: MessageContentPart = {
-              type: "agent_image",
-              imageId: trackingImageId,
-              title: suggestion.title || "Error",
-              aspectRatio: "1:1",
-              prompt: suggestion.prompt || "",
-              status: "error",
-              ...(isInsufficientCredits && { reason: "INSUFFICIENT_CREDITS" }),
-            };
-            ctx.send({ type: "part_update", imageId: trackingImageId, part: errorPart });
-            const idx = state.finalContent.findIndex(
-              (p) => p.type === "agent_image" && (p as any).imageId === trackingImageId
-            );
-            if (idx !== -1) state.finalContent[idx] = errorPart;
-          }
-        })();
-
-        state.imageTasks.push(task);
-      } else {
-        console.log(
-          `[Agent-2] Skipping suggestion beyond limit of ${maxSuggestions}. Title: ${suggestion.title}`
-        );
-      }
-    } catch (e) {
-      console.error("Failed to parse suggestion JSON", e);
-      throw new Error(`JSON parsing failed: ${e}`);
+    // waitForOutput tools: pause stream, execute handler, inject result, restart
+    if (toolDef.waitForOutput) {
+      return this.handleWaitForOutput(tag, toolDef, state, ctx, preparedMessages, maxSuggestions);
     }
 
-    return "handled";
-  }
-
-  private handleVideo(tag: ParsedTag, state: StreamState, ctx: RequestContext): "handled" {
-    try {
-      const videoConfig = tag.parsedContent;
-      const modelId =
-        typeof videoConfig.modelId === "string" && getVideoModel(videoConfig.modelId)
-          ? videoConfig.modelId
-          : DEFAULT_VIDEO_MODEL_ID;
-      const model = getVideoModel(modelId);
-      const modelApiConfig = getModelConfigForApi(modelId);
-
-      if (model && modelApiConfig) {
-        const videoParams: Record<string, any> = {};
-        for (const param of modelApiConfig.params) {
-          if (
-            param.name === "prompt" ||
-            param.name === model.imageParams.sourceImage ||
-            param.name === model.imageParams.endImage
-          ) continue;
-          if (videoConfig[param.name] !== undefined) {
-            videoParams[param.name] = videoConfig[param.name];
-          } else if (param.default !== undefined) {
-            videoParams[param.name] = param.default;
-          }
-        }
-
-        const videoPart: MessageContentPart = {
-          type: "agent_video",
-          config: {
-            modelId,
-            modelName: model.name,
-            prompt: videoConfig.prompt || "",
-            sourceImageId: typeof videoConfig.sourceImageId === "string" ? videoConfig.sourceImageId : undefined,
-            params: videoParams,
-          },
-          status: "pending",
-        };
-
-        ctx.send({ type: "part", part: videoPart });
-        state.finalContent.push(videoPart);
-        console.log("[Perf] Agent video config sent", `model=${model.name}`, `[${Date.now() - ctx.requestStartTime}ms]`);
-      }
-    } catch (e) {
-      console.error("Failed to parse video config JSON", e);
+    // fireAndForget tools: create placeholder, run handler in background
+    if (toolDef.fireAndForget) {
+      this.handleFireAndForget(tag, toolDef, state, ctx);
+      return "handled";
     }
-    return "handled";
-  }
 
-  private handleShotList(tag: ParsedTag, state: StreamState, ctx: RequestContext): "handled" {
-    try {
-      const shotListData = tag.parsedContent;
-      const shotListPart: MessageContentPart = {
-        type: "agent_shot_list",
-        title: shotListData.title || "Shot List",
-        columns: Array.isArray(shotListData.columns) ? shotListData.columns : [],
-        rows: Array.isArray(shotListData.rows) ? shotListData.rows : [],
-        status: "complete",
-      };
-
-      ctx.send({ type: "part", part: shotListPart });
-      state.finalContent.push(shotListPart);
-      console.log("[Perf] Agent shot list sent", `rows=${shotListPart.rows.length}`, `[${Date.now() - ctx.requestStartTime}ms]`);
-    } catch (e) {
-      console.error("Failed to parse shot list JSON", e);
-    }
-    return "handled";
-  }
-
-  private handleSearch(tag: ParsedTag, state: StreamState, ctx: RequestContext): "handled" {
-    try {
-      const searchData = tag.parsedContent;
-      const searchPart: MessageContentPart = {
-        type: "agent_search",
-        query: {
-          textSearch: typeof searchData.text === "string" ? searchData.text : "",
-          filterIds: Array.isArray(searchData.filters) ? searchData.filters : [],
-        },
-        status: "pending",
-      };
-
-      ctx.send({ type: "part", part: searchPart });
-      state.finalContent.push(searchPart);
-      console.log(
-        "[Perf] Agent search query sent",
-        `text="${searchPart.query.textSearch}"`,
-        `filters=${JSON.stringify(searchPart.query.filterIds)}`,
-        `[${Date.now() - ctx.requestStartTime}ms]`
-      );
-    } catch (e) {
-      console.error("Failed to parse search JSON", e);
-    }
+    // Passive tools: create part, emit event
+    this.handlePassive(tag, toolDef, state, ctx);
     return "handled";
   }
 
   /**
-   * Handle CHECK_TAXONOMY tool call.
-   * This is a waitForOutput tool: we pause the stream, execute the handler,
-   * inject the result, and start a new LLM stream.
+   * Handle a passive tool: create a content part and emit an event.
    */
-  private async handleCheckTaxonomy(
+  private handlePassive(
     tag: ParsedTag,
+    toolDef: ToolDefinition,
+    state: StreamState,
+    ctx: RequestContext,
+  ): void {
+    if (!toolDef.createPart) return;
+
+    try {
+      const part = toolDef.createPart(tag.parsedContent, ctx);
+      if (!part) return;
+
+      // Emit event — use tool's custom createEvent, or default to { type: "part", part }
+      const event = toolDef.createEvent
+        ? toolDef.createEvent(part, ctx)
+        : { type: "part", part };
+      if (event) ctx.send(event);
+
+      state.finalContent.push(part);
+      console.log(`[Perf] Agent ${tag.toolName} sent`, `[${Date.now() - ctx.requestStartTime}ms]`);
+    } catch (e) {
+      console.error(`Failed to process ${tag.toolName}:`, e);
+    }
+  }
+
+  /**
+   * Handle a fire-and-forget tool: create placeholder, run handler in background.
+   * The handler is responsible for sending part_update events and returning
+   * contentParts in the ToolResult for finalContent updates.
+   */
+  private handleFireAndForget(
+    tag: ParsedTag,
+    toolDef: ToolDefinition,
+    state: StreamState,
+    ctx: RequestContext,
+  ): void {
+    try {
+      // Create placeholder via createPart if defined
+      let placeholder: MessageContentPart | null = null;
+      if (toolDef.createPart) {
+        placeholder = toolDef.createPart(tag.parsedContent, ctx);
+        if (placeholder) {
+          const event = toolDef.createEvent
+            ? toolDef.createEvent(placeholder, ctx)
+            : { type: "part", part: placeholder };
+          if (event) ctx.send(event);
+          state.finalContent.push(placeholder);
+        }
+      }
+
+      console.log(
+        `[Perf] Agent ${tag.toolName} start`,
+        `[${Date.now() - ctx.requestStartTime}ms]`,
+        placeholder && "imageId" in placeholder ? `imageId=${(placeholder as any).imageId}` : "",
+      );
+
+      // Fire async task
+      const task = (async () => {
+        try {
+          // Enrich parsedContent with tracking info from placeholder
+          const enrichedContent = { ...tag.parsedContent };
+          if (placeholder && "imageId" in placeholder) {
+            enrichedContent._trackingImageId = (placeholder as any).imageId;
+          }
+
+          const result = await this.toolExecutor.execute(
+            { ...tag, parsedContent: enrichedContent },
+            ctx,
+          );
+
+          // Update finalContent placeholder with the actual result part
+          if (result.contentParts?.[0] && placeholder) {
+            const idx = state.finalContent.indexOf(placeholder);
+            if (idx !== -1) state.finalContent[idx] = result.contentParts[0];
+          }
+        } catch (err) {
+          console.error(`[Agent-2] Fire-and-forget error for ${tag.toolName}:`, err);
+        }
+      })();
+
+      state.asyncTasks.push(task);
+    } catch (e) {
+      console.error(`Failed to start fire-and-forget ${tag.toolName}:`, e);
+    }
+  }
+
+  /**
+   * Handle a waitForOutput tool: execute handler, inject result into
+   * conversation, and restart the LLM stream.
+   */
+  private async handleWaitForOutput(
+    tag: ParsedTag,
+    toolDef: ToolDefinition,
     state: StreamState,
     ctx: RequestContext,
     preparedMessages: any[],
     maxSuggestions: number,
   ): Promise<"handled" | "restart"> {
-    // Add loading part to finalContent
-    state.finalContent.push({ type: "tool_call", tool: "check_taxonomy", status: "loading" });
+    // Create loading part if tool defines createPart
+    let loadingPart: MessageContentPart | null = null;
+    if (toolDef.createPart) {
+      loadingPart = toolDef.createPart(tag.parsedContent, ctx);
+      if (loadingPart) state.finalContent.push(loadingPart);
+    }
 
-    // Get the partial response before the tool call
-    const partialResponse = state.fullLlmResponse.substring(
-      0,
-      state.fullLlmResponse.indexOf("<TOOL_CALL>")
-    );
+    // Get the partial LLM response before the tool call tag
+    const tagOpen = `<${toolDef.tag}>`;
+    const tagIdx = state.fullLlmResponse.indexOf(tagOpen);
+    const partialResponse = tagIdx >= 0
+      ? state.fullLlmResponse.substring(0, tagIdx)
+      : state.fullLlmResponse;
 
     // Execute the handler
     const result = await this.toolExecutor.execute(tag, ctx);
 
-    // Update the loading part to complete or error
-    const toolCallIdx = state.finalContent.findIndex(
-      (p) => p.type === "tool_call" && (p as any).status === "loading"
-    );
-    if (toolCallIdx !== -1) {
-      state.finalContent[toolCallIdx] = {
-        type: "tool_call",
-        tool: "check_taxonomy",
-        status: result.success ? "complete" : "error",
-      };
+    // Update loading part status
+    if (loadingPart) {
+      const idx = state.finalContent.indexOf(loadingPart);
+      if (idx !== -1) {
+        state.finalContent[idx] = {
+          ...loadingPart,
+          status: result.success ? "complete" : "error",
+        } as MessageContentPart;
+      }
     }
 
     if (!result.success) {
-      console.error("[Agent-2] CHECK_TAXONOMY failed:", result.error);
+      console.error(`[Agent-2] ${tag.toolName} failed:`, result.error);
       return "handled";
     }
 
-    // Build continuation messages with the taxonomy data
+    // Build continuation message from handler result
+    if (!toolDef.buildContinuationMessage) {
+      console.warn(`[Agent-2] waitForOutput tool ${tag.toolName} has no buildContinuationMessage`);
+      return "handled";
+    }
+
+    const continuationUserMessage = toolDef.buildContinuationMessage(result.data);
     const continuationMessages = [
       ...preparedMessages,
       { role: "assistant", content: partialResponse.trim() },
-      {
-        role: "user",
-        content: `[System: Tool call result for CHECK_TAXONOMY]\n\nHere is the taxonomy tree. Each selectable item has an [id:NUMBER] prefix. Use these IDs in your <SEARCH> filters and taxonomy: links.\n\n${result.data.serializedTaxonomy}`,
-      },
+      { role: "user", content: continuationUserMessage },
     ];
 
     // Start a new LLM stream
@@ -413,15 +317,19 @@ export class StreamLoop {
       stream: true,
     });
 
-    console.log("[Perf] Agent continuation LLM stream started after tool call", `[${Date.now() - ctx.requestStartTime}ms]`);
+    console.log(
+      `[Perf] Agent continuation LLM stream started after ${tag.toolName}`,
+      `[${Date.now() - ctx.requestStartTime}ms]`,
+    );
 
     // Reset parser state for the continuation
     this.outputParser.setBuffer("");
     state.fullLlmResponse = "";
-    state.thoughtSent = true; // Don't re-send thought in continuation
-    state.questionSent = false;
-    state.suggestionIndex = 0;
-    state.shotListStartSent = false;
+    // Preserve think occurrence so the continuation doesn't re-send thought
+    const thinkCount = state.occurrences.get("think") || 0;
+    state.occurrences.clear();
+    if (thinkCount > 0) state.occurrences.set("think", thinkCount);
+    state.openTagsFired.clear();
 
     // Recursively consume the continuation stream
     await this.consumeStream(continuationStream, state, ctx, continuationMessages, maxSuggestions);

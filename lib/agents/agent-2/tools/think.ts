@@ -18,9 +18,14 @@ user_persona: Romantic, detail-oriented...
 </think>`,
   ],
   waitForOutput: false,
+  maxOccurrences: 1,
   parseContent: (raw: string) => raw.trim(),
   createPart: (parsed: any) => ({
     type: "internal_think" as const,
     text: parsed as string,
   }),
+  createEvent: (part) =>
+    part?.type === "internal_think"
+      ? { type: "internal_think", content: (part as any).text }
+      : null,
 };
