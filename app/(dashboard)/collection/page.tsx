@@ -294,14 +294,13 @@ export default function CollectionsPage() {
                   >
                     <Dropdown>
                       <DropdownTrigger>
-                        <Button
-                          isIconOnly
-                          size="sm"
-                          variant="solid"
-                          className="bg-background/80 backdrop-blur-sm"
+                        <div
+                          role="button"
+                          tabIndex={0}
+                          className="inline-flex items-center justify-center w-8 h-8 rounded-medium bg-background/80 backdrop-blur-sm cursor-pointer hover:opacity-80"
                         >
                           <MoreVertical size={16} />
-                        </Button>
+                        </div>
                       </DropdownTrigger>
                       <DropdownMenu aria-label="Collection actions">
                         <DropdownItem
