@@ -476,7 +476,7 @@ export default function ProjectDetailPage({
                     )}
                     {/* Tags overlay on cover */}
                     {(collection.tags ?? []).length > 0 && (
-                      <div className="absolute bottom-1.5 left-1.5 right-1.5">
+                      <div className="absolute bottom-1.5 left-1.5 right-1.5 z-10">
                         <CollectionTags tags={collection.tags ?? []} maxVisible={3} />
                       </div>
                     )}
