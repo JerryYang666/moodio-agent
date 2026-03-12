@@ -43,7 +43,7 @@
   },
   "nav": {
     "inspiration": "Inspiration",
-    "image": "Image",
+    "generation": "Generation",
     "video": "Video",
     "assets": "Assets",
     "canvas": "Canvas",
@@ -464,7 +464,11 @@
     "title": "Storyboard",
     "subtitle": "Storyboard your ideas",
     "goToStoryboard": "Go to Storyboard",
-    "model": "Model"
+    "model": "Model",
+    "deprecationTitle": "This page is being deprecated",
+    "deprecationDescription": "All video generation features have moved to the Generation page. The video list has been merged into the Assets page.",
+    "goToGeneration": "Go to Generation",
+    "goToAssets": "Go to Assets"
   },
   "browse": {
     "title": "Browse",

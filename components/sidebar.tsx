@@ -387,7 +387,7 @@ export const Sidebar = () => {
                 exit={{ opacity: 0, width: 0 }}
                 className="font-bold text-lg whitespace-nowrap overflow-hidden"
               >
-                {t("nav.image")}
+                {t("nav.generation")}
               </motion.p>
             )}
           </AnimatePresence>

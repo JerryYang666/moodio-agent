@@ -43,7 +43,7 @@
   },
   "nav": {
     "inspiration": "靈感",
-    "image": "圖片",
+    "generation": "生成",
     "video": "影片",
     "assets": "資產",
     "canvas": "畫布",
@@ -384,7 +384,11 @@
     "title": "分鏡腳本",
     "subtitle": "將您的點子製作成分鏡腳本",
     "goToStoryboard": "前往分鏡腳本",
-    "model": "模型"
+    "model": "模型",
+    "deprecationTitle": "此頁面即將停用",
+    "deprecationDescription": "所有影片生成功能已移至「生成」頁面。影片列表已整合至「資產」頁面。",
+    "goToGeneration": "前往生成",
+    "goToAssets": "前往資產"
   },
   "browse": {
     "title": "瀏覽",

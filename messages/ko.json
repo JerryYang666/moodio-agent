@@ -43,7 +43,7 @@
   },
   "nav": {
     "inspiration": "영감",
-    "image": "이미지",
+    "generation": "생성",
     "video": "비디오",
     "assets": "에셋",
     "canvas": "캔버스",
@@ -384,7 +384,11 @@
     "title": "스토리보드",
     "subtitle": "아이디어를 스토리보드로",
     "goToStoryboard": "스토리보드로 이동",
-    "model": "모델"
+    "model": "모델",
+    "deprecationTitle": "이 페이지는 지원이 중단될 예정입니다",
+    "deprecationDescription": "모든 동영상 생성 기능은 「생성」 페이지로 이전되었습니다. 동영상 목록은 「에셋」 페이지에 통합되었습니다.",
+    "goToGeneration": "생성으로",
+    "goToAssets": "에셋으로"
   },
   "browse": {
     "title": "둘러보기",

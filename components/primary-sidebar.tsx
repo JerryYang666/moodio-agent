@@ -16,7 +16,7 @@ import {
   PencilRuler,
   PanelLeftClose,
   PanelLeftOpen,
-  Image,
+  Sparkles,
   Video,
   Monitor,
 } from "lucide-react";
@@ -63,9 +63,9 @@ export const PrimarySidebar = () => {
       isActive: (path: string) => path.startsWith("/browse") || path === "/",
     },
     {
-      label: t("image"),
+      label: t("generation"),
       href: "/chat",
-      icon: <Image size={20} />,
+      icon: <Sparkles size={20} />,
       isActive: (path: string) => path.startsWith("/chat"),
     },
     {

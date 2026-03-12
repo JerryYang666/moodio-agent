@@ -43,7 +43,7 @@
   },
   "nav": {
     "inspiration": "インスピレーション",
-    "image": "画像",
+    "generation": "生成",
     "video": "動画",
     "assets": "アセット",
     "canvas": "キャンバス",
@@ -384,7 +384,11 @@
     "title": "ストーリーボード",
     "subtitle": "アイデアをストーリーボードに",
     "goToStoryboard": "ストーリーボードへ移動",
-    "model": "モデル"
+    "model": "モデル",
+    "deprecationTitle": "このページは廃止予定です",
+    "deprecationDescription": "動画生成機能はすべて「生成」ページに移行しました。動画リストは「アセット」ページに統合されました。",
+    "goToGeneration": "生成へ",
+    "goToAssets": "アセットへ"
   },
   "browse": {
     "title": "ブラウズ",

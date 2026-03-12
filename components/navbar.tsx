@@ -26,7 +26,7 @@ import {
   Bean,
   User as UserIcon,
   PencilRuler,
-  Image,
+  Sparkles,
   Video,
   Monitor,
 } from "lucide-react";
@@ -51,11 +51,11 @@ export const Navbar = () => {
   const showDesktop = useFeatureFlag<boolean>("user_desktop") ?? false;
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [activeSection, setActiveSection] = useState<
-    "inspiration" | "image" | "video" | "assets" | "canvas"
+    "inspiration" | "generation" | "video" | "assets" | "canvas"
   >("inspiration");
 
   useEffect(() => {
-    if (pathname?.startsWith("/chat")) setActiveSection("image");
+    if (pathname?.startsWith("/chat")) setActiveSection("generation");
     else if (pathname?.startsWith("/storyboard")) setActiveSection("video");
     else if (
       pathname?.startsWith("/projects") ||
@@ -92,9 +92,9 @@ export const Navbar = () => {
       href: "/browse",
     },
     {
-      id: "image",
-      label: t("nav.image"),
-      icon: <Image size={20} />,
+      id: "generation",
+      label: t("nav.generation"),
+      icon: <Sparkles size={20} />,
       href: "/chat",
     },
     {
@@ -197,7 +197,7 @@ export const Navbar = () => {
               </div>
             )}
 
-            {activeSection === "image" && (
+            {activeSection === "generation" && (
               <ChatHistorySelector
                 onChatSelect={() => setIsMenuOpen(false)}
                 onNewChat={handleNewChat}

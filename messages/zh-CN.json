@@ -43,7 +43,7 @@
   },
   "nav": {
     "inspiration": "灵感",
-    "image": "图片",
+    "generation": "生成",
     "video": "视频",
     "assets": "资产",
     "canvas": "画布",
@@ -384,7 +384,11 @@
     "title": "故事板",
     "subtitle": "将您的想法可视化",
     "goToStoryboard": "前往故事板",
-    "model": "模型"
+    "model": "模型",
+    "deprecationTitle": "此页面即将弃用",
+    "deprecationDescription": "所有视频生成功能已迁移至「生成」页面。视频列表已合并至「资产」页面。",
+    "goToGeneration": "前往生成",
+    "goToAssets": "前往资产"
   },
   "browse": {
     "title": "浏览",
