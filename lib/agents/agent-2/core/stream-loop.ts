@@ -71,7 +71,7 @@ export class StreamLoop {
 
     // If no content was produced, try to extract text from the buffer
     if (state.finalContent.length === 0) {
-      const text = this.outputParser.getBuffer().replace(/<[^>]*>/g, "").trim();
+      const text = this.outputParser.getBuffer().replace(/<[^]*?>/g, "").trim();
       if (text) {
         ctx.send({ type: "text", content: text });
         state.finalContent.push({ type: "text", text });
