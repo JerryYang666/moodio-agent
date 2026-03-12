@@ -378,7 +378,15 @@
     "bulkDeletedDesc": "{count}개 항목이 컬렉션에서 삭제됨",
     "failedToBulkMove": "항목 이동 실패",
     "failedToBulkCopy": "항목 복사 실패",
-    "failedToBulkDelete": "항목 삭제 실패"
+    "failedToBulkDelete": "항목 삭제 실패",
+    "tags": "태그",
+    "addTag": "태그 추가",
+    "add": "추가",
+    "editTags": "태그 편집",
+    "tagPlaceholder": "태그 이름",
+    "filterByTag": "태그로 필터",
+    "clearFilter": "지우기",
+    "noCollectionsMatchFilter": "선택한 태그와 일치하는 컬렉션이 없습니다"
   },
   "storyboard": {
     "title": "스토리보드",

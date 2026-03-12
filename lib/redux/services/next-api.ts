@@ -28,6 +28,13 @@ export interface GenerateVideoError {
   cost?: number;
 }
 
+// Types for collection tags
+export interface CollectionTagItem {
+  id: string;
+  label: string;
+  color: string;
+}
+
 // Types for collections
 export interface CollectionItem {
   id: string;
@@ -40,6 +47,7 @@ export interface CollectionItem {
   isOwner: boolean;
   sharedAt?: Date;
   coverImageUrl?: string | null;
+  tags: CollectionTagItem[];
 }
 
 /**
@@ -84,7 +92,7 @@ export const nextApi = createApi({
 
     createCollection: builder.mutation<
       CollectionItem,
-      { name: string; projectId?: string }
+      { name: string; projectId?: string; tags?: { label: string; color: string }[] }
     >({
       query: (body) => ({
         url: "/api/collection",
@@ -98,12 +106,12 @@ export const nextApi = createApi({
 
     renameCollection: builder.mutation<
       CollectionItem,
-      { collectionId: string; name: string }
+      { collectionId: string; name?: string; tags?: { label: string; color: string }[] }
     >({
-      query: ({ collectionId, name }) => ({
+      query: ({ collectionId, ...body }) => ({
         url: `/api/collection/${collectionId}`,
         method: "PATCH",
-        body: { name },
+        body,
       }),
       transformResponse: (response: { collection: CollectionItem }) =>
         response.collection,

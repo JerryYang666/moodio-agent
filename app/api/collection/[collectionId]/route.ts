@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { 
-  collections, 
-  collectionImages, 
+import {
+  collections,
+  collectionImages,
   collectionShares,
+  collectionTags,
   type CollectionShare,
   users
 } from "@/lib/db/schema";
@@ -13,6 +14,7 @@ import { eq, and, desc } from "drizzle-orm";
 import { getImageUrl, getVideoUrl } from "@/lib/storage/s3";
 import { getUserPermission } from "@/lib/collection-utils";
 import { PERMISSION_OWNER, isOwner, type SharePermission } from "@/lib/permissions";
+import { TAG_COLOR_MAP } from "@/lib/tag-colors";
 
 /**
  * GET /api/collection/[collectionId]
@@ -99,11 +101,21 @@ export async function GET(
       }));
     }
 
+    // Get tags for this collection
+    const tags = (
+      await db
+        .select()
+        .from(collectionTags)
+        .where(eq(collectionTags.collectionId, collectionId))
+        .orderBy(collectionTags.createdAt)
+    ).map((t) => ({ id: t.id, label: t.label, color: t.color }));
+
     return NextResponse.json({
       collection: {
         ...collection,
         permission,
         isOwner: isOwner(permission),
+        tags,
       },
       images,
       shares,
@@ -149,30 +161,77 @@ export async function PATCH(
     }
 
     const body = await req.json();
-    const { name } = body;
+    const { name, tags } = body as {
+      name?: string;
+      tags?: { label: string; color: string }[];
+    };
 
-    if (!name || typeof name !== "string" || !name.trim()) {
+    if (name !== undefined && (!name || typeof name !== "string" || !name.trim())) {
       return NextResponse.json(
         { error: "Collection name is required" },
         { status: 400 }
       );
     }
 
-    // Update collection
+    // Update collection name if provided
+    const updatePayload: Record<string, unknown> = { updatedAt: new Date() };
+    if (name) updatePayload.name = name.trim();
+
     const [updatedCollection] = await db
       .update(collections)
-      .set({
-        name: name.trim(),
-        updatedAt: new Date(),
-      })
+      .set(updatePayload)
       .where(eq(collections.id, collectionId))
       .returning();
+
+    // Update tags if provided (replace all)
+    let updatedTags: { id: string; label: string; color: string }[] = [];
+    if (Array.isArray(tags)) {
+      // Delete existing tags
+      await db
+        .delete(collectionTags)
+        .where(eq(collectionTags.collectionId, collectionId));
+
+      // Validate and insert new tags
+      const validTags = tags.filter(
+        (t) =>
+          t &&
+          typeof t.label === "string" &&
+          t.label.trim() &&
+          typeof t.color === "string" &&
+          TAG_COLOR_MAP.has(t.color)
+      );
+
+      if (validTags.length > 0) {
+        updatedTags = (
+          await db
+            .insert(collectionTags)
+            .values(
+              validTags.map((t) => ({
+                collectionId,
+                label: t.label.trim().substring(0, 50),
+                color: t.color,
+              }))
+            )
+            .returning()
+        ).map((t) => ({ id: t.id, label: t.label, color: t.color }));
+      }
+    } else {
+      // Return current tags if not updating
+      updatedTags = (
+        await db
+          .select()
+          .from(collectionTags)
+          .where(eq(collectionTags.collectionId, collectionId))
+          .orderBy(collectionTags.createdAt)
+      ).map((t) => ({ id: t.id, label: t.label, color: t.color }));
+    }
 
     return NextResponse.json({
       collection: {
         ...updatedCollection,
         permission: PERMISSION_OWNER,
         isOwner: true,
+        tags: updatedTags,
       },
     });
   } catch (error) {

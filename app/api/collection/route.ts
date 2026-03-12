@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { collections, collectionShares, collectionImages, projects, projectShares } from "@/lib/db/schema";
+import { collections, collectionShares, collectionImages, collectionTags, projects, projectShares } from "@/lib/db/schema";
 import { getAccessToken } from "@/lib/auth/cookies";
 import { verifyAccessToken } from "@/lib/auth/jwt";
 import { eq, or, and, desc, sql } from "drizzle-orm";
@@ -8,6 +8,7 @@ import { ensureDefaultProject } from "@/lib/db/projects";
 import { getImageUrl } from "@/lib/storage/s3";
 import { getProjectPermission, hasProjectWritePermission } from "@/lib/project-utils";
 import { PERMISSION_OWNER } from "@/lib/permissions";
+import { TAG_COLOR_MAP } from "@/lib/tag-colors";
 
 /**
  * GET /api/collection
@@ -93,12 +94,30 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    // Get tags for all collections
+    const allTags = allCollectionIds.length > 0
+      ? await db
+          .select()
+          .from(collectionTags)
+          .where(sql`${collectionTags.collectionId} IN ${allCollectionIds}`)
+          .orderBy(collectionTags.createdAt)
+      : [];
+
+    // Create a map of collectionId -> tags
+    const tagsMap = new Map<string, { id: string; label: string; color: string }[]>();
+    for (const tag of allTags) {
+      const arr = tagsMap.get(tag.collectionId) ?? [];
+      arr.push({ id: tag.id, label: tag.label, color: tag.color });
+      tagsMap.set(tag.collectionId, arr);
+    }
+
     // Format response
     const owned = ownedCollections.map((col) => ({
       ...col,
       permission: PERMISSION_OWNER,
       isOwner: true,
       coverImageUrl: coverMap.get(col.id) || null,
+      tags: tagsMap.get(col.id) ?? [],
     }));
 
     const shared = sharedCollectionsData.map((item) => ({
@@ -107,6 +126,7 @@ export async function GET(req: NextRequest) {
       isOwner: false,
       sharedAt: item.sharedAt,
       coverImageUrl: coverMap.get(item.collection.id) || null,
+      tags: tagsMap.get(item.collection.id) ?? [],
     }));
 
     const inherited = inheritedCollections.map((item) => ({
@@ -115,6 +135,7 @@ export async function GET(req: NextRequest) {
       isOwner: false,
       sharedAt: item.sharedAt,
       coverImageUrl: coverMap.get(item.collection.id) || null,
+      tags: tagsMap.get(item.collection.id) ?? [],
     }));
 
     return NextResponse.json({
@@ -147,13 +168,33 @@ export async function POST(req: NextRequest) {
 
     const userId = payload.userId;
     const body = await req.json();
-    const { name, projectId } = body as { name?: unknown; projectId?: unknown };
+    const { name, projectId, tags } = body as {
+      name?: unknown;
+      projectId?: unknown;
+      tags?: { label: string; color: string }[];
+    };
 
     if (!name || typeof name !== "string" || !name.trim()) {
       return NextResponse.json(
         { error: "Collection name is required" },
         { status: 400 }
       );
+    }
+
+    // Validate tags if provided
+    const validTags: { label: string; color: string }[] = [];
+    if (Array.isArray(tags)) {
+      for (const tag of tags) {
+        if (
+          tag &&
+          typeof tag.label === "string" &&
+          tag.label.trim() &&
+          typeof tag.color === "string" &&
+          TAG_COLOR_MAP.has(tag.color)
+        ) {
+          validTags.push({ label: tag.label.trim().substring(0, 50), color: tag.color });
+        }
+      }
     }
 
     const resolvedProjectId =
@@ -180,11 +221,29 @@ export async function POST(req: NextRequest) {
       })
       .returning();
 
+    // Insert tags if provided
+    let insertedTags: { id: string; label: string; color: string }[] = [];
+    if (validTags.length > 0) {
+      insertedTags = (
+        await db
+          .insert(collectionTags)
+          .values(
+            validTags.map((t) => ({
+              collectionId: newCollection.id,
+              label: t.label,
+              color: t.color,
+            }))
+          )
+          .returning()
+      ).map((t) => ({ id: t.id, label: t.label, color: t.color }));
+    }
+
     return NextResponse.json({
       collection: {
         ...newCollection,
         permission: PERMISSION_OWNER,
         isOwner: true,
+        tags: insertedTags,
       },
     });
   } catch (error) {

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { collectionImages, collections, projects, projectShares, users, type ProjectShare } from "@/lib/db/schema";
+import { collectionImages, collections, collectionTags, projects, projectShares, users, type ProjectShare } from "@/lib/db/schema";
 import { getAccessToken } from "@/lib/auth/cookies";
 import { verifyAccessToken } from "@/lib/auth/jwt";
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
@@ -87,10 +87,27 @@ export async function GET(
       }
     }
 
-    // Add cover image URL to each collection
+    // Get tags for all collections
+    const allTags = collectionIds.length > 0
+      ? await db
+          .select()
+          .from(collectionTags)
+          .where(sql`${collectionTags.collectionId} IN ${collectionIds}`)
+          .orderBy(collectionTags.createdAt)
+      : [];
+
+    const tagsMap = new Map<string, { id: string; label: string; color: string }[]>();
+    for (const tag of allTags) {
+      const arr = tagsMap.get(tag.collectionId) ?? [];
+      arr.push({ id: tag.id, label: tag.label, color: tag.color });
+      tagsMap.set(tag.collectionId, arr);
+    }
+
+    // Add cover image URL and tags to each collection
     const collectionsWithCovers = projectCollections.map((col) => ({
       ...col,
       coverImageUrl: coverMap.get(col.id) || null,
+      tags: tagsMap.get(col.id) ?? [],
     }));
 
     // Get shares if user is owner
