@@ -41,25 +41,11 @@ const MAX_RETRY = 2;
 export class ImageGenerateHandler implements ToolHandler {
   async execute(parsedTag: ParsedTag, ctx: RequestContext): Promise<ToolResult> {
     const suggestion = parsedTag.parsedContent;
-    const trackingImageId = generateImageId();
+    // Use tracking ID from the caller (stream loop) if provided, otherwise generate one
+    const trackingImageId = suggestion._trackingImageId || generateImageId();
 
-    // Emit loading placeholder immediately
-    const placeholder: MessageContentPart = {
-      type: "agent_image",
-      imageId: trackingImageId,
-      title: "Loading...",
-      aspectRatio: suggestion.aspectRatio as AspectRatio,
-      prompt: suggestion.prompt,
-      status: "loading",
-    };
-
-    ctx.send({ type: "part", part: placeholder });
-
-    console.log(
-      "[Perf] Agent image generation start",
-      `[${Date.now() - ctx.requestStartTime}ms]`,
-      `imageId=${trackingImageId}`
-    );
+    // NOTE: The stream loop already emits the loading placeholder and manages
+    // finalContent tracking. This handler only does the actual generation.
 
     try {
       const part = await this.generateImageWithRetry(
