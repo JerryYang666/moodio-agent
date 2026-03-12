@@ -102,7 +102,7 @@ export default function TagInput({ tags, onChange, maxTags = 10 }: TagInputProps
             <PopoverTrigger>
               <button
                 type="button"
-                className="w-7 h-7 rounded-full border-2 border-default-300 flex-shrink-0"
+                className="w-7 h-7 rounded-full border-2 border-default-300 shrink-0"
                 style={{ backgroundColor: getTagColor(selectedColor).dot }}
               />
             </PopoverTrigger>
