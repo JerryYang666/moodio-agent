@@ -13,7 +13,7 @@ import {
 } from "@/lib/storage/s3";
 import { createLLMClient } from "@/lib/llm/client";
 import { Message, MessageContentPart, MessageMetadata, DEFAULT_LLM_MODEL, isGeneratedImagePart } from "@/lib/llm/types";
-import { agent1 } from "@/lib/agents/agent-1";
+import { agent2 } from "@/lib/agents/agent-2";
 import { waitUntil } from "@vercel/functions";
 import { recordEvent, sanitizeGeminiResponse } from "@/lib/telemetry";
 import {
@@ -918,10 +918,10 @@ export async function POST(
     }
 
     // ===== Agent Mode (default) =====
-    // Use Agent 1 with parallel variants
+    // Use Agent 2 with parallel variants
     // Pass all imageIds directly - the agent will use these for image generation
     const { stream: agentStream, completions } =
-      await agent1.processRequestParallel(
+      await agent2.processRequestParallel(
         history,
         userMessage,
         payload.userId,
