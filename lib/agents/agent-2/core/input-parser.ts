@@ -206,7 +206,7 @@ export class InputParser {
       }
       formattedUserMessage.content.push({
         type: "text",
-        text: `\nGenerate exactly ${ctx.maxImageQuantity} image suggestion${ctx.maxImageQuantity === 1 ? "" : "s"}.`,
+        text: `\nGenerate exactly ${ctx.maxImageQuantity} image suggestion${ctx.maxImageQuantity === 1 ? "" : "s"}. If the user is not asking for images, ignore this instruction.`,
       });
       console.log(`[Agent-2] User selected image quantity: ${ctx.maxImageQuantity}`);
     }
