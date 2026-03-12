@@ -32,6 +32,6 @@ jobs:
           node-version: "24"
           cache: npm
       - run: npm ci
-      - run: npx vitest run __tests__/llm-integration.test.ts
+      - run: npx vitest run __tests__/llm-integration.test.ts __tests__/agent-2/llm-integration.test.ts
         env:
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
