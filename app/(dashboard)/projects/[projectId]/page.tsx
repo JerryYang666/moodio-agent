@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState, use } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Card, CardBody, CardFooter } from "@heroui/card";
+import { Card, CardBody } from "@heroui/card";
 import { Button } from "@heroui/button";
 import { Input } from "@heroui/input";
 import { Spinner } from "@heroui/spinner";
@@ -18,13 +18,7 @@ import {
   ModalFooter,
   useDisclosure,
 } from "@heroui/modal";
-import {
-  Dropdown,
-  DropdownTrigger,
-  DropdownMenu,
-  DropdownItem,
-} from "@heroui/dropdown";
-import { ArrowLeft, Folder, Plus, MoreVertical, Pencil, Share2, Tags } from "lucide-react";
+import { ArrowLeft, Plus, Share2, Tags } from "lucide-react";
 import ImageDetailModal, { ImageInfo } from "@/components/chat/image-detail-modal";
 import { useShareModal, type ShareEntry } from "@/hooks/use-share-modal";
 import ShareModal from "@/components/share-modal";
@@ -32,7 +26,7 @@ import {
   useCreateCollectionMutation,
   useRenameCollectionMutation,
 } from "@/lib/redux/services/next-api";
-import CollectionTags from "@/components/collection/collection-tags";
+import CollectionCard from "@/components/collection/collection-card";
 import TagInput, { type TagValue } from "@/components/collection/tag-input";
 import { getTagColor } from "@/lib/tag-colors";
 
@@ -451,85 +445,27 @@ export default function ProjectDetailPage({
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {filteredCollections.map((collection) => (
-              <Card
+              <CollectionCard
                 key={collection.id}
-                isPressable
+                collection={collection}
                 onPress={() => router.push(`/collection/${collection.id}`)}
-                className="group"
-              >
-                <CardBody className="p-3 pb-1 relative">
-                  <div className="w-full h-36 bg-default-100 rounded-lg overflow-hidden relative">
-                    {collection.coverImageUrl ? (
-                      <Image
-                        src={collection.coverImageUrl}
-                        alt={collection.name}
-                        radius="none"
-                        classNames={{
-                          wrapper: "w-full h-full !max-w-full",
-                          img: "w-full h-full object-cover",
-                        }}
-                      />
-                    ) : (
-                      <div className="flex items-center justify-center w-full h-full">
-                        <Folder size={40} className="text-default-400" />
-                      </div>
-                    )}
-                    {/* Tags overlay on cover */}
-                    {(collection.tags ?? []).length > 0 && (
-                      <div className="absolute bottom-1.5 left-1.5 right-1.5 z-10">
-                        <CollectionTags tags={collection.tags ?? []} maxVisible={3} />
-                      </div>
-                    )}
-                  </div>
-                  <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity z-10" onClick={(e) => e.stopPropagation()}>
-                    <Dropdown>
-                      <DropdownTrigger>
-                        <div
-                          role="button"
-                          tabIndex={0}
-                          className="inline-flex items-center justify-center w-8 h-8 rounded-medium bg-background/80 backdrop-blur-sm cursor-pointer hover:opacity-80"
-                        >
-                          <MoreVertical size={16} />
-                        </div>
-                      </DropdownTrigger>
-                      <DropdownMenu aria-label="Collection actions">
-                        <DropdownItem
-                          key="rename"
-                          startContent={<Pencil size={16} />}
-                          onPress={() => {
-                            setCollectionToRename(collection);
-                            setRenameCollectionValue(collection.name);
-                            onRenameCollectionOpen();
-                          }}
-                        >
-                          {tCommon("rename")}
-                        </DropdownItem>
-                        <DropdownItem
-                          key="editTags"
-                          startContent={<Tags size={16} />}
-                          onPress={() => {
-                            setCollectionToEditTags(collection);
-                            setEditTagsValue(
-                              (collection.tags ?? []).map((t) => ({
-                                label: t.label,
-                                color: t.color,
-                              }))
-                            );
-                            onEditTagsOpen();
-                          }}
-                        >
-                          {tCollections("editTags")}
-                        </DropdownItem>
-                      </DropdownMenu>
-                    </Dropdown>
-                  </div>
-                </CardBody>
-                <CardFooter className="flex flex-col items-start gap-1 px-3 pt-1 pb-3">
-                  <h3 className="font-semibold text-base truncate w-full">
-                    {collection.name}
-                  </h3>
-                </CardFooter>
-              </Card>
+                thumbnailHeight="h-36"
+                onRename={() => {
+                  setCollectionToRename(collection);
+                  setRenameCollectionValue(collection.name);
+                  onRenameCollectionOpen();
+                }}
+                onEditTags={() => {
+                  setCollectionToEditTags(collection);
+                  setEditTagsValue(
+                    (collection.tags ?? []).map((t) => ({
+                      label: t.label,
+                      color: t.color,
+                    }))
+                  );
+                  onEditTagsOpen();
+                }}
+              />
             ))}
           </div>
         )}

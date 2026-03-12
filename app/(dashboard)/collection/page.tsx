@@ -3,13 +3,10 @@
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Card, CardBody, CardFooter } from "@heroui/card";
 import { Button } from "@heroui/button";
 import { Input } from "@heroui/input";
 import { Spinner } from "@heroui/spinner";
-import { Chip } from "@heroui/chip";
 import { PERMISSION_COLLABORATOR } from "@/lib/permissions";
-import { Image } from "@heroui/image";
 import {
   Modal,
   ModalContent,
@@ -18,16 +15,10 @@ import {
   ModalFooter,
   useDisclosure,
 } from "@heroui/modal";
-import {
-  Dropdown,
-  DropdownTrigger,
-  DropdownMenu,
-  DropdownItem,
-} from "@heroui/dropdown";
-import { Folder, Plus, MoreVertical, Pencil, Tags } from "lucide-react";
+import { Folder, Plus, Tags } from "lucide-react";
 import { useCollections } from "@/hooks/use-collections";
 import TagInput, { type TagValue } from "@/components/collection/tag-input";
-import CollectionTags from "@/components/collection/collection-tags";
+import CollectionCard from "@/components/collection/collection-card";
 import { getTagColor } from "@/lib/tag-colors";
 
 export default function CollectionsPage() {
@@ -256,106 +247,36 @@ export default function CollectionsPage() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {filteredCollections.map((collection) => (
-            <Card
+            <CollectionCard
               key={collection.id}
-              isPressable
+              collection={collection}
               onPress={() => router.push(`/collection/${collection.id}`)}
-              className="hover:scale-105 transition-transform group"
-            >
-              <CardBody className="p-3 pb-1 relative">
-                <div className="w-full h-40 bg-default-100 rounded-lg overflow-hidden relative">
-                  {collection.coverImageUrl ? (
-                    <Image
-                      src={collection.coverImageUrl}
-                      alt={collection.name}
-                      radius="none"
-                      classNames={{
-                        wrapper: "w-full h-full !max-w-full",
-                        img: "w-full h-full object-cover",
-                      }}
-                    />
-                  ) : (
-                    <div className="flex items-center justify-center w-full h-full">
-                      <Folder size={48} className="text-default-400" />
-                    </div>
-                  )}
-                  {/* Tags overlay on cover */}
-                  {(collection.tags ?? []).length > 0 && (
-                    <div className="absolute bottom-1.5 left-1.5 right-1.5">
-                      <CollectionTags tags={collection.tags ?? []} maxVisible={3} />
-                    </div>
-                  )}
-                </div>
-                {(collection.isOwner ||
-                  collection.permission === PERMISSION_COLLABORATOR) && (
-                  <div
-                    className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity z-10"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <Dropdown>
-                      <DropdownTrigger>
-                        <div
-                          role="button"
-                          tabIndex={0}
-                          className="inline-flex items-center justify-center w-8 h-8 rounded-medium bg-background/80 backdrop-blur-sm cursor-pointer hover:opacity-80"
-                        >
-                          <MoreVertical size={16} />
-                        </div>
-                      </DropdownTrigger>
-                      <DropdownMenu aria-label="Collection actions">
-                        <DropdownItem
-                          key="rename"
-                          startContent={<Pencil size={16} />}
-                          onPress={() => {
-                            setCollectionToRename(collection);
-                            setRenameValue(collection.name);
-                            onRenameOpen();
-                          }}
-                        >
-                          {tCommon("rename")}
-                        </DropdownItem>
-                        <DropdownItem
-                          key="editTags"
-                          startContent={<Tags size={16} />}
-                          onPress={() => {
-                            setCollectionToEditTags(collection);
-                            setEditTagsValue(
-                              (collection.tags ?? []).map((t) => ({
-                                label: t.label,
-                                color: t.color,
-                              }))
-                            );
-                            onEditTagsOpen();
-                          }}
-                        >
-                          {t("editTags")}
-                        </DropdownItem>
-                      </DropdownMenu>
-                    </Dropdown>
-                  </div>
-                )}
-              </CardBody>
-              <CardFooter className="flex flex-col items-start gap-1 px-3 pt-1 pb-3">
-                <h3 className="font-semibold text-base truncate w-full">
-                  {collection.name}
-                </h3>
-                <div className="flex items-center gap-2">
-                  <Chip
-                    size="sm"
-                    variant="flat"
-                    color={collection.isOwner ? "primary" : "default"}
-                    className="capitalize"
-                  >
-                    {collection.permission}
-                  </Chip>
-                  {!collection.isOwner && (
-                    <Chip size="sm" variant="flat" color="secondary">
-                      {t("shared")}
-                    </Chip>
-                  )}
-                </div>
-              </CardFooter>
-            </Card>
+              thumbnailHeight="h-40"
+              showPermissionChips
+              onRename={
+                collection.isOwner || collection.permission === PERMISSION_COLLABORATOR
+                  ? () => {
+                      setCollectionToRename(collection);
+                      setRenameValue(collection.name);
+                      onRenameOpen();
+                    }
+                  : undefined
+              }
+              onEditTags={
+                collection.isOwner || collection.permission === PERMISSION_COLLABORATOR
+                  ? () => {
+                      setCollectionToEditTags(collection);
+                      setEditTagsValue(
+                        (collection.tags ?? []).map((t) => ({
+                          label: t.label,
+                          color: t.color,
+                        }))
+                      );
+                      onEditTagsOpen();
+                    }
+                  : undefined
+              }
+            />
           ))}
         </div>
       )}
