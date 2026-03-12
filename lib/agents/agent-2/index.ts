@@ -374,11 +374,11 @@ export class Agent2 implements Agent {
       if (Array.isArray(userMsg.content)) {
         userMsg.content.push({
           type: "text",
-          text: "\n\nPlease remember to follow the required format with <TEXT> and <JSON> tags as specified in the system prompt.",
+          text: "\n\nPlease remember to use XML-style tags for all outputs as specified in the system prompt (e.g. <TEXT>, <IMAGE>).",
         });
       } else if (typeof userMsg.content === "string") {
         userMsg.content +=
-          "\n\nPlease remember to follow the required format with <TEXT> and <JSON> tags as specified in the system prompt.";
+          "\n\nPlease remember to use XML-style tags for all outputs as specified in the system prompt (e.g. <TEXT>, <IMAGE>).";
       }
     }
 

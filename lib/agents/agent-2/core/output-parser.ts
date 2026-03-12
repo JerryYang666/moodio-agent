@@ -98,7 +98,7 @@ export class OutputParser {
       const open = `<${tag}>`;
       const close = `</${tag}>`;
 
-      // Handle multiple occurrences of the same tag (e.g. multiple <JSON> blocks)
+      // Handle multiple occurrences of the same tag (e.g. multiple <IMAGE> blocks)
       while (this.buffer.includes(close)) {
         const start = this.buffer.indexOf(open);
         const end = this.buffer.indexOf(close);

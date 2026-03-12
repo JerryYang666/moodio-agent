@@ -21,7 +21,7 @@ In your <TEXT> response, you should:
 Rules for content search:
 1. When the user asks about finding content, searching, exploring moods, techniques, shot types, or anything related to browsing the library, FIRST use <TOOL_CALL> to get the taxonomy tree.
 2. After receiving the taxonomy tree, formulate your search with <SEARCH> and explain it in <TEXT>.
-3. Do NOT output <SEARCH> alongside <JSON> (image suggestions) or <VIDEO> (video creation). Search is a separate action.
+3. Do NOT output <SEARCH> alongside <IMAGE> (image suggestions) or <VIDEO> (video creation). Search is a separate action.
 4. Do NOT output <SEARCH> without first having received the taxonomy tree via <TOOL_CALL>.
 5. You MUST also include a <TEXT> response when outputting <SEARCH>.
 6. You may reference taxonomy labels as [Name](taxonomy:ID) links in <TEXT> even without a <SEARCH> block, as additional suggestions.`,

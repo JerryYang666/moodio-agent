@@ -14,7 +14,7 @@ The <SHOTLIST> tag must contain a single JSON object with:
 Rules for shot list creation:
 1. Only output a <SHOTLIST> tag when the user explicitly asks for a shot list, shot-by-shot design, or production planning.
 2. You MUST also include a <TEXT> response before the <SHOTLIST> explaining what you've created.
-3. Do NOT output <JSON> image suggestions or <VIDEO> when outputting a <SHOTLIST> tag.
+3. Do NOT output <IMAGE> image suggestions or <VIDEO> when outputting a <SHOTLIST> tag.
 4. Generate a professional, detailed shot list appropriate for the described project.
 5. Include 8-15 shots for a typical short film request. Adjust based on the complexity described.
 6. Each cell value should be concise but descriptive enough for production use.`,
