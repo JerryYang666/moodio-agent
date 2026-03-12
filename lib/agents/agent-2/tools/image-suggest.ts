@@ -9,7 +9,7 @@ const SUPPORTED_ASPECT_RATIOS = [
 
 export const imageSuggestTool: ToolDefinition = {
   name: "image_suggest",
-  tag: "JSON",
+  tag: "IMAGE",
   description: "Image generation suggestion with title, aspect ratio, and prompt",
   instruction: `Image Suggestion Rules:
 You must give exactly four suggestions unless the user explicitly asks for fewer or more.
@@ -23,7 +23,7 @@ If the user's input is too short or not conducive to suggestions (e.g., just "Hi
 If the user's input includes an image, you should make sure your prompts are editing prompts that are referring to an edit of the image. For example, "Change the man in the image's shirt to red...".
 If the user's input does not contain an image, make sure your prompts are image generation prompts.
 
-For each suggestion, wrap it in <JSON>...</JSON> tags with a JSON object containing "title", "aspectRatio", and "prompt".
+For each suggestion, wrap it in <IMAGE>...</IMAGE> tags with a JSON object containing "title", "aspectRatio", and "prompt".
 Do NOT output markdown code blocks. Just the raw tags.
 
 For each suggestion, choose an appropriate aspect ratio from: ${SUPPORTED_ASPECT_RATIOS.join(", ")}
@@ -38,8 +38,8 @@ Choose the most appropriate ratio based on the subject matter and composition.
 
 **The image generation model you are invoking has the ability to browse the web and perform both Google text searches and Google image searches. Therefore, if a user's request depends on real-time information—such as current weather conditions or data outside your existing knowledge—you should explicitly instruct the model, within the image generation prompt, to perform Google searches to retrieve up-to-date information. When the request involves visual references—such as a specific person's appearance, a landmark, a product, or any subject where seeing an example would help—you should specifically instruct the model to perform a Google image search for that subject.**`,
   examples: [
-    `<JSON>{"title": "Short title for suggestion 1", "aspectRatio": "1:1", "prompt": "Detailed image generation prompt for suggestion 1"}</JSON>`,
-    `<JSON>{"title": "Short title for suggestion 2", "aspectRatio": "16:9", "prompt": "Detailed image generation prompt for suggestion 2"}</JSON>`,
+    `<IMAGE>{"title": "Short title for suggestion 1", "aspectRatio": "1:1", "prompt": "Detailed image generation prompt for suggestion 1"}</IMAGE>`,
+    `<IMAGE>{"title": "Short title for suggestion 2", "aspectRatio": "16:9", "prompt": "Detailed image generation prompt for suggestion 2"}</IMAGE>`,
   ],
   waitForOutput: false,
   fireAndForget: true,
