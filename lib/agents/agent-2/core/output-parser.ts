@@ -88,49 +88,60 @@ export class OutputParser {
   }
 
   /**
-   * Extract all fully-closed tags from the buffer.
+   * Extract all fully-closed tags from the buffer in document order.
    * Returns an array of parsed tags and advances the buffer past them.
+   *
+   * Tags are found by earliest closing-tag position so that interleaved
+   * tag types (e.g. TEXT, IMAGE, TEXT, IMAGE) are extracted without
+   * dropping content between them.
    */
   extractCompleteTags(): ParsedTag[] {
     const results: ParsedTag[] = [];
 
-    for (const tag of this.validTags) {
-      const open = `<${tag}>`;
-      const close = `</${tag}>`;
+    while (true) {
+      let earliest: { tag: string; start: number; end: number; closeLen: number } | null = null;
 
-      // Handle multiple occurrences of the same tag (e.g. multiple <IMAGE> blocks)
-      while (this.buffer.includes(close)) {
+      for (const tag of this.validTags) {
+        const open = `<${tag}>`;
+        const close = `</${tag}>`;
         const start = this.buffer.indexOf(open);
         const end = this.buffer.indexOf(close);
-        if (start === -1 || end === -1 || start >= end) break;
+        if (start === -1 || end === -1 || start >= end) continue;
 
-        const rawContent = this.buffer.substring(start + open.length, end);
-        const rest = this.buffer.substring(end + close.length);
-
-        const toolDef = this.registry.getByTag(tag);
-        if (!toolDef) break;
-
-        let parsedContent: any;
-        try {
-          if (toolDef.parseContent) {
-            parsedContent = toolDef.parseContent(rawContent);
-          } else {
-            parsedContent = JSON.parse(rawContent);
-          }
-        } catch (e) {
-          // If parsing fails, store the raw content and let the executor handle it
-          parsedContent = rawContent;
+        if (!earliest || start < earliest.start) {
+          earliest = { tag, start, end, closeLen: close.length };
         }
-
-        results.push({
-          toolName: toolDef.name,
-          tag,
-          rawContent,
-          parsedContent,
-        });
-
-        this.buffer = rest;
       }
+
+      if (!earliest) break;
+
+      const open = `<${earliest.tag}>`;
+      const rawContent = this.buffer.substring(earliest.start + open.length, earliest.end);
+      const before = this.buffer.substring(0, earliest.start);
+      const after = this.buffer.substring(earliest.end + earliest.closeLen);
+
+      const toolDef = this.registry.getByTag(earliest.tag);
+      if (!toolDef) break;
+
+      let parsedContent: any;
+      try {
+        if (toolDef.parseContent) {
+          parsedContent = toolDef.parseContent(rawContent);
+        } else {
+          parsedContent = JSON.parse(rawContent);
+        }
+      } catch (e) {
+        parsedContent = rawContent;
+      }
+
+      results.push({
+        toolName: toolDef.name,
+        tag: earliest.tag,
+        rawContent,
+        parsedContent,
+      });
+
+      this.buffer = before + after;
     }
 
     return results;

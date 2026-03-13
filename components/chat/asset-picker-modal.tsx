@@ -633,22 +633,33 @@ export default function AssetPickerModal({
       setIsRecordingVideo(true);
       setRecordingSeconds(0);
 
-      recordingTimerRef.current = setInterval(() => {
-        setRecordingSeconds((prev) => {
-          if (prev + 1 >= MAX_VIDEO_RECORDING_SECONDS) {
-            mediaRecorderRef.current?.stop();
-            if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
-            setIsRecordingVideo(false);
-          }
-          return prev + 1;
-        });
+      const timerId = setInterval(() => {
+        setRecordingSeconds((prev) => prev + 1);
       }, 1000);
+      recordingTimerRef.current = timerId;
     } catch (err) {
       console.error("Video recording error:", err);
       setCameraError(t("assetPicker.cameraAccessDenied"));
       setCameraActive(false);
     }
   }, [t, stopCamera, recordedVideoUrl]);
+
+  // Auto-stop recording when reaching the time limit.
+  // Kept outside the state updater to avoid side effects in pure functions.
+  useEffect(() => {
+    if (recordingSeconds >= MAX_VIDEO_RECORDING_SECONDS && isRecordingVideo) {
+      mediaRecorderRef.current?.stop();
+      if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+      setIsRecordingVideo(false);
+    }
+  }, [recordingSeconds, isRecordingVideo]);
+
+  // Clean up the recording interval on unmount
+  useEffect(() => {
+    return () => {
+      if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+    };
+  }, []);
 
   const stopVideoRecording = useCallback(() => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {

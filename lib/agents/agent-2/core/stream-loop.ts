@@ -275,7 +275,13 @@ export class StreamLoop {
     let loadingPart: MessageContentPart | null = null;
     if (toolDef.createPart) {
       loadingPart = toolDef.createPart(tag.parsedContent, ctx);
-      if (loadingPart) state.finalContent.push(loadingPart);
+      if (loadingPart) {
+        const event = toolDef.createEvent
+          ? toolDef.createEvent(loadingPart, ctx)
+          : { type: "part", part: loadingPart };
+        if (event) ctx.send(event);
+        state.finalContent.push(loadingPart);
+      }
     }
 
     // Get the partial LLM response before the tool call tag

@@ -16,10 +16,10 @@ export class CheckTaxonomyHandler implements ToolHandler {
     const parsed = parsedTag.parsedContent;
 
     // Validate it's actually a CHECK_TAXONOMY call
-    if (typeof parsed === "object" && parsed.tool !== "CHECK_TAXONOMY") {
+    if (typeof parsed !== "object" || parsed === null || parsed.tool !== "CHECK_TAXONOMY") {
       return {
         success: false,
-        error: `Unknown tool call: ${parsed.tool}`,
+        error: `Invalid or unknown tool call: ${typeof parsed === "object" ? parsed?.tool : typeof parsed}`,
       };
     }
 
