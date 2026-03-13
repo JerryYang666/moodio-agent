@@ -31,6 +31,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Dropdown, DropdownTrigger, DropdownMenu, DropdownItem } from "@heroui/dropdown";
 import MenuConfiguration, { MenuState } from "./menu-configuration";
 import { PendingImage, MAX_PENDING_IMAGES } from "./pending-image-types";
+import { PendingVideo, MAX_PENDING_VIDEOS } from "./pending-video-types";
 import {
   ReferenceImage,
   ReferenceImageTag,
@@ -68,6 +69,8 @@ interface ChatInputProps {
   onStopRecording: () => void;
   pendingImages: PendingImage[];
   onRemovePendingImage: (imageId: string) => void;
+  pendingVideos?: PendingVideo[];
+  onRemovePendingVideo?: (videoId: string) => void;
   onOpenAssetPicker: () => void;
   onAssetDrop: (payload: {
     assetId: string;
@@ -132,6 +135,8 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
   onStopRecording,
   pendingImages,
   onRemovePendingImage,
+  pendingVideos = [],
+  onRemovePendingVideo,
   onOpenAssetPicker,
   onAssetDrop,
   onFilesUpload,
@@ -437,10 +442,10 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
 
   // Auto-expand if there are attachments, recording, or video mode
   useEffect(() => {
-    if (pendingImages.length > 0 || isRecording || menuState.mode === "video") {
+    if (pendingImages.length > 0 || pendingVideos.length > 0 || isRecording || menuState.mode === "video") {
       setIsExpanded(true);
     }
-  }, [pendingImages.length, isRecording, menuState.mode]);
+  }, [pendingImages.length, pendingVideos.length, isRecording, menuState.mode]);
 
   // Helper to get source icon for pending image
   const getSourceIcon = (source: PendingImage["source"]) => {
@@ -1218,6 +1223,68 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
                       );
                     }
                   })}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Pending Videos Area */}
+          <AnimatePresence>
+            {isExpanded && menuState.mode !== "video" && pendingVideos.length > 0 && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="px-4 pt-2 overflow-hidden"
+              >
+                <div className="flex gap-2 flex-wrap mb-2">
+                  {pendingVideos.map((vid) => (
+                    <div key={vid.videoId} className="relative w-fit group">
+                      <div className="h-20 w-20 rounded-lg border border-divider overflow-hidden relative bg-black">
+                        {vid.isUploading ? (
+                          <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                            <Spinner size="sm" color="white" />
+                          </div>
+                        ) : (
+                          <video
+                            src={vid.localPreviewUrl || vid.url}
+                            className="w-full h-full object-cover"
+                            muted
+                            playsInline
+                          />
+                        )}
+                        <div className="absolute top-1 left-1 z-10">
+                          <span className="text-[9px] font-semibold bg-danger/90 text-white px-1.5 py-0.5 rounded flex items-center gap-0.5">
+                            <Video size={8} />
+                            {t("chat.videoLabel")}
+                          </span>
+                        </div>
+                        {!vid.isUploading && vid.title && (
+                          <div className="absolute inset-0 bg-linear-to-t from-black/70 to-transparent flex flex-col justify-end p-1">
+                            <span className="text-white text-[10px] leading-tight font-medium line-clamp-1">
+                              {vid.title}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                      {onRemovePendingVideo && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onRemovePendingVideo(vid.videoId);
+                          }}
+                          disabled={vid.isUploading}
+                          className={clsx(
+                            "absolute -top-2 -right-2 bg-default-100 rounded-full p-1 shadow-sm border border-divider z-10",
+                            vid.isUploading ? "opacity-50 cursor-not-allowed" : "hover:bg-default-200"
+                          )}
+                        >
+                          <X size={14} />
+                        </button>
+                      )}
+                    </div>
+                  ))}
                 </div>
               </motion.div>
             )}
