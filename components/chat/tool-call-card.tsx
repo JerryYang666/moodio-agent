@@ -1,7 +1,7 @@
 "use client";
 
 import { Spinner } from "@heroui/spinner";
-import { Check, Search } from "lucide-react";
+import { Check, Search, Video } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 interface ToolCallCardProps {
@@ -9,10 +9,15 @@ interface ToolCallCardProps {
   status: "loading" | "complete" | "error";
 }
 
-const TOOL_LABELS: Record<string, { loading: string; complete: string }> = {
+const TOOL_LABELS: Record<string, { loading: string; complete: string; icon?: "search" | "video" }> = {
   check_taxonomy: {
     loading: "chat.toolCall.checkingTaxonomy",
     complete: "chat.toolCall.taxonomyLoaded",
+  },
+  video_understand: {
+    loading: "chat.toolCall.analyzingVideo",
+    complete: "chat.toolCall.videoAnalyzed",
+    icon: "video",
   },
 };
 
@@ -24,6 +29,8 @@ export default function ToolCallCard({ tool, status }: ToolCallCardProps) {
     ? t(status === "loading" ? labels.loading : labels.complete)
     : tool;
 
+  const ErrorIcon = labels?.icon === "video" ? Video : Search;
+
   return (
     <div className="flex items-center gap-2 text-xs text-default-500 py-1">
       {status === "loading" ? (
@@ -31,7 +38,7 @@ export default function ToolCallCard({ tool, status }: ToolCallCardProps) {
       ) : status === "complete" ? (
         <Check size={14} className="text-success" />
       ) : (
-        <Search size={14} className="text-danger" />
+        <ErrorIcon size={14} className="text-danger" />
       )}
       <span>{label}</span>
     </div>

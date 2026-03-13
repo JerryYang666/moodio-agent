@@ -9,8 +9,14 @@ import {
 import { getAccessToken } from "@/lib/auth/cookies";
 import { verifyAccessToken } from "@/lib/auth/jwt";
 import { and, desc, eq, inArray, isNull, or } from "drizzle-orm";
-import { getImageUrl } from "@/lib/storage/s3";
+import { getImageUrl, getVideoUrl } from "@/lib/storage/s3";
 import { ensureDefaultProject } from "@/lib/db/projects";
+
+function getAssetUrl(asset: { assetType: string; imageId: string; assetId: string }): string {
+  return asset.assetType === "video"
+    ? getVideoUrl(asset.assetId)
+    : getImageUrl(asset.imageId);
+}
 
 function parseLimit(value: string | null, fallback: number) {
   const n = value ? Number(value) : NaN;
@@ -95,7 +101,7 @@ export async function GET(req: NextRequest) {
 
       const assets = pageRows.map((a) => ({
         ...a,
-        imageUrl: getImageUrl(a.imageId),
+        imageUrl: getAssetUrl(a),
       }));
 
       return NextResponse.json({
@@ -133,7 +139,7 @@ export async function GET(req: NextRequest) {
 
       const assets = pageRows.map((a) => ({
         ...a,
-        imageUrl: getImageUrl(a.imageId),
+        imageUrl: getAssetUrl(a),
       }));
 
       return NextResponse.json({
@@ -183,7 +189,7 @@ export async function GET(req: NextRequest) {
     const pageRows = hasMore ? rows.slice(0, limit) : rows;
     const assets = pageRows.map((a) => ({
       ...a,
-      imageUrl: getImageUrl(a.imageId),
+      imageUrl: getAssetUrl(a),
     }));
 
     return NextResponse.json({

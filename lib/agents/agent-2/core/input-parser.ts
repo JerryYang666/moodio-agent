@@ -64,6 +64,12 @@ export class InputParser {
                 text: `[Tool call: ${p.tool} — ${p.status}]`,
               };
             }
+            if (p.type === "video") {
+              return {
+                type: "text" as const,
+                text: `[Video | ID: ${p.videoId} | Source: ${p.source} | URL: ${p.videoUrl}]`,
+              };
+            }
             return p;
           }),
         };
@@ -151,6 +157,12 @@ export class InputParser {
                   },
                 },
               ];
+            }
+            if (p.type === "video") {
+              return [{
+                type: "text" as const,
+                text: `[Video | ID: ${p.videoId} | Source: ${p.source} | URL: ${p.videoUrl}]`,
+              }];
             }
             return [p];
           })

@@ -41,12 +41,22 @@ import {
 } from "./pending-image-types";
 import type { VideoRestoreData } from "@/components/video/video-detail-modal";
 import {
+  PendingVideo,
+  MAX_PENDING_VIDEOS,
+  canAddVideo,
+  hasUploadingVideos,
+} from "./pending-video-types";
+import {
   uploadImage,
   validateFile,
   getMaxFileSizeMB,
   shouldCompressFile,
   getCompressThresholdMB,
 } from "@/lib/upload/client";
+import {
+  uploadVideo,
+  validateVideoFile,
+} from "@/lib/upload/video-client";
 import {
   saveChatDraft,
   loadChatDraft,
@@ -257,6 +267,8 @@ export default function ChatInterface({
   >(null);
   // Unified pending images array - replaces selectedFile, previewUrl, selectedAsset, selectedAgentPart
   const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
+  // Pending videos array (max 1 video, combined limit with images is 10)
+  const [pendingVideos, setPendingVideos] = useState<PendingVideo[]>([]);
   const [isAssetPickerOpen, setIsAssetPickerOpen] = useState(false);
   const toggleAssetPicker = useCallback(() => setIsAssetPickerOpen((v) => !v), []);
   // Track which picker mode is active: "pending" for regular images, "reference" for reference images
@@ -450,6 +462,10 @@ export default function ChatInterface({
         if (img.localPreviewUrl) URL.revokeObjectURL(img.localPreviewUrl);
       });
       setPendingImages([]);
+      pendingVideos.forEach((vid) => {
+        if (vid.localPreviewUrl) URL.revokeObjectURL(vid.localPreviewUrl);
+      });
+      setPendingVideos([]);
       setPrecisionEditing(false);
       setIsSending(false);
       setLoadedDraft(null);
@@ -879,6 +895,132 @@ export default function ChatInterface({
     [menuState]
   );
 
+  // Upload and add video files
+  const uploadAndAddVideos = useCallback(
+    async (files: File[]) => {
+      for (const file of files) {
+        const validationError = validateVideoFile(file);
+        if (validationError) {
+          addToast({
+            title: validationError.code === "FILE_TOO_LARGE"
+              ? t("chat.fileSizeTooLarge", { maxSize: siteConfig.upload.maxFileSizeMB })
+              : t("chat.uploadFailed"),
+            color: "danger",
+          });
+          return;
+        }
+      }
+
+      if (pendingVideos.length + files.length > MAX_PENDING_VIDEOS) {
+        addToast({
+          title: t("chat.maxVideosReached", { max: MAX_PENDING_VIDEOS }),
+          color: "warning",
+        });
+        return;
+      }
+
+      const combinedCount = pendingImages.length + pendingVideos.length + files.length;
+      if (combinedCount > MAX_PENDING_IMAGES) {
+        addToast({
+          title: t("chat.tooManyAttachments"),
+          color: "warning",
+        });
+        return;
+      }
+
+      const entries = files.map((file) => {
+        const tempId = `uploading-video-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const localPreviewUrl = URL.createObjectURL(file);
+        const placeholder: PendingVideo = {
+          videoId: tempId,
+          url: localPreviewUrl,
+          source: "upload",
+          title: file.name,
+          isUploading: true,
+          localPreviewUrl,
+        };
+        return { file, tempId, localPreviewUrl, placeholder };
+      });
+
+      setPendingVideos((prev) => [...prev, ...entries.map((e) => e.placeholder)]);
+
+      await Promise.all(
+        entries.map(async ({ file, tempId, localPreviewUrl }) => {
+          const result = await uploadVideo(file);
+
+          if (result.success) {
+            setPendingVideos((prev) =>
+              prev.map((v) =>
+                v.videoId === tempId
+                  ? {
+                    ...v,
+                    videoId: result.data.videoId,
+                    url: result.data.videoUrl,
+                    isUploading: false,
+                    localPreviewUrl: undefined,
+                  }
+                  : v
+              )
+            );
+            URL.revokeObjectURL(localPreviewUrl);
+          } else {
+            console.error("Video upload failed:", result.error);
+            setPendingVideos((prev) => prev.filter((v) => v.videoId !== tempId));
+            URL.revokeObjectURL(localPreviewUrl);
+            addToast({ title: t("chat.uploadFailed"), color: "danger" });
+          }
+        })
+      );
+    },
+    [pendingImages.length, pendingVideos, t]
+  );
+
+  // Remove a pending video
+  const removePendingVideo = useCallback(
+    (videoId: string) => {
+      setPendingVideos((prev) => {
+        const vid = prev.find((v) => v.videoId === videoId);
+        if (vid?.localPreviewUrl) URL.revokeObjectURL(vid.localPreviewUrl);
+        return prev.filter((v) => v.videoId !== videoId);
+      });
+    },
+    []
+  );
+
+  // Add a retrieval video from the browse page
+  const addRetrievalVideo = useCallback(
+    (contentId: number, storageKey: string, url: string) => {
+      if (!canAddVideo(pendingVideos)) {
+        addToast({
+          title: t("chat.maxVideosReached", { max: MAX_PENDING_VIDEOS }),
+          color: "warning",
+        });
+        return;
+      }
+
+      const newVideo: PendingVideo = {
+        videoId: String(contentId),
+        url,
+        source: "retrieval",
+      };
+      setPendingVideos((prev) => [...prev, newVideo]);
+    },
+    [pendingVideos, t]
+  );
+
+  // Listen for "learn from this video" events from the browse page
+  useEffect(() => {
+    const handleLearnFromVideo = (e: Event) => {
+      const { contentId, storageKey, videoUrl } = (e as CustomEvent).detail;
+      if (contentId && videoUrl) {
+        addRetrievalVideo(Number(contentId), storageKey, videoUrl);
+      }
+    };
+
+    window.addEventListener("learn-from-video", handleLearnFromVideo);
+    return () => window.removeEventListener("learn-from-video", handleLearnFromVideo);
+  }, [addRetrievalVideo]);
+
   // Add an asset from the library to pending images
   const addAssetImage = useCallback(
     (asset: {
@@ -1116,6 +1258,22 @@ export default function ChatInterface({
   );
 
   // Get the appropriate upload handler based on asset picker mode
+  // Unified file upload handler that routes video vs image files
+  const handleFilesUpload = useCallback(
+    async (files: File[]) => {
+      const videoTypes = siteConfig.upload.allowedVideoTypes;
+      const videoFiles = files.filter((f) => videoTypes.includes(f.type));
+      const imageFiles = files.filter((f) => !videoTypes.includes(f.type));
+      if (videoFiles.length > 0) {
+        await uploadAndAddVideos(videoFiles);
+      }
+      if (imageFiles.length > 0) {
+        await uploadAndAddImages(imageFiles);
+      }
+    },
+    [uploadAndAddImages, uploadAndAddVideos]
+  );
+
   const handleAssetUpload = useCallback(
     async (files: File[]) => {
       if (assetPickerMode === "reference") {
@@ -1123,10 +1281,10 @@ export default function ChatInterface({
           await uploadAndAddReferenceImage(file);
         }
       } else {
-        await uploadAndAddImages(files);
+        await handleFilesUpload(files);
       }
     },
-    [assetPickerMode, uploadAndAddImages, uploadAndAddReferenceImage]
+    [assetPickerMode, handleFilesUpload, uploadAndAddReferenceImage]
   );
 
   // Listen for asset selection events from the hover sidebar
@@ -1183,14 +1341,23 @@ export default function ChatInterface({
   const handleAssetPicked = useCallback(
     (asset: AssetSummary) => {
       if (assetPickerMode === "reference") {
-        // Add to reference images with default tag "subject"
         addReferenceImage({
           imageId: asset.imageId,
           url: asset.imageUrl,
           title: asset.generationDetails?.title || t("chat.selectedAsset"),
         }, "subject");
+      } else if (asset.assetType === "video") {
+        if (!canAddVideo(pendingVideos)) {
+          addToast({ title: t("chat.maxVideosReached", { max: MAX_PENDING_VIDEOS }), color: "warning" });
+          return;
+        }
+        setPendingVideos((prev) => [...prev, {
+          videoId: asset.assetId || asset.imageId,
+          url: asset.imageUrl,
+          source: "library",
+          title: asset.generationDetails?.title || t("chat.selectedAsset"),
+        }]);
       } else {
-        // Add to pending images
         addAssetImage({
           assetId: asset.id,
           url: asset.imageUrl,
@@ -1199,13 +1366,16 @@ export default function ChatInterface({
         });
       }
     },
-    [addAssetImage, addReferenceImage, assetPickerMode, t]
+    [addAssetImage, addReferenceImage, assetPickerMode, pendingVideos, t]
   );
 
   const pendingImagesRef = useRef(pendingImages);
   pendingImagesRef.current = pendingImages;
   const referenceImagesRef = useRef(referenceImages);
   referenceImagesRef.current = referenceImages;
+
+  const pendingVideosRef = useRef(pendingVideos);
+  pendingVideosRef.current = pendingVideos;
 
   const handleAssetPickedMultiple = useCallback(
     (assets: AssetSummary[]) => {
@@ -1220,13 +1390,23 @@ export default function ChatInterface({
         }
       } else {
         for (const asset of assets) {
-          if (!canAddImage(pendingImagesRef.current)) break;
-          addAssetImage({
-            assetId: asset.id,
-            url: asset.imageUrl,
-            title: asset.generationDetails?.title || t("chat.selectedAsset"),
-            imageId: asset.imageId,
-          });
+          if (asset.assetType === "video") {
+            if (!canAddVideo(pendingVideosRef.current)) continue;
+            setPendingVideos((prev) => [...prev, {
+              videoId: asset.assetId || asset.imageId,
+              url: asset.imageUrl,
+              source: "library" as const,
+              title: asset.generationDetails?.title || t("chat.selectedAsset"),
+            }]);
+          } else {
+            if (!canAddImage(pendingImagesRef.current)) break;
+            addAssetImage({
+              assetId: asset.id,
+              url: asset.imageUrl,
+              title: asset.generationDetails?.title || t("chat.selectedAsset"),
+              imageId: asset.imageId,
+            });
+          }
         }
       }
     },
@@ -1372,8 +1552,8 @@ export default function ChatInterface({
   }, []);
 
   const handleSend = async () => {
-    // Block send if uploading images or no content
-    if (hasUploadingImages(pendingImages)) {
+    // Block send if uploading images or videos
+    if (hasUploadingImages(pendingImages) || hasUploadingVideos(pendingVideos)) {
       addToast({
         title: t("chat.waitForUpload"),
         color: "warning",
@@ -1382,7 +1562,7 @@ export default function ChatInterface({
     }
 
     if (
-      (!input.trim() && pendingImages.length === 0) ||
+      (!input.trim() && pendingImages.length === 0 && pendingVideos.length === 0) ||
       isSending ||
       isRecording ||
       isTranscribing
@@ -1414,19 +1594,18 @@ export default function ChatInterface({
     lastPendingImagesRef.current = [...pendingImages];
     lastEditorContentRef.current = chatInputRef.current?.getEditorJSON() || null;
 
-    // Capture current pending images before clearing
+    // Capture current pending images and videos before clearing
     const currentPendingImages = [...pendingImages];
+    const currentPendingVideos = [...pendingVideos];
 
-    // Build optimistic message content with image metadata for display and pre-select
+    // Build optimistic message content with image/video metadata for display and pre-select
     const optimisticContent: Message["content"] =
-      currentPendingImages.length > 0
+      currentPendingImages.length > 0 || currentPendingVideos.length > 0
         ? (() => {
           const parts: MessageContentPart[] = [];
           if (currentInput) {
             parts.push({ type: "text", text: currentInput });
           }
-          // Add images to the optimistic content with full metadata
-          // This ensures pre-select works correctly after AI response
           for (const img of currentPendingImages) {
             parts.push({
               type: "image",
@@ -1434,6 +1613,14 @@ export default function ChatInterface({
               imageUrl: img.url,
               source: img.source,
               title: img.title,
+            });
+          }
+          for (const vid of currentPendingVideos) {
+            parts.push({
+              type: "video",
+              videoId: vid.videoId,
+              source: vid.source as "retrieval" | "upload" | "library" | "ai_generated",
+              videoUrl: vid.url,
             });
           }
           return parts;
@@ -1492,9 +1679,10 @@ export default function ChatInterface({
 
     setMessages(optimisticMessages);
 
-    // Clear input and pending images
+    // Clear input and pending images/videos
     setInput("");
     setPendingImages([]);
+    setPendingVideos([]);
     setPrecisionEditing(false);
     
     // Clear the draft since we're sending the message
@@ -1568,6 +1756,12 @@ export default function ChatInterface({
           imageId: img.imageId,
           tag: img.tag,
           title: img.title,
+        })),
+        // Include video sources
+        videoSources: currentPendingVideos.map((vid) => ({
+          videoId: vid.videoId,
+          source: vid.source,
+          videoUrl: vid.url,
         })),
       };
 
@@ -2818,9 +3012,11 @@ export default function ChatInterface({
         onStopRecording={stopRecording}
         pendingImages={pendingImages}
         onRemovePendingImage={removePendingImage}
+        pendingVideos={pendingVideos}
+        onRemovePendingVideo={removePendingVideo}
         onOpenAssetPicker={openPendingImagePicker}
         onAssetDrop={handleAssetDrop}
-        onFilesUpload={uploadAndAddImages}
+        onFilesUpload={handleFilesUpload}
         showFileUpload={true}
         precisionEditing={precisionEditing}
         onPrecisionEditingChange={handlePrecisionEditingChange}

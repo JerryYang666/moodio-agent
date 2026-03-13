@@ -56,6 +56,15 @@ export class StreamLoop {
 
     await this.consumeStream(llmStream, state, ctx, preparedMessages, maxSuggestions);
 
+    // If the LLM stopped mid-tag, close it and process the rescued tag
+    if (this.outputParser.closeUnclosedTag()) {
+      console.log("[Agent-2] Closed unclosed tag at end of stream");
+      const rescued = this.outputParser.extractCompleteTags();
+      for (const tag of rescued) {
+        await this.handleTag(tag, state, ctx, preparedMessages, maxSuggestions);
+      }
+    }
+
     // Wait for all background tasks (e.g. image generation) to complete
     await Promise.all(state.asyncTasks);
 
