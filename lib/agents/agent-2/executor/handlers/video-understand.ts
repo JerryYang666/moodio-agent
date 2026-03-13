@@ -60,7 +60,7 @@ export class VideoUnderstandHandler implements ToolHandler {
         }
 
         const uploadedFile = await ai.files.upload({
-          file: new Blob([videoBuffer], { type: "video/mp4" }),
+          file: new Blob([new Uint8Array(videoBuffer)], { type: "video/mp4" }),
           config: { mimeType: "video/mp4" },
         });
 

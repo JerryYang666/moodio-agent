@@ -6,7 +6,7 @@ import {
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/cloudfront-signer";
 import { getSignedUrl as getS3SignedUrl } from "@aws-sdk/s3-request-presigner";
-import { Message } from "@/lib/llm/types";
+import { Message, MessageContentPart } from "@/lib/llm/types";
 import { randomUUID } from "crypto";
 import { siteConfig } from "@/config/site";
 import { compressImageIfNeeded } from "@/lib/image/compress";
@@ -185,15 +185,14 @@ function stripDerivedUrls(messages: Message[]): Message[] {
         };
       }
       if (part.type === "video" && "videoUrl" in part) {
-        const { videoUrl, ...rest } = part;
-        return rest;
+        return { ...part, videoUrl: "" };
       }
       return part;
     });
 
     return {
       ...message,
-      content: strippedContent,
+      content: strippedContent as MessageContentPart[],
     };
   });
 }

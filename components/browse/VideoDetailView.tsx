@@ -183,7 +183,7 @@ export function VideoDetailView({
                   onPress={isLearnAction && onLearnFromVideo ? () => {
                     onLearnFromVideo({
                       contentId: Number(selectedPhoto.id),
-                      storageKey: selectedPhoto.id,
+                      storageKey: String(selectedPhoto.id),
                       videoUrl: selectedPhoto.src,
                     });
                   } : undefined}
