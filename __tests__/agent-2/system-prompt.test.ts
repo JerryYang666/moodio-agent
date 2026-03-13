@@ -86,7 +86,7 @@ describe("SystemPromptConstructor", () => {
     const constructor = createConstructor();
     const prompt = constructor.build();
 
-    expect(prompt).toContain("<JSON>");
+    expect(prompt).toContain("<IMAGE>");
     expect(prompt).toContain("aspectRatio");
     expect(prompt).toContain("prompt");
   });
