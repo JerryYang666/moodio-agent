@@ -2,7 +2,7 @@ import { GoogleGenAI, createPartFromUri } from "@google/genai";
 import { ToolHandler, ToolResult } from "../tool-executor";
 import { ParsedTag } from "../../core/output-parser";
 import { RequestContext } from "../../context";
-import { downloadVideo, getSignedVideoUrl } from "@/lib/storage/s3";
+import { downloadVideo, checkVideoExists } from "@/lib/storage/s3";
 
 export class VideoUnderstandHandler implements ToolHandler {
   async execute(parsedTag: ParsedTag, ctx: RequestContext): Promise<ToolResult> {
@@ -44,14 +44,21 @@ export class VideoUnderstandHandler implements ToolHandler {
         ];
       } else {
         let videoBuffer: Buffer | null = null;
+        let mimeType = "video/mp4";
 
         if (source === "retrieval" && videoUrl) {
           const response = await fetch(videoUrl);
           if (!response.ok) {
             throw new Error(`Failed to fetch retrieval video: ${response.status}`);
           }
+          const contentType = response.headers.get("content-type");
+          if (contentType) mimeType = contentType.split(";")[0].trim();
           videoBuffer = Buffer.from(await response.arrayBuffer());
         } else if (videoId) {
+          const meta = await checkVideoExists(videoId);
+          if (meta.exists && meta.contentType) {
+            mimeType = meta.contentType;
+          }
           videoBuffer = await downloadVideo(videoId);
         }
 
@@ -60,8 +67,8 @@ export class VideoUnderstandHandler implements ToolHandler {
         }
 
         const uploadedFile = await ai.files.upload({
-          file: new Blob([new Uint8Array(videoBuffer)], { type: "video/mp4" }),
-          config: { mimeType: "video/mp4" },
+          file: new Blob([new Uint8Array(videoBuffer)], { type: mimeType }),
+          config: { mimeType },
         });
 
         if (!uploadedFile.uri || !uploadedFile.mimeType) {
