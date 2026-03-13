@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAccessToken } from "@/lib/auth/cookies";
 import { verifyAccessToken } from "@/lib/auth/jwt";
 import { getSystemPrompt } from "@/lib/agents/system-prompts";
+import { agent2 } from "@/lib/agents/agent-2";
 
 export async function GET(request: NextRequest) {
   const accessToken = getAccessToken(request);
@@ -15,9 +16,14 @@ export async function GET(request: NextRequest) {
   }
 
   const searchParams = request.nextUrl.searchParams;
-  const agentId = searchParams.get("agentId") || "agent-1";
+  const agentId = searchParams.get("agentId") || "agent-2";
 
-  const prompt = getSystemPrompt(agentId);
+  let prompt: string;
+  if (agentId === "agent-2") {
+    prompt = agent2.getDefaultSystemPrompt();
+  } else {
+    prompt = getSystemPrompt(agentId);
+  }
 
   return NextResponse.json({ prompt });
 }

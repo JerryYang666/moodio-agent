@@ -1,0 +1,175 @@
+import { ToolRegistry } from "../tools/registry";
+
+/**
+ * Represents a fully parsed XML tag from the LLM output.
+ */
+export interface ParsedTag {
+  toolName: string;
+  tag: string;
+  rawContent: string;
+  parsedContent: any;
+}
+
+/**
+ * Registry-driven tag parser that replaces the hardcoded VALID_TAGS array
+ * and individual parse functions from Agent 1.
+ *
+ * Uses the tool registry to know which tags to look for, making it
+ * automatically aware of newly registered tools.
+ */
+export class OutputParser {
+  private buffer: string = "";
+  private validTags: string[];
+
+  constructor(private registry: ToolRegistry) {
+    this.validTags = registry.getAllTags();
+  }
+
+  /** Feed a new chunk of LLM output into the parser. */
+  feed(chunk: string): void {
+    this.buffer += chunk;
+  }
+
+  /** Get the current buffer contents (for external inspection). */
+  getBuffer(): string {
+    return this.buffer;
+  }
+
+  /** Replace the buffer (used after tag extraction or tool call restart). */
+  setBuffer(newBuffer: string): void {
+    this.buffer = newBuffer;
+  }
+
+  /**
+   * Validate that no non-whitespace text appears outside known XML tags.
+   * Throws if invalid content is found.
+   * Ported from parse-agent-output.ts validateBufferTags().
+   */
+  validateBuffer(): void {
+    let insideTag = false;
+    let inAngleBrackets = false;
+    let i = 0;
+
+    while (i < this.buffer.length) {
+      const remaining = this.buffer.substring(i);
+
+      let tagMatched = false;
+      for (const tag of this.validTags) {
+        const open = `<${tag}>`;
+        const close = `</${tag}>`;
+        if (remaining.startsWith(open)) {
+          insideTag = true;
+          i += open.length;
+          tagMatched = true;
+          break;
+        }
+        if (remaining.startsWith(close)) {
+          insideTag = false;
+          i += close.length;
+          tagMatched = true;
+          break;
+        }
+      }
+      if (tagMatched) continue;
+
+      const char = this.buffer[i];
+      if (char === "<") {
+        inAngleBrackets = true;
+      } else if (char === ">") {
+        inAngleBrackets = false;
+      } else if (!insideTag && !inAngleBrackets && char.trim() !== "") {
+        throw new Error(
+          `Invalid LLM response: text outside tags at position ${i}`
+        );
+      }
+
+      i++;
+    }
+  }
+
+  /**
+   * Extract all fully-closed tags from the buffer in document order.
+   * Returns an array of parsed tags and advances the buffer past them.
+   *
+   * Tags are found by earliest closing-tag position so that interleaved
+   * tag types (e.g. TEXT, IMAGE, TEXT, IMAGE) are extracted without
+   * dropping content between them.
+   */
+  extractCompleteTags(): ParsedTag[] {
+    const results: ParsedTag[] = [];
+
+    while (true) {
+      let earliest: { tag: string; start: number; end: number; closeLen: number } | null = null;
+
+      for (const tag of this.validTags) {
+        const open = `<${tag}>`;
+        const close = `</${tag}>`;
+        const start = this.buffer.indexOf(open);
+        const end = this.buffer.indexOf(close);
+        if (start === -1 || end === -1 || start >= end) continue;
+
+        if (!earliest || start < earliest.start) {
+          earliest = { tag, start, end, closeLen: close.length };
+        }
+      }
+
+      if (!earliest) break;
+
+      const open = `<${earliest.tag}>`;
+      const rawContent = this.buffer.substring(earliest.start + open.length, earliest.end);
+      const before = this.buffer.substring(0, earliest.start);
+      const after = this.buffer.substring(earliest.end + earliest.closeLen);
+
+      const toolDef = this.registry.getByTag(earliest.tag);
+      if (!toolDef) break;
+
+      let parsedContent: any;
+      try {
+        if (toolDef.parseContent) {
+          parsedContent = toolDef.parseContent(rawContent);
+        } else {
+          parsedContent = JSON.parse(rawContent);
+        }
+      } catch (e) {
+        parsedContent = rawContent;
+      }
+
+      results.push({
+        toolName: toolDef.name,
+        tag: earliest.tag,
+        rawContent,
+        parsedContent,
+      });
+
+      this.buffer = before + after;
+    }
+
+    return results;
+  }
+
+  /**
+   * Check if a specific tag's opening tag is present in the buffer
+   * (even if the closing tag hasn't arrived yet).
+   */
+  hasOpenTag(tag: string): boolean {
+    return this.buffer.includes(`<${tag}>`);
+  }
+
+  /**
+   * If the buffer contains an open tag without a matching close tag,
+   * append the closing tag. Called once at the end of the final stream
+   * to recover from the LLM stopping mid-tag.
+   * @returns true if a closing tag was appended
+   */
+  closeUnclosedTag(): boolean {
+    for (const tag of this.validTags) {
+      const open = `<${tag}>`;
+      const close = `</${tag}>`;
+      if (this.buffer.includes(open) && !this.buffer.includes(close)) {
+        this.buffer += close;
+        return true;
+      }
+    }
+    return false;
+  }
+}

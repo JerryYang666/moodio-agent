@@ -9,7 +9,7 @@ import { Wrench } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 
 // Local storage key - must match what is used in ChatInterface
-export const SYSTEM_PROMPT_STORAGE_KEY = "agent-1_systemPromptOverride";
+export const SYSTEM_PROMPT_STORAGE_KEY = "agent-2_systemPromptOverride";
 
 export function TestKit() {
   const { user } = useAuth();
@@ -40,7 +40,7 @@ export function TestKit() {
   const fetchDefaultPrompt = async () => {
     setIsLoading(true);
     try {
-      const res = await fetch("/api/admin/system-prompt?agentId=agent-1");
+      const res = await fetch("/api/admin/system-prompt?agentId=agent-2");
       if (res.ok) {
         const data = await res.json();
         setPrompt(data.prompt);

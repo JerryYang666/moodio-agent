@@ -90,6 +90,12 @@ export type MessageContentPart =
       status: "pending" | "executed";
     }
   | {
+      type: "video";
+      videoId: string;
+      source: "retrieval" | "upload" | "library" | "ai_generated";
+      videoUrl: string;
+    }
+  | {
       type: "tool_call";
       tool: string;
       status: "loading" | "complete" | "error";

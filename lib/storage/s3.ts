@@ -6,7 +6,7 @@ import {
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/cloudfront-signer";
 import { getSignedUrl as getS3SignedUrl } from "@aws-sdk/s3-request-presigner";
-import { Message } from "@/lib/llm/types";
+import { Message, MessageContentPart } from "@/lib/llm/types";
 import { randomUUID } from "crypto";
 import { siteConfig } from "@/config/site";
 import { compressImageIfNeeded } from "@/lib/image/compress";
@@ -184,12 +184,19 @@ function stripDerivedUrls(messages: Message[]): Message[] {
           config: cleanConfig,
         };
       }
+      if (part.type === "video") {
+        if (part.source === "retrieval") {
+          return part;
+        }
+        const { videoUrl, ...rest } = part;
+        return { ...rest, videoUrl: "" };
+      }
       return part;
     });
 
     return {
       ...message,
-      content: strippedContent,
+      content: strippedContent as MessageContentPart[],
     };
   });
 }
@@ -259,6 +266,15 @@ function addDerivedUrls(messages: Message[]): Message[] {
             : undefined,
           videoUrl: part.videoId ? getVideoUrl(part.videoId) : undefined,
           signedVideoUrl: part.videoId ? getSignedVideoUrl(part.videoId) : undefined,
+        };
+      }
+      if (part.type === "video" && "videoId" in part) {
+        if (part.source === "retrieval") {
+          return part;
+        }
+        return {
+          ...part,
+          videoUrl: getVideoUrl(part.videoId),
         };
       }
       return part;
@@ -408,6 +424,56 @@ export function getSignedImageUrl(
 // ============================================================================
 // Video Storage Functions
 // ============================================================================
+
+/**
+ * Generate a presigned URL for direct client-to-S3 video upload
+ */
+export async function getPresignedVideoUploadUrl(
+  videoId: string,
+  contentType: string,
+  contentLength: number,
+  expiresIn: number = 300
+): Promise<string> {
+  const key = `videos/${videoId}`;
+
+  const command = new PutObjectCommand({
+    Bucket: BUCKET_NAME,
+    Key: key,
+    ContentType: contentType,
+    ContentLength: contentLength,
+  });
+
+  return await getS3SignedUrl(s3Client, command, { expiresIn });
+}
+
+/**
+ * Check if a video exists in S3
+ */
+export async function checkVideoExists(
+  videoId: string
+): Promise<{ exists: boolean; contentType?: string; contentLength?: number }> {
+  const key = `videos/${videoId}`;
+
+  try {
+    const response = await s3Client.send(
+      new HeadObjectCommand({
+        Bucket: BUCKET_NAME,
+        Key: key,
+      })
+    );
+
+    return {
+      exists: true,
+      contentType: response.ContentType,
+      contentLength: response.ContentLength,
+    };
+  } catch (error: any) {
+    if (error.name === "NotFound" || error.$metadata?.httpStatusCode === 404) {
+      return { exists: false };
+    }
+    throw error;
+  }
+}
 
 /**
  * Generate a unique video ID for tracking purposes

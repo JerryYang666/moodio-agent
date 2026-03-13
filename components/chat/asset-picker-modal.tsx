@@ -16,7 +16,7 @@ import { Select, SelectItem } from "@heroui/select";
 import { Input } from "@heroui/input";
 import { Image } from "@heroui/image";
 import { Tab, Tabs } from "@heroui/tabs";
-import { Search, Expand, Camera, Star, X, Check } from "lucide-react";
+import { Search, Expand, Camera, Star, X, Check, Video } from "lucide-react";
 import { siteConfig } from "@/config/site";
 import { useGetCollectionsQuery } from "@/lib/redux/services/next-api";
 
@@ -25,7 +25,10 @@ export type AssetSummary = {
   projectId: string;
   collectionId: string | null;
   imageId: string;
+  assetId?: string;
   imageUrl: string;
+  videoUrl?: string;
+  assetType?: "image" | "video";
   chatId: string | null;
   generationDetails: {
     title: string;
@@ -89,6 +92,15 @@ const AssetGridItem = React.memo(function AssetGridItem({
             }}
           />
         </button>
+
+        {/* Video badge */}
+        {asset.assetType === "video" && (
+          <div className="absolute bottom-8 right-1.5 z-10">
+            <span className="text-[9px] font-semibold bg-danger/90 text-white px-1.5 py-0.5 rounded flex items-center gap-0.5">
+              <Video size={8} />
+            </span>
+          </div>
+        )}
 
         {/* Selection checkbox overlay */}
         {multiSelect && (
@@ -363,6 +375,16 @@ export default function AssetPickerModal({
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
 
+  // Video recording state
+  const [cameraMode, setCameraMode] = useState<"photo" | "video">("photo");
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordedChunksRef = useRef<Blob[]>([]);
+  const [isRecordingVideo, setIsRecordingVideo] = useState(false);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [recordedVideoUrl, setRecordedVideoUrl] = useState<string | null>(null);
+  const MAX_VIDEO_RECORDING_SECONDS = 15;
+
   useEffect(() => {
     if (!isOpen) {
       setPreviewAsset(null);
@@ -374,6 +396,12 @@ export default function AssetPickerModal({
       setLoadingMoreAssets(false);
       stopCamera();
       setCapturedPhoto(null);
+      setCameraMode("photo");
+      setIsRecordingVideo(false);
+      setRecordingSeconds(0);
+      if (recordedVideoUrl) URL.revokeObjectURL(recordedVideoUrl);
+      setRecordedVideoUrl(null);
+      if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
       return;
     }
     setTabKey(hideLibraryTab ? "upload" : "library");
@@ -400,6 +428,11 @@ export default function AssetPickerModal({
     if (tabKey !== "camera") {
       stopCamera();
       setCapturedPhoto(null);
+      setIsRecordingVideo(false);
+      setRecordingSeconds(0);
+      if (recordedVideoUrl) URL.revokeObjectURL(recordedVideoUrl);
+      setRecordedVideoUrl(null);
+      if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
     }
   }, [tabKey]);
 
@@ -550,6 +583,97 @@ export default function AssetPickerModal({
     [capturedPhoto, onUpload]
   );
 
+  // Video recording functions
+  const startVideoRecording = useCallback(async () => {
+    setCameraError(null);
+    if (recordedVideoUrl) {
+      URL.revokeObjectURL(recordedVideoUrl);
+      setRecordedVideoUrl(null);
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: true,
+      });
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+      }
+      setCameraActive(true);
+
+      const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9")
+        ? "video/webm;codecs=vp9"
+        : "video/webm";
+      const recorder = new MediaRecorder(stream, { mimeType });
+      mediaRecorderRef.current = recorder;
+      recordedChunksRef.current = [];
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) recordedChunksRef.current.push(e.data);
+      };
+
+      recorder.onstop = () => {
+        const blob = new Blob(recordedChunksRef.current, { type: "video/webm" });
+        const url = URL.createObjectURL(blob);
+        setRecordedVideoUrl(url);
+        stopCamera();
+      };
+
+      recorder.start(100);
+      setIsRecordingVideo(true);
+      setRecordingSeconds(0);
+
+      const timerId = setInterval(() => {
+        setRecordingSeconds((prev) => prev + 1);
+      }, 1000);
+      recordingTimerRef.current = timerId;
+    } catch (err) {
+      console.error("Video recording error:", err);
+      setCameraError(t("assetPicker.cameraAccessDenied"));
+      setCameraActive(false);
+    }
+  }, [t, stopCamera, recordedVideoUrl]);
+
+  // Auto-stop recording when reaching the time limit.
+  // Kept outside the state updater to avoid side effects in pure functions.
+  useEffect(() => {
+    if (recordingSeconds >= MAX_VIDEO_RECORDING_SECONDS && isRecordingVideo) {
+      mediaRecorderRef.current?.stop();
+      if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+      setIsRecordingVideo(false);
+    }
+  }, [recordingSeconds, isRecordingVideo]);
+
+  // Clean up the recording interval on unmount
+  useEffect(() => {
+    return () => {
+      if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+    };
+  }, []);
+
+  const stopVideoRecording = useCallback(() => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      mediaRecorderRef.current.stop();
+    }
+    if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+    setIsRecordingVideo(false);
+  }, []);
+
+  const useRecordedVideo = useCallback(
+    async (onClose: () => void) => {
+      if (!recordedVideoUrl) return;
+      const res = await fetch(recordedVideoUrl);
+      const blob = await res.blob();
+      const file = new File([blob], `recording-${Date.now()}.webm`, { type: "video/webm" });
+      onUpload([file]);
+      URL.revokeObjectURL(recordedVideoUrl);
+      setRecordedVideoUrl(null);
+      onClose();
+    },
+    [recordedVideoUrl, onUpload]
+  );
+
   // Keep filteredAssets in a ref so handleAssetClick doesn't depend on it
   const filteredAssetsRef = useRef(filteredAssets);
   filteredAssetsRef.current = filteredAssets;
@@ -644,75 +768,169 @@ export default function AssetPickerModal({
                 {tabKey === "camera" ? (
                   /* ── Camera Tab ── */
                   <div className="flex flex-col gap-4 items-center">
+                    {/* Photo / Video mode toggle */}
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant={cameraMode === "photo" ? "solid" : "flat"}
+                        color={cameraMode === "photo" ? "primary" : "default"}
+                        onPress={() => { setCameraMode("photo"); stopVideoRecording(); }}
+                      >
+                        {t("assetPicker.photoMode")}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={cameraMode === "video" ? "solid" : "flat"}
+                        color={cameraMode === "video" ? "danger" : "default"}
+                        onPress={() => { setCameraMode("video"); setCapturedPhoto(null); }}
+                      >
+                        {t("assetPicker.videoMode")}
+                      </Button>
+                    </div>
+
                     {cameraError && (
                       <div className="text-sm text-danger text-center py-4">
                         {cameraError}
                       </div>
                     )}
 
-                    {capturedPhoto ? (
-                      /* Show captured photo preview */
-                      <div className="flex flex-col items-center gap-4 w-full">
-                        <div className="relative rounded-lg overflow-hidden border border-divider max-w-lg w-full">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={capturedPhoto}
-                            alt={t("assetPicker.capturedPhoto")}
-                            className="w-full h-auto"
-                          />
-                        </div>
-                        <div className="flex gap-2">
-                          <Button
-                            variant="flat"
-                            onPress={() => {
-                              setCapturedPhoto(null);
-                              startCamera();
-                            }}
-                          >
-                            {t("assetPicker.retakePhoto")}
-                          </Button>
-                          <Button
-                            color="primary"
-                            onPress={() => useCapturedPhoto(onClose)}
-                          >
-                            {t("assetPicker.usePhoto")}
-                          </Button>
-                        </div>
-                      </div>
-                    ) : (
-                      /* Camera viewfinder */
-                      <div className="flex flex-col items-center gap-4 w-full">
-                        <div className="relative rounded-lg overflow-hidden border border-divider bg-black max-w-lg w-full aspect-video">
-                          <video
-                            ref={videoRef}
-                            autoPlay
-                            playsInline
-                            muted
-                            className="w-full h-full object-cover"
-                          />
-                          <canvas ref={canvasRef} className="hidden" />
-                        </div>
-                        {!cameraActive ? (
-                          <Button
-                            color="primary"
-                            startContent={<Camera size={16} />}
-                            onPress={startCamera}
-                          >
-                            {t("assetPicker.startCamera")}
-                          </Button>
+                    {cameraMode === "photo" ? (
+                      /* ── Photo mode ── */
+                      <>
+                        {capturedPhoto ? (
+                          <div className="flex flex-col items-center gap-4 w-full">
+                            <div className="relative rounded-lg overflow-hidden border border-divider max-w-lg w-full">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={capturedPhoto}
+                                alt={t("assetPicker.capturedPhoto")}
+                                className="w-full h-auto"
+                              />
+                            </div>
+                            <div className="flex gap-2">
+                              <Button
+                                variant="flat"
+                                onPress={() => {
+                                  setCapturedPhoto(null);
+                                  startCamera();
+                                }}
+                              >
+                                {t("assetPicker.retakePhoto")}
+                              </Button>
+                              <Button
+                                color="primary"
+                                onPress={() => useCapturedPhoto(onClose)}
+                              >
+                                {t("assetPicker.usePhoto")}
+                              </Button>
+                            </div>
+                          </div>
                         ) : (
-                          <Button
-                            color="primary"
-                            size="lg"
-                            isIconOnly
-                            className="rounded-full w-16 h-16 border-4 border-white shadow-lg"
-                            onPress={capturePhoto}
-                            title={t("assetPicker.takePhoto")}
-                          >
-                            <Camera size={24} />
-                          </Button>
+                          <div className="flex flex-col items-center gap-4 w-full">
+                            <div className="relative rounded-lg overflow-hidden border border-divider bg-black max-w-lg w-full aspect-video">
+                              <video
+                                ref={videoRef}
+                                autoPlay
+                                playsInline
+                                muted
+                                className="w-full h-full object-cover"
+                              />
+                              <canvas ref={canvasRef} className="hidden" />
+                            </div>
+                            {!cameraActive ? (
+                              <Button
+                                color="primary"
+                                startContent={<Camera size={16} />}
+                                onPress={startCamera}
+                              >
+                                {t("assetPicker.startCamera")}
+                              </Button>
+                            ) : (
+                              <Button
+                                color="primary"
+                                size="lg"
+                                isIconOnly
+                                className="rounded-full w-16 h-16 border-4 border-white shadow-lg"
+                                onPress={capturePhoto}
+                                title={t("assetPicker.takePhoto")}
+                              >
+                                <Camera size={24} />
+                              </Button>
+                            )}
+                          </div>
                         )}
-                      </div>
+                      </>
+                    ) : (
+                      /* ── Video recording mode ── */
+                      <>
+                        {recordedVideoUrl ? (
+                          <div className="flex flex-col items-center gap-4 w-full">
+                            <div className="relative rounded-lg overflow-hidden border border-divider max-w-lg w-full aspect-video">
+                              <video
+                                src={recordedVideoUrl}
+                                controls
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                            <div className="flex gap-2">
+                              <Button
+                                variant="flat"
+                                onPress={() => {
+                                  if (recordedVideoUrl) URL.revokeObjectURL(recordedVideoUrl);
+                                  setRecordedVideoUrl(null);
+                                  setRecordingSeconds(0);
+                                }}
+                              >
+                                {t("assetPicker.retakeVideo")}
+                              </Button>
+                              <Button
+                                color="primary"
+                                onPress={() => useRecordedVideo(onClose)}
+                              >
+                                {t("assetPicker.useVideo")}
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex flex-col items-center gap-4 w-full">
+                            <div className="relative rounded-lg overflow-hidden border border-divider bg-black max-w-lg w-full aspect-video">
+                              <video
+                                ref={videoRef}
+                                autoPlay
+                                playsInline
+                                muted
+                                className="w-full h-full object-cover"
+                              />
+                              {isRecordingVideo && (
+                                <div className="absolute top-3 right-3 flex items-center gap-2 bg-danger/90 text-white px-3 py-1 rounded-full text-sm font-medium">
+                                  <div className="w-2 h-2 rounded-full bg-white animate-pulse" />
+                                  {recordingSeconds}s / {MAX_VIDEO_RECORDING_SECONDS}s
+                                </div>
+                              )}
+                            </div>
+                            {!isRecordingVideo ? (
+                              <Button
+                                color="danger"
+                                startContent={<Camera size={16} />}
+                                onPress={startVideoRecording}
+                              >
+                                {t("assetPicker.startRecording")}
+                              </Button>
+                            ) : (
+                              <Button
+                                color="danger"
+                                variant="bordered"
+                                onPress={stopVideoRecording}
+                              >
+                                {t("assetPicker.stopRecording")}
+                              </Button>
+                            )}
+                            <span className="text-xs text-default-400">
+                              {t("assetPicker.maxRecordingDuration", { seconds: MAX_VIDEO_RECORDING_SECONDS })}
+                            </span>
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                 ) : tabKey === "upload" ? (
@@ -722,13 +940,19 @@ export default function AssetPickerModal({
                       type="file"
                       ref={fileInputRef}
                       className="hidden"
-                      accept="image/png, image/jpeg, image/webp, image/gif"
+                      accept={[
+                        ...siteConfig.upload.allowedImageTypes,
+                        ...siteConfig.upload.allowedVideoTypes,
+                      ].join(", ")}
                       multiple
                       onChange={(e) => {
                         const fileList = e.target.files;
                         if (!fileList || fileList.length === 0) return;
                         const maxBytes = siteConfig.upload.maxFileSizeMB * 1024 * 1024;
-                        const validTypes = siteConfig.upload.allowedImageTypes;
+                        const validTypes = [
+                          ...siteConfig.upload.allowedImageTypes,
+                          ...siteConfig.upload.allowedVideoTypes,
+                        ];
                         const validFiles: File[] = [];
                         for (const file of Array.from(fileList)) {
                           if (file.size > maxBytes) {
@@ -953,17 +1177,29 @@ export default function AssetPickerModal({
               </ModalHeader>
               <ModalBody className="flex items-center justify-center p-4">
                 {previewAsset && (
-                  <Image
-                    src={previewAsset.imageUrl}
-                    alt={
-                      previewAsset.generationDetails?.title ||
-                      t("assetPicker.assetAlt")
-                    }
-                    classNames={{
-                      wrapper: "max-w-full max-h-[70vh]",
-                      img: "max-w-full max-h-[70vh] object-contain",
-                    }}
-                  />
+                  previewAsset.assetType === "video" && previewAsset.videoUrl ? (
+                    <video
+                      src={previewAsset.videoUrl}
+                      controls
+                      autoPlay
+                      loop
+                      muted
+                      playsInline
+                      className="max-w-full max-h-[70vh] object-contain"
+                    />
+                  ) : (
+                    <Image
+                      src={previewAsset.imageUrl}
+                      alt={
+                        previewAsset.generationDetails?.title ||
+                        t("assetPicker.assetAlt")
+                      }
+                      classNames={{
+                        wrapper: "max-w-full max-h-[70vh]",
+                        img: "max-w-full max-h-[70vh] object-contain",
+                      }}
+                    />
+                  )
                 )}
               </ModalBody>
               <ModalFooter className="justify-center gap-2">
