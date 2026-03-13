@@ -137,7 +137,9 @@
     "thinkingProcess": "사고 과정",
     "toolCall": {
       "checkingTaxonomy": "분류 트리 확인 중...",
-      "taxonomyLoaded": "분류 트리 로드됨"
+      "taxonomyLoaded": "분류 트리 로드됨",
+      "analyzingVideo": "비디오 분석 중...",
+      "videoAnalyzed": "비디오 분석 완료"
     },
     "search": {
       "searched": "검색됨",

@@ -137,7 +137,9 @@
     "thinkingProcess": "思考过程",
     "toolCall": {
       "checkingTaxonomy": "正在查看分类标签树...",
-      "taxonomyLoaded": "分类标签树已加载"
+      "taxonomyLoaded": "分类标签树已加载",
+      "analyzingVideo": "正在分析视频...",
+      "videoAnalyzed": "视频分析完成"
     },
     "search": {
       "searched": "已搜索",

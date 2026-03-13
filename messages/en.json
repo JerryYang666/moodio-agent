@@ -137,7 +137,9 @@
     "thinkingProcess": "Thinking Process",
     "toolCall": {
       "checkingTaxonomy": "Checking taxonomy tree...",
-      "taxonomyLoaded": "Taxonomy tree loaded"
+      "taxonomyLoaded": "Taxonomy tree loaded",
+      "analyzingVideo": "Analyzing video...",
+      "videoAnalyzed": "Video analysis complete"
     },
     "search": {
       "searched": "Searched",

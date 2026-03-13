@@ -137,7 +137,9 @@
     "thinkingProcess": "思考プロセス",
     "toolCall": {
       "checkingTaxonomy": "タクソノミーツリーを確認中...",
-      "taxonomyLoaded": "タクソノミーツリーを読み込みました"
+      "taxonomyLoaded": "タクソノミーツリーを読み込みました",
+      "analyzingVideo": "動画を分析中...",
+      "videoAnalyzed": "動画分析完了"
     },
     "search": {
       "searched": "検索済み",
