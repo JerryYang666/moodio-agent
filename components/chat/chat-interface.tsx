@@ -1353,7 +1353,7 @@ export default function ChatInterface({
         }
         setPendingVideos((prev) => [...prev, {
           videoId: asset.assetId || asset.imageId,
-          url: asset.imageUrl,
+          url: asset.videoUrl || asset.imageUrl,
           source: "library",
           title: asset.generationDetails?.title || t("chat.selectedAsset"),
         }]);
@@ -1394,7 +1394,7 @@ export default function ChatInterface({
             if (!canAddVideo(pendingVideosRef.current)) continue;
             setPendingVideos((prev) => [...prev, {
               videoId: asset.assetId || asset.imageId,
-              url: asset.imageUrl,
+              url: asset.videoUrl || asset.imageUrl,
               source: "library" as const,
               title: asset.generationDetails?.title || t("chat.selectedAsset"),
             }]);
