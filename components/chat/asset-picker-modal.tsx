@@ -27,6 +27,7 @@ export type AssetSummary = {
   imageId: string;
   assetId?: string;
   imageUrl: string;
+  videoUrl?: string;
   assetType?: "image" | "video";
   chatId: string | null;
   generationDetails: {
@@ -81,25 +82,15 @@ const AssetGridItem = React.memo(function AssetGridItem({
           className="w-full h-full"
           onClick={(e) => onClick(asset, index, e)}
         >
-          {asset.assetType === "video" ? (
-            <video
-              src={asset.imageUrl}
-              preload="metadata"
-              muted
-              playsInline
-              className={`w-full h-full object-cover ${multiSelect && isSelected ? "opacity-80" : ""}`}
-            />
-          ) : (
-            <Image
-              src={asset.imageUrl}
-              alt={asset.generationDetails?.title || assetAltLabel}
-              radius="none"
-              classNames={{
-                wrapper: "w-full h-full !max-w-full",
-                img: `w-full h-full object-cover ${multiSelect && isSelected ? "opacity-80" : ""}`,
-              }}
-            />
-          )}
+          <Image
+            src={asset.imageUrl}
+            alt={asset.generationDetails?.title || assetAltLabel}
+            radius="none"
+            classNames={{
+              wrapper: "w-full h-full !max-w-full",
+              img: `w-full h-full object-cover ${multiSelect && isSelected ? "opacity-80" : ""}`,
+            }}
+          />
         </button>
 
         {/* Video badge */}
@@ -1186,9 +1177,9 @@ export default function AssetPickerModal({
               </ModalHeader>
               <ModalBody className="flex items-center justify-center p-4">
                 {previewAsset && (
-                  previewAsset.assetType === "video" ? (
+                  previewAsset.assetType === "video" && previewAsset.videoUrl ? (
                     <video
-                      src={previewAsset.imageUrl}
+                      src={previewAsset.videoUrl}
                       controls
                       autoPlay
                       loop

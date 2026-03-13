@@ -1,4 +1,5 @@
 import { siteConfig } from "@/config/site";
+import { uploadImage } from "@/lib/upload/client";
 
 export interface VideoUploadResult {
   videoId: string;
@@ -35,6 +36,69 @@ export function validateVideoFile(file: File): VideoUploadError | null {
   return null;
 }
 
+/**
+ * Extract the first frame of a video file as a JPEG blob using
+ * a transient <video> + <canvas> in the browser.
+ */
+export function extractVideoThumbnail(file: File): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    const video = document.createElement("video");
+    video.preload = "metadata";
+    video.muted = true;
+    video.playsInline = true;
+
+    const cleanup = () => URL.revokeObjectURL(video.src);
+
+    video.onloadeddata = () => {
+      video.currentTime = 0.1;
+    };
+
+    video.onseeked = () => {
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          cleanup();
+          reject(new Error("Failed to get canvas context"));
+          return;
+        }
+        ctx.drawImage(video, 0, 0);
+        canvas.toBlob(
+          (blob) => {
+            cleanup();
+            if (blob) resolve(blob);
+            else reject(new Error("Failed to extract video frame"));
+          },
+          "image/jpeg",
+          0.85,
+        );
+      } catch (err) {
+        cleanup();
+        reject(err);
+      }
+    };
+
+    video.onerror = () => {
+      cleanup();
+      reject(new Error("Failed to load video for thumbnail extraction"));
+    };
+
+    video.src = URL.createObjectURL(file);
+  });
+}
+
+/**
+ * Upload a video thumbnail blob via the image presign flow.
+ * Returns the imageId on success, or undefined if the upload fails.
+ */
+async function uploadThumbnail(blob: Blob): Promise<string | undefined> {
+  const file = new File([blob], "thumbnail.jpg", { type: "image/jpeg" });
+  const result = await uploadImage(file, { skipCollection: true });
+  return result.success ? result.data.imageId : undefined;
+}
+
 export async function uploadVideo(file: File): Promise<VideoUploadOutcome> {
   const validationError = validateVideoFile(file);
   if (validationError) {
@@ -42,6 +106,12 @@ export async function uploadVideo(file: File): Promise<VideoUploadOutcome> {
   }
 
   try {
+    // Start thumbnail extraction in parallel with the video presign request.
+    // If extraction fails we proceed without a thumbnail.
+    const thumbnailPromise = extractVideoThumbnail(file)
+      .then(uploadThumbnail)
+      .catch(() => undefined);
+
     const presignResponse = await fetch("/api/video/upload/presign", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -84,12 +154,16 @@ export async function uploadVideo(file: File): Promise<VideoUploadOutcome> {
       };
     }
 
+    // Wait for thumbnail before confirming so we can pass its imageId
+    const thumbnailImageId = await thumbnailPromise;
+
     const confirmResponse = await fetch("/api/video/upload/confirm", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         videoId,
         filename: file.name,
+        thumbnailImageId,
       }),
     });
 

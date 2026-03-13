@@ -4,7 +4,7 @@ import { verifyAccessToken } from "@/lib/auth/jwt";
 import { db } from "@/lib/db";
 import { collectionImages, collections } from "@/lib/db/schema";
 import { ensureDefaultProject } from "@/lib/db/projects";
-import { checkVideoExists, getSignedVideoUrl } from "@/lib/storage/s3";
+import { checkVideoExists, checkImageExists, getSignedVideoUrl } from "@/lib/storage/s3";
 import { and, desc, eq } from "drizzle-orm";
 
 const COLLECTION_NAME = "My Video Uploads";
@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { videoId, filename, skipCollection } = body;
+    const { videoId, filename, skipCollection, thumbnailImageId } = body;
 
     if (!videoId || typeof videoId !== "string") {
       return NextResponse.json(
@@ -37,6 +37,15 @@ export async function POST(request: NextRequest) {
         { error: "Video not found in storage. Upload may have failed." },
         { status: 404 }
       );
+    }
+
+    // Validate thumbnail exists in S3 when provided; fall back to videoId otherwise
+    let resolvedImageId = videoId;
+    if (typeof thumbnailImageId === "string" && thumbnailImageId) {
+      const thumbCheck = await checkImageExists(thumbnailImageId);
+      if (thumbCheck.exists) {
+        resolvedImageId = thumbnailImageId;
+      }
     }
 
     if (skipCollection) {
@@ -76,7 +85,7 @@ export async function POST(request: NextRequest) {
     await db.insert(collectionImages).values({
       projectId: defaultProject.id,
       collectionId: targetCollection.id,
-      imageId: videoId,
+      imageId: resolvedImageId,
       assetId: videoId,
       assetType: "video",
       chatId: null,
