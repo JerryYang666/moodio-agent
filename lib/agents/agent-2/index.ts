@@ -371,6 +371,7 @@ export class Agent2 implements Agent {
     // 1. Build system prompt
     const systemPrompt = this.promptConstructor.build({
       systemPromptOverride: ctx.systemPromptOverride,
+      maxImageQuantity: ctx.maxImageQuantity,
     });
 
     // 2. Parse input

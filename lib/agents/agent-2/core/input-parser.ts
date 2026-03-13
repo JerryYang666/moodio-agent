@@ -1,9 +1,6 @@
 import { Message, MessageContentPart } from "@/lib/llm/types";
 import { RequestContext } from "../context";
 import { getSignedImageUrl } from "@/lib/storage/s3";
-import { siteConfig } from "@/config/site";
-
-const MAX_SUGGESTIONS_HARD_CAP = siteConfig.imageLimits.maxSuggestionsHardCap;
 
 /** Maximum number of user messages to keep in history (excluding the first user message). */
 const MAX_USER_MESSAGES = 15;
@@ -193,22 +190,6 @@ export class InputParser {
           text: "\nPrecision Editing on. Make sure that your prompt is describing an edit to the picture(s).",
         });
       }
-    }
-
-    // Add image quantity instruction
-    if (
-      ctx.maxImageQuantity &&
-      ctx.maxImageQuantity >= 1 &&
-      ctx.maxImageQuantity <= MAX_SUGGESTIONS_HARD_CAP
-    ) {
-      if (!Array.isArray(formattedUserMessage.content)) {
-        formattedUserMessage.content = [{ type: "text", text: formattedUserMessage.content as string }];
-      }
-      formattedUserMessage.content.push({
-        type: "text",
-        text: `\nGenerate exactly ${ctx.maxImageQuantity} image suggestion${ctx.maxImageQuantity === 1 ? "" : "s"}. If the user is not asking for images, ignore this instruction.`,
-      });
-      console.log(`[Agent-2] User selected image quantity: ${ctx.maxImageQuantity}`);
     }
 
     return formattedUserMessage;

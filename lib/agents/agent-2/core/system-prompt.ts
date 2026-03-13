@@ -1,4 +1,7 @@
 import { ToolRegistry } from "../tools/registry";
+import { siteConfig } from "@/config/site";
+
+const MAX_SUGGESTIONS_HARD_CAP = siteConfig.imageLimits.maxSuggestionsHardCap;
 
 /**
  * Minimal persona template. All tool-specific instructions are injected
@@ -35,7 +38,7 @@ Tool Usage Rules:
 export class SystemPromptConstructor {
   constructor(private registry: ToolRegistry) {}
 
-  build(options?: { systemPromptOverride?: string }): string {
+  build(options?: { systemPromptOverride?: string; maxImageQuantity?: number }): string {
     // If admin override is provided, use it directly
     if (options?.systemPromptOverride) {
       return options.systemPromptOverride;
@@ -61,6 +64,16 @@ export class SystemPromptConstructor {
       if (tool.examples.length > 0) {
         prompt += "\n\nExample:\n" + tool.examples.join("\n");
       }
+    }
+
+    // Append per-request image quantity constraint at the end of the system prompt
+    if (
+      options?.maxImageQuantity &&
+      options.maxImageQuantity >= 1 &&
+      options.maxImageQuantity <= MAX_SUGGESTIONS_HARD_CAP
+    ) {
+      const n = options.maxImageQuantity;
+      prompt += `\n\nGenerate exactly ${n} image suggestion${n === 1 ? "" : "s"}. If the user is not asking for images, ignore this instruction.`;
     }
 
     return prompt;
