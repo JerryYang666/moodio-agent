@@ -1328,14 +1328,23 @@ export default function ChatInterface({
   const handleAssetPicked = useCallback(
     (asset: AssetSummary) => {
       if (assetPickerMode === "reference") {
-        // Add to reference images with default tag "subject"
         addReferenceImage({
           imageId: asset.imageId,
           url: asset.imageUrl,
           title: asset.generationDetails?.title || t("chat.selectedAsset"),
         }, "subject");
+      } else if (asset.assetType === "video") {
+        if (!canAddVideo(pendingVideos)) {
+          addToast({ title: t("chat.maxVideosReached", { max: MAX_PENDING_VIDEOS }), color: "warning" });
+          return;
+        }
+        setPendingVideos((prev) => [...prev, {
+          videoId: asset.imageId,
+          url: asset.imageUrl,
+          source: "library",
+          title: asset.generationDetails?.title || t("chat.selectedAsset"),
+        }]);
       } else {
-        // Add to pending images
         addAssetImage({
           assetId: asset.id,
           url: asset.imageUrl,
@@ -1344,13 +1353,16 @@ export default function ChatInterface({
         });
       }
     },
-    [addAssetImage, addReferenceImage, assetPickerMode, t]
+    [addAssetImage, addReferenceImage, assetPickerMode, pendingVideos, t]
   );
 
   const pendingImagesRef = useRef(pendingImages);
   pendingImagesRef.current = pendingImages;
   const referenceImagesRef = useRef(referenceImages);
   referenceImagesRef.current = referenceImages;
+
+  const pendingVideosRef = useRef(pendingVideos);
+  pendingVideosRef.current = pendingVideos;
 
   const handleAssetPickedMultiple = useCallback(
     (assets: AssetSummary[]) => {
@@ -1365,13 +1377,23 @@ export default function ChatInterface({
         }
       } else {
         for (const asset of assets) {
-          if (!canAddImage(pendingImagesRef.current)) break;
-          addAssetImage({
-            assetId: asset.id,
-            url: asset.imageUrl,
-            title: asset.generationDetails?.title || t("chat.selectedAsset"),
-            imageId: asset.imageId,
-          });
+          if (asset.assetType === "video") {
+            if (!canAddVideo(pendingVideosRef.current)) continue;
+            setPendingVideos((prev) => [...prev, {
+              videoId: asset.imageId,
+              url: asset.imageUrl,
+              source: "library" as const,
+              title: asset.generationDetails?.title || t("chat.selectedAsset"),
+            }]);
+          } else {
+            if (!canAddImage(pendingImagesRef.current)) break;
+            addAssetImage({
+              assetId: asset.id,
+              url: asset.imageUrl,
+              title: asset.generationDetails?.title || t("chat.selectedAsset"),
+              imageId: asset.imageId,
+            });
+          }
         }
       }
     },
