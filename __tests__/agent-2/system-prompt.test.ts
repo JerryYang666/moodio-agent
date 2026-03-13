@@ -91,6 +91,30 @@ describe("SystemPromptConstructor", () => {
     expect(prompt).toContain("prompt");
   });
 
+  it("appends image quantity instruction for plural", () => {
+    const constructor = createConstructor();
+    const prompt = constructor.build({ maxImageQuantity: 2 });
+
+    expect(prompt).toContain("exactly 2 image suggestions");
+  });
+
+  it("appends singular image quantity instruction for 1", () => {
+    const constructor = createConstructor();
+    const prompt = constructor.build({ maxImageQuantity: 1 });
+
+    expect(prompt).toContain("exactly 1 image suggestion");
+    expect(prompt).not.toMatch(/exactly 1 image suggestions/);
+  });
+
+  it("does not append image quantity instruction when out of bounds", () => {
+    const constructor = createConstructor();
+    const promptZero = constructor.build({ maxImageQuantity: 0 });
+    expect(promptZero).not.toMatch(/Generate exactly \d+ image suggestion/);
+
+    const promptOver = constructor.build({ maxImageQuantity: 9999 });
+    expect(promptOver).not.toMatch(/Generate exactly \d+ image suggestion/);
+  });
+
   it("uses system prompt override when provided", () => {
     const constructor = createConstructor();
     const prompt = constructor.build({

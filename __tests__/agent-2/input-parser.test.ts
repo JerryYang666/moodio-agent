@@ -233,21 +233,12 @@ describe("InputParser", () => {
       expect(result.content).toHaveLength(1);
     });
 
-    it("appends image quantity instruction", () => {
+    it("does not append image quantity instruction (handled by system prompt)", () => {
       const msg: Message = { role: "user", content: "test" };
       const ctx = makeCtx({ maxImageQuantity: 2 });
       const result = parser.parseUserMessage(msg, ctx);
-      const lastPart = result.content[result.content.length - 1];
-      expect(lastPart.text).toContain("exactly 2 image suggestions");
-    });
-
-    it("appends singular image quantity instruction for 1", () => {
-      const msg: Message = { role: "user", content: "test" };
-      const ctx = makeCtx({ maxImageQuantity: 1 });
-      const result = parser.parseUserMessage(msg, ctx);
-      const lastPart = result.content[result.content.length - 1];
-      expect(lastPart.text).toContain("exactly 1 image suggestion.");
-      expect(lastPart.text).not.toContain("suggestions");
+      expect(result.content).toHaveLength(1);
+      expect(result.content[0].text).toBe("test");
     });
   });
 });
