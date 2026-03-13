@@ -71,7 +71,6 @@ interface VideoDetailViewProps {
   onClose: () => void;
   onTargetReady: (rect: DOMRect) => void;
   videoVisible: boolean;
-  onLearnFromVideo?: (data: { contentId: number; storageKey: string; videoUrl: string }) => void;
 }
 
 export function VideoDetailView({
@@ -80,7 +79,6 @@ export function VideoDetailView({
   onClose,
   onTargetReady,
   videoVisible,
-  onLearnFromVideo,
 }: VideoDetailViewProps) {
   const detail: VideoDetailData = MOCK_VIDEO_DETAIL;
   const videoTargetRef = useRef<HTMLDivElement>(null);
@@ -182,12 +180,14 @@ export function VideoDetailView({
                   className="justify-center gap-3 items-center border-default-300 dark:border-default-500 text-default-700 dark:text-default-600 hover:bg-default-100 dark:hover:bg-white/10 w-full"
                   startContent={<Icon size={18} />}
                   isDisabled={isLearnAction && (!videoDetail || isLoadingDetail)}
-                  onPress={isLearnAction && onLearnFromVideo && videoDetail ? () => {
-                    onLearnFromVideo({
-                      contentId: videoDetail.id,
-                      storageKey: videoDetail.storage_key,
-                      videoUrl: getBrowseVideoUrl(videoDetail.storage_key),
-                    });
+                  onPress={isLearnAction && videoDetail ? () => {
+                    window.dispatchEvent(new CustomEvent("learn-from-video", {
+                      detail: {
+                        contentId: videoDetail.id,
+                        storageKey: videoDetail.storage_key,
+                        videoUrl: getBrowseVideoUrl(videoDetail.storage_key),
+                      },
+                    }));
                   } : undefined}
                 >
                   {action.label}

@@ -1008,6 +1008,19 @@ export default function ChatInterface({
     [pendingVideos, t]
   );
 
+  // Listen for "learn from this video" events from the browse page
+  useEffect(() => {
+    const handleLearnFromVideo = (e: Event) => {
+      const { contentId, storageKey, videoUrl } = (e as CustomEvent).detail;
+      if (contentId && videoUrl) {
+        addRetrievalVideo(Number(contentId), storageKey, videoUrl);
+      }
+    };
+
+    window.addEventListener("learn-from-video", handleLearnFromVideo);
+    return () => window.removeEventListener("learn-from-video", handleLearnFromVideo);
+  }, [addRetrievalVideo]);
+
   // Add an asset from the library to pending images
   const addAssetImage = useCallback(
     (asset: {
