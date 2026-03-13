@@ -4,7 +4,7 @@ import { Card, CardBody } from "@heroui/card";
 import { Spinner } from "@heroui/spinner";
 import { Avatar } from "@heroui/avatar";
 import { Image } from "@heroui/image";
-import { Bot, X, Pencil, ChevronDown, ChevronRight, Brain, Maximize2, Monitor } from "lucide-react";
+import { Bot, X, Pencil, ChevronDown, ChevronRight, Brain, Maximize2, Monitor, Video } from "lucide-react";
 import clsx from "clsx";
 import { Message, MessageContentPart, isGeneratedImagePart } from "@/lib/llm/types";
 import ImageWithMenu from "@/components/collection/image-with-menu";
@@ -283,6 +283,7 @@ export default function ChatMessage({
     const thinkParts = content.filter((p) => p.type === "internal_think");
     const toolCallParts = content.filter((p) => p.type === "tool_call");
     const searchParts = content.filter((p) => p.type === "agent_search");
+    const userVideoParts = content.filter((p) => p.type === "video");
 
     return (
       <div className="space-y-4">
@@ -363,6 +364,36 @@ export default function ChatMessage({
                 );
               });
             })()}
+          </div>
+        )}
+
+        {isUser && userVideoParts.length > 0 && (
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {userVideoParts.map((part: any, i) => (
+              <div
+                key={`vid-${i}`}
+                className="h-20 w-20 rounded-lg border border-divider overflow-hidden shrink-0 relative bg-black"
+              >
+                {part.videoUrl ? (
+                  <video
+                    src={part.videoUrl}
+                    className="h-full w-full object-cover"
+                    muted
+                    playsInline
+                  />
+                ) : (
+                  <div className="h-full w-full flex items-center justify-center">
+                    <Video size={20} className="text-default-400" />
+                  </div>
+                )}
+                <div className="absolute top-1 left-1 z-10">
+                  <span className="text-[9px] font-semibold bg-danger/90 text-white px-1.5 py-0.5 rounded flex items-center gap-0.5">
+                    <Video size={8} />
+                    {t("chat.videoLabel")}
+                  </span>
+                </div>
+              </div>
+            ))}
           </div>
         )}
 

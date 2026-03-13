@@ -184,8 +184,12 @@ function stripDerivedUrls(messages: Message[]): Message[] {
           config: cleanConfig,
         };
       }
-      if (part.type === "video" && "videoUrl" in part) {
-        return { ...part, videoUrl: "" };
+      if (part.type === "video") {
+        if (part.source === "retrieval") {
+          return part;
+        }
+        const { videoUrl, ...rest } = part;
+        return { ...rest, videoUrl: "" };
       }
       return part;
     });
@@ -265,6 +269,9 @@ function addDerivedUrls(messages: Message[]): Message[] {
         };
       }
       if (part.type === "video" && "videoId" in part) {
+        if (part.source === "retrieval") {
+          return part;
+        }
         return {
           ...part,
           videoUrl: getVideoUrl(part.videoId),
