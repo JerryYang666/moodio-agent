@@ -28,7 +28,7 @@ export function validateVideoFile(file: File): VideoUploadError | null {
   if (!allowedTypes.includes(file.type)) {
     return {
       code: "INVALID_TYPE",
-      message: "Invalid file type. Supported: MP4, WebM, MOV, AVI",
+      message: "Invalid file type. Supported: MP4, WebM, MOV (QuickTime), AVI",
     };
   }
 

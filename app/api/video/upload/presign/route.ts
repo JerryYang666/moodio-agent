@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
 
     if (!siteConfig.upload.allowedVideoTypes.includes(contentType)) {
       return NextResponse.json(
-        { error: "Invalid file type. Supported: MP4, WebM, MOV, AVI" },
+        { error: "Invalid file type. Supported: MP4, WebM, MOV (QuickTime), AVI" },
         { status: 400 }
       );
     }

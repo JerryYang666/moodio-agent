@@ -312,7 +312,10 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
 
     // Second: check for dropped files (external file drag)
     if (e.dataTransfer.files.length > 0) {
-      const allowedTypes = siteConfig.upload.allowedImageTypes;
+      const allowedTypes = [
+        ...siteConfig.upload.allowedImageTypes,
+        ...siteConfig.upload.allowedVideoTypes,
+      ];
       const validFiles: File[] = [];
       let hasInvalid = false;
       for (const file of Array.from(e.dataTransfer.files)) {
@@ -331,13 +334,16 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
     }
   };
 
-  // Handle paste: extract image data from clipboard
+  // Handle paste: extract image/video data from clipboard
   const handlePaste = useCallback(
     (e: React.ClipboardEvent) => {
       const items = e.clipboardData?.items;
       if (!items) return;
 
-      const allowedTypes = siteConfig.upload.allowedImageTypes;
+      const allowedTypes = [
+        ...siteConfig.upload.allowedImageTypes,
+        ...siteConfig.upload.allowedVideoTypes,
+      ];
       const files: File[] = [];
       for (const item of Array.from(items)) {
         if (item.kind === "file" && allowedTypes.includes(item.type)) {

@@ -1245,6 +1245,22 @@ export default function ChatInterface({
   );
 
   // Get the appropriate upload handler based on asset picker mode
+  // Unified file upload handler that routes video vs image files
+  const handleFilesUpload = useCallback(
+    async (files: File[]) => {
+      const videoTypes = siteConfig.upload.allowedVideoTypes;
+      const videoFiles = files.filter((f) => videoTypes.includes(f.type));
+      const imageFiles = files.filter((f) => !videoTypes.includes(f.type));
+      if (videoFiles.length > 0) {
+        await uploadAndAddVideos(videoFiles);
+      }
+      if (imageFiles.length > 0) {
+        await uploadAndAddImages(imageFiles);
+      }
+    },
+    [uploadAndAddImages, uploadAndAddVideos]
+  );
+
   const handleAssetUpload = useCallback(
     async (files: File[]) => {
       if (assetPickerMode === "reference") {
@@ -1252,19 +1268,10 @@ export default function ChatInterface({
           await uploadAndAddReferenceImage(file);
         }
       } else {
-        // Route video files to video upload, image files to image upload
-        const videoTypes = siteConfig.upload.allowedVideoTypes;
-        const videoFiles = files.filter((f) => videoTypes.includes(f.type));
-        const imageFiles = files.filter((f) => !videoTypes.includes(f.type));
-        if (videoFiles.length > 0) {
-          await uploadAndAddVideos(videoFiles);
-        }
-        if (imageFiles.length > 0) {
-          await uploadAndAddImages(imageFiles);
-        }
+        await handleFilesUpload(files);
       }
     },
-    [assetPickerMode, uploadAndAddImages, uploadAndAddVideos, uploadAndAddReferenceImage]
+    [assetPickerMode, handleFilesUpload, uploadAndAddReferenceImage]
   );
 
   // Listen for asset selection events from the hover sidebar
@@ -2974,7 +2981,7 @@ export default function ChatInterface({
         onRemovePendingVideo={removePendingVideo}
         onOpenAssetPicker={openPendingImagePicker}
         onAssetDrop={handleAssetDrop}
-        onFilesUpload={uploadAndAddImages}
+        onFilesUpload={handleFilesUpload}
         showFileUpload={true}
         precisionEditing={precisionEditing}
         onPrecisionEditingChange={handlePrecisionEditingChange}
