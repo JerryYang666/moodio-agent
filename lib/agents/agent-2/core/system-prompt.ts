@@ -49,6 +49,7 @@ export class SystemPromptConstructor {
       prompt += "\n\n---\n";
       prompt += `Tool name: ${tool.name}\n`;
       prompt += `Tool description: ${tool.description}\n`;
+      prompt += `Tool tag format: <${tool.tag}>...</${tool.tag}>\n`;
 
       // Inject dynamic runtime data if the tool provides it (e.g. video model list)
       if (tool.dynamicPromptData) {

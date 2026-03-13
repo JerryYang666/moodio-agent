@@ -350,6 +350,14 @@ export class Agent2 implements Agent {
   }
 
   /**
+   * Returns the fully-built default system prompt (no override) from the tool registry.
+   * Used by the admin test kit to populate the "Reset to Default" textarea.
+   */
+  getDefaultSystemPrompt(): string {
+    return this.promptConstructor.build();
+  }
+
+  /**
    * Core LLM call + parse flow.
    * Builds system prompt, parses input, calls LLM, runs stream loop.
    */
