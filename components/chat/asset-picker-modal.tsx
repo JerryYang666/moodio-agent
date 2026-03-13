@@ -25,6 +25,7 @@ export type AssetSummary = {
   projectId: string;
   collectionId: string | null;
   imageId: string;
+  assetId?: string;
   imageUrl: string;
   assetType?: "image" | "video";
   chatId: string | null;
