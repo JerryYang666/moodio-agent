@@ -143,4 +143,22 @@ export class OutputParser {
   hasOpenTag(tag: string): boolean {
     return this.buffer.includes(`<${tag}>`);
   }
+
+  /**
+   * If the buffer contains an open tag without a matching close tag,
+   * append the closing tag. Called once at the end of the final stream
+   * to recover from the LLM stopping mid-tag.
+   * @returns true if a closing tag was appended
+   */
+  closeUnclosedTag(): boolean {
+    for (const tag of this.validTags) {
+      const open = `<${tag}>`;
+      const close = `</${tag}>`;
+      if (this.buffer.includes(open) && !this.buffer.includes(close)) {
+        this.buffer += close;
+        return true;
+      }
+    }
+    return false;
+  }
 }
