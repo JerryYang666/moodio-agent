@@ -16,7 +16,7 @@ import { Select, SelectItem } from "@heroui/select";
 import { Input } from "@heroui/input";
 import { Image } from "@heroui/image";
 import { Tab, Tabs } from "@heroui/tabs";
-import { Search, Expand, Camera, Star, X, Check } from "lucide-react";
+import { Search, Expand, Camera, Star, X, Check, Video } from "lucide-react";
 import { siteConfig } from "@/config/site";
 import { useGetCollectionsQuery } from "@/lib/redux/services/next-api";
 
@@ -80,16 +80,35 @@ const AssetGridItem = React.memo(function AssetGridItem({
           className="w-full h-full"
           onClick={(e) => onClick(asset, index, e)}
         >
-          <Image
-            src={asset.imageUrl}
-            alt={asset.generationDetails?.title || assetAltLabel}
-            radius="none"
-            classNames={{
-              wrapper: "w-full h-full !max-w-full",
-              img: `w-full h-full object-cover ${multiSelect && isSelected ? "opacity-80" : ""}`,
-            }}
-          />
+          {asset.assetType === "video" ? (
+            <video
+              src={asset.imageUrl}
+              preload="metadata"
+              muted
+              playsInline
+              className={`w-full h-full object-cover ${multiSelect && isSelected ? "opacity-80" : ""}`}
+            />
+          ) : (
+            <Image
+              src={asset.imageUrl}
+              alt={asset.generationDetails?.title || assetAltLabel}
+              radius="none"
+              classNames={{
+                wrapper: "w-full h-full !max-w-full",
+                img: `w-full h-full object-cover ${multiSelect && isSelected ? "opacity-80" : ""}`,
+              }}
+            />
+          )}
         </button>
+
+        {/* Video badge */}
+        {asset.assetType === "video" && (
+          <div className="absolute bottom-8 right-1.5 z-10">
+            <span className="text-[9px] font-semibold bg-danger/90 text-white px-1.5 py-0.5 rounded flex items-center gap-0.5">
+              <Video size={8} />
+            </span>
+          </div>
+        )}
 
         {/* Selection checkbox overlay */}
         {multiSelect && (
@@ -1155,17 +1174,29 @@ export default function AssetPickerModal({
               </ModalHeader>
               <ModalBody className="flex items-center justify-center p-4">
                 {previewAsset && (
-                  <Image
-                    src={previewAsset.imageUrl}
-                    alt={
-                      previewAsset.generationDetails?.title ||
-                      t("assetPicker.assetAlt")
-                    }
-                    classNames={{
-                      wrapper: "max-w-full max-h-[70vh]",
-                      img: "max-w-full max-h-[70vh] object-contain",
-                    }}
-                  />
+                  previewAsset.assetType === "video" ? (
+                    <video
+                      src={previewAsset.imageUrl}
+                      controls
+                      autoPlay
+                      loop
+                      muted
+                      playsInline
+                      className="max-w-full max-h-[70vh] object-contain"
+                    />
+                  ) : (
+                    <Image
+                      src={previewAsset.imageUrl}
+                      alt={
+                        previewAsset.generationDetails?.title ||
+                        t("assetPicker.assetAlt")
+                      }
+                      classNames={{
+                        wrapper: "max-w-full max-h-[70vh]",
+                        img: "max-w-full max-h-[70vh] object-contain",
+                      }}
+                    />
+                  )
                 )}
               </ModalBody>
               <ModalFooter className="justify-center gap-2">
