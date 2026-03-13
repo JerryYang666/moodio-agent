@@ -410,6 +410,56 @@ export function getSignedImageUrl(
 // ============================================================================
 
 /**
+ * Generate a presigned URL for direct client-to-S3 video upload
+ */
+export async function getPresignedVideoUploadUrl(
+  videoId: string,
+  contentType: string,
+  contentLength: number,
+  expiresIn: number = 300
+): Promise<string> {
+  const key = `videos/${videoId}`;
+
+  const command = new PutObjectCommand({
+    Bucket: BUCKET_NAME,
+    Key: key,
+    ContentType: contentType,
+    ContentLength: contentLength,
+  });
+
+  return await getS3SignedUrl(s3Client, command, { expiresIn });
+}
+
+/**
+ * Check if a video exists in S3
+ */
+export async function checkVideoExists(
+  videoId: string
+): Promise<{ exists: boolean; contentType?: string; contentLength?: number }> {
+  const key = `videos/${videoId}`;
+
+  try {
+    const response = await s3Client.send(
+      new HeadObjectCommand({
+        Bucket: BUCKET_NAME,
+        Key: key,
+      })
+    );
+
+    return {
+      exists: true,
+      contentType: response.ContentType,
+      contentLength: response.ContentLength,
+    };
+  } catch (error: any) {
+    if (error.name === "NotFound" || error.$metadata?.httpStatusCode === 404) {
+      return { exists: false };
+    }
+    throw error;
+  }
+}
+
+/**
  * Generate a unique video ID for tracking purposes
  */
 export function generateVideoId(): string {
