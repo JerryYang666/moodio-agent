@@ -333,6 +333,23 @@ export async function POST(
         title: typeof entry.title === "string" ? entry.title : undefined,
       }));
 
+    // Parse video sources
+    type VideoSourceEntry = {
+      videoId: string;
+      source: "retrieval" | "upload" | "library" | "ai_generated";
+      videoUrl: string;
+    };
+    const rawVideoSources = Array.isArray(json.videoSources) ? json.videoSources : [];
+    const videoSources: VideoSourceEntry[] = rawVideoSources
+      .filter((entry: any) => typeof entry?.videoId === "string")
+      .map((entry: any) => ({
+        videoId: entry.videoId as string,
+        source: (["retrieval", "upload", "library", "ai_generated"].includes(entry.source)
+          ? entry.source
+          : "upload") as VideoSourceEntry["source"],
+        videoUrl: typeof entry.videoUrl === "string" ? entry.videoUrl : "",
+      }));
+
     // Parse mode (agent, image, or video)
     const mode: string =
       json.mode === "image" ? "image" :
@@ -426,7 +443,7 @@ export async function POST(
       videoParams: mode === "video" ? videoParams : undefined,
     };
 
-    if (imageIds.length > 0) {
+    if (imageIds.length > 0 || videoSources.length > 0) {
       const sourceById = new Map<string, ImageSourceEntry>(
         imageSources.map((entry) => [entry.imageId, entry])
       );
@@ -434,7 +451,6 @@ export async function POST(
       if (content) {
         parts.push({ type: "text", text: content });
       }
-      // Add all images to the message (including title for pre-select feature)
       for (const imgId of imageIds) {
         const sourceEntry = sourceById.get(imgId);
         parts.push({
@@ -442,6 +458,14 @@ export async function POST(
           imageId: imgId,
           source: sourceEntry?.source,
           title: sourceEntry?.title,
+        });
+      }
+      for (const vid of videoSources) {
+        parts.push({
+          type: "video",
+          videoId: vid.videoId,
+          source: vid.source,
+          videoUrl: vid.videoUrl,
         });
       }
       userMessage = {

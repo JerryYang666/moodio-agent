@@ -184,6 +184,10 @@ function stripDerivedUrls(messages: Message[]): Message[] {
           config: cleanConfig,
         };
       }
+      if (part.type === "video" && "videoUrl" in part) {
+        const { videoUrl, ...rest } = part;
+        return rest;
+      }
       return part;
     });
 
@@ -259,6 +263,12 @@ function addDerivedUrls(messages: Message[]): Message[] {
             : undefined,
           videoUrl: part.videoId ? getVideoUrl(part.videoId) : undefined,
           signedVideoUrl: part.videoId ? getSignedVideoUrl(part.videoId) : undefined,
+        };
+      }
+      if (part.type === "video" && "videoId" in part) {
+        return {
+          ...part,
+          videoUrl: getVideoUrl(part.videoId),
         };
       }
       return part;

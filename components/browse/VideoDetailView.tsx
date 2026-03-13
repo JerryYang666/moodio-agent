@@ -70,6 +70,7 @@ interface VideoDetailViewProps {
   onClose: () => void;
   onTargetReady: (rect: DOMRect) => void;
   videoVisible: boolean;
+  onLearnFromVideo?: (data: { contentId: number; storageKey: string; videoUrl: string }) => void;
 }
 
 export function VideoDetailView({
@@ -78,6 +79,7 @@ export function VideoDetailView({
   onClose,
   onTargetReady,
   videoVisible,
+  onLearnFromVideo,
 }: VideoDetailViewProps) {
   const detail: VideoDetailData = MOCK_VIDEO_DETAIL;
   const videoTargetRef = useRef<HTMLDivElement>(null);
@@ -171,12 +173,20 @@ export function VideoDetailView({
           <div className="flex flex-col gap-2 mb-5">
             {detail.actions.map((action) => {
               const Icon = ACTION_ICONS[action.icon];
+              const isLearnAction = action.icon === "learn";
               return (
                 <Button
                   key={action.label}
                   variant="bordered"
                   className="justify-center gap-3 items-center border-default-300 dark:border-default-500 text-default-700 dark:text-default-600 hover:bg-default-100 dark:hover:bg-white/10 w-full"
                   startContent={<Icon size={18} />}
+                  onPress={isLearnAction && onLearnFromVideo ? () => {
+                    onLearnFromVideo({
+                      contentId: Number(selectedPhoto.id),
+                      storageKey: selectedPhoto.id,
+                      videoUrl: selectedPhoto.src,
+                    });
+                  } : undefined}
                 >
                   {action.label}
                 </Button>
