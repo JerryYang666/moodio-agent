@@ -18,6 +18,7 @@ import { Squircle } from "@/components/Squircle";
 import { VideoVisibilityProvider } from "@/hooks/use-video-visibility";
 import { MOCK_VIDEO_DETAIL, type VideoDetailData } from "./video-detail-data";
 import { useGetVideoDetailQuery, type ContentLabel } from "@/lib/redux/services/api";
+import { getVideoUrl as getBrowseVideoUrl } from "@/lib/config/video.config";
 
 const ACTION_ICONS = {
   learn: GraduationCap,
@@ -180,11 +181,12 @@ export function VideoDetailView({
                   variant="bordered"
                   className="justify-center gap-3 items-center border-default-300 dark:border-default-500 text-default-700 dark:text-default-600 hover:bg-default-100 dark:hover:bg-white/10 w-full"
                   startContent={<Icon size={18} />}
-                  onPress={isLearnAction && onLearnFromVideo ? () => {
+                  isDisabled={isLearnAction && (!videoDetail || isLoadingDetail)}
+                  onPress={isLearnAction && onLearnFromVideo && videoDetail ? () => {
                     onLearnFromVideo({
-                      contentId: Number(selectedPhoto.id),
-                      storageKey: String(selectedPhoto.id),
-                      videoUrl: selectedPhoto.src,
+                      contentId: videoDetail.id,
+                      storageKey: videoDetail.storage_key,
+                      videoUrl: getBrowseVideoUrl(videoDetail.storage_key),
                     });
                   } : undefined}
                 >
