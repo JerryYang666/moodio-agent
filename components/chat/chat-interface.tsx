@@ -2548,6 +2548,9 @@ export default function ChatInterface({
 
               if (event.type === "part") {
                 variantContents.push(event.part);
+                if (event.part?.type === "direct_video") {
+                  refreshBalance();
+                }
               }
 
               updateStreamMessages((prev) => {
@@ -2585,7 +2588,7 @@ export default function ChatInterface({
         }
       }
     },
-    [chatId, isSending, disableActiveChatPersistence, onChatCreated, t]
+    [chatId, isSending, disableActiveChatPersistence, onChatCreated, refreshBalance, t]
   );
 
   // Persist a part update to S3. Returns a Promise that resolves when the
