@@ -578,6 +578,17 @@ export default function DesktopDetailPage({
     clearTimeline,
   } = useTimeline(desktopId);
 
+  const handleZIndexChange = useCallback(
+    (assetId: string, delta: number) => {
+      const asset = detail?.assets.find((a) => a.id === assetId);
+      if (!asset) return;
+      const newZIndex = asset.zIndex + delta;
+      updateAsset(assetId, { zIndex: newZIndex });
+      sendEvent("asset_z_changed", { assetId, zIndex: newZIndex });
+    },
+    [detail?.assets, updateAsset, sendEvent]
+  );
+
   const handleSendToTimeline = useCallback(
     (asset: EnrichedDesktopAsset) => {
       if (asset.assetType !== "video") return;
@@ -819,6 +830,7 @@ export default function DesktopDetailPage({
           textLocks={textLocks}
           onCellCommit={handleCellCommit}
           onTextCommit={handleTextCommit}
+          onZIndexChange={canEdit ? handleZIndexChange : undefined}
           onSendToTimeline={canEdit ? handleSendToTimeline : undefined}
           onExternalImageDrop={canEdit ? handleExternalImageDrop : undefined}
           onExternalTextDrop={canEdit ? handleExternalTextDrop : undefined}

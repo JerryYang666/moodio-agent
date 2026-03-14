@@ -1046,6 +1046,9 @@
     "generatingShotList": "正在生成鏡頭清單...",
     "shotList": "鏡頭清單",
     "shotCount": "{count} 個鏡頭",
-    "desktopActions": "桌面操作"
+    "desktopActions": "桌面操作",
+    "imageTitle": "圖片",
+    "bringForward": "上移一層",
+    "sendBackward": "下移一層"
   }
 }

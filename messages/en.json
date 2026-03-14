@@ -473,7 +473,10 @@
     "generatingShotList": "Generating shot list...",
     "shotList": "Shot List",
     "shotCount": "{count} shots",
-    "desktopActions": "Desktop actions"
+    "desktopActions": "Desktop actions",
+    "imageTitle": "Image",
+    "bringForward": "Bring Forward",
+    "sendBackward": "Send Backward"
   },
   "storyboard": {
     "title": "Storyboard",

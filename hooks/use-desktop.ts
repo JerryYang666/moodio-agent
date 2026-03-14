@@ -354,6 +354,21 @@ export function useDesktopDetail(desktopId: string) {
           });
           break;
         }
+        case "asset_z_changed": {
+          const { assetId, zIndex } = event.payload || {};
+          if (!assetId || zIndex == null) return;
+          setDetail((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  assets: prev.assets.map((a) =>
+                    a.id === assetId ? { ...a, zIndex } : a
+                  ),
+                }
+              : null
+          );
+          break;
+        }
         case "asset_updated": {
           const { assetId, metadata } = event.payload || {};
           if (!assetId || !metadata) return;
