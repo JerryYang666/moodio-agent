@@ -626,21 +626,26 @@ export default function DesktopDetailPage({
   const handleAssetPickerSelect = useCallback(
     async (asset: AssetSummary) => {
       const pos = addAssetPositionRef.current;
+      const isVideo = asset.assetType === "video";
       try {
+        const metadata: Record<string, unknown> = {
+          imageId: asset.imageId,
+          chatId: asset.chatId ?? undefined,
+          title: asset.generationDetails?.title || (isVideo ? "Video" : "Image"),
+          prompt: asset.generationDetails?.prompt || "",
+          status: asset.generationDetails?.status || "generated",
+        };
+        if (isVideo && asset.assetId) {
+          metadata.videoId = asset.assetId;
+        }
         const res = await fetch(`/api/desktop/${desktopId}/assets`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             assets: [
               {
-                assetType: "image",
-                metadata: {
-                  imageId: asset.imageId,
-                  chatId: asset.chatId ?? undefined,
-                  title: asset.generationDetails?.title || "Image",
-                  prompt: asset.generationDetails?.prompt || "",
-                  status: asset.generationDetails?.status || "generated",
-                },
+                assetType: isVideo ? "video" : "image",
+                metadata,
                 posX: pos.x,
                 posY: pos.y,
               },
