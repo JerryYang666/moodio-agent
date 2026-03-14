@@ -602,6 +602,38 @@ export function getSignedVideoUrl(
   });
 }
 
+// Allowed hostnames for external downloads (e.g. Fal AI media URLs)
+const ALLOWED_DOWNLOAD_HOSTS = [
+  "fal.media",
+  "storage.googleapis.com",
+  "v3.fal.media",
+  "fal.ai",
+  "rest.alpha.fal.ai",
+];
+
+/**
+ * Validate that a URL belongs to an allowed external host.
+ * Throws if the URL hostname is not in the allowlist.
+ */
+export function validateDownloadUrl(url: string): void {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw new Error("Invalid URL provided for download");
+  }
+  if (parsed.protocol !== "https:") {
+    throw new Error("Only HTTPS URLs are allowed for download");
+  }
+  const hostname = parsed.hostname;
+  const isAllowed = ALLOWED_DOWNLOAD_HOSTS.some(
+    (allowed) => hostname === allowed || hostname.endsWith("." + allowed)
+  );
+  if (!isAllowed) {
+    throw new Error(`Download from host '${hostname}' is not allowed`);
+  }
+}
+
 /**
  * Download a file from an external URL
  * Used for downloading video results from Fal
@@ -609,6 +641,7 @@ export function getSignedVideoUrl(
  * @returns Buffer containing the file data
  */
 export async function downloadFromUrl(url: string): Promise<Buffer> {
+  validateDownloadUrl(url);
   const response = await fetch(url);
   if (!response.ok) {
     throw new Error(`Failed to download from URL: ${response.status} ${response.statusText}`);

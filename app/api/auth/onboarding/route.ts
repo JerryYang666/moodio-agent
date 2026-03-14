@@ -6,6 +6,9 @@ import { users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { setAccessTokenCookie } from "@/lib/auth/cookies";
 import { setCloudFrontCookies } from "@/lib/auth/cloudfront-cookies";
+import { grantCredits } from "@/lib/credits";
+
+const SIGNUP_BONUS_CREDITS = 300;
 
 export async function POST(request: NextRequest) {
   try {
@@ -41,6 +44,16 @@ export async function POST(request: NextRequest) {
 
     if (!updatedUser) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
+
+    // Grant new user signup bonus credits
+    if (payload.roles?.includes("new_user")) {
+      await grantCredits(
+        updatedUser.id,
+        SIGNUP_BONUS_CREDITS,
+        "signup_bonus",
+        "New user signup bonus"
+      );
     }
 
     // Generate new access token with updated info

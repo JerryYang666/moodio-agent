@@ -31,6 +31,11 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "imageId is required" }, { status: 400 });
   }
 
+  // Validate imageId to prevent SSRF — only allow safe filename characters
+  if (!/^[a-zA-Z0-9._-]+$/.test(imageId)) {
+    return NextResponse.json({ error: "Invalid imageId" }, { status: 400 });
+  }
+
   try {
     // Get a signed CloudFront URL for the image
     // We must use signed URLs here because server-side fetches don't have
