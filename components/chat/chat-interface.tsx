@@ -2567,6 +2567,7 @@ export default function ChatInterface({
   const persistPartUpdate = useCallback(
     (
       messageTimestamp: number,
+      messageVariantId: string | undefined,
       partType: string,
       partTypeIndex: number,
       updates: Record<string, any>
@@ -2578,6 +2579,7 @@ export default function ChatInterface({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           messageTimestamp,
+          messageVariantId,
           partType,
           partTypeIndex,
           updates,
@@ -2594,14 +2596,19 @@ export default function ChatInterface({
   const handleVideoPartUpdate = useCallback(
     (
       messageTimestamp: number,
+      messageVariantId: string | undefined,
       partType: string,
       partTypeIndex: number,
       updates: any
     ) => {
       setMessages((prev) => {
-        const msgIdx = prev.findIndex(
-          (m) => m.createdAt === messageTimestamp
-        );
+        const byVariantIdx = messageVariantId
+          ? prev.findIndex((m) => m.variantId === messageVariantId)
+          : -1;
+        const msgIdx =
+          byVariantIdx !== -1
+            ? byVariantIdx
+            : prev.findIndex((m) => m.createdAt === messageTimestamp);
         if (msgIdx === -1) return prev;
 
         const msg = prev[msgIdx];
@@ -2622,7 +2629,13 @@ export default function ChatInterface({
         }
         return prev;
       });
-      persistPartUpdate(messageTimestamp, partType, partTypeIndex, updates);
+      persistPartUpdate(
+        messageTimestamp,
+        messageVariantId,
+        partType,
+        partTypeIndex,
+        updates
+      );
     },
     [persistPartUpdate]
   );

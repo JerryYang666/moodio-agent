@@ -63,6 +63,7 @@ interface ParallelMessageProps {
   /** Callback when a user edits an agent_video part's config */
   onVideoPartUpdate?: (
     messageTimestamp: number,
+    messageVariantId: string | undefined,
     partType: string,
     partTypeIndex: number,
     updates: any

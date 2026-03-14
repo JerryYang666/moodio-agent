@@ -80,6 +80,7 @@ interface ChatMessageProps {
   /** Callback when a user edits an agent_video part's config */
   onVideoPartUpdate?: (
     messageTimestamp: number,
+    messageVariantId: string | undefined,
     partType: string,
     partTypeIndex: number,
     updates: any
@@ -552,7 +553,13 @@ export default function ChatMessage({
                 onSendAsVideoMessage={!desktopId ? onSendAsVideoMessage : undefined}
                 onPartUpdate={(updates) => {
                   if (onVideoPartUpdate && message.createdAt) {
-                    onVideoPartUpdate(message.createdAt, "agent_video", i, updates);
+                    onVideoPartUpdate(
+                      message.createdAt,
+                      message.variantId,
+                      "agent_video",
+                      i,
+                      updates
+                    );
                   }
                 }}
               />
