@@ -1916,7 +1916,9 @@ export default function ChatInterface({
               }
 
               variantContents[variantId] = [];
-              isFirstChunkByVariant[variantId] = true;
+              // Don't reset isFirstChunkByVariant — the message already exists in the
+              // messages array. Keeping it false ensures that the next chunk updates
+              // the existing message in-place instead of pushing a duplicate.
 
               // Update the messages state to clear this variant
               updateStreamMessages((prev) => {
@@ -2866,9 +2868,25 @@ export default function ChatInterface({
             }
 
             if (event.type === "invalidate") {
-              // Retry - clear content
+              // Retry - clear content but don't reset isFirstChunk if the
+              // message already exists, to avoid creating a duplicate variant.
               variantContent = [];
-              isFirstChunk = true;
+              if (!isFirstChunk) {
+                // Message already exists in the array — clear it in-place
+                updateStreamMessages((prev) => {
+                  const newMessages = [...prev];
+                  for (let i = newMessages.length - 1; i >= 0; i--) {
+                    const msg = newMessages[i];
+                    if (msg.role === "assistant" && msg.variantId === variantId) {
+                      newMessages[i] = { ...msg, content: [] };
+                      break;
+                    }
+                  }
+                  return newMessages;
+                });
+              }
+              // If isFirstChunk is still true, no message was created yet, so
+              // nothing to clear — just let it create normally on next chunk.
               continue;
             }
 
