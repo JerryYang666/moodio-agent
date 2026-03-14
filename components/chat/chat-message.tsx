@@ -77,6 +77,13 @@ interface ChatMessageProps {
   ) => void;
   /** Callback to restore a direct_video generation's params back into the input */
   onDirectVideoRestore?: (data: import("@/components/video/video-detail-modal").VideoRestoreData) => void;
+  /** Callback when a user edits an agent_video part's config */
+  onVideoPartUpdate?: (
+    messageTimestamp: number,
+    partType: string,
+    partTypeIndex: number,
+    updates: any
+  ) => void;
 }
 
 export default function ChatMessage({
@@ -97,6 +104,7 @@ export default function ChatMessage({
   onSendAsVideoMessage,
   onDirectVideoStatusUpdate,
   onDirectVideoRestore,
+  onVideoPartUpdate,
 }: ChatMessageProps) {
   const isUser = message.role === "user";
   const [isForkPopoverOpen, setIsForkPopoverOpen] = useState(false);
@@ -542,6 +550,11 @@ export default function ChatMessage({
                   }
                 }}
                 onSendAsVideoMessage={!desktopId ? onSendAsVideoMessage : undefined}
+                onPartUpdate={(updates) => {
+                  if (onVideoPartUpdate && message.createdAt) {
+                    onVideoPartUpdate(message.createdAt, "agent_video", i, updates);
+                  }
+                }}
               />
             );
           })}

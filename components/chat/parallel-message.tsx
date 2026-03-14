@@ -60,6 +60,13 @@ interface ParallelMessageProps {
     sourceImageUrl?: string;
     params: Record<string, any>;
   }) => void;
+  /** Callback when a user edits an agent_video part's config */
+  onVideoPartUpdate?: (
+    messageTimestamp: number,
+    partType: string,
+    partTypeIndex: number,
+    updates: any
+  ) => void;
 }
 
 export default function ParallelMessage({
@@ -82,6 +89,7 @@ export default function ParallelMessage({
   onDirectVideoStatusUpdate,
   onDirectVideoRestore,
   onSendAsVideoMessage,
+  onVideoPartUpdate,
 }: ParallelMessageProps) {
   const t = useTranslations();
   const [currentVariantIndex, setCurrentVariantIndex] = useState(0);
@@ -172,6 +180,7 @@ export default function ParallelMessage({
           onDirectVideoStatusUpdate={onDirectVideoStatusUpdate}
           onDirectVideoRestore={onDirectVideoRestore}
           onSendAsVideoMessage={onSendAsVideoMessage}
+          onVideoPartUpdate={onVideoPartUpdate}
         />
         {/* Generate Another Option button - only show when not sending */}
         {onGenerateVariant && !isSending && (
@@ -232,6 +241,7 @@ export default function ParallelMessage({
                 onDirectVideoStatusUpdate={onDirectVideoStatusUpdate}
                 onDirectVideoRestore={onDirectVideoRestore}
                 onSendAsVideoMessage={onSendAsVideoMessage}
+                onVideoPartUpdate={onVideoPartUpdate}
               />
             </div>
           ))}
@@ -320,6 +330,7 @@ export default function ParallelMessage({
               onDirectVideoStatusUpdate={onDirectVideoStatusUpdate}
               onDirectVideoRestore={onDirectVideoRestore}
               onSendAsVideoMessage={onSendAsVideoMessage}
+              onVideoPartUpdate={onVideoPartUpdate}
             />
           </div>
         </div>

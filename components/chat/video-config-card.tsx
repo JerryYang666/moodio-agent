@@ -5,6 +5,12 @@ import { Card, CardBody, CardFooter } from "@heroui/card";
 import { Button } from "@heroui/button";
 import { Chip } from "@heroui/chip";
 import { Spinner } from "@heroui/spinner";
+import {
+  Dropdown,
+  DropdownTrigger,
+  DropdownMenu,
+  DropdownItem,
+} from "@heroui/dropdown";
 import { addToast } from "@heroui/toast";
 import {
   Video,
@@ -17,6 +23,11 @@ import {
   Check,
   AlertCircle,
   Maximize,
+  PenLine,
+  Settings2,
+  Camera,
+  Hash,
+  ChevronDown,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useVideo } from "@/components/video-provider";
@@ -24,23 +35,32 @@ import { useCredits } from "@/hooks/use-credits";
 import { useGenerateVideoMutation } from "@/lib/redux/services/next-api";
 import { getViewportCenterPosition } from "@/lib/desktop/types";
 import type { MessageContentPart } from "@/lib/llm/types";
+import { getVideoModel, type VideoModelParam } from "@/lib/video/models";
 
 type AgentVideoPart = Extract<MessageContentPart, { type: "agent_video" }>;
 
+const PARAM_ICON_MAP: Record<
+  string,
+  React.ComponentType<{ size?: number; className?: string }>
+> = {
+  duration: Clock,
+  resolution: Monitor,
+  aspect_ratio: Maximize,
+  generate_audio: Volume2,
+  camera_fixed: Camera,
+  seed: Hash,
+  cfg_scale: Settings2,
+};
+
 interface VideoConfigCardProps {
   part: AgentVideoPart;
-  /** Available source images from the conversation (imageId -> imageUrl) */
   sourceImages: Array<{ imageId: string; imageUrl: string; title?: string }>;
-  /** Desktop ID if viewing from desktop page - enables adding asset to desktop */
   desktopId?: string;
-  /** Chat ID for linking */
   chatId?: string;
-  /** Callback when video creation status changes */
   onStatusChange?: (
     status: AgentVideoPart["status"],
     generationId?: string
   ) => void;
-  /** Callback to send video generation as a user message (when not on desktop) */
   onSendAsVideoMessage?: (config: {
     modelId: string;
     modelName: string;
@@ -49,6 +69,7 @@ interface VideoConfigCardProps {
     sourceImageUrl?: string;
     params: Record<string, any>;
   }) => void;
+  onPartUpdate?: (updates: Partial<AgentVideoPart>) => void;
 }
 
 export default function VideoConfigCard({
@@ -58,6 +79,7 @@ export default function VideoConfigCard({
   chatId,
   onStatusChange,
   onSendAsVideoMessage,
+  onPartUpdate,
 }: VideoConfigCardProps) {
   const t = useTranslations();
   const { monitorGeneration } = useVideo();
@@ -70,6 +92,12 @@ export default function VideoConfigCard({
   const [error, setError] = useState<string | undefined>(part.error);
   const [creating, setCreating] = useState(false);
 
+  // Editable state — initialized from the part config (which may already contain saved edits)
+  const [editedPrompt, setEditedPrompt] = useState(part.config.prompt);
+  const [editedParams, setEditedParams] = useState<Record<string, any>>({
+    ...part.config.params,
+  });
+
   // Cost estimation
   const [estimatedCost, setEstimatedCost] = useState<number | null>(null);
   const [costLoading, setCostLoading] = useState(false);
@@ -77,7 +105,34 @@ export default function VideoConfigCard({
   const insufficientCredits =
     estimatedCost !== null && balance !== null && balance < estimatedCost;
 
-  // Prefer the sourceImageId specified by the agent; fall back to the most recent image
+  const isEditable = status === "pending" || status === "error";
+
+  const modelConfig = useMemo(
+    () => getVideoModel(part.config.modelId),
+    [part.config.modelId]
+  );
+
+  const visibleParams = useMemo(() => {
+    if (!modelConfig) return [];
+    return modelConfig.params.filter(
+      (p) =>
+        p.name !== "prompt" &&
+        p.name !== modelConfig.imageParams.sourceImage &&
+        p.name !== modelConfig.imageParams.endImage &&
+        p.status !== "hidden" &&
+        p.status !== "disabled"
+    );
+  }, [modelConfig]);
+
+  const gridParams = useMemo(
+    () => visibleParams.filter((p) => p.type !== "string"),
+    [visibleParams]
+  );
+  const textParams = useMemo(
+    () => visibleParams.filter((p) => p.type === "string"),
+    [visibleParams]
+  );
+
   const selectedSourceImage = useMemo(() => {
     if (part.config.sourceImageId) {
       const match = sourceImages.find(
@@ -88,18 +143,16 @@ export default function VideoConfigCard({
     return sourceImages[sourceImages.length - 1] || null;
   }, [sourceImages, part.config.sourceImageId]);
 
-  // Memoize cost params to avoid unnecessary refetches
   const costParamsKey = useMemo(() => {
-    const entries = Object.entries(part.config.params)
+    const entries = Object.entries(editedParams)
       .filter(
         ([, value]) =>
           value !== undefined && value !== null && value !== ""
       )
       .sort(([a], [b]) => a.localeCompare(b));
     return JSON.stringify(entries);
-  }, [part.config.params]);
+  }, [editedParams]);
 
-  // Fetch cost preview
   useEffect(() => {
     if (!part.config.modelId || status !== "pending") {
       setEstimatedCost(null);
@@ -112,7 +165,7 @@ export default function VideoConfigCard({
         const searchParams = new URLSearchParams();
         searchParams.set("modelId", part.config.modelId);
 
-        Object.entries(part.config.params).forEach(([key, value]) => {
+        Object.entries(editedParams).forEach(([key, value]) => {
           if (value !== undefined && value !== null && value !== "") {
             searchParams.set(key, String(value));
           }
@@ -144,16 +197,31 @@ export default function VideoConfigCard({
       return;
     }
 
-    // If not on desktop and onSendAsVideoMessage is available,
-    // send as a user message instead of generating directly
+    const hasEdits =
+      editedPrompt !== part.config.prompt ||
+      JSON.stringify(editedParams) !== JSON.stringify(part.config.params);
+
+    if (onPartUpdate) {
+      onPartUpdate({
+        config: {
+          ...part.config,
+          prompt: editedPrompt,
+          params: editedParams,
+        },
+        ...(hasEdits
+          ? { userEdited: true, userEditedAt: Date.now() }
+          : {}),
+      });
+    }
+
     if (!desktopId && onSendAsVideoMessage) {
       onSendAsVideoMessage({
         modelId: part.config.modelId,
         modelName: part.config.modelName,
-        prompt: part.config.prompt,
+        prompt: editedPrompt,
         sourceImageId: selectedSourceImage.imageId,
         sourceImageUrl: selectedSourceImage.imageUrl,
-        params: part.config.params,
+        params: editedParams,
       });
       setStatus("created");
       onStatusChange?.("created");
@@ -170,8 +238,8 @@ export default function VideoConfigCard({
         modelId: part.config.modelId,
         sourceImageId: selectedSourceImage.imageId,
         params: {
-          prompt: part.config.prompt,
-          ...part.config.params,
+          prompt: editedPrompt,
+          ...editedParams,
         },
       }).unwrap();
 
@@ -179,10 +247,8 @@ export default function VideoConfigCard({
       setStatus("created");
       onStatusChange?.("created", result.generationId);
 
-      // Start monitoring for completion
       monitorGeneration(result.generationId);
 
-      // Add video as desktop asset if on desktop page
       if (desktopId) {
         try {
           const pos = getViewportCenterPosition();
@@ -196,8 +262,8 @@ export default function VideoConfigCard({
                   metadata: {
                     generationId: result.generationId,
                     imageId: selectedSourceImage.imageId,
-                    title: part.config.prompt.slice(0, 80),
-                    prompt: part.config.prompt,
+                    title: editedPrompt.slice(0, 80),
+                    prompt: editedPrompt,
                     status: "processing",
                     modelId: part.config.modelId,
                     chatId,
@@ -210,7 +276,6 @@ export default function VideoConfigCard({
           });
           if (assetRes.ok) {
             const assetData = await assetRes.json();
-            // Dispatch event so the desktop page can add the asset to the canvas
             window.dispatchEvent(
               new CustomEvent("desktop-asset-added", {
                 detail: { assets: assetData.assets, desktopId },
@@ -231,7 +296,9 @@ export default function VideoConfigCard({
       const errorMessage =
         errorData?.error === "INSUFFICIENT_CREDITS"
           ? t("credits.insufficientCredits")
-          : errorData?.error || e?.message || t("video.failedToStartGeneration");
+          : errorData?.error ||
+            e?.message ||
+            t("video.failedToStartGeneration");
       setError(errorMessage);
       setStatus("error");
       onStatusChange?.("error");
@@ -241,21 +308,249 @@ export default function VideoConfigCard({
   }, [
     selectedSourceImage,
     part.config,
+    editedPrompt,
+    editedParams,
     generateVideo,
     monitorGeneration,
     desktopId,
     chatId,
     onStatusChange,
     onSendAsVideoMessage,
+    onPartUpdate,
     t,
   ]);
 
-  // Parameter display helpers
-  const params = part.config.params;
-  const duration = params.duration || "5";
-  const resolution = params.resolution || "720p";
-  const aspectRatio = params.aspect_ratio || "16:9";
-  const generateAudio = params.generate_audio !== false;
+  const handleParamChange = useCallback((name: string, value: any) => {
+    setEditedParams((prev) => ({ ...prev, [name]: value }));
+  }, []);
+
+  const getParamIcon = (param: VideoModelParam) => {
+    if (param.name === "generate_audio") {
+      const value = editedParams[param.name] ?? param.default;
+      return value !== false ? Volume2 : VolumeX;
+    }
+    return PARAM_ICON_MAP[param.name] || Settings2;
+  };
+
+  const getParamDisplayValue = (param: VideoModelParam) => {
+    const value = editedParams[param.name] ?? param.default ?? "";
+    if (param.type === "boolean") {
+      return value ? t("common.on") : t("common.off");
+    }
+    if (
+      param.name === "duration" &&
+      typeof value === "string" &&
+      !value.includes("s")
+    ) {
+      return `${value}s`;
+    }
+    return String(value);
+  };
+
+  const renderParamCell = (param: VideoModelParam) => {
+    const Icon = getParamIcon(param);
+    const displayValue = getParamDisplayValue(param);
+    const label = param.label || param.name;
+
+    if (param.type === "boolean") {
+      const value = editedParams[param.name] ?? param.default ?? false;
+      return (
+        <div
+          key={param.name}
+          role={isEditable ? "button" : undefined}
+          tabIndex={isEditable ? 0 : undefined}
+          className={`flex items-center gap-1.5 bg-background/50 rounded-lg px-2.5 py-1.5 border border-divider ${
+            isEditable
+              ? "cursor-pointer hover:bg-default-100 transition-colors"
+              : ""
+          }`}
+          onClick={
+            isEditable
+              ? () => handleParamChange(param.name, !value)
+              : undefined
+          }
+          onKeyDown={
+            isEditable
+              ? (e) => {
+                  if (e.key === "Enter" || e.key === " ")
+                    handleParamChange(param.name, !value);
+                }
+              : undefined
+          }
+        >
+          <Icon size={14} className="text-default-400 shrink-0" />
+          <div className="flex-1 min-w-0">
+            <div className="text-[10px] text-default-400">{label}</div>
+            <div className="text-xs font-medium">{displayValue}</div>
+          </div>
+        </div>
+      );
+    }
+
+    if (param.type === "enum" && param.options) {
+      if (!isEditable) {
+        return (
+          <div
+            key={param.name}
+            className="flex items-center gap-1.5 bg-background/50 rounded-lg px-2.5 py-1.5 border border-divider"
+          >
+            <Icon size={14} className="text-default-400 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <div className="text-[10px] text-default-400">{label}</div>
+              <div className="text-xs font-medium">{displayValue}</div>
+            </div>
+          </div>
+        );
+      }
+      const value = editedParams[param.name] ?? param.default ?? "";
+      return (
+        <Dropdown key={param.name}>
+          <DropdownTrigger>
+            <div className="flex items-center gap-1.5 bg-background/50 rounded-lg px-2.5 py-1.5 border border-divider cursor-pointer hover:bg-default-100 transition-colors">
+              <Icon size={14} className="text-default-400 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <div className="text-[10px] text-default-400">{label}</div>
+                <div className="text-xs font-medium flex items-center gap-1">
+                  {displayValue}
+                  <ChevronDown size={10} className="text-default-400" />
+                </div>
+              </div>
+            </div>
+          </DropdownTrigger>
+          <DropdownMenu
+            disallowEmptySelection
+            aria-label={label}
+            selectedKeys={
+              value !== "" ? new Set([String(value)]) : new Set<string>()
+            }
+            selectionMode="single"
+            variant="flat"
+            onSelectionChange={(keys) => {
+              const selected = Array.from(keys)[0] as string;
+              if (selected) {
+                const original = param.options?.find(
+                  (opt) => String(opt) === selected
+                );
+                handleParamChange(param.name, original ?? selected);
+              }
+            }}
+          >
+            {param.options.map((opt) => (
+              <DropdownItem key={String(opt)}>{String(opt)}</DropdownItem>
+            ))}
+          </DropdownMenu>
+        </Dropdown>
+      );
+    }
+
+    if (param.type === "number") {
+      const value = editedParams[param.name] ?? param.default ?? "";
+      const hasFiniteRange =
+        param.min !== undefined &&
+        param.max !== undefined &&
+        param.max - param.min <= 20;
+
+      if (hasFiniteRange && isEditable) {
+        const min = param.min!;
+        const max = param.max!;
+        const step = max - min <= 1 ? 0.1 : 1;
+        const items: string[] = [];
+        for (
+          let i = min;
+          i <= max + Number.EPSILON;
+          i = Math.round((i + step) * 10) / 10
+        ) {
+          items.push(step < 1 ? i.toFixed(1) : String(i));
+        }
+        return (
+          <Dropdown key={param.name}>
+            <DropdownTrigger>
+              <div className="flex items-center gap-1.5 bg-background/50 rounded-lg px-2.5 py-1.5 border border-divider cursor-pointer hover:bg-default-100 transition-colors">
+                <Icon size={14} className="text-default-400 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <div className="text-[10px] text-default-400">{label}</div>
+                  <div className="text-xs font-medium flex items-center gap-1">
+                    {String(value) || "—"}
+                    <ChevronDown size={10} className="text-default-400" />
+                  </div>
+                </div>
+              </div>
+            </DropdownTrigger>
+            <DropdownMenu
+              disallowEmptySelection
+              aria-label={label}
+              selectedKeys={
+                value !== ""
+                  ? new Set([String(value)])
+                  : new Set<string>()
+              }
+              selectionMode="single"
+              variant="flat"
+              onSelectionChange={(keys) => {
+                const selected = Array.from(keys)[0] as string;
+                if (selected) handleParamChange(param.name, Number(selected));
+              }}
+            >
+              {items.map((item) => (
+                <DropdownItem key={item}>{item}</DropdownItem>
+              ))}
+            </DropdownMenu>
+          </Dropdown>
+        );
+      }
+
+      if (!isEditable) {
+        return (
+          <div
+            key={param.name}
+            className="flex items-center gap-1.5 bg-background/50 rounded-lg px-2.5 py-1.5 border border-divider"
+          >
+            <Icon size={14} className="text-default-400 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <div className="text-[10px] text-default-400">{label}</div>
+              <div className="text-xs font-medium">
+                {String(value) || "—"}
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      return (
+        <div
+          key={param.name}
+          className="flex items-center gap-1.5 bg-background/50 rounded-lg px-2.5 py-1.5 border border-divider"
+        >
+          <Icon size={14} className="text-default-400 shrink-0" />
+          <div className="flex-1 min-w-0">
+            <div className="text-[10px] text-default-400">{label}</div>
+            <input
+              type="number"
+              className="text-xs font-medium w-full bg-transparent outline-none border-none p-0"
+              value={value === "" || value === undefined ? "" : value}
+              min={param.min}
+              max={param.max}
+              placeholder={param.description || ""}
+              onChange={(e) => {
+                const raw = e.target.value;
+                if (raw === "" || raw === "-") {
+                  handleParamChange(
+                    param.name,
+                    raw === "-" ? raw : undefined
+                  );
+                  return;
+                }
+                const num = Number(raw);
+                if (!isNaN(num)) handleParamChange(param.name, num);
+              }}
+            />
+          </div>
+        </div>
+      );
+    }
+
+    return null;
+  };
 
   return (
     <Card className="my-3 border border-primary/20 bg-linear-to-br from-primary/5 to-secondary/5 dark:from-primary/10 dark:to-secondary/10">
@@ -266,8 +561,26 @@ export default function VideoConfigCard({
             <Video size={16} className="text-primary" />
           </div>
           <div className="flex-1 min-w-0">
-            <div className="text-sm font-semibold">{t("video.videoCreation")}</div>
-            <div className="text-xs text-default-500">{part.config.modelName}</div>
+            <div className="text-sm font-semibold flex items-center gap-1.5">
+              {t("video.videoCreation")}
+              {part.userEdited && (
+                <Chip
+                  size="sm"
+                  variant="flat"
+                  color="warning"
+                  startContent={<PenLine size={10} />}
+                  classNames={{
+                    base: "h-5 px-1.5",
+                    content: "text-[10px] px-0.5",
+                  }}
+                >
+                  Edited
+                </Chip>
+              )}
+            </div>
+            <div className="text-xs text-default-500">
+              {part.config.modelName}
+            </div>
           </div>
           {status === "created" && (
             <Chip
@@ -296,51 +609,61 @@ export default function VideoConfigCard({
           <div className="text-xs text-default-400 mb-1 font-medium">
             {t("video.prompt")}
           </div>
-          <div className="whitespace-pre-wrap">{part.config.prompt}</div>
+          {isEditable ? (
+            <textarea
+              className="w-full bg-transparent outline-none resize-vertical text-sm whitespace-pre-wrap min-h-24"
+              value={editedPrompt}
+              onChange={(e) => setEditedPrompt(e.target.value)}
+              rows={Math.max(4, editedPrompt.split("\n").length)}
+            />
+          ) : (
+            <div className="whitespace-pre-wrap">{editedPrompt}</div>
+          )}
         </div>
 
         {/* Parameters Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          <div className="flex items-center gap-1.5 bg-background/50 rounded-lg px-2.5 py-1.5 border border-divider">
-            <Clock size={14} className="text-default-400 shrink-0" />
-            <div>
-              <div className="text-[10px] text-default-400">{t("video.durationLabel")}</div>
-              <div className="text-xs font-medium">{duration}s</div>
-            </div>
+        {gridParams.length > 0 && (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {gridParams.map((param) => renderParamCell(param))}
           </div>
-          <div className="flex items-center gap-1.5 bg-background/50 rounded-lg px-2.5 py-1.5 border border-divider">
-            <Monitor size={14} className="text-default-400 shrink-0" />
-            <div>
-              <div className="text-[10px] text-default-400">{t("video.resolution")}</div>
-              <div className="text-xs font-medium">{resolution}</div>
-            </div>
-          </div>
-          <div className="flex items-center gap-1.5 bg-background/50 rounded-lg px-2.5 py-1.5 border border-divider">
-            <Maximize size={14} className="text-default-400 shrink-0" />
-            <div>
-              <div className="text-[10px] text-default-400">{t("video.aspectRatio")}</div>
-              <div className="text-xs font-medium">{aspectRatio}</div>
-            </div>
-          </div>
-          <div className="flex items-center gap-1.5 bg-background/50 rounded-lg px-2.5 py-1.5 border border-divider">
-            {generateAudio ? (
-              <Volume2 size={14} className="text-default-400 shrink-0" />
-            ) : (
-              <VolumeX size={14} className="text-default-400 shrink-0" />
-            )}
-            <div>
-              <div className="text-[10px] text-default-400">{t("video.audio")}</div>
-              <div className="text-xs font-medium">
-                {generateAudio ? t("common.on") : t("common.off")}
+        )}
+
+        {/* String-type params (e.g., negative_prompt) */}
+        {textParams.map((param) => {
+          const value = editedParams[param.name] ?? param.default ?? "";
+          return (
+            <div
+              key={param.name}
+              className="text-sm text-foreground/90 bg-background/50 rounded-lg p-3 border border-divider"
+            >
+              <div className="text-xs text-default-400 mb-1 font-medium">
+                {param.label || param.name}
               </div>
+              {isEditable ? (
+                <textarea
+                  className="w-full bg-transparent outline-none resize-none text-xs whitespace-pre-wrap min-h-6"
+                  value={String(value)}
+                  onChange={(e) =>
+                    handleParamChange(param.name, e.target.value)
+                  }
+                  rows={1}
+                  placeholder={param.description || ""}
+                />
+              ) : (
+                <div className="text-xs whitespace-pre-wrap">
+                  {String(value) || "—"}
+                </div>
+              )}
             </div>
-          </div>
-        </div>
+          );
+        })}
 
         {/* Source Image Preview */}
         {selectedSourceImage && (
           <div className="flex items-center gap-2">
-            <div className="text-xs text-default-400">{t("video.sourceImage")}:</div>
+            <div className="text-xs text-default-400">
+              {t("video.sourceImage")}:
+            </div>
             <div className="w-12 h-8 rounded overflow-hidden border border-divider">
               <img
                 src={selectedSourceImage.imageUrl}
@@ -385,9 +708,7 @@ export default function VideoConfigCard({
             color="primary"
             size="md"
             className="w-full"
-            startContent={
-              creating ? undefined : <Sparkles size={16} />
-            }
+            startContent={creating ? undefined : <Sparkles size={16} />}
             isLoading={creating}
             isDisabled={!selectedSourceImage || creating || insufficientCredits}
             onPress={handleCreate}

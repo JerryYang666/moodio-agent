@@ -48,6 +48,8 @@ export type MessageContentPart =
       status: "pending" | "creating" | "created" | "error";
       generationId?: string; // Set after video creation starts
       error?: string;
+      userEdited?: boolean;
+      userEditedAt?: number; // Unix timestamp in milliseconds
     }
   | {
       type: "direct_video";

@@ -2558,6 +2558,71 @@ export default function ChatInterface({
     [chatId, isSending, disableActiveChatPersistence, onChatCreated, t]
   );
 
+  // Persist a part update to S3 in the background (fire-and-forget).
+  // Parts are addressed by stable identifiers, not raw array indices.
+  const persistPartUpdate = useCallback(
+    (
+      messageTimestamp: number,
+      partType: string,
+      partTypeIndex: number,
+      updates: Record<string, any>
+    ) => {
+      const id = chatIdRef.current;
+      if (!id) return;
+      fetch(`/api/chat/${id}/parts`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messageTimestamp,
+          partType,
+          partTypeIndex,
+          updates,
+        }),
+      }).catch((err) => {
+        console.error("Failed to persist part update:", err);
+      });
+    },
+    []
+  );
+
+  // Handle agent_video part edits from VideoConfigCard.
+  // Addressed by message timestamp + Nth occurrence of the part type.
+  const handleVideoPartUpdate = useCallback(
+    (
+      messageTimestamp: number,
+      partType: string,
+      partTypeIndex: number,
+      updates: any
+    ) => {
+      setMessages((prev) => {
+        const msgIdx = prev.findIndex(
+          (m) => m.createdAt === messageTimestamp
+        );
+        if (msgIdx === -1) return prev;
+
+        const msg = prev[msgIdx];
+        if (!Array.isArray(msg.content)) return prev;
+
+        const newContent = [...msg.content];
+        let typeCount = 0;
+        for (let i = 0; i < newContent.length; i++) {
+          if (newContent[i].type === partType) {
+            if (typeCount === partTypeIndex) {
+              newContent[i] = { ...newContent[i], ...updates };
+              const newMessages = [...prev];
+              newMessages[msgIdx] = { ...msg, content: newContent };
+              return newMessages;
+            }
+            typeCount++;
+          }
+        }
+        return prev;
+      });
+      persistPartUpdate(messageTimestamp, partType, partTypeIndex, updates);
+    },
+    [persistPartUpdate]
+  );
+
   // Handle direct video status updates from DirectVideoCard
   const handleDirectVideoStatusUpdate = useCallback(
     (messageIndex: number, partIndex: number, updates: any) => {
@@ -2938,6 +3003,7 @@ export default function ChatInterface({
                 desktopId={desktopId}
                 allMessages={messages}
                 onSendAsVideoMessage={handleSendVideoFromAgent}
+                onVideoPartUpdate={handleVideoPartUpdate}
               />
             );
           } else {
@@ -2987,6 +3053,7 @@ export default function ChatInterface({
                 onDirectVideoStatusUpdate={handleDirectVideoStatusUpdate}
                 onDirectVideoRestore={handleDirectVideoRestore}
                 onSendAsVideoMessage={handleSendVideoFromAgent}
+                onVideoPartUpdate={handleVideoPartUpdate}
               />
             );
           }
