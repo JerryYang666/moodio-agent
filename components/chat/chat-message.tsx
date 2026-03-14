@@ -280,19 +280,27 @@ export default function ChatMessage({
     const isStaleMessage =
       messageTimestamp && Date.now() - messageTimestamp > 10 * 60 * 1000;
 
-    // Group parts by type for rendering
-    const textParts = content.filter((p) => p.type === "text");
-    const imageParts = content.filter(
-      (p) => p.type === "image" || p.type === "image_url"
-    );
-    const agentParts = content.filter((p) => isGeneratedImagePart(p));
-    const videoParts = content.filter((p) => p.type === "agent_video");
-    const directVideoParts = content.filter((p) => p.type === "direct_video");
-    const shotListParts = content.filter((p) => p.type === "agent_shot_list");
+    // Meta parts always rendered at top
     const thinkParts = content.filter((p) => p.type === "internal_think");
     const toolCallParts = content.filter((p) => p.type === "tool_call");
-    const searchParts = content.filter((p) => p.type === "agent_search");
-    const userVideoParts = content.filter((p) => p.type === "video");
+
+    // Content parts in insertion order (everything except meta)
+    const orderedParts = content.filter(
+      (p) => p.type !== "internal_think" && p.type !== "tool_call"
+    );
+
+    // Group consecutive same-type parts so e.g. 4 agent images still render in a grid
+    type ContentGroup = { groupType: string; parts: MessageContentPart[] };
+    const groups: ContentGroup[] = [];
+    for (const part of orderedParts) {
+      const gt = isGeneratedImagePart(part) ? "agent_image" : part.type;
+      const last = groups[groups.length - 1];
+      if (last && last.groupType === gt) {
+        last.parts.push(part);
+      } else {
+        groups.push({ groupType: gt, parts: [part] });
+      }
+    }
 
     return (
       <div className="space-y-4">
@@ -325,279 +333,290 @@ export default function ChatMessage({
             <ToolCallCard key={`tool-${i}`} tool={part.tool} status={part.status} />
           ))}
 
-        {textParts.map((part: any, i) => (
-          <MarkdownRenderer key={`text-${i}`} components={markdownComponents}>
-            {part.text}
-          </MarkdownRenderer>
-        ))}
+        {groups.map((group, gi) => {
+          switch (group.groupType) {
+            case "text":
+              return group.parts.map((part: any, i) => (
+                <MarkdownRenderer key={`text-${gi}-${i}`} components={markdownComponents}>
+                  {part.text}
+                </MarkdownRenderer>
+              ));
 
-        {isUser && imageParts.length > 0 && (
-          <div className="flex gap-2 overflow-x-auto pb-1">
-            {(() => {
-              const images: ImageInfo[] = imageParts
-                .map((p: any) => {
-                  const imageUrl =
-                    p.type === "image" ? p.imageUrl || "" : p.image_url.url;
-                  if (!imageUrl) return null;
-                  return {
-                    url: imageUrl,
-                    title: t("chat.image"),
-                    prompt: undefined,
-                    imageId: p.type === "image" ? p.imageId : undefined,
-                  };
-                })
-                .filter(Boolean) as ImageInfo[];
+            case "image":
+            case "image_url":
+              if (!isUser) return null;
+              return (
+                <div key={`user-images-${gi}`} className="flex gap-2 overflow-x-auto pb-1">
+                  {(() => {
+                    const images: ImageInfo[] = group.parts
+                      .map((p: any) => {
+                        const imageUrl =
+                          p.type === "image" ? p.imageUrl || "" : p.image_url.url;
+                        if (!imageUrl) return null;
+                        return {
+                          url: imageUrl,
+                          title: t("chat.image"),
+                          prompt: undefined,
+                          imageId: p.type === "image" ? p.imageId : undefined,
+                        };
+                      })
+                      .filter(Boolean) as ImageInfo[];
 
-              return imageParts.map((part: any, i) => {
-                const url =
-                  part.type === "image"
-                    ? part.imageUrl || ""
-                    : part.image_url.url;
-                if (!url) return null;
-                return (
-                  <ImageHoverPreview key={`img-${i}`} src={url} alt={t("chat.userUpload")}>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        onUserImageClick && onUserImageClick(images, i)
-                      }
-                      className="h-20 w-20 rounded-lg border border-divider overflow-hidden shrink-0 focus:outline-none focus:ring-2 focus:ring-primary"
+                    return group.parts.map((part: any, i) => {
+                      const url =
+                        part.type === "image"
+                          ? part.imageUrl || ""
+                          : part.image_url.url;
+                      if (!url) return null;
+                      return (
+                        <ImageHoverPreview key={`img-${gi}-${i}`} src={url} alt={t("chat.userUpload")}>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              onUserImageClick && onUserImageClick(images, i)
+                            }
+                            className="h-20 w-20 rounded-lg border border-divider overflow-hidden shrink-0 focus:outline-none focus:ring-2 focus:ring-primary"
+                          >
+                            <img
+                              src={url}
+                              alt={t("chat.userUpload")}
+                              className="h-full w-full object-cover"
+                            />
+                          </button>
+                        </ImageHoverPreview>
+                      );
+                    });
+                  })()}
+                </div>
+              );
+
+            case "video":
+              if (!isUser) return null;
+              return (
+                <div key={`user-videos-${gi}`} className="flex gap-2 overflow-x-auto pb-1">
+                  {group.parts.map((part: any, i) => (
+                    <div
+                      key={`vid-${gi}-${i}`}
+                      className="h-20 w-20 rounded-lg border border-divider overflow-hidden shrink-0 relative bg-black"
                     >
-                      <img
-                        src={url}
-                        alt={t("chat.userUpload")}
-                        className="h-full w-full object-cover"
-                      />
-                    </button>
-                  </ImageHoverPreview>
+                      {part.videoUrl ? (
+                        <video
+                          src={part.videoUrl}
+                          className="h-full w-full object-cover"
+                          muted
+                          playsInline
+                        />
+                      ) : (
+                        <div className="h-full w-full flex items-center justify-center">
+                          <Video size={20} className="text-default-400" />
+                        </div>
+                      )}
+                      <div className="absolute top-1 left-1 z-10">
+                        <span className="text-[9px] font-semibold bg-danger/90 text-white px-1.5 py-0.5 rounded flex items-center gap-0.5">
+                          <Video size={8} />
+                          {t("chat.videoLabel")}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              );
+
+            case "agent_image":
+              return (
+                <div key={`agent-images-${gi}`} className="grid grid-cols-2 gap-3 mt-2">
+                  {group.parts.map((part: any, i) => {
+                    const url = part.imageUrl || "";
+                    const isSelected =
+                      (part.imageId && selectedImageIds.includes(part.imageId)) ||
+                      part.isSelected;
+
+                    const realPartIndex = (content as MessageContentPart[]).indexOf(
+                      part
+                    );
+
+                    const effectiveStatus =
+                      part.status === "loading" && isStaleMessage
+                        ? "error"
+                        : part.status;
+
+                    return (
+                      <ImageWithMenu
+                        key={`agent-${gi}-${i}`}
+                        imageId={part.imageId || ""}
+                        imageUrl={url}
+                        chatId={chatId}
+                        desktopId={desktopId}
+                        generationDetails={{
+                          title: part.title,
+                          prompt: part.prompt,
+                          status: effectiveStatus,
+                        }}
+                        onViewDetails={() => onAgentTitleClick(part)}
+                        topRightActions={
+                          effectiveStatus === "generated" && onAgentExpandClick ? (
+                            <Button
+                              isIconOnly
+                              size="sm"
+                              variant="solid"
+                              aria-label={t("imageDetail.viewFullSize")}
+                              title={t("imageDetail.viewFullSize")}
+                              className="bg-background/80 backdrop-blur-sm"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                onAgentExpandClick(part);
+                              }}
+                            >
+                              <Maximize2 size={16} />
+                            </Button>
+                          ) : null
+                        }
+                      >
+                        <ImageHoverPreview
+                          src={url}
+                          alt={part.title}
+                          maxPreviewWidth={600}
+                          maxPreviewHeight={600}
+                          className="block"
+                          disabled={effectiveStatus !== "generated"}
+                        >
+                          <Card
+                            className={clsx(
+                              "w-full",
+                              isSelected && "border-4 border-primary"
+                            )}
+                          >
+                            <CardBody
+                              className="p-0 overflow-hidden relative cursor-pointer group/image rounded-lg"
+                              draggable={effectiveStatus === "generated"}
+                              onClick={() =>
+                                effectiveStatus === "generated" &&
+                                msgIndex !== undefined &&
+                                onAgentImageSelect(
+                                  part,
+                                  msgIndex,
+                                  realPartIndex,
+                                  message.variantId
+                                )
+                              }
+                              onDragStart={(e) => handleAgentDragStart(e, part)}
+                              onDoubleClick={(e) => {
+                                e.preventDefault();
+                                if (
+                                  effectiveStatus === "generated" ||
+                                  effectiveStatus === "error"
+                                ) {
+                                  onAgentTitleClick(part);
+                                }
+                              }}
+                            >
+                              <div className="aspect-square w-full">
+                              {effectiveStatus === "loading" && (
+                                <div className="w-full h-full flex items-center justify-center bg-default-100">
+                                  <Spinner />
+                                </div>
+                              )}
+                              {effectiveStatus === "error" && (
+                                <div className="w-full h-full flex items-center justify-center bg-danger-50 text-danger">
+                                  <X />
+                                </div>
+                              )}
+                              {effectiveStatus === "generated" && (
+                                <Image
+                                  src={url}
+                                  alt={part.title}
+                                  radius="none"
+                                  classNames={{
+                                    wrapper: "w-full h-full !max-w-full",
+                                    img: "w-full h-full object-contain bg-default-100 dark:bg-black",
+                                  }}
+                                />
+                              )}
+                              </div>
+                              {(effectiveStatus === "generated" ||
+                                effectiveStatus === "error") && (
+                                <div className="absolute bottom-0 left-0 right-0 bg-white/90 dark:bg-black/60 text-black dark:text-white p-2 text-xs truncate md:opacity-0 md:group-hover/image:opacity-100 transition-opacity z-10 pointer-events-none">
+                                  {part.title}
+                                </div>
+                              )}
+                            </CardBody>
+                          </Card>
+                        </ImageHoverPreview>
+                      </ImageWithMenu>
+                    );
+                  })}
+                </div>
+              );
+
+            case "agent_video":
+              return group.parts.map((part: any, i) => {
+                const realPartIndex = (content as MessageContentPart[]).indexOf(part);
+                return (
+                  <VideoConfigCard
+                    key={`video-${gi}-${i}`}
+                    part={part}
+                    sourceImages={sourceImagesForVideo}
+                    desktopId={desktopId}
+                    chatId={chatId}
+                    onStatusChange={(status, generationId) => {
+                      if (onVideoStatusChange && msgIndex !== undefined) {
+                        onVideoStatusChange(msgIndex, realPartIndex, status, generationId);
+                      }
+                    }}
+                    onSendAsVideoMessage={!desktopId ? onSendAsVideoMessage : undefined}
+                    onPartUpdate={(updates) => {
+                      if (onVideoPartUpdate && message.createdAt) {
+                        return onVideoPartUpdate(
+                          message.createdAt,
+                          message.variantId,
+                          "agent_video",
+                          i,
+                          updates
+                        );
+                      }
+                    }}
+                  />
                 );
               });
-            })()}
-          </div>
-        )}
 
-        {isUser && userVideoParts.length > 0 && (
-          <div className="flex gap-2 overflow-x-auto pb-1">
-            {userVideoParts.map((part: any, i) => (
-              <div
-                key={`vid-${i}`}
-                className="h-20 w-20 rounded-lg border border-divider overflow-hidden shrink-0 relative bg-black"
-              >
-                {part.videoUrl ? (
-                  <video
-                    src={part.videoUrl}
-                    className="h-full w-full object-cover"
-                    muted
-                    playsInline
+            case "direct_video":
+              return group.parts.map((part: any, i) => {
+                const realPartIndex = (content as MessageContentPart[]).indexOf(part);
+                return (
+                  <DirectVideoCard
+                    key={`direct-video-${gi}-${i}`}
+                    part={part}
+                    onStatusUpdate={(updates) => {
+                      if (onDirectVideoStatusUpdate && msgIndex !== undefined) {
+                        onDirectVideoStatusUpdate(msgIndex, realPartIndex, updates);
+                      }
+                    }}
+                    onRestore={onDirectVideoRestore}
                   />
-                ) : (
-                  <div className="h-full w-full flex items-center justify-center">
-                    <Video size={20} className="text-default-400" />
-                  </div>
-                )}
-                <div className="absolute top-1 left-1 z-10">
-                  <span className="text-[9px] font-semibold bg-danger/90 text-white px-1.5 py-0.5 rounded flex items-center gap-0.5">
-                    <Video size={8} />
-                    {t("chat.videoLabel")}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+                );
+              });
 
-        {agentParts.length > 0 && (
-          <div className="grid grid-cols-2 gap-3 mt-2">
-            {agentParts.map((part: any, i) => {
-              // Use imageUrl from API response (CloudFront + signed cookies)
-              const url = part.imageUrl || "";
-              // Check if this image is selected by checking if its imageId is in selectedImageIds
-              const isSelected =
-                (part.imageId && selectedImageIds.includes(part.imageId)) ||
-                part.isSelected;
+            case "agent_shot_list":
+              return group.parts.map((part: any, i) => (
+                <ShotListCard key={`shotlist-${gi}-${i}`} part={part} />
+              ));
 
-              const realPartIndex = (content as MessageContentPart[]).indexOf(
-                part
-              );
-
-              // Show error if image is loading but message is more than 10 minutes old
-              const effectiveStatus =
-                part.status === "loading" && isStaleMessage
-                  ? "error"
-                  : part.status;
-
-              return (
-                <ImageWithMenu
-                  key={`agent-${i}`}
-                  imageId={part.imageId || ""}
-                  imageUrl={url}
-                  chatId={chatId}
+            case "agent_search":
+              return group.parts.map((part: any, i) => (
+                <SearchQueryCard
+                  key={`search-${gi}-${i}`}
+                  query={(part as any).query}
+                  status={(part as any).status}
+                  autoExecute={gi === 0 && i === 0}
                   desktopId={desktopId}
-                  generationDetails={{
-                    title: part.title,
-                    prompt: part.prompt,
-                    status: effectiveStatus,
-                  }}
-                  onViewDetails={() => onAgentTitleClick(part)}
-                  topRightActions={
-                    effectiveStatus === "generated" && onAgentExpandClick ? (
-                      <Button
-                        isIconOnly
-                        size="sm"
-                        variant="solid"
-                        aria-label={t("imageDetail.viewFullSize")}
-                        title={t("imageDetail.viewFullSize")}
-                        className="bg-background/80 backdrop-blur-sm"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          onAgentExpandClick(part);
-                        }}
-                      >
-                        <Maximize2 size={16} />
-                      </Button>
-                    ) : null
-                  }
-                >
-                  <ImageHoverPreview
-                    src={url}
-                    alt={part.title}
-                    maxPreviewWidth={600}
-                    maxPreviewHeight={600}
-                    className="block"
-                    disabled={effectiveStatus !== "generated"}
-                  >
-                    <Card
-                      className={clsx(
-                        "w-full",
-                        isSelected && "border-4 border-primary"
-                      )}
-                    >
-                      <CardBody
-                        className="p-0 overflow-hidden relative cursor-pointer group/image rounded-lg"
-                        draggable={effectiveStatus === "generated"}
-                        onClick={() =>
-                          effectiveStatus === "generated" &&
-                          msgIndex !== undefined &&
-                          onAgentImageSelect(
-                            part,
-                            msgIndex,
-                            realPartIndex,
-                            message.variantId
-                          )
-                        }
-                        onDragStart={(e) => handleAgentDragStart(e, part)}
-                        onDoubleClick={(e) => {
-                          e.preventDefault();
-                          if (
-                            effectiveStatus === "generated" ||
-                            effectiveStatus === "error"
-                          ) {
-                            onAgentTitleClick(part);
-                          }
-                        }}
-                      >
-                        <div className="aspect-square w-full">
-                        {effectiveStatus === "loading" && (
-                          <div className="w-full h-full flex items-center justify-center bg-default-100">
-                            <Spinner />
-                          </div>
-                        )}
-                        {effectiveStatus === "error" && (
-                          <div className="w-full h-full flex items-center justify-center bg-danger-50 text-danger">
-                            <X />
-                          </div>
-                        )}
-                        {effectiveStatus === "generated" && (
-                          <Image
-                            src={url}
-                            alt={part.title}
-                            radius="none"
-                            classNames={{
-                              wrapper: "w-full h-full !max-w-full",
-                              img: "w-full h-full object-contain bg-default-100 dark:bg-black",
-                            }}
-                          />
-                        )}
-                        </div>
-                        {(effectiveStatus === "generated" ||
-                          effectiveStatus === "error") && (
-                          <div className="absolute bottom-0 left-0 right-0 bg-white/90 dark:bg-black/60 text-black dark:text-white p-2 text-xs truncate md:opacity-0 md:group-hover/image:opacity-100 transition-opacity z-10 pointer-events-none">
-                            {part.title}
-                          </div>
-                        )}
-                      </CardBody>
-                    </Card>
-                  </ImageHoverPreview>
-                </ImageWithMenu>
-              );
-            })}
-          </div>
-        )}
+                />
+              ));
 
-        {videoParts.length > 0 &&
-          videoParts.map((part: any, i) => {
-            const realPartIndex = (content as MessageContentPart[]).indexOf(part);
-            return (
-              <VideoConfigCard
-                key={`video-${i}`}
-                part={part}
-                sourceImages={sourceImagesForVideo}
-                desktopId={desktopId}
-                chatId={chatId}
-                onStatusChange={(status, generationId) => {
-                  if (onVideoStatusChange && msgIndex !== undefined) {
-                    onVideoStatusChange(msgIndex, realPartIndex, status, generationId);
-                  }
-                }}
-                onSendAsVideoMessage={!desktopId ? onSendAsVideoMessage : undefined}
-                onPartUpdate={(updates) => {
-                  if (onVideoPartUpdate && message.createdAt) {
-                    return onVideoPartUpdate(
-                      message.createdAt,
-                      message.variantId,
-                      "agent_video",
-                      i,
-                      updates
-                    );
-                  }
-                }}
-              />
-            );
-          })}
-
-        {directVideoParts.length > 0 &&
-          directVideoParts.map((part: any, i) => {
-            const realPartIndex = (content as MessageContentPart[]).indexOf(part);
-            return (
-              <DirectVideoCard
-                key={`direct-video-${i}`}
-                part={part}
-                onStatusUpdate={(updates) => {
-                  if (onDirectVideoStatusUpdate && msgIndex !== undefined) {
-                    onDirectVideoStatusUpdate(msgIndex, realPartIndex, updates);
-                  }
-                }}
-                onRestore={onDirectVideoRestore}
-              />
-            );
-          })}
-
-        {shotListParts.length > 0 &&
-          shotListParts.map((part: any, i) => (
-            <ShotListCard key={`shotlist-${i}`} part={part} />
-          ))}
-
-        {searchParts.length > 0 &&
-          searchParts.map((part: any, i) => (
-            <SearchQueryCard
-              key={`search-${i}`}
-              query={part.query}
-              status={part.status}
-              autoExecute={i === 0}
-              desktopId={desktopId}
-            />
-          ))}
+            default:
+              return null;
+          }
+        })}
       </div>
     );
   };

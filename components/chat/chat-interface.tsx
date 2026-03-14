@@ -2078,18 +2078,7 @@ export default function ChatInterface({
                 });
               }
             } else if (event.type === "text") {
-              // Append text to the first part if it's text, or create new
-              if (
-                currentContent.length === 0 ||
-                currentContent[0].type !== "text"
-              ) {
-                variantContents[variantId] = [
-                  { type: "text", text: event.content },
-                  ...currentContent,
-                ];
-              } else {
-                currentContent[0] = { type: "text", text: event.content };
-              }
+              currentContent.push({ type: "text", text: event.content });
             } else if (event.type === "part") {
               // If this is a completed shot list, replace the streaming placeholder
               if (event.part.type === "agent_shot_list" && event.part.status === "complete") {

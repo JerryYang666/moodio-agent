@@ -52,7 +52,7 @@ const ACTION_ICONS = {
 const ACTION_PROMPTS: Record<string, string> = {
   learn: "Explain what filming techniques are used in this video and break down the key creative decisions.",
   explore: "Analyze this video first, then find similar or related videos using the search tool.",
-  create: "Analyze this video and help me create a similar one with the same style and techniques.",
+  create: "Analyze this video and help me create a similar one with the same style and techniques using the video tool.",
 };
 
 function groupLabelsByProperty(labels: ContentLabel[]): Record<string, string[]> {
