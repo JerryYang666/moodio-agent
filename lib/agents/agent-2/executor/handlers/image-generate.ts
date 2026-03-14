@@ -58,6 +58,10 @@ export class ImageGenerateHandler implements ToolHandler {
 
       return {
         success: true,
+        data: {
+          imageId: (part as any).imageId,
+          imageUrl: (part as any).imageUrl,
+        },
         contentParts: [part],
       };
     } catch (err) {

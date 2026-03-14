@@ -30,6 +30,7 @@ import { shotListTool } from "./tools/shot-list";
 import { searchTool } from "./tools/search";
 import { checkTaxonomyTool } from "./tools/check-taxonomy";
 import { videoUnderstandTool } from "./tools/video-understand";
+import { imageGenerateSyncTool } from "./tools/image-generate-sync";
 
 const MAX_RETRY = 2;
 const MAX_SUGGESTIONS_HARD_CAP = siteConfig.imageLimits.maxSuggestionsHardCap;
@@ -53,6 +54,7 @@ export class Agent2 implements Agent {
     this.registry.register(searchTool);
     this.registry.register(checkTaxonomyTool);
     this.registry.register(videoUnderstandTool);
+    this.registry.register(imageGenerateSyncTool);
 
     this.promptConstructor = new SystemPromptConstructor(this.registry);
     this.inputParser = new InputParser();
@@ -67,6 +69,7 @@ export class Agent2 implements Agent {
     executor.registerHandler("check_taxonomy", new CheckTaxonomyHandler());
     executor.registerHandler("image_suggest", new ImageGenerateHandler());
     executor.registerHandler("video_understand", new VideoUnderstandHandler());
+    executor.registerHandler("image_generate_sync", new ImageGenerateHandler());
     return executor;
   }
 

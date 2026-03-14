@@ -292,17 +292,21 @@ export class StreamLoop {
       ? state.fullLlmResponse.substring(0, tagIdx)
       : state.fullLlmResponse;
 
+    // Pass tracking info from placeholder to handler (same pattern as fireAndForget)
+    if (loadingPart && "imageId" in loadingPart) {
+      tag = { ...tag, parsedContent: { ...tag.parsedContent, _trackingImageId: (loadingPart as any).imageId } };
+    }
+
     // Execute the handler
     const result = await this.toolExecutor.execute(tag, ctx);
 
-    // Update loading part status
+    // Update loading part in finalContent — prefer the handler's full content part
+    // (e.g. agent_image with imageUrl) over a simple status flip
     if (loadingPart) {
       const idx = state.finalContent.indexOf(loadingPart);
       if (idx !== -1) {
-        state.finalContent[idx] = {
-          ...loadingPart,
-          status: result.success ? "complete" : "error",
-        } as MessageContentPart;
+        state.finalContent[idx] = result.contentParts?.[0]
+          ?? { ...loadingPart, status: result.success ? "complete" : "error" } as MessageContentPart;
       }
     }
 
