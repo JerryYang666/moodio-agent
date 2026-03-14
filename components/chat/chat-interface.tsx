@@ -196,6 +196,10 @@ export default function ChatInterface({
   const chatIdRef = useRef(chatId);
   useEffect(() => { chatIdRef.current = chatId; }, [chatId]);
   const [messages, setMessages] = useState<Message[]>(initialMessages);
+  const messagesRef = useRef(messages);
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(
     !!initialChatId && initialMessages.length === 0
@@ -2410,7 +2414,7 @@ export default function ChatInterface({
         createdAt: Date.now(),
       };
 
-      const optimisticMessages = [...messages, userMessage];
+      const optimisticMessages = [...messagesRef.current, userMessage];
       setMessages(optimisticMessages);
       setIsSending(true);
 
