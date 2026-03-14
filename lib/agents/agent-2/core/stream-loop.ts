@@ -8,6 +8,7 @@ import { ToolDefinition } from "../tools/types";
 import { siteConfig } from "@/config/site";
 
 const MAX_SUGGESTIONS_HARD_CAP = siteConfig.imageLimits.maxSuggestionsHardCap;
+const MAX_CONTINUATION_RETRY = 2;
 
 /** Mutable state shared across the stream parsing pipeline. */
 interface StreamState {
@@ -317,37 +318,89 @@ export class StreamLoop {
     }
 
     const continuationUserMessage = toolDef.buildContinuationMessage(result.data);
-    const continuationMessages = [
+    const baseContinuationMessages = [
       ...preparedMessages,
       { role: "assistant", content: partialResponse.trim() },
       { role: "user", content: continuationUserMessage },
     ];
 
-    // Start a new LLM stream
-    const continuationStream = await new OpenAI({
-      apiKey: process.env.LLM_API_KEY,
-    }).chat.completions.create({
-      model: DEFAULT_LLM_MODEL,
-      messages: continuationMessages as any,
-      stream: true,
-    });
+    // Snapshot the content produced before this tool call so we can restore
+    // it on continuation retry without re-running the tool.
+    const preToolContent = [...state.finalContent];
 
-    console.log(
-      `[Perf] Agent continuation LLM stream started after ${tag.toolName}`,
-      `[${Date.now() - ctx.requestStartTime}ms]`,
+    let lastContinuationError: Error | undefined;
+
+    for (let contAttempt = 0; contAttempt <= MAX_CONTINUATION_RETRY; contAttempt++) {
+      try {
+        // On retry, send partial invalidation and restore pre-tool state
+        if (contAttempt > 0) {
+          console.log(
+            `[Agent-2] Retrying continuation after ${tag.toolName}, attempt ${contAttempt + 1}/${MAX_CONTINUATION_RETRY + 1}`,
+          );
+          ctx.send({ type: "invalidate_continuation", reason: "retry" });
+
+          // Restore finalContent to what we had right after the tool call
+          state.finalContent.length = 0;
+          for (const part of preToolContent) state.finalContent.push(part);
+        }
+
+        // Build messages — append XML reminder on retry
+        const continuationMessages = contAttempt > 0
+          ? [
+              ...baseContinuationMessages.slice(0, -1),
+              {
+                ...baseContinuationMessages[baseContinuationMessages.length - 1],
+                content:
+                  baseContinuationMessages[baseContinuationMessages.length - 1].content +
+                  "\n\nPlease remember to use XML-style tags for all outputs as specified in the system prompt (e.g. <TEXT>, <IMAGE>).",
+              },
+            ]
+          : baseContinuationMessages;
+
+        // Start a new LLM stream
+        const continuationStream = await new OpenAI({
+          apiKey: process.env.LLM_API_KEY,
+        }).chat.completions.create({
+          model: DEFAULT_LLM_MODEL,
+          messages: continuationMessages as any,
+          stream: true,
+        });
+
+        console.log(
+          `[Perf] Agent continuation LLM stream started after ${tag.toolName}`,
+          `[${Date.now() - ctx.requestStartTime}ms]`,
+        );
+
+        // Reset parser state for the continuation
+        this.outputParser.setBuffer("");
+        state.fullLlmResponse = "";
+        // Preserve think occurrence so the continuation doesn't re-send thought
+        const thinkCount = state.occurrences.get("think") || 0;
+        state.occurrences.clear();
+        if (thinkCount > 0) state.occurrences.set("think", thinkCount);
+        state.openTagsFired.clear();
+
+        // Recursively consume the continuation stream
+        await this.consumeStream(continuationStream, state, ctx, continuationMessages, maxSuggestions);
+
+        if (contAttempt > 0) {
+          console.log(`[Agent-2] Continuation succeeded on retry attempt ${contAttempt + 1}`);
+        }
+        return "restart";
+      } catch (error) {
+        lastContinuationError = error as Error;
+        console.error(
+          `[Agent-2] Continuation attempt ${contAttempt + 1}/${MAX_CONTINUATION_RETRY + 1} failed after ${tag.toolName}:`,
+          error,
+        );
+      }
+    }
+
+    // All continuation retries exhausted — let the error bubble up so the
+    // outer retry loop in index.ts can do a full restart as a last resort.
+    console.error(
+      `[Agent-2] Continuation failed after ${MAX_CONTINUATION_RETRY + 1} attempts for ${tag.toolName}`,
     );
-
-    // Reset parser state for the continuation
-    this.outputParser.setBuffer("");
-    state.fullLlmResponse = "";
-    // Preserve think occurrence so the continuation doesn't re-send thought
-    const thinkCount = state.occurrences.get("think") || 0;
-    state.occurrences.clear();
-    if (thinkCount > 0) state.occurrences.set("think", thinkCount);
-    state.openTagsFired.clear();
-
-    // Recursively consume the continuation stream
-    await this.consumeStream(continuationStream, state, ctx, continuationMessages, maxSuggestions);
-    return "restart";
+    throw lastContinuationError || new Error(`Continuation failed after ${tag.toolName}`);
   }
 }

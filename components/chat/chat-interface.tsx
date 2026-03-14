@@ -1916,7 +1916,9 @@ export default function ChatInterface({
               }
 
               variantContents[variantId] = [];
-              isFirstChunkByVariant[variantId] = true;
+              // Don't reset isFirstChunkByVariant — the message already exists in the
+              // messages array. Keeping it false ensures that the next chunk updates
+              // the existing message in-place instead of pushing a duplicate.
 
               // Update the messages state to clear this variant
               updateStreamMessages((prev) => {
@@ -1926,6 +1928,31 @@ export default function ChatInterface({
                   const msg = newMessages[i];
                   if (msg.role === "assistant" && msg.variantId === variantId) {
                     newMessages[i] = { ...msg, content: [] };
+                    break;
+                  }
+                }
+                return newMessages;
+              });
+              continue;
+            }
+
+            if (event.type === "invalidate_continuation") {
+              // Only the post-tool-call continuation is being retried.
+              // Preserve tool_call and internal_think parts, clear everything else.
+              console.log(
+                `[Chat] Received invalidate_continuation for variant ${variantId} - clearing post-tool content`
+              );
+
+              variantContents[variantId] = variantContents[variantId].filter(
+                (part) => part.type === "tool_call" || part.type === "internal_think"
+              );
+
+              updateStreamMessages((prev) => {
+                const newMessages = [...prev];
+                for (let i = newMessages.length - 1; i >= 0; i--) {
+                  const msg = newMessages[i];
+                  if (msg.role === "assistant" && msg.variantId === variantId) {
+                    newMessages[i] = { ...msg, content: [...variantContents[variantId]] };
                     break;
                   }
                 }
@@ -2866,9 +2893,49 @@ export default function ChatInterface({
             }
 
             if (event.type === "invalidate") {
-              // Retry - clear content
+              // Retry - clear content but don't reset isFirstChunk if the
+              // message already exists, to avoid creating a duplicate variant.
               variantContent = [];
-              isFirstChunk = true;
+              if (!isFirstChunk) {
+                // Message already exists in the array — clear it in-place
+                updateStreamMessages((prev) => {
+                  const newMessages = [...prev];
+                  for (let i = newMessages.length - 1; i >= 0; i--) {
+                    const msg = newMessages[i];
+                    if (msg.role === "assistant" && msg.variantId === variantId) {
+                      newMessages[i] = { ...msg, content: [] };
+                      break;
+                    }
+                  }
+                  return newMessages;
+                });
+              }
+              // If isFirstChunk is still true, no message was created yet, so
+              // nothing to clear — just let it create normally on next chunk.
+              continue;
+            }
+
+            if (event.type === "invalidate_continuation") {
+              // Continuation retry — preserve tool_call and internal_think parts
+              console.log(
+                `[Chat] Received invalidate_continuation for variant ${variantId} - clearing post-tool content`
+              );
+              variantContent = variantContent.filter(
+                (part) => part.type === "tool_call" || part.type === "internal_think"
+              );
+              if (!isFirstChunk) {
+                updateStreamMessages((prev) => {
+                  const newMessages = [...prev];
+                  for (let i = newMessages.length - 1; i >= 0; i--) {
+                    const msg = newMessages[i];
+                    if (msg.role === "assistant" && msg.variantId === variantId) {
+                      newMessages[i] = { ...msg, content: [...variantContent] };
+                      break;
+                    }
+                  }
+                  return newMessages;
+                });
+              }
               continue;
             }
 
