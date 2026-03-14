@@ -58,8 +58,23 @@ export class VideoUnderstandHandler implements ToolHandler {
           const meta = await checkVideoExists(videoId);
           if (meta.exists && meta.contentType) {
             mimeType = meta.contentType;
+            videoBuffer = await downloadVideo(videoId);
           }
-          videoBuffer = await downloadVideo(videoId);
+
+          // Fallback: if videoId download failed, try extracting ID from videoUrl
+          if (!videoBuffer && videoUrl && typeof videoUrl === "string") {
+            const fallbackId = extractIdFromUrl(videoUrl);
+            if (fallbackId && fallbackId !== videoId) {
+              console.warn(
+                `[Agent-2] VIDEO_UNDERSTAND: videoId=${videoId} download failed, retrying with ID from URL: ${fallbackId}`
+              );
+              const fallbackMeta = await checkVideoExists(fallbackId);
+              if (fallbackMeta.exists) {
+                if (fallbackMeta.contentType) mimeType = fallbackMeta.contentType;
+                videoBuffer = await downloadVideo(fallbackId);
+              }
+            }
+          }
         }
 
         if (!videoBuffer) {
@@ -135,6 +150,19 @@ export class VideoUnderstandHandler implements ToolHandler {
         ],
       };
     }
+  }
+}
+
+/**
+ * Extract a UUID-style ID from the last path segment of a video URL.
+ * e.g. "https://cdn0.moodio.art/videos/567c1909-ac5d-4952-8989-e5eecce2ea08" → "567c1909-..."
+ */
+function extractIdFromUrl(url: string): string | null {
+  try {
+    const lastSegment = new URL(url).pathname.split("/").filter(Boolean).pop();
+    return lastSegment && /^[0-9a-f-]{36}$/i.test(lastSegment) ? lastSegment : null;
+  } catch {
+    return null;
   }
 }
 
