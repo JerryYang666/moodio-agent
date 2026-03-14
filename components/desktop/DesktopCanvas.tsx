@@ -7,6 +7,7 @@ import type { CameraState } from "@/hooks/use-desktop";
 import type { RemoteCursor } from "@/hooks/use-desktop-ws";
 import type { EnrichedDesktopAsset } from "./assets";
 import { ImageAsset, VideoAsset, TextAsset, LinkAsset } from "./assets";
+import PublicVideoAsset from "./assets/PublicVideoAsset";
 import TableAsset from "./assets/TableAsset";
 import { hasWriteAccess, type Permission } from "@/lib/permissions";
 import type { CanvasMode } from "./DesktopToolbar";
@@ -731,15 +732,27 @@ export default function DesktopCanvas({
         title: ((singleSelectedAsset.metadata as Record<string, unknown>)?.title as string) || t("imageTitle"),
       }
     : null;
-  const floatingBarVideoInfo = singleSelectedAsset?.assetType === "video"
-    ? {
-        assetId: singleSelectedAsset.id,
-        videoId: (singleSelectedAsset as EnrichedDesktopAsset).generationData?.videoId ||
-          ((singleSelectedAsset.metadata as Record<string, unknown>)?.videoId as string) || singleSelectedAsset.id,
-        url: (singleSelectedAsset as EnrichedDesktopAsset).videoUrl || "",
-        title: ((singleSelectedAsset.metadata as Record<string, unknown>)?.title as string) || t("videoTitle"),
-      }
-    : null;
+  const floatingBarVideoInfo =
+    singleSelectedAsset?.assetType === "video" || singleSelectedAsset?.assetType === "public_video"
+      ? {
+          assetId: singleSelectedAsset.id,
+          videoId:
+            singleSelectedAsset.assetType === "public_video"
+              ? (((singleSelectedAsset.metadata as Record<string, unknown>)?.contentUuid as string) ||
+                singleSelectedAsset.id)
+              : (singleSelectedAsset as EnrichedDesktopAsset).generationData?.videoId ||
+              ((singleSelectedAsset.metadata as Record<string, unknown>)?.videoId as string) ||
+              singleSelectedAsset.id,
+          url: (singleSelectedAsset as EnrichedDesktopAsset).videoUrl || "",
+          title:
+            ((singleSelectedAsset.metadata as Record<string, unknown>)?.title as string) ||
+            t("videoTitle"),
+          source:
+            singleSelectedAsset.assetType === "public_video"
+              ? ("retrieval" as const)
+              : ("library" as const),
+        }
+      : null;
   const floatingBarChatId = singleSelectedAsset &&
     typeof (singleSelectedAsset.metadata as Record<string, unknown>)?.chatId === "string"
     ? ((singleSelectedAsset.metadata as Record<string, unknown>).chatId as string)
@@ -1109,6 +1122,7 @@ export default function DesktopCanvas({
                         videoId: floatingBarVideoInfo.videoId,
                         url: floatingBarVideoInfo.url,
                         title: floatingBarVideoInfo.title,
+                        source: floatingBarVideoInfo.source,
                       },
                     })
                   );
@@ -1182,6 +1196,8 @@ function AssetCardContent({
       return <ImageAsset asset={asset} onImageLoad={onImageLoad} />;
     case "video":
       return <VideoAsset asset={asset} playing={playing} onPlayToggle={onPlayToggle} onImageLoad={onImageLoad} />;
+    case "public_video":
+      return <PublicVideoAsset asset={asset} playing={playing} onPlayToggle={onPlayToggle} onImageLoad={onImageLoad} />;
     case "text": {
       const textLock = textLocks?.get(asset.id);
       const isTextLockedByOther = !!textLock && textLock.userId !== currentUserId;

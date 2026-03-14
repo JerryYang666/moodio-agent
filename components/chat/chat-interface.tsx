@@ -1322,10 +1322,17 @@ export default function ChatInterface({
         addToast({ title: t("chat.maxVideosReached", { max: MAX_PENDING_VIDEOS }), color: "warning" });
         return;
       }
+      const source =
+        d?.source === "retrieval" ||
+          d?.source === "upload" ||
+          d?.source === "library" ||
+          d?.source === "ai_generated"
+          ? d.source
+          : "library";
       setPendingVideos((prev) => [...prev, {
         videoId: d.videoId,
         url: d.url,
-        source: "library" as const,
+        source,
         title: d.title || "Selected video",
       }]);
     };

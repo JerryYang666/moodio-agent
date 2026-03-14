@@ -63,11 +63,11 @@ import ShareModal from "@/components/share-modal";
 interface CollectionAsset {
   id: string;
   collectionId: string;
-  imageId: string; // Thumbnail/display image ID
-  assetId: string; // Actual asset ID (same as imageId for images, video ID for videos)
-  assetType: "image" | "video";
-  imageUrl: string; // CloudFront URL for thumbnail (access via signed cookies)
-  videoUrl?: string; // CloudFront URL for video (only for videos)
+  imageId: string; // Thumbnail/display image ID (content_uuid for public_video)
+  assetId: string; // Actual asset ID (storage_key for public_video)
+  assetType: "image" | "video" | "public_video";
+  imageUrl: string; // CloudFront URL for thumbnail (access via signed cookies; empty for public_video)
+  videoUrl?: string; // CloudFront URL for video (only for videos / public_video)
   chatId: string | null;
   generationDetails: {
     title: string;
@@ -75,6 +75,8 @@ interface CollectionAsset {
     status: "loading" | "generated" | "error" | "pending" | "processing" | "completed" | "failed";
     imageUrl?: string;
     videoUrl?: string;
+    source?: "browse";
+    storageKey?: string;
   };
   rating: number | null;
   addedAt: Date;
@@ -363,7 +365,7 @@ export default function CollectionPage({
         );
         addToast({
           title: t("itemRenamed"),
-          description: itemToRename.assetType === "video" ? t("videoRenamedDesc") : t("imageRenamedDesc"),
+          description: itemToRename.assetType === "video" || itemToRename.assetType === "public_video" ? t("videoRenamedDesc") : t("imageRenamedDesc"),
           color: "success",
         });
         onRenameItemOpenChange();
@@ -425,7 +427,7 @@ export default function CollectionPage({
         );
         addToast({
           title: t("itemMoved"),
-          description: itemToMove.assetType === "video" 
+          description: itemToMove.assetType === "video" || itemToMove.assetType === "public_video"
             ? t("videoMovedDesc", { collection: targetCollection?.name || "collection" })
             : t("imageMovedDesc", { collection: targetCollection?.name || "collection" }),
           color: "success",
@@ -480,7 +482,7 @@ export default function CollectionPage({
         );
         addToast({
           title: t("itemCopied"),
-          description: itemToCopy.assetType === "video"
+          description: itemToCopy.assetType === "video" || itemToCopy.assetType === "public_video"
             ? t("videoCopiedDesc", { collection: targetCollection?.name || "collection" })
             : t("imageCopiedDesc", { collection: targetCollection?.name || "collection" }),
           color: "success",
@@ -664,8 +666,7 @@ export default function CollectionPage({
       toggleSelection(asset.id);
       return;
     }
-    if (asset.assetType === "video") {
-      // Open video detail modal
+    if (asset.assetType === "video" || asset.assetType === "public_video") {
       setSelectedVideo(asset);
       onVideoDetailOpen();
     } else {
@@ -957,7 +958,7 @@ export default function CollectionPage({
 
   // Count images and videos separately
   const imageCount = images.filter((a) => a.assetType === "image").length;
-  const videoCount = images.filter((a) => a.assetType === "video").length;
+  const videoCount = images.filter((a) => a.assetType === "video" || a.assetType === "public_video").length;
 
   const getAssetCountText = () => {
     const parts = [];
@@ -1152,16 +1153,32 @@ export default function CollectionPage({
                     className={`group relative ${isSelectionMode && isSelected ? "ring-2 ring-primary ring-offset-2 ring-offset-background" : ""}`}
                   >
                     <CardBody className="p-0 overflow-hidden aspect-square relative rounded-lg">
-                      <Image
-                        src={asset.imageUrl}
-                        alt={asset.generationDetails.title}
-                        radius="none"
-                        classNames={{
-                          wrapper: `w-full h-full !max-w-full ${isSelectionMode ? "cursor-pointer" : "cursor-pointer"}`,
-                          img: `w-full h-full object-cover transition-opacity ${isSelectionMode && isSelected ? "opacity-80" : ""}`,
-                        }}
-                        onClick={() => handleAssetClick(asset)}
-                      />
+                      {asset.assetType === "public_video" && asset.videoUrl ? (
+                        <div
+                          className={`w-full h-full cursor-pointer ${isSelectionMode && isSelected ? "opacity-80" : ""}`}
+                          onClick={() => handleAssetClick(asset)}
+                        >
+                          <video
+                            src={asset.videoUrl}
+                            muted
+                            loop
+                            playsInline
+                            autoPlay
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      ) : (
+                        <Image
+                          src={asset.imageUrl}
+                          alt={asset.generationDetails.title}
+                          radius="none"
+                          classNames={{
+                            wrapper: `w-full h-full !max-w-full ${isSelectionMode ? "cursor-pointer" : "cursor-pointer"}`,
+                            img: `w-full h-full object-cover transition-opacity ${isSelectionMode && isSelected ? "opacity-80" : ""}`,
+                          }}
+                          onClick={() => handleAssetClick(asset)}
+                        />
+                      )}
                       {/* Selection checkbox overlay */}
                       {isSelectionMode && (
                         <div
@@ -1174,7 +1191,7 @@ export default function CollectionPage({
                         </div>
                       )}
                       {/* Video Badge */}
-                      {asset.assetType === "video" && (
+                      {(asset.assetType === "video" || asset.assetType === "public_video") && (
                         <div className={`absolute ${isSelectionMode ? "top-2 left-10" : "top-2 left-2"} z-10`}>
                           <div className="bg-black/70 text-white rounded-full p-1.5 flex items-center gap-1">
                             <Play size={12} fill="white" />
@@ -1679,7 +1696,7 @@ export default function CollectionPage({
         <ModalContent>
           {(onClose) => (
             <>
-              <ModalHeader>{itemToRename?.assetType === "video" ? t("renameVideo") : t("renameImage")}</ModalHeader>
+              <ModalHeader>{itemToRename?.assetType === "video" || itemToRename?.assetType === "public_video" ? t("renameVideo") : t("renameImage")}</ModalHeader>
               <ModalBody>
                 <Input
                   label={t("itemTitle")}
@@ -1805,21 +1822,27 @@ export default function CollectionPage({
                 {
                   assetType: desktopSendAsset.assetType,
                   metadata:
-                    desktopSendAsset.assetType === "video"
+                    desktopSendAsset.assetType === "public_video"
                       ? {
-                          imageId: desktopSendAsset.imageId,
-                          videoId: desktopSendAsset.assetId,
-                          chatId: desktopSendAsset.chatId,
+                          storageKey: desktopSendAsset.assetId,
+                          contentUuid: desktopSendAsset.imageId,
                           title: desktopSendAsset.generationDetails.title,
-                          prompt: desktopSendAsset.generationDetails.prompt,
-                          status: desktopSendAsset.generationDetails.status,
                         }
-                      : {
-                          imageId: desktopSendAsset.imageId,
-                          chatId: desktopSendAsset.chatId,
-                          title: desktopSendAsset.generationDetails.title,
-                          prompt: desktopSendAsset.generationDetails.prompt,
-                          status: desktopSendAsset.generationDetails.status,
+                      : desktopSendAsset.assetType === "video"
+                        ? {
+                            imageId: desktopSendAsset.imageId,
+                            videoId: desktopSendAsset.assetId,
+                            chatId: desktopSendAsset.chatId,
+                            title: desktopSendAsset.generationDetails.title,
+                            prompt: desktopSendAsset.generationDetails.prompt,
+                            status: desktopSendAsset.generationDetails.status,
+                          }
+                        : {
+                            imageId: desktopSendAsset.imageId,
+                            chatId: desktopSendAsset.chatId,
+                            title: desktopSendAsset.generationDetails.title,
+                            prompt: desktopSendAsset.generationDetails.prompt,
+                            status: desktopSendAsset.generationDetails.status,
                         },
                 },
               ]

@@ -595,6 +595,7 @@ export default function ChatMessage({
               query={part.query}
               status={part.status}
               autoExecute={i === 0}
+              desktopId={desktopId}
             />
           ))}
       </div>

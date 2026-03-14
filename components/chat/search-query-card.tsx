@@ -20,9 +20,10 @@ interface SearchQueryCardProps {
   status: "pending" | "executed";
   /** Only the first suggestion should auto-execute to avoid redundant API calls */
   autoExecute?: boolean;
+  desktopId?: string;
 }
 
-export default function SearchQueryCard({ query, status, autoExecute = false }: SearchQueryCardProps) {
+export default function SearchQueryCard({ query, status, autoExecute = false, desktopId }: SearchQueryCardProps) {
   const dispatch = useDispatch();
   const pathname = usePathname();
   const locale = useLocale();
@@ -100,6 +101,7 @@ export default function SearchQueryCard({ query, status, autoExecute = false }: 
           isOpen={isModalOpen}
           onClose={() => setIsModalOpen(false)}
           query={query}
+          desktopId={desktopId}
         />
       )}
     </div>

@@ -20,7 +20,7 @@ interface SendToDesktopModalProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
   assets: Array<{
-    assetType: "image" | "video" | "text";
+    assetType: "image" | "video" | "public_video" | "text";
     metadata: Record<string, unknown>;
   }>;
   /** When provided, skip desktop selection and send directly to this desktop */
@@ -53,7 +53,7 @@ async function sendAssetsToDesktop(
           const sizeByType =
             a.assetType === "image"
               ? { w: 300, h: 300 }
-              : a.assetType === "video"
+              : a.assetType === "video" || a.assetType === "public_video"
                 ? { w: 300, h: 300 }
                 : a.assetType === "text"
                   ? { w: 300, h: 200 }

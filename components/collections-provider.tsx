@@ -25,7 +25,7 @@ export interface CollectionImage {
   collectionId: string | null;
   imageId: string;
   assetId: string;
-  assetType: "image" | "video";
+  assetType: "image" | "video" | "public_video";
   chatId: string | null;
   generationDetails: {
     title: string;
@@ -33,6 +33,8 @@ export interface CollectionImage {
     status: "loading" | "generated" | "error" | "pending" | "processing" | "completed" | "failed";
     imageUrl?: string;
     videoUrl?: string;
+    source?: "browse";
+    storageKey?: string;
   };
   addedAt: Date;
 }
@@ -65,6 +67,12 @@ interface CollectionsContextValue {
     thumbnailImageId: string,
     videoId: string,
     generationDetails: any
+  ) => Promise<boolean>;
+  addPublicVideoToCollection: (
+    collectionId: string,
+    storageKey: string,
+    contentUuid: string,
+    title: string
   ) => Promise<boolean>;
   removeItemFromCollection: (
     collectionId: string,
@@ -285,6 +293,59 @@ export function CollectionsProvider({
     [dispatch]
   );
 
+  const addPublicVideoToCollection = useCallback(
+    async (
+      collectionId: string,
+      storageKey: string,
+      contentUuid: string,
+      title: string
+    ) => {
+      try {
+        const res = await fetch(`/api/collection/${collectionId}/images`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            imageId: contentUuid,
+            assetId: storageKey,
+            assetType: "public_video",
+            chatId: null,
+            generationDetails: {
+              title,
+              status: "generated",
+              prompt: "",
+              source: "browse",
+              storageKey,
+            },
+          }),
+        });
+
+        if (!res.ok) {
+          const data = await res.json();
+          throw new Error(data.error || "Failed to add video to collection");
+        }
+
+        dispatch(
+          nextApi.util.updateQueryData("getCollections", undefined, (draft) => {
+            const col = draft.find((c) => c.id === collectionId);
+            if (col) col.updatedAt = new Date();
+          })
+        );
+
+        window.dispatchEvent(
+          new CustomEvent(ASSETS_UPDATED_EVENT, {
+            detail: { collectionId },
+          })
+        );
+
+        return true;
+      } catch (err) {
+        console.error("Error adding public video to collection:", err);
+        return false;
+      }
+    },
+    [dispatch]
+  );
+
   const removeItemFromCollection = useCallback(
     async (collectionId: string, itemId: string) => {
       try {
@@ -364,6 +425,7 @@ export function CollectionsProvider({
     deleteCollection,
     addImageToCollection,
     addVideoToCollection,
+    addPublicVideoToCollection,
     removeItemFromCollection,
     shareCollection,
     removeShare,

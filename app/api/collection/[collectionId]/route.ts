@@ -12,6 +12,7 @@ import { getAccessToken } from "@/lib/auth/cookies";
 import { verifyAccessToken } from "@/lib/auth/jwt";
 import { eq, and, desc } from "drizzle-orm";
 import { getImageUrl, getVideoUrl } from "@/lib/storage/s3";
+import { getVideoUrl as getPublicVideoUrl } from "@/lib/config/video.config";
 import { getUserPermission } from "@/lib/collection-utils";
 import { PERMISSION_OWNER, isOwner, type SharePermission } from "@/lib/permissions";
 import { TAG_COLOR_MAP } from "@/lib/tag-colors";
@@ -69,11 +70,20 @@ export async function GET(
       .orderBy(desc(collectionImages.addedAt));
 
     // Add CloudFront URLs to assets
-    const images = rawAssets.map((asset) => ({
-      ...asset,
-      imageUrl: getImageUrl(asset.imageId), // Thumbnail URL (works for both images and videos)
-      videoUrl: asset.assetType === "video" ? getVideoUrl(asset.assetId) : undefined, // Video URL for videos only
-    }));
+    const images = rawAssets.map((asset) => {
+      if (asset.assetType === "public_video") {
+        return {
+          ...asset,
+          imageUrl: "",
+          videoUrl: getPublicVideoUrl(asset.assetId),
+        };
+      }
+      return {
+        ...asset,
+        imageUrl: getImageUrl(asset.imageId),
+        videoUrl: asset.assetType === "video" ? getVideoUrl(asset.assetId) : undefined,
+      };
+    });
 
     // Get shares if user is owner
     let shares: (CollectionShare & { email: string })[] = [];

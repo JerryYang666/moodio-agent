@@ -34,9 +34,10 @@ const videoToPhoto = (video: Video): Photo => ({
 
 interface VideoGridProps {
   hideSummary?: boolean;
+  desktopId?: string;
 }
 
-const VideoGrid: React.FC<VideoGridProps> = ({ hideSummary = false }) => {
+const VideoGrid: React.FC<VideoGridProps> = ({ hideSummary = false, desktopId }) => {
   const t = useTranslations("browse");
   const locale = useLocale();
   const dispatch = useDispatch();
@@ -256,6 +257,7 @@ const VideoGrid: React.FC<VideoGridProps> = ({ hideSummary = false }) => {
             onClose={handleCloseDetail}
             onTargetReady={handleTargetReady}
             videoVisible={!isFlying}
+            desktopId={desktopId}
           />
         </div>
       ) : (

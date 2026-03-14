@@ -11,7 +11,7 @@ import { recordResearchEvent } from "@/lib/research-telemetry";
 
 /**
  * POST /api/collection/[collectionId]/images
- * Add image or video to collection
+ * Add image, video, or public video to collection
  *
  * For images:
  *   - imageId: S3 image ID (required)
@@ -22,6 +22,11 @@ import { recordResearchEvent } from "@/lib/research-telemetry";
  *   - imageId: S3 thumbnail image ID (required)
  *   - assetId: S3 video ID (required)
  *   - assetType: "video" (required)
+ *
+ * For public videos (browse/retrieval content):
+ *   - imageId: content_uuid (required, used as unique identifier)
+ *   - assetId: storage_key (required, CloudFront content key)
+ *   - assetType: "public_video" (required)
  */
 export async function POST(
   req: NextRequest,
@@ -85,6 +90,13 @@ export async function POST(
       );
     }
 
+    if (resolvedAssetType === "public_video" && !assetId) {
+      return NextResponse.json(
+        { error: "assetId (storage key) is required for public videos" },
+        { status: 400 }
+      );
+    }
+
     // Check if asset already exists in collection (check by assetId to avoid duplicates)
     const [existingAsset] = await db
       .select()
@@ -98,8 +110,9 @@ export async function POST(
       .limit(1);
 
     if (existingAsset) {
+      const label = resolvedAssetType === "video" || resolvedAssetType === "public_video" ? "Video" : "Image";
       return NextResponse.json(
-        { error: `${resolvedAssetType === "video" ? "Video" : "Image"} already exists in this collection` },
+        { error: `${label} already exists in this collection` },
         { status: 400 }
       );
     }
@@ -136,6 +149,17 @@ export async function POST(
             videoId: resolvedAssetId,
             collectionId,
             generationId: generationDetails?.generationId,
+          },
+        });
+      } else if (resolvedAssetType === "public_video") {
+        recordResearchEvent({
+          userId,
+          eventType: "video_saved_to_collection",
+          imageId,
+          metadata: {
+            storageKey: resolvedAssetId,
+            collectionId,
+            source: "browse",
           },
         });
       } else {

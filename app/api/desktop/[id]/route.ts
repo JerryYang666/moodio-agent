@@ -14,6 +14,7 @@ import { verifyAccessToken } from "@/lib/auth/jwt";
 import { eq, desc, inArray } from "drizzle-orm";
 import { getDesktopPermission } from "@/lib/desktop/permissions";
 import { getImageUrl, getVideoUrl } from "@/lib/storage/s3";
+import { getVideoUrl as getPublicVideoUrl } from "@/lib/config/video.config";
 
 /**
  * GET /api/desktop/[id]
@@ -100,6 +101,16 @@ export async function GET(
             completedAt: gen.completedAt,
           };
         }
+      }
+
+      if (asset.assetType === "public_video") {
+        const storageKey = typeof meta.storageKey === "string" ? meta.storageKey : null;
+        return {
+          ...asset,
+          imageUrl: null,
+          videoUrl: storageKey ? getPublicVideoUrl(storageKey) : null,
+          generationData: null,
+        };
       }
 
       return {

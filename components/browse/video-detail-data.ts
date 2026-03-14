@@ -1,6 +1,6 @@
 export interface VideoDetailAction {
   label: string;
-  icon: "learn" | "explore" | "create";
+  icon: "learn" | "explore" | "create" | "collection" | "desktop";
 }
 
 export interface VideoDetailTopic {
@@ -21,6 +21,8 @@ export const MOCK_VIDEO_DETAIL: VideoDetailData = {
     { label: "Learn from this video", icon: "learn" },
     { label: "Explore related videos", icon: "explore" },
     { label: "Create a video like this", icon: "create" },
+    { label: "Add to Collection", icon: "collection" },
+    { label: "Send to Desktop", icon: "desktop" },
   ],
   topics: [
     { label: "Subject & Appearance" },

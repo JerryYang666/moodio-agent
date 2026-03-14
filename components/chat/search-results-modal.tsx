@@ -21,12 +21,14 @@ interface SearchResultsModalProps {
     textSearch: string;
     filterIds: number[];
   };
+  desktopId?: string;
 }
 
 export default function SearchResultsModal({
   isOpen,
   onClose,
   query,
+  desktopId,
 }: SearchResultsModalProps) {
   const dispatch = useDispatch();
   const router = useRouter();
@@ -94,7 +96,7 @@ export default function SearchResultsModal({
             </ModalHeader>
             <ModalBody className="p-4 overflow-hidden!">
               <div className="h-[calc(95vh-160px)] overflow-hidden">
-                <VideoGrid hideSummary={true} />
+                <VideoGrid hideSummary={true} desktopId={desktopId} />
               </div>
             </ModalBody>
             <ModalFooter className="justify-center border-t border-default-200">

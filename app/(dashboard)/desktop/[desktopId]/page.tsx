@@ -555,6 +555,12 @@ export default function DesktopDetailPage({
 
   const handleAssetClick = useCallback(
     (asset: EnrichedDesktopAsset) => {
+      if (asset.assetType === "public_video") {
+        if (asset.videoUrl) {
+          setPlayingAssetId((prev) => (prev === asset.id ? null : asset.id));
+        }
+        return;
+      }
       if (asset.assetType === "video") {
         const meta = asset.metadata as Record<string, unknown>;
         const status = asset.generationData?.status || meta.status;

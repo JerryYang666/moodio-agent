@@ -19,6 +19,14 @@ export type VideoAssetMeta = {
   modelId?: string;
 };
 
+export type PublicVideoAssetMeta = {
+  storageKey: string;
+  contentUuid: string;
+  title?: string;
+  width?: number;
+  height?: number;
+};
+
 export type TextAssetMeta = {
   content: string;
   fontSize?: number;
@@ -52,11 +60,12 @@ export type TableAssetMeta = {
 export type DesktopAssetMetadata =
   | { assetType: "image"; metadata: ImageAssetMeta }
   | { assetType: "video"; metadata: VideoAssetMeta }
+  | { assetType: "public_video"; metadata: PublicVideoAssetMeta }
   | { assetType: "text"; metadata: TextAssetMeta }
   | { assetType: "link"; metadata: LinkAssetMeta }
   | { assetType: "table"; metadata: TableAssetMeta };
 
-const SUPPORTED_ASSET_TYPES = ["image", "video", "text", "link", "table"] as const;
+const SUPPORTED_ASSET_TYPES = ["image", "video", "public_video", "text", "link", "table"] as const;
 export type SupportedAssetType = (typeof SUPPORTED_ASSET_TYPES)[number];
 
 export function validateAssetMetadata(
@@ -88,6 +97,14 @@ export function validateAssetMetadata(
       const hasGenerationId = typeof m.generationId === "string" && m.generationId;
       if (!hasVideoId && !hasGenerationId) {
         return { valid: false, error: "video metadata requires either a videoId or generationId" };
+      }
+      break;
+    case "public_video":
+      if (typeof m.storageKey !== "string" || !m.storageKey) {
+        return { valid: false, error: "public_video metadata requires a non-empty storageKey string" };
+      }
+      if (typeof m.contentUuid !== "string" || !m.contentUuid) {
+        return { valid: false, error: "public_video metadata requires a non-empty contentUuid string" };
       }
       break;
     case "text":
