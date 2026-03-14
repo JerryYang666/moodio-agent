@@ -1015,9 +1015,12 @@ export default function ChatInterface({
   // Listen for "learn from this video" events from the browse page
   useEffect(() => {
     const handleLearnFromVideo = (e: Event) => {
-      const { contentId, storageKey, videoUrl } = (e as CustomEvent).detail;
+      const { contentId, storageKey, videoUrl, prompt } = (e as CustomEvent).detail;
       if (contentId && videoUrl) {
         addRetrievalVideo(Number(contentId), storageKey, videoUrl);
+        if (prompt && chatInputRef.current) {
+          chatInputRef.current.insertText(prompt);
+        }
       }
     };
 

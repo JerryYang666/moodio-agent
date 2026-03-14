@@ -26,6 +26,12 @@ const ACTION_ICONS = {
   create: Wand2,
 } as const;
 
+const ACTION_PROMPTS: Record<string, string> = {
+  learn: "Explain what filming techniques are used in this video and break down the key creative decisions.",
+  explore: "Analyze this video first, then find similar or related videos using the search tool.",
+  create: "Analyze this video and help me create a similar one with the same style and techniques.",
+};
+
 /**
  * Groups labels by the last 2 levels of their property_path.
  * e.g. "Camera Movement.Zoom" -> "Camera Movement > Zoom"
@@ -172,20 +178,20 @@ export function VideoDetailView({
           <div className="flex flex-col gap-2 mb-5">
             {detail.actions.map((action) => {
               const Icon = ACTION_ICONS[action.icon];
-              const isLearnAction = action.icon === "learn";
               return (
                 <Button
                   key={action.label}
                   variant="bordered"
                   className="justify-center gap-3 items-center border-default-300 dark:border-default-500 text-default-700 dark:text-default-600 hover:bg-default-100 dark:hover:bg-white/10 w-full"
                   startContent={<Icon size={18} />}
-                  isDisabled={isLearnAction && (!videoDetail || isLoadingDetail)}
-                  onPress={isLearnAction && videoDetail ? () => {
+                  isDisabled={!videoDetail || isLoadingDetail}
+                  onPress={videoDetail ? () => {
                     window.dispatchEvent(new CustomEvent("learn-from-video", {
                       detail: {
                         contentId: videoDetail.id,
                         storageKey: videoDetail.storage_key,
                         videoUrl: getBrowseVideoUrl(videoDetail.storage_key),
+                        prompt: ACTION_PROMPTS[action.icon],
                       },
                     }));
                   } : undefined}
