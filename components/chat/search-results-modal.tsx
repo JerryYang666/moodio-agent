@@ -74,11 +74,8 @@ export default function SearchResultsModal({
         if (!open) handleClose();
       }}
       size="5xl"
-      scrollBehavior="normal"
       classNames={{
         base: "max-w-[95vw] max-h-[95vh] m-auto",
-        body: "p-0 flex-1 min-h-0 overflow-hidden",
-        wrapper: "overflow-hidden",
       }}
     >
       <ModalContent className="flex flex-col max-h-[inherit]">
@@ -87,10 +84,8 @@ export default function SearchResultsModal({
             <ModalHeader className="border-b border-default-200 shrink-0">
               {query.textSearch ? `"${query.textSearch}"` : tSearch("searchQuery")}
             </ModalHeader>
-            <ModalBody>
-              <div className="h-full overflow-hidden">
-                <VideoGrid hideSummary={true} />
-              </div>
+            <ModalBody className="flex-1 min-h-0 overflow-hidden p-4">
+              <VideoGrid hideSummary={true} />
             </ModalBody>
             <ModalFooter className="justify-center border-t border-default-200">
               <Button
