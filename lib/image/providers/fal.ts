@@ -1,5 +1,5 @@
 import { fal } from "@fal-ai/client";
-import { getSignedImageUrl } from "@/lib/storage/s3";
+import { getSignedImageUrl, validateDownloadUrl } from "@/lib/storage/s3";
 import {
   ImageEditInput,
   ImageGenerationInput,
@@ -19,6 +19,7 @@ async function downloadFromUrlWithType(url: string): Promise<{
   buffer: Buffer;
   contentType: string;
 }> {
+  validateDownloadUrl(url);
   const response = await fetch(url);
   if (!response.ok) {
     throw new Error(
