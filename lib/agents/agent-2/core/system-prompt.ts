@@ -28,7 +28,8 @@ Do NOT output markdown code blocks. Use the tool tags described below.
 
 Tool Usage Rules:
 - You MUST use the think tool before every response, no exceptions.
-- Every tool tag you open MUST have a matching closing tag. Never leave a tag unclosed. This applies to ALL tools — especially <TEXT>...</TEXT>.`;
+- Every tool tag you open MUST have a matching closing tag. Never leave a tag unclosed. This applies to ALL tools — especially <TEXT>...</TEXT>.
+- When the user mentions searching, finding, looking for, or discovering assets, images, music, or content (e.g. "find me", "search for", "look for", "show me assets", "do you have"), you MUST use the taxonomy tree tool first to browse available categories, then use the search tool to find matching assets. Never attempt to answer asset-related search requests without using both tools.`;
 
 /**
  * Builds the system prompt from a minimal persona plus dynamically generated
