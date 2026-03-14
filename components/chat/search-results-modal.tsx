@@ -4,7 +4,7 @@ import React, { useEffect, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Modal, ModalContent, ModalBody, ModalFooter } from "@heroui/modal";
+import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter } from "@heroui/modal";
 import { Button } from "@heroui/button";
 import { ExternalLink } from "lucide-react";
 import {
@@ -73,16 +73,19 @@ export default function SearchResultsModal({
       onOpenChange={(open) => {
         if (!open) handleClose();
       }}
-      size="5xl"
+      size="full"
       scrollBehavior="inside"
       classNames={{
-        base: "max-h-[60vh] m-auto",
+        base: "max-w-[90vw] max-h-[70vh] m-auto",
         body: "p-4",
       }}
     >
       <ModalContent>
         {() => (
           <>
+            <ModalHeader className="border-b border-default-200">
+              {query.textSearch ? `"${query.textSearch}"` : tSearch("searchQuery")}
+            </ModalHeader>
             <ModalBody>
               <VideoGrid hideSummary={true} />
             </ModalBody>
