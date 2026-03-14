@@ -1936,6 +1936,31 @@ export default function ChatInterface({
               continue;
             }
 
+            if (event.type === "invalidate_continuation") {
+              // Only the post-tool-call continuation is being retried.
+              // Preserve tool_call and internal_think parts, clear everything else.
+              console.log(
+                `[Chat] Received invalidate_continuation for variant ${variantId} - clearing post-tool content`
+              );
+
+              variantContents[variantId] = variantContents[variantId].filter(
+                (part) => part.type === "tool_call" || part.type === "internal_think"
+              );
+
+              updateStreamMessages((prev) => {
+                const newMessages = [...prev];
+                for (let i = newMessages.length - 1; i >= 0; i--) {
+                  const msg = newMessages[i];
+                  if (msg.role === "assistant" && msg.variantId === variantId) {
+                    newMessages[i] = { ...msg, content: [...variantContents[variantId]] };
+                    break;
+                  }
+                }
+                return newMessages;
+              });
+              continue;
+            }
+
             if (
               event.type === "retry_exhausted" ||
               event.type === "variant_failed"
@@ -2887,6 +2912,30 @@ export default function ChatInterface({
               }
               // If isFirstChunk is still true, no message was created yet, so
               // nothing to clear — just let it create normally on next chunk.
+              continue;
+            }
+
+            if (event.type === "invalidate_continuation") {
+              // Continuation retry — preserve tool_call and internal_think parts
+              console.log(
+                `[Chat] Received invalidate_continuation for variant ${variantId} - clearing post-tool content`
+              );
+              variantContent = variantContent.filter(
+                (part) => part.type === "tool_call" || part.type === "internal_think"
+              );
+              if (!isFirstChunk) {
+                updateStreamMessages((prev) => {
+                  const newMessages = [...prev];
+                  for (let i = newMessages.length - 1; i >= 0; i--) {
+                    const msg = newMessages[i];
+                    if (msg.role === "assistant" && msg.variantId === variantId) {
+                      newMessages[i] = { ...msg, content: [...variantContent] };
+                      break;
+                    }
+                  }
+                  return newMessages;
+                });
+              }
               continue;
             }
 
