@@ -73,10 +73,10 @@ export default function SearchResultsModal({
       onOpenChange={(open) => {
         if (!open) handleClose();
       }}
-      size="full"
+      size="5xl"
       scrollBehavior="inside"
       classNames={{
-        base: "max-w-[90vw] max-h-[70vh] m-auto",
+        base: "max-w-[95vw] max-h-[95vh] m-auto",
         body: "p-4",
       }}
     >
