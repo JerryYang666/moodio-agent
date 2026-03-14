@@ -4,6 +4,7 @@ import { uploadImage } from "@/lib/upload/client";
 export interface VideoUploadResult {
   videoId: string;
   videoUrl: string;
+  thumbnailImageId?: string;
 }
 
 export interface VideoUploadError {
@@ -182,7 +183,7 @@ export async function uploadVideo(file: File): Promise<VideoUploadOutcome> {
 
     return {
       success: true,
-      data: { videoId, videoUrl },
+      data: { videoId, videoUrl, thumbnailImageId },
     };
   } catch (error) {
     console.error("Video upload failed:", error);

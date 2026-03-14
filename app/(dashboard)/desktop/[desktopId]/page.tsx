@@ -12,6 +12,7 @@ import { Tooltip } from "@heroui/tooltip";
 import { ArrowLeft, Share2, Pencil, Wifi, WifiOff } from "lucide-react";
 import AssetPickerModal, { type AssetSummary } from "@/components/chat/asset-picker-modal";
 import { uploadImage } from "@/lib/upload/client";
+import { uploadVideo } from "@/lib/upload/video-client";
 import DesktopCanvas from "@/components/desktop/DesktopCanvas";
 import type { EnrichedDesktopAsset } from "@/components/desktop/assets";
 import DesktopToolbar, { type CanvasMode } from "@/components/desktop/DesktopToolbar";
@@ -665,30 +666,52 @@ export default function DesktopDetailPage({
     async (files: File[]) => {
       const pos = addAssetPositionRef.current;
       for (const file of files) {
-        const result = await uploadImage(file);
-        if (!result.success) {
-          addToast({ title: t("uploadFailed"), description: result.error.message, color: "danger" });
-          continue;
+        const isVideo = siteConfig.upload.allowedVideoTypes.includes(file.type);
+
+        let asset: { assetType: string; metadata: Record<string, unknown>; posX: number; posY: number };
+
+        if (isVideo) {
+          const result = await uploadVideo(file);
+          if (!result.success) {
+            addToast({ title: t("uploadFailed"), description: result.error.message, color: "danger" });
+            continue;
+          }
+          asset = {
+            assetType: "video",
+            metadata: {
+              videoId: result.data.videoId,
+              imageId: result.data.thumbnailImageId || result.data.videoId,
+              title: file.name,
+              prompt: "",
+              status: "completed",
+            },
+            posX: pos.x,
+            posY: pos.y,
+          };
+        } else {
+          const result = await uploadImage(file);
+          if (!result.success) {
+            addToast({ title: t("uploadFailed"), description: result.error.message, color: "danger" });
+            continue;
+          }
+          asset = {
+            assetType: "image",
+            metadata: {
+              imageId: result.data.imageId,
+              title: file.name,
+              prompt: "",
+              status: "generated",
+            },
+            posX: pos.x,
+            posY: pos.y,
+          };
         }
+
         try {
           const res = await fetch(`/api/desktop/${desktopId}/assets`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              assets: [
-                {
-                  assetType: "image",
-                  metadata: {
-                    imageId: result.data.imageId,
-                    title: file.name,
-                    prompt: "",
-                    status: "generated",
-                  },
-                  posX: pos.x,
-                  posY: pos.y,
-                },
-              ],
-            }),
+            body: JSON.stringify({ assets: [asset] }),
           });
           if (!res.ok) throw new Error("Failed to add uploaded asset to desktop");
           const data = await res.json();
