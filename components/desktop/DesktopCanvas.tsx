@@ -19,8 +19,8 @@ import {
   SendHorizontal,
   Film,
   Plus,
-  ArrowUpToLine,
-  ArrowDownToLine,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
 
 const MIN_ZOOM = 0.1;
@@ -715,19 +715,7 @@ export default function DesktopCanvas({
           assetId: contextAsset.id,
           imageId: (contextAsset.metadata as Record<string, unknown>)?.imageId as string | undefined,
           url: contextAsset.imageUrl,
-          title: ((contextAsset.metadata as Record<string, unknown>)?.title as string) || t("videoTitle"),
-        }
-      : null;
-
-  const contextVideoInfo =
-    contextAsset?.assetType === "video"
-      ? {
-          assetId: contextAsset.id,
-          videoId: ((contextAsset.metadata as Record<string, unknown>)?.videoId as string) ||
-            ((contextAsset.metadata as Record<string, unknown>)?.imageId as string) || contextAsset.id,
-          url: (contextAsset as EnrichedDesktopAsset).videoUrl ||
-            (contextAsset as EnrichedDesktopAsset).imageUrl || "",
-          title: ((contextAsset.metadata as Record<string, unknown>)?.title as string) || t("videoTitle"),
+          title: ((contextAsset.metadata as Record<string, unknown>)?.title as string) || t("imageTitle"),
         }
       : null;
 
@@ -740,7 +728,7 @@ export default function DesktopCanvas({
         assetId: singleSelectedAsset.id,
         imageId: (singleSelectedAsset.metadata as Record<string, unknown>)?.imageId as string | undefined,
         url: singleSelectedAsset.imageUrl,
-        title: ((singleSelectedAsset.metadata as Record<string, unknown>)?.title as string) || t("videoTitle"),
+        title: ((singleSelectedAsset.metadata as Record<string, unknown>)?.title as string) || t("imageTitle"),
       }
     : null;
   const floatingBarVideoInfo = singleSelectedAsset?.assetType === "video"
@@ -1037,8 +1025,8 @@ export default function DesktopCanvas({
                       setContextMenu(null);
                     }}
                   >
-                    <ArrowUpToLine size={14} />
-                    {t("bringToFront")}
+                    <ArrowUp size={14} />
+                    {t("bringForward")}
                   </button>
                   <button
                     className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-default-100 transition-colors text-left"
@@ -1047,8 +1035,8 @@ export default function DesktopCanvas({
                       setContextMenu(null);
                     }}
                   >
-                    <ArrowDownToLine size={14} />
-                    {t("sendToBack")}
+                    <ArrowDown size={14} />
+                    {t("sendBackward")}
                   </button>
                 </>
               )}

@@ -474,8 +474,9 @@
     "shotList": "Shot List",
     "shotCount": "{count} shots",
     "desktopActions": "Desktop actions",
-    "bringToFront": "Bring to Front",
-    "sendToBack": "Send to Back"
+    "imageTitle": "Image",
+    "bringForward": "Bring Forward",
+    "sendBackward": "Send Backward"
   },
   "storyboard": {
     "title": "Storyboard",

@@ -1047,7 +1047,8 @@
     "shotList": "샷 목록",
     "shotCount": "{count}개 샷",
     "desktopActions": "데스크톱 작업",
-    "bringToFront": "맨 앞으로 가져오기",
-    "sendToBack": "맨 뒤로 보내기"
+    "imageTitle": "이미지",
+    "bringForward": "앞으로 가져오기",
+    "sendBackward": "뒤로 보내기"
   }
 }

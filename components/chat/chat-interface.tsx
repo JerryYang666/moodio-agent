@@ -1311,7 +1311,7 @@ export default function ChatInterface({
       const ce = e as CustomEvent;
       const d = ce.detail as any;
       if (!d?.videoId || !d?.url) return;
-      if (!canAddVideo(pendingVideos)) {
+      if (!canAddVideo(pendingVideosRef.current)) {
         addToast({ title: t("chat.maxVideosReached", { max: MAX_PENDING_VIDEOS }), color: "warning" });
         return;
       }
@@ -1325,7 +1325,7 @@ export default function ChatInterface({
     window.addEventListener("moodio-video-selected", handler as any);
     return () =>
       window.removeEventListener("moodio-video-selected", handler as any);
-  }, [pendingVideos, t]);
+  }, [t]);
 
   const handleAssetDrop = useCallback(
     async (payload: any) => {
