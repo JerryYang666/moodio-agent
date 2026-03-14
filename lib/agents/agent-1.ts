@@ -285,6 +285,12 @@ export class Agent1 implements Agent {
                   }\nPrompt: ${p.prompt}`,
               };
             }
+            if (p.type === "video") {
+              return {
+                type: "text" as const,
+                text: `[Video | ID: ${(p as any).videoId} | Source: ${(p as any).source} | URL: ${(p as any).videoUrl}]`,
+              };
+            }
             if (p.type === "agent_video") {
               return {
                 type: "text" as const,
@@ -371,6 +377,14 @@ export class Agent1 implements Agent {
                 image_url: {
                   url: getSignedImageUrl(p.imageId),
                 },
+              },
+            ];
+          }
+          if (p.type === "video") {
+            return [
+              {
+                type: "text" as const,
+                text: `[Video | ID: ${(p as any).videoId} | Source: ${(p as any).source} | URL: ${(p as any).videoUrl}]`,
               },
             ];
           }
