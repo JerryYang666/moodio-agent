@@ -656,7 +656,7 @@ export class Agent1 implements Agent {
       console.log("=== END FINAL AI LLM RESPONSE ===");
 
       if (state.finalContent.length === 0) {
-        const text = state.buffer.replace(/<[^>]*>/g, "").trim();
+        const text = state.buffer.replace(/<|>/g, "").trim();
         if (text) {
           send({ type: "text", content: text });
           state.finalContent.push({ type: "text", text });
