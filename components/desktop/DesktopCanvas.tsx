@@ -19,6 +19,8 @@ import {
   SendHorizontal,
   Film,
   Plus,
+  ArrowUpToLine,
+  ArrowDownToLine,
 } from "lucide-react";
 
 const MIN_ZOOM = 0.1;
@@ -46,6 +48,7 @@ interface DesktopCanvasProps {
   playingAssetId?: string | null;
   onCopyToCollection?: (asset: EnrichedDesktopAsset) => void;
   onSendToTimeline?: (asset: EnrichedDesktopAsset) => void;
+  onZIndexChange?: (assetId: string, delta: number) => void;
   sendEvent?: (type: string, payload: Record<string, unknown>) => void;
   remoteCursors?: RemoteCursor[];
   remoteSelections?: Map<string, { sessionId: string; userId: string; firstName: string }[]>;
@@ -133,6 +136,7 @@ export default function DesktopCanvas({
   playingAssetId,
   onCopyToCollection,
   onSendToTimeline,
+  onZIndexChange,
   sendEvent,
   remoteCursors,
   remoteSelections,
@@ -715,6 +719,45 @@ export default function DesktopCanvas({
         }
       : null;
 
+  const contextVideoInfo =
+    contextAsset?.assetType === "video"
+      ? {
+          assetId: contextAsset.id,
+          videoId: ((contextAsset.metadata as Record<string, unknown>)?.videoId as string) ||
+            ((contextAsset.metadata as Record<string, unknown>)?.imageId as string) || contextAsset.id,
+          url: (contextAsset as EnrichedDesktopAsset).videoUrl ||
+            (contextAsset as EnrichedDesktopAsset).imageUrl || "",
+          title: ((contextAsset.metadata as Record<string, unknown>)?.title as string) || t("videoTitle"),
+        }
+      : null;
+
+  // Floating bar: compute info for the single selected asset
+  const singleSelectedAsset = selectedIds.size === 1 && !draggingAssetId && !resizingAssetId
+    ? assets.find((a) => selectedIds.has(a.id))
+    : null;
+  const floatingBarImageInfo = singleSelectedAsset?.assetType === "image"
+    ? {
+        assetId: singleSelectedAsset.id,
+        imageId: (singleSelectedAsset.metadata as Record<string, unknown>)?.imageId as string | undefined,
+        url: singleSelectedAsset.imageUrl,
+        title: ((singleSelectedAsset.metadata as Record<string, unknown>)?.title as string) || t("videoTitle"),
+      }
+    : null;
+  const floatingBarVideoInfo = singleSelectedAsset?.assetType === "video"
+    ? {
+        assetId: singleSelectedAsset.id,
+        videoId: ((singleSelectedAsset.metadata as Record<string, unknown>)?.videoId as string) ||
+          ((singleSelectedAsset.metadata as Record<string, unknown>)?.imageId as string) || singleSelectedAsset.id,
+        url: (singleSelectedAsset as EnrichedDesktopAsset).videoUrl ||
+          (singleSelectedAsset as EnrichedDesktopAsset).imageUrl || "",
+        title: ((singleSelectedAsset.metadata as Record<string, unknown>)?.title as string) || t("videoTitle"),
+      }
+    : null;
+  const floatingBarChatId = singleSelectedAsset &&
+    typeof (singleSelectedAsset.metadata as Record<string, unknown>)?.chatId === "string"
+    ? ((singleSelectedAsset.metadata as Record<string, unknown>).chatId as string)
+    : null;
+
   const worldStyle = {
     transform: `translate(${camera.x}px, ${camera.y}px) scale(${camera.zoom})`,
     transformOrigin: "0 0",
@@ -831,7 +874,7 @@ export default function DesktopCanvas({
                 } ${isDragging ? "opacity-80 shadow-xl" : ""}`}
                 style={
                   remoteSelectorsForAsset?.length && !isSelected
-                    ? { boxShadow: `0 0 0 2px ${userIdToColor(remoteSelectorsForAsset[0].userId)}` }
+                    ? { boxShadow: `0 0 0 ${2 / camera.zoom}px ${userIdToColor(remoteSelectorsForAsset[0].userId)}` }
                     : undefined
                 }
               >
@@ -903,10 +946,19 @@ export default function DesktopCanvas({
               )}
               {remoteSelectorsForAsset?.length && !isSelected ? (
                 <div
-                  className="absolute -top-5 left-1 text-[10px] font-medium px-1 rounded text-white whitespace-nowrap"
-                  style={{ backgroundColor: userIdToColor(remoteSelectorsForAsset[0].userId) }}
+                  className="absolute left-0 pointer-events-none"
+                  style={{
+                    top: 0,
+                    transform: `translateY(-100%) scale(${1 / camera.zoom})`,
+                    transformOrigin: "bottom left",
+                  }}
                 >
-                  {remoteSelectorsForAsset.map((s) => s.firstName).join(", ")}
+                  <div
+                    className="text-[10px] font-medium px-1 py-0.5 rounded text-white whitespace-nowrap"
+                    style={{ backgroundColor: userIdToColor(remoteSelectorsForAsset[0].userId) }}
+                  >
+                    {remoteSelectorsForAsset.map((s) => s.firstName).join(", ")}
+                  </div>
                 </div>
               ) : null}
             </div>
@@ -974,64 +1026,31 @@ export default function DesktopCanvas({
               {t("deleteAllSelected", { count: selectedIds.size })}
             </button>
           ) : (
-            /* Single-select context menu: full options */
+            /* Single-select context menu: z-index + delete */
             <>
-              {contextChatId && onOpenChat && (
-                <button
-                  className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-default-100 transition-colors text-left"
-                  onClick={() => {
-                    onOpenChat(contextChatId as string);
-                    setContextMenu(null);
-                  }}
-                >
-                  <MessageSquare size={14} />
-                  {t("openInChat")}
-                </button>
-              )}
-              {contextImageInfo?.imageId && contextImageInfo.url && (
-                <button
-                  className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-default-100 transition-colors text-left"
-                  onClick={() => {
-                    window.dispatchEvent(
-                      new CustomEvent("moodio-asset-selected", {
-                        detail: {
-                          assetId: contextImageInfo.assetId,
-                          imageId: contextImageInfo.imageId,
-                          url: contextImageInfo.url,
-                          title: contextImageInfo.title,
-                        },
-                      })
-                    );
-                    setContextMenu(null);
-                  }}
-                >
-                  <SendHorizontal size={14} />
-                  {t("sendToChat")}
-                </button>
-              )}
-              {contextAsset && onCopyToCollection && (
-                <button
-                  className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-default-100 transition-colors text-left"
-                  onClick={() => {
-                    onCopyToCollection(contextAsset);
-                    setContextMenu(null);
-                  }}
-                >
-                  <FolderPlus size={14} />
-                  {t("copyToCollection")}
-                </button>
-              )}
-              {contextAsset?.assetType === "video" && onSendToTimeline && (
-                <button
-                  className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-default-100 transition-colors text-left"
-                  onClick={() => {
-                    onSendToTimeline(contextAsset);
-                    setContextMenu(null);
-                  }}
-                >
-                  <Film size={14} />
-                  {t("sendToTimeline")}
-                </button>
+              {contextAsset && onZIndexChange && (
+                <>
+                  <button
+                    className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-default-100 transition-colors text-left"
+                    onClick={() => {
+                      onZIndexChange(contextAsset.id, 10);
+                      setContextMenu(null);
+                    }}
+                  >
+                    <ArrowUpToLine size={14} />
+                    {t("bringToFront")}
+                  </button>
+                  <button
+                    className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-default-100 transition-colors text-left"
+                    onClick={() => {
+                      onZIndexChange(contextAsset.id, -10);
+                      setContextMenu(null);
+                    }}
+                  >
+                    <ArrowDownToLine size={14} />
+                    {t("sendToBack")}
+                  </button>
+                </>
               )}
               <button
                 className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-danger-50 text-danger transition-colors text-left"
@@ -1044,6 +1063,98 @@ export default function DesktopCanvas({
           )}
         </div>
       )}
+
+      {/* Floating action bar — appears above the single selected asset */}
+      {singleSelectedAsset && canEdit && !contextMenu && (() => {
+        const dims = getAssetDimensions(singleSelectedAsset, naturalDims.get(singleSelectedAsset.id));
+        const screenX = singleSelectedAsset.posX * camera.zoom + camera.x;
+        const screenY = singleSelectedAsset.posY * camera.zoom + camera.y;
+        const screenW = dims.w * camera.zoom;
+        return (
+          <div
+            className="absolute z-50 flex items-center gap-1 bg-background border border-divider rounded-lg shadow-lg px-1 py-1"
+            style={{
+              left: screenX + screenW / 2,
+              top: screenY - 8,
+              transform: "translate(-50%, -100%)",
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            {floatingBarChatId && onOpenChat && (
+              <button
+                className="flex items-center gap-1.5 px-2 py-1 text-xs hover:bg-default-100 rounded-md transition-colors whitespace-nowrap"
+                onClick={() => onOpenChat(floatingBarChatId)}
+                title={t("openInChat")}
+              >
+                <MessageSquare size={13} />
+                {t("openInChat")}
+              </button>
+            )}
+            {floatingBarImageInfo?.imageId && floatingBarImageInfo.url && (
+              <button
+                className="flex items-center gap-1.5 px-2 py-1 text-xs hover:bg-default-100 rounded-md transition-colors whitespace-nowrap"
+                onClick={() => {
+                  window.dispatchEvent(
+                    new CustomEvent("moodio-asset-selected", {
+                      detail: {
+                        assetId: floatingBarImageInfo.assetId,
+                        imageId: floatingBarImageInfo.imageId,
+                        url: floatingBarImageInfo.url,
+                        title: floatingBarImageInfo.title,
+                      },
+                    })
+                  );
+                }}
+                title={t("sendToChat")}
+              >
+                <SendHorizontal size={13} />
+                {t("sendToChat")}
+              </button>
+            )}
+            {floatingBarVideoInfo?.videoId && floatingBarVideoInfo.url && (
+              <button
+                className="flex items-center gap-1.5 px-2 py-1 text-xs hover:bg-default-100 rounded-md transition-colors whitespace-nowrap"
+                onClick={() => {
+                  window.dispatchEvent(
+                    new CustomEvent("moodio-video-selected", {
+                      detail: {
+                        assetId: floatingBarVideoInfo.assetId,
+                        videoId: floatingBarVideoInfo.videoId,
+                        url: floatingBarVideoInfo.url,
+                        title: floatingBarVideoInfo.title,
+                      },
+                    })
+                  );
+                }}
+                title={t("sendToChat")}
+              >
+                <SendHorizontal size={13} />
+                {t("sendToChat")}
+              </button>
+            )}
+            {singleSelectedAsset && onCopyToCollection && (
+              <button
+                className="flex items-center gap-1.5 px-2 py-1 text-xs hover:bg-default-100 rounded-md transition-colors whitespace-nowrap"
+                onClick={() => onCopyToCollection(singleSelectedAsset)}
+                title={t("copyToCollection")}
+              >
+                <FolderPlus size={13} />
+                {t("copyToCollection")}
+              </button>
+            )}
+            {singleSelectedAsset.assetType === "video" && onSendToTimeline && (
+              <button
+                className="flex items-center gap-1.5 px-2 py-1 text-xs hover:bg-default-100 rounded-md transition-colors whitespace-nowrap"
+                onClick={() => onSendToTimeline(singleSelectedAsset)}
+                title={t("sendToTimeline")}
+              >
+                <Film size={13} />
+                {t("sendToTimeline")}
+              </button>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Selection count indicator */}
       {selectedIds.size > 1 && (

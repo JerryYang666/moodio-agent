@@ -1046,6 +1046,8 @@
     "generatingShotList": "正在生成镜头列表...",
     "shotList": "镜头列表",
     "shotCount": "{count} 个镜头",
-    "desktopActions": "桌面操作"
+    "desktopActions": "桌面操作",
+    "bringToFront": "置于顶层",
+    "sendToBack": "置于底层"
   }
 }

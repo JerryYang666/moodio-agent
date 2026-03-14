@@ -1305,6 +1305,28 @@ export default function ChatInterface({
       window.removeEventListener("moodio-asset-selected", handler as any);
   }, [addAssetImage]);
 
+  // Listen for video selection events from the canvas floating bar
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const ce = e as CustomEvent;
+      const d = ce.detail as any;
+      if (!d?.videoId || !d?.url) return;
+      if (!canAddVideo(pendingVideos)) {
+        addToast({ title: t("chat.maxVideosReached", { max: MAX_PENDING_VIDEOS }), color: "warning" });
+        return;
+      }
+      setPendingVideos((prev) => [...prev, {
+        videoId: d.videoId,
+        url: d.url,
+        source: "library" as const,
+        title: d.title || "Selected video",
+      }]);
+    };
+    window.addEventListener("moodio-video-selected", handler as any);
+    return () =>
+      window.removeEventListener("moodio-video-selected", handler as any);
+  }, [pendingVideos, t]);
+
   const handleAssetDrop = useCallback(
     async (payload: any) => {
       if (payload?.assetId && payload?.url && payload?.imageId) {

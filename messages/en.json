@@ -473,7 +473,9 @@
     "generatingShotList": "Generating shot list...",
     "shotList": "Shot List",
     "shotCount": "{count} shots",
-    "desktopActions": "Desktop actions"
+    "desktopActions": "Desktop actions",
+    "bringToFront": "Bring to Front",
+    "sendToBack": "Send to Back"
   },
   "storyboard": {
     "title": "Storyboard",

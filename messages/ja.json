@@ -1046,6 +1046,8 @@
     "generatingShotList": "ショットリストを生成中...",
     "shotList": "ショットリスト",
     "shotCount": "{count} ショット",
-    "desktopActions": "デスクトップのアクション"
+    "desktopActions": "デスクトップのアクション",
+    "bringToFront": "最前面に移動",
+    "sendToBack": "最背面に移動"
   }
 }
