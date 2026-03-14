@@ -50,6 +50,13 @@ export default function SearchResultsModal({
     }
   }, [isOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleLearnFromVideo = () => handleClose();
+    window.addEventListener("learn-from-video", handleLearnFromVideo);
+    return () => window.removeEventListener("learn-from-video", handleLearnFromVideo);
+  }, [isOpen]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleClose = () => {
     // Restore previous query state
     if (prevQueryRef.current) {
@@ -76,6 +83,7 @@ export default function SearchResultsModal({
       size="5xl"
       classNames={{
         base: "max-w-[95vw] max-h-[95vh] m-auto",
+        wrapper: "z-[70]",
       }}
     >
       <ModalContent>
@@ -84,7 +92,7 @@ export default function SearchResultsModal({
             <ModalHeader className="border-b border-default-200">
               {query.textSearch ? `"${query.textSearch}"` : tSearch("searchQuery")}
             </ModalHeader>
-            <ModalBody className="p-4 !overflow-hidden">
+            <ModalBody className="p-4 overflow-hidden!">
               <div className="h-[calc(95vh-160px)] overflow-hidden">
                 <VideoGrid hideSummary={true} />
               </div>
