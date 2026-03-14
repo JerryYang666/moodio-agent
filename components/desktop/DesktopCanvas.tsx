@@ -1151,10 +1151,6 @@ export default function DesktopCanvas({
         </div>
       )}
 
-      {/* Zoom indicator */}
-      <div className="absolute bottom-4 left-4 bg-background/80 backdrop-blur-sm text-xs text-default-500 px-2 py-1 rounded-lg border border-divider">
-        {Math.round(camera.zoom * 100)}%
-      </div>
     </div>
   );
 }
