@@ -1,15 +1,16 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useDispatch } from "react-redux";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
-import { Search, ExternalLink } from "lucide-react";
+import { Search, Eye } from "lucide-react";
 import { Button } from "@heroui/button";
 import { Chip } from "@heroui/chip";
 import { setTextSearch, setSelectedFilters } from "@/lib/redux/slices/querySlice";
 import { useGetPropertiesQuery } from "@/lib/redux/services/api";
 import { useFilterChips } from "@/hooks/use-filter-chips";
+import SearchResultsModal from "./search-results-modal";
 
 interface SearchQueryCardProps {
   query: {
@@ -23,7 +24,6 @@ interface SearchQueryCardProps {
 
 export default function SearchQueryCard({ query, status, autoExecute = false }: SearchQueryCardProps) {
   const dispatch = useDispatch();
-  const router = useRouter();
   const pathname = usePathname();
   const locale = useLocale();
   const t = useTranslations("chat.search");
@@ -31,6 +31,7 @@ export default function SearchQueryCard({ query, status, autoExecute = false }: 
   const filterChips = useFilterChips(properties, query.filterIds);
   const isOnBrowse = pathname === "/browse";
   const hasExecuted = useRef(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
     if (autoExecute && isOnBrowse && !hasExecuted.current && status === "pending") {
@@ -41,10 +42,11 @@ export default function SearchQueryCard({ query, status, autoExecute = false }: 
   }, [autoExecute, isOnBrowse, status, query, dispatch]);
 
   const handleSearch = () => {
-    dispatch(setTextSearch(query.textSearch));
-    dispatch(setSelectedFilters(query.filterIds));
-    if (!isOnBrowse) {
-      router.push("/browse");
+    if (isOnBrowse) {
+      dispatch(setTextSearch(query.textSearch));
+      dispatch(setSelectedFilters(query.filterIds));
+    } else {
+      setIsModalOpen(true);
     }
   };
 
@@ -86,12 +88,20 @@ export default function SearchQueryCard({ query, status, autoExecute = false }: 
         size="sm"
         color="primary"
         variant="flat"
-        startContent={isOnBrowse ? <Search size={14} /> : <ExternalLink size={14} />}
+        startContent={isOnBrowse ? <Search size={14} /> : <Eye size={14} />}
         onPress={handleSearch}
         className="self-start mt-1"
       >
-        {isOnBrowse ? t("searchQuery") : t("goToBrowse")}
+        {isOnBrowse ? t("searchQuery") : t("viewResults")}
       </Button>
+
+      {!isOnBrowse && (
+        <SearchResultsModal
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          query={query}
+        />
+      )}
     </div>
   );
 }

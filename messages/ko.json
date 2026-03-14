@@ -146,6 +146,7 @@
       "goToBrowse": "브라우즈 페이지에서 검색",
       "textQuery": "텍스트",
       "searchQuery": "검색",
+      "viewResults": "결과 보기",
       "filters": "필터"
     },
     "userUpload": "사용자 업로드",

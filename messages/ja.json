@@ -146,6 +146,7 @@
       "goToBrowse": "ブラウズページで検索",
       "textQuery": "テキスト",
       "searchQuery": "検索",
+      "viewResults": "結果を表示",
       "filters": "フィルター"
     },
     "userUpload": "ユーザーアップロード",

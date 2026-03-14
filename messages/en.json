@@ -146,6 +146,7 @@
       "goToBrowse": "Go to Browse to search",
       "textQuery": "Text",
       "searchQuery": "Search",
+      "viewResults": "View Results",
       "filters": "Filters"
     },
     "userUpload": "User upload",
