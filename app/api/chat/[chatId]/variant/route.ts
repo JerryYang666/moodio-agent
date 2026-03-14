@@ -6,7 +6,7 @@ import { chats } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getChatHistory, saveChatHistory } from "@/lib/storage/s3";
 import { Message, MessageContentPart } from "@/lib/llm/types";
-import { agent1 } from "@/lib/agents/agent-1";
+import { agent2 } from "@/lib/agents/agent-2";
 import { waitUntil } from "@vercel/functions";
 
 /**
@@ -182,14 +182,21 @@ export async function POST(
       }
     }
 
+    // Extract reference images from the original user message metadata
+    const referenceImages = userMessage.metadata?.referenceImages?.map((ref) => ({
+      imageId: ref.imageId,
+      tag: (ref.tag as "none" | "subject" | "scene" | "item" | "style") || "none",
+      title: ref.title,
+    }));
+
     console.log(
-      "[Variant] Calling agent for new variant",
+      "[Variant] Calling agent-2 for new variant",
       `[${Date.now() - requestStartTime}ms]`
     );
 
-    // Generate a single new variant
+    // Generate a single new variant using Agent 2
     const { stream: agentStream, completions } =
-      await agent1.processRequestParallel(
+      await agent2.processRequestParallel(
         historyBeforeMessage,
         modifiedUserMessage,
         payload.userId,
@@ -197,7 +204,14 @@ export async function POST(
         1, // Generate only 1 variant
         requestStartTime,
         false, // precisionEditing
-        imageIds
+        imageIds,
+        undefined, // systemPromptOverride
+        userMessage.metadata?.aspectRatio, // aspectRatioOverride
+        userMessage.metadata?.imageSize as "2k" | "4k" | undefined, // imageSizeOverride
+        userMessage.metadata?.imageModelId, // imageModelId
+        messageTimestamp, // messageTimestamp for frontend sync
+        referenceImages, // referenceImages
+        userMessage.metadata?.imageQuantity, // maxImageQuantity
       );
 
     // Handle background completion (saving the new variant to history)
