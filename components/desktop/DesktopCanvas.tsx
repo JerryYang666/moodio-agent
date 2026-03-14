@@ -734,10 +734,8 @@ export default function DesktopCanvas({
   const floatingBarVideoInfo = singleSelectedAsset?.assetType === "video"
     ? {
         assetId: singleSelectedAsset.id,
-        videoId: ((singleSelectedAsset.metadata as Record<string, unknown>)?.videoId as string) ||
-          ((singleSelectedAsset.metadata as Record<string, unknown>)?.imageId as string) || singleSelectedAsset.id,
-        url: (singleSelectedAsset as EnrichedDesktopAsset).videoUrl ||
-          (singleSelectedAsset as EnrichedDesktopAsset).imageUrl || "",
+        videoId: ((singleSelectedAsset.metadata as Record<string, unknown>)?.videoId as string) || singleSelectedAsset.id,
+        url: (singleSelectedAsset as EnrichedDesktopAsset).videoUrl || "",
         title: ((singleSelectedAsset.metadata as Record<string, unknown>)?.title as string) || t("videoTitle"),
       }
     : null;
