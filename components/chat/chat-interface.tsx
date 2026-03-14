@@ -2562,8 +2562,9 @@ export default function ChatInterface({
     [chatId, isSending, disableActiveChatPersistence, onChatCreated, t]
   );
 
-  // Persist a part update to S3 in the background (fire-and-forget).
-  // Parts are addressed by stable identifiers, not raw array indices.
+  // Persist a part update to S3. Returns a Promise that resolves when the
+  // update has been saved so callers can await it before triggering dependent
+  // operations (e.g. video generation that relies on the saved config).
   const persistPartUpdate = useCallback(
     (
       messageTimestamp: number,
@@ -2571,10 +2572,10 @@ export default function ChatInterface({
       partType: string,
       partTypeIndex: number,
       updates: Record<string, any>
-    ) => {
+    ): Promise<void> => {
       const id = chatIdRef.current;
-      if (!id) return;
-      fetch(`/api/chat/${id}/parts`, {
+      if (!id) return Promise.resolve();
+      return fetch(`/api/chat/${id}/parts`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -2584,15 +2585,19 @@ export default function ChatInterface({
           partTypeIndex,
           updates,
         }),
-      }).catch((err) => {
-        console.error("Failed to persist part update:", err);
-      });
+      })
+        .then(() => {})
+        .catch((err) => {
+          console.error("Failed to persist part update:", err);
+        });
     },
     []
   );
 
   // Handle agent_video part edits from VideoConfigCard.
   // Addressed by message timestamp + Nth occurrence of the part type.
+  // Returns a Promise that resolves when the S3 persist completes so callers
+  // can await it before triggering dependent operations (e.g. video generation).
   const handleVideoPartUpdate = useCallback(
     (
       messageTimestamp: number,
@@ -2600,7 +2605,7 @@ export default function ChatInterface({
       partType: string,
       partTypeIndex: number,
       updates: any
-    ) => {
+    ): Promise<void> => {
       setMessages((prev) => {
         const byVariantIdx = messageVariantId
           ? prev.findIndex((m) => m.variantId === messageVariantId)
@@ -2629,7 +2634,7 @@ export default function ChatInterface({
         }
         return prev;
       });
-      persistPartUpdate(
+      return persistPartUpdate(
         messageTimestamp,
         messageVariantId,
         partType,

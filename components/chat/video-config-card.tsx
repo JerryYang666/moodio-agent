@@ -69,7 +69,7 @@ interface VideoConfigCardProps {
     sourceImageUrl?: string;
     params: Record<string, any>;
   }) => void;
-  onPartUpdate?: (updates: Partial<AgentVideoPart>) => void;
+  onPartUpdate?: (updates: Partial<AgentVideoPart>) => Promise<void> | void;
 }
 
 export default function VideoConfigCard({
@@ -202,7 +202,7 @@ export default function VideoConfigCard({
       JSON.stringify(editedParams) !== JSON.stringify(part.config.params);
 
     if (onPartUpdate) {
-      onPartUpdate({
+      await onPartUpdate({
         config: {
           ...part.config,
           prompt: editedPrompt,
