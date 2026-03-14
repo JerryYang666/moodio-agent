@@ -41,7 +41,14 @@ export default function ShareModal({
   const tShare = useTranslations("share");
 
   return (
-    <Modal isOpen={isOpen} onOpenChange={onOpenChange} size="2xl">
+    <Modal
+      isOpen={isOpen}
+      onOpenChange={onOpenChange}
+      size="2xl"
+      classNames={{
+        wrapper: "z-[70]",
+      }}
+    >
       <ModalContent>
         {(onClose) => (
           <>
