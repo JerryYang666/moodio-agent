@@ -78,14 +78,16 @@ export default function SearchResultsModal({
         base: "max-w-[95vw] max-h-[95vh] m-auto",
       }}
     >
-      <ModalContent className="flex flex-col max-h-[inherit]">
+      <ModalContent>
         {() => (
           <>
-            <ModalHeader className="border-b border-default-200 shrink-0">
+            <ModalHeader className="border-b border-default-200">
               {query.textSearch ? `"${query.textSearch}"` : tSearch("searchQuery")}
             </ModalHeader>
-            <ModalBody className="flex-1 min-h-0 overflow-hidden p-4">
-              <VideoGrid hideSummary={true} />
+            <ModalBody className="p-4 !overflow-hidden">
+              <div className="h-[calc(95vh-160px)] overflow-hidden">
+                <VideoGrid hideSummary={true} />
+              </div>
             </ModalBody>
             <ModalFooter className="justify-center border-t border-default-200">
               <Button
