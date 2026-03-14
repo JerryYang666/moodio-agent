@@ -84,7 +84,7 @@ interface ChatMessageProps {
     partType: string,
     partTypeIndex: number,
     updates: any
-  ) => void;
+  ) => Promise<void> | void;
 }
 
 export default function ChatMessage({
@@ -553,7 +553,7 @@ export default function ChatMessage({
                 onSendAsVideoMessage={!desktopId ? onSendAsVideoMessage : undefined}
                 onPartUpdate={(updates) => {
                   if (onVideoPartUpdate && message.createdAt) {
-                    onVideoPartUpdate(
+                    return onVideoPartUpdate(
                       message.createdAt,
                       message.variantId,
                       "agent_video",
