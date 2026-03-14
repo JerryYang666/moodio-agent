@@ -62,9 +62,10 @@ export default function CreditsPage() {
   }, []);
 
   useEffect(() => {
+    refreshBalance();
     fetchCredits();
     fetchCheckinStatus();
-  }, [fetchCredits, fetchCheckinStatus]);
+  }, [refreshBalance, fetchCredits, fetchCheckinStatus]);
 
   const handleCheckin = async () => {
     setClaiming(true);
