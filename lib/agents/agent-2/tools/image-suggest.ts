@@ -28,7 +28,7 @@ Always output a <TEXT> response before your <IMAGE> suggestions that briefly int
 For each suggestion, wrap it in <IMAGE>...</IMAGE> tags with a JSON object containing "title", "aspectRatio", "prompt", and optionally "referenceImageIds".
 Do NOT output markdown code blocks. Just the raw tags.
 
-referenceImageIds (optional): An array of Image IDs from the conversation to use as reference images for editing. Use this when the user asks you to modify or build upon a previously generated or uploaded image that is NOT attached to the current message. If the user's current message already includes an image attachment, do NOT include referenceImageIds — the attached images will be used automatically. Only include referenceImageIds when you want to reference images from earlier in the conversation for editing purposes.
+referenceImageIds (optional): An array of Image IDs from the conversation to use as reference images for editing. Use this when the user asks you to modify or build upon a previously generated or uploaded image from earlier in the conversation.
 
 For each suggestion, choose an appropriate aspect ratio from: ${SUPPORTED_ASPECT_RATIOS.join(", ")}
 - Use "1:1" for square/profile images
