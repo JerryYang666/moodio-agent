@@ -738,8 +738,9 @@ export default function ChatInterface({
               }
             }, 0);
           }
-          // Pre-select images from the last user message on page load
+          // Pre-select images and restore suggestions from the last user message on page load
           applyPreselectImages(hydratedMessages);
+          extractPostMessageSuggestions(hydratedMessages);
         }
       } catch (error) {
         console.error("Failed to fetch chat", error);
@@ -1216,44 +1217,48 @@ export default function ChatInterface({
     }
   }, [draftHadImages]);
 
+  // Extract post-message suggestions from the last assistant message
+  const extractPostMessageSuggestions = useCallback((msgs: Message[]) => {
+    const lastMsg = msgs[msgs.length - 1];
+    if (lastMsg?.role === "assistant" && Array.isArray(lastMsg.content)) {
+      const suggPart = lastMsg.content.find(
+        (p) => p.type === "suggestions"
+      );
+      if (suggPart && suggPart.type === "suggestions" && suggPart.suggestions.length > 0) {
+        setPostMessageSuggestions(
+          suggPart.suggestions.slice(0, 3).map((s, i) => ({
+            id: `post-msg-${i}-${Date.now()}`,
+            label: s.label,
+            icon: s.icon,
+            contexts: ["post-message" as SuggestionBubbleContext],
+            action: { promptText: s.promptText },
+          }))
+        );
+        return;
+      }
+    }
+    setPostMessageSuggestions([]);
+  }, []);
+
   // Pre-select images and extract post-message suggestions after AI response completes
   useEffect(() => {
     // Detect transition from sending (true) to not sending (false)
     if (prevIsSendingRef.current && !isSending) {
       // AI response just completed, pre-select images from the last user message
       applyPreselectImages(messages);
-
-      // Extract post-message suggestions from the latest assistant message only
-      const lastMsg = messages[messages.length - 1];
-      if (lastMsg?.role === "assistant" && Array.isArray(lastMsg.content)) {
-        const suggPart = lastMsg.content.find(
-          (p) => p.type === "suggestions"
-        );
-        if (suggPart && suggPart.type === "suggestions" && suggPart.suggestions.length > 0) {
-          setPostMessageSuggestions(
-            suggPart.suggestions.slice(0, 3).map((s, i) => ({
-              id: `post-msg-${i}-${Date.now()}`,
-              label: s.label,
-              icon: s.icon,
-              contexts: ["post-message" as SuggestionBubbleContext],
-              action: { promptText: s.promptText },
-            }))
-          );
-        } else {
-          setPostMessageSuggestions([]);
-        }
-      }
+      extractPostMessageSuggestions(messages);
     }
     prevIsSendingRef.current = isSending;
-  }, [isSending, messages, applyPreselectImages]);
+  }, [isSending, messages, applyPreselectImages, extractPostMessageSuggestions]);
 
   // Pre-select images when initialMessages are provided (component mount with pre-loaded messages)
   useEffect(() => {
     if (!hasAppliedInitialPreselect.current && initialMessages.length > 0 && !isLoading) {
       applyPreselectImages(initialMessages);
+      extractPostMessageSuggestions(initialMessages);
       hasAppliedInitialPreselect.current = true;
     }
-  }, [initialMessages, isLoading, applyPreselectImages]);
+  }, [initialMessages, isLoading, applyPreselectImages, extractPostMessageSuggestions]);
 
   // Open asset picker for reference images
   const openReferenceImagePicker = useCallback(() => {
