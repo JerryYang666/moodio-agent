@@ -64,7 +64,8 @@ export const Navbar = () => {
       setActiveSection("assets");
     else if (pathname?.startsWith("/desktop"))
       setActiveSection("canvas");
-    else setActiveSection("inspiration");
+    else if (pathname?.startsWith("/browse"))
+      setActiveSection("inspiration");
   }, [pathname]);
 
   useEffect(() => {

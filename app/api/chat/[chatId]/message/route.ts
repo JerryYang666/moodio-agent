@@ -350,6 +350,14 @@ export async function POST(
         videoUrl: typeof entry.videoUrl === "string" ? entry.videoUrl : "",
       }));
 
+    // Parse expertise selection
+    const VALID_EXPERTISE = ["commercial", "film", "game", "uiux", "product"] as const;
+    type Expertise = typeof VALID_EXPERTISE[number];
+    const expertise: Expertise | undefined =
+      typeof json.expertise === "string" && (VALID_EXPERTISE as readonly string[]).includes(json.expertise)
+        ? (json.expertise as Expertise)
+        : undefined;
+
     // Parse mode (agent, image, or video)
     const mode: string =
       json.mode === "image" ? "image" :
@@ -960,7 +968,8 @@ export async function POST(
         imageModelId,
         messageTimestamp, // Pass timestamp for frontend sync
         referenceImages, // Pass reference images with tags
-        imageQuantity // Pass user-selected image quantity (undefined = smart)
+        imageQuantity, // Pass user-selected image quantity (undefined = smart)
+        expertise, // Pass expertise selection for system prompt
       );
 
     // Handle background completion (saving history)

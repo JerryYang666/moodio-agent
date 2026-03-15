@@ -9,6 +9,8 @@ export interface ReferenceImageEntry {
 }
 
 /** Stream event sent to the frontend via SSE. */
+export type Expertise = "commercial" | "film" | "game" | "uiux" | "product";
+
 export type StreamEvent = { type: string; [key: string]: any };
 
 /**
@@ -34,6 +36,7 @@ export interface RequestContext {
   imageModelId?: string;
   maxImageQuantity?: number;
   systemPromptOverride?: string;
+  expertise?: Expertise;
 
   // Event emitter for streaming events to frontend
   send: (event: StreamEvent) => void;
@@ -68,6 +71,7 @@ export interface CreateRequestContextInput {
   imageModelId?: string;
   maxImageQuantity?: number;
   systemPromptOverride?: string;
+  expertise?: Expertise;
   send: (event: StreamEvent) => void;
 }
 
@@ -115,6 +119,7 @@ export function createRequestContext(input: CreateRequestContextInput): RequestC
     imageModelId: input.imageModelId,
     maxImageQuantity: input.maxImageQuantity,
     systemPromptOverride: input.systemPromptOverride,
+    expertise: input.expertise,
     send: input.send,
   };
 }

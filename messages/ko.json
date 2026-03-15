@@ -552,6 +552,7 @@
       "gemini-3": "gemini-3"
     },
     "expertiseOptions": {
+      "smart": "스마트",
       "commercial": "커머셜",
       "film": "영화",
       "game": "게임",

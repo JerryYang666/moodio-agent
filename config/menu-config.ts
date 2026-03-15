@@ -39,8 +39,14 @@ export const MENU_CONFIG = {
 
     expertise: {
       label: "Expertise",
-      default: "commercial",
+      default: "smart",
       options: {
+        smart: {
+          label: "Smart",
+          description:
+            "Let the agent adapt its creative expertise based on your request",
+          icon: "Sparkles",
+        },
         commercial: { label: "Commercial" },
         film: { label: "Film" },
         game: { label: "Game" },
@@ -99,7 +105,7 @@ export const MENU_CONFIG = {
     agent: {
       defaults: {
         model: "nano-banana-pro",
-        expertise: "commercial",
+        expertise: "smart",
         aspectRatio: "smart",
         imageSize: "2k",
         imageQuantity: "smart",
@@ -111,7 +117,7 @@ export const MENU_CONFIG = {
         },
         expertise: {
           enabled: true,
-          allowed: ["commercial", "film", "game", "uiux", "product"],
+          allowed: ["smart", "commercial", "film", "game", "uiux", "product"],
         },
         aspectRatio: {
           enabled: true,

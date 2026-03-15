@@ -60,7 +60,7 @@ export const PrimarySidebar = () => {
       label: t("inspiration"),
       href: "/browse",
       icon: <BookOpen size={20} />,
-      isActive: (path: string) => path.startsWith("/browse") || path === "/",
+      isActive: (path: string) => path.startsWith("/browse"),
     },
     {
       label: t("generation"),
