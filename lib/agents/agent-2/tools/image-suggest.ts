@@ -25,8 +25,10 @@ If the user's input does not contain an image, make sure your prompts are image 
 
 Always output a <TEXT> response before your <IMAGE> suggestions that briefly introduces them (e.g. "Here are some ideas:", "Here's what I came up with:", etc.). Never output an <IMAGE> tag without a preceding <TEXT> introduction.
 
-For each suggestion, wrap it in <IMAGE>...</IMAGE> tags with a JSON object containing "title", "aspectRatio", and "prompt".
+For each suggestion, wrap it in <IMAGE>...</IMAGE> tags with a JSON object containing "title", "aspectRatio", "prompt", and optionally "referenceImageIds".
 Do NOT output markdown code blocks. Just the raw tags.
+
+referenceImageIds (optional): An array of Image IDs from the conversation to use as reference images for editing. Use this when the user asks you to modify or build upon a previously generated or uploaded image that is NOT attached to the current message. If the user's current message already includes an image attachment, do NOT include referenceImageIds — the attached images will be used automatically. Only include referenceImageIds when you want to reference images from earlier in the conversation for editing purposes.
 
 For each suggestion, choose an appropriate aspect ratio from: ${SUPPORTED_ASPECT_RATIOS.join(", ")}
 - Use "1:1" for square/profile images
@@ -42,6 +44,7 @@ Choose the most appropriate ratio based on the subject matter and composition.
   examples: [
     `<IMAGE>{"title": "Short title for suggestion 1", "aspectRatio": "1:1", "prompt": "Detailed image generation prompt for suggestion 1"}</IMAGE>`,
     `<IMAGE>{"title": "Short title for suggestion 2", "aspectRatio": "16:9", "prompt": "Detailed image generation prompt for suggestion 2"}</IMAGE>`,
+    `<IMAGE>{"title": "Edit of previous image", "aspectRatio": "1:1", "prompt": "Editing prompt describing changes to make", "referenceImageIds": ["abc123"]}</IMAGE>`,
   ],
   waitForOutput: false,
   fireAndForget: true,

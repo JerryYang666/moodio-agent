@@ -23,9 +23,11 @@ HOW IT WORKS:
 - You can then use that imageId in subsequent tool calls (e.g., as sourceImageId in a <VIDEO> tag).
 
 OUTPUT FORMAT:
-Wrap a single JSON object in <IMAGE_GENERATE_SYNC>...</IMAGE_GENERATE_SYNC> tags with "title", "aspectRatio", and "prompt".
+Wrap a single JSON object in <IMAGE_GENERATE_SYNC>...</IMAGE_GENERATE_SYNC> tags with "title", "aspectRatio", "prompt", and optionally "referenceImageIds".
 Only output ONE <IMAGE_GENERATE_SYNC> tag per response.
 Always output a <TEXT> response before the tag explaining what you are doing.
+
+referenceImageIds (optional): An array of Image IDs from the conversation to use as reference images for editing. Use this when you need to modify or build upon a previously generated or uploaded image that is NOT attached to the current message. If the user's current message already includes an image attachment, do NOT include referenceImageIds — the attached images will be used automatically.
 
 Choose an appropriate aspect ratio from: ${SUPPORTED_ASPECT_RATIOS.join(", ")}
 
@@ -34,6 +36,7 @@ Choose an appropriate aspect ratio from: ${SUPPORTED_ASPECT_RATIOS.join(", ")}
 **The image generation model has the ability to browse the web and perform Google text/image searches. If the request depends on real-time information or visual references, instruct the model to perform the appropriate searches within the prompt.**`,
   examples: [
     `<IMAGE_GENERATE_SYNC>{"title": "Sunset over mountains", "aspectRatio": "16:9", "prompt": "A breathtaking sunset over snow-capped mountains with warm golden light..."}</IMAGE_GENERATE_SYNC>`,
+    `<IMAGE_GENERATE_SYNC>{"title": "Modified sunset", "aspectRatio": "16:9", "prompt": "Add a silhouette of a hiker on the mountain ridge...", "referenceImageIds": ["abc123"]}</IMAGE_GENERATE_SYNC>`,
   ],
   waitForOutput: true,
   maxOccurrences: 1,

@@ -62,6 +62,7 @@ interface Suggestion {
   title: string;
   aspectRatio: string;
   prompt: string;
+  referenceImageIds?: string[];
 }
 
 interface AgentOutput {
@@ -1113,7 +1114,7 @@ export class Agent1 implements Agent {
 
     let finalImageId: string;
 
-    // Await all image base64 data
+    // Await all image base64 data (user-provided images)
     const imageBase64Data = await Promise.all(prepared.imageBase64Promises);
 
     // Filter out undefined values and get valid base64 strings
@@ -1121,11 +1122,34 @@ export class Agent1 implements Agent {
       (data): data is string => data !== undefined
     );
 
-    // Determine if we should use image editing (if we have any images and precision editing is on)
-    // or if we have images at all (for image-to-image generation)
-    const useImageEditing =
-      (prepared.precisionEditing && validImageBase64.length > 0) ||
-      validImageBase64.length > 0;
+    // If user provided no images, check if the agent specified referenceImageIds
+    const agentReferenceImageIds: string[] =
+      validImageBase64.length === 0 && Array.isArray(suggestion.referenceImageIds)
+        ? suggestion.referenceImageIds.filter((id): id is string => typeof id === "string" && id.length > 0)
+        : [];
+
+    let agentReferenceBase64: string[] = [];
+    if (agentReferenceImageIds.length > 0) {
+      const agentImageData: (string | undefined)[] = await Promise.all(
+        agentReferenceImageIds.map((id) =>
+          downloadImage(id).then((buf) => buf?.toString("base64"))
+        )
+      );
+      agentReferenceBase64 = agentImageData.filter(
+        (data): data is string => data !== undefined
+      );
+      if (agentReferenceBase64.length > 0) {
+        console.log(
+          `[Agent-1] Using ${agentReferenceBase64.length} agent-specified reference image(s) for editing`
+        );
+      }
+    }
+
+    // Use user images if available, otherwise fall back to agent-specified reference images
+    const effectiveImageBase64 = validImageBase64.length > 0 ? validImageBase64 : agentReferenceBase64;
+    const effectiveImageIds = validImageBase64.length > 0 ? prepared.imageIds : agentReferenceImageIds;
+
+    const useImageEditing = effectiveImageBase64.length > 0;
 
     try {
       const modelId = prepared.imageModelId;
@@ -1140,14 +1164,14 @@ export class Agent1 implements Agent {
       }
 
       let result;
-      if (useImageEditing && validImageBase64.length > 0) {
+      if (useImageEditing) {
         console.log(
-          `[Agent-1] Using image editing mode with ${validImageBase64.length} image(s) for index=${index}`
+          `[Agent-1] Using image editing mode with ${effectiveImageBase64.length} image(s) for index=${index}`
         );
         result = await editImageWithModel(modelId, {
           prompt: suggestion.prompt,
-          imageIds: prepared.imageIds,
-          imageBase64: validImageBase64,
+          imageIds: effectiveImageIds,
+          imageBase64: effectiveImageBase64,
           aspectRatio,
           imageSize,
         });
