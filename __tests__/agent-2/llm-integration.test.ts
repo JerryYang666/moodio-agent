@@ -606,8 +606,10 @@ describe("Agent 2 LLM integration: conversational (no images)", () => {
       assertThinkFinalContent(finalContent);
       assertTextFinalContent(finalContent);
 
-      // Should not have any image/video/search events
-      const partEvents = events.filter((e) => e.type === "part");
+      // Should not have any image/video/search events (suggestions parts are allowed)
+      const partEvents = events.filter(
+        (e) => e.type === "part" && e.part?.type !== "suggestions"
+      );
       expect(partEvents.length).toBe(0);
     },
     LLM_TIMEOUT
