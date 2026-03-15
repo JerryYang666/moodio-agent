@@ -1817,8 +1817,8 @@ export default function ChatInterface({
       // Pass the mode so the backend knows whether to use agent or direct generation
       payload.mode = menuState.mode;
 
-      // Pass expertise selection for agent mode
-      if (menuState.mode === "agent" && menuState.expertise) {
+      // Pass expertise selection for agent mode (skip "smart" — let agent decide)
+      if (menuState.mode === "agent" && menuState.expertise && menuState.expertise !== "smart") {
         payload.expertise = menuState.expertise;
       }
 

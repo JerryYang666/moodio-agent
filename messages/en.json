@@ -635,6 +635,7 @@
       "gemini-3": "gemini-3"
     },
     "expertiseOptions": {
+      "smart": "Smart",
       "commercial": "Commercial",
       "film": "Film",
       "game": "Game",

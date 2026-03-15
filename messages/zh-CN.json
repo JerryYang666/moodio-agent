@@ -552,6 +552,7 @@
       "gemini-3": "gemini-3"
     },
     "expertiseOptions": {
+      "smart": "智能",
       "commercial": "商业",
       "film": "影视",
       "game": "游戏",
