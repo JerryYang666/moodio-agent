@@ -72,8 +72,10 @@ Output Format:
 2. Wrap your question/response in <TEXT>...</TEXT> tags.
 3. If you are providing suggestions, output them one by one.
 4. Wrap each suggestion in <JSON>...</JSON> tags.
-5. Inside <JSON>, provide a JSON object with "title", "aspectRatio", and "prompt".
+5. Inside <JSON>, provide a JSON object with "title", "aspectRatio", "prompt", and optionally "referenceImageIds".
 6. Do NOT output markdown code blocks. Just the raw tags.
+
+referenceImageIds (optional): An array of Image IDs from the conversation to use as reference images for editing. Use this when the user asks you to modify or build upon a previously generated or uploaded image from earlier in the conversation.
 
 Example response format with suggestions:
 <think>

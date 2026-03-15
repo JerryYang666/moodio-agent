@@ -92,7 +92,7 @@ export class ImageGenerateHandler implements ToolHandler {
    * Ported from Agent 1's generateImage() + generateImageCore().
    */
   private async generateImageWithRetry(
-    suggestion: { title: string; aspectRatio: string; prompt: string },
+    suggestion: { title: string; aspectRatio: string; prompt: string; referenceImageIds?: string[] },
     ctx: RequestContext,
     trackingImageId: string
   ): Promise<MessageContentPart> {
@@ -150,7 +150,7 @@ export class ImageGenerateHandler implements ToolHandler {
   }
 
   private async generateImageCore(
-    suggestion: { title: string; aspectRatio: string; prompt: string },
+    suggestion: { title: string; aspectRatio: string; prompt: string; referenceImageIds?: string[] },
     ctx: RequestContext,
     trackingImageId: string
   ): Promise<MessageContentPart> {
@@ -166,15 +166,40 @@ export class ImageGenerateHandler implements ToolHandler {
     }
     const imageSize: ImageSize = ctx.imageSizeOverride || "2k";
 
-    // Await all image base64 data
+    // Await all image base64 data (user-provided images)
     const imageBase64Data = await Promise.all(ctx.imageBase64Promises);
     const validImageBase64: string[] = imageBase64Data.filter(
       (data): data is string => data !== undefined
     );
 
-    const useImageEditing =
-      (ctx.precisionEditing && validImageBase64.length > 0) ||
-      validImageBase64.length > 0;
+    // If user provided no images, check if the agent specified referenceImageIds
+    const agentReferenceImageIds: string[] =
+      validImageBase64.length === 0 && Array.isArray(suggestion.referenceImageIds)
+        ? suggestion.referenceImageIds.filter((id: unknown): id is string => typeof id === "string" && id.length > 0)
+        : [];
+
+    let agentReferenceBase64: string[] = [];
+    if (agentReferenceImageIds.length > 0) {
+      const agentImageData: (string | undefined)[] = await Promise.all(
+        agentReferenceImageIds.map((id: string) =>
+          downloadImage(id).then((buf) => buf?.toString("base64"))
+        )
+      );
+      agentReferenceBase64 = agentImageData.filter(
+        (data): data is string => data !== undefined
+      );
+      if (agentReferenceBase64.length > 0) {
+        console.log(
+          `[Agent-2] Using ${agentReferenceBase64.length} agent-specified reference image(s) for editing`
+        );
+      }
+    }
+
+    // Use user images if available, otherwise fall back to agent-specified reference images
+    const effectiveImageBase64 = validImageBase64.length > 0 ? validImageBase64 : agentReferenceBase64;
+    const effectiveImageIds = validImageBase64.length > 0 ? ctx.imageIds : agentReferenceImageIds;
+
+    const useImageEditing = effectiveImageBase64.length > 0;
 
     // Calculate cost and verify balance
     const cost = await calculateCost("Image/all", {});
@@ -188,14 +213,14 @@ export class ImageGenerateHandler implements ToolHandler {
     const modelId = ctx.imageModelId;
     let result;
 
-    if (useImageEditing && validImageBase64.length > 0) {
+    if (useImageEditing) {
       console.log(
-        `[Agent-2] Using image editing mode with ${validImageBase64.length} image(s)`
+        `[Agent-2] Using image editing mode with ${effectiveImageBase64.length} image(s)`
       );
       result = await editImageWithModel(modelId, {
         prompt: suggestion.prompt,
-        imageIds: ctx.imageIds,
-        imageBase64: validImageBase64,
+        imageIds: effectiveImageIds,
+        imageBase64: effectiveImageBase64,
         aspectRatio,
         imageSize,
       });
