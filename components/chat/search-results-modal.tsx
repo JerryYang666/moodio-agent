@@ -13,6 +13,7 @@ import {
 } from "@/lib/redux/slices/querySlice";
 import type { RootState } from "@/lib/redux/store";
 import VideoGrid from "@/components/browse/VideoGrid";
+import { SUGGESTION_BUBBLE_EVENT } from "./suggestion-bubble-types";
 
 interface SearchResultsModalProps {
   isOpen: boolean;
@@ -55,8 +56,8 @@ export default function SearchResultsModal({
   useEffect(() => {
     if (!isOpen) return;
     const handleLearnFromVideo = () => handleClose();
-    window.addEventListener("learn-from-video", handleLearnFromVideo);
-    return () => window.removeEventListener("learn-from-video", handleLearnFromVideo);
+    window.addEventListener(SUGGESTION_BUBBLE_EVENT, handleLearnFromVideo);
+    return () => window.removeEventListener(SUGGESTION_BUBBLE_EVENT, handleLearnFromVideo);
   }, [isOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleClose = () => {
