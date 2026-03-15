@@ -84,6 +84,7 @@ export const BROWSE_VIDEO_ACTIONS: Record<string, SuggestionBubbleFactory> = {
     action: {
       promptText:
         "Explain what filming techniques are used in this video and break down the key creative decisions.",
+      menuState: { expertise: "film" },
       pendingVideos: [
         {
           videoId: String(contentId),
@@ -102,6 +103,7 @@ export const BROWSE_VIDEO_ACTIONS: Record<string, SuggestionBubbleFactory> = {
     action: {
       promptText:
         "Analyze this video first, then find similar or related videos using the search tool.",
+      menuState: { expertise: "film" },
       pendingVideos: [
         {
           videoId: String(contentId),
@@ -120,6 +122,7 @@ export const BROWSE_VIDEO_ACTIONS: Record<string, SuggestionBubbleFactory> = {
     action: {
       promptText:
         "Analyze this video and help me create a similar one with the same style and techniques using the video tool.",
+      menuState: { expertise: "film" },
       pendingVideos: [
         {
           videoId: String(contentId),
