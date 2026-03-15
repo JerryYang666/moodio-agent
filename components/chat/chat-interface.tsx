@@ -79,6 +79,10 @@ import {
 import { getPreselectImages } from "./preselect-images-utils";
 import type { JSONContent } from "@tiptap/react";
 import { useResearchTelemetry } from "@/hooks/use-research-telemetry";
+import type { SuggestionBubbleAction } from "./suggestion-bubble-types";
+import { SUGGESTION_BUBBLE_EVENT } from "./suggestion-bubble-types";
+import { EMPTY_CHAT_SUGGESTIONS } from "@/config/suggestion-bubbles";
+import SuggestionBubbleGroup from "./SuggestionBubbleGroup";
 
 // Helper to group consecutive assistant messages with the same timestamp as variants
 interface MessageGroup {
@@ -1012,21 +1016,51 @@ export default function ChatInterface({
     [pendingVideos, t]
   );
 
-  // Listen for "learn from this video" events from the browse page
-  useEffect(() => {
-    const handleLearnFromVideo = (e: Event) => {
-      const { contentId, storageKey, videoUrl, prompt } = (e as CustomEvent).detail;
-      if (contentId && videoUrl) {
-        addRetrievalVideo(Number(contentId), storageKey, videoUrl);
-        if (prompt && chatInputRef.current) {
-          chatInputRef.current.insertText(prompt);
+  // Handle a suggestion bubble activation (unified handler)
+  const handleSuggestionBubbleActivate = useCallback(
+    (action: SuggestionBubbleAction) => {
+      // 1. Apply menu state overrides (mode, expertise, etc.)
+      if (action.menuState) {
+        setMenuState((prev) =>
+          resolveMenuState({ ...prev, ...action.menuState })
+        );
+      }
+
+      // 2. Add pending videos
+      if (action.pendingVideos) {
+        for (const video of action.pendingVideos) {
+          addRetrievalVideo(Number(video.videoId), "", video.url);
         }
+      }
+
+      // 3. Add pending images
+      if (action.pendingImages) {
+        setPendingImages((prev) => {
+          const remaining = MAX_PENDING_IMAGES - prev.length;
+          return [...prev, ...action.pendingImages!.slice(0, remaining)];
+        });
+      }
+
+      // 4. Insert prompt text
+      if (action.promptText && chatInputRef.current) {
+        chatInputRef.current.insertText(action.promptText);
+      }
+    },
+    [addRetrievalVideo]
+  );
+
+  // Listen for suggestion bubble events from anywhere in the app
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail?.action) {
+        handleSuggestionBubbleActivate(detail.action);
       }
     };
 
-    window.addEventListener("learn-from-video", handleLearnFromVideo);
-    return () => window.removeEventListener("learn-from-video", handleLearnFromVideo);
-  }, [addRetrievalVideo]);
+    window.addEventListener(SUGGESTION_BUBBLE_EVENT, handler);
+    return () => window.removeEventListener(SUGGESTION_BUBBLE_EVENT, handler);
+  }, [handleSuggestionBubbleActivate]);
 
   // Add an asset from the library to pending images
   const addAssetImage = useCallback(
@@ -3069,9 +3103,13 @@ export default function ChatInterface({
     <div className="flex flex-col h-full relative">
       <div className="flex-1 overflow-y-auto space-y-6 pb-24 pr-2 pt-4 scrollbar-hide">
         {messages.length === 0 && (
-          <div className="text-center text-default-500 mt-60">
-            <Bot size={48} className="mx-auto mb-4 opacity-20" />
+          <div className="flex flex-col items-center text-default-500 mt-40 gap-6">
+            <Bot size={48} className="opacity-20" />
             <p>{t("chat.startConversation")}</p>
+            <SuggestionBubbleGroup
+              suggestions={EMPTY_CHAT_SUGGESTIONS}
+              onActivate={handleSuggestionBubbleActivate}
+            />
           </div>
         )}
 

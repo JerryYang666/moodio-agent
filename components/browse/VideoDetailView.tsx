@@ -40,6 +40,8 @@ import { useCollections } from "@/hooks/use-collections";
 import { useFeatureFlag } from "@/lib/feature-flags";
 import { hasWriteAccess } from "@/lib/permissions";
 import SendToDesktopModal from "@/components/desktop/SendToDesktopModal";
+import { dispatchSuggestionBubble } from "@/components/chat/suggestion-bubble-types";
+import { BROWSE_VIDEO_ACTIONS } from "@/config/suggestion-bubbles";
 
 const ACTION_ICONS = {
   learn: GraduationCap,
@@ -49,11 +51,6 @@ const ACTION_ICONS = {
   desktop: LayoutDashboard,
 } as const;
 
-const ACTION_PROMPTS: Record<string, string> = {
-  learn: "Explain what filming techniques are used in this video and break down the key creative decisions.",
-  explore: "Analyze this video first, then find similar or related videos using the search tool.",
-  create: "Analyze this video and help me create a similar one with the same style and techniques using the video tool.",
-};
 
 function groupLabelsByProperty(labels: ContentLabel[]): Record<string, string[]> {
   const groups: Record<string, string[]> = {};
@@ -341,14 +338,15 @@ export function VideoDetailView({
                   startContent={<Icon size={18} />}
                   isDisabled={!videoDetail || isLoadingDetail}
                   onPress={videoDetail ? () => {
-                    window.dispatchEvent(new CustomEvent("learn-from-video", {
-                      detail: {
+                    const factory = BROWSE_VIDEO_ACTIONS[action.icon];
+                    if (factory) {
+                      const bubble = factory({
                         contentId: videoDetail.id,
                         storageKey: videoDetail.storage_key,
                         videoUrl: getBrowseVideoUrl(videoDetail.storage_key),
-                        prompt: ACTION_PROMPTS[action.icon],
-                      },
-                    }));
+                      });
+                      dispatchSuggestionBubble(bubble.action);
+                    }
                   } : undefined}
                 >
                   {action.label}
