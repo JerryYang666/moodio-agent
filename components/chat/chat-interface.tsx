@@ -1817,6 +1817,11 @@ export default function ChatInterface({
       // Pass the mode so the backend knows whether to use agent or direct generation
       payload.mode = menuState.mode;
 
+      // Pass expertise selection for agent mode
+      if (menuState.mode === "agent" && menuState.expertise) {
+        payload.expertise = menuState.expertise;
+      }
+
       // Add precision editing flag if enabled
       if (precisionEditing) {
         payload.precisionEditing = true;

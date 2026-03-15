@@ -8,6 +8,7 @@ import { siteConfig } from "@/config/site";
 import {
   RequestContext,
   ReferenceImageEntry,
+  Expertise,
   StreamEvent,
   createRequestContext,
 } from "./context";
@@ -212,6 +213,7 @@ export class Agent2 implements Agent {
     messageTimestamp?: number,
     referenceImages?: ReferenceImageEntry[],
     maxImageQuantity?: number,
+    expertise?: Expertise,
   ): Promise<ParallelAgentResponse> {
     const startTime = requestStartTime || Date.now();
     const variantTimestamp = messageTimestamp || Date.now();
@@ -289,6 +291,7 @@ export class Agent2 implements Agent {
               imageModelId,
               maxImageQuantity,
               systemPromptOverride,
+              expertise,
               send,
             });
 
@@ -379,6 +382,7 @@ export class Agent2 implements Agent {
     const systemPrompt = this.promptConstructor.build({
       systemPromptOverride: ctx.systemPromptOverride,
       maxImageQuantity: ctx.maxImageQuantity,
+      expertise: ctx.expertise,
     });
 
     // 2. Parse input
