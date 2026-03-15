@@ -12,6 +12,18 @@ import {
   GraduationCap,
   Search,
   Wand2,
+  RefreshCw,
+  Palette,
+  Sparkles,
+  Layers,
+  Pencil,
+  Zap,
+  Eye,
+  ArrowRight,
+  Video,
+  Type,
+  Lightbulb,
+  Brush,
 } from "lucide-react";
 import type {
   SuggestionBubble,
@@ -29,6 +41,18 @@ const ICON_MAP: Record<string, React.ElementType> = {
   GraduationCap,
   Search,
   Wand2,
+  RefreshCw,
+  Palette,
+  Sparkles,
+  Layers,
+  Pencil,
+  Zap,
+  Eye,
+  ArrowRight,
+  Video,
+  Type,
+  Lightbulb,
+  Brush,
 };
 
 interface SuggestionBubbleGroupProps {

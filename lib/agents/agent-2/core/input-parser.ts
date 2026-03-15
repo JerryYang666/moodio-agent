@@ -70,8 +70,12 @@ export class InputParser {
                 text: `[Video | ID: ${p.videoId} | Source: ${p.source} | URL: ${p.videoUrl}]`,
               };
             }
+            // Strip suggestions — they are UI-only and should never be sent back to the LLM
+            if (p.type === "suggestions") {
+              return null;
+            }
             return p;
-          }),
+          }).filter(Boolean) as MessageContentPart[],
         };
       }
       return m;

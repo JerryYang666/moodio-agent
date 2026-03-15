@@ -120,6 +120,7 @@ import { videoTool } from "@/lib/agents/agent-2/tools/video";
 import { shotListTool } from "@/lib/agents/agent-2/tools/shot-list";
 import { searchTool } from "@/lib/agents/agent-2/tools/search";
 import { checkTaxonomyTool } from "@/lib/agents/agent-2/tools/check-taxonomy";
+import { suggestionsTool } from "@/lib/agents/agent-2/tools/suggestions";
 
 const LLM_TIMEOUT = 120_000; // higher timeout to accommodate tool-call two-turn
 
@@ -142,6 +143,7 @@ function buildRegistry(): ToolRegistry {
   reg.register(shotListTool);
   reg.register(searchTool);
   reg.register(checkTaxonomyTool);
+  reg.register(suggestionsTool);
   return reg;
 }
 
@@ -667,6 +669,90 @@ describe("Agent 2 LLM integration: event ordering and uniqueness", () => {
       );
       const ids = loadingEvents.map((e) => e.part.imageId);
       expect(new Set(ids).size).toBe(ids.length);
+    },
+    LLM_TIMEOUT
+  );
+});
+
+// ---------------------------------------------------------------------------
+// SUGGESTIONS (post-message follow-up actions)
+// ---------------------------------------------------------------------------
+
+function assertSuggestionsEvent(events: StreamEvent[]): void {
+  const suggEvent = events.find(
+    (e) => e.type === "part" && e.part?.type === "suggestions"
+  );
+  expect(suggEvent).toBeDefined();
+  expect(Array.isArray(suggEvent!.part.suggestions)).toBe(true);
+  expect(suggEvent!.part.suggestions.length).toBeGreaterThanOrEqual(1);
+  expect(suggEvent!.part.suggestions.length).toBeLessThanOrEqual(3);
+
+  for (const s of suggEvent!.part.suggestions) {
+    expect(typeof s.label).toBe("string");
+    expect(s.label.length).toBeGreaterThan(0);
+    expect(typeof s.promptText).toBe("string");
+    expect(s.promptText.length).toBeGreaterThan(0);
+  }
+}
+
+function assertSuggestionsFinalContent(finalContent: MessageContentPart[]): void {
+  const suggPart = finalContent.find((p) => p.type === "suggestions");
+  expect(suggPart).toBeDefined();
+  if (suggPart?.type === "suggestions") {
+    expect(Array.isArray(suggPart.suggestions)).toBe(true);
+    expect(suggPart.suggestions.length).toBeGreaterThanOrEqual(1);
+    expect(suggPart.suggestions.length).toBeLessThanOrEqual(3);
+
+    for (const s of suggPart.suggestions) {
+      expect(typeof s.label).toBe("string");
+      expect(typeof s.promptText).toBe("string");
+    }
+  }
+}
+
+describe("Agent 2 LLM integration: SUGGESTIONS (post-message)", () => {
+  it(
+    "emits suggestions after a creative prompt with image generation",
+    async () => {
+      const { events, finalContent } = await runPipeline(
+        "I want to create dreamy sunset landscape images. Please also suggest follow-up actions I can take."
+      );
+
+      // Should have the standard events
+      assertThinkEvent(events);
+      assertTextEvent(events);
+
+      // Should have a suggestions part event
+      assertSuggestionsEvent(events);
+
+      // Check finalContent
+      assertThinkFinalContent(finalContent);
+      assertTextFinalContent(finalContent);
+      assertSuggestionsFinalContent(finalContent);
+    },
+    LLM_TIMEOUT
+  );
+
+  it(
+    "suggestions have valid structure with label, promptText, and optional icon",
+    async () => {
+      const { finalContent } = await runPipeline(
+        "Help me design a game character. Please suggest follow-up actions."
+      );
+
+      const suggPart = finalContent.find((p) => p.type === "suggestions");
+      expect(suggPart).toBeDefined();
+      if (suggPart?.type === "suggestions") {
+        for (const s of suggPart.suggestions) {
+          expect(typeof s.label).toBe("string");
+          expect(s.label.split(" ").length).toBeLessThanOrEqual(8);
+          expect(typeof s.promptText).toBe("string");
+          expect(s.promptText.length).toBeGreaterThan(0);
+          if (s.icon !== undefined) {
+            expect(typeof s.icon).toBe("string");
+          }
+        }
+      }
     },
     LLM_TIMEOUT
   );

@@ -101,6 +101,14 @@ export type MessageContentPart =
       type: "tool_call";
       tool: string;
       status: "loading" | "complete" | "error";
+    }
+  | {
+      type: "suggestions";
+      suggestions: Array<{
+        label: string;
+        icon?: string;
+        promptText: string;
+      }>;
     };
 
 /** Type for parts that represent generated images (agent_image or direct_image) */
