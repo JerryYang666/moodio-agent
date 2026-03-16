@@ -1,9 +1,8 @@
 import {
   type VideoProvider,
   type ProviderVariant,
-  type VideoModelConfig,
-  type VideoModelParam,
   getVideoModel,
+  setProviderResolver
 } from "./models";
 
 /**
@@ -46,23 +45,6 @@ export function getActiveProvider(modelId: string): ProviderVariant {
 }
 
 /**
- * Resolve effective parameters for a provider variant by merging
- * the base model params with the variant's overrides.
- */
-export function resolveParamsForProvider(
-  model: VideoModelConfig,
-  variant: ProviderVariant
-): VideoModelParam[] {
-  if (!variant.paramOverrides) return model.params;
-
-  return model.params.map((p) => {
-    const override = variant.paramOverrides![p.name];
-    if (!override) return p;
-    return { ...p, ...override };
-  });
-}
-
-/**
  * Apply param name mapping for a provider that uses different param names.
  * Returns a new params object with keys renamed according to the mapping.
  */
@@ -79,3 +61,13 @@ export function applyParamMapping(
   }
   return mapped;
 }
+
+// Register the provider resolver so models.ts can resolve
+// effective params without a circular import.
+setProviderResolver((modelId) => {
+  try {
+    return getActiveProvider(modelId);
+  } catch {
+    return null;
+  }
+});

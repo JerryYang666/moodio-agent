@@ -1030,14 +1030,44 @@ export function getVideoModel(modelId: string): VideoModelConfig | undefined {
 }
 
 /**
+ * Resolve effective parameters for a provider variant by merging
+ * the base model params with the variant's overrides.
+ */
+export function resolveParamsForProvider(
+  model: VideoModelConfig,
+  variant: ProviderVariant
+): VideoModelParam[] {
+  if (!variant.paramOverrides) return model.params;
+
+  return model.params.map((p) => {
+    const override = variant.paramOverrides![p.name];
+    if (!override) return p;
+    return { ...p, ...override };
+  });
+}
+
+/**
+ * Provider resolver callback. Set by provider-config.ts to break the
+ * circular dependency. When unset, base model params are used as-is.
+ */
+let _providerResolver:
+  | ((modelId: string) => ProviderVariant | null)
+  | null = null;
+
+export function setProviderResolver(
+  resolver: (modelId: string) => ProviderVariant | null
+): void {
+  _providerResolver = resolver;
+}
+
+/**
  * Resolve the effective params for a model considering the active provider's overrides.
- * Imported lazily to avoid circular dependency with provider-config.
  */
 function getEffectiveParams(model: VideoModelConfig): VideoModelParam[] {
-  // Lazy import to avoid circular dependency
-  const { getActiveProvider, resolveParamsForProvider } = require("./provider-config");
+  if (!_providerResolver) return model.params;
   try {
-    const variant = getActiveProvider(model.id);
+    const variant = _providerResolver(model.id);
+    if (!variant) return model.params;
     return resolveParamsForProvider(model, variant);
   } catch {
     return model.params;
