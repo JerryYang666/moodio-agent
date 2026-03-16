@@ -28,7 +28,7 @@ Rules for video creation:
 6. You MUST also include a <TEXT> response explaining what video configuration you've prepared.
 7. Do NOT output <IMAGE> image suggestions when outputting a <VIDEO> tag.`,
   examples: [
-    `<VIDEO>{"modelId": "fal-ai/bytedance/seedance/v1.5/pro/image-to-video", "prompt": "Gentle camera push-in on the scene. Soft ambient movement with natural swaying of elements. Subtle lighting shifts create a dreamy atmosphere. Cinematic slow motion feel with smooth transitions.", "duration": "5", "aspect_ratio": "16:9", "resolution": "720p", "generate_audio": true, "camera_fixed": false}</VIDEO>`,
+    `<VIDEO>{"modelId": "seedance-v1.5-pro", "prompt": "Gentle camera push-in on the scene. Soft ambient movement with natural swaying of elements. Subtle lighting shifts create a dreamy atmosphere. Cinematic slow motion feel with smooth transitions.", "duration": "5", "aspect_ratio": "16:9", "resolution": "720p", "generate_audio": true, "camera_fixed": false}</VIDEO>`,
   ],
   waitForOutput: false,
   maxOccurrences: 1,

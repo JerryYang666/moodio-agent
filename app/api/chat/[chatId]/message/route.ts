@@ -28,7 +28,7 @@ import {
   validateAndMergeParams,
   DEFAULT_VIDEO_MODEL_ID,
 } from "@/lib/video/models";
-import { submitVideoGeneration } from "@/lib/video/fal-client";
+import { submitVideoGeneration } from "@/lib/video/video-client";
 import { videoGenerations } from "@/lib/db/schema";
 import { siteConfig } from "@/config/site";
 
@@ -849,20 +849,21 @@ export async function POST(
               if (!baseUrl) {
                 throw new Error("Server configuration error: Missing base URL");
               }
-              const webhookUrl = `${baseUrl}/api/video/webhook`;
 
-              // Submit to Fal queue
-              const { requestId } = await submitVideoGeneration(
+              // Submit to provider queue
+              const { requestId, provider, providerModelId } = await submitVideoGeneration(
                 modelId,
                 mergedParams,
-                webhookUrl
+                baseUrl
               );
 
-              // Update record with Fal request ID
+              // Update record with request ID and provider info
               await db
                 .update(videoGenerations)
                 .set({
-                  falRequestId: requestId,
+                  providerRequestId: requestId,
+                  provider,
+                  providerModelId,
                   status: "processing",
                 })
                 .where(eq(videoGenerations.id, generation.id));
@@ -873,7 +874,7 @@ export async function POST(
                 {
                   status: "submitted",
                   generationId: generation.id,
-                  falRequestId: requestId,
+                  providerRequestId: requestId,
                   modelId,
                   sourceImageId,
                   endImageId,

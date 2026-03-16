@@ -242,13 +242,15 @@ export const videoGenerations = pgTable("video_generations", {
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
   modelId: varchar("model_id", { length: 255 }).notNull(),
-  falRequestId: varchar("fal_request_id", { length: 255 }), // For webhook correlation
-  status: varchar("status", { length: 50 }).notNull().default("pending"), // pending, processing, completed, failed
+  provider: varchar("provider", { length: 50 }),
+  providerModelId: varchar("provider_model_id", { length: 255 }),
+  providerRequestId: varchar("provider_request_id", { length: 255 }),
+  status: varchar("status", { length: 50 }).notNull().default("pending"),
   sourceImageId: varchar("source_image_id", { length: 255 }).notNull(),
   endImageId: varchar("end_image_id", { length: 255 }),
-  videoId: varchar("video_id", { length: 255 }), // S3 video ID
+  videoId: varchar("video_id", { length: 255 }),
   thumbnailImageId: varchar("thumbnail_image_id", { length: 255 }),
-  params: jsonb("params").notNull(), // User-provided + defaults merged
+  params: jsonb("params").notNull(),
   error: text("error"),
   seed: bigint("seed", { mode: "number" }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
