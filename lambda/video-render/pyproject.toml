@@ -1,0 +1,7 @@
+[project]
+name = "video-render"
+version = "0.1.0"
+description = "Trim and concatenate video segments via FFmpeg on AWS Lambda"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = ["boto3"]
