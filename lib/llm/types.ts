@@ -1,6 +1,6 @@
 // Common types for LLM integration
 
-export const DEFAULT_LLM_MODEL = "gpt-5.3-chat-latest";
+export const DEFAULT_LLM_MODEL = "gpt-5.4";
 
 export type MessageContentPart =
   | { type: "text"; text: string }
