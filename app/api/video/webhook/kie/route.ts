@@ -64,6 +64,8 @@ interface KieWebhookPayload {
 export async function POST(request: NextRequest) {
   const bodyBuffer = Buffer.from(await request.arrayBuffer());
 
+  console.log("[Webhook/Kie] Received payload:", bodyBuffer.toString("utf-8"));
+
   let payload: KieWebhookPayload;
   try {
     payload = JSON.parse(bodyBuffer.toString("utf-8"));
