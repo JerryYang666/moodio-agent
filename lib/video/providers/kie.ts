@@ -47,15 +47,59 @@ function isImageUrlParam(key: string): boolean {
   return IMAGE_URL_KEYS.has(key);
 }
 
+const MIME_TO_EXT: Record<string, string> = {
+  "image/jpeg": ".jpg",
+  "image/jpg": ".jpg",
+  "image/png": ".png",
+  "image/webp": ".webp",
+  "image/gif": ".gif",
+  "image/bmp": ".bmp",
+  "image/tiff": ".tiff",
+  "video/mp4": ".mp4",
+  "video/webm": ".webm",
+};
+
+/**
+ * Try to determine a file extension for the given URL.
+ * 1. Check the URL path for a recognisable extension.
+ * 2. Fall back to a HEAD request to read Content-Type.
+ * 3. Default to ".jpg" — Kie needs *some* extension.
+ */
+async function inferExtension(url: string): Promise<string> {
+  try {
+    const pathname = new URL(url).pathname;
+    const match = pathname.match(/\.([a-zA-Z0-9]{2,5})(?:[?#]|$)/);
+    if (match) {
+      const ext = `.${match[1].toLowerCase()}`;
+      if (Object.values(MIME_TO_EXT).includes(ext)) return ext;
+    }
+  } catch {}
+
+  try {
+    const head = await fetch(url, { method: "HEAD" });
+    const ct = head.headers.get("content-type")?.split(";")[0]?.trim();
+    if (ct && MIME_TO_EXT[ct]) return MIME_TO_EXT[ct];
+  } catch (err) {
+    console.warn("[Kie Upload] HEAD request failed, defaulting to .jpg", err);
+  }
+
+  return ".jpg";
+}
+
 /**
  * Upload an external image URL to Kie's temp storage so the task API
  * receives a URL it can reliably resolve the file type from.
  * URLs already hosted on Kie's temp storage are passed through as-is.
  */
 async function uploadToKie(url: string): Promise<string> {
-  if (url.includes("kieai.redpandaai.co")) return url;
+  if (url.includes("redpandaai.co")) return url;
 
-  console.log("[Kie Upload] Re-uploading external image to Kie temp storage");
+  const ext = await inferExtension(url);
+  const fileName = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}${ext}`;
+
+  console.log(
+    `[Kie Upload] Re-uploading external image to Kie temp storage (fileName: ${fileName})`
+  );
 
   const res = await fetch(`${KIE_FILE_UPLOAD_BASE}/api/file-url-upload`, {
     method: "POST",
@@ -63,6 +107,7 @@ async function uploadToKie(url: string): Promise<string> {
     body: JSON.stringify({
       fileUrl: url,
       uploadPath: "moodio/video-inputs",
+      fileName,
     }),
   });
 
