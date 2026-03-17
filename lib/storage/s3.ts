@@ -609,6 +609,9 @@ const ALLOWED_DOWNLOAD_HOSTS = [
   "v3.fal.media",
   "fal.ai",
   "rest.alpha.fal.ai",
+  "tempfile.aiquickdraw.com",
+  "tempfile.redpandaai.co",
+  "kieai.redpandaai.co",
 ];
 
 /**
@@ -641,7 +644,7 @@ export function validateDownloadUrl(url: string): void {
  * @returns Buffer containing the file data
  */
 export async function downloadFromUrl(url: string): Promise<Buffer> {
-  // validateDownloadUrl(url);
+  validateDownloadUrl(url);
   const response = await fetch(url);
   if (!response.ok) {
     throw new Error(`Failed to download from URL: ${response.status} ${response.statusText}`);
