@@ -329,7 +329,6 @@ const wanV26ImageToVideo: VideoModelConfig = {
       paramOverrides: {
         negative_prompt: { status: "disabled" },
         enable_prompt_expansion: { status: "disabled" },
-        multi_shots: { status: "disabled" },
         seed: { status: "disabled" },
         enable_safety_checker: { status: "disabled" },
       },
