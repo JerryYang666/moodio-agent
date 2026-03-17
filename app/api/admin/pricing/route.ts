@@ -7,6 +7,7 @@ import {
   validateFormula,
 } from "@/lib/pricing";
 import { VIDEO_MODELS } from "@/lib/video/models";
+import { getActiveProvider } from "@/lib/video/provider-config";
 
 /**
  * GET /api/admin/pricing
@@ -27,23 +28,33 @@ export async function GET(request: NextRequest) {
     const formulas = await getAllPricingFormulas();
 
     // Include model info for reference
-    const models = VIDEO_MODELS.map((m) => ({
-      id: m.id,
-      name: m.name,
-      params: m.params
-        .filter((p) => !p.status || p.status === "active")
-        .map((p) => ({
-          name: p.name,
-          type: p.type,
-          options: p.options,
-          default: p.default,
-        })),
-    }));
+    const models = VIDEO_MODELS.map((m) => {
+      let provider: string | null = null;
+      try {
+        const variant = getActiveProvider(m.id);
+        provider = variant.provider;
+      } catch {}
+
+      return {
+        id: m.id,
+        name: m.name,
+        provider,
+        params: m.params
+          .filter((p) => !p.status || p.status === "active")
+          .map((p) => ({
+            name: p.name,
+            type: p.type,
+            options: p.options,
+            default: p.default,
+          })),
+      };
+    });
 
     // Add image generation as a configurable pricing entry
     models.push({
       id: "Image/all",
       name: "Image (All Models)",
+      provider: null,
       params: [],
     });
 

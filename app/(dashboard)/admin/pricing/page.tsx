@@ -44,6 +44,7 @@ interface ModelParam {
 interface ModelInfo {
   id: string;
   name: string;
+  provider: string | null;
   params: ModelParam[];
 }
 
@@ -261,6 +262,7 @@ export default function PricingPage() {
           <Table aria-label="Pricing table">
             <TableHeader>
               <TableColumn>MODEL</TableColumn>
+              <TableColumn>PROVIDER</TableColumn>
               <TableColumn>FORMULA</TableColumn>
               <TableColumn>STATUS</TableColumn>
               <TableColumn>UPDATED</TableColumn>
@@ -281,6 +283,19 @@ export default function PricingPage() {
                           {model.id}
                         </p>
                       </div>
+                    </TableCell>
+                    <TableCell>
+                      {model.provider ? (
+                        <Chip
+                          size="sm"
+                          variant="flat"
+                          color={model.provider === "fal" ? "secondary" : "primary"}
+                        >
+                          {model.provider}
+                        </Chip>
+                      ) : (
+                        <span className="text-default-300">-</span>
+                      )}
                     </TableCell>
                     <TableCell>
                       {existingFormula ? (
