@@ -1058,23 +1058,32 @@ export function resolveParamsForProvider(
 }
 
 /**
- * Provider resolver callback. Set by provider-config.ts to break the
- * circular dependency. When unset, base model params are used as-is.
+ * Provider resolver callback, lazily loaded from provider-config.ts.
+ * Cached after first call.
  */
 let _providerResolver:
   | ((modelId: string) => ProviderVariant | null)
   | null = null;
+let _resolverLoaded = false;
 
 export function setProviderResolver(
   resolver: (modelId: string) => ProviderVariant | null
 ): void {
   _providerResolver = resolver;
+  _resolverLoaded = true;
 }
 
 /**
  * Resolve the effective params for a model considering the active provider's overrides.
  */
 function getEffectiveParams(model: VideoModelConfig): VideoModelParam[] {
+  if (!_resolverLoaded) {
+    try {
+      require("./provider-config");
+    } catch {
+      // If provider-config can't be loaded (e.g. in test env), use base params
+    }
+  }
   if (!_providerResolver) return model.params;
   try {
     const variant = _providerResolver(model.id);
