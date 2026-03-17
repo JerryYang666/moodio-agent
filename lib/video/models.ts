@@ -1034,10 +1034,15 @@ export const LEGACY_MODEL_ID_MAP: Record<string, string> = {
 };
 
 /**
- * Get a video model config by ID
+ * Get a video model config by ID.
+ * Returns the model with effective params (provider overrides applied).
  */
 export function getVideoModel(modelId: string): VideoModelConfig | undefined {
-  return VIDEO_MODELS.find((m) => m.id === modelId);
+  const model = VIDEO_MODELS.find((m) => m.id === modelId);
+  if (!model) return undefined;
+  const params = getEffectiveParams(model);
+  if (params === model.params) return model;
+  return { ...model, params };
 }
 
 /**
@@ -1078,10 +1083,11 @@ export function setProviderResolver(
  */
 function getEffectiveParams(model: VideoModelConfig): VideoModelParam[] {
   if (!_resolverLoaded) {
+    _resolverLoaded = true;
     try {
       require("./provider-config");
     } catch {
-      // If provider-config can't be loaded (e.g. in test env), use base params
+      // Client-side or test env — provider-config unavailable, use base params
     }
   }
   if (!_providerResolver) return model.params;
