@@ -53,7 +53,7 @@ function isImageUrlParam(key: string): boolean {
  * URLs already hosted on Kie's temp storage are passed through as-is.
  */
 async function uploadToKie(url: string): Promise<string> {
-  if (url.includes("tempfile.redpandaai.co")) return url;
+  if (url.includes("kieai.redpandaai.co")) return url;
 
   console.log("[Kie Upload] Re-uploading external image to Kie temp storage");
 
