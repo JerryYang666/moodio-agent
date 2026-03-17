@@ -1,8 +1,8 @@
 /**
- * Fal Webhook Signature Verification
+ * Webhook Signature Verification
  *
- * Verifies the authenticity of incoming webhook requests from Fal
- * using ED25519 signature verification against their JWKS public keys.
+ * Fal: ED25519 signature verification against their JWKS public keys.
+ * Kie: HMAC-SHA256 signature with a shared secret key.
  */
 
 import crypto from "crypto";
@@ -215,6 +215,88 @@ export async function verifyFalWebhook(
 
   console.error("[Webhook Verify] Signature verification failed with all keys");
   return false;
+}
+
+// ---------------------------------------------------------------------------
+// Kie — HMAC-SHA256 signature verification
+// ---------------------------------------------------------------------------
+
+export interface KieWebhookHeaders {
+  timestamp: string | null;
+  signature: string | null;
+}
+
+export function extractKieWebhookHeaders(headers: Headers): KieWebhookHeaders {
+  return {
+    timestamp: headers.get("x-webhook-timestamp"),
+    signature: headers.get("x-webhook-signature"),
+  };
+}
+
+/**
+ * Verify a Kie webhook request.
+ *
+ * Kie signs with: base64(HMAC-SHA256(taskId + "." + timestamp, secret))
+ * where the secret is the KIE_WEBHOOK_HMAC_KEY env var set from
+ * https://kie.ai/settings.
+ *
+ * @param kieHeaders  Extracted X-Webhook-Timestamp / X-Webhook-Signature
+ * @param taskId      The task_id from the parsed request body
+ * @returns true if the signature is valid
+ */
+export function verifyKieWebhook(
+  kieHeaders: KieWebhookHeaders,
+  taskId: string
+): boolean {
+  const secret = process.env.KIE_WEBHOOK_HMAC_KEY;
+  if (!secret) {
+    console.error("[Webhook Verify/Kie] KIE_WEBHOOK_HMAC_KEY is not set");
+    return false;
+  }
+
+  const { timestamp, signature } = kieHeaders;
+  if (!timestamp || !signature) {
+    console.error("[Webhook Verify/Kie] Missing required headers");
+    return false;
+  }
+
+  // Validate timestamp freshness (same ±5 min leeway as Fal)
+  const timestampInt = parseInt(timestamp, 10);
+  if (Number.isNaN(timestampInt)) {
+    console.error("[Webhook Verify/Kie] Invalid timestamp format");
+    return false;
+  }
+  const currentTime = Math.floor(Date.now() / 1000);
+  if (Math.abs(currentTime - timestampInt) > TIMESTAMP_LEEWAY_SECONDS) {
+    console.error("[Webhook Verify/Kie] Timestamp is too old or in the future:", {
+      timestampInt,
+      currentTime,
+      diff: currentTime - timestampInt,
+    });
+    return false;
+  }
+
+  const dataToSign = `${taskId}.${timestamp}`;
+  const expectedSignature = crypto
+    .createHmac("sha256", secret)
+    .update(dataToSign)
+    .digest("base64");
+
+  // Constant-time comparison to prevent timing attacks
+  if (expectedSignature.length !== signature.length) {
+    console.error("[Webhook Verify/Kie] Signature length mismatch");
+    return false;
+  }
+
+  const isValid = crypto.timingSafeEqual(
+    Buffer.from(expectedSignature),
+    Buffer.from(signature)
+  );
+
+  if (!isValid) {
+    console.error("[Webhook Verify/Kie] Signature verification failed");
+  }
+  return isValid;
 }
 
 /**

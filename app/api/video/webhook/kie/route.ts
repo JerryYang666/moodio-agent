@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { shouldSkipVerification } from "@/lib/video/webhook-verify";
-import type { VideoGenerationResult } from "@/lib/video/providers";
+import {
+  verifyKieWebhook,
+  extractKieWebhookHeaders,
+  shouldSkipVerification,
+} from "@/lib/video/webhook-verify";
 import {
   findGenerationByRequestId,
   isTerminal,
@@ -10,46 +13,56 @@ import {
 import { waitUntil } from "@vercel/functions";
 
 /**
- * TODO: Implement kie-specific signature verification.
- * Replace this stub once kie's verification method is known.
- */
-async function verifyKieWebhook(
-  _headers: Headers,
-  _body: Buffer
-): Promise<boolean> {
-  console.warn("[Webhook/Kie] Signature verification not yet implemented");
-  return false;
-}
-
-/**
  * Kie webhook payload structure.
- * TODO: Update to match actual kie payload format once known.
- * For now, we assume the same shape as Fal for scaffolding purposes.
+ * Ref: https://docs.kie.ai/common-api/webhook-verification
+ *
+ * On success the body looks like:
+ * {
+ *   "taskId": "...",
+ *   "code": 200,
+ *   "msg": "Success",
+ *   "data": {
+ *     "task_id": "...",
+ *     "callbackType": "task_completed",
+ *     "state": "success",
+ *     "resultJson": "{\"resultUrls\":[\"https://...\"]}"
+ *   }
+ * }
+ *
+ * On failure:
+ * {
+ *   "taskId": "...",
+ *   "code": 501,
+ *   "msg": "Generation Failed",
+ *   "data": {
+ *     "task_id": "...",
+ *     "state": "fail",
+ *     "failCode": "...",
+ *     "failMsg": "..."
+ *   }
+ * }
  */
 interface KieWebhookPayload {
-  request_id: string;
-  status: "OK" | "ERROR";
-  payload?: VideoGenerationResult | null;
-  error?: string;
+  taskId: string;
+  code: number;
+  msg: string;
+  data: {
+    task_id: string;
+    callbackType?: string;
+    state?: string;
+    resultJson?: string;
+    failCode?: string;
+    failMsg?: string;
+  };
 }
 
 /**
  * POST /api/video/webhook/kie
  * Receives completion callbacks from Kie.
- * TODO: Implement actual kie signature verification.
+ * Verifies HMAC-SHA256 signature against KIE_WEBHOOK_HMAC_KEY.
  */
 export async function POST(request: NextRequest) {
   const bodyBuffer = Buffer.from(await request.arrayBuffer());
-
-  if (!shouldSkipVerification()) {
-    const isValid = await verifyKieWebhook(request.headers, bodyBuffer);
-    if (!isValid) {
-      console.error("[Webhook/Kie] Invalid signature");
-      return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
-    }
-  } else {
-    console.warn("[Webhook/Kie] Skipping signature verification in development");
-  }
 
   let payload: KieWebhookPayload;
   try {
@@ -59,22 +72,31 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
   }
 
-  const {
-    request_id: requestId,
-    status,
-    payload: resultPayload,
-    error,
-  } = payload;
+  const taskId = payload.data?.task_id;
+  if (!taskId) {
+    console.error("[Webhook/Kie] Missing data.task_id in payload");
+    return NextResponse.json({ error: "Missing task_id" }, { status: 400 });
+  }
+
+  if (!shouldSkipVerification()) {
+    const kieHeaders = extractKieWebhookHeaders(request.headers);
+    const isValid = verifyKieWebhook(kieHeaders, taskId);
+    if (!isValid) {
+      console.error("[Webhook/Kie] Invalid signature");
+      return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
+    }
+  } else {
+    console.warn("[Webhook/Kie] Skipping signature verification in development");
+  }
 
   console.log(
-    `[Webhook/Kie] Received callback for request ${requestId}, status: ${status}`
+    `[Webhook/Kie] Received callback for task ${taskId}, code: ${payload.code}, state: ${payload.data.state}`
   );
 
-  const generation = await findGenerationByRequestId(requestId);
+  // Kie uses taskId as the request ID we stored at submission time
+  const generation = await findGenerationByRequestId(taskId);
   if (!generation) {
-    console.error(
-      `[Webhook/Kie] Generation not found for request ${requestId}`
-    );
+    console.error(`[Webhook/Kie] Generation not found for task ${taskId}`);
     return NextResponse.json(
       { error: "Generation not found" },
       { status: 404 }
@@ -88,20 +110,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ received: true, status: "already_processed" });
   }
 
-  if (status === "ERROR") {
-    const errorMsg = error || "Unknown error from Kie";
-    await handleGenerationFailure(
-      generation.id,
-      generation.userId,
-      generation.modelId,
-      errorMsg
-    );
-    console.error(`[Webhook/Kie] Generation ${generation.id} failed:`, errorMsg);
-    return NextResponse.json({ received: true, status: "failed" });
-  }
+  const state = payload.data.state;
 
-  if (!resultPayload) {
-    const errorMsg = "No result payload received";
+  if (state === "fail" || payload.code === 501) {
+    const errorMsg =
+      payload.data.failMsg || payload.msg || "Unknown error from Kie";
     await handleGenerationFailure(
       generation.id,
       generation.userId,
@@ -109,13 +122,51 @@ export async function POST(request: NextRequest) {
       errorMsg
     );
     console.error(
-      `[Webhook/Kie] Generation ${generation.id} payload error:`,
+      `[Webhook/Kie] Generation ${generation.id} failed:`,
       errorMsg
     );
     return NextResponse.json({ received: true, status: "failed" });
   }
 
-  waitUntil(processVideoResult(generation.id, resultPayload));
+  if (state !== "success") {
+    console.log(
+      `[Webhook/Kie] Non-terminal state "${state}" for generation ${generation.id}, ignoring`
+    );
+    return NextResponse.json({ received: true, status: "ignored" });
+  }
+
+  // Parse resultJson to extract video URL
+  let resultUrls: string[] = [];
+  try {
+    if (payload.data.resultJson) {
+      const parsed = JSON.parse(payload.data.resultJson);
+      resultUrls = parsed.resultUrls ?? [];
+    }
+  } catch (e) {
+    console.error("[Webhook/Kie] Failed to parse resultJson:", e);
+  }
+
+  if (resultUrls.length === 0) {
+    const errorMsg = "No result URLs in Kie callback";
+    await handleGenerationFailure(
+      generation.id,
+      generation.userId,
+      generation.modelId,
+      errorMsg
+    );
+    console.error(
+      `[Webhook/Kie] Generation ${generation.id}: ${errorMsg}`
+    );
+    return NextResponse.json({ received: true, status: "failed" });
+  }
+
+  // Transform into the VideoGenerationResult shape our shared handler expects
+  const videoResult = {
+    video: { url: resultUrls[0] },
+    seed: 0,
+  };
+
+  waitUntil(processVideoResult(generation.id, videoResult));
 
   return NextResponse.json({ received: true, status: "processing" });
 }

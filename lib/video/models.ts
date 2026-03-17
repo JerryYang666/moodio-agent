@@ -322,7 +322,18 @@ const wanV26ImageToVideo: VideoModelConfig = {
   },
   providers: [
     { provider: "fal", providerModelId: "wan/v2.6/image-to-video" },
-    { provider: "kie", providerModelId: "PLACEHOLDER_kie_wan_v26" },
+    {
+      provider: "kie",
+      providerModelId: "wan/2-6-image-to-video",
+      paramMapping: { image_url: "image_urls" },
+      paramOverrides: {
+        negative_prompt: { status: "disabled" },
+        enable_prompt_expansion: { status: "disabled" },
+        multi_shots: { status: "disabled" },
+        seed: { status: "disabled" },
+        enable_safety_checker: { status: "disabled" },
+      },
+    },
   ],
   params: [
     {

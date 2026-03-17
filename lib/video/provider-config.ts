@@ -14,7 +14,7 @@ const ACTIVE_PROVIDERS: Partial<Record<string, VideoProvider>> = {
   "hailuo-2.3-fast-pro": "fal",
   "hailuo-2.3-pro": "fal",
   "hailuo-02-pro": "fal",
-  "wan-v2.6": "fal",
+  "wan-v2.6": "kie",
   "kling-v2.6-pro": "fal",
   "kling-o1-pro": "fal",
   "kling-o3-pro": "fal",
