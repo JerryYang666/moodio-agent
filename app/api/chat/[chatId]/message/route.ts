@@ -34,6 +34,7 @@ import { siteConfig } from "@/config/site";
 
 const MAX_IMAGES_PER_MESSAGE = siteConfig.imageLimits.maxImagesPerMessage;
 const MAX_SUGGESTIONS_HARD_CAP = siteConfig.imageLimits.maxSuggestionsHardCap;
+const DIRECT_IMAGE_MAX_RETRY = 2;
 
 type ImageSourceEntry = {
   imageId: string;
@@ -583,45 +584,75 @@ export async function POST(
                     }
                   }
 
-                  // Determine whether to edit or generate
+                  // Determine whether to edit or generate (with retry for transient errors)
                   let result;
-                  if (imageIds.length > 0) {
-                    // Download reference images for editing
-                    const imageBase64Data = await Promise.all(
-                      imageIds.map(async (imgId) => {
-                        try {
-                          const buf = await downloadImage(imgId);
-                          return buf ? buf.toString("base64") : undefined;
-                        } catch {
-                          return undefined;
-                        }
-                      })
-                    );
-                    const validImageBase64 = imageBase64Data.filter(
-                      (data): data is string => data !== undefined
-                    );
+                  let lastGenError: unknown;
+                  for (let attempt = 0; attempt <= DIRECT_IMAGE_MAX_RETRY; attempt++) {
+                    try {
+                      if (attempt > 0) {
+                        console.log(
+                          `[Direct-Image] Retrying image generation, attempt ${attempt + 1}/${DIRECT_IMAGE_MAX_RETRY + 1}`
+                        );
+                      }
 
-                    if (validImageBase64.length > 0) {
-                      result = await editImageWithModel(imageModelId, {
-                        prompt: content,
-                        imageIds,
-                        imageBase64: validImageBase64,
-                        aspectRatio: aspectRatioOverride,
-                        imageSize: imageSizeOverride,
-                      });
-                    } else {
-                      result = await generateImageWithModel(imageModelId, {
-                        prompt: content,
-                        aspectRatio: aspectRatioOverride,
-                        imageSize: imageSizeOverride,
-                      });
+                      if (imageIds.length > 0) {
+                        const imageBase64Data = await Promise.all(
+                          imageIds.map(async (imgId) => {
+                            try {
+                              const buf = await downloadImage(imgId);
+                              return buf ? buf.toString("base64") : undefined;
+                            } catch {
+                              return undefined;
+                            }
+                          })
+                        );
+                        const validImageBase64 = imageBase64Data.filter(
+                          (data): data is string => data !== undefined
+                        );
+
+                        if (validImageBase64.length > 0) {
+                          result = await editImageWithModel(imageModelId, {
+                            prompt: content,
+                            imageIds,
+                            imageBase64: validImageBase64,
+                            aspectRatio: aspectRatioOverride,
+                            imageSize: imageSizeOverride,
+                          });
+                        } else {
+                          result = await generateImageWithModel(imageModelId, {
+                            prompt: content,
+                            aspectRatio: aspectRatioOverride,
+                            imageSize: imageSizeOverride,
+                          });
+                        }
+                      } else {
+                        result = await generateImageWithModel(imageModelId, {
+                          prompt: content,
+                          aspectRatio: aspectRatioOverride,
+                          imageSize: imageSizeOverride,
+                        });
+                      }
+
+                      if (attempt > 0) {
+                        console.log(
+                          `[Direct-Image] Image generation succeeded on retry attempt ${attempt + 1}`
+                        );
+                      }
+                      break;
+                    } catch (genErr) {
+                      if (genErr instanceof InsufficientCreditsError) {
+                        throw genErr;
+                      }
+                      lastGenError = genErr;
+                      console.error(
+                        `[Direct-Image] Image generation attempt ${attempt + 1}/${DIRECT_IMAGE_MAX_RETRY + 1} failed:`,
+                        genErr
+                      );
                     }
-                  } else {
-                    result = await generateImageWithModel(imageModelId, {
-                      prompt: content,
-                      aspectRatio: aspectRatioOverride,
-                      imageSize: imageSizeOverride,
-                    });
+                  }
+
+                  if (!result) {
+                    throw lastGenError || new Error("Image generation failed after retries");
                   }
 
                   // Upload the generated image
