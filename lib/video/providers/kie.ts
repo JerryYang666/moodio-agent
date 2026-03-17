@@ -1,6 +1,7 @@
 import type { VideoProviderClient, VideoGenerationResult } from "./index";
 
 const KIE_API_BASE = "https://api.kie.ai";
+const KIE_FILE_UPLOAD_BASE = "https://kieai.redpandaai.co";
 
 function getApiKey(): string {
   const key = process.env.KIE_API_KEY;
@@ -56,7 +57,7 @@ async function uploadToKie(url: string): Promise<string> {
 
   console.log("[Kie Upload] Re-uploading external image to Kie temp storage");
 
-  const res = await fetch(`${KIE_API_BASE}/api/file-url-upload`, {
+  const res = await fetch(`${KIE_FILE_UPLOAD_BASE}/api/file-url-upload`, {
     method: "POST",
     headers: authHeaders(),
     body: JSON.stringify({
