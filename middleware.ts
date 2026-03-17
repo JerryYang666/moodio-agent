@@ -23,6 +23,8 @@ function isPublicPath(pathname: string): boolean {
     "/api/auth/passkey/login/verify",
     "/api/auth/login-password",
     "/api/video/webhook",
+    "/api/video/webhook/fal",
+    "/api/video/webhook/kie",
   ];
 
   if (publicPaths.includes(pathname)) {
