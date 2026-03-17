@@ -18,24 +18,22 @@ import { waitUntil } from "@vercel/functions";
  *
  * On success the body looks like:
  * {
- *   "taskId": "...",
  *   "code": 200,
- *   "msg": "Success",
+ *   "msg": "Playground task completed successfully.",
  *   "data": {
- *     "task_id": "...",
- *     "callbackType": "task_completed",
+ *     "taskId": "...",
  *     "state": "success",
+ *     "model": "...",
  *     "resultJson": "{\"resultUrls\":[\"https://...\"]}"
  *   }
  * }
  *
  * On failure:
  * {
- *   "taskId": "...",
  *   "code": 501,
  *   "msg": "Generation Failed",
  *   "data": {
- *     "task_id": "...",
+ *     "taskId": "...",
  *     "state": "fail",
  *     "failCode": "...",
  *     "failMsg": "..."
@@ -43,11 +41,12 @@ import { waitUntil } from "@vercel/functions";
  * }
  */
 interface KieWebhookPayload {
-  taskId: string;
+  taskId?: string;
   code: number;
   msg: string;
   data: {
-    task_id: string;
+    taskId?: string;
+    task_id?: string;
     callbackType?: string;
     state?: string;
     resultJson?: string;
@@ -74,9 +73,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
   }
 
-  const taskId = payload.data?.task_id;
+  const taskId = payload.data?.taskId || payload.data?.task_id || payload.taskId;
   if (!taskId) {
-    console.error("[Webhook/Kie] Missing data.task_id in payload");
+    console.error("[Webhook/Kie] Missing taskId in payload");
     return NextResponse.json({ error: "Missing task_id" }, { status: 400 });
   }
 
