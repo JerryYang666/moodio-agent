@@ -8,12 +8,90 @@ function getApiKey(): string {
   return key;
 }
 
-function headers(): Record<string, string> {
+function authHeaders(): Record<string, string> {
   return {
     Authorization: `Bearer ${getApiKey()}`,
     "Content-Type": "application/json",
   };
 }
+
+// ---------------------------------------------------------------------------
+// Kie File Upload — re-upload external URLs so Kie can infer the file type
+// ---------------------------------------------------------------------------
+
+interface KieFileUploadResponse {
+  success: boolean;
+  code: number;
+  msg: string;
+  data: {
+    fileName: string;
+    filePath: string;
+    downloadUrl: string;
+    fileSize: number;
+    mimeType: string;
+    uploadedAt: string;
+  };
+}
+
+const IMAGE_URL_KEYS = new Set([
+  "image_url",
+  "image_urls",
+  "start_image_url",
+  "end_image_url",
+  "first_frame_url",
+  "last_frame_url",
+]);
+
+function isImageUrlParam(key: string): boolean {
+  return IMAGE_URL_KEYS.has(key);
+}
+
+/**
+ * Upload an external image URL to Kie's temp storage so the task API
+ * receives a URL it can reliably resolve the file type from.
+ * URLs already hosted on Kie's temp storage are passed through as-is.
+ */
+async function uploadToKie(url: string): Promise<string> {
+  if (url.includes("tempfile.redpandaai.co")) return url;
+
+  console.log("[Kie Upload] Re-uploading external image to Kie temp storage");
+
+  const res = await fetch(`${KIE_API_BASE}/api/file-url-upload`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify({
+      fileUrl: url,
+      uploadPath: "moodio/video-inputs",
+    }),
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Kie file upload failed (${res.status}): ${text}`);
+  }
+
+  const json: KieFileUploadResponse = await res.json();
+  if (!json.success || json.code !== 200) {
+    throw new Error(`Kie file upload error (${json.code}): ${json.msg}`);
+  }
+
+  console.log(
+    `[Kie Upload] OK — ${json.data.mimeType}, ${json.data.fileSize} bytes → ${json.data.downloadUrl}`
+  );
+  return json.data.downloadUrl;
+}
+
+async function reuploadSingle(value: string): Promise<string> {
+  return uploadToKie(value);
+}
+
+async function reuploadArray(value: string[]): Promise<string[]> {
+  return Promise.all(value.map(uploadToKie));
+}
+
+// ---------------------------------------------------------------------------
+// Param preparation
+// ---------------------------------------------------------------------------
 
 interface KieCreateTaskResponse {
   code: number;
@@ -35,15 +113,16 @@ interface KieTaskDetailResponse {
 }
 
 /**
- * Kie expects image/file URL params as arrays (e.g. `image_urls: [...]`).
- * After paramMapping renames `image_url` → `image_urls`, the value is still
- * a plain string. This function wraps any string value whose key ends with
- * `_urls` into an array.
+ * Normalise input params for the Kie task API:
+ *  1. Wrap bare string values whose key ends with `_urls` into arrays.
+ *  2. Re-upload any external image URLs via Kie's File Upload API so
+ *     the task endpoint can reliably determine the file type.
  */
-function prepareInputParams(
+async function prepareInputParams(
   params: Record<string, any>
-): Record<string, any> {
+): Promise<Record<string, any>> {
   const prepared: Record<string, any> = {};
+  const uploadTasks: Promise<void>[] = [];
 
   for (const [key, value] of Object.entries(params)) {
     if (key.endsWith("_urls") && typeof value === "string") {
@@ -53,6 +132,25 @@ function prepareInputParams(
     }
   }
 
+  for (const [key, value] of Object.entries(prepared)) {
+    if (!isImageUrlParam(key)) continue;
+
+    if (Array.isArray(value)) {
+      uploadTasks.push(
+        reuploadArray(value as string[]).then((urls) => {
+          prepared[key] = urls;
+        })
+      );
+    } else if (typeof value === "string" && value.startsWith("http")) {
+      uploadTasks.push(
+        reuploadSingle(value).then((url) => {
+          prepared[key] = url;
+        })
+      );
+    }
+  }
+
+  await Promise.all(uploadTasks);
   return prepared;
 }
 
@@ -62,7 +160,7 @@ export class KieVideoProvider implements VideoProviderClient {
     params: Record<string, any>,
     webhookUrl: string
   ): Promise<{ requestId: string }> {
-    const input = prepareInputParams(params);
+    const input = await prepareInputParams(params);
 
     const requestBody = {
       model: providerModelId,
@@ -74,7 +172,7 @@ export class KieVideoProvider implements VideoProviderClient {
 
     const res = await fetch(`${KIE_API_BASE}/api/v1/jobs/createTask`, {
       method: "POST",
-      headers: headers(),
+      headers: authHeaders(),
       body: JSON.stringify(requestBody),
     });
 
@@ -162,7 +260,7 @@ export class KieVideoProvider implements VideoProviderClient {
     taskId: string
   ): Promise<KieTaskDetailResponse> {
     const url = `${KIE_API_BASE}/api/v1/jobs/recordInfo?taskId=${encodeURIComponent(taskId)}`;
-    const res = await fetch(url, { headers: headers() });
+    const res = await fetch(url, { headers: authHeaders() });
 
     if (!res.ok) {
       const text = await res.text();
