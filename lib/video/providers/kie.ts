@@ -64,22 +64,29 @@ export class KieVideoProvider implements VideoProviderClient {
   ): Promise<{ requestId: string }> {
     const input = prepareInputParams(params);
 
+    const requestBody = {
+      model: providerModelId,
+      callBackUrl: webhookUrl,
+      input,
+    };
+
+    console.log("[Kie Submit] Request:", JSON.stringify(requestBody, null, 2));
+
     const res = await fetch(`${KIE_API_BASE}/api/v1/jobs/createTask`, {
       method: "POST",
       headers: headers(),
-      body: JSON.stringify({
-        model: providerModelId,
-        callBackUrl: webhookUrl,
-        input,
-      }),
+      body: JSON.stringify(requestBody),
     });
 
     if (!res.ok) {
       const text = await res.text();
+      console.error("[Kie Submit] HTTP error:", res.status, text);
       throw new Error(`Kie createTask failed (${res.status}): ${text}`);
     }
 
     const json: KieCreateTaskResponse = await res.json();
+    console.log("[Kie Submit] Response:", JSON.stringify(json, null, 2));
+
     if (json.code !== 200) {
       throw new Error(`Kie createTask error (${json.code}): ${json.msg}`);
     }

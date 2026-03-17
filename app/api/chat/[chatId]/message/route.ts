@@ -22,7 +22,7 @@ import {
 } from "@/lib/image/service";
 import { ImageSize } from "@/lib/image/types";
 import { calculateCost } from "@/lib/pricing";
-import { deductCredits, getUserBalance, refundCharge, InsufficientCreditsError } from "@/lib/credits";
+import { deductCredits, getUserBalance, assertSufficientCredits, InsufficientCreditsError } from "@/lib/credits";
 import {
   getVideoModel,
   validateAndMergeParams,
@@ -829,31 +829,21 @@ export async function POST(
             let generatedPart: MessageContentPart;
 
             try {
-              // Create DB record and deduct credits in transaction
-              const generation = await db.transaction(async (tx) => {
-                const [gen] = await tx
-                  .insert(videoGenerations)
-                  .values({
-                    userId: payload.userId,
-                    modelId,
-                    status: "pending",
-                    sourceImageId,
-                    endImageId,
-                    params: mergedParams,
-                  })
-                  .returning();
+              // Check balance before doing any work
+              await assertSufficientCredits(payload.userId, cost);
 
-                await deductCredits(
-                  payload.userId,
-                  cost,
-                  "video_generation",
-                  `Generated video with model ${model.name} (chat)`,
-                  { type: "video_generation", id: gen.id },
-                  tx
-                );
-
-                return gen;
-              });
+              // Create generation record (no credit deduction yet)
+              const [generation] = await db
+                .insert(videoGenerations)
+                .values({
+                  userId: payload.userId,
+                  modelId,
+                  status: "pending",
+                  sourceImageId,
+                  endImageId,
+                  params: mergedParams,
+                })
+                .returning();
 
               // Send initial part with generationId
               const pendingPart: MessageContentPart = {
@@ -888,16 +878,27 @@ export async function POST(
                 baseUrl
               );
 
-              // Update record with request ID and provider info
-              await db
-                .update(videoGenerations)
-                .set({
-                  providerRequestId: requestId,
-                  provider,
-                  providerModelId,
-                  status: "processing",
-                })
-                .where(eq(videoGenerations.id, generation.id));
+              // Submission succeeded — deduct credits and update record atomically
+              await db.transaction(async (tx) => {
+                await deductCredits(
+                  payload.userId,
+                  cost,
+                  "video_generation",
+                  `Generated video with model ${model.name} (chat)`,
+                  { type: "video_generation", id: generation.id },
+                  tx
+                );
+
+                await tx
+                  .update(videoGenerations)
+                  .set({
+                    providerRequestId: requestId,
+                    provider,
+                    providerModelId,
+                    status: "processing",
+                  })
+                  .where(eq(videoGenerations.id, generation.id));
+              });
 
               await recordEvent(
                 "video_generation",

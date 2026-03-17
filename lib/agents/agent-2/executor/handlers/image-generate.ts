@@ -17,7 +17,7 @@ import { getImageModel } from "@/lib/image/models";
 import { calculateCost } from "@/lib/pricing";
 import {
   deductCredits,
-  getUserBalance,
+  assertSufficientCredits,
   InsufficientCreditsError,
 } from "@/lib/credits";
 import { recordEvent, sanitizeGeminiResponse } from "@/lib/telemetry";
@@ -201,13 +201,10 @@ export class ImageGenerateHandler implements ToolHandler {
 
     const useImageEditing = effectiveImageBase64.length > 0;
 
-    // Calculate cost and verify balance
+    // Verify balance before doing any work
     const cost = await calculateCost("Image/all", {});
     if (cost > 0) {
-      const balance = await getUserBalance(ctx.userId);
-      if (balance < cost) {
-        throw new InsufficientCreditsError();
-      }
+      await assertSufficientCredits(ctx.userId, cost);
     }
 
     const modelId = ctx.imageModelId;

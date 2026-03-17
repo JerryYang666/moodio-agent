@@ -46,6 +46,20 @@ export async function getUserBalance(
 }
 
 /**
+ * Verify a user has enough credits. Throws InsufficientCreditsError if not.
+ */
+export async function assertSufficientCredits(
+  userId: string,
+  amount: number,
+  tx: DbOrTx = db
+): Promise<void> {
+  const balance = await getUserBalance(userId, tx);
+  if (balance < Math.abs(amount)) {
+    throw new InsufficientCreditsError();
+  }
+}
+
+/**
  * Deduct credits from a user.
  * Throws InsufficientCreditsError if balance is too low.
  */

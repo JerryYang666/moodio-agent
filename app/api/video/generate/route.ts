@@ -9,7 +9,7 @@ import {
   validateAndMergeParams,
   DEFAULT_VIDEO_MODEL_ID,
 } from "@/lib/video/models";
-import { deductCredits, refundCharge, InsufficientCreditsError } from "@/lib/credits";
+import { deductCredits, assertSufficientCredits, InsufficientCreditsError } from "@/lib/credits";
 import { calculateCost } from "@/lib/pricing";
 import { submitVideoGeneration } from "@/lib/video/video-client";
 import { getSignedImageUrl } from "@/lib/storage/s3";
@@ -95,35 +95,9 @@ export async function POST(request: NextRequest) {
     // Calculate cost from pricing formula
     const cost = await calculateCost(modelId, mergedParams);
 
-    // Create database record and deduct credits transactionally
-    let generation;
+    // Check balance before doing any work
     try {
-      generation = await db.transaction(async (tx) => {
-        // Create generation record first to get ID
-        const [gen] = await tx
-          .insert(videoGenerations)
-          .values({
-            userId: payload.userId,
-            modelId,
-            status: "pending",
-            sourceImageId,
-            endImageId: endImageId || null,
-            params: mergedParams,
-          })
-          .returning();
-
-        // Deduct credits with reference to generation
-        await deductCredits(
-          payload.userId,
-          cost,
-          "video_generation",
-          `Generated video with model ${model.name}`,
-          { type: "video_generation", id: gen.id },
-          tx
-        );
-
-        return gen;
-      });
+      await assertSufficientCredits(payload.userId, cost);
     } catch (error: any) {
       if (
         error.message === "INSUFFICIENT_CREDITS" ||
@@ -146,44 +120,26 @@ export async function POST(request: NextRequest) {
     // Build webhook URL
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL;
     if (!baseUrl) {
-      // Refund credits and update record to failed status
-      await db.transaction(async (tx) => {
-        // Refund by looking up original charge
-        await refundCharge(
-          { type: "video_generation", id: generation.id },
-          `Config Error: ${model.name}`,
-          tx
-        );
-
-        // Update record
-        await tx
-          .update(videoGenerations)
-          .set({
-            status: "failed",
-            error: "Server configuration error: Missing base URL",
-          })
-          .where(eq(videoGenerations.id, generation.id));
-      });
-
-      await recordEvent(
-        "video_generation_refund",
-        payload.userId,
-        {
-          status: "refunded",
-          generationId: generation.id,
-          modelId,
-          reason: "config_error",
-        },
-        ipAddress
-      );
-
       return NextResponse.json(
         { error: "Server configuration error" },
         { status: 500 }
       );
     }
 
-    // Submit to provider queue
+    // Create generation record (no credit deduction yet)
+    const [generation] = await db
+      .insert(videoGenerations)
+      .values({
+        userId: payload.userId,
+        modelId,
+        status: "pending",
+        sourceImageId,
+        endImageId: endImageId || null,
+        params: mergedParams,
+      })
+      .returning();
+
+    // Submit to provider
     try {
       const { requestId, provider, providerModelId } = await submitVideoGeneration(
         modelId,
@@ -191,16 +147,27 @@ export async function POST(request: NextRequest) {
         baseUrl
       );
 
-      // Update record with request ID and provider info
-      await db
-        .update(videoGenerations)
-        .set({
-          providerRequestId: requestId,
-          provider,
-          providerModelId,
-          status: "processing",
-        })
-        .where(eq(videoGenerations.id, generation.id));
+      // Submission succeeded — deduct credits and update record atomically
+      await db.transaction(async (tx) => {
+        await deductCredits(
+          payload.userId,
+          cost,
+          "video_generation",
+          `Generated video with model ${model.name}`,
+          { type: "video_generation", id: generation.id },
+          tx
+        );
+
+        await tx
+          .update(videoGenerations)
+          .set({
+            providerRequestId: requestId,
+            provider,
+            providerModelId,
+            status: "processing",
+          })
+          .where(eq(videoGenerations.id, generation.id));
+      });
 
       await recordEvent(
         "video_generation",
@@ -242,31 +209,23 @@ export async function POST(request: NextRequest) {
     } catch (submitError: any) {
       console.error("[Video Generate] Provider submission error:", submitError);
 
-      // Refund credits and update record to failed status
-      await db.transaction(async (tx) => {
-        await refundCharge(
-          { type: "video_generation", id: generation.id },
-          `Provider Error: ${model.name}`,
-          tx
-        );
-
-        await tx
-          .update(videoGenerations)
-          .set({
-            status: "failed",
-            error: submitError.message || "Failed to submit to provider",
-          })
-          .where(eq(videoGenerations.id, generation.id));
-      });
+      // Mark generation as failed (no credits to refund)
+      await db
+        .update(videoGenerations)
+        .set({
+          status: "failed",
+          error: submitError.message || "Failed to submit to provider",
+          completedAt: new Date(),
+        })
+        .where(eq(videoGenerations.id, generation.id));
 
       await recordEvent(
-        "video_generation_refund",
+        "video_generation",
         payload.userId,
         {
-          status: "refunded",
+          status: "submission_failed",
           generationId: generation.id,
           modelId,
-          reason: "provider_submission_error",
           error: submitError.message || "Failed to submit to provider",
         },
         ipAddress
