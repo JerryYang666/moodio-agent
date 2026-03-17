@@ -220,7 +220,7 @@ export default function VideoManagementPage() {
               <Input
                 className="w-full lg:max-w-[260px]"
                 label="Model ID"
-                placeholder="e.g. fal-ai/bytedance/seedance..."
+                placeholder="e.g. seedance-v1.5-pro..."
                 value={modelFilter}
                 onValueChange={(value) => {
                   setModelFilter(value);

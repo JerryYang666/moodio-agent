@@ -9,7 +9,7 @@
 import { db } from "@/lib/db";
 import { videoGenerations } from "@/lib/db/schema";
 import { eq, and, lt, inArray } from "drizzle-orm";
-import { tryRecoverVideoGeneration, SeedanceVideoResult } from "./fal-client";
+import { tryRecoverVideoGeneration, type VideoGenerationResult } from "./video-client";
 import {
   uploadVideo,
   downloadFromUrl,
@@ -49,7 +49,7 @@ export async function findStaleGenerations(userId?: string) {
  */
 async function processVideoResult(
   generationId: string,
-  result: SeedanceVideoResult
+  result: VideoGenerationResult
 ): Promise<{ videoId: string }> {
   console.log(`[Recovery] Processing video for generation ${generationId}`);
 
@@ -73,7 +73,9 @@ export async function recoverGeneration(generation: {
   id: string;
   userId: string;
   modelId: string;
-  falRequestId: string | null;
+  provider: string | null;
+  providerModelId: string | null;
+  providerRequestId: string | null;
   sourceImageId: string;
 }): Promise<{ recovered: boolean; status: string; error?: string }> {
   // Re-check current status to avoid race condition with webhook
@@ -92,13 +94,12 @@ export async function recoverGeneration(generation: {
     return { recovered: false, status: currentGen.status };
   }
 
-  if (!generation.falRequestId) {
-    // No Fal request ID - can't recover
+  if (!generation.providerRequestId) {
     await db
       .update(videoGenerations)
       .set({
         status: "failed",
-        error: "No Fal request ID - cannot recover",
+        error: "No request ID - cannot recover",
         completedAt: new Date(),
       })
       .where(eq(videoGenerations.id, generation.id));
@@ -107,18 +108,23 @@ export async function recoverGeneration(generation: {
       status: "failed",
       generationId: generation.id,
       modelId: generation.modelId,
-      error: "No Fal request ID",
+      error: "No request ID",
     });
 
-    return { recovered: false, status: "failed", error: "No Fal request ID" };
+    return { recovered: false, status: "failed", error: "No request ID" };
   }
 
-  console.log(`[Recovery] Attempting to recover generation ${generation.id} (Fal: ${generation.falRequestId})`);
+  // Resolve provider info: use stored values, fall back to active provider config
+  let recoverProvider = generation.provider ?? "fal";
+  let recoverProviderModelId = generation.providerModelId ?? generation.modelId;
+
+  console.log(`[Recovery] Attempting to recover generation ${generation.id} (provider: ${recoverProvider}, requestId: ${generation.providerRequestId})`);
 
   try {
     const recoveryResult = await tryRecoverVideoGeneration(
-      generation.modelId,
-      generation.falRequestId
+      recoverProvider,
+      recoverProviderModelId,
+      generation.providerRequestId
     );
 
     if (recoveryResult.status === "in_progress") {

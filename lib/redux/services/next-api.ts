@@ -19,7 +19,7 @@ export interface GenerateVideoRequest {
 export interface GenerateVideoResponse {
   success: boolean;
   generationId: string;
-  falRequestId: string;
+  providerRequestId: string;
   status: string;
 }
 

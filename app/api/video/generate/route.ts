@@ -11,7 +11,7 @@ import {
 } from "@/lib/video/models";
 import { deductCredits, refundCharge, InsufficientCreditsError } from "@/lib/credits";
 import { calculateCost } from "@/lib/pricing";
-import { submitVideoGeneration } from "@/lib/video/fal-client";
+import { submitVideoGeneration } from "@/lib/video/video-client";
 import { getSignedImageUrl } from "@/lib/storage/s3";
 import { recordEvent } from "@/lib/telemetry";
 import { isFeatureFlagEnabled } from "@/lib/feature-flags/server";
@@ -183,21 +183,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const webhookUrl = `${baseUrl}/api/video/webhook`;
-
-    // Submit to Fal queue
+    // Submit to provider queue
     try {
-      const { requestId } = await submitVideoGeneration(
+      const { requestId, provider, providerModelId } = await submitVideoGeneration(
         modelId,
         mergedParams,
-        webhookUrl
+        baseUrl
       );
 
-      // Update record with Fal request ID
+      // Update record with request ID and provider info
       await db
         .update(videoGenerations)
         .set({
-          falRequestId: requestId,
+          providerRequestId: requestId,
+          provider,
+          providerModelId,
           status: "processing",
         })
         .where(eq(videoGenerations.id, generation.id));
@@ -208,7 +208,7 @@ export async function POST(request: NextRequest) {
         {
           status: "submitted",
           generationId: generation.id,
-          falRequestId: requestId,
+          providerRequestId: requestId,
           modelId,
           sourceImageId,
           endImageId: endImageId || null,
@@ -236,27 +236,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: true,
         generationId: generation.id,
-        falRequestId: requestId,
+        providerRequestId: requestId,
         status: "processing",
       });
-    } catch (falError: any) {
-      console.error("[Video Generate] Fal submission error:", falError);
+    } catch (submitError: any) {
+      console.error("[Video Generate] Provider submission error:", submitError);
 
       // Refund credits and update record to failed status
       await db.transaction(async (tx) => {
-        // Refund by looking up original charge
         await refundCharge(
           { type: "video_generation", id: generation.id },
-          `Fal Error: ${model.name}`,
+          `Provider Error: ${model.name}`,
           tx
         );
 
-        // Update record
         await tx
           .update(videoGenerations)
           .set({
             status: "failed",
-            error: falError.message || "Failed to submit to Fal",
+            error: submitError.message || "Failed to submit to provider",
           })
           .where(eq(videoGenerations.id, generation.id));
       });
@@ -268,8 +266,8 @@ export async function POST(request: NextRequest) {
           status: "refunded",
           generationId: generation.id,
           modelId,
-          reason: "fal_submission_error",
-          error: falError.message || "Failed to submit to Fal",
+          reason: "provider_submission_error",
+          error: submitError.message || "Failed to submit to provider",
         },
         ipAddress
       );

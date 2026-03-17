@@ -36,16 +36,37 @@ export interface VideoModelParam {
   status?: VideoModelParamStatus; // Defaults to "active" if not specified
 }
 
+export type VideoProvider = "fal" | "kie";
+
+/**
+ * Per-provider overrides for a single parameter.
+ * Only include fields that differ from the base model definition.
+ */
+export interface ParamOverride {
+  options?: Array<string | number>;
+  min?: number;
+  max?: number;
+  default?: string | number | boolean | string[];
+  status?: VideoModelParamStatus;
+}
+
+export interface ProviderVariant {
+  provider: VideoProvider;
+  providerModelId: string;
+  paramMapping?: Record<string, string>;
+  paramOverrides?: Record<string, ParamOverride>;
+}
+
 export interface VideoModelConfig {
   id: string;
   name: string;
   description?: string;
   params: VideoModelParam[];
-  // Which params are for images (special handling with asset picker)
   imageParams: {
-    sourceImage: string; // Required source image param name
-    endImage?: string; // Optional end image param name
+    sourceImage: string;
+    endImage?: string;
   };
+  providers: ProviderVariant[];
 }
 
 /**
@@ -53,7 +74,7 @@ export interface VideoModelConfig {
  * ByteDance's video generation model
  */
 const seedanceV15Pro: VideoModelConfig = {
-  id: "fal-ai/bytedance/seedance/v1.5/pro/image-to-video",
+  id: "seedance-v1.5-pro",
   name: "Seedance v1.5 Pro",
   description:
     "ByteDance's high-quality image-to-video generation model with audio support",
@@ -61,6 +82,10 @@ const seedanceV15Pro: VideoModelConfig = {
     sourceImage: "image_url",
     endImage: "end_image_url",
   },
+  providers: [
+    { provider: "fal", providerModelId: "fal-ai/bytedance/seedance/v1.5/pro/image-to-video" },
+    { provider: "kie", providerModelId: "PLACEHOLDER_kie_seedance_v15_pro" },
+  ],
   params: [
     {
       name: "prompt",
@@ -154,13 +179,17 @@ const seedanceV15Pro: VideoModelConfig = {
  * Advanced fast image-to-video generation model with 1080p resolution
  */
 const hailuo23FastPro: VideoModelConfig = {
-  id: "fal-ai/minimax/hailuo-2.3-fast/pro/image-to-video",
+  id: "hailuo-2.3-fast-pro",
   name: "Hailuo 2.3 Fast Pro",
   description:
     "MiniMax's fast image-to-video model with 1080p output and prompt optimization",
   imageParams: {
     sourceImage: "image_url",
   },
+  providers: [
+    { provider: "fal", providerModelId: "fal-ai/minimax/hailuo-2.3-fast/pro/image-to-video" },
+    { provider: "kie", providerModelId: "PLACEHOLDER_kie_hailuo_23_fast_pro" },
+  ],
   params: [
     {
       name: "prompt",
@@ -192,13 +221,17 @@ const hailuo23FastPro: VideoModelConfig = {
  * Advanced image-to-video generation model with 1080p resolution
  */
 const hailuo23Pro: VideoModelConfig = {
-  id: "fal-ai/minimax/hailuo-2.3/pro/image-to-video",
+  id: "hailuo-2.3-pro",
   name: "Hailuo 2.3 Pro",
   description:
     "MiniMax's high-quality image-to-video model with 1080p output and prompt optimization",
   imageParams: {
     sourceImage: "image_url",
   },
+  providers: [
+    { provider: "fal", providerModelId: "fal-ai/minimax/hailuo-2.3/pro/image-to-video" },
+    { provider: "kie", providerModelId: "PLACEHOLDER_kie_hailuo_23_pro" },
+  ],
   params: [
     {
       name: "prompt",
@@ -230,7 +263,7 @@ const hailuo23Pro: VideoModelConfig = {
  * Advanced image-to-video generation model with 1080p resolution
  */
 const hailuo02Pro: VideoModelConfig = {
-  id: "fal-ai/minimax/hailuo-02/pro/image-to-video",
+  id: "hailuo-02-pro",
   name: "Hailuo 02 Pro",
   description:
     "MiniMax's high-quality image-to-video model with 1080p output and prompt optimization",
@@ -238,6 +271,10 @@ const hailuo02Pro: VideoModelConfig = {
     sourceImage: "image_url",
     endImage: "end_image_url",
   },
+  providers: [
+    { provider: "fal", providerModelId: "fal-ai/minimax/hailuo-02/pro/image-to-video" },
+    { provider: "kie", providerModelId: "PLACEHOLDER_kie_hailuo_02_pro" },
+  ],
   params: [
     {
       name: "prompt",
@@ -276,13 +313,17 @@ const hailuo02Pro: VideoModelConfig = {
  * High-quality image-to-video generation with support for multi-shot segmentation
  */
 const wanV26ImageToVideo: VideoModelConfig = {
-  id: "wan/v2.6/image-to-video",
+  id: "wan-v2.6",
   name: "Wan v2.6",
   description:
     "High-quality image-to-video with up to 15s duration and intelligent multi-shot segmentation",
   imageParams: {
     sourceImage: "image_url",
   },
+  providers: [
+    { provider: "fal", providerModelId: "wan/v2.6/image-to-video" },
+    { provider: "kie", providerModelId: "PLACEHOLDER_kie_wan_v26" },
+  ],
   params: [
     {
       name: "prompt",
@@ -369,7 +410,7 @@ const wanV26ImageToVideo: VideoModelConfig = {
  * Top-tier image-to-video with cinematic visuals, fluid motion, and native audio generation
  */
 const klingV26Pro: VideoModelConfig = {
-  id: "fal-ai/kling-video/v2.6/pro/image-to-video",
+  id: "kling-v2.6-pro",
   name: "Kling Video v2.6 Pro",
   description:
     "Top-tier image-to-video with cinematic visuals, fluid motion, and native audio generation",
@@ -377,6 +418,10 @@ const klingV26Pro: VideoModelConfig = {
     sourceImage: "start_image_url",
     endImage: "end_image_url",
   },
+  providers: [
+    { provider: "fal", providerModelId: "fal-ai/kling-video/v2.6/pro/image-to-video" },
+    { provider: "kie", providerModelId: "PLACEHOLDER_kie_kling_v26_pro" },
+  ],
   params: [
     {
       name: "prompt",
@@ -445,7 +490,7 @@ const klingV26Pro: VideoModelConfig = {
  * Generate a video by animating the transition between start and end frames
  */
 const klingO1Pro: VideoModelConfig = {
-  id: "fal-ai/kling-video/o1/image-to-video",
+  id: "kling-o1-pro",
   name: "Kling O1 Pro",
   description:
     "Generate a video by animating the transition between start and end frames",
@@ -453,6 +498,10 @@ const klingO1Pro: VideoModelConfig = {
     sourceImage: "start_image_url",
     endImage: "end_image_url",
   },
+  providers: [
+    { provider: "fal", providerModelId: "fal-ai/kling-video/o1/image-to-video" },
+    { provider: "kie", providerModelId: "PLACEHOLDER_kie_kling_o1_pro" },
+  ],
   params: [
     {
       name: "prompt",
@@ -494,7 +543,7 @@ const klingO1Pro: VideoModelConfig = {
  * between them while following text-driven style and scene guidance.
  */
 const klingO3Pro: VideoModelConfig = {
-  id: "fal-ai/kling-video/o3/pro/image-to-video",
+  id: "kling-o3-pro",
   name: "Kling O3 Pro",
   description:
     "Generate a video by animating the transition between start and end frames with text-driven style and scene guidance",
@@ -502,6 +551,10 @@ const klingO3Pro: VideoModelConfig = {
     sourceImage: "image_url",
     endImage: "end_image_url",
   },
+  providers: [
+    { provider: "fal", providerModelId: "fal-ai/kling-video/o3/pro/image-to-video" },
+    { provider: "kie", providerModelId: "PLACEHOLDER_kie_kling_o3_pro" },
+  ],
   params: [
     {
       name: "prompt",
@@ -565,7 +618,7 @@ const klingO3Pro: VideoModelConfig = {
  * with custom element support.
  */
 const klingV3Pro: VideoModelConfig = {
-  id: "fal-ai/kling-video/v3/pro/image-to-video",
+  id: "kling-v3-pro",
   name: "Kling Video v3 Pro",
   description:
     "Top-tier image-to-video with cinematic visuals, fluid motion, native audio generation, and custom element support",
@@ -573,6 +626,10 @@ const klingV3Pro: VideoModelConfig = {
     sourceImage: "start_image_url",
     endImage: "end_image_url",
   },
+  providers: [
+    { provider: "fal", providerModelId: "fal-ai/kling-video/v3/pro/image-to-video" },
+    { provider: "kie", providerModelId: "PLACEHOLDER_kie_kling_v3_pro" },
+  ],
   params: [
     {
       name: "prompt",
@@ -664,13 +721,17 @@ const klingV3Pro: VideoModelConfig = {
  * Google's state-of-the-art image-to-video generation model
  */
 const veo31: VideoModelConfig = {
-  id: "fal-ai/veo3.1/image-to-video",
+  id: "veo-3.1",
   name: "Veo 3.1",
   description:
     "Google DeepMind's state-of-the-art image-to-video model with optional audio generation",
   imageParams: {
     sourceImage: "image_url",
   },
+  providers: [
+    { provider: "fal", providerModelId: "fal-ai/veo3.1/image-to-video" },
+    { provider: "kie", providerModelId: "PLACEHOLDER_kie_veo_31" },
+  ],
   params: [
     {
       name: "prompt",
@@ -753,7 +814,7 @@ const veo31: VideoModelConfig = {
  * Google's state-of-the-art video generation from first and last frames
  */
 const veo31FirstLastFrame: VideoModelConfig = {
-  id: "fal-ai/veo3.1/first-last-frame-to-video",
+  id: "veo-3.1-first-last-frame",
   name: "Veo 3.1 First-Last-Frame",
   description:
     "Google DeepMind's video generation from first and last frames with optional audio",
@@ -761,6 +822,10 @@ const veo31FirstLastFrame: VideoModelConfig = {
     sourceImage: "first_frame_url",
     endImage: "last_frame_url",
   },
+  providers: [
+    { provider: "fal", providerModelId: "fal-ai/veo3.1/first-last-frame-to-video" },
+    { provider: "kie", providerModelId: "PLACEHOLDER_kie_veo_31_first_last_frame" },
+  ],
   params: [
     {
       name: "prompt",
@@ -849,13 +914,17 @@ const veo31FirstLastFrame: VideoModelConfig = {
  * OpenAI's state-of-the-art image-to-video model with audio
  */
 const sora2Pro: VideoModelConfig = {
-  id: "fal-ai/sora-2/image-to-video/pro",
+  id: "sora-2-pro",
   name: "Sora 2 Pro",
   description:
     "OpenAI's state-of-the-art image-to-video model capable of detailed clips with audio",
   imageParams: {
     sourceImage: "image_url",
   },
+  providers: [
+    { provider: "fal", providerModelId: "fal-ai/sora-2/image-to-video/pro" },
+    { provider: "kie", providerModelId: "PLACEHOLDER_kie_sora_2_pro" },
+  ],
   params: [
     {
       name: "prompt",
@@ -932,14 +1001,77 @@ export const VIDEO_MODELS: VideoModelConfig[] = [
 /**
  * Default model ID
  */
-export const DEFAULT_VIDEO_MODEL_ID =
-  "fal-ai/bytedance/seedance/v1.5/pro/image-to-video";
+export const DEFAULT_VIDEO_MODEL_ID = "seedance-v1.5-pro";
+
+/**
+ * Mapping from legacy fal model IDs to new stable display IDs.
+ * Used for DB migration and backward compatibility.
+ */
+export const LEGACY_MODEL_ID_MAP: Record<string, string> = {
+  "fal-ai/bytedance/seedance/v1.5/pro/image-to-video": "seedance-v1.5-pro",
+  "fal-ai/minimax/hailuo-2.3-fast/pro/image-to-video": "hailuo-2.3-fast-pro",
+  "fal-ai/minimax/hailuo-2.3/pro/image-to-video": "hailuo-2.3-pro",
+  "fal-ai/minimax/hailuo-02/pro/image-to-video": "hailuo-02-pro",
+  "wan/v2.6/image-to-video": "wan-v2.6",
+  "fal-ai/kling-video/v2.6/pro/image-to-video": "kling-v2.6-pro",
+  "fal-ai/kling-video/o1/image-to-video": "kling-o1-pro",
+  "fal-ai/kling-video/o3/pro/image-to-video": "kling-o3-pro",
+  "fal-ai/kling-video/v3/pro/image-to-video": "kling-v3-pro",
+  "fal-ai/veo3.1/image-to-video": "veo-3.1",
+  "fal-ai/veo3.1/first-last-frame-to-video": "veo-3.1-first-last-frame",
+  "fal-ai/sora-2/image-to-video/pro": "sora-2-pro",
+};
 
 /**
  * Get a video model config by ID
  */
 export function getVideoModel(modelId: string): VideoModelConfig | undefined {
   return VIDEO_MODELS.find((m) => m.id === modelId);
+}
+
+/**
+ * Resolve effective parameters for a provider variant by merging
+ * the base model params with the variant's overrides.
+ */
+export function resolveParamsForProvider(
+  model: VideoModelConfig,
+  variant: ProviderVariant
+): VideoModelParam[] {
+  if (!variant.paramOverrides) return model.params;
+
+  return model.params.map((p) => {
+    const override = variant.paramOverrides![p.name];
+    if (!override) return p;
+    return { ...p, ...override };
+  });
+}
+
+/**
+ * Provider resolver callback. Set by provider-config.ts to break the
+ * circular dependency. When unset, base model params are used as-is.
+ */
+let _providerResolver:
+  | ((modelId: string) => ProviderVariant | null)
+  | null = null;
+
+export function setProviderResolver(
+  resolver: (modelId: string) => ProviderVariant | null
+): void {
+  _providerResolver = resolver;
+}
+
+/**
+ * Resolve the effective params for a model considering the active provider's overrides.
+ */
+function getEffectiveParams(model: VideoModelConfig): VideoModelParam[] {
+  if (!_providerResolver) return model.params;
+  try {
+    const variant = _providerResolver(model.id);
+    if (!variant) return model.params;
+    return resolveParamsForProvider(model, variant);
+  } catch {
+    return model.params;
+  }
 }
 
 /**
@@ -950,11 +1082,10 @@ export function getModelDefaults(modelId: string): Record<string, any> {
   const model = getVideoModel(modelId);
   if (!model) return {};
 
+  const params = getEffectiveParams(model);
   const defaults: Record<string, any> = {};
-  for (const param of model.params) {
-    // Skip disabled parameters - they don't participate in replace and fill
+  for (const param of params) {
     if (param.status === "disabled") continue;
-
     if (param.default !== undefined) {
       defaults[param.name] = param.default;
     }
@@ -980,15 +1111,14 @@ export function validateAndMergeParams(
     throw new Error(`Unknown video model: ${modelId}`);
   }
 
+  const params = getEffectiveParams(model);
+
   // Start with defaults (already excludes disabled params)
   const merged = getModelDefaults(modelId);
 
   // Validate and merge user params
-  for (const param of model.params) {
-    // Skip disabled parameters entirely
+  for (const param of params) {
     if (param.status === "disabled") continue;
-
-    // For hidden parameters, ignore user input and always use default
     if (param.status === "hidden") continue;
 
     const userValue = userParams[param.name];
@@ -1103,13 +1233,14 @@ export function getModelConfigForApi(modelId: string) {
   const model = getVideoModel(modelId);
   if (!model) return null;
 
+  const params = getEffectiveParams(model);
+
   return {
     id: model.id,
     name: model.name,
     description: model.description,
     imageParams: model.imageParams,
-    params: model.params
-      // Filter out hidden and disabled params - they shouldn't be exposed to frontend
+    params: params
       .filter((p) => !p.status || p.status === "active")
       .map((p) => ({
         name: p.name,
@@ -1139,8 +1270,9 @@ export function getAllModelsForApi() {
  * automatically), hidden/disabled params, and the prompt param (always required).
  */
 function describeModelParams(model: VideoModelConfig): string {
+  const params = getEffectiveParams(model);
   const lines: string[] = [];
-  for (const param of model.params) {
+  for (const param of params) {
     if (param.status === "hidden" || param.status === "disabled") continue;
     if (param.name === "prompt") continue;
     if (param.name === model.imageParams.sourceImage) continue;
