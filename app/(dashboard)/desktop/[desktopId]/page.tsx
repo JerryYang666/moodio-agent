@@ -798,7 +798,7 @@ export default function DesktopDetailPage({
                 >
                   {user.initial}
                   {user.sessionCount > 1 && (
-                    <span className="absolute -top-1 -right-1 text-[8px] bg-default-800 text-white rounded-full w-3.5 h-3.5 flex items-center justify-center">
+                    <span className="absolute -top-1 -right-1 text-[8px] bg-foreground text-background rounded-full w-3.5 h-3.5 flex items-center justify-center border border-background">
                       {user.sessionCount}
                     </span>
                   )}
