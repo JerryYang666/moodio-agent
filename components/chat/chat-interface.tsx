@@ -634,6 +634,8 @@ export default function ChatInterface({
   );
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const [chatInputHeight, setChatInputHeight] = useState(0);
   const notificationModalRef = useRef<NotificationPermissionModalRef>(null);
   const lastUserInputRef = useRef<string>("");
   const lastPendingImagesRef = useRef<PendingImage[]>([]);
@@ -674,6 +676,18 @@ export default function ChatInterface({
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
+
+  const handleChatInputHeightChange = useCallback((height: number) => {
+    setChatInputHeight(height);
+    const el = scrollAreaRef.current;
+    if (!el) return;
+    const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 150;
+    if (isNearBottom) {
+      requestAnimationFrame(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      });
+    }
+  }, []);
 
   useEffect(() => {
     scrollToBottom();
@@ -3136,7 +3150,11 @@ export default function ChatInterface({
 
   return (
     <div className="flex flex-col h-full relative">
-      <div className="flex-1 overflow-y-auto space-y-6 pb-24 pr-2 pt-4 scrollbar-hide">
+      <div
+        ref={scrollAreaRef}
+        className="flex-1 overflow-y-auto space-y-6 pr-2 pt-4 scrollbar-hide"
+        style={{ paddingBottom: chatInputHeight ? chatInputHeight + 32 : 96 }}
+      >
         {messages.length === 0 && (
           <div className="flex flex-col items-center text-default-500 mt-40 gap-6">
             <Bot size={48} className="opacity-20" />
@@ -3296,6 +3314,7 @@ export default function ChatInterface({
         videoCost={videoCost}
         videoCostLoading={videoCostLoading}
         videoModelSupportsEndImage={videoModelSupportsEndImage}
+        onHeightChange={handleChatInputHeightChange}
       />
 
       <AssetPickerModal

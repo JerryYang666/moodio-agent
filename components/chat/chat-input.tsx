@@ -111,6 +111,8 @@ interface ChatInputProps {
   videoCostLoading?: boolean;
   /** Whether the selected video model supports end images */
   videoModelSupportsEndImage?: boolean;
+  /** Callback when the input container height changes */
+  onHeightChange?: (height: number) => void;
 }
 
 /** Ref handle for ChatInput to allow getting editor content */
@@ -159,6 +161,7 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
   videoCost,
   videoCostLoading,
   videoModelSupportsEndImage,
+  onHeightChange,
 }, ref) {
   const t = useTranslations();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -187,6 +190,18 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
     insertText: (text: string) => mentionTextboxRef.current?.insertText(text),
     setEditorContent: (content: JSONContent) => mentionTextboxRef.current?.setContent(content),
   }), []);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el || !onHeightChange) return;
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        onHeightChange(entry.borderBoxSize?.[0]?.blockSize ?? entry.target.getBoundingClientRect().height);
+      }
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [onHeightChange]);
 
   // Convert pending images to mention items for the textbox
   const mentionItems: MentionItem[] = useMemo(() => {
