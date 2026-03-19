@@ -94,5 +94,26 @@ export const CREATIVE_SUGGESTIONS: Partial<Record<string, CreativeSuggestion[]>>
       imageId: "362855e8-0dff-47e4-b5fa-c07fb4e60363",
       imageUrl: `${CDN_BASE}/362855e8-0dff-47e4-b5fa-c07fb4e60363`,
     },
+    {
+      id: "film-noir-chase",
+      title: "Rain-soaked noir chase",
+      promptText: "Rain-soaked noir chase, Generate a video using Kling V3 Pro, 10s, 16:9, 1080p",
+      imageId: "6defa153-aca1-4fab-8b41-dfe77c1fc5df",
+      imageUrl: `${CDN_BASE}/6defa153-aca1-4fab-8b41-dfe77c1fc5df`,
+    },
+    {
+      id: "film-desert-standoff",
+      title: "Desert standoff at golden hour",
+      promptText: "Desert standoff at golden hour, Generate a video using Seedance 2.0, 10s, 21:9, 1080p",
+      imageId: "867caee4-d90d-4950-b12d-160ade40bb72",
+      imageUrl: `${CDN_BASE}/867caee4-d90d-4950-b12d-160ade40bb72`,
+    },
+    {
+      id: "film-space-station",
+      title: "Space station reveal",
+      promptText: "Space station reveal, Generate a video using Kling V3 Pro, 10s, 16:9, 1080p",
+      imageId: "4c5dd9a5-e059-4660-95ff-99cd330c8906",
+      imageUrl: `${CDN_BASE}/4c5dd9a5-e059-4660-95ff-99cd330c8906`,
+    },
   ],
 };
