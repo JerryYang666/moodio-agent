@@ -15,7 +15,7 @@ export const EMPTY_CHAT_SUGGESTIONS: SuggestionBubble[] = [
     icon: "Film",
     contexts: ["empty-chat"],
     action: {
-      promptText: "A cinematic scene where ",
+      promptText: "A cinematic scene where",
       menuState: { mode: "agent", expertise: "film" },
     },
   },
@@ -25,7 +25,7 @@ export const EMPTY_CHAT_SUGGESTIONS: SuggestionBubble[] = [
     icon: "Megaphone",
     contexts: ["empty-chat"],
     action: {
-      promptText: "Create a UGC ad for ",
+      promptText: "Create a UGC ad for",
       menuState: { mode: "agent", expertise: "ugcAd" },
     },
   },
@@ -35,17 +35,17 @@ export const EMPTY_CHAT_SUGGESTIONS: SuggestionBubble[] = [
     icon: "Gamepad2",
     contexts: ["empty-chat"],
     action: {
-      promptText: "Make a game trailer showing ",
+      promptText: "Make a game trailer showing",
       menuState: { mode: "agent", expertise: "game" },
     },
   },
   {
     id: "empty-music-video",
-    label: "Create a music video concept",
+    label: "Create a music video",
     icon: "Music",
     contexts: ["empty-chat"],
     action: {
-      promptText: "Make a music video where ",
+      promptText: "Make a music video where",
       menuState: { mode: "agent", expertise: "musicVideo" },
     },
   },
@@ -55,17 +55,17 @@ export const EMPTY_CHAT_SUGGESTIONS: SuggestionBubble[] = [
     icon: "Clapperboard",
     contexts: ["empty-chat"],
     action: {
-      promptText: "Create a story when ",
+      promptText: "Create a story when",
       menuState: { mode: "agent", expertise: "shortDrama" },
     },
   },
   {
     id: "empty-animation",
-    label: "Create an animation concept",
+    label: "Create an animation",
     icon: "Sparkles",
     contexts: ["empty-chat"],
     action: {
-      promptText: "An animated scene where ",
+      promptText: "An animated scene where",
       menuState: { mode: "agent", expertise: "animation" },
     },
   },
