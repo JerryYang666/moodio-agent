@@ -707,7 +707,7 @@ export default function ChatMessage({
             {isTimestampLoading ? (
               <Spinner
                 variant="dots"
-                size="sm"
+                size="md"
                 className="px-1 scale-75 origin-left"
               />
             ) : (
