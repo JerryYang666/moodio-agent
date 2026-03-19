@@ -182,28 +182,25 @@ export default function ParallelMessage({
           onDirectVideoRestore={onDirectVideoRestore}
           onSendAsVideoMessage={onSendAsVideoMessage}
           onVideoPartUpdate={onVideoPartUpdate}
+          timestampAction={
+            onGenerateVariant && !isSending ? (
+              <Button
+                size="sm"
+                variant="flat"
+                color="default"
+                onPress={onGenerateVariant}
+                isLoading={isGeneratingVariant}
+                isDisabled={isGeneratingVariant}
+                startContent={!isGeneratingVariant && <Sparkles size={14} />}
+                className="h-6 min-h-6 px-2 text-default-500 hover:text-default-700"
+              >
+                {isGeneratingVariant
+                  ? t("chat.generatingVariant")
+                  : t("chat.generateAnotherOption")}
+              </Button>
+            ) : undefined
+          }
         />
-        {/* Generate Another Option button - only show when not sending */}
-        {onGenerateVariant && !isSending && (
-          <div className="flex justify-center mt-3">
-            <Button
-              size="sm"
-              variant="flat"
-              color="default"
-              onPress={onGenerateVariant}
-              isLoading={isGeneratingVariant}
-              isDisabled={isGeneratingVariant}
-              startContent={
-                !isGeneratingVariant && <Sparkles size={14} />
-              }
-              className="text-default-500 hover:text-default-700"
-            >
-              {isGeneratingVariant
-                ? t("chat.generatingVariant")
-                : t("chat.generateAnotherOption")}
-            </Button>
-          </div>
-        )}
       </div>
     );
   }

@@ -3321,7 +3321,7 @@ export default function ChatInterface({
             </div>
           )}
         {!isSending && postMessageSuggestions.length > 0 && (
-          <div className="flex justify-center py-3">
+          <div className="flex justify-center pt-1 pb-2">
             <SuggestionBubbleGroup
               suggestions={postMessageSuggestions}
               onActivate={handleSuggestionBubbleActivate}

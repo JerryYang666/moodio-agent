@@ -85,6 +85,8 @@ interface ChatMessageProps {
     partTypeIndex: number,
     updates: any
   ) => Promise<void> | void;
+  /** Optional action rendered inline with the timestamp row */
+  timestampAction?: React.ReactNode;
 }
 
 export default function ChatMessage({
@@ -106,6 +108,7 @@ export default function ChatMessage({
   onDirectVideoStatusUpdate,
   onDirectVideoRestore,
   onVideoPartUpdate,
+  timestampAction,
 }: ChatMessageProps) {
   const isUser = message.role === "user";
   const [isForkPopoverOpen, setIsForkPopoverOpen] = useState(false);
@@ -701,6 +704,9 @@ export default function ChatMessage({
             <span className="text-xs text-default-400 px-1">
               {formatTime(message.createdAt)}
             </span>
+            {!isUser && timestampAction && (
+              <div className="ml-auto">{timestampAction}</div>
+            )}
             {isUser && messageIndex > 0 && onForkChat && (
               <Popover
                 isOpen={isForkPopoverOpen}
