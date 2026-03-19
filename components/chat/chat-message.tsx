@@ -87,6 +87,8 @@ interface ChatMessageProps {
   ) => Promise<void> | void;
   /** Optional action rendered inline with the timestamp row */
   timestampAction?: React.ReactNode;
+  /** Show loading spinner in place of timestamp (assistant streaming) */
+  isTimestampLoading?: boolean;
 }
 
 export default function ChatMessage({
@@ -109,6 +111,7 @@ export default function ChatMessage({
   onDirectVideoRestore,
   onVideoPartUpdate,
   timestampAction,
+  isTimestampLoading = false,
 }: ChatMessageProps) {
   const isUser = message.role === "user";
   const [isForkPopoverOpen, setIsForkPopoverOpen] = useState(false);
@@ -694,16 +697,24 @@ export default function ChatMessage({
           }
           desktopId={desktopId}
         />
-        {message.createdAt && (
+        {(message.createdAt || isTimestampLoading) && (
           <div
             className={clsx(
               "flex items-center gap-2",
               isUser ? "justify-end" : "justify-start"
             )}
           >
-            <span className="text-xs text-default-400 px-1">
-              {formatTime(message.createdAt)}
-            </span>
+            {isTimestampLoading ? (
+              <Spinner
+                variant="dots"
+                size="sm"
+                className="px-1 scale-75 origin-left"
+              />
+            ) : (
+              <span className="text-xs text-default-400 px-1">
+                {formatTime(message.createdAt)}
+              </span>
+            )}
             {!isUser && timestampAction && (
               <div className="ml-auto">{timestampAction}</div>
             )}

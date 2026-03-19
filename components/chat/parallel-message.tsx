@@ -68,6 +68,8 @@ interface ParallelMessageProps {
     partTypeIndex: number,
     updates: any
   ) => void;
+  /** Show spinner in place of timestamp while assistant is streaming */
+  isTimestampLoading?: boolean;
 }
 
 export default function ParallelMessage({
@@ -91,6 +93,7 @@ export default function ParallelMessage({
   onDirectVideoRestore,
   onSendAsVideoMessage,
   onVideoPartUpdate,
+  isTimestampLoading = false,
 }: ParallelMessageProps) {
   const t = useTranslations();
   const [currentVariantIndex, setCurrentVariantIndex] = useState(0);
@@ -164,7 +167,7 @@ export default function ParallelMessage({
   // If only one variant, render normally with option to generate another
   if (variants.length === 1) {
     return (
-      <div className="w-full">
+      <div className="w-full mb-1">
         <ChatMessage
           message={variants[0]}
           messageIndex={messageIndex}
@@ -182,6 +185,7 @@ export default function ParallelMessage({
           onDirectVideoRestore={onDirectVideoRestore}
           onSendAsVideoMessage={onSendAsVideoMessage}
           onVideoPartUpdate={onVideoPartUpdate}
+          isTimestampLoading={isTimestampLoading}
           timestampAction={
             onGenerateVariant && !isSending ? (
               <Button

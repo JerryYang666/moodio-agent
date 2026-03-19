@@ -469,6 +469,8 @@ export default function ChatInterface({
       chatIdRef.current = undefined;
       setChatId(undefined);
       setMessages([]);
+      setPostMessageSuggestions([]);
+      setGeneratingVariantTimestamp(null);
       setInput("");
       // Clean up any local preview URLs before clearing
       pendingImages.forEach((img) => {
@@ -481,6 +483,7 @@ export default function ChatInterface({
       setPendingVideos([]);
       setPrecisionEditing(false);
       setIsSending(false);
+      setShowCreativeSuggestions(false);
       setLoadedDraft(null);
       setIsDraftLoaded(false);
       setDraftHadImages(false);
@@ -491,7 +494,13 @@ export default function ChatInterface({
 
     window.addEventListener("reset-chat", handleReset);
     return () => window.removeEventListener("reset-chat", handleReset);
-  }, [pendingImages]);
+  }, [pendingImages, pendingVideos]);
+
+  // Clear transient post-response UI when switching chats to avoid stale carry-over.
+  useEffect(() => {
+    setPostMessageSuggestions([]);
+    setGeneratingVariantTimestamp(null);
+  }, [chatId]);
 
   // Save menu state to localStorage when it changes (debounced)
   useEffect(() => {
@@ -3244,6 +3253,8 @@ export default function ChatInterface({
           } else {
             // Assistant message(s) - use ParallelMessage for variants
             const messageTimestamp = group.messages[0]?.createdAt;
+            const isStreamingAssistantGroup =
+              isSending && groupIdx === groupedMessages.length - 1;
             // Only show "New Idea" button on the last assistant message group
             // (not for direct image/video modes)
             const isLastAssistantGroup =
@@ -3289,6 +3300,7 @@ export default function ChatInterface({
                 onDirectVideoRestore={handleDirectVideoRestore}
                 onSendAsVideoMessage={handleSendVideoFromAgent}
                 onVideoPartUpdate={handleVideoPartUpdate}
+                isTimestampLoading={isStreamingAssistantGroup}
               />
             );
           }
@@ -3310,18 +3322,8 @@ export default function ChatInterface({
               </Card>
             </div>
           )}
-        {isSending &&
-          groupedMessages.length > 0 &&
-          groupedMessages[groupedMessages.length - 1]?.type !== "user" && (
-            <div className="flex gap-3 max-w-3xl mx-auto justify-start items-center">
-              {!hideAvatars && (
-                <div className="hidden md:flex w-8 h-8 shrink-0" />
-              )}
-              <Spinner variant="dots" size="sm" className="ml-1" />
-            </div>
-          )}
         {!isSending && postMessageSuggestions.length > 0 && (
-          <div className="flex justify-center pt-1 pb-2">
+          <div className="flex justify-center pt-0 pb-0">
             <SuggestionBubbleGroup
               suggestions={postMessageSuggestions}
               onActivate={handleSuggestionBubbleActivate}
