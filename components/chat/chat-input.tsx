@@ -451,6 +451,11 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
           return;
         }
 
+        // Don't collapse if there's text in the input or pending images
+        if (input.trim().length > 0 || pendingImages.length > 0) {
+          return;
+        }
+
         setIsExpanded(false);
       }
     };
@@ -459,7 +464,7 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
-  }, [isRecording, isTranscribing]);
+  }, [isRecording, isTranscribing, input, pendingImages.length]);
 
   // Auto-expand if there are attachments, recording, or video mode
   useEffect(() => {

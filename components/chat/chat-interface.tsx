@@ -83,6 +83,8 @@ import type { SuggestionBubble, SuggestionBubbleAction, SuggestionBubbleContext 
 import { SUGGESTION_BUBBLE_EVENT } from "./suggestion-bubble-types";
 import { EMPTY_CHAT_SUGGESTIONS } from "@/config/suggestion-bubbles";
 import SuggestionBubbleGroup from "./SuggestionBubbleGroup";
+import { CREATIVE_SUGGESTIONS, type CreativeSuggestion } from "@/config/creative-suggestions";
+import CreativeSuggestionGroup from "./CreativeSuggestionGroup";
 
 // Helper to group consecutive assistant messages with the same timestamp as variants
 interface MessageGroup {
@@ -270,6 +272,8 @@ export default function ChatInterface({
   }, [initialChatId]);
   const [isSending, setIsSending] = useState(false);
   const [postMessageSuggestions, setPostMessageSuggestions] = useState<SuggestionBubble[]>([]);
+  const [creativeSuggestions, setCreativeSuggestions] = useState<CreativeSuggestion[]>([]);
+  const [showCreativeSuggestions, setShowCreativeSuggestions] = useState(false);
   // Track which message timestamp is currently generating an additional variant
   const [generatingVariantTimestamp, setGeneratingVariantTimestamp] = useState<
     number | null
@@ -1061,8 +1065,56 @@ export default function ChatInterface({
       if (action.promptText && chatInputRef.current) {
         chatInputRef.current.insertText(action.promptText);
       }
+
+      // 5. Show creative suggestions if expertise has entries
+      if (action.menuState?.expertise) {
+        const pool = CREATIVE_SUGGESTIONS[action.menuState.expertise];
+        if (pool && pool.length > 0) {
+          const shuffled = [...pool].sort(() => Math.random() - 0.5);
+          setCreativeSuggestions(shuffled.slice(0, 3));
+          setShowCreativeSuggestions(true);
+        }
+      }
     },
     [addRetrievalVideo]
+  );
+
+  const refreshCreativeSuggestions = useCallback(() => {
+    setCreativeSuggestions((prev) => {
+      const expertise = menuState.expertise;
+      const pool = expertise ? CREATIVE_SUGGESTIONS[expertise] : undefined;
+      if (!pool || pool.length === 0) return prev;
+      const prevIds = new Set(prev.map((s) => s.id));
+      const remaining = pool.filter((s) => !prevIds.has(s.id));
+      const source = remaining.length >= 3 ? remaining : [...pool];
+      const shuffled = source.sort(() => Math.random() - 0.5);
+      return shuffled.slice(0, 3);
+    });
+  }, [menuState.expertise]);
+
+  const handleCreativeSuggestionActivate = useCallback(
+    (suggestion: CreativeSuggestion) => {
+      if (chatInputRef.current) {
+        chatInputRef.current.insertText(suggestion.promptText);
+      }
+      if (suggestion.imageId && suggestion.imageUrl) {
+        setPendingImages((prev) => {
+          const remaining = MAX_PENDING_IMAGES - prev.length;
+          if (remaining <= 0) return prev;
+          return [
+            ...prev,
+            {
+              imageId: suggestion.imageId!,
+              url: suggestion.imageUrl!,
+              source: "asset" as const,
+              title: suggestion.title,
+            },
+          ];
+        });
+      }
+      setShowCreativeSuggestions(false);
+    },
+    []
   );
 
   // Listen for suggestion bubble events from anywhere in the app
@@ -1665,6 +1717,7 @@ export default function ChatInterface({
   const handleSend = async () => {
     // Clear post-message suggestions when sending a new message
     setPostMessageSuggestions([]);
+    setShowCreativeSuggestions(false);
 
     // Block send if uploading images or videos
     if (hasUploadingImages(pendingImages) || hasUploadingVideos(pendingVideos)) {
@@ -3277,6 +3330,21 @@ export default function ChatInterface({
         )}
         <div ref={messagesEndRef} />
       </div>
+
+      {messages.length === 0 && showCreativeSuggestions && creativeSuggestions.length > 0 && (
+        <div
+          className="absolute left-0 right-0 z-10 flex justify-center px-4"
+          style={{ bottom: (chatInputHeight || 64) + 16 }}
+        >
+          <div className="w-full" style={{ maxWidth: "48rem" }}>
+            <CreativeSuggestionGroup
+              suggestions={creativeSuggestions}
+              onActivate={handleCreativeSuggestionActivate}
+              onRefresh={refreshCreativeSuggestions}
+            />
+          </div>
+        </div>
+      )}
 
       <ChatInput
         ref={chatInputRef}

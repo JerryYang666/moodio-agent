@@ -24,6 +24,8 @@ import {
   Type,
   Lightbulb,
   Brush,
+  Megaphone,
+  Music,
 } from "lucide-react";
 import type {
   SuggestionBubble,
@@ -53,6 +55,8 @@ const ICON_MAP: Record<string, React.ElementType> = {
   Type,
   Lightbulb,
   Brush,
+  Megaphone,
+  Music,
 };
 
 interface SuggestionBubbleGroupProps {

@@ -11,7 +11,7 @@ import type {
 export const EMPTY_CHAT_SUGGESTIONS: SuggestionBubble[] = [
   {
     id: "empty-film-cinematic",
-    label: "Generate cinematic film stills",
+    label: "Generate cinematic film",
     icon: "Film",
     contexts: ["empty-chat"],
     action: {
