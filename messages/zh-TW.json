@@ -553,11 +553,12 @@
     },
     "expertiseOptions": {
       "smart": "智慧",
-      "commercial": "商業廣告",
-      "film": "電影",
-      "game": "遊戲",
-      "uiux": "UI/UX",
-      "product": "產品"
+      "film": "電影 / 影視",
+      "ugcAd": "UGC 廣告",
+      "game": "遊戲 / 互動",
+      "musicVideo": "音樂影片",
+      "shortDrama": "短劇",
+      "animation": "動畫"
     },
     "aspectRatioOptions": {
       "smart": "智慧",

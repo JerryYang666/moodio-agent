@@ -352,7 +352,7 @@ export async function POST(
       }));
 
     // Parse expertise selection
-    const VALID_EXPERTISE = ["commercial", "film", "game", "uiux", "product"] as const;
+    const VALID_EXPERTISE = ["film", "ugcAd", "game", "musicVideo", "shortDrama", "animation"] as const;
     type Expertise = typeof VALID_EXPERTISE[number];
     const expertise: Expertise | undefined =
       typeof json.expertise === "string" && (VALID_EXPERTISE as readonly string[]).includes(json.expertise)

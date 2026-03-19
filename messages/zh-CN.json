@@ -553,11 +553,12 @@
     },
     "expertiseOptions": {
       "smart": "智能",
-      "commercial": "商业",
-      "film": "影视",
-      "game": "游戏",
-      "uiux": "UI/UX",
-      "product": "产品"
+      "film": "电影 / 影视",
+      "ugcAd": "UGC 广告",
+      "game": "游戏 / 互动",
+      "musicVideo": "音乐视频",
+      "shortDrama": "短剧",
+      "animation": "动画"
     },
     "aspectRatioOptions": {
       "smart": "智能",

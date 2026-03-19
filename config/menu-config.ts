@@ -47,11 +47,12 @@ export const MENU_CONFIG = {
             "Let the agent adapt its creative expertise based on your request",
           icon: "Sparkles",
         },
-        commercial: { label: "Commercial" },
-        film: { label: "Film" },
-        game: { label: "Game" },
-        uiux: { label: "UI/UX" },
-        product: { label: "Product" },
+        film: { label: "Film / Cinematic" },
+        ugcAd: { label: "UGC Ad" },
+        game: { label: "Game / Interactive" },
+        musicVideo: { label: "Music Video" },
+        shortDrama: { label: "Short Drama" },
+        animation: { label: "Animation" },
       },
     },
 
@@ -117,7 +118,7 @@ export const MENU_CONFIG = {
         },
         expertise: {
           enabled: true,
-          allowed: ["smart", "commercial", "film", "game", "uiux", "product"],
+          allowed: ["smart", "film", "ugcAd", "game", "musicVideo", "shortDrama", "animation"],
         },
         aspectRatio: {
           enabled: true,

@@ -636,11 +636,12 @@
     },
     "expertiseOptions": {
       "smart": "Smart",
-      "commercial": "Commercial",
-      "film": "Film",
-      "game": "Game",
-      "uiux": "UI/UX",
-      "product": "Product"
+      "film": "Film / Cinematic",
+      "ugcAd": "UGC Ad",
+      "game": "Game / Interactive",
+      "musicVideo": "Music Video",
+      "shortDrama": "Short Drama",
+      "animation": "Animation"
     },
     "aspectRatioOptions": {
       "smart": "Smart",

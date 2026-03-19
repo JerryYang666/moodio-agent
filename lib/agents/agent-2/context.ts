@@ -9,7 +9,7 @@ export interface ReferenceImageEntry {
 }
 
 /** Stream event sent to the frontend via SSE. */
-export type Expertise = "commercial" | "film" | "game" | "uiux" | "product";
+export type Expertise = "film" | "ugcAd" | "game" | "musicVideo" | "shortDrama" | "animation";
 
 export type StreamEvent = { type: string; [key: string]: any };
 

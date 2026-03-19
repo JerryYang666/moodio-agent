@@ -553,11 +553,12 @@
     },
     "expertiseOptions": {
       "smart": "スマート",
-      "commercial": "コマーシャル",
-      "film": "映画",
-      "game": "ゲーム",
-      "uiux": "UI/UX",
-      "product": "プロダクト"
+      "film": "映画 / シネマティック",
+      "ugcAd": "UGC広告",
+      "game": "ゲーム / インタラクティブ",
+      "musicVideo": "ミュージックビデオ",
+      "shortDrama": "ショートドラマ",
+      "animation": "アニメーション"
     },
     "aspectRatioOptions": {
       "smart": "スマート",
