@@ -116,4 +116,374 @@ export const CREATIVE_SUGGESTIONS: Partial<Record<string, CreativeSuggestion[]>>
       imageUrl: `${CDN_BASE}/4c5dd9a5-e059-4660-95ff-99cd330c8906`,
     },
   ],
+
+  ugcAd: [
+    {
+      id: "ugc-pet-food-taste-test",
+      title: "Pet food taste test",
+      promptText: "Pet food taste test, Generate a video using Kling V3 Pro, 10s, 9:16, 1080p",
+    },
+    {
+      id: "ugc-skincare-morning-routine",
+      title: "Skincare morning routine",
+      promptText: "Skincare morning routine, Generate a video using Seedance 2.0, 10s, 9:16, 1080p",
+    },
+    {
+      id: "ugc-tech-gadget-unboxing",
+      title: "Tech gadget unboxing",
+      promptText: "Tech gadget unboxing, Generate a video using Kling V3 Pro, 10s, 9:16, 1080p",
+    },
+    {
+      id: "ugc-fitness-supplement",
+      title: "Fitness supplement before/after",
+      promptText: "Fitness supplement before/after, Generate a video using Seedance 2.0, 10s, 9:16, 1080p",
+    },
+    {
+      id: "ugc-kitchen-gadget-stress",
+      title: "Kitchen gadget stress test",
+      promptText: "Kitchen gadget stress test, Generate a video using Kling V3 Pro, 10s, 9:16, 1080p",
+    },
+    {
+      id: "ugc-baby-product-review",
+      title: "Baby product honest review",
+      promptText: "Baby product honest review, Generate a video using Seedance 2.0, 10s, 9:16, 1080p",
+    },
+    {
+      id: "ugc-room-makeover",
+      title: "Room makeover one product",
+      promptText: "Room makeover one product, Generate a video using Kling V3 Pro, 10s, 9:16, 1080p",
+    },
+    {
+      id: "ugc-fashion-try-on",
+      title: "Fashion try-on rating",
+      promptText: "Fashion try-on rating, Generate a video using Seedance 2.0, 10s, 9:16, 1080p",
+    },
+    {
+      id: "ugc-cleaning-asmr",
+      title: "Cleaning before/after ASMR",
+      promptText: "Cleaning before/after ASMR, Generate a video using Kling V3 Pro, 8s, 9:16, 1080p",
+    },
+    {
+      id: "ugc-morning-routine",
+      title: "Morning routine product placement",
+      promptText: "Morning routine product placement, Generate a video using Seedance 2.0, 10s, 9:16, 1080p",
+    },
+    {
+      id: "ugc-subscription-box",
+      title: "Subscription box first open",
+      promptText: "Subscription box first open, Generate a video using Kling V3 Pro, 10s, 9:16, 1080p",
+    },
+    {
+      id: "ugc-pet-toy-reaction",
+      title: "Pet toy reaction compilation",
+      promptText: "Pet toy reaction compilation, Generate a video using Seedance 2.0, 8s, 9:16, 1080p",
+    },
+    {
+      id: "ugc-wellness-supplement",
+      title: "Wellness supplement journey",
+      promptText: "Wellness supplement journey, Generate a video using Kling V3 Pro, 10s, 9:16, 1080p",
+    },
+    {
+      id: "ugc-taste-test-reaction",
+      title: "Taste test honest reaction",
+      promptText: "Taste test honest reaction, Generate a video using Seedance 2.0, 8s, 9:16, 1080p",
+    },
+    {
+      id: "ugc-gaming-accessory",
+      title: "Gaming accessory setup reveal",
+      promptText: "Gaming accessory setup reveal, Generate a video using Kling V3 Pro, 10s, 9:16, 1080p",
+    },
+  ],
+
+  game: [
+    {
+      id: "game-rpg-boss-fight",
+      title: "RPG boss fight cinematic",
+      promptText: "RPG boss fight cinematic, Generate a video using Kling V3 Pro, 10s, 16:9, 1080p",
+    },
+    {
+      id: "game-puzzle-solve",
+      title: "Puzzle game satisfying solve",
+      promptText: "Puzzle game satisfying solve, Generate a video using Seedance 2.0, 8s, 9:16, 1080p",
+    },
+    {
+      id: "game-open-world-reveal",
+      title: "Open world first-person reveal",
+      promptText: "Open world first-person reveal, Generate a video using Kling V3 Pro, 10s, 16:9, 1080p",
+    },
+    {
+      id: "game-strategy-base-timelapse",
+      title: "Strategy game base timelapse",
+      promptText: "Strategy game base timelapse, Generate a video using Seedance 2.0, 10s, 9:16, 1080p",
+    },
+    {
+      id: "game-horror-jump-scare",
+      title: "Horror game jump scare tease",
+      promptText: "Horror game jump scare tease, Generate a video using Kling V3 Pro, 8s, 9:16, 1080p",
+    },
+    {
+      id: "game-racing-speed-rush",
+      title: "Racing game POV speed rush",
+      promptText: "Racing game POV speed rush, Generate a video using Kling V3 Pro, 8s, 16:9, 1080p",
+    },
+    {
+      id: "game-idle-progression",
+      title: "Idle game progression dopamine",
+      promptText: "Idle game progression dopamine, Generate a video using Seedance 2.0, 10s, 9:16, 1080p",
+    },
+    {
+      id: "game-choose-path-horror",
+      title: "Choose-your-path horror",
+      promptText: "Choose-your-path horror, Generate a video using Kling V3 Pro, 10s, 9:16, 1080p",
+    },
+    {
+      id: "game-card-battle-combo",
+      title: "Card battle combo chain",
+      promptText: "Card battle combo chain, Generate a video using Seedance 2.0, 8s, 9:16, 1080p",
+    },
+    {
+      id: "game-survival-night-defense",
+      title: "Survival crafting night defense",
+      promptText: "Survival crafting night defense, Generate a video using Kling V3 Pro, 10s, 16:9, 1080p",
+    },
+    {
+      id: "game-gacha-summon",
+      title: "Anime gacha character summon",
+      promptText: "Anime gacha character summon, Generate a video using Seedance 2.0, 8s, 9:16, 1080p",
+    },
+    {
+      id: "game-asmr-sorting",
+      title: "ASMR sorting satisfaction",
+      promptText: "ASMR sorting satisfaction, Generate a video using Seedance 2.0, 8s, 9:16, 1080p",
+    },
+    {
+      id: "game-tycoon-empire",
+      title: "Tycoon empire overview",
+      promptText: "Tycoon empire overview, Generate a video using Kling V3 Pro, 10s, 16:9, 1080p",
+    },
+    {
+      id: "game-fighting-character-select",
+      title: "Fighting game character select",
+      promptText: "Fighting game character select, Generate a video using Seedance 2.0, 10s, 16:9, 1080p",
+    },
+  ],
+
+  musicVideo: [
+    {
+      id: "mv-hiphop-rooftop",
+      title: "Hip-hop rooftop power shot",
+      promptText: "Hip-hop rooftop power shot, Generate a video using Kling V3 Pro, 10s, 16:9, 1080p",
+    },
+    {
+      id: "mv-rnb-bedroom",
+      title: "R&B bedroom intimacy",
+      promptText: "R&B bedroom intimacy, Generate a video using Seedance 2.0, 10s, 16:9, 1080p",
+    },
+    {
+      id: "mv-pop-choreography",
+      title: "Pop choreography color burst",
+      promptText: "Pop choreography color burst, Generate a video using Kling V3 Pro, 8s, 16:9, 1080p",
+    },
+    {
+      id: "mv-rock-live-raw",
+      title: "Rock live performance raw energy",
+      promptText: "Rock live performance raw energy, Generate a video using Seedance 2.0, 10s, 16:9, 1080p",
+    },
+    {
+      id: "mv-electronic-abstract",
+      title: "Electronic abstract visual sync",
+      promptText: "Electronic abstract visual sync, Generate a video using Kling V3 Pro, 8s, 16:9, 1080p",
+    },
+    {
+      id: "mv-indie-folk-nature",
+      title: "Indie folk nature wandering",
+      promptText: "Indie folk nature wandering, Generate a video using Seedance 2.0, 10s, 16:9, 1080p",
+    },
+    {
+      id: "mv-kpop-street-formation",
+      title: "K-pop group street formation",
+      promptText: "K-pop group street formation, Generate a video using Kling V3 Pro, 8s, 16:9, 1080p",
+    },
+    {
+      id: "mv-jazz-club-smoky",
+      title: "Jazz club smoky close-up",
+      promptText: "Jazz club smoky close-up, Generate a video using Seedance 2.0, 10s, 16:9, 1080p",
+    },
+    {
+      id: "mv-latin-dance-heat",
+      title: "Latin dance heat and color",
+      promptText: "Latin dance heat and color, Generate a video using Kling V3 Pro, 8s, 16:9, 1080p",
+    },
+    {
+      id: "mv-ambient-dreamscape",
+      title: "Ambient/electronic dreamscape",
+      promptText: "Ambient/electronic dreamscape, Generate a video using Seedance 2.0, 10s, 16:9, 1080p",
+    },
+    {
+      id: "mv-one-take-corridor",
+      title: "Music video one-take corridor",
+      promptText: "Music video one-take corridor, Generate a video using Kling V3 Pro, 10s, 16:9, 1080p",
+    },
+    {
+      id: "mv-sunset-drive",
+      title: "Sunset drive windows-down",
+      promptText: "Sunset drive windows-down, Generate a video using Seedance 2.0, 10s, 16:9, 1080p",
+    },
+    {
+      id: "mv-concert-crowd",
+      title: "Concert crowd energy",
+      promptText: "Concert crowd energy, Generate a video using Kling V3 Pro, 8s, 16:9, 1080p",
+    },
+  ],
+
+  shortDrama: [
+    {
+      id: "sd-revenge-gala",
+      title: "Revenge: the gala entrance",
+      promptText: "Revenge: the gala entrance, Generate a video using Seedance 2.0, 10s, 9:16, 1080p",
+    },
+    {
+      id: "sd-romance-elevator",
+      title: "Romance: elevator stuck",
+      promptText: "Romance: elevator stuck, Generate a video using Kling V3 Pro, 10s, 9:16, 1080p",
+    },
+    {
+      id: "sd-thriller-hidden-camera",
+      title: "Thriller: hidden camera found",
+      promptText: "Thriller: hidden camera found, Generate a video using Seedance 2.0, 10s, 9:16, 1080p",
+    },
+    {
+      id: "sd-family-letter",
+      title: "Family: letter from beyond",
+      promptText: "Family: letter from beyond, Generate a video using Kling V3 Pro, 10s, 9:16, 1080p",
+    },
+    {
+      id: "sd-office-intern-truth",
+      title: "Office: intern reveals the truth",
+      promptText: "Office: intern reveals the truth, Generate a video using Seedance 2.0, 10s, 9:16, 1080p",
+    },
+    {
+      id: "sd-medical-dilemma",
+      title: "Medical: doctor's dilemma",
+      promptText: "Medical: doctor's dilemma, Generate a video using Kling V3 Pro, 10s, 9:16, 1080p",
+    },
+    {
+      id: "sd-campus-rival-ally",
+      title: "Campus: rival becomes ally",
+      promptText: "Campus: rival becomes ally, Generate a video using Seedance 2.0, 10s, 9:16, 1080p",
+    },
+    {
+      id: "sd-identity-princess-switch",
+      title: "Identity: princess switch",
+      promptText: "Identity: princess switch, Generate a video using Kling V3 Pro, 10s, 9:16, 1080p",
+    },
+    {
+      id: "sd-time-loop-worst-day",
+      title: "Time loop: worst day again",
+      promptText: "Time loop: worst day again, Generate a video using Seedance 2.0, 10s, 9:16, 1080p",
+    },
+    {
+      id: "sd-secret-double-life",
+      title: "Secret: best friend's double life",
+      promptText: "Secret: best friend's double life, Generate a video using Kling V3 Pro, 10s, 9:16, 1080p",
+    },
+    {
+      id: "sd-rags-to-riches-viral",
+      title: "Rags to riches: the viral moment",
+      promptText: "Rags to riches: the viral moment, Generate a video using Seedance 2.0, 10s, 9:16, 1080p",
+    },
+    {
+      id: "sd-ghost-romance",
+      title: "Ghost romance: first love returns",
+      promptText: "Ghost romance: first love returns, Generate a video using Kling V3 Pro, 10s, 9:16, 1080p",
+    },
+    {
+      id: "sd-wrongly-accused-proof",
+      title: "Wrongly accused: the proof",
+      promptText: "Wrongly accused: the proof, Generate a video using Seedance 2.0, 10s, 9:16, 1080p",
+    },
+    {
+      id: "sd-roommate-bond",
+      title: "Roommate: the unexpected bond",
+      promptText: "Roommate: the unexpected bond, Generate a video using Kling V3 Pro, 10s, 9:16, 1080p",
+    },
+    {
+      id: "sd-twin-switch-identity",
+      title: "Twin switch: identity crisis",
+      promptText: "Twin switch: identity crisis, Generate a video using Seedance 2.0, 10s, 9:16, 1080p",
+    },
+  ],
+
+  animation: [
+    {
+      id: "anim-ghibli-countryside",
+      title: "Ghibli countryside golden hour",
+      promptText: "Ghibli countryside golden hour, Generate a video using Seedance 2.0, 10s, 16:9, 1080p",
+    },
+    {
+      id: "anim-cyberpunk-robot",
+      title: "Cyberpunk neon robot awakening",
+      promptText: "Cyberpunk neon robot awakening, Generate a video using Kling V3 Pro, 10s, 16:9, 1080p",
+    },
+    {
+      id: "anim-anime-sword-sakuga",
+      title: "Anime sword strike sakuga",
+      promptText: "Anime sword strike sakuga, Generate a video using Kling V3 Pro, 8s, 16:9, 1080p",
+    },
+    {
+      id: "anim-stop-motion-kitchen",
+      title: "Stop motion clay kitchen chaos",
+      promptText: "Stop motion clay kitchen chaos, Generate a video using Seedance 2.0, 8s, 16:9, 1080p",
+    },
+    {
+      id: "anim-underwater-3d",
+      title: "Underwater world 3D exploration",
+      promptText: "Underwater world 3D exploration, Generate a video using Kling V3 Pro, 10s, 16:9, 1080p",
+    },
+    {
+      id: "anim-pixel-art-retro",
+      title: "Pixel art retro game world",
+      promptText: "Pixel art retro game world, Generate a video using Seedance 2.0, 8s, 16:9, 1080p",
+    },
+    {
+      id: "anim-kinetic-typography",
+      title: "Motion graphics kinetic typography",
+      promptText: "Motion graphics kinetic typography, Generate a video using Seedance 2.0, 8s, 16:9, 1080p",
+    },
+    {
+      id: "anim-dragon-flight",
+      title: "Dragon flight over mountains",
+      promptText: "Dragon flight over mountains, Generate a video using Kling V3 Pro, 10s, 16:9, 1080p",
+    },
+    {
+      id: "anim-toy-midnight",
+      title: "Toy world midnight adventure",
+      promptText: "Toy world midnight adventure, Generate a video using Seedance 2.0, 10s, 16:9, 1080p",
+    },
+    {
+      id: "anim-superhero-transform",
+      title: "Superhero transformation sequence",
+      promptText: "Superhero transformation sequence, Generate a video using Kling V3 Pro, 8s, 16:9, 1080p",
+    },
+    {
+      id: "anim-paper-craft-storybook",
+      title: "Paper craft storybook opening",
+      promptText: "Paper craft storybook opening, Generate a video using Seedance 2.0, 10s, 16:9, 1080p",
+    },
+    {
+      id: "anim-abstract-paint-blob",
+      title: "Abstract paint-blob genesis",
+      promptText: "Abstract paint-blob genesis, Generate a video using Kling V3 Pro, 8s, 16:9, 1080p",
+    },
+    {
+      id: "anim-chibi-food-kitchen",
+      title: "Chibi food character kitchen",
+      promptText: "Chibi food character kitchen, Generate a video using Seedance 2.0, 8s, 16:9, 1080p",
+    },
+    {
+      id: "anim-mecha-launch",
+      title: "Mecha launch sci-fi anime",
+      promptText: "Mecha launch sci-fi anime, Generate a video using Kling V3 Pro, 10s, 16:9, 1080p",
+    },
+  ],
 };
