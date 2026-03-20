@@ -12,7 +12,7 @@ const MAX_USER_MESSAGES = 15;
 export class InputParser {
   /**
    * Clean and convert conversation history messages for the LLM.
-   * - Converts agent_image/direct_image/agent_video/direct_video/agent_shot_list/agent_search/tool_call to text summaries
+   * - Converts agent_image/direct_image/agent_video_suggest/agent_video/direct_video/agent_shot_list/agent_search/tool_call to text summaries
    * - Filters to keep first user+assistant pair + last N user messages
    * - Converts image parts to image_url + text annotations
    * - Keeps only the latest internal_think part
@@ -28,6 +28,12 @@ export class InputParser {
               return {
                 type: "text" as const,
                 text: `[Image ID: ${p.imageId || "unknown"}] Suggestion: ${p.title}\nAspect Ratio: ${p.aspectRatio || "1:1"}\nPrompt: ${p.prompt}`,
+              };
+            }
+            if (p.type === "agent_video_suggest") {
+              return {
+                type: "text" as const,
+                text: `[Image ID: ${p.imageId || "unknown"}] Video Suggestion: ${p.title}\nAspect Ratio: ${p.aspectRatio || "16:9"}\nFirst Frame Prompt: ${p.prompt}\nVideo Idea: ${p.videoIdea}`,
               };
             }
             if (p.type === "agent_video") {
