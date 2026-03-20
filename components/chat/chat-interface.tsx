@@ -83,6 +83,7 @@ import type { SuggestionBubble, SuggestionBubbleAction, SuggestionBubbleContext 
 import { SUGGESTION_BUBBLE_EVENT } from "./suggestion-bubble-types";
 import { EMPTY_CHAT_SUGGESTIONS } from "@/config/suggestion-bubbles";
 import SuggestionBubbleGroup from "./SuggestionBubbleGroup";
+import AskUserCard from "./ask-user-card";
 import { CREATIVE_SUGGESTIONS, type CreativeSuggestion } from "@/config/creative-suggestions";
 import CreativeSuggestionGroup from "./CreativeSuggestionGroup";
 
@@ -272,6 +273,10 @@ export default function ChatInterface({
   }, [initialChatId]);
   const [isSending, setIsSending] = useState(false);
   const [postMessageSuggestions, setPostMessageSuggestions] = useState<SuggestionBubble[]>([]);
+  const [askUserQuestions, setAskUserQuestions] = useState<
+    Array<{ id: string; question: string; options: string[] }> | null
+  >(null);
+  const pendingAskUserSendRef = useRef<string | null>(null);
   const [creativeSuggestions, setCreativeSuggestions] = useState<CreativeSuggestion[]>([]);
   const [showCreativeSuggestions, setShowCreativeSuggestions] = useState(false);
   // Track which message timestamp is currently generating an additional variant
@@ -470,6 +475,7 @@ export default function ChatInterface({
       setChatId(undefined);
       setMessages([]);
       setPostMessageSuggestions([]);
+      setAskUserQuestions(null);
       setGeneratingVariantTimestamp(null);
       setInput("");
       // Clean up any local preview URLs before clearing
@@ -499,6 +505,7 @@ export default function ChatInterface({
   // Clear transient post-response UI when switching chats to avoid stale carry-over.
   useEffect(() => {
     setPostMessageSuggestions([]);
+    setAskUserQuestions(null);
     setGeneratingVariantTimestamp(null);
   }, [chatId]);
 
@@ -1296,6 +1303,14 @@ export default function ChatInterface({
   const extractPostMessageSuggestions = useCallback((msgs: Message[]) => {
     const lastMsg = msgs[msgs.length - 1];
     if (lastMsg?.role === "assistant" && Array.isArray(lastMsg.content)) {
+      // Check for ask_user (takes priority — mutually exclusive with suggestions)
+      const askPart = lastMsg.content.find((p) => p.type === "agent_ask_user");
+      if (askPart && askPart.type === "agent_ask_user" && askPart.questions.length > 0) {
+        setAskUserQuestions(askPart.questions);
+        setPostMessageSuggestions([]);
+        return;
+      }
+
       const suggPart = lastMsg.content.find(
         (p) => p.type === "suggestions"
       );
@@ -1309,10 +1324,12 @@ export default function ChatInterface({
             action: { promptText: s.promptText },
           }))
         );
+        setAskUserQuestions(null);
         return;
       }
     }
     setPostMessageSuggestions([]);
+    setAskUserQuestions(null);
   }, []);
 
   // Pre-select images and extract post-message suggestions after AI response completes
@@ -1724,8 +1741,9 @@ export default function ChatInterface({
   }, []);
 
   const handleSend = async () => {
-    // Clear post-message suggestions when sending a new message
+    // Clear post-message suggestions and ask-user questions when sending a new message
     setPostMessageSuggestions([]);
+    setAskUserQuestions(null);
     setShowCreativeSuggestions(false);
 
     // Block send if uploading images or videos
@@ -2423,6 +2441,30 @@ export default function ChatInterface({
       }
     }
   };
+
+  // Handle ask-user card confirm: set input and schedule send
+  const handleAskUserConfirm = useCallback(
+    (formattedAnswer: string) => {
+      setAskUserQuestions(null);
+      pendingAskUserSendRef.current = formattedAnswer;
+      setInput(formattedAnswer);
+      if (chatInputRef.current) {
+        chatInputRef.current.setEditorContent({
+          type: "doc",
+          content: [{ type: "paragraph", content: [{ type: "text", text: formattedAnswer }] }],
+        });
+      }
+    },
+    []
+  );
+
+  // Trigger send when input is updated from ask-user confirm
+  useEffect(() => {
+    if (pendingAskUserSendRef.current && input === pendingAskUserSendRef.current) {
+      pendingAskUserSendRef.current = null;
+      handleSend();
+    }
+  }, [input]);
 
   // Handle precision editing toggle
   const handlePrecisionEditingChange = useCallback(
@@ -3317,6 +3359,14 @@ export default function ChatInterface({
             <SuggestionBubbleGroup
               suggestions={postMessageSuggestions}
               onActivate={handleSuggestionBubbleActivate}
+            />
+          </div>
+        )}
+        {!isSending && askUserQuestions && askUserQuestions.length > 0 && (
+          <div className="flex justify-center pt-1 pb-0">
+            <AskUserCard
+              questions={askUserQuestions}
+              onConfirm={handleAskUserConfirm}
             />
           </div>
         )}

@@ -127,6 +127,10 @@
     "loading": "載入中...",
     "expandChat": "展開對話面板",
     "collapseChat": "收合對話面板",
+    "askUser": {
+      "customOption": "我想要其他選項",
+      "customPlaceholder": "輸入你的回答..."
+    },
     "retryMessages": {
       "rethink": "糟糕！讓我重新想一下...",
       "rephrase": "嗯，讓我換個方式說！",

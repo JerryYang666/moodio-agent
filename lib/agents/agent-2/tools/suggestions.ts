@@ -25,6 +25,7 @@ Rules:
 - Maximum 3 suggestions
 - Suggestions should be diverse — offer different directions the user could take
 - The promptText should be specific enough to be useful but open enough for the user to customize
+- NEVER use both <SUGGESTIONS> and <ASK_USER> in the same response — pick one. Use <SUGGESTIONS> when you've already completed your response and are offering follow-up actions; use <ASK_USER> when you need clarification before proceeding.
 
 CRITICAL: You MUST always include the closing </SUGGESTIONS> tag. Never leave a <SUGGESTIONS> tag unclosed.`,
   examples: [

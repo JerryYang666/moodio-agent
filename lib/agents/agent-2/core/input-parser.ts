@@ -70,8 +70,8 @@ export class InputParser {
                 text: `[Video | ID: ${p.videoId} | Source: ${p.source} | URL: ${p.videoUrl}]`,
               };
             }
-            // Strip suggestions — they are UI-only and should never be sent back to the LLM
-            if (p.type === "suggestions") {
+            // Strip suggestions and ask_user — they are UI-only and should never be sent back to the LLM
+            if (p.type === "suggestions" || p.type === "agent_ask_user") {
               return null;
             }
             return p;

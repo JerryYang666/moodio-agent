@@ -121,6 +121,14 @@ export type MessageContentPart =
         icon?: string;
         promptText: string;
       }>;
+    }
+  | {
+      type: "agent_ask_user";
+      questions: Array<{
+        id: string;
+        question: string;
+        options: string[];
+      }>;
     };
 
 /** Type for parts that represent generated images (agent_image, direct_image, or agent_video_suggest) */
