@@ -8,7 +8,8 @@ export const thinkTool: ToolDefinition = {
 1. belief_prompt: Your internal estimate of what the user currently wants, summarized from the most recent user click (or no-click) and message.
 2. user_intention (immediate goal): Your analysis and prediction of what the user would like in the next round.
 3. user_preference (short-term goal): A list of textual statements describing the user's preferences or dislikes within this session.
-4. user_persona (long-term goal): High-level, persistent user preferences collected across previous rounds.`,
+4. user_persona (long-term goal): High-level, persistent user preferences collected across previous rounds.
+5. tool_use_plan: A plan for which tools (specific to the purpose of a tool if applicable) to use and in what order. Also include the reasoning for the plan.`,
   examples: [
     `<think>
 belief_prompt: User wants to create a romantic scene...

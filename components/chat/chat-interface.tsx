@@ -3116,17 +3116,7 @@ export default function ChatInterface({
                 text: event.content,
               });
             } else if (event.type === "text") {
-              if (
-                variantContent.length === 0 ||
-                variantContent[0].type !== "text"
-              ) {
-                variantContent = [
-                  { type: "text", text: event.content },
-                  ...variantContent,
-                ];
-              } else {
-                variantContent[0] = { type: "text", text: event.content };
-              }
+              variantContent.push({ type: "text", text: event.content });
             } else if (event.type === "part") {
               if (event.part.type === "agent_shot_list" && event.part.status === "complete") {
                 const placeholderIdx = variantContent.findIndex(
