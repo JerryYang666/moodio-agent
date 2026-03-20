@@ -706,7 +706,7 @@ export default function ChatMessage({
 
             case "agent_shot_list":
               return group.parts.map((part: any, i) => (
-                <ShotListCard key={`shotlist-${gi}-${i}`} part={part} />
+                <ShotListCard key={`shotlist-${gi}-${i}`} part={part} desktopId={desktopId} chatId={chatId} />
               ));
 
             case "agent_search":
