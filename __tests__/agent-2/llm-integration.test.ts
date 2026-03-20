@@ -116,11 +116,13 @@ import { ImageGenerateHandler } from "@/lib/agents/agent-2/executor/handlers/ima
 import { thinkTool } from "@/lib/agents/agent-2/tools/think";
 import { textTool } from "@/lib/agents/agent-2/tools/text";
 import { imageSuggestTool } from "@/lib/agents/agent-2/tools/image-suggest";
+import { videoSuggestTool } from "@/lib/agents/agent-2/tools/video-suggest";
 import { videoTool } from "@/lib/agents/agent-2/tools/video";
 import { shotListTool } from "@/lib/agents/agent-2/tools/shot-list";
 import { searchTool } from "@/lib/agents/agent-2/tools/search";
 import { checkTaxonomyTool } from "@/lib/agents/agent-2/tools/check-taxonomy";
 import { suggestionsTool } from "@/lib/agents/agent-2/tools/suggestions";
+import { askUserTool } from "@/lib/agents/agent-2/tools/ask-user";
 
 const LLM_TIMEOUT = 120_000; // higher timeout to accommodate tool-call two-turn
 
@@ -139,11 +141,13 @@ function buildRegistry(): ToolRegistry {
   reg.register(thinkTool);
   reg.register(textTool);
   reg.register(imageSuggestTool);
+  reg.register(videoSuggestTool);
   reg.register(videoTool);
   reg.register(shotListTool);
   reg.register(searchTool);
   reg.register(checkTaxonomyTool);
   reg.register(suggestionsTool);
+  reg.register(askUserTool);
   return reg;
 }
 
@@ -194,6 +198,7 @@ async function runPipeline(
   const toolExecutor = new ToolExecutor(registry);
   toolExecutor.registerHandler("check_taxonomy", new CheckTaxonomyHandler());
   toolExecutor.registerHandler("image_suggest", new ImageGenerateHandler());
+  toolExecutor.registerHandler("video_suggest", new ImageGenerateHandler());
 
   const outputParser = new OutputParser(registry);
   const streamLoop = new StreamLoop(outputParser, toolExecutor, registry);
@@ -606,9 +611,9 @@ describe("Agent 2 LLM integration: conversational (no images)", () => {
       assertThinkFinalContent(finalContent);
       assertTextFinalContent(finalContent);
 
-      // Should not have any image/video/search events (suggestions parts are allowed)
+      // Should not have any image/video/search events (suggestions and ask_user parts are allowed)
       const partEvents = events.filter(
-        (e) => e.type === "part" && e.part?.type !== "suggestions"
+        (e) => e.type === "part" && e.part?.type !== "suggestions" && e.part?.type !== "agent_ask_user"
       );
       expect(partEvents.length).toBe(0);
     },
@@ -671,6 +676,131 @@ describe("Agent 2 LLM integration: event ordering and uniqueness", () => {
       );
       const ids = loadingEvents.map((e) => e.part.imageId);
       expect(new Set(ids).size).toBe(ids.length);
+    },
+    LLM_TIMEOUT
+  );
+});
+
+// ---------------------------------------------------------------------------
+// VIDEO_SUGGEST
+// ---------------------------------------------------------------------------
+
+function assertVideoSuggestEvents(events: StreamEvent[], minCount = 1, maxCount = 6): void {
+  const placeholders = events.filter(
+    (e) => e.type === "part" && e.part?.type === "agent_video_suggest" && e.part?.status === "loading"
+  );
+  expect(placeholders.length).toBeGreaterThanOrEqual(minCount);
+  expect(placeholders.length).toBeLessThanOrEqual(maxCount);
+
+  const ids = placeholders.map((e) => e.part.imageId);
+  expect(new Set(ids).size).toBe(ids.length);
+
+  for (const id of ids) {
+    const update = events.find(
+      (e) => e.type === "part_update" && e.imageId === id
+    );
+    expect(update).toBeDefined();
+    expect(["generated", "error"]).toContain(update!.part.status);
+  }
+}
+
+function assertVideoSuggestFinalContent(finalContent: MessageContentPart[], minCount = 1, maxCount = 6): void {
+  const parts = finalContent.filter((p) => p.type === "agent_video_suggest");
+  expect(parts.length).toBeGreaterThanOrEqual(minCount);
+  expect(parts.length).toBeLessThanOrEqual(maxCount);
+
+  for (const part of parts) {
+    if (part.type !== "agent_video_suggest") continue;
+    expect(["generated", "error"]).toContain(part.status);
+    expect(typeof part.prompt).toBe("string");
+    expect(part.prompt.length).toBeGreaterThan(0);
+    expect(typeof part.videoIdea).toBe("string");
+    expect(part.videoIdea.length).toBeGreaterThan(0);
+    if (part.status === "generated") {
+      expect(typeof part.aspectRatio).toBe("string");
+      expect(SUPPORTED_ASPECT_RATIOS).toContain(part.aspectRatio);
+    }
+  }
+}
+
+describe("Agent 2 LLM integration: VIDEO_SUGGEST", () => {
+  it(
+    "sends think, text, and video suggest events for a video idea request",
+    async () => {
+      const { events, finalContent } = await runPipeline(
+        "Give me 4 video ideas for a travel vlog about Tokyo"
+      );
+
+      assertThinkEvent(events);
+      assertTextEvent(events);
+      assertVideoSuggestEvents(events);
+
+      assertThinkFinalContent(finalContent);
+      assertTextFinalContent(finalContent);
+      assertVideoSuggestFinalContent(finalContent);
+    },
+    LLM_TIMEOUT
+  );
+
+  it(
+    "defaults to 4 video suggestions",
+    async () => {
+      const { events, finalContent } = await runPipeline(
+        "Suggest video ideas for a coffee brand promotion"
+      );
+
+      const placeholders = events.filter(
+        (e) => e.type === "part" && e.part?.type === "agent_video_suggest"
+      );
+      expect(placeholders.length).toBe(4);
+
+      const parts = finalContent.filter((p) => p.type === "agent_video_suggest");
+      expect(parts.length).toBe(4);
+    },
+    LLM_TIMEOUT
+  );
+
+  it(
+    "each video suggest part contains a videoIdea field",
+    async () => {
+      const { finalContent } = await runPipeline(
+        "Give me 4 video ideas for an underwater nature documentary"
+      );
+
+      const parts = finalContent.filter((p) => p.type === "agent_video_suggest");
+      expect(parts.length).toBeGreaterThanOrEqual(1);
+
+      for (const part of parts) {
+        if (part.type !== "agent_video_suggest") continue;
+        expect(typeof part.videoIdea).toBe("string");
+        expect(part.videoIdea.length).toBeGreaterThan(10);
+      }
+    },
+    LLM_TIMEOUT
+  );
+
+  it(
+    "each video suggest gets exactly one placeholder and one update",
+    async () => {
+      const { events } = await runPipeline(
+        "Suggest 4 video ideas for a fitness workout series"
+      );
+
+      const placeholders = events.filter(
+        (e) => e.type === "part" && e.part?.type === "agent_video_suggest" && e.part?.status === "loading"
+      );
+      const updates = events.filter(
+        (e) => e.type === "part_update" && e.part?.type === "agent_video_suggest"
+      );
+
+      expect(updates.length).toBe(placeholders.length);
+
+      const placeholderIds = placeholders.map((e) => e.part.imageId);
+      expect(new Set(placeholderIds).size).toBe(placeholderIds.length);
+
+      for (const update of updates) {
+        expect(placeholderIds).toContain(update.imageId);
+      }
     },
     LLM_TIMEOUT
   );
@@ -752,6 +882,103 @@ describe("Agent 2 LLM integration: SUGGESTIONS (post-message)", () => {
           expect(s.promptText.length).toBeGreaterThan(0);
           if (s.icon !== undefined) {
             expect(typeof s.icon).toBe("string");
+          }
+        }
+      }
+    },
+    LLM_TIMEOUT
+  );
+});
+
+// ---------------------------------------------------------------------------
+// ASK_USER (structured questions for the user)
+// ---------------------------------------------------------------------------
+
+function assertAskUserEvent(events: StreamEvent[]): void {
+  const askEvent = events.find(
+    (e) => e.type === "part" && e.part?.type === "agent_ask_user"
+  );
+  expect(askEvent).toBeDefined();
+  expect(Array.isArray(askEvent!.part.questions)).toBe(true);
+  expect(askEvent!.part.questions.length).toBeGreaterThanOrEqual(1);
+  expect(askEvent!.part.questions.length).toBeLessThanOrEqual(3);
+
+  for (const q of askEvent!.part.questions) {
+    expect(typeof q.id).toBe("string");
+    expect(q.id.length).toBeGreaterThan(0);
+    expect(typeof q.question).toBe("string");
+    expect(q.question.length).toBeGreaterThan(0);
+    expect(Array.isArray(q.options)).toBe(true);
+    expect(q.options.length).toBeGreaterThanOrEqual(2);
+    expect(q.options.length).toBeLessThanOrEqual(4);
+    for (const opt of q.options) {
+      expect(typeof opt).toBe("string");
+    }
+  }
+}
+
+function assertAskUserFinalContent(finalContent: MessageContentPart[]): void {
+  const askPart = finalContent.find((p) => p.type === "agent_ask_user");
+  expect(askPart).toBeDefined();
+  if (askPart?.type === "agent_ask_user") {
+    expect(Array.isArray(askPart.questions)).toBe(true);
+    expect(askPart.questions.length).toBeGreaterThanOrEqual(1);
+    expect(askPart.questions.length).toBeLessThanOrEqual(3);
+
+    for (const q of askPart.questions) {
+      expect(typeof q.id).toBe("string");
+      expect(typeof q.question).toBe("string");
+      expect(Array.isArray(q.options)).toBe(true);
+      expect(q.options.length).toBeGreaterThanOrEqual(2);
+    }
+  }
+}
+
+describe("Agent 2 LLM integration: ASK_USER (structured questions)", () => {
+  it(
+    "emits ask_user questions for a vague video request",
+    async () => {
+      const { events, finalContent } = await runPipeline(
+        "I want to create a video"
+      );
+
+      assertThinkEvent(events);
+
+      // The LLM should ask clarifying questions via ASK_USER
+      assertAskUserEvent(events);
+      assertAskUserFinalContent(finalContent);
+
+      // Should NOT have both suggestions and ask_user (mutually exclusive)
+      const suggPart = finalContent.find((p) => p.type === "suggestions");
+      const askPart = finalContent.find((p) => p.type === "agent_ask_user");
+      if (askPart) {
+        expect(suggPart).toBeUndefined();
+      }
+    },
+    LLM_TIMEOUT
+  );
+
+  it(
+    "ask_user questions have valid structure with id, question, and options",
+    async () => {
+      const { finalContent } = await runPipeline(
+        "Make me a video"
+      );
+
+      const askPart = finalContent.find((p) => p.type === "agent_ask_user");
+      expect(askPart).toBeDefined();
+      if (askPart?.type === "agent_ask_user") {
+        for (const q of askPart.questions) {
+          expect(typeof q.id).toBe("string");
+          expect(q.id.length).toBeGreaterThan(0);
+          expect(typeof q.question).toBe("string");
+          expect(q.question.length).toBeGreaterThan(0);
+          expect(Array.isArray(q.options)).toBe(true);
+          expect(q.options.length).toBeGreaterThanOrEqual(2);
+          expect(q.options.length).toBeLessThanOrEqual(4);
+          for (const opt of q.options) {
+            expect(typeof opt).toBe("string");
+            expect(opt.length).toBeGreaterThan(0);
           }
         }
       }
