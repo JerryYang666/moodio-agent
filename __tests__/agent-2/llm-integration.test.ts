@@ -381,7 +381,7 @@ describe("Agent 2 LLM integration: TEXT + JSON (image suggestions)", () => {
     "uses appropriate wide aspect ratios for panoramic prompts",
     async () => {
       const { finalContent } = await runPipeline(
-        "Create a panoramic ultra-wide cinematic shot of a canyon"
+        "Generate 4 image suggestions of a panoramic ultra-wide cinematic shot of a canyon at golden hour"
       );
 
       const images = finalContent.filter((p) => p.type === "agent_image");
