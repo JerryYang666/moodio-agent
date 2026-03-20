@@ -728,7 +728,7 @@ describe("Agent 2 LLM integration: VIDEO_SUGGEST", () => {
     "sends think, text, and video suggest events for a video idea request",
     async () => {
       const { events, finalContent } = await runPipeline(
-        "Give me 4 video ideas for a travel vlog about Tokyo"
+        "Give me 4 video ideas for a 15-second 16:9 landscape travel vlog about Tokyo street food"
       );
 
       assertThinkEvent(events);
@@ -746,7 +746,7 @@ describe("Agent 2 LLM integration: VIDEO_SUGGEST", () => {
     "defaults to 4 video suggestions",
     async () => {
       const { events, finalContent } = await runPipeline(
-        "Suggest video ideas for a coffee brand promotion"
+        "Suggest 4 video ideas for a 30-second 9:16 vertical coffee brand social media ad"
       );
 
       const placeholders = events.filter(
@@ -764,7 +764,7 @@ describe("Agent 2 LLM integration: VIDEO_SUGGEST", () => {
     "each video suggest part contains a videoIdea field",
     async () => {
       const { finalContent } = await runPipeline(
-        "Give me 4 video ideas for an underwater nature documentary"
+        "Give me 4 video ideas for a 15-second 16:9 underwater nature documentary short"
       );
 
       const parts = finalContent.filter((p) => p.type === "agent_video_suggest");
@@ -783,7 +783,7 @@ describe("Agent 2 LLM integration: VIDEO_SUGGEST", () => {
     "each video suggest gets exactly one placeholder and one update",
     async () => {
       const { events } = await runPipeline(
-        "Suggest 4 video ideas for a fitness workout series"
+        "Suggest 4 video ideas for a 10-second 9:16 vertical fitness workout series for Instagram Reels"
       );
 
       const placeholders = events.filter(
