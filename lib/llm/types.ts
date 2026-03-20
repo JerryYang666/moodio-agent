@@ -36,6 +36,18 @@ export type MessageContentPart =
       reason?: string;
     }
   | {
+      type: "agent_video_suggest";
+      imageId?: string;
+      imageUrl?: string;
+      title: string;
+      aspectRatio?: string;
+      prompt: string;
+      videoIdea: string;
+      status: "loading" | "generated" | "error";
+      isSelected?: boolean;
+      reason?: string;
+    }
+  | {
       type: "agent_video";
       config: {
         modelId: string;
@@ -111,17 +123,17 @@ export type MessageContentPart =
       }>;
     };
 
-/** Type for parts that represent generated images (agent_image or direct_image) */
+/** Type for parts that represent generated images (agent_image, direct_image, or agent_video_suggest) */
 export type GeneratedImagePart = Extract<
   MessageContentPart,
-  { type: "agent_image" } | { type: "direct_image" }
+  { type: "agent_image" } | { type: "direct_image" } | { type: "agent_video_suggest" }
 >;
 
-/** Check if a message content part is a generated image (agent_image or direct_image) */
+/** Check if a message content part is a generated image (agent_image, direct_image, or agent_video_suggest) */
 export function isGeneratedImagePart(
   part: MessageContentPart
 ): part is GeneratedImagePart {
-  return part.type === "agent_image" || part.type === "direct_image";
+  return part.type === "agent_image" || part.type === "direct_image" || part.type === "agent_video_suggest";
 }
 
 export interface MessageMetadata {

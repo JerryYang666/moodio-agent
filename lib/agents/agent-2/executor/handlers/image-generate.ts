@@ -41,17 +41,15 @@ const MAX_RETRY = 2;
 export class ImageGenerateHandler implements ToolHandler {
   async execute(parsedTag: ParsedTag, ctx: RequestContext): Promise<ToolResult> {
     const suggestion = parsedTag.parsedContent;
-    // Use tracking ID from the caller (stream loop) if provided, otherwise generate one
     const trackingImageId = suggestion._trackingImageId || generateImageId();
-
-    // NOTE: The stream loop already emits the loading placeholder and manages
-    // finalContent tracking. This handler only does the actual generation.
+    const isVideoSuggest = parsedTag.toolName === "video_suggest";
 
     try {
       const part = await this.generateImageWithRetry(
         suggestion,
         ctx,
-        trackingImageId
+        trackingImageId,
+        isVideoSuggest
       );
 
       ctx.send({ type: "part_update", imageId: trackingImageId, part });
@@ -67,15 +65,26 @@ export class ImageGenerateHandler implements ToolHandler {
     } catch (err) {
       console.error(`Image gen error for imageId ${trackingImageId}`, err);
       const isInsufficientCredits = err instanceof InsufficientCreditsError;
-      const errorPart: MessageContentPart = {
-        type: "agent_image",
-        imageId: trackingImageId,
-        title: suggestion.title || "Error",
-        aspectRatio: "1:1",
-        prompt: suggestion.prompt || "",
-        status: "error",
-        ...(isInsufficientCredits && { reason: "INSUFFICIENT_CREDITS" }),
-      };
+      const errorPart: MessageContentPart = isVideoSuggest
+        ? {
+            type: "agent_video_suggest",
+            imageId: trackingImageId,
+            title: suggestion.title || "Error",
+            aspectRatio: "1:1",
+            prompt: suggestion.prompt || "",
+            videoIdea: suggestion.videoIdea || "",
+            status: "error",
+            ...(isInsufficientCredits && { reason: "INSUFFICIENT_CREDITS" }),
+          }
+        : {
+            type: "agent_image",
+            imageId: trackingImageId,
+            title: suggestion.title || "Error",
+            aspectRatio: "1:1",
+            prompt: suggestion.prompt || "",
+            status: "error",
+            ...(isInsufficientCredits && { reason: "INSUFFICIENT_CREDITS" }),
+          };
 
       ctx.send({ type: "part_update", imageId: trackingImageId, part: errorPart });
 
@@ -92,9 +101,10 @@ export class ImageGenerateHandler implements ToolHandler {
    * Ported from Agent 1's generateImage() + generateImageCore().
    */
   private async generateImageWithRetry(
-    suggestion: { title: string; aspectRatio: string; prompt: string; referenceImageIds?: string[] },
+    suggestion: { title: string; aspectRatio: string; prompt: string; referenceImageIds?: string[]; videoIdea?: string },
     ctx: RequestContext,
-    trackingImageId: string
+    trackingImageId: string,
+    isVideoSuggest: boolean = false
   ): Promise<MessageContentPart> {
     let lastError: Error | undefined;
 
@@ -106,7 +116,7 @@ export class ImageGenerateHandler implements ToolHandler {
           );
         }
 
-        const result = await this.generateImageCore(suggestion, ctx, trackingImageId);
+        const result = await this.generateImageCore(suggestion, ctx, trackingImageId, isVideoSuggest);
 
         if (attempt > 0) {
           console.log(
@@ -150,9 +160,10 @@ export class ImageGenerateHandler implements ToolHandler {
   }
 
   private async generateImageCore(
-    suggestion: { title: string; aspectRatio: string; prompt: string; referenceImageIds?: string[] },
+    suggestion: { title: string; aspectRatio: string; prompt: string; referenceImageIds?: string[]; videoIdea?: string },
     ctx: RequestContext,
-    trackingImageId: string
+    trackingImageId: string,
+    isVideoSuggest: boolean = false
   ): Promise<MessageContentPart> {
     // Determine aspect ratio: user override > agent suggestion > fallback
     let aspectRatio: AspectRatio;
@@ -263,15 +274,26 @@ export class ImageGenerateHandler implements ToolHandler {
       response,
     });
 
-    const imagePart: MessageContentPart = {
-      type: "agent_image",
-      imageId: finalImageId,
-      imageUrl: getSignedImageUrl(finalImageId),
-      title: suggestion.title,
-      aspectRatio,
-      prompt: suggestion.prompt,
-      status: "generated",
-    };
+    const imagePart: MessageContentPart = isVideoSuggest
+      ? {
+          type: "agent_video_suggest",
+          imageId: finalImageId,
+          imageUrl: getSignedImageUrl(finalImageId),
+          title: suggestion.title,
+          aspectRatio,
+          prompt: suggestion.prompt,
+          videoIdea: suggestion.videoIdea || "",
+          status: "generated",
+        }
+      : {
+          type: "agent_image",
+          imageId: finalImageId,
+          imageUrl: getSignedImageUrl(finalImageId),
+          title: suggestion.title,
+          aspectRatio,
+          prompt: suggestion.prompt,
+          status: "generated",
+        };
 
     console.log(
       `[Perf] Image generation end`,

@@ -32,6 +32,8 @@ When a user asks to create a video but their request is vague or missing key det
 2. Duration — How long should the video be? (e.g. 5 seconds, 15 seconds, 30 seconds, 60 seconds)
 3. Aspect ratio — What format? (e.g. 16:9 landscape for YouTube, 9:16 vertical for TikTok/Reels/Shorts, 1:1 square for Instagram feed)
 
+After making vague requests clear, you MUST use the video suggest tool at least once (if not more) before you generate a video. Always help user explore creative ideas first. Always help user explore creative ideas first.
+
 ALWAYS make sure your response is short and concise. NEVER ask more than 2 questions at a time because that will overwhelm the user.`;
 
 /**

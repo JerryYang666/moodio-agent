@@ -26,6 +26,7 @@ import { VideoUnderstandHandler } from "./executor/handlers/video-understand";
 import { thinkTool } from "./tools/think";
 import { textTool } from "./tools/text";
 import { imageSuggestTool } from "./tools/image-suggest";
+import { videoSuggestTool } from "./tools/video-suggest";
 import { videoTool } from "./tools/video";
 import { shotListTool } from "./tools/shot-list";
 import { searchTool } from "./tools/search";
@@ -51,6 +52,7 @@ export class Agent2 implements Agent {
     this.registry.register(thinkTool);
     this.registry.register(textTool);
     this.registry.register(imageSuggestTool);
+    this.registry.register(videoSuggestTool);
     this.registry.register(videoTool);
     this.registry.register(shotListTool);
     this.registry.register(searchTool);
@@ -71,6 +73,7 @@ export class Agent2 implements Agent {
     const executor = new ToolExecutor(this.registry);
     executor.registerHandler("check_taxonomy", new CheckTaxonomyHandler());
     executor.registerHandler("image_suggest", new ImageGenerateHandler());
+    executor.registerHandler("video_suggest", new ImageGenerateHandler());
     executor.registerHandler("video_understand", new VideoUnderstandHandler());
     executor.registerHandler("image_generate_sync", new ImageGenerateHandler());
     return executor;
