@@ -508,6 +508,57 @@ export default function DesktopDetailPage({
     [desktopId, t]
   );
 
+  const handleExternalShotlistDrop = useCallback(
+    async (
+      payload: {
+        title: string;
+        columns: string[];
+        rows: Array<{ id: string; cells: Array<{ value: string }> }>;
+        chatId?: string | null;
+      },
+      position: { x: number; y: number }
+    ) => {
+      try {
+        const res = await fetch(`/api/desktop/${desktopId}/assets`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            assets: [
+              {
+                assetType: "table",
+                metadata: {
+                  title: payload.title,
+                  columns: payload.columns,
+                  rows: payload.rows,
+                  chatId: payload.chatId ?? undefined,
+                  status: "complete",
+                },
+                posX: position.x,
+                posY: position.y,
+                width: 700,
+                height: 40 + payload.rows.length * 36 + 40,
+              },
+            ],
+          }),
+        });
+        if (!res.ok) throw new Error("Failed to add dropped shotlist to desktop");
+        const data = await res.json();
+        window.dispatchEvent(
+          new CustomEvent("desktop-asset-added", {
+            detail: { assets: data.assets, desktopId },
+          })
+        );
+      } catch (error) {
+        console.error("Failed to drop shotlist onto desktop:", error);
+        addToast({
+          title: t("failedToAddText"),
+          color: "danger",
+        });
+      }
+    },
+    [desktopId, t]
+  );
+
   const handleCellCommit = useCallback(
     (assetId: string, rowId: string, colIndex: number, value: string) => {
       applyRemoteEvent({
@@ -868,6 +919,7 @@ export default function DesktopDetailPage({
           onSendToTimeline={canEdit ? handleSendToTimeline : undefined}
           onExternalImageDrop={canEdit ? handleExternalImageDrop : undefined}
           onExternalTextDrop={canEdit ? handleExternalTextDrop : undefined}
+          onExternalShotlistDrop={canEdit ? handleExternalShotlistDrop : undefined}
           onAddAssetAtPosition={canEdit ? handleAddAssetAtPosition : undefined}
         />
         <DesktopToolbar
