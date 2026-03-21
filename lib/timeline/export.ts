@@ -50,7 +50,6 @@ export function buildRenderRequest(
     outputBucket?: string;
   } = {}
 ): RenderRequest {
-  console.log("process.env.AWS_S3_BUCKET_NAME", process.env.AWS_S3_BUCKET_NAME);
   const {
     outputFormat = "mp4",
     inputBucket = process.env.AWS_S3_BUCKET_NAME || "moodio-agent-dev-1",
