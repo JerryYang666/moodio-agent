@@ -3,33 +3,28 @@
 import { useRef, useState, useCallback, useEffect } from "react";
 import { Play, Pause, SkipBack, SkipForward } from "lucide-react";
 import type { TimelineClip } from "./types";
+import { getEffectiveDuration } from "./types";
 
 interface TimelinePreviewProps {
   clips: TimelineClip[];
   activeClipIndex: number;
   onActiveClipChange: (index: number) => void;
+  scrubTime?: number | null;
 }
 
 /**
  * Double-buffered video preview for gapless sequential playback.
- *
- * Two <video> elements alternate roles:
- *   - "front"  → visible, currently playing
- *   - "back"   → hidden, preloading the next clip
- *
- * When the front video ends we instantly swap: the back becomes front
- * (already loaded & ready to play) and the old front begins preloading
- * the clip after that.
+ * Respects trimStart/trimEnd: seeks to trimStart on play, stops at trimEnd.
  */
 export default function TimelinePreview({
   clips,
   activeClipIndex,
   onActiveClipChange,
+  scrubTime,
 }: TimelinePreviewProps) {
   const videoARef = useRef<HTMLVideoElement>(null);
   const videoBRef = useRef<HTMLVideoElement>(null);
 
-  // Which ref is currently the "front" (visible) player
   const [frontSlot, setFrontSlot] = useState<"A" | "B">("A");
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -40,8 +35,27 @@ export default function TimelinePreview({
   const frontRef = frontSlot === "A" ? videoARef : videoBRef;
   const backRef = frontSlot === "A" ? videoBRef : videoARef;
 
-  // Flag to distinguish auto-advance (onEnded) from manual clip changes
   const autoAdvancingRef = useRef(false);
+  const scrubActiveRef = useRef(false);
+
+  const getTrimStart = (clip: TimelineClip | null) => clip?.trimStart ?? 0;
+  const getTrimEnd = (clip: TimelineClip | null) =>
+    clip?.trimEnd ?? clip?.duration ?? 0;
+
+  // ---- Scrub: pause and seek during trim drag ----
+  useEffect(() => {
+    if (scrubTime == null) {
+      scrubActiveRef.current = false;
+      return;
+    }
+    scrubActiveRef.current = true;
+    const front = frontRef.current;
+    if (!front) return;
+    front.pause();
+    front.currentTime = scrubTime;
+    setCurrentTime(scrubTime);
+    setIsPlaying(false);
+  }, [scrubTime, frontRef]);
 
   // ---- Keep the back buffer preloaded with the next clip ----
   useEffect(() => {
@@ -54,35 +68,72 @@ export default function TimelinePreview({
     }
   }, [nextClip?.videoUrl, backRef]);
 
-  // ---- When activeClipIndex changes externally (skip / click), reset ----
+  // ---- When activeClipIndex changes externally (skip / click) or via auto-advance, reset ----
   const prevIndexRef = useRef(activeClipIndex);
   useEffect(() => {
     if (prevIndexRef.current === activeClipIndex) return;
+    const wasAutoAdvancing = autoAdvancingRef.current;
     prevIndexRef.current = activeClipIndex;
-
-    // Skip reset when the advance came from handleVideoEnded
-    if (autoAdvancingRef.current) {
-      autoAdvancingRef.current = false;
-      return;
-    }
+    autoAdvancingRef.current = false;
 
     const front = frontRef.current;
     if (!front) return;
 
     front.pause();
-    setIsPlaying(false);
 
     const url = activeClip?.videoUrl ?? "";
     if (front.src !== url) {
       front.src = url;
       if (url) front.load();
     }
-    front.currentTime = 0;
-    setCurrentTime(0);
-  }, [activeClipIndex, activeClip?.videoUrl, frontRef]);
+    const startTime = getTrimStart(activeClip);
+    front.currentTime = startTime;
+    setCurrentTime(startTime);
 
-  // ---- Gapless advance: swap buffers on ended ----
+    if (wasAutoAdvancing && url) {
+      // Auto-play the next clip
+      front.play().catch(() => {});
+      setIsPlaying(true);
+    } else {
+      setIsPlaying(false);
+    }
+  }, [activeClipIndex, activeClip?.videoUrl, frontRef, activeClip]);
+
+  // ---- Stop at trimEnd during playback ----
+  const handleTimeUpdate = useCallback(() => {
+    const front = frontRef.current;
+    if (!front) return;
+    setCurrentTime(front.currentTime);
+
+    // Skip auto-advance when paused (during scrub/trim drag or user pause)
+    if (front.paused || scrubActiveRef.current) return;
+
+    const endTime = getTrimEnd(activeClip);
+    if (endTime > 0 && front.currentTime >= endTime - 0.05) {
+      front.pause();
+      if (activeClipIndex < clips.length - 1) {
+        const back = backRef.current;
+        if (back) {
+          const nextStart = getTrimStart(nextClip);
+          back.currentTime = nextStart;
+          back.play().catch(() => {});
+        }
+        autoAdvancingRef.current = true;
+        setFrontSlot((prev) => (prev === "A" ? "B" : "A"));
+        // Keep isPlaying true since the next clip continues playing
+        setIsPlaying(true);
+        onActiveClipChange(activeClipIndex + 1);
+      } else {
+        setIsPlaying(false);
+      }
+    }
+  }, [frontRef, activeClip, activeClipIndex, clips.length, backRef, nextClip, onActiveClipChange]);
+
+  // ---- Gapless advance: swap buffers on ended (fallback if trimEnd isn't set) ----
   const handleVideoEnded = useCallback(() => {
+    // Guard: if auto-advance already happened from handleTimeUpdate, skip
+    if (autoAdvancingRef.current) return;
+
     if (activeClipIndex >= clips.length - 1) {
       setIsPlaying(false);
       return;
@@ -90,30 +141,31 @@ export default function TimelinePreview({
 
     const back = backRef.current;
     if (back) {
-      back.currentTime = 0;
+      const nextStart = getTrimStart(nextClip);
+      back.currentTime = nextStart;
       back.play().catch(() => {});
     }
 
     autoAdvancingRef.current = true;
     setFrontSlot((prev) => (prev === "A" ? "B" : "A"));
+    setIsPlaying(true);
     onActiveClipChange(activeClipIndex + 1);
-  }, [activeClipIndex, clips.length, onActiveClipChange, backRef]);
+  }, [activeClipIndex, clips.length, onActiveClipChange, backRef, nextClip]);
 
-  const handleTimeUpdate = useCallback(() => {
-    const front = frontRef.current;
-    if (front) setCurrentTime(front.currentTime);
-  }, [frontRef]);
-
-  // ---- Transport controls ----
   const handleTogglePlay = useCallback(() => {
     const front = frontRef.current;
     if (!front || !activeClip?.videoUrl) return;
     if (isPlaying) {
       front.pause();
     } else {
+      const startTime = getTrimStart(activeClip);
+      const endTime = getTrimEnd(activeClip);
+      if (front.currentTime < startTime || front.currentTime >= endTime) {
+        front.currentTime = startTime;
+      }
       front.play().catch(() => {});
     }
-  }, [isPlaying, activeClip?.videoUrl, frontRef]);
+  }, [isPlaying, activeClip, frontRef]);
 
   const handlePrev = useCallback(() => {
     if (activeClipIndex <= 0) return;
@@ -142,6 +194,10 @@ export default function TimelinePreview({
       </div>
     );
   }
+
+  const effectiveDur = activeClip ? getEffectiveDuration(activeClip) : 0;
+  const trimStart = getTrimStart(activeClip);
+  const relativeTime = Math.max(0, currentTime - trimStart);
 
   return (
     <div className="flex flex-col h-full">
@@ -185,7 +241,6 @@ export default function TimelinePreview({
             No preview available
           </div>
         )}
-
       </div>
 
       {/* Transport controls */}
@@ -215,8 +270,8 @@ export default function TimelinePreview({
         </button>
 
         <span className="text-[10px] text-default-400 ml-2 tabular-nums">
-          {formatTime(currentTime)}
-          {activeClip?.duration ? ` / ${formatTime(activeClip.duration)}` : ""}
+          {formatTime(relativeTime)}
+          {effectiveDur > 0 ? ` / ${formatTime(effectiveDur)}` : ""}
         </span>
       </div>
     </div>

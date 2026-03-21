@@ -18,6 +18,10 @@ export interface TimelineClip {
   videoUrl: string | null;
   /** Duration in seconds (from asset metadata, or 0 if unknown) */
   duration: number;
+  /** Trim start in seconds (default: 0 = beginning of clip) */
+  trimStart?: number;
+  /** Trim end in seconds (default: duration = end of clip) */
+  trimEnd?: number;
 }
 
 export interface TimelineState {
@@ -32,4 +36,10 @@ export const TIMELINE_STORAGE_KEY_PREFIX = "moodio-timeline-";
 
 export function getTimelineStorageKey(desktopId: string): string {
   return `${TIMELINE_STORAGE_KEY_PREFIX}${desktopId}`;
+}
+
+export function getEffectiveDuration(clip: TimelineClip): number {
+  const start = clip.trimStart ?? 0;
+  const end = clip.trimEnd ?? clip.duration;
+  return Math.max(0, end - start);
 }

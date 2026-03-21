@@ -131,7 +131,7 @@ def handler(event, context):
             return {"statusCode": 400, "body": {"success": False, "error": f"segment[{i}] end must be > start"}}
 
         ext = PurePosixPath(seg["s3_key"]).suffix.lower()
-        if ext not in SUPPORTED_INPUT_EXTS:
+        if ext and ext not in SUPPORTED_INPUT_EXTS:
             return {
                 "statusCode": 400,
                 "body": {"success": False, "error": f"segment[{i}] unsupported input extension '{ext}'. Supported: {sorted(SUPPORTED_INPUT_EXTS)}"},
@@ -151,7 +151,7 @@ def handler(event, context):
             s3_key = seg["s3_key"]
             if s3_key in s3_key_to_local:
                 continue
-            ext = PurePosixPath(s3_key).suffix.lower()
+            ext = PurePosixPath(s3_key).suffix.lower() or ".mp4"
             local_path = str(SOURCES_DIR / f"src_{download_index:04d}{ext}")
             download_index += 1
             logger.info("Downloading s3://%s/%s -> %s", input_bucket, s3_key, local_path)

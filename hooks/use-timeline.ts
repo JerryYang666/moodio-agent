@@ -22,6 +22,22 @@ function saveTimeline(desktopId: string, clips: TimelineClip[]): void {
   localStorage.setItem(getTimelineStorageKey(desktopId), JSON.stringify(state));
 }
 
+function probeDuration(videoUrl: string): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const video = document.createElement("video");
+    video.preload = "metadata";
+    video.onloadedmetadata = () => {
+      resolve(video.duration);
+      video.remove();
+    };
+    video.onerror = () => {
+      video.remove();
+      reject(new Error("Failed to load video metadata"));
+    };
+    video.src = videoUrl;
+  });
+}
+
 export function useTimeline(desktopId: string) {
   const [clips, setClips] = useState<TimelineClip[]>(() =>
     loadTimeline(desktopId)
@@ -35,9 +51,28 @@ export function useTimeline(desktopId: string) {
     saveTimeline(desktopId, clipsRef.current);
   }, [clips, desktopId]);
 
+  // Probe duration for any clip with duration=0 (newly added or loaded from storage)
+  const probedIdsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const zeroDurationClips = clips.filter(
+      (c) => (!c.duration || c.duration <= 0) && c.videoUrl && !probedIdsRef.current.has(c.id)
+    );
+    if (zeroDurationClips.length === 0) return;
+
+    zeroDurationClips.forEach((clip) => {
+      probedIdsRef.current.add(clip.id);
+      probeDuration(clip.videoUrl!)
+        .then((dur) => {
+          setClips((prev) =>
+            prev.map((c) => (c.id === clip.id ? { ...c, duration: dur } : c))
+          );
+        })
+        .catch(() => {});
+    });
+  }, [clips]);
+
   const addClip = useCallback((clip: TimelineClip) => {
     setClips((prev) => {
-      // Don't add duplicates by assetId
       if (prev.some((c) => c.assetId === clip.assetId)) return prev;
       return [...prev, clip];
     });
@@ -46,6 +81,15 @@ export function useTimeline(desktopId: string) {
   const removeClip = useCallback((clipId: string) => {
     setClips((prev) => prev.filter((c) => c.id !== clipId));
   }, []);
+
+  const updateClip = useCallback(
+    (clipId: string, updates: Partial<Omit<TimelineClip, "id">>) => {
+      setClips((prev) =>
+        prev.map((c) => (c.id === clipId ? { ...c, ...updates } : c))
+      );
+    },
+    []
+  );
 
   const reorderClips = useCallback((fromIndex: number, toIndex: number) => {
     setClips((prev) => {
@@ -73,6 +117,7 @@ export function useTimeline(desktopId: string) {
     toggleExpanded,
     addClip,
     removeClip,
+    updateClip,
     reorderClips,
     clearTimeline,
   };
