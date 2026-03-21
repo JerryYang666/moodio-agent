@@ -3042,38 +3042,17 @@ export default function ChatInterface({
       partTypeIndex: number,
       updates: { title: string; videoIdea: string }
     ): Promise<void> => {
-      setMessages((prev) => {
-        const byVariantIdx = messageVariantId
-          ? prev.findIndex((m) => m.variantId === messageVariantId)
-          : -1;
-        const msgIdx =
-          byVariantIdx !== -1
-            ? byVariantIdx
-            : prev.findIndex((m) => m.createdAt === messageTimestamp);
-        if (msgIdx === -1) return prev;
+      // Reuse the generic handler for state update + S3 persistence
+      const persistPromise = handleVideoPartUpdate(
+        messageTimestamp,
+        messageVariantId,
+        "agent_video_suggest",
+        partTypeIndex,
+        updates
+      );
 
-        const msg = prev[msgIdx];
-        if (!Array.isArray(msg.content)) return prev;
-
-        const newContent = [...msg.content];
-        let typeCount = 0;
-        for (let i = 0; i < newContent.length; i++) {
-          if (newContent[i].type === "agent_video_suggest") {
-            if (typeCount === partTypeIndex) {
-              newContent[i] = { ...newContent[i], ...updates };
-              const newMessages = [...prev];
-              newMessages[msgIdx] = { ...msg, content: newContent };
-              return newMessages;
-            }
-            typeCount++;
-          }
-        }
-        return prev;
-      });
-
-      // Sync to desktop: find any video_suggest asset that references this message part
+      // Additionally sync to desktop: find any video_suggest asset that references this message part
       if (desktopId) {
-        // Fire and forget: update desktop assets that match this message
         (async () => {
           try {
             const res = await fetch(`/api/desktop/${desktopId}/assets/sync-video-suggest`, {
@@ -3102,15 +3081,9 @@ export default function ChatInterface({
         })();
       }
 
-      return persistPartUpdate(
-        messageTimestamp,
-        messageVariantId,
-        "agent_video_suggest",
-        partTypeIndex,
-        updates
-      );
+      return persistPromise;
     },
-    [persistPartUpdate, desktopId]
+    [handleVideoPartUpdate, desktopId]
   );
 
   // Handle direct video status updates from DirectVideoCard
