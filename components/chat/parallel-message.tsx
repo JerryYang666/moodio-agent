@@ -109,6 +109,17 @@ export default function ParallelMessage({
   const [swipeOffset, setSwipeOffset] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
   const touchStartRef = useRef<{ x: number; time: number } | null>(null);
+  const prevVariantsLengthRef = useRef(variants.length);
+
+  // Auto-navigate to the newest variant when one is added during generation
+  useEffect(() => {
+    const prevLen = prevVariantsLengthRef.current;
+    prevVariantsLengthRef.current = variants.length;
+
+    if (variants.length > prevLen && isGeneratingVariant) {
+      setCurrentVariantIndex(variants.length - 1);
+    }
+  }, [variants.length, isGeneratingVariant]);
 
   // Handle touch start
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
