@@ -898,7 +898,7 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
                 transition={{ duration: 0.2 }}
                 className="px-4 pt-3 overflow-hidden"
               >
-                <div className="flex items-center gap-2 p-2 rounded-lg border border-dashed border-default-300 bg-default-50 dark:bg-default-50/5">
+                <div className="flex flex-wrap items-center gap-2 p-2 rounded-lg border border-dashed border-default-300 bg-default-50 dark:bg-default-50/5">
                   <div className="flex gap-1.5 shrink-0">
                     {suggestedImages.slice(0, 3).map((img) => (
                       <div
@@ -918,25 +918,27 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
                       </div>
                     )}
                   </div>
-                  <span className="text-xs text-default-500 flex-1 min-w-0">
-                    {t("chat.suggestedImageLabel")}
-                  </span>
-                  <div className="flex gap-1 shrink-0">
-                    <Button
-                      size="sm"
-                      variant="light"
-                      onPress={onDismissSuggestedImages}
-                    >
-                      <X size={14} />
-                    </Button>
-                    <Button
-                      size="sm"
-                      color="primary"
-                      variant="flat"
-                      onPress={onConfirmSuggestedImages}
-                    >
-                      {t("chat.suggestedImageConfirm")}
-                    </Button>
+                  <div className="flex items-center gap-2 flex-1 min-w-[200px]">
+                    <span className="text-xs text-default-500 flex-1 min-w-0">
+                      {t("chat.suggestedImageLabel")}
+                    </span>
+                    <div className="flex gap-1 shrink-0">
+                      <Button
+                        size="sm"
+                        variant="light"
+                        onPress={onDismissSuggestedImages}
+                      >
+                        <X size={14} />
+                      </Button>
+                      <Button
+                        size="sm"
+                        color="primary"
+                        variant="flat"
+                        onPress={onConfirmSuggestedImages}
+                      >
+                        {t("chat.suggestedImageConfirm")}
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </motion.div>
