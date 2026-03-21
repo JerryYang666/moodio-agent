@@ -1798,6 +1798,157 @@ export default function ChatInterface({
     setDrawingImage(null);
   }, []);
 
+  // Shared logic for processing streaming content events (used by both
+  // the first-message handler and the variant handler).
+  const processStreamContentEvent = (
+    event: any,
+    variantId: string,
+    content: MessageContentPart[],
+    callbacks?: {
+      onBalanceRefresh?: (part: any, key: string) => void;
+      onDesktopImagePlacement?: (event: any, variantId: string, content: MessageContentPart[]) => void;
+    },
+  ): void => {
+    if (event.type === "shot_list_start") {
+      content.push({
+        type: "agent_shot_list",
+        title: "",
+        columns: [],
+        rows: [],
+        status: "streaming",
+      } as any);
+
+      if (desktopId) {
+        (async () => {
+          try {
+            const { getViewportVisibleCenterPosition } = await import("@/lib/desktop/types");
+            const pos = getViewportVisibleCenterPosition(700, 300);
+            window.dispatchEvent(
+              new CustomEvent("desktop-table-generating", {
+                detail: { desktopId, posX: pos.x, posY: pos.y },
+              })
+            );
+          } catch {
+            window.dispatchEvent(
+              new CustomEvent("desktop-table-generating", {
+                detail: { desktopId, posX: 0, posY: 0 },
+              })
+            );
+          }
+        })();
+      }
+    } else if (event.type === "internal_think") {
+      content.push({
+        type: "internal_think",
+        text: event.content,
+      });
+    } else if (event.type === "tool_call") {
+      const existingIdx = content.findIndex(
+        (p) => p.type === "tool_call" && (p as any).tool === event.tool
+      );
+      if (existingIdx !== -1) {
+        content[existingIdx] = {
+          type: "tool_call",
+          tool: event.tool,
+          status: event.status,
+        };
+      } else {
+        content.push({
+          type: "tool_call",
+          tool: event.tool,
+          status: event.status,
+        });
+      }
+    } else if (event.type === "text") {
+      content.push({ type: "text", text: event.content });
+    } else if (event.type === "part") {
+      if (event.part.type === "agent_shot_list" && event.part.status === "complete") {
+        const placeholderIdx = content.findIndex(
+          (p) => p.type === "agent_shot_list" && (p as any).status === "streaming"
+        );
+        if (placeholderIdx !== -1) {
+          content[placeholderIdx] = event.part;
+        } else {
+          content.push(event.part);
+        }
+      } else {
+        content.push(event.part);
+      }
+
+      const partRefreshKey = event.part?.imageId
+        ? `part:${variantId}:${event.part.imageId}`
+        : `part:${variantId}:${content.length}`;
+      callbacks?.onBalanceRefresh?.(event.part, partRefreshKey);
+
+      // Auto-create desktop asset for shot lists
+      if (event.part.type === "agent_shot_list" && desktopId) {
+        (async () => {
+          try {
+            const { getViewportVisibleCenterPosition } = await import("@/lib/desktop/types");
+            const tableH = 40 + event.part.rows.length * 36 + 40;
+            const pos = getViewportVisibleCenterPosition(700, tableH);
+            const assetRes = await fetch(`/api/desktop/${desktopId}/assets`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                assets: [{
+                  assetType: "table",
+                  metadata: {
+                    title: event.part.title,
+                    columns: event.part.columns,
+                    rows: event.part.rows,
+                    chatId: chatId,
+                    status: "complete",
+                  },
+                  posX: pos.x,
+                  posY: pos.y,
+                  width: 700,
+                  height: tableH,
+                }],
+              }),
+            });
+            if (assetRes.ok) {
+              const assetData = await assetRes.json();
+              window.dispatchEvent(
+                new CustomEvent("desktop-asset-added", {
+                  detail: { assets: assetData.assets, desktopId },
+                })
+              );
+            }
+          } catch (e) {
+            console.error("Failed to add shot list asset to desktop:", e);
+          }
+        })();
+      }
+    } else if (event.type === "part_update") {
+      if (event.imageId) {
+        const partIdx = content.findIndex(
+          (p) => isGeneratedImagePart(p) && p.imageId === event.imageId
+        );
+        if (partIdx !== -1) {
+          content[partIdx] = event.part;
+        }
+      } else if (event.index !== undefined) {
+        const hasThink = content.some(
+          (p) => p.type === "internal_think"
+        );
+        const offset = hasThink ? 2 : 1;
+        if (content[event.index + offset]) {
+          content[event.index + offset] = event.part;
+        }
+      }
+
+      const partUpdateRefreshKey = event.imageId
+        ? `part_update:${variantId}:${event.imageId}`
+        : event.part?.imageId
+          ? `part_update:${variantId}:${event.part.imageId}`
+          : `part_update:${variantId}:${event.index ?? "unknown"}`;
+      callbacks?.onBalanceRefresh?.(event.part, partUpdateRefreshKey);
+
+      callbacks?.onDesktopImagePlacement?.(event, variantId, content);
+    }
+  };
+
   const handleSend = async () => {
     // Clear post-message suggestions, ask-user questions, and image suggestions when sending
     setPostMessageSuggestions([]);
@@ -2280,257 +2431,117 @@ export default function ChatInterface({
 
             const currentContent = variantContents[variantId];
 
-            if (event.type === "internal_think") {
-              // Add internal_think part
-              currentContent.push({
-                type: "internal_think",
-                text: event.content,
-              });
-            } else if (event.type === "tool_call") {
-              // Tool call status updates — find existing or push new
-              const existingIdx = currentContent.findIndex(
-                (p) => p.type === "tool_call" && (p as any).tool === event.tool
-              );
-              if (existingIdx !== -1) {
-                currentContent[existingIdx] = {
-                  type: "tool_call",
-                  tool: event.tool,
-                  status: event.status,
-                };
-              } else {
-                currentContent.push({
-                  type: "tool_call",
-                  tool: event.tool,
-                  status: event.status,
-                });
-              }
-            } else if (event.type === "text") {
-              currentContent.push({ type: "text", text: event.content });
-            } else if (event.type === "part") {
-              // If this is a completed shot list, replace the streaming placeholder
-              if (event.part.type === "agent_shot_list" && event.part.status === "complete") {
-                const placeholderIdx = currentContent.findIndex(
-                  (p) => p.type === "agent_shot_list" && (p as any).status === "streaming"
-                );
-                if (placeholderIdx !== -1) {
-                  currentContent[placeholderIdx] = event.part;
-                } else {
-                  currentContent.push(event.part);
-                }
-              } else {
-                currentContent.push(event.part);
-              }
+            processStreamContentEvent(event, variantId, currentContent, {
+              onBalanceRefresh: refreshBalanceForGeneratedImage,
+              onDesktopImagePlacement: (evt, vId, content) => {
+                // Auto-place generated images and video suggestions onto the desktop canvas
+                if (desktopId && evt.part?.status === "generated" && evt.part?.imageId) {
+                  const partType = evt.part.type;
+                  if (partType === "agent_image" || partType === "agent_video_suggest") {
+                    (async () => {
+                      try {
+                        const { getViewportVisibleCenterPosition } = await import("@/lib/desktop/types");
 
-              const partRefreshKey = event.part?.imageId
-                ? `part:${variantId}:${event.part.imageId}`
-                : `part:${variantId}:${currentContent.length}`;
-              refreshBalanceForGeneratedImage(event.part, partRefreshKey);
-
-              // Auto-create desktop asset for shot lists
-              if (event.part.type === "agent_shot_list" && desktopId) {
-                (async () => {
-                  try {
-                    const { getViewportVisibleCenterPosition } = await import("@/lib/desktop/types");
-                    const tableH = 40 + event.part.rows.length * 36 + 40;
-                    const pos = getViewportVisibleCenterPosition(700, tableH);
-                    const assetRes = await fetch(`/api/desktop/${desktopId}/assets`, {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({
-                        assets: [{
-                          assetType: "table",
-                          metadata: {
-                            title: event.part.title,
-                            columns: event.part.columns,
-                            rows: event.part.rows,
-                            chatId: chatId,
-                            status: "complete",
-                          },
-                          posX: pos.x,
-                          posY: pos.y,
-                          width: 700,
-                          height: tableH,
-                        }],
-                      }),
-                    });
-                    if (assetRes.ok) {
-                      const assetData = await assetRes.json();
-                      window.dispatchEvent(
-                        new CustomEvent("desktop-asset-added", {
-                          detail: { assets: assetData.assets, desktopId },
-                        })
-                      );
-                    }
-                  } catch (e) {
-                    console.error("Failed to add shot list asset to desktop:", e);
-                  }
-                })();
-              }
-            } else if (event.type === "shot_list_start") {
-              // Show loading placeholder in chat
-              currentContent.push({
-                type: "agent_shot_list",
-                title: "",
-                columns: [],
-                rows: [],
-                status: "streaming",
-              } as any);
-
-              // Broadcast generating event to the room
-              if (desktopId) {
-                (async () => {
-                  try {
-                    const { getViewportVisibleCenterPosition } = await import("@/lib/desktop/types");
-                    const pos = getViewportVisibleCenterPosition(700, 300);
-                    window.dispatchEvent(
-                      new CustomEvent("desktop-table-generating", {
-                        detail: { desktopId, posX: pos.x, posY: pos.y },
-                      })
-                    );
-                  } catch {
-                    window.dispatchEvent(
-                      new CustomEvent("desktop-table-generating", {
-                        detail: { desktopId, posX: 0, posY: 0 },
-                      })
-                    );
-                  }
-                })();
-              }
-            } else if (event.type === "part_update") {
-              // Update existing part by imageId (for parallel support)
-              if (event.imageId) {
-                // Find the part with matching imageId
-                const partIdx = currentContent.findIndex(
-                  (p) => isGeneratedImagePart(p) && p.imageId === event.imageId
-                );
-                if (partIdx !== -1) {
-                  currentContent[partIdx] = event.part;
-                }
-              } else if (event.index !== undefined) {
-                // Legacy: Update by index (backward compatibility)
-                const hasThink = currentContent.some(
-                  (p) => p.type === "internal_think"
-                );
-                const offset = hasThink ? 2 : 1;
-                if (currentContent[event.index + offset]) {
-                  currentContent[event.index + offset] = event.part;
-                }
-              }
-
-              const partUpdateRefreshKey = event.imageId
-                ? `part_update:${variantId}:${event.imageId}`
-                : event.part?.imageId
-                  ? `part_update:${variantId}:${event.part.imageId}`
-                  : `part_update:${variantId}:${event.index ?? "unknown"}`;
-              refreshBalanceForGeneratedImage(event.part, partUpdateRefreshKey);
-
-              // Auto-place generated images and video suggestions onto the desktop canvas
-              if (desktopId && event.part?.status === "generated" && event.part?.imageId) {
-                const partType = event.part.type;
-                if (partType === "agent_image" || partType === "agent_video_suggest") {
-                  (async () => {
-                    try {
-                      const { getViewportVisibleCenterPosition } = await import("@/lib/desktop/types");
-
-                      // Compute anchor position once per variant
-                      if (!desktopAnchorPositions[variantId]) {
-                        desktopAnchorPositions[variantId] = getViewportVisibleCenterPosition(
-                          partType === "agent_image" ? 620 : 340,
-                          partType === "agent_image" ? 620 : 440
-                        );
-                      }
-                      const anchor = desktopAnchorPositions[variantId]!;
-
-                      let posX: number;
-                      let posY: number;
-
-                      if (partType === "agent_image") {
-                        // 2x2 grid layout: 300px wide with 10px gap
-                        const idx = desktopPlacedImages[variantId] || 0;
-                        desktopPlacedImages[variantId] = idx + 1;
-                        const col = idx % 2;
-                        const row = Math.floor(idx / 2);
-                        posX = anchor.x + col * 310;
-                        posY = anchor.y + row * 310;
-
-                        const assetRes = await fetch(`/api/desktop/${desktopId}/assets`, {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({
-                            assets: [{
-                              assetType: "image",
-                              metadata: {
-                                imageId: event.part.imageId,
-                                chatId: chatId,
-                                title: event.part.title || "",
-                                prompt: event.part.prompt || "",
-                                status: "generated",
-                              },
-                              posX,
-                              posY,
-                            }],
-                          }),
-                        });
-                        if (assetRes.ok) {
-                          const assetData = await assetRes.json();
-                          window.dispatchEvent(
-                            new CustomEvent("desktop-asset-added", {
-                              detail: { assets: assetData.assets, desktopId },
-                            })
+                        // Compute anchor position once per variant
+                        if (!desktopAnchorPositions[vId]) {
+                          desktopAnchorPositions[vId] = getViewportVisibleCenterPosition(
+                            partType === "agent_image" ? 620 : 340,
+                            partType === "agent_image" ? 620 : 440
                           );
                         }
-                      } else if (partType === "agent_video_suggest") {
-                        // Vertical column layout: 340px wide, 100px tall with 10px gap
-                        const idx = desktopPlacedVideoSuggests[variantId] || 0;
-                        desktopPlacedVideoSuggests[variantId] = idx + 1;
-                        posX = anchor.x;
-                        posY = anchor.y + idx * 110;
+                        const anchor = desktopAnchorPositions[vId]!;
 
-                        // Compute partTypeIndex: count how many video_suggest parts exist before this one
-                        const partTypeIndex = currentContent.filter(
-                          (p) => p.type === "agent_video_suggest"
-                        ).length - 1;
+                        let posX: number;
+                        let posY: number;
 
-                        const assetRes = await fetch(`/api/desktop/${desktopId}/assets`, {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({
-                            assets: [{
-                              assetType: "video_suggest",
-                              metadata: {
-                                imageId: event.part.imageId,
-                                chatId: chatId,
-                                title: event.part.title || "",
-                                videoIdea: event.part.videoIdea || "",
-                                prompt: event.part.prompt || "",
-                                aspectRatio: event.part.aspectRatio || "",
-                                messageTimestamp: variantTimestamp,
-                                messageVariantId: variantId !== "default" ? variantId : undefined,
-                                partTypeIndex: Math.max(0, partTypeIndex),
-                              },
-                              posX,
-                              posY,
-                              width: 340,
-                              height: 100,
-                            }],
-                          }),
-                        });
-                        if (assetRes.ok) {
-                          const assetData = await assetRes.json();
-                          window.dispatchEvent(
-                            new CustomEvent("desktop-asset-added", {
-                              detail: { assets: assetData.assets, desktopId },
-                            })
-                          );
+                        if (partType === "agent_image") {
+                          // 2x2 grid layout: 300px wide with 10px gap
+                          const idx = desktopPlacedImages[vId] || 0;
+                          desktopPlacedImages[vId] = idx + 1;
+                          const col = idx % 2;
+                          const row = Math.floor(idx / 2);
+                          posX = anchor.x + col * 310;
+                          posY = anchor.y + row * 310;
+
+                          const assetRes = await fetch(`/api/desktop/${desktopId}/assets`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                              assets: [{
+                                assetType: "image",
+                                metadata: {
+                                  imageId: evt.part.imageId,
+                                  chatId: chatId,
+                                  title: evt.part.title || "",
+                                  prompt: evt.part.prompt || "",
+                                  status: "generated",
+                                },
+                                posX,
+                                posY,
+                              }],
+                            }),
+                          });
+                          if (assetRes.ok) {
+                            const assetData = await assetRes.json();
+                            window.dispatchEvent(
+                              new CustomEvent("desktop-asset-added", {
+                                detail: { assets: assetData.assets, desktopId },
+                              })
+                            );
+                          }
+                        } else if (partType === "agent_video_suggest") {
+                          // Vertical column layout: 340px wide, 100px tall with 10px gap
+                          const idx = desktopPlacedVideoSuggests[vId] || 0;
+                          desktopPlacedVideoSuggests[vId] = idx + 1;
+                          posX = anchor.x;
+                          posY = anchor.y + idx * 110;
+
+                          // Compute partTypeIndex: count how many video_suggest parts exist before this one
+                          const partTypeIndex = content.filter(
+                            (p) => p.type === "agent_video_suggest"
+                          ).length - 1;
+
+                          const assetRes = await fetch(`/api/desktop/${desktopId}/assets`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                              assets: [{
+                                assetType: "video_suggest",
+                                metadata: {
+                                  imageId: evt.part.imageId,
+                                  chatId: chatId,
+                                  title: evt.part.title || "",
+                                  videoIdea: evt.part.videoIdea || "",
+                                  prompt: evt.part.prompt || "",
+                                  aspectRatio: evt.part.aspectRatio || "",
+                                  messageTimestamp: variantTimestamp,
+                                  messageVariantId: vId !== "default" ? vId : undefined,
+                                  partTypeIndex: Math.max(0, partTypeIndex),
+                                },
+                                posX,
+                                posY,
+                                width: 340,
+                                height: 100,
+                              }],
+                            }),
+                          });
+                          if (assetRes.ok) {
+                            const assetData = await assetRes.json();
+                            window.dispatchEvent(
+                              new CustomEvent("desktop-asset-added", {
+                                detail: { assets: assetData.assets, desktopId },
+                              })
+                            );
+                          }
                         }
+                      } catch (e) {
+                        console.error("Failed to auto-place agent output on desktop:", e);
                       }
-                    } catch (e) {
-                      console.error("Failed to auto-place agent output on desktop:", e);
-                    }
-                  })();
+                    })();
+                  }
                 }
-              }
-            }
+              },
+            });
 
             // Update the specific variant message
             updateStreamMessages((prev) => {
@@ -3376,119 +3387,7 @@ export default function ChatInterface({
               isFirstChunk = false;
             }
 
-            // Process content events
-            if (event.type === "shot_list_start") {
-              // Show loading placeholder in chat (same as first message)
-              variantContent.push({
-                type: "agent_shot_list",
-                title: "",
-                columns: [],
-                rows: [],
-                status: "streaming",
-              } as any);
-
-              // Broadcast generating event to the room
-              if (desktopId) {
-                (async () => {
-                  try {
-                    const { getViewportVisibleCenterPosition } = await import("@/lib/desktop/types");
-                    const pos = getViewportVisibleCenterPosition(700, 300);
-                    window.dispatchEvent(
-                      new CustomEvent("desktop-table-generating", {
-                        detail: { desktopId, posX: pos.x, posY: pos.y },
-                      })
-                    );
-                  } catch {
-                    window.dispatchEvent(
-                      new CustomEvent("desktop-table-generating", {
-                        detail: { desktopId, posX: 0, posY: 0 },
-                      })
-                    );
-                  }
-                })();
-              }
-            } else if (event.type === "internal_think") {
-              // Add internal_think part
-              variantContent.push({
-                type: "internal_think",
-                text: event.content,
-              });
-            } else if (event.type === "text") {
-              variantContent.push({ type: "text", text: event.content });
-            } else if (event.type === "part") {
-              if (event.part.type === "agent_shot_list" && event.part.status === "complete") {
-                const placeholderIdx = variantContent.findIndex(
-                  (p) => p.type === "agent_shot_list" && (p as any).status === "streaming"
-                );
-                if (placeholderIdx !== -1) {
-                  variantContent[placeholderIdx] = event.part;
-                } else {
-                  variantContent.push(event.part);
-                }
-
-                // Auto-create desktop asset for shot lists
-                if (desktopId) {
-                  (async () => {
-                    try {
-                      const { getViewportVisibleCenterPosition } = await import("@/lib/desktop/types");
-                      const tableH = 40 + event.part.rows.length * 36 + 40;
-                      const pos = getViewportVisibleCenterPosition(700, tableH);
-                      const assetRes = await fetch(`/api/desktop/${desktopId}/assets`, {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                          assets: [{
-                            assetType: "table",
-                            metadata: {
-                              title: event.part.title,
-                              columns: event.part.columns,
-                              rows: event.part.rows,
-                              chatId: chatId,
-                              status: "complete",
-                            },
-                            posX: pos.x,
-                            posY: pos.y,
-                            width: 700,
-                            height: tableH,
-                          }],
-                        }),
-                      });
-                      if (assetRes.ok) {
-                        const assetData = await assetRes.json();
-                        window.dispatchEvent(
-                          new CustomEvent("desktop-asset-added", {
-                            detail: { assets: assetData.assets, desktopId },
-                          })
-                        );
-                      }
-                    } catch (e) {
-                      console.error("Failed to add variant shot list asset to desktop:", e);
-                    }
-                  })();
-                }
-              } else {
-                variantContent.push(event.part);
-              }
-            } else if (event.type === "part_update") {
-              // Update existing part by imageId
-              if (event.imageId) {
-                const partIdx = variantContent.findIndex(
-                  (p) => isGeneratedImagePart(p) && p.imageId === event.imageId
-                );
-                if (partIdx !== -1) {
-                  variantContent[partIdx] = event.part;
-                }
-              } else if (event.index !== undefined) {
-                // Legacy: Update by index (backward compatibility)
-                const hasThink = variantContent.some(
-                  (p) => p.type === "internal_think"
-                );
-                const offset = hasThink ? 2 : 1;
-                if (variantContent[event.index + offset]) {
-                  variantContent[event.index + offset] = event.part;
-                }
-              }
-            }
+            processStreamContentEvent(event, variantId, variantContent);
 
             // Update the message in state
             updateStreamMessages((prev) => {
