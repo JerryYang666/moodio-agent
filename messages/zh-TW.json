@@ -159,6 +159,10 @@
     "editInNewChatDescription": "這將從此處建立新對話，並保留到目前為止的對話記錄。",
     "editAndFork": "編輯並分支",
     "sendSelectionToDesktop": "傳送到桌面",
+    "videoSuggestTitle": "標題",
+    "videoSuggestIdea": "影片創意",
+    "suggestedImageLabel": "您可能想要傳送這張圖片",
+    "suggestedImageConfirm": "加入",
     "errorMessages": {
       "overwhelmed": "糟糕！智慧代理有點手忙腳亂...可以再試一次嗎？",
       "coffeeBreak": "抱歉！智慧代理正在喝咖啡休息中。請再試一次！",

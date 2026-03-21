@@ -285,6 +285,8 @@ export default function ChatInterface({
   >(null);
   // Unified pending images array - replaces selectedFile, previewUrl, selectedAsset, selectedAgentPart
   const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
+  // Suggested images from last user message - shown as a suggestion, not yet in pending area
+  const [suggestedImages, setSuggestedImages] = useState<PendingImage[]>([]);
   // Pending videos array (max 1 video, combined limit with images is 10)
   const [pendingVideos, setPendingVideos] = useState<PendingVideo[]>([]);
   const [isAssetPickerOpen, setIsAssetPickerOpen] = useState(false);
@@ -854,7 +856,8 @@ export default function ChatInterface({
         return { file, tempId, localPreviewUrl, placeholder };
       });
 
-      // Add all placeholders at once
+      // Add all placeholders at once — clear image suggestions since user is adding their own
+      setSuggestedImages([]);
       setPendingImages((prev) => [...prev, ...entries.map((e) => e.placeholder)]);
 
       // Show compression warning for any files that exceed the threshold
@@ -1146,6 +1149,49 @@ export default function ChatInterface({
     return () => window.removeEventListener(SUGGESTION_BUBBLE_EVENT, handler);
   }, [handleSuggestionBubbleActivate]);
 
+  // Listen for video suggest edits synced from the desktop canvas
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (!detail) return;
+      const { chatId: syncedChatId, messageTimestamp, messageVariantId, partTypeIndex, updates } = detail;
+      // Only apply if it's for the current chat
+      if (syncedChatId !== chatIdRef.current) return;
+
+      setMessages((prev) => {
+        const byVariantIdx = messageVariantId
+          ? prev.findIndex((m) => m.variantId === messageVariantId)
+          : -1;
+        const msgIdx =
+          byVariantIdx !== -1
+            ? byVariantIdx
+            : prev.findIndex((m) => m.createdAt === messageTimestamp);
+        if (msgIdx === -1) return prev;
+
+        const msg = prev[msgIdx];
+        if (!Array.isArray(msg.content)) return prev;
+
+        const newContent = [...msg.content];
+        let typeCount = 0;
+        for (let i = 0; i < newContent.length; i++) {
+          if (newContent[i].type === "agent_video_suggest") {
+            if (typeCount === partTypeIndex) {
+              newContent[i] = { ...newContent[i], ...updates };
+              const newMessages = [...prev];
+              newMessages[msgIdx] = { ...msg, content: newContent };
+              return newMessages;
+            }
+            typeCount++;
+          }
+        }
+        return prev;
+      });
+    };
+
+    window.addEventListener("video-suggest-synced-from-desktop", handler);
+    return () => window.removeEventListener("video-suggest-synced-from-desktop", handler);
+  }, []);
+
   // Add an asset from the library to pending images
   const addAssetImage = useCallback(
     (asset: {
@@ -1178,6 +1224,7 @@ export default function ChatInterface({
         title: asset.title,
       };
 
+      setSuggestedImages([]);
       setPendingImages((prev) => [...prev, newImage]);
     },
     [pendingImages, t]
@@ -1284,20 +1331,31 @@ export default function ChatInterface({
     setIsReferenceImagesCollapsed((prev) => !prev);
   }, []);
 
-  // Pre-select images from the last user message with images
-  // This helps users who want to continue editing the same images
-  // Skip if draft had images (draft takes priority over system pre-select)
+  // Pre-select images from the last user message with images.
+  // Instead of directly adding to pending, show them as a suggestion
+  // that the user can confirm or dismiss.
   const applyPreselectImages = useCallback((msgs: Message[]) => {
     // Skip pre-select if draft had images (draft takes priority)
     if (draftHadImages) {
       return;
     }
-    
+
     const preselectedImages = getPreselectImages(msgs);
     if (preselectedImages.length > 0) {
-      setPendingImages(preselectedImages);
+      setSuggestedImages(preselectedImages);
     }
   }, [draftHadImages]);
+
+  // Confirm suggested images: move them to pending area
+  const confirmSuggestedImages = useCallback(() => {
+    setPendingImages((prev) => [...prev, ...suggestedImages]);
+    setSuggestedImages([]);
+  }, [suggestedImages]);
+
+  // Dismiss suggested images
+  const dismissSuggestedImages = useCallback(() => {
+    setSuggestedImages([]);
+  }, []);
 
   // Extract post-message suggestions from the last assistant message
   const extractPostMessageSuggestions = useCallback((msgs: Message[]) => {
@@ -1741,10 +1799,11 @@ export default function ChatInterface({
   }, []);
 
   const handleSend = async () => {
-    // Clear post-message suggestions and ask-user questions when sending a new message
+    // Clear post-message suggestions, ask-user questions, and image suggestions when sending
     setPostMessageSuggestions([]);
     setAskUserQuestions(null);
     setShowCreativeSuggestions(false);
+    setSuggestedImages([]);
 
     // Block send if uploading images or videos
     if (hasUploadingImages(pendingImages) || hasUploadingVideos(pendingVideos)) {
@@ -2027,6 +2086,11 @@ export default function ChatInterface({
       let variantTimestamp: number | null = null;
       // Track already-refreshed image updates to avoid duplicate balance refetches.
       const refreshedImageKeys = new Set<string>();
+      // Track generated image/video-suggest counts per variant for desktop grid placement
+      const desktopPlacedImages: Record<string, number> = {};
+      const desktopPlacedVideoSuggests: Record<string, number> = {};
+      // Track the anchor position per variant for desktop placement (computed once per batch)
+      const desktopAnchorPositions: Record<string, { x: number; y: number } | null> = {};
       const refreshBalanceForGeneratedImage = (
         part: MessageContentPart,
         refreshKey: string
@@ -2358,6 +2422,113 @@ export default function ChatInterface({
                   ? `part_update:${variantId}:${event.part.imageId}`
                   : `part_update:${variantId}:${event.index ?? "unknown"}`;
               refreshBalanceForGeneratedImage(event.part, partUpdateRefreshKey);
+
+              // Auto-place generated images and video suggestions onto the desktop canvas
+              if (desktopId && event.part?.status === "generated" && event.part?.imageId) {
+                const partType = event.part.type;
+                if (partType === "agent_image" || partType === "agent_video_suggest") {
+                  (async () => {
+                    try {
+                      const { getViewportVisibleCenterPosition } = await import("@/lib/desktop/types");
+
+                      // Compute anchor position once per variant
+                      if (!desktopAnchorPositions[variantId]) {
+                        desktopAnchorPositions[variantId] = getViewportVisibleCenterPosition(
+                          partType === "agent_image" ? 620 : 340,
+                          partType === "agent_image" ? 620 : 440
+                        );
+                      }
+                      const anchor = desktopAnchorPositions[variantId]!;
+
+                      let posX: number;
+                      let posY: number;
+
+                      if (partType === "agent_image") {
+                        // 2x2 grid layout: 300px wide with 10px gap
+                        const idx = desktopPlacedImages[variantId] || 0;
+                        desktopPlacedImages[variantId] = idx + 1;
+                        const col = idx % 2;
+                        const row = Math.floor(idx / 2);
+                        posX = anchor.x + col * 310;
+                        posY = anchor.y + row * 310;
+
+                        const assetRes = await fetch(`/api/desktop/${desktopId}/assets`, {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({
+                            assets: [{
+                              assetType: "image",
+                              metadata: {
+                                imageId: event.part.imageId,
+                                chatId: chatId,
+                                title: event.part.title || "",
+                                prompt: event.part.prompt || "",
+                                status: "generated",
+                              },
+                              posX,
+                              posY,
+                            }],
+                          }),
+                        });
+                        if (assetRes.ok) {
+                          const assetData = await assetRes.json();
+                          window.dispatchEvent(
+                            new CustomEvent("desktop-asset-added", {
+                              detail: { assets: assetData.assets, desktopId },
+                            })
+                          );
+                        }
+                      } else if (partType === "agent_video_suggest") {
+                        // Vertical column layout: 340px wide, 100px tall with 10px gap
+                        const idx = desktopPlacedVideoSuggests[variantId] || 0;
+                        desktopPlacedVideoSuggests[variantId] = idx + 1;
+                        posX = anchor.x;
+                        posY = anchor.y + idx * 110;
+
+                        // Compute partTypeIndex: count how many video_suggest parts exist before this one
+                        const partTypeIndex = currentContent.filter(
+                          (p) => p.type === "agent_video_suggest"
+                        ).length - 1;
+
+                        const assetRes = await fetch(`/api/desktop/${desktopId}/assets`, {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({
+                            assets: [{
+                              assetType: "video_suggest",
+                              metadata: {
+                                imageId: event.part.imageId,
+                                chatId: chatId,
+                                title: event.part.title || "",
+                                videoIdea: event.part.videoIdea || "",
+                                prompt: event.part.prompt || "",
+                                aspectRatio: event.part.aspectRatio || "",
+                                messageTimestamp: variantTimestamp,
+                                messageVariantId: variantId !== "default" ? variantId : undefined,
+                                partTypeIndex: Math.max(0, partTypeIndex),
+                              },
+                              posX,
+                              posY,
+                              width: 340,
+                              height: 100,
+                            }],
+                          }),
+                        });
+                        if (assetRes.ok) {
+                          const assetData = await assetRes.json();
+                          window.dispatchEvent(
+                            new CustomEvent("desktop-asset-added", {
+                              detail: { assets: assetData.assets, desktopId },
+                            })
+                          );
+                        }
+                      }
+                    } catch (e) {
+                      console.error("Failed to auto-place agent output on desktop:", e);
+                    }
+                  })();
+                }
+              }
             }
 
             // Update the specific variant message
@@ -2814,7 +2985,7 @@ export default function ChatInterface({
   // Addressed by message timestamp + Nth occurrence of the part type.
   // Returns a Promise that resolves when the S3 persist completes so callers
   // can await it before triggering dependent operations (e.g. video generation).
-  const handleVideoPartUpdate = useCallback(
+  const handlePartUpdate = useCallback(
     (
       messageTimestamp: number,
       messageVariantId: string | undefined,
@@ -2859,6 +3030,60 @@ export default function ChatInterface({
       );
     },
     [persistPartUpdate]
+  );
+
+  // Handle agent_video_suggest part edits (title/videoIdea).
+  // Updates local state, persists to S3, and syncs to any desktop asset that
+  // references this message via matching messageTimestamp + partTypeIndex.
+  const handleVideoSuggestPartUpdate = useCallback(
+    (
+      messageTimestamp: number,
+      messageVariantId: string | undefined,
+      partTypeIndex: number,
+      updates: { title: string; videoIdea: string }
+    ): Promise<void> => {
+      // Reuse the generic handler for state update + S3 persistence
+      const persistPromise = handlePartUpdate(
+        messageTimestamp,
+        messageVariantId,
+        "agent_video_suggest",
+        partTypeIndex,
+        updates
+      );
+
+      // Additionally sync to desktop: find any video_suggest asset that references this message part
+      if (desktopId) {
+        (async () => {
+          try {
+            const res = await fetch(`/api/desktop/${desktopId}/assets/sync-video-suggest`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                messageTimestamp,
+                messageVariantId,
+                partTypeIndex,
+                updates,
+              }),
+            });
+            if (res.ok) {
+              const data = await res.json();
+              if (data.asset) {
+                window.dispatchEvent(
+                  new CustomEvent("desktop-asset-updated", {
+                    detail: { asset: data.asset, desktopId },
+                  })
+                );
+              }
+            }
+          } catch (e) {
+            console.error("Failed to sync video suggest edit to desktop:", e);
+          }
+        })();
+      }
+
+      return persistPromise;
+    },
+    [handlePartUpdate, desktopId]
   );
 
   // Handle direct video status updates from DirectVideoCard
@@ -3279,7 +3504,8 @@ export default function ChatInterface({
                 desktopId={desktopId}
                 allMessages={messages}
                 onSendAsVideoMessage={handleSendVideoFromAgent}
-                onVideoPartUpdate={handleVideoPartUpdate}
+                onPartUpdate={handlePartUpdate}
+                onVideoSuggestPartUpdate={handleVideoSuggestPartUpdate}
               />
             );
           } else {
@@ -3331,7 +3557,8 @@ export default function ChatInterface({
                 onDirectVideoStatusUpdate={handleDirectVideoStatusUpdate}
                 onDirectVideoRestore={handleDirectVideoRestore}
                 onSendAsVideoMessage={handleSendVideoFromAgent}
-                onVideoPartUpdate={handleVideoPartUpdate}
+                onPartUpdate={handlePartUpdate}
+                onVideoSuggestPartUpdate={handleVideoSuggestPartUpdate}
                 isTimestampLoading={isStreamingAssistantGroup}
               />
             );
@@ -3401,6 +3628,9 @@ export default function ChatInterface({
         onStopRecording={stopRecording}
         pendingImages={pendingImages}
         onRemovePendingImage={removePendingImage}
+        suggestedImages={suggestedImages}
+        onConfirmSuggestedImages={confirmSuggestedImages}
+        onDismissSuggestedImages={dismissSuggestedImages}
         pendingVideos={pendingVideos}
         onRemovePendingVideo={removePendingVideo}
         onOpenAssetPicker={openPendingImagePicker}

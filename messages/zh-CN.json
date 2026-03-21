@@ -159,6 +159,10 @@
     "editInNewChatDescription": "这将从这里开始创建一个新对话，并保留到此为止的对话历史。",
     "editAndFork": "编辑并分支",
     "sendSelectionToDesktop": "发送到桌面",
+    "videoSuggestTitle": "标题",
+    "videoSuggestIdea": "视频创意",
+    "suggestedImageLabel": "你可能想要发送这张图片",
+    "suggestedImageConfirm": "添加",
     "errorMessages": {
       "overwhelmed": "哎呀！我们的智能体有点忙不过来了... 请再试一次？",
       "coffeeBreak": "抱歉！我们的智能体正在休息中，请稍后再试！",

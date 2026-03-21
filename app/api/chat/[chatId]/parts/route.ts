@@ -9,6 +9,7 @@ import type { MessageContentPart } from "@/lib/llm/types";
 
 const UPDATABLE_PART_TYPES = new Set<MessageContentPart["type"]>([
   "agent_video",
+  "agent_video_suggest",
 ]);
 
 /**

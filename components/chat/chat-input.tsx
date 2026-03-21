@@ -69,6 +69,12 @@ interface ChatInputProps {
   onStopRecording: () => void;
   pendingImages: PendingImage[];
   onRemovePendingImage: (imageId: string) => void;
+  /** Suggested images from last user message (shown as a confirm-to-add box) */
+  suggestedImages?: PendingImage[];
+  /** Confirm the suggested images and add them to pending area */
+  onConfirmSuggestedImages?: () => void;
+  /** Dismiss the suggested images */
+  onDismissSuggestedImages?: () => void;
   pendingVideos?: PendingVideo[];
   onRemovePendingVideo?: (videoId: string) => void;
   onOpenAssetPicker: () => void;
@@ -137,6 +143,9 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
   onStopRecording,
   pendingImages,
   onRemovePendingImage,
+  suggestedImages = [],
+  onConfirmSuggestedImages,
+  onDismissSuggestedImages,
   pendingVideos = [],
   onRemovePendingVideo,
   onOpenAssetPicker,
@@ -874,6 +883,63 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
                       )}
                     </>
                   )}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Suggested images from previous message */}
+          <AnimatePresence>
+            {suggestedImages.length > 0 && pendingImages.length === 0 && menuState.mode !== "video" && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="px-4 pt-3 overflow-hidden"
+              >
+                <div className="flex flex-wrap items-center gap-2 p-2 rounded-lg border border-dashed border-default-300 bg-default-50 dark:bg-default-50/5">
+                  <div className="flex gap-1.5 shrink-0">
+                    {suggestedImages.slice(0, 3).map((img) => (
+                      <div
+                        key={img.imageId}
+                        className="h-10 w-10 rounded border border-divider overflow-hidden shrink-0"
+                      >
+                        <img
+                          src={img.url}
+                          alt={img.title || t("chat.image")}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    ))}
+                    {suggestedImages.length > 3 && (
+                      <div className="h-10 w-10 rounded border border-divider flex items-center justify-center bg-default-100 text-default-500 text-xs">
+                        +{suggestedImages.length - 3}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 flex-1 min-w-[200px]">
+                    <span className="text-xs text-default-500 flex-1 min-w-0">
+                      {t("chat.suggestedImageLabel")}
+                    </span>
+                    <div className="flex gap-1 shrink-0">
+                      <Button
+                        size="sm"
+                        variant="light"
+                        onPress={onDismissSuggestedImages}
+                      >
+                        <X size={14} />
+                      </Button>
+                      <Button
+                        size="sm"
+                        color="primary"
+                        variant="flat"
+                        onPress={onConfirmSuggestedImages}
+                      >
+                        {t("chat.suggestedImageConfirm")}
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               </motion.div>
             )}

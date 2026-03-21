@@ -556,7 +556,7 @@ describe("Agent 2 LLM integration: VIDEO", () => {
         {
           role: "user",
           content:
-            "[Image ID: img-abc123] Suggestion: Golden Sunset\nAspect Ratio: 16:9\nPrompt: A golden sunset over the ocean\n\nCreate a video from this image. Animate it with a slow camera push-in and gentle waves.",
+            "[Image ID: img-abc123] Suggestion: Golden Sunset\nAspect Ratio: 16:9\nPrompt: A golden sunset over the ocean\n\nCreate a video from this image. Purpose: personal project. Duration: 5 seconds. Aspect ratio: 16:9 landscape. Style: cinematic. Motion: slow camera push-in with gentle waves. Mood: warm and peaceful. No questions needed — all details are provided, proceed directly to video generation.",
         },
       ]);
 
@@ -728,7 +728,7 @@ describe("Agent 2 LLM integration: VIDEO_SUGGEST", () => {
     "sends think, text, and video suggest events for a video idea request",
     async () => {
       const { events, finalContent } = await runPipeline(
-        "Give me 4 video ideas for a 15-second 16:9 landscape travel vlog about Tokyo street food"
+        "Give me exactly 4 video ideas for a 15-second 16:9 landscape travel vlog about Tokyo street food. Purpose: social media content. Target audience: foodies and travelers. Mood: vibrant and energetic. Style: handheld documentary. All details are provided — skip clarifying questions and go straight to video suggestions."
       );
 
       assertThinkEvent(events);
@@ -746,7 +746,7 @@ describe("Agent 2 LLM integration: VIDEO_SUGGEST", () => {
     "defaults to 4 video suggestions",
     async () => {
       const { events, finalContent } = await runPipeline(
-        "Suggest 4 video ideas for a 30-second 9:16 vertical coffee brand social media ad"
+        "Suggest exactly 4 video ideas for a 30-second 9:16 vertical coffee brand social media ad. Purpose: Instagram Reels ad campaign. Target audience: young coffee lovers aged 18-35. Mood: cozy and aspirational. Style: product showcase with lifestyle. All details are provided — skip clarifying questions and go straight to video suggestions."
       );
 
       const placeholders = events.filter(
@@ -764,7 +764,7 @@ describe("Agent 2 LLM integration: VIDEO_SUGGEST", () => {
     "each video suggest part contains a videoIdea field",
     async () => {
       const { finalContent } = await runPipeline(
-        "Give me 4 video ideas for a 15-second 16:9 underwater nature documentary short"
+        "Give me exactly 4 video ideas for a 15-second 16:9 underwater nature documentary short. Purpose: YouTube Shorts. Target audience: nature enthusiasts. Mood: serene and awe-inspiring. Style: BBC Earth-inspired cinematography. All details are provided — skip clarifying questions and go straight to video suggestions."
       );
 
       const parts = finalContent.filter((p) => p.type === "agent_video_suggest");

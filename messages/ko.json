@@ -159,6 +159,10 @@
     "editInNewChatDescription": "이 시점부터 새 채팅이 생성되며, 이 시점까지의 대화 기록이 유지됩니다.",
     "editAndFork": "편집 및 분기",
     "sendSelectionToDesktop": "데스크톱으로 보내기",
+    "videoSuggestTitle": "제목",
+    "videoSuggestIdea": "동영상 아이디어",
+    "suggestedImageLabel": "이 이미지를 보내시겠습니까",
+    "suggestedImageConfirm": "추가",
     "errorMessages": {
       "overwhelmed": "이런! 에이전트가 좀 당황했네요... 다시 시도해 주시겠어요?",
       "coffeeBreak": "죄송합니다! 에이전트가 커피 브레이크 중이에요. 다시 시도해 주세요!",

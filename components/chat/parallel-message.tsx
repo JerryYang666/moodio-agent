@@ -60,14 +60,21 @@ interface ParallelMessageProps {
     sourceImageUrl?: string;
     params: Record<string, any>;
   }) => void;
-  /** Callback when a user edits an agent_video part's config */
-  onVideoPartUpdate?: (
+  /** Callback when a user edits a message content part (e.g. agent_video, agent_video_suggest) */
+  onPartUpdate?: (
     messageTimestamp: number,
     messageVariantId: string | undefined,
     partType: string,
     partTypeIndex: number,
     updates: any
   ) => void;
+  /** Callback when a user edits an agent_video_suggest part (title/videoIdea) */
+  onVideoSuggestPartUpdate?: (
+    messageTimestamp: number,
+    messageVariantId: string | undefined,
+    partTypeIndex: number,
+    updates: { title: string; videoIdea: string }
+  ) => Promise<void> | void;
   /** Show spinner in place of timestamp while assistant is streaming */
   isTimestampLoading?: boolean;
 }
@@ -92,7 +99,8 @@ export default function ParallelMessage({
   onDirectVideoStatusUpdate,
   onDirectVideoRestore,
   onSendAsVideoMessage,
-  onVideoPartUpdate,
+  onPartUpdate,
+  onVideoSuggestPartUpdate,
   isTimestampLoading = false,
 }: ParallelMessageProps) {
   const t = useTranslations();
@@ -184,7 +192,8 @@ export default function ParallelMessage({
           onDirectVideoStatusUpdate={onDirectVideoStatusUpdate}
           onDirectVideoRestore={onDirectVideoRestore}
           onSendAsVideoMessage={onSendAsVideoMessage}
-          onVideoPartUpdate={onVideoPartUpdate}
+          onPartUpdate={onPartUpdate}
+          onVideoSuggestPartUpdate={onVideoSuggestPartUpdate}
           isTimestampLoading={isTimestampLoading}
           timestampAction={
             onGenerateVariant && !isSending ? (
@@ -243,7 +252,8 @@ export default function ParallelMessage({
                 onDirectVideoStatusUpdate={onDirectVideoStatusUpdate}
                 onDirectVideoRestore={onDirectVideoRestore}
                 onSendAsVideoMessage={onSendAsVideoMessage}
-                onVideoPartUpdate={onVideoPartUpdate}
+                onPartUpdate={onPartUpdate}
+          onVideoSuggestPartUpdate={onVideoSuggestPartUpdate}
               />
             </div>
           ))}
@@ -332,7 +342,8 @@ export default function ParallelMessage({
               onDirectVideoStatusUpdate={onDirectVideoStatusUpdate}
               onDirectVideoRestore={onDirectVideoRestore}
               onSendAsVideoMessage={onSendAsVideoMessage}
-              onVideoPartUpdate={onVideoPartUpdate}
+              onPartUpdate={onPartUpdate}
+          onVideoSuggestPartUpdate={onVideoSuggestPartUpdate}
             />
           </div>
         </div>
