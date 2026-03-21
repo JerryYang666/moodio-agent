@@ -315,7 +315,7 @@ export default function TimelineClipCard({
       {/* Right-click context menu — portaled to body to escape backdrop-blur stacking context */}
       {contextMenu && onRemove && createPortal(
         <div
-          className="fixed z-[9999] bg-background border border-divider rounded-lg shadow-lg py-1 min-w-[140px]"
+          className="fixed z-9999 bg-background border border-divider rounded-lg shadow-lg py-1 min-w-[140px]"
           style={{ left: contextMenu.x, top: contextMenu.y }}
           onMouseDown={(e) => e.stopPropagation()}
         >
