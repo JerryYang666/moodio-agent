@@ -581,6 +581,7 @@ export default function DesktopDetailPage({
     toggleExpanded: toggleTimelineExpanded,
     addClip: addTimelineClip,
     removeClip: removeTimelineClip,
+    updateClip: updateTimelineClip,
     reorderClips: reorderTimelineClips,
     clearTimeline,
   } = useTimeline(desktopId);
@@ -600,13 +601,19 @@ export default function DesktopDetailPage({
     (asset: EnrichedDesktopAsset) => {
       if (asset.assetType !== "video") return;
       const meta = asset.metadata as unknown as VideoAssetMeta;
+      const duration =
+        meta.duration ||
+        (asset.generationData?.params?.duration
+          ? Number(asset.generationData.params.duration)
+          : 0);
+
       addTimelineClip({
         id: `clip-${asset.id}-${Date.now()}`,
         assetId: asset.id,
         title: meta.title || t("untitledVideo"),
         thumbnailUrl: asset.imageUrl || null,
         videoUrl: asset.videoUrl || null,
-        duration: meta.duration || 0,
+        duration,
       });
       // Dispatch event so TimelinePanel auto-expands
       window.dispatchEvent(new CustomEvent("timeline-clip-added"));
@@ -887,6 +894,8 @@ export default function DesktopDetailPage({
         onRemoveClip={removeTimelineClip}
         onReorderClips={reorderTimelineClips}
         onClearTimeline={clearTimeline}
+        onUpdateClip={updateTimelineClip}
+        desktopId={desktopId}
       />
       </div>
 

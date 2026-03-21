@@ -1,8 +1,10 @@
 "use client";
 
-import { useCallback, useRef } from "react";
-import { GripVertical, X, Film, Music } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { Loader2, Trash2 } from "lucide-react";
 import type { TimelineClip } from "./types";
+import { getEffectiveDuration } from "./types";
 
 export type DropSide = "before" | "after";
 
@@ -12,20 +14,23 @@ interface TimelineClipCardProps {
   variant: "video" | "audio";
   isActive?: boolean;
   isDragging?: boolean;
-  onRemove: (clipId: string) => void;
   onClick: (index: number) => void;
+  onRemove?: (clipId: string) => void;
   onDragStart: (index: number) => void;
   onDragOver: (index: number, side: DropSide) => void;
   onDragEnd: () => void;
+  onTrimChange?: (clipId: string, trimStart: number, trimEnd: number) => void;
+  onTrimScrub?: (time: number | null) => void;
 }
 
-/** Formats seconds into m:ss */
-function formatDuration(seconds: number): string {
-  if (!seconds || seconds <= 0) return "0:00";
-  const m = Math.floor(seconds / 60);
-  const s = Math.floor(seconds % 60);
-  return `${m}:${s.toString().padStart(2, "0")}`;
-}
+const MIN_CLIP_DURATION = 0.5;
+const HANDLE_WIDTH = 6;
+const PX_PER_SECOND = 30;
+const MIN_CLIP_WIDTH = 36;
+const DEFAULT_LOADING_WIDTH = 120;
+
+// Module-level flag to block onClick across all clip instances during/after trim drag
+let _trimDragActive = false;
 
 export default function TimelineClipCard({
   clip,
@@ -33,15 +38,44 @@ export default function TimelineClipCard({
   variant,
   isActive,
   isDragging,
-  onRemove,
   onClick,
+  onRemove,
   onDragStart,
   onDragOver,
   onDragEnd,
+  onTrimChange,
+  onTrimScrub,
 }: TimelineClipCardProps) {
   const cardRef = useRef<HTMLDivElement>(null);
+  const [trimDrag, setTrimDrag] = useState<{
+    side: "left" | "right";
+    currentValue: number;
+  } | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
 
-  const handleDragStart = useCallback(
+  // Close context menu on click-away or Escape
+  useEffect(() => {
+    if (!contextMenu) return;
+    const close = () => setContextMenu(null);
+    const handleKey = (e: KeyboardEvent) => { if (e.key === "Escape") close(); };
+    document.addEventListener("mousedown", close);
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("mousedown", close);
+      document.removeEventListener("keydown", handleKey);
+    };
+  }, [contextMenu]);
+
+  const handleContextMenu = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setContextMenu({ x: e.clientX, y: e.clientY });
+    },
+    []
+  );
+
+  const handleReorderDragStart = useCallback(
     (e: React.DragEvent) => {
       e.dataTransfer.effectAllowed = "move";
       e.dataTransfer.setData("text/plain", String(index));
@@ -63,70 +97,242 @@ export default function TimelineClipCard({
     [index, onDragOver]
   );
 
-  const isVideo = variant === "video";
-  const Icon = isVideo ? Film : Music;
+  const handleTrimHandleMouseDown = useCallback(
+    (side: "left" | "right", e: React.MouseEvent) => {
+      e.stopPropagation();
+      e.preventDefault();
+      if (!onTrimChange || clip.duration <= 0) return;
 
-  const minWidth = 120;
-  const pxPerSecond = 30;
-  const width = Math.max(minWidth, (clip.duration || 4) * pxPerSecond);
+      // Select this clip and block other clips from capturing click
+      _trimDragActive = true;
+      onClick(index);
+
+      const startX = e.clientX;
+      const startTrimStart = clip.trimStart ?? 0;
+      const startTrimEnd = clip.trimEnd ?? clip.duration;
+
+      setTrimDrag({
+        side,
+        currentValue: side === "left" ? startTrimStart : startTrimEnd,
+      });
+
+      // Fire initial scrub and track latest value for mouseUp
+      let latestScrubValue = side === "left" ? startTrimStart : startTrimEnd;
+      onTrimScrub?.(latestScrubValue);
+      let lastScrubTime = Date.now();
+
+      const handleMouseMove = (moveEvent: MouseEvent) => {
+        const deltaX = moveEvent.clientX - startX;
+        const deltaTime = deltaX / PX_PER_SECOND;
+
+        let newTrimStart = startTrimStart;
+        let newTrimEnd = startTrimEnd;
+
+        if (side === "left") {
+          newTrimStart = Math.max(0, startTrimStart + deltaTime);
+          newTrimStart = Math.min(newTrimStart, newTrimEnd - MIN_CLIP_DURATION);
+          newTrimStart = Math.max(0, Math.round(newTrimStart * 10) / 10);
+          setTrimDrag({ side, currentValue: newTrimStart });
+          latestScrubValue = newTrimStart;
+        } else {
+          newTrimEnd = Math.min(clip.duration, startTrimEnd + deltaTime);
+          newTrimEnd = Math.max(newTrimEnd, newTrimStart + MIN_CLIP_DURATION);
+          newTrimEnd = Math.min(clip.duration, Math.round(newTrimEnd * 10) / 10);
+          setTrimDrag({ side, currentValue: newTrimEnd });
+          latestScrubValue = newTrimEnd;
+        }
+
+        onTrimChange(clip.id, newTrimStart, newTrimEnd);
+
+        // Throttled scrub (~60ms)
+        const now = Date.now();
+        if (now - lastScrubTime >= 60) {
+          lastScrubTime = now;
+          onTrimScrub?.(latestScrubValue);
+        }
+      };
+
+      const handleMouseUp = () => {
+        // Final scrub to the exact last value
+        onTrimScrub?.(latestScrubValue);
+        // Clear scrub on next frame so the video stays on this frame
+        requestAnimationFrame(() => onTrimScrub?.(null));
+
+        setTrimDrag(null);
+        document.removeEventListener("mousemove", handleMouseMove);
+        document.removeEventListener("mouseup", handleMouseUp);
+
+        // Clear flag after click event cycle completes
+        setTimeout(() => { _trimDragActive = false; }, 50);
+      };
+
+      document.addEventListener("mousemove", handleMouseMove);
+      document.addEventListener("mouseup", handleMouseUp);
+    },
+    [clip, onTrimChange, onTrimScrub, onClick, index]
+  );
+
+  const handleHandleDoubleClick = useCallback(
+    (side: "left" | "right", e: React.MouseEvent) => {
+      e.stopPropagation();
+      e.preventDefault();
+      if (!onTrimChange || clip.duration <= 0) return;
+      const trimStart = clip.trimStart ?? 0;
+      const trimEnd = clip.trimEnd ?? clip.duration;
+      if (side === "left") {
+        onTrimChange(clip.id, 0, trimEnd);
+      } else {
+        onTrimChange(clip.id, trimStart, clip.duration);
+      }
+    },
+    [clip, onTrimChange]
+  );
+
+  const isVideo = variant === "video";
+  const effectiveDuration = getEffectiveDuration(clip);
+  const isTrimmed =
+    (clip.trimStart != null && clip.trimStart > 0) ||
+    (clip.trimEnd != null && clip.trimEnd < clip.duration);
+  const durationKnown = clip.duration > 0;
+  const canTrim = isVideo && !!onTrimChange;
+
+  // Width: default 120px when duration unknown, otherwise proportional with 36px minimum
+  const fullWidth = !durationKnown
+    ? DEFAULT_LOADING_WIDTH
+    : Math.max(MIN_CLIP_WIDTH, clip.duration * PX_PER_SECOND);
+  const width = !durationKnown
+    ? DEFAULT_LOADING_WIDTH
+    : Math.max(MIN_CLIP_WIDTH, effectiveDuration * PX_PER_SECOND);
+
+  // Thumbnail crop offset: shift left by trimStart, clamped so image right edge doesn't pass clip right edge
+  const trimStartRatio = durationKnown && clip.duration > 0 ? (clip.trimStart ?? 0) / clip.duration : 0;
+  const thumbOffset = Math.max(-(fullWidth - width), -(trimStartRatio * fullWidth));
 
   return (
-    <div
-      ref={cardRef}
-      draggable
-      onClick={() => onClick(index)}
-      onDragStart={handleDragStart}
-      onDragOver={handleDragOver}
-      onDragEnd={onDragEnd}
-      className={`relative shrink-0 h-full rounded-lg border overflow-hidden cursor-pointer active:cursor-grabbing select-none group/clip transition-all ${
-        isDragging ? "opacity-30" : ""
-      } ${
-        isActive
-          ? "border-primary ring-1 ring-primary"
-          : isVideo
-            ? "border-primary/30 bg-primary/10 hover:border-primary/50"
-            : "border-secondary/30 bg-secondary/10 hover:border-secondary/50"
-      }`}
-      style={{ width }}
-    >
-      {/* Thumbnail / visual */}
-      <div className="absolute inset-0 flex items-center">
-        {isVideo && clip.thumbnailUrl ? (
-          <img
-            src={clip.thumbnailUrl}
-            alt=""
-            draggable={false}
-            className="w-full h-full object-cover opacity-40"
-          />
-        ) : null}
-      </div>
-
-      {/* Content overlay */}
-      <div className="relative z-10 flex items-center gap-1.5 h-full px-2">
-        <GripVertical
-          size={12}
-          className="text-default-400 shrink-0 opacity-0 group-hover/clip:opacity-100 transition-opacity"
-        />
-        <Icon
-          size={12}
-          className={`shrink-0 ${isVideo ? "text-primary" : "text-secondary"}`}
-        />
-        <span className="text-[10px] font-medium truncate text-default-700 flex-1">
+    <div className="flex flex-col items-start shrink-0">
+      {/* Title + duration label above the clip */}
+      <div
+        className="flex items-center gap-1 px-0.5 mb-0.5 min-w-0"
+        style={{ maxWidth: width }}
+      >
+        <span className="text-[10px] text-default-400 truncate min-w-0">
           {clip.title || "Untitled"}
         </span>
-        <span className="text-[9px] text-default-400 shrink-0">
-          {formatDuration(clip.duration)}
-        </span>
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onRemove(clip.id);
-          }}
-          className="ml-0.5 p-0.5 rounded hover:bg-danger/20 text-default-400 hover:text-danger opacity-0 group-hover/clip:opacity-100 transition-all shrink-0"
-        >
-          <X size={10} />
-        </button>
+        {effectiveDuration > 0 && (
+          <span className="text-[10px] text-default-400 shrink-0 tabular-nums">
+            · {isTrimmed ? `${effectiveDuration.toFixed(1)}s` : `${effectiveDuration.toFixed(1)}s`}
+          </span>
+        )}
       </div>
+
+      {/* Clip card */}
+      <div
+        ref={cardRef}
+        draggable
+        onClick={() => { if (!_trimDragActive) onClick(index); }}
+        onContextMenu={handleContextMenu}
+        onDragStart={handleReorderDragStart}
+        onDragOver={handleDragOver}
+        onDragEnd={onDragEnd}
+        className={`relative shrink-0 h-[44px] rounded-lg border overflow-visible cursor-pointer active:cursor-grabbing select-none group/clip ${
+          isDragging ? "opacity-30" : ""
+        } ${
+          isActive
+            ? "border-primary ring-1 ring-primary"
+            : isVideo
+              ? "border-primary/30 bg-primary/10 hover:border-primary/50"
+              : "border-secondary/30 bg-secondary/10 hover:border-secondary/50"
+        }`}
+        style={{ width }}
+      >
+        {/* Thumbnail — crops with trim, not scale */}
+        <div className="absolute inset-0 rounded-lg overflow-hidden">
+          {isVideo && clip.thumbnailUrl ? (
+            <img
+              src={clip.thumbnailUrl}
+              alt=""
+              draggable={false}
+              className={`h-full max-w-none object-cover ${durationKnown ? "opacity-80" : "opacity-40"}`}
+              style={{ width: fullWidth, marginLeft: thumbOffset }}
+            />
+          ) : null}
+        </div>
+
+        {/* Loading indicator when duration is being probed */}
+        {!durationKnown && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center">
+            <Loader2 size={14} className="animate-spin text-default-400" />
+          </div>
+        )}
+
+        {/* Left trim handle — always visible */}
+        {canTrim && (
+          <div
+            className="absolute left-0 top-0 bottom-0 z-20 cursor-col-resize group/handle-l flex items-center justify-center"
+            style={{ width: HANDLE_WIDTH }}
+            onMouseDown={(e) => handleTrimHandleMouseDown("left", e)}
+            onDoubleClick={(e) => handleHandleDoubleClick("left", e)}
+          >
+            <div
+              className={`w-[3px] h-[60%] rounded-full transition-all ${
+                trimDrag?.side === "left"
+                  ? "bg-primary shadow-[0_0_6px_1px_hsl(var(--heroui-primary)/0.6)]"
+                  : "bg-default-400/50 group-hover/handle-l:bg-primary/80"
+              }`}
+            />
+            {trimDrag?.side === "left" && (
+              <div className="absolute -top-5 left-1/2 -translate-x-1/2 bg-foreground text-background text-[9px] px-1.5 py-0.5 rounded tabular-nums whitespace-nowrap shadow-md">
+                {trimDrag.currentValue.toFixed(1)}s
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Right trim handle — always visible */}
+        {canTrim && (
+          <div
+            className="absolute right-0 top-0 bottom-0 z-20 cursor-col-resize group/handle-r flex items-center justify-center"
+            style={{ width: HANDLE_WIDTH }}
+            onMouseDown={(e) => handleTrimHandleMouseDown("right", e)}
+            onDoubleClick={(e) => handleHandleDoubleClick("right", e)}
+          >
+            <div
+              className={`w-[3px] h-[60%] rounded-full transition-all ${
+                trimDrag?.side === "right"
+                  ? "bg-primary shadow-[0_0_6px_1px_hsl(var(--heroui-primary)/0.6)]"
+                  : "bg-default-400/50 group-hover/handle-r:bg-primary/80"
+              }`}
+            />
+            {trimDrag?.side === "right" && (
+              <div className="absolute -top-5 left-1/2 -translate-x-1/2 bg-foreground text-background text-[9px] px-1.5 py-0.5 rounded tabular-nums whitespace-nowrap shadow-md">
+                {trimDrag.currentValue.toFixed(1)}s
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Right-click context menu — portaled to body to escape backdrop-blur stacking context */}
+      {contextMenu && onRemove && createPortal(
+        <div
+          className="fixed z-[9999] bg-background border border-divider rounded-lg shadow-lg py-1 min-w-[140px]"
+          style={{ left: contextMenu.x, top: contextMenu.y }}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          <button
+            className="flex items-center gap-2 w-full px-3 py-1.5 text-xs text-danger hover:bg-danger/10 transition-colors text-left"
+            onClick={(e) => {
+              e.stopPropagation();
+              setContextMenu(null);
+              onRemove(clip.id);
+            }}
+          >
+            <Trash2 size={12} />
+            Delete clip
+          </button>
+        </div>,
+        document.body
+      )}
     </div>
   );
 }

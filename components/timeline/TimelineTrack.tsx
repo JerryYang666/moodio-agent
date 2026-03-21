@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useCallback, useRef } from "react";
 import type { TimelineClip } from "./types";
 import TimelineClipCard, { type DropSide } from "./TimelineClipCard";
 
@@ -9,9 +9,20 @@ interface TimelineTrackProps {
   variant: "video" | "audio";
   clips: TimelineClip[];
   activeClipId: string | null;
-  onRemoveClip: (clipId: string) => void;
   onClipClick: (index: number) => void;
-  onReorder: (fromIndex: number, toIndex: number) => void;
+  onRemoveClip?: (clipId: string) => void;
+  onTrimChange?: (clipId: string, trimStart: number, trimEnd: number) => void;
+  onTrimScrub?: (time: number | null) => void;
+  /** Which clip index is currently being dragged (null = none) */
+  dragIndex: number | null;
+  /** Computed insertion-point index for the drop indicator (null = none) */
+  dropSlot: number | null;
+  /** Fired when a clip starts being dragged */
+  onDragStart: (index: number) => void;
+  /** Fired continuously during drag with the hovered clip index + side */
+  onDragOver: (index: number, side: DropSide) => void;
+  /** Fired when the drag ends (drop or cancel) */
+  onDragEnd: () => void;
 }
 
 export default function TimelineTrack({
@@ -19,68 +30,28 @@ export default function TimelineTrack({
   variant,
   clips,
   activeClipId,
-  onRemoveClip,
   onClipClick,
-  onReorder,
+  onRemoveClip,
+  onTrimChange,
+  onTrimScrub,
+  dragIndex,
+  dropSlot,
+  onDragStart,
+  onDragOver,
+  onDragEnd,
 }: TimelineTrackProps) {
-  const [dragIndex, setDragIndex] = useState<number | null>(null);
-  const [dropTarget, setDropTarget] = useState<{
-    index: number;
-    side: DropSide;
-  } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const handleDragStart = useCallback((index: number) => {
-    setDragIndex(index);
-  }, []);
-
-  const handleDragOver = useCallback(
-    (index: number, side: DropSide) => {
-      if (dragIndex === null) return;
-      // Skip indicators that represent no actual move
-      const insertionIndex = side === "before" ? index : index + 1;
-      if (insertionIndex === dragIndex || insertionIndex === dragIndex + 1) {
-        setDropTarget(null);
-        return;
-      }
-      setDropTarget({ index, side });
-    },
-    [dragIndex]
-  );
-
-  const handleDragEnd = useCallback(() => {
-    if (dragIndex !== null && dropTarget !== null) {
-      const toIndex =
-        dropTarget.side === "before" ? dropTarget.index : dropTarget.index + 1;
-      // Adjust for the removal of the dragged item
-      const adjusted = toIndex > dragIndex ? toIndex - 1 : toIndex;
-      if (adjusted !== dragIndex) {
-        onReorder(dragIndex, adjusted);
-      }
-    }
-    setDragIndex(null);
-    setDropTarget(null);
-  }, [dragIndex, dropTarget, onReorder]);
-
   const handleDragLeave = useCallback((e: React.DragEvent) => {
-    // Only clear when leaving the track container itself
     if (!scrollRef.current?.contains(e.relatedTarget as Node)) {
-      setDropTarget(null);
+      // Don't clear drop target here — let the panel handle it
     }
   }, []);
 
   const isVideo = variant === "video";
 
-  // Convert dropTarget {index, side} into a slot position (0 = before first, 1 = between first & second, etc.)
-  const dropSlot =
-    dragIndex !== null && dropTarget
-      ? dropTarget.side === "before"
-        ? dropTarget.index
-        : dropTarget.index + 1
-      : null;
-
   return (
-    <div className="flex items-stretch gap-0 h-[52px]">
+    <div className="flex items-stretch gap-0 min-h-[64px]">
       {/* Track label */}
       <div
         className={`w-[80px] shrink-0 flex items-center justify-center text-[10px] font-semibold uppercase tracking-wider border-r border-divider ${
@@ -95,27 +66,27 @@ export default function TimelineTrack({
       {/* Clips area */}
       <div
         ref={scrollRef}
-        className="flex-1 flex items-center px-2 py-1 overflow-x-auto min-w-0"
+        className="flex-1 flex items-end px-2 py-1 min-w-0"
         onDragOver={(e) => e.preventDefault()}
         onDragLeave={handleDragLeave}
       >
         {clips.length === 0 ? (
-          <div className="flex items-center justify-center h-full w-full">
+          <div className="flex items-center justify-center h-[60px] w-full">
             <span className="text-[10px] text-default-300 italic">
               {isVideo ? "Drag videos here or right-click an asset" : "Audio appears automatically"}
             </span>
           </div>
         ) : (
           clips.map((clip, i) => (
-            <div key={clip.id} className="flex items-center shrink-0 h-full">
+            <div key={clip.id} className="flex items-end shrink-0">
               {/* Drop indicator before this clip */}
               <div
-                className={`flex items-center justify-center shrink-0 transition-all duration-200 ease-out h-full ${
+                className={`flex items-center justify-center shrink-0 transition-all duration-200 ease-out min-h-[44px] ${
                   dropSlot === i ? "w-[14px] mx-[2px]" : "w-[4px]"
                 }`}
               >
                 {dropSlot === i && (
-                  <div className="w-[4px] h-[80%] bg-primary rounded-full shadow-[0_0_8px_2px_hsl(var(--heroui-primary)/0.5)]" />
+                  <div className="w-[4px] h-[36px] bg-primary rounded-full shadow-[0_0_8px_2px_hsl(var(--heroui-primary)/0.5)]" />
                 )}
               </div>
               <TimelineClipCard
@@ -124,21 +95,23 @@ export default function TimelineTrack({
                 variant={variant}
                 isActive={clip.id === activeClipId}
                 isDragging={dragIndex === i}
-                onRemove={onRemoveClip}
                 onClick={onClipClick}
-                onDragStart={handleDragStart}
-                onDragOver={handleDragOver}
-                onDragEnd={handleDragEnd}
+                onRemove={onRemoveClip}
+                onDragStart={onDragStart}
+                onDragOver={onDragOver}
+                onDragEnd={onDragEnd}
+                onTrimChange={onTrimChange}
+                onTrimScrub={onTrimScrub}
               />
               {/* Drop indicator after the last clip */}
               {i === clips.length - 1 && (
                 <div
-                  className={`flex items-center justify-center shrink-0 transition-all duration-200 ease-out h-full ${
+                  className={`flex items-center justify-center shrink-0 transition-all duration-200 ease-out min-h-[44px] ${
                     dropSlot === clips.length ? "w-[14px] mx-[2px]" : "w-[4px]"
                   }`}
                 >
                   {dropSlot === clips.length && (
-                    <div className="w-[4px] h-[80%] bg-primary rounded-full shadow-[0_0_8px_2px_hsl(var(--heroui-primary)/0.5)]" />
+                    <div className="w-[4px] h-[36px] bg-primary rounded-full shadow-[0_0_8px_2px_hsl(var(--heroui-primary)/0.5)]" />
                   )}
                 </div>
               )}
