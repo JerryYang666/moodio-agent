@@ -50,6 +50,8 @@ export async function POST(request: Request) {
       );
     }
 
+    console.log("[render/export] Lambda payload:", JSON.stringify(renderRequest, null, 2));
+
     const command = new InvokeCommand({
       FunctionName: LAMBDA_FUNCTION,
       Payload: new TextEncoder().encode(JSON.stringify(renderRequest)),
