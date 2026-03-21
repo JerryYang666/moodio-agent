@@ -4,20 +4,24 @@ import { ToolRegistry } from "@/lib/agents/agent-2/tools/registry";
 import { thinkTool } from "@/lib/agents/agent-2/tools/think";
 import { textTool } from "@/lib/agents/agent-2/tools/text";
 import { imageSuggestTool } from "@/lib/agents/agent-2/tools/image-suggest";
+import { videoSuggestTool } from "@/lib/agents/agent-2/tools/video-suggest";
 import { searchTool } from "@/lib/agents/agent-2/tools/search";
 import { shotListTool } from "@/lib/agents/agent-2/tools/shot-list";
 import { videoTool } from "@/lib/agents/agent-2/tools/video";
 import { checkTaxonomyTool } from "@/lib/agents/agent-2/tools/check-taxonomy";
+import { askUserTool } from "@/lib/agents/agent-2/tools/ask-user";
 
 function createParser(): OutputParser {
   const registry = new ToolRegistry();
   registry.register(thinkTool);
   registry.register(textTool);
   registry.register(imageSuggestTool);
+  registry.register(videoSuggestTool);
   registry.register(videoTool);
   registry.register(shotListTool);
   registry.register(searchTool);
   registry.register(checkTaxonomyTool);
+  registry.register(askUserTool);
   return new OutputParser(registry);
 }
 
@@ -147,6 +151,69 @@ describe("OutputParser", () => {
       expect(tags).toHaveLength(1);
       expect(tags[0].toolName).toBe("video");
       expect(tags[0].parsedContent).toEqual({ modelId: "m1", prompt: "fly" });
+    });
+
+    it("extracts a VIDEO_SUGGEST tag", () => {
+      const parser = createParser();
+      parser.feed('<VIDEO_SUGGEST>{"title": "Sunset Walk", "aspectRatio": "16:9", "prompt": "A sunset", "videoIdea": "Camera dollies forward"}</VIDEO_SUGGEST>');
+      const tags = parser.extractCompleteTags();
+      expect(tags).toHaveLength(1);
+      expect(tags[0].toolName).toBe("video_suggest");
+      expect(tags[0].tag).toBe("VIDEO_SUGGEST");
+      expect(tags[0].parsedContent).toEqual({
+        title: "Sunset Walk",
+        aspectRatio: "16:9",
+        prompt: "A sunset",
+        videoIdea: "Camera dollies forward",
+      });
+    });
+
+    it("extracts multiple VIDEO_SUGGEST tags", () => {
+      const parser = createParser();
+      parser.feed(
+        '<VIDEO_SUGGEST>{"title": "A", "aspectRatio": "16:9", "prompt": "a", "videoIdea": "idea a"}</VIDEO_SUGGEST>' +
+        '<VIDEO_SUGGEST>{"title": "B", "aspectRatio": "9:16", "prompt": "b", "videoIdea": "idea b"}</VIDEO_SUGGEST>'
+      );
+      const tags = parser.extractCompleteTags();
+      expect(tags).toHaveLength(2);
+      expect(tags[0].parsedContent.title).toBe("A");
+      expect(tags[0].parsedContent.videoIdea).toBe("idea a");
+      expect(tags[1].parsedContent.title).toBe("B");
+      expect(tags[1].parsedContent.videoIdea).toBe("idea b");
+    });
+
+    it("extracts an ASK_USER tag with multiple questions", () => {
+      const parser = createParser();
+      parser.feed(
+        '<ASK_USER>[{"id":"purpose","question":"What is this video for?","options":["Social media ad","Product demo"]},{"id":"duration","question":"How long?","options":["15 seconds","30 seconds"]}]</ASK_USER>'
+      );
+      const tags = parser.extractCompleteTags();
+      expect(tags).toHaveLength(1);
+      expect(tags[0].toolName).toBe("ask_user");
+      expect(tags[0].tag).toBe("ASK_USER");
+      expect(tags[0].parsedContent).toHaveLength(2);
+      expect(tags[0].parsedContent[0]).toEqual({
+        id: "purpose",
+        question: "What is this video for?",
+        options: ["Social media ad", "Product demo"],
+      });
+      expect(tags[0].parsedContent[1]).toEqual({
+        id: "duration",
+        question: "How long?",
+        options: ["15 seconds", "30 seconds"],
+      });
+    });
+
+    it("extracts an ASK_USER tag with a single question", () => {
+      const parser = createParser();
+      parser.feed(
+        '<ASK_USER>[{"id":"style","question":"Which style?","options":["Cinematic","Bright","Minimalist"]}]</ASK_USER>'
+      );
+      const tags = parser.extractCompleteTags();
+      expect(tags).toHaveLength(1);
+      expect(tags[0].parsedContent).toHaveLength(1);
+      expect(tags[0].parsedContent[0].id).toBe("style");
+      expect(tags[0].parsedContent[0].options).toHaveLength(3);
     });
   });
 

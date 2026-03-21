@@ -124,6 +124,32 @@ describe("InputParser", () => {
       expect(result[0].content[0].text).toContain("check_taxonomy");
     });
 
+    it("converts agent_video_suggest parts to text summaries", () => {
+      const history: Message[] = [
+        {
+          role: "assistant",
+          content: [
+            {
+              type: "agent_video_suggest",
+              imageId: "img-vs-1",
+              title: "Sunset Walk",
+              aspectRatio: "16:9",
+              prompt: "A cinematic sunset",
+              videoIdea: "Camera dollies forward along the shore",
+              status: "generated",
+            },
+          ],
+        },
+      ];
+
+      const result = parser.parseHistory(history, makeCtx());
+      expect(result[0].content[0].type).toBe("text");
+      expect(result[0].content[0].text).toContain("img-vs-1");
+      expect(result[0].content[0].text).toContain("Sunset Walk");
+      expect(result[0].content[0].text).toContain("A cinematic sunset");
+      expect(result[0].content[0].text).toContain("Camera dollies forward along the shore");
+    });
+
     it("keeps only the latest internal_think part", () => {
       const history: Message[] = [
         {
@@ -168,6 +194,47 @@ describe("InputParser", () => {
 
       const result = parser.parseHistory(history, makeCtx());
       expect(result[0].content[0]).toEqual({ type: "text", text: "hello" });
+    });
+
+    it("strips agent_ask_user parts from history", () => {
+      const history: Message[] = [
+        {
+          role: "assistant",
+          content: [
+            { type: "text", text: "Let me ask you some questions." },
+            {
+              type: "agent_ask_user",
+              questions: [
+                { id: "q1", question: "What style?", options: ["Cinematic", "Bright"] },
+              ],
+            },
+          ],
+        },
+      ];
+
+      const result = parser.parseHistory(history, makeCtx());
+      expect(result[0].content).toHaveLength(1);
+      expect(result[0].content[0].type).toBe("text");
+      expect(result[0].content[0].text).toBe("Let me ask you some questions.");
+    });
+
+    it("strips suggestions parts from history", () => {
+      const history: Message[] = [
+        {
+          role: "assistant",
+          content: [
+            { type: "text", text: "Here you go." },
+            {
+              type: "suggestions",
+              suggestions: [{ label: "Try again", promptText: "try again" }],
+            },
+          ],
+        },
+      ];
+
+      const result = parser.parseHistory(history, makeCtx());
+      expect(result[0].content).toHaveLength(1);
+      expect(result[0].content[0].type).toBe("text");
     });
   });
 

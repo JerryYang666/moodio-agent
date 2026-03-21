@@ -127,6 +127,10 @@
     "loading": "読み込み中...",
     "expandChat": "チャットパネルを展開",
     "collapseChat": "チャットパネルを折りたたむ",
+    "askUser": {
+      "customOption": "他のものが欲しい",
+      "customPlaceholder": "回答を入力..."
+    },
     "retryMessages": {
       "rethink": "おっと！もう一度考えてみます...",
       "rephrase": "うーん、もっとうまく言い直してみます！",

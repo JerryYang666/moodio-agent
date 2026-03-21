@@ -10,37 +10,35 @@ const SUPPORTED_ASPECT_RATIOS = [
 export const imageSuggestTool: ToolDefinition = {
   name: "image_suggest",
   tag: "IMAGE",
-  description: "Image generation suggestion with title, aspect ratio, and prompt",
-  instruction: `Image Suggestion Rules:
-You must give exactly four suggestions unless the user explicitly asks for fewer or more.
-You must give exactly four suggestions unless the user explicitly asks for fewer or more.
-You must give exactly four suggestions unless the user explicitly asks for fewer or more.
-The absolute maximum number of suggestions you can give is ${MAX_SUGGESTIONS}. If the user asks for more than ${MAX_SUGGESTIONS}, you should give ${MAX_SUGGESTIONS} suggestions.
+  description: "Generate image suggestions. Use when the user explicitly wants image generation ideas, image edits, or any visual content that is NOT video.",
+  instruction: `Use this tool when the user explicitly wants image generation ideas, image edits, or any visual content that is NOT video.
 
-For example, if the user said "I want to create an image of two couples kissing", you can ask "Where are these two couples kissing?" and provide suggestions like "In a classroom", "In a playground", etc.
-
-If the user's input is too short or not conducive to suggestions (e.g., just "Hi"), you can choose not to provide any suggestions.
-If the user's input includes an image, you should make sure your prompts are editing prompts that are referring to an edit of the image. For example, "Change the man in the image's shirt to red...".
-If the user's input does not contain an image, make sure your prompts are image generation prompts.
-
-Always output a <TEXT> response before your <IMAGE> suggestions that briefly introduces them (e.g. "Here are some ideas:", "Here's what I came up with:", etc.). Never output an <IMAGE> tag without a preceding <TEXT> introduction.
-
-For each suggestion, wrap it in <IMAGE>...</IMAGE> tags with a JSON object containing "title", "aspectRatio", "prompt", and optionally "referenceImageIds".
-Do NOT output markdown code blocks. Just the raw tags.
-
-referenceImageIds (optional): An array of Image IDs from the conversation to use as reference images for editing. Use this when the user asks you to modify or build upon a previously generated or uploaded image from earlier in the conversation.
-
-For each suggestion, choose an appropriate aspect ratio from: ${SUPPORTED_ASPECT_RATIOS.join(", ")}
-- Use "1:1" for square/profile images
-- Use "16:9" for wide landscape/cinematic scenes
-- Use "9:16" for tall portrait/mobile content
-- Use "3:2" or "2:3" for standard photography
-- Use "21:9" for ultra-wide cinematic scenes
-Choose the most appropriate ratio based on the subject matter and composition.
+RULES:
+- You must give exactly four suggestions unless the user explicitly asks for fewer or more.
+- You must give exactly four suggestions unless the user explicitly asks for fewer or more.
+- You must give exactly four suggestions unless the user explicitly asks for fewer or more.
+- The absolute maximum number of suggestions you can give is ${MAX_SUGGESTIONS}. If the user asks for more than ${MAX_SUGGESTIONS}, you should give ${MAX_SUGGESTIONS} suggestions.
+- For each suggestion, wrap it in <IMAGE>...</IMAGE> tags with a JSON object.
+- Do NOT output markdown code blocks. Just the raw tags.
+- For each suggestion, choose an appropriate aspect ratio from: ${SUPPORTED_ASPECT_RATIOS.join(", ")}
+  - Use "1:1" for square/profile images
+  - Use "16:9" for wide landscape/cinematic scenes
+  - Use "9:16" for tall portrait/mobile content
+  - Use "3:2" or "2:3" for standard photography
+  - Use "21:9" for ultra-wide cinematic scenes
+  Choose the most appropriate ratio based on the subject matter and composition.
 
 **If the user's input contains one or more URLs, you should keep ALL of them AS IS in the prompt.**
 
-**The image generation model you are invoking has the ability to browse the web and perform both Google text searches and Google image searches. Therefore, if a user's request depends on real-time information—such as current weather conditions or data outside your existing knowledge—you should explicitly instruct the model, within the image generation prompt, to perform Google searches to retrieve up-to-date information. When the request involves visual references—such as a specific person's appearance, a landmark, a product, or any subject where seeing an example would help—you should specifically instruct the model to perform a Google image search for that subject.**`,
+**The image generation model you are invoking has the ability to browse the web and perform both Google text searches and Google image searches. Therefore, if a user's request depends on real-time information—such as current weather conditions or data outside your existing knowledge—you should explicitly instruct the model, within the image generation prompt, to perform Google searches to retrieve up-to-date information. When the request involves visual references—such as a specific person's appearance, a landmark, a product, or any subject where seeing an example would help—you should specifically instruct the model to perform a Google image search for that subject.**
+
+OUTPUT FORMAT:
+- The JSON object must contain "title", "aspectRatio", "prompt", and optionally "referenceImageIds".
+- referenceImageIds (optional): An array of Image IDs from the conversation to use as reference images for editing. Use this when the user asks you to modify or build upon a previously generated or uploaded image from earlier in the conversation.
+- If the user's input includes an image, make sure your prompts are editing prompts referring to an edit of the image. For example, "Change the man in the image's shirt to red...".
+- If the user's input does not contain an image, make sure your prompts are image generation prompts.
+- Always output a <TEXT> response before your <IMAGE> suggestions that briefly introduces them. Never output an <IMAGE> tag without a preceding <TEXT> introduction.
+For example, if the user said "I want to create an image of two couples kissing", you can ask "Where are these two couples kissing?" and provide suggestions like "In a classroom", "In a playground", etc.`,
   examples: [
     `<IMAGE>{"title": "Short title for suggestion 1", "aspectRatio": "1:1", "prompt": "Detailed image generation prompt for suggestion 1"}</IMAGE>`,
     `<IMAGE>{"title": "Short title for suggestion 2", "aspectRatio": "16:9", "prompt": "Detailed image generation prompt for suggestion 2"}</IMAGE>`,

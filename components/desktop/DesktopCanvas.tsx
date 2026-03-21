@@ -11,7 +11,7 @@ import PublicVideoAsset from "./assets/PublicVideoAsset";
 import TableAsset from "./assets/TableAsset";
 import { hasWriteAccess, type Permission } from "@/lib/permissions";
 import type { CanvasMode } from "./DesktopToolbar";
-import { AI_IMAGE_DRAG_MIME, AI_TEXT_DRAG_MIME } from "@/components/chat/asset-dnd";
+import { AI_IMAGE_DRAG_MIME, AI_TEXT_DRAG_MIME, AI_SHOTLIST_DRAG_MIME } from "@/components/chat/asset-dnd";
 import {
   Trash2,
   MessageSquare,
@@ -69,6 +69,15 @@ interface DesktopCanvasProps {
   ) => void;
   onExternalTextDrop?: (
     payload: { content: string; chatId?: string | null },
+    position: { x: number; y: number }
+  ) => void;
+  onExternalShotlistDrop?: (
+    payload: {
+      title: string;
+      columns: string[];
+      rows: Array<{ id: string; cells: Array<{ value: string }> }>;
+      chatId?: string | null;
+    },
     position: { x: number; y: number }
   ) => void;
   textLocks?: Map<string, { userId: string; sessionId: string; firstName: string }>;
@@ -146,6 +155,7 @@ export default function DesktopCanvas({
   onCellCommit,
   onExternalImageDrop,
   onExternalTextDrop,
+  onExternalShotlistDrop,
   textLocks,
   onTextCommit,
   onAddAssetAtPosition,
@@ -334,19 +344,44 @@ export default function DesktopCanvas({
     }
   }, []);
 
+  const parseAiShotlistDropPayload = useCallback((e: React.DragEvent) => {
+    try {
+      const json = e.dataTransfer.getData(AI_SHOTLIST_DRAG_MIME);
+      if (!json) return null;
+      const parsed = JSON.parse(json) as {
+        title?: unknown;
+        columns?: unknown;
+        rows?: unknown;
+        chatId?: unknown;
+      };
+      if (typeof parsed.title !== "string" || !Array.isArray(parsed.columns) || !Array.isArray(parsed.rows)) {
+        return null;
+      }
+      return {
+        title: parsed.title,
+        columns: parsed.columns as string[],
+        rows: parsed.rows as Array<{ id: string; cells: Array<{ value: string }> }>,
+        chatId: typeof parsed.chatId === "string" || parsed.chatId === null ? parsed.chatId : undefined,
+      };
+    } catch {
+      return null;
+    }
+  }, []);
+
   const handleDragOver = useCallback(
     (e: React.DragEvent) => {
       if (!canEdit) return;
       const types = Array.from(e.dataTransfer.types);
       if (
         (onExternalImageDrop && types.includes(AI_IMAGE_DRAG_MIME)) ||
-        (onExternalTextDrop && types.includes(AI_TEXT_DRAG_MIME))
+        (onExternalTextDrop && types.includes(AI_TEXT_DRAG_MIME)) ||
+        (onExternalShotlistDrop && types.includes(AI_SHOTLIST_DRAG_MIME))
       ) {
         e.preventDefault();
         e.dataTransfer.dropEffect = "copy";
       }
     },
-    [canEdit, onExternalImageDrop, onExternalTextDrop]
+    [canEdit, onExternalImageDrop, onExternalTextDrop, onExternalShotlistDrop]
   );
 
   const handleDrop = useCallback(
@@ -370,8 +405,17 @@ export default function DesktopCanvas({
         onExternalTextDrop!(textPayload, world);
         return;
       }
+
+      const shotlistPayload = onExternalShotlistDrop ? parseAiShotlistDropPayload(e) : null;
+      if (shotlistPayload) {
+        e.preventDefault();
+        e.stopPropagation();
+        const world = screenToWorld(e.clientX, e.clientY);
+        onExternalShotlistDrop!(shotlistPayload, world);
+        return;
+      }
     },
-    [canEdit, onExternalImageDrop, onExternalTextDrop, parseAiImageDropPayload, parseAiTextDropPayload, screenToWorld]
+    [canEdit, onExternalImageDrop, onExternalTextDrop, onExternalShotlistDrop, parseAiImageDropPayload, parseAiTextDropPayload, parseAiShotlistDropPayload, screenToWorld]
   );
 
   const handlePointerDown = useCallback(

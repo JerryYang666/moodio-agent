@@ -12,7 +12,7 @@ You MUST always include the closing </TEXT> tag. Never leave a <TEXT> tag unclos
     `<TEXT>Here is my response to the user.</TEXT>`,
   ],
   waitForOutput: false,
-  maxOccurrences: 1,
+  maxOccurrences: 10,
   parseContent: (raw: string) => raw.trim(),
   createPart: (parsed: any) => ({
     type: "text" as const,

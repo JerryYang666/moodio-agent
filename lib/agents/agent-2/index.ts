@@ -26,6 +26,7 @@ import { VideoUnderstandHandler } from "./executor/handlers/video-understand";
 import { thinkTool } from "./tools/think";
 import { textTool } from "./tools/text";
 import { imageSuggestTool } from "./tools/image-suggest";
+import { videoSuggestTool } from "./tools/video-suggest";
 import { videoTool } from "./tools/video";
 import { shotListTool } from "./tools/shot-list";
 import { searchTool } from "./tools/search";
@@ -33,6 +34,7 @@ import { checkTaxonomyTool } from "./tools/check-taxonomy";
 import { videoUnderstandTool } from "./tools/video-understand";
 import { imageGenerateSyncTool } from "./tools/image-generate-sync";
 import { suggestionsTool } from "./tools/suggestions";
+import { askUserTool } from "./tools/ask-user";
 
 const MAX_RETRY = 2;
 const MAX_SUGGESTIONS_HARD_CAP = siteConfig.imageLimits.maxSuggestionsHardCap;
@@ -51,6 +53,7 @@ export class Agent2 implements Agent {
     this.registry.register(thinkTool);
     this.registry.register(textTool);
     this.registry.register(imageSuggestTool);
+    this.registry.register(videoSuggestTool);
     this.registry.register(videoTool);
     this.registry.register(shotListTool);
     this.registry.register(searchTool);
@@ -58,6 +61,7 @@ export class Agent2 implements Agent {
     this.registry.register(videoUnderstandTool);
     this.registry.register(imageGenerateSyncTool);
     this.registry.register(suggestionsTool);
+    this.registry.register(askUserTool);
 
     this.promptConstructor = new SystemPromptConstructor(this.registry);
     this.inputParser = new InputParser();
@@ -71,6 +75,7 @@ export class Agent2 implements Agent {
     const executor = new ToolExecutor(this.registry);
     executor.registerHandler("check_taxonomy", new CheckTaxonomyHandler());
     executor.registerHandler("image_suggest", new ImageGenerateHandler());
+    executor.registerHandler("video_suggest", new ImageGenerateHandler());
     executor.registerHandler("video_understand", new VideoUnderstandHandler());
     executor.registerHandler("image_generate_sync", new ImageGenerateHandler());
     return executor;

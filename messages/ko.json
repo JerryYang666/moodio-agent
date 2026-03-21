@@ -127,6 +127,10 @@
     "loading": "로딩 중...",
     "expandChat": "채팅 패널 확장",
     "collapseChat": "채팅 패널 접기",
+    "askUser": {
+      "customOption": "다른 것을 원합니다",
+      "customPlaceholder": "답변을 입력하세요..."
+    },
     "retryMessages": {
       "rethink": "이런! 다시 한번 생각해 볼게요...",
       "rephrase": "음, 더 잘 표현해 볼게요!",

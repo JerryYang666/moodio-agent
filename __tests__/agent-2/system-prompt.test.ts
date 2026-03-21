@@ -26,7 +26,7 @@ describe("SystemPromptConstructor", () => {
     const constructor = createConstructor();
     const prompt = constructor.build();
 
-    expect(prompt).toContain("You are a creative assistant");
+    expect(prompt).toContain("You are a creative video generation assistant");
     // Think tool instruction is injected dynamically
     expect(prompt).toContain("belief_prompt");
     expect(prompt).toContain("user_intention");
@@ -52,9 +52,8 @@ describe("SystemPromptConstructor", () => {
     const constructor = createConstructor();
     const prompt = constructor.build();
 
-    expect(prompt).toContain("Reference Images:");
-    expect(prompt).toContain("subject");
-    expect(prompt).toContain("style");
+    expect(prompt).toContain("referenceImageIds");
+    expect(prompt).toContain("reference images");
   });
 
   it("includes video creation instructions", () => {
@@ -121,7 +120,7 @@ describe("SystemPromptConstructor", () => {
       systemPromptOverride: "Custom override prompt for testing",
     });
 
-    expect(prompt).not.toContain("You are a creative assistant");
+    expect(prompt).not.toContain("You are a creative video generation assistant");
     expect(prompt).toBe("Custom override prompt for testing");
   });
 });

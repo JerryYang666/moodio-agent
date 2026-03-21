@@ -158,7 +158,7 @@ function stripDerivedUrls(messages: Message[]): Message[] {
         const { imageUrl, ...rest } = part;
         return rest;
       }
-      if ((part.type === "agent_image" || part.type === "direct_image") && "imageUrl" in part) {
+      if ((part.type === "agent_image" || part.type === "direct_image" || part.type === "agent_video_suggest") && "imageUrl" in part) {
         const { imageUrl, ...rest } = part;
         return rest;
       }
@@ -234,7 +234,7 @@ function addDerivedUrls(messages: Message[]): Message[] {
           imageUrl: getImageUrl(part.imageId),
         };
       }
-      if ((part.type === "agent_image" || part.type === "direct_image") && part.imageId) {
+      if ((part.type === "agent_image" || part.type === "direct_image" || part.type === "agent_video_suggest") && part.imageId) {
         return {
           ...part,
           imageUrl: getImageUrl(part.imageId),

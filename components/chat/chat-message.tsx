@@ -299,7 +299,9 @@ export default function ChatMessage({
     type ContentGroup = { groupType: string; parts: MessageContentPart[] };
     const groups: ContentGroup[] = [];
     for (const part of orderedParts) {
-      const gt = isGeneratedImagePart(part) ? "agent_image" : part.type;
+      const gt = part.type === "agent_video_suggest"
+        ? "agent_video_suggest"
+        : isGeneratedImagePart(part) ? "agent_image" : part.type;
       const last = groups[groups.length - 1];
       if (last && last.groupType === gt) {
         last.parts.push(part);
@@ -555,6 +557,105 @@ export default function ChatMessage({
                 </div>
               );
 
+            case "agent_video_suggest":
+              return (
+                <div key={`video-suggest-${gi}`} className="grid grid-cols-1 gap-3 mt-2">
+                  {group.parts.map((part: any, i) => {
+                    const url = part.imageUrl || "";
+                    const isSelected =
+                      (part.imageId && selectedImageIds.includes(part.imageId)) ||
+                      part.isSelected;
+
+                    const realPartIndex = (content as MessageContentPart[]).indexOf(
+                      part
+                    );
+
+                    const effectiveStatus =
+                      part.status === "loading" && isStaleMessage
+                        ? "error"
+                        : part.status;
+
+                    return (
+                      <Card
+                        key={`video-suggest-${gi}-${i}`}
+                        className={clsx(
+                          "w-full transition-all",
+                          isSelected && "border-4 border-primary",
+                          effectiveStatus === "generated" && "hover:shadow-md cursor-pointer"
+                        )}
+                      >
+                        <CardBody
+                          className="p-0 overflow-hidden"
+                          onClick={() =>
+                            effectiveStatus === "generated" &&
+                            msgIndex !== undefined &&
+                            onAgentImageSelect(
+                              part,
+                              msgIndex,
+                              realPartIndex,
+                              message.variantId
+                            )
+                          }
+                        >
+                          <div className="flex flex-row">
+                            <div className="w-[150px] min-w-[150px] aspect-square relative group/vsimg">
+                              {effectiveStatus === "loading" && (
+                                <div className="w-full h-full flex items-center justify-center bg-default-100">
+                                  <Spinner />
+                                </div>
+                              )}
+                              {effectiveStatus === "error" && (
+                                <div className="w-full h-full flex items-center justify-center bg-danger-50 text-danger">
+                                  <X />
+                                </div>
+                              )}
+                              {effectiveStatus === "generated" && (
+                                <>
+                                  <Image
+                                    src={url}
+                                    alt={part.title}
+                                    radius="none"
+                                    classNames={{
+                                      wrapper: "w-full h-full !max-w-full",
+                                      img: "w-full h-full object-cover",
+                                    }}
+                                  />
+                                  {onAgentExpandClick && (
+                                    <Button
+                                      isIconOnly
+                                      size="sm"
+                                      variant="solid"
+                                      aria-label={t("imageDetail.viewFullSize")}
+                                      title={t("imageDetail.viewFullSize")}
+                                      className="absolute top-1 right-1 z-10 bg-background/80 backdrop-blur-sm opacity-0 group-hover/vsimg:opacity-100 transition-opacity"
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        onAgentExpandClick(part);
+                                      }}
+                                    >
+                                      <Maximize2 size={14} />
+                                    </Button>
+                                  )}
+                                </>
+                              )}
+                            </div>
+                            <div className="flex-1 p-3 flex flex-col justify-center min-w-0">
+                              <p className="font-semibold text-sm truncate">{part.title === "Loading..." && effectiveStatus !== "loading" ? "" : part.title}</p>
+                              {part.videoIdea && (
+                                <p className="text-xs text-default-500 mt-1 line-clamp-4">
+                                  {part.videoIdea}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        </CardBody>
+                      </Card>
+                    );
+                  })}
+                </div>
+              );
+
             case "agent_video":
               return group.parts.map((part: any, i) => {
                 const realPartIndex = (content as MessageContentPart[]).indexOf(part);
@@ -605,7 +706,7 @@ export default function ChatMessage({
 
             case "agent_shot_list":
               return group.parts.map((part: any, i) => (
-                <ShotListCard key={`shotlist-${gi}-${i}`} part={part} />
+                <ShotListCard key={`shotlist-${gi}-${i}`} part={part} desktopId={desktopId} chatId={chatId} />
               ));
 
             case "agent_search":

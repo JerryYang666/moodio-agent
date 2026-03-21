@@ -127,6 +127,10 @@
     "loading": "Loading...",
     "expandChat": "Expand chat panel",
     "collapseChat": "Collapse chat panel",
+    "askUser": {
+      "customOption": "I want something else",
+      "customPlaceholder": "Type your answer..."
+    },
     "retryMessages": {
       "rethink": "Oops! Let me think about that again...",
       "rephrase": "Hmm, let me rephrase that better!",
