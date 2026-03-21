@@ -33,7 +33,7 @@ import { useTranslations } from "next-intl";
 import { useVideo } from "@/components/video-provider";
 import { useCredits } from "@/hooks/use-credits";
 import { useGenerateVideoMutation } from "@/lib/redux/services/next-api";
-import { getViewportCenterPosition } from "@/lib/desktop/types";
+import { getViewportVisibleCenterPosition } from "@/lib/desktop/types";
 import type { MessageContentPart } from "@/lib/llm/types";
 import { getVideoModel, type VideoModelParam } from "@/lib/video/models";
 
@@ -251,7 +251,7 @@ export default function VideoConfigCard({
 
       if (desktopId) {
         try {
-          const pos = getViewportCenterPosition();
+          const pos = getViewportVisibleCenterPosition(300, 300);
           const assetRes = await fetch(`/api/desktop/${desktopId}/assets`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },

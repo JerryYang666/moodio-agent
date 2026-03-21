@@ -2330,8 +2330,9 @@ export default function ChatInterface({
               if (event.part.type === "agent_shot_list" && desktopId) {
                 (async () => {
                   try {
-                    const { getViewportCenterPosition } = await import("@/lib/desktop/types");
-                    const pos = getViewportCenterPosition();
+                    const { getViewportVisibleCenterPosition } = await import("@/lib/desktop/types");
+                    const tableH = 40 + event.part.rows.length * 36 + 40;
+                    const pos = getViewportVisibleCenterPosition(700, tableH);
                     const assetRes = await fetch(`/api/desktop/${desktopId}/assets`, {
                       method: "POST",
                       headers: { "Content-Type": "application/json" },
@@ -2348,7 +2349,7 @@ export default function ChatInterface({
                           posX: pos.x,
                           posY: pos.y,
                           width: 700,
-                          height: 40 + event.part.rows.length * 36 + 40,
+                          height: tableH,
                         }],
                       }),
                     });
@@ -2379,8 +2380,8 @@ export default function ChatInterface({
               if (desktopId) {
                 (async () => {
                   try {
-                    const { getViewportCenterPosition } = await import("@/lib/desktop/types");
-                    const pos = getViewportCenterPosition();
+                    const { getViewportVisibleCenterPosition } = await import("@/lib/desktop/types");
+                    const pos = getViewportVisibleCenterPosition(700, 300);
                     window.dispatchEvent(
                       new CustomEvent("desktop-table-generating", {
                         detail: { desktopId, posX: pos.x, posY: pos.y },
