@@ -2,10 +2,14 @@ import { NextResponse } from "next/server";
 import { LambdaClient, InvokeCommand } from "@aws-sdk/client-lambda";
 import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import type { RenderRequest } from "@/lib/timeline/export";
+import {
+  buildRenderRequest,
+  type ExportRequest,
+} from "@/lib/timeline/export";
 
 const LAMBDA_FUNCTION = process.env.VIDEO_RENDER_LAMBDA_ARN;
 const AWS_REGION = process.env.AWS_REGION || "us-east-2";
+const S3_BUCKET = process.env.AWS_S3_BUCKET_NAME!;
 
 const lambdaClient = new LambdaClient({
   region: AWS_REGION,
@@ -25,12 +29,12 @@ const s3Client = new S3Client({
 
 export async function POST(request: Request) {
   try {
-    const renderRequest: RenderRequest = await request.json();
+    const exportReq: ExportRequest = await request.json();
 
     if (
-      !renderRequest.segments ||
-      !Array.isArray(renderRequest.segments) ||
-      renderRequest.segments.length === 0
+      !exportReq.segments ||
+      !Array.isArray(exportReq.segments) ||
+      exportReq.segments.length === 0
     ) {
       return NextResponse.json(
         { success: false, error: "segments must be a non-empty array" },
@@ -44,13 +48,17 @@ export async function POST(request: Request) {
           success: false,
           error:
             "VIDEO_RENDER_LAMBDA_ARN not configured. Export is not available until the Lambda is deployed.",
-          payload: renderRequest,
         },
         { status: 503 }
       );
     }
 
-    console.log("[render/export] Lambda payload:", JSON.stringify(renderRequest, null, 2));
+    const renderRequest = buildRenderRequest(exportReq, S3_BUCKET);
+
+    console.log(
+      "[render/export] Lambda payload:",
+      JSON.stringify(renderRequest, null, 2)
+    );
 
     const command = new InvokeCommand({
       FunctionName: LAMBDA_FUNCTION,

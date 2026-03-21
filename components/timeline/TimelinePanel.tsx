@@ -25,7 +25,7 @@ import {
   DropdownSection,
 } from "@heroui/dropdown";
 import {
-  buildRenderRequest,
+  buildExportRequest,
   SUPPORTED_OUTPUT_FORMATS,
   type OutputFormat,
 } from "@/lib/timeline/export";
@@ -165,9 +165,7 @@ export default function TimelinePanel({
     if (!desktopId || clips.length === 0) return;
     setExportState({ status: "exporting" });
     try {
-      const payload = buildRenderRequest(clips, desktopId, {
-        outputFormat: format,
-      });
+      const payload = buildExportRequest(clips, desktopId, format);
       const res = await fetch("/api/render/export", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -190,22 +188,20 @@ export default function TimelinePanel({
     }
   }, [clips, desktopId]);
 
-  // Dev-mode: expose buildRenderRequest on window for console testing
+  // Dev-mode: expose buildExportRequest on window for console testing
   useEffect(() => {
     if (process.env.NODE_ENV !== "development" || !desktopId) return;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (window as any).__buildRenderRequest = (format?: OutputFormat) => {
+    (window as any).__buildExportRequest = (format?: OutputFormat) => {
       const key = getTimelineStorageKey(desktopId);
       const raw = localStorage.getItem(key);
       if (!raw) return { error: `No timeline data at key: ${key}` };
       const timeline = JSON.parse(raw);
-      return buildRenderRequest(timeline.clips, timeline.desktopId, {
-        outputFormat: format ?? "mp4",
-      });
+      return buildExportRequest(timeline.clips, timeline.desktopId, format ?? "mp4");
     };
     return () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      delete (window as any).__buildRenderRequest;
+      delete (window as any).__buildExportRequest;
     };
   }, [desktopId]);
 
