@@ -2985,7 +2985,7 @@ export default function ChatInterface({
   // Addressed by message timestamp + Nth occurrence of the part type.
   // Returns a Promise that resolves when the S3 persist completes so callers
   // can await it before triggering dependent operations (e.g. video generation).
-  const handleVideoPartUpdate = useCallback(
+  const handlePartUpdate = useCallback(
     (
       messageTimestamp: number,
       messageVariantId: string | undefined,
@@ -3043,7 +3043,7 @@ export default function ChatInterface({
       updates: { title: string; videoIdea: string }
     ): Promise<void> => {
       // Reuse the generic handler for state update + S3 persistence
-      const persistPromise = handleVideoPartUpdate(
+      const persistPromise = handlePartUpdate(
         messageTimestamp,
         messageVariantId,
         "agent_video_suggest",
@@ -3083,7 +3083,7 @@ export default function ChatInterface({
 
       return persistPromise;
     },
-    [handleVideoPartUpdate, desktopId]
+    [handlePartUpdate, desktopId]
   );
 
   // Handle direct video status updates from DirectVideoCard
@@ -3504,7 +3504,7 @@ export default function ChatInterface({
                 desktopId={desktopId}
                 allMessages={messages}
                 onSendAsVideoMessage={handleSendVideoFromAgent}
-                onVideoPartUpdate={handleVideoPartUpdate}
+                onPartUpdate={handlePartUpdate}
                 onVideoSuggestPartUpdate={handleVideoSuggestPartUpdate}
               />
             );
@@ -3557,7 +3557,7 @@ export default function ChatInterface({
                 onDirectVideoStatusUpdate={handleDirectVideoStatusUpdate}
                 onDirectVideoRestore={handleDirectVideoRestore}
                 onSendAsVideoMessage={handleSendVideoFromAgent}
-                onVideoPartUpdate={handleVideoPartUpdate}
+                onPartUpdate={handlePartUpdate}
                 onVideoSuggestPartUpdate={handleVideoSuggestPartUpdate}
                 isTimestampLoading={isStreamingAssistantGroup}
               />

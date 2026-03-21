@@ -60,8 +60,8 @@ interface ParallelMessageProps {
     sourceImageUrl?: string;
     params: Record<string, any>;
   }) => void;
-  /** Callback when a user edits an agent_video part's config */
-  onVideoPartUpdate?: (
+  /** Callback when a user edits a message content part (e.g. agent_video, agent_video_suggest) */
+  onPartUpdate?: (
     messageTimestamp: number,
     messageVariantId: string | undefined,
     partType: string,
@@ -99,7 +99,7 @@ export default function ParallelMessage({
   onDirectVideoStatusUpdate,
   onDirectVideoRestore,
   onSendAsVideoMessage,
-  onVideoPartUpdate,
+  onPartUpdate,
   onVideoSuggestPartUpdate,
   isTimestampLoading = false,
 }: ParallelMessageProps) {
@@ -192,7 +192,7 @@ export default function ParallelMessage({
           onDirectVideoStatusUpdate={onDirectVideoStatusUpdate}
           onDirectVideoRestore={onDirectVideoRestore}
           onSendAsVideoMessage={onSendAsVideoMessage}
-          onVideoPartUpdate={onVideoPartUpdate}
+          onPartUpdate={onPartUpdate}
           onVideoSuggestPartUpdate={onVideoSuggestPartUpdate}
           isTimestampLoading={isTimestampLoading}
           timestampAction={
@@ -252,7 +252,7 @@ export default function ParallelMessage({
                 onDirectVideoStatusUpdate={onDirectVideoStatusUpdate}
                 onDirectVideoRestore={onDirectVideoRestore}
                 onSendAsVideoMessage={onSendAsVideoMessage}
-                onVideoPartUpdate={onVideoPartUpdate}
+                onPartUpdate={onPartUpdate}
           onVideoSuggestPartUpdate={onVideoSuggestPartUpdate}
               />
             </div>
@@ -342,7 +342,7 @@ export default function ParallelMessage({
               onDirectVideoStatusUpdate={onDirectVideoStatusUpdate}
               onDirectVideoRestore={onDirectVideoRestore}
               onSendAsVideoMessage={onSendAsVideoMessage}
-              onVideoPartUpdate={onVideoPartUpdate}
+              onPartUpdate={onPartUpdate}
           onVideoSuggestPartUpdate={onVideoSuggestPartUpdate}
             />
           </div>

@@ -78,8 +78,8 @@ interface ChatMessageProps {
   ) => void;
   /** Callback to restore a direct_video generation's params back into the input */
   onDirectVideoRestore?: (data: import("@/components/video/video-detail-modal").VideoRestoreData) => void;
-  /** Callback when a user edits an agent_video part's config */
-  onVideoPartUpdate?: (
+  /** Callback when a user edits a message content part (e.g. agent_video, agent_video_suggest) */
+  onPartUpdate?: (
     messageTimestamp: number,
     messageVariantId: string | undefined,
     partType: string,
@@ -117,7 +117,7 @@ export default function ChatMessage({
   onSendAsVideoMessage,
   onDirectVideoStatusUpdate,
   onDirectVideoRestore,
-  onVideoPartUpdate,
+  onPartUpdate,
   onVideoSuggestPartUpdate,
   timestampAction,
   isTimestampLoading = false,
@@ -644,8 +644,8 @@ export default function ChatMessage({
                     }}
                     onSendAsVideoMessage={!desktopId ? onSendAsVideoMessage : undefined}
                     onPartUpdate={(updates) => {
-                      if (onVideoPartUpdate && message.createdAt) {
-                        return onVideoPartUpdate(
+                      if (onPartUpdate && message.createdAt) {
+                        return onPartUpdate(
                           message.createdAt,
                           message.variantId,
                           "agent_video",
