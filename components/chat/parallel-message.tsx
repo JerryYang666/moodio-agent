@@ -68,6 +68,13 @@ interface ParallelMessageProps {
     partTypeIndex: number,
     updates: any
   ) => void;
+  /** Callback when a user edits an agent_video_suggest part (title/videoIdea) */
+  onVideoSuggestPartUpdate?: (
+    messageTimestamp: number,
+    messageVariantId: string | undefined,
+    partTypeIndex: number,
+    updates: { title: string; videoIdea: string }
+  ) => Promise<void> | void;
   /** Show spinner in place of timestamp while assistant is streaming */
   isTimestampLoading?: boolean;
 }
@@ -93,6 +100,7 @@ export default function ParallelMessage({
   onDirectVideoRestore,
   onSendAsVideoMessage,
   onVideoPartUpdate,
+  onVideoSuggestPartUpdate,
   isTimestampLoading = false,
 }: ParallelMessageProps) {
   const t = useTranslations();
@@ -185,6 +193,7 @@ export default function ParallelMessage({
           onDirectVideoRestore={onDirectVideoRestore}
           onSendAsVideoMessage={onSendAsVideoMessage}
           onVideoPartUpdate={onVideoPartUpdate}
+          onVideoSuggestPartUpdate={onVideoSuggestPartUpdate}
           isTimestampLoading={isTimestampLoading}
           timestampAction={
             onGenerateVariant && !isSending ? (
@@ -244,6 +253,7 @@ export default function ParallelMessage({
                 onDirectVideoRestore={onDirectVideoRestore}
                 onSendAsVideoMessage={onSendAsVideoMessage}
                 onVideoPartUpdate={onVideoPartUpdate}
+          onVideoSuggestPartUpdate={onVideoSuggestPartUpdate}
               />
             </div>
           ))}
@@ -333,6 +343,7 @@ export default function ParallelMessage({
               onDirectVideoRestore={onDirectVideoRestore}
               onSendAsVideoMessage={onSendAsVideoMessage}
               onVideoPartUpdate={onVideoPartUpdate}
+          onVideoSuggestPartUpdate={onVideoSuggestPartUpdate}
             />
           </div>
         </div>

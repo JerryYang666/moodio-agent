@@ -159,6 +159,10 @@
     "editInNewChatDescription": "This will create a new chat starting from here, preserving the conversation history up to this point.",
     "editAndFork": "Edit & Fork",
     "sendSelectionToDesktop": "Send to Desktop",
+    "videoSuggestTitle": "Title",
+    "videoSuggestIdea": "Video Idea",
+    "suggestedImageLabel": "You might want to send this image",
+    "suggestedImageConfirm": "Include",
     "errorMessages": {
       "overwhelmed": "Oops! Our agent got a bit overwhelmed... Mind trying again?",
       "coffeeBreak": "So sorry! Our agent is taking a coffee break. Please try again!",

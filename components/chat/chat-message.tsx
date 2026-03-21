@@ -26,6 +26,7 @@ import DirectVideoCard from "./direct-video-card";
 import ShotListCard from "./shot-list-card";
 import ToolCallCard from "./tool-call-card";
 import SearchQueryCard from "./search-query-card";
+import VideoSuggestCard from "./video-suggest-card";
 import MarkdownRenderer from "@/components/ui/markdown-renderer";
 
 interface ChatMessageProps {
@@ -85,6 +86,13 @@ interface ChatMessageProps {
     partTypeIndex: number,
     updates: any
   ) => Promise<void> | void;
+  /** Callback when a user edits an agent_video_suggest part (title/videoIdea) */
+  onVideoSuggestPartUpdate?: (
+    messageTimestamp: number,
+    messageVariantId: string | undefined,
+    partTypeIndex: number,
+    updates: { title: string; videoIdea: string }
+  ) => Promise<void> | void;
   /** Optional action rendered inline with the timestamp row */
   timestampAction?: React.ReactNode;
   /** Show loading spinner in place of timestamp (assistant streaming) */
@@ -110,6 +118,7 @@ export default function ChatMessage({
   onDirectVideoStatusUpdate,
   onDirectVideoRestore,
   onVideoPartUpdate,
+  onVideoSuggestPartUpdate,
   timestampAction,
   isTimestampLoading = false,
 }: ChatMessageProps) {
@@ -557,104 +566,66 @@ export default function ChatMessage({
                 </div>
               );
 
-            case "agent_video_suggest":
+            case "agent_video_suggest": {
+              // Track the index of each agent_video_suggest within the full content
+              // so we can map each card to its partTypeIndex for editing
+              let videoSuggestTypeIndex = 0;
+              const orderedContent = content as MessageContentPart[];
+              for (const p of orderedContent) {
+                if (p === group.parts[0]) break;
+                if (p.type === "agent_video_suggest") videoSuggestTypeIndex++;
+              }
+
               return (
                 <div key={`video-suggest-${gi}`} className="grid grid-cols-1 gap-3 mt-2">
                   {group.parts.map((part: any, i) => {
-                    const url = part.imageUrl || "";
                     const isSelected =
                       (part.imageId && selectedImageIds.includes(part.imageId)) ||
                       part.isSelected;
 
-                    const realPartIndex = (content as MessageContentPart[]).indexOf(
-                      part
-                    );
+                    const realPartIndex = orderedContent.indexOf(part);
 
                     const effectiveStatus =
                       part.status === "loading" && isStaleMessage
                         ? "error"
                         : part.status;
 
+                    const currentPartTypeIndex = videoSuggestTypeIndex + i;
+
                     return (
-                      <Card
+                      <VideoSuggestCard
                         key={`video-suggest-${gi}-${i}`}
-                        className={clsx(
-                          "w-full transition-all",
-                          isSelected && "border-4 border-primary",
-                          effectiveStatus === "generated" && "hover:shadow-md cursor-pointer"
-                        )}
-                      >
-                        <CardBody
-                          className="p-0 overflow-hidden"
-                          onClick={() =>
-                            effectiveStatus === "generated" &&
-                            msgIndex !== undefined &&
-                            onAgentImageSelect(
-                              part,
-                              msgIndex,
-                              realPartIndex,
-                              message.variantId
-                            )
-                          }
-                        >
-                          <div className="flex flex-row">
-                            <div className="w-[150px] min-w-[150px] aspect-square relative group/vsimg">
-                              {effectiveStatus === "loading" && (
-                                <div className="w-full h-full flex items-center justify-center bg-default-100">
-                                  <Spinner />
-                                </div>
-                              )}
-                              {effectiveStatus === "error" && (
-                                <div className="w-full h-full flex items-center justify-center bg-danger-50 text-danger">
-                                  <X />
-                                </div>
-                              )}
-                              {effectiveStatus === "generated" && (
-                                <>
-                                  <Image
-                                    src={url}
-                                    alt={part.title}
-                                    radius="none"
-                                    classNames={{
-                                      wrapper: "w-full h-full !max-w-full",
-                                      img: "w-full h-full object-cover",
-                                    }}
-                                  />
-                                  {onAgentExpandClick && (
-                                    <Button
-                                      isIconOnly
-                                      size="sm"
-                                      variant="solid"
-                                      aria-label={t("imageDetail.viewFullSize")}
-                                      title={t("imageDetail.viewFullSize")}
-                                      className="absolute top-1 right-1 z-10 bg-background/80 backdrop-blur-sm opacity-0 group-hover/vsimg:opacity-100 transition-opacity"
-                                      onClick={(e) => {
-                                        e.preventDefault();
-                                        e.stopPropagation();
-                                        onAgentExpandClick(part);
-                                      }}
-                                    >
-                                      <Maximize2 size={14} />
-                                    </Button>
-                                  )}
-                                </>
-                              )}
-                            </div>
-                            <div className="flex-1 p-3 flex flex-col justify-center min-w-0">
-                              <p className="font-semibold text-sm truncate">{part.title === "Loading..." && effectiveStatus !== "loading" ? "" : part.title}</p>
-                              {part.videoIdea && (
-                                <p className="text-xs text-default-500 mt-1 line-clamp-4">
-                                  {part.videoIdea}
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                        </CardBody>
-                      </Card>
+                        part={part}
+                        isSelected={isSelected}
+                        effectiveStatus={effectiveStatus}
+                        onClick={() =>
+                          effectiveStatus === "generated" &&
+                          msgIndex !== undefined &&
+                          onAgentImageSelect(
+                            part,
+                            msgIndex,
+                            realPartIndex,
+                            message.variantId
+                          )
+                        }
+                        onExpandClick={onAgentExpandClick}
+                        onSave={
+                          onVideoSuggestPartUpdate && message.createdAt
+                            ? (updates) =>
+                                onVideoSuggestPartUpdate(
+                                  message.createdAt!,
+                                  message.variantId,
+                                  currentPartTypeIndex,
+                                  updates
+                                )
+                            : undefined
+                        }
+                      />
                     );
                   })}
                 </div>
               );
+            }
 
             case "agent_video":
               return group.parts.map((part: any, i) => {

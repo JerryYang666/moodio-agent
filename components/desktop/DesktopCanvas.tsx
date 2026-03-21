@@ -6,7 +6,7 @@ import type { DesktopAsset } from "@/lib/db/schema";
 import type { CameraState } from "@/hooks/use-desktop";
 import type { RemoteCursor } from "@/hooks/use-desktop-ws";
 import type { EnrichedDesktopAsset } from "./assets";
-import { ImageAsset, VideoAsset, TextAsset, LinkAsset } from "./assets";
+import { ImageAsset, VideoAsset, TextAsset, LinkAsset, VideoSuggestAsset } from "./assets";
 import PublicVideoAsset from "./assets/PublicVideoAsset";
 import TableAsset from "./assets/TableAsset";
 import { hasWriteAccess, type Permission } from "@/lib/permissions";
@@ -82,6 +82,7 @@ interface DesktopCanvasProps {
   ) => void;
   textLocks?: Map<string, { userId: string; sessionId: string; firstName: string }>;
   onTextCommit?: (assetId: string, content: string) => void;
+  onVideoSuggestCommit?: (assetId: string, updates: { title: string; videoIdea: string }) => void;
   onAddAssetAtPosition?: (worldPos: { x: number; y: number }) => void;
 }
 
@@ -123,6 +124,9 @@ function getAssetDimensions(
   if (asset.assetType === "text") {
     return { w: DEFAULT_ASSET_WIDTH, h: 200 };
   }
+  if (asset.assetType === "video_suggest") {
+    return { w: 340, h: 100 };
+  }
   if (naturalDims) {
     const scale = DEFAULT_ASSET_WIDTH / naturalDims.w;
     return { w: DEFAULT_ASSET_WIDTH, h: naturalDims.h * scale };
@@ -158,6 +162,7 @@ export default function DesktopCanvas({
   onExternalShotlistDrop,
   textLocks,
   onTextCommit,
+  onVideoSuggestCommit,
   onAddAssetAtPosition,
 }: DesktopCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -933,6 +938,7 @@ export default function DesktopCanvas({
                 currentUserId={currentUserId}
                 onCellCommit={onCellCommit}
                 onTextCommit={onTextCommit}
+                onVideoSuggestCommit={onVideoSuggestCommit}
               />
               </div>
               {/* Resize handles — visible when selected */}
@@ -1223,6 +1229,7 @@ function AssetCardContent({
   currentUserId,
   onCellCommit,
   onTextCommit,
+  onVideoSuggestCommit,
 }: {
   asset: EnrichedDesktopAsset;
   playing?: boolean;
@@ -1234,6 +1241,7 @@ function AssetCardContent({
   currentUserId?: string;
   onCellCommit?: (assetId: string, rowId: string, colIndex: number, value: string) => void;
   onTextCommit?: (assetId: string, content: string) => void;
+  onVideoSuggestCommit?: (assetId: string, updates: { title: string; videoIdea: string }) => void;
 }) {
   switch (asset.assetType) {
     case "image":
@@ -1258,6 +1266,8 @@ function AssetCardContent({
     }
     case "link":
       return <LinkAsset asset={asset} />;
+    case "video_suggest":
+      return <VideoSuggestAsset asset={asset} onImageLoad={onImageLoad} onContentCommit={onVideoSuggestCommit} />;
     case "table": {
       const assetPrefix = `${asset.id}:`;
       const assetCellLocks = new Map<string, { userId: string; sessionId: string; firstName: string }>();

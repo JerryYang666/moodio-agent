@@ -159,6 +159,10 @@
     "editInNewChatDescription": "ここから新しいチャットを作成し、この時点までの会話履歴を保持します。",
     "editAndFork": "編集して分岐",
     "sendSelectionToDesktop": "デスクトップに送信",
+    "videoSuggestTitle": "タイトル",
+    "videoSuggestIdea": "動画アイデア",
+    "suggestedImageLabel": "この画像を送信しますか",
+    "suggestedImageConfirm": "追加",
     "errorMessages": {
       "overwhelmed": "おっと！エージェントが少し混乱してしまいました...もう一度お試しいただけますか？",
       "coffeeBreak": "申し訳ありません！エージェントがコーヒーブレイク中です。もう一度お試しください！",

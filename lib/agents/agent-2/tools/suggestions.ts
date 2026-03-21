@@ -27,6 +27,11 @@ Rules:
 - The promptText should be specific enough to be useful but open enough for the user to customize
 - NEVER use both <SUGGESTIONS> and <ASK_USER> in the same response — pick one. Use <SUGGESTIONS> when you've already completed your response and are offering follow-up actions; use <ASK_USER> when you need clarification before proceeding.
 
+IMPORTANT: When you use <SUGGESTIONS> immediately after using <VIDEO_SUGGEST> (i.e. you just suggested video ideas), you MUST suggest exactly these three actions:
+1. "Create a video" (icon: "Video", promptText: "Let's create a video from one of these ideas ")
+2. "Generate a shot list" (icon: "Clapperboard", promptText: "Generate a shot list for these video ideas ")
+3. "More ideas" (icon: "Lightbulb", promptText: "Give me more video ideas ")
+
 CRITICAL: You MUST always include the closing </SUGGESTIONS> tag. Never leave a <SUGGESTIONS> tag unclosed.`,
   examples: [
     `<SUGGESTIONS>[{"label":"Try different style","icon":"Palette","promptText":"Recreate this with a watercolor painting style "},{"label":"Generate variations","icon":"RefreshCw","promptText":"Generate 4 variations of the same concept with different compositions "},{"label":"Create a video","icon":"Video","promptText":"Turn this into a short animated video "}]</SUGGESTIONS>`,

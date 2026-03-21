@@ -304,11 +304,25 @@ export default function DesktopDetailPage({
       }
     };
 
+    const handleAssetUpdated = (e: CustomEvent) => {
+      if (e.detail?.desktopId === desktopId && e.detail?.asset) {
+        applyRemoteEvent({
+          type: "asset_updated",
+          payload: {
+            assetId: e.detail.asset.id,
+            metadata: e.detail.asset.metadata,
+          },
+        });
+      }
+    };
+
     window.addEventListener("desktop-asset-added", handleAssetAdded as EventListener);
     window.addEventListener("desktop-table-generating", handleTableGenerating as EventListener);
+    window.addEventListener("desktop-asset-updated", handleAssetUpdated as EventListener);
     return () => {
       window.removeEventListener("desktop-asset-added", handleAssetAdded as EventListener);
       window.removeEventListener("desktop-table-generating", handleTableGenerating as EventListener);
+      window.removeEventListener("desktop-asset-updated", handleAssetUpdated as EventListener);
     };
   }, [desktopId, fetchDetail, sendEvent, applyRemoteEvent]);
 
@@ -586,6 +600,73 @@ export default function DesktopDetailPage({
       }
     },
     [desktopId, applyRemoteEvent]
+  );
+
+  const handleVideoSuggestCommit = useCallback(
+    async (assetId: string, updates: { title: string; videoIdea: string }) => {
+      // Update local state immediately
+      applyRemoteEvent({
+        type: "asset_updated",
+        payload: { assetId, metadata: updates },
+      });
+
+      // Find the asset to get its message pointer
+      const currentAssets = detail?.assets ?? [];
+      const asset = currentAssets.find((a) => a.id === assetId);
+      const meta = asset?.metadata as Record<string, unknown> | undefined;
+
+      // Persist to DB
+      try {
+        const existing = await fetch(`/api/desktop/${desktopId}/assets/${assetId}`).then((r) => r.json());
+        if (existing?.asset) {
+          const newMeta = { ...existing.asset.metadata, ...updates };
+          await fetch(`/api/desktop/${desktopId}/assets/${assetId}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ metadata: newMeta }),
+          });
+        }
+      } catch (error) {
+        console.error("Failed to save video suggest content:", error);
+      }
+
+      // Sync to chat if we have a message pointer
+      if (
+        meta &&
+        typeof meta.messageTimestamp === "number" &&
+        typeof meta.partTypeIndex === "number" &&
+        typeof meta.chatId === "string"
+      ) {
+        try {
+          await fetch(`/api/chat/${meta.chatId}/parts`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              messageTimestamp: meta.messageTimestamp,
+              messageVariantId: meta.messageVariantId || undefined,
+              partType: "agent_video_suggest",
+              partTypeIndex: meta.partTypeIndex,
+              updates,
+            }),
+          });
+          // Dispatch event so the chat panel can pick up the change
+          window.dispatchEvent(
+            new CustomEvent("video-suggest-synced-from-desktop", {
+              detail: {
+                chatId: meta.chatId,
+                messageTimestamp: meta.messageTimestamp,
+                messageVariantId: meta.messageVariantId,
+                partTypeIndex: meta.partTypeIndex,
+                updates,
+              },
+            })
+          );
+        } catch (error) {
+          console.error("Failed to sync video suggest edit to chat:", error);
+        }
+      }
+    },
+    [desktopId, applyRemoteEvent, detail?.assets]
   );
 
   const handleOpenChat = useCallback(
@@ -915,6 +996,7 @@ export default function DesktopDetailPage({
           textLocks={textLocks}
           onCellCommit={handleCellCommit}
           onTextCommit={handleTextCommit}
+          onVideoSuggestCommit={canEdit ? handleVideoSuggestCommit : undefined}
           onZIndexChange={canEdit ? handleZIndexChange : undefined}
           onSendToTimeline={canEdit ? handleSendToTimeline : undefined}
           onExternalImageDrop={canEdit ? handleExternalImageDrop : undefined}

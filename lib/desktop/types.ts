@@ -57,15 +57,31 @@ export type TableAssetMeta = {
   status?: "streaming" | "complete";
 };
 
+export type VideoSuggestAssetMeta = {
+  imageId: string;
+  chatId?: string;
+  title: string;
+  videoIdea: string;
+  prompt?: string;
+  aspectRatio?: string;
+  /** Timestamp of the message this card belongs to (for chat sync) */
+  messageTimestamp?: number;
+  /** Variant ID of the message (for chat sync) */
+  messageVariantId?: string;
+  /** Index of this part among agent_video_suggest parts in the message */
+  partTypeIndex?: number;
+};
+
 export type DesktopAssetMetadata =
   | { assetType: "image"; metadata: ImageAssetMeta }
   | { assetType: "video"; metadata: VideoAssetMeta }
   | { assetType: "public_video"; metadata: PublicVideoAssetMeta }
   | { assetType: "text"; metadata: TextAssetMeta }
   | { assetType: "link"; metadata: LinkAssetMeta }
-  | { assetType: "table"; metadata: TableAssetMeta };
+  | { assetType: "table"; metadata: TableAssetMeta }
+  | { assetType: "video_suggest"; metadata: VideoSuggestAssetMeta };
 
-const SUPPORTED_ASSET_TYPES = ["image", "video", "public_video", "text", "link", "table"] as const;
+const SUPPORTED_ASSET_TYPES = ["image", "video", "public_video", "text", "link", "table", "video_suggest"] as const;
 export type SupportedAssetType = (typeof SUPPORTED_ASSET_TYPES)[number];
 
 export function validateAssetMetadata(
@@ -126,6 +142,14 @@ export function validateAssetMetadata(
       }
       if (!Array.isArray(m.rows)) {
         return { valid: false, error: "table metadata requires a rows array" };
+      }
+      break;
+    case "video_suggest":
+      if (typeof m.imageId !== "string" || !m.imageId) {
+        return { valid: false, error: "video_suggest metadata requires a non-empty imageId string" };
+      }
+      if (typeof m.title !== "string") {
+        return { valid: false, error: "video_suggest metadata requires a title string" };
       }
       break;
   }
