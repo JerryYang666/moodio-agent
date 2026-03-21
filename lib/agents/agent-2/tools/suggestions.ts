@@ -12,7 +12,7 @@ export const suggestionsTool: ToolDefinition = {
   tag: "SUGGESTIONS",
   description:
     "Contextual follow-up action suggestions shown to the user after your response",
-  instruction: `After completing your response (after </TEXT> and any image/video tags), you may optionally emit a <SUGGESTIONS> tag containing a JSON array of 0-3 contextual follow-up actions the user might want to take next.
+  instruction: `You MUST include a <SUGGESTIONS> tag in every response, unless the response contains <ASK_USER>. After completing your response (after </TEXT> and any image/video tags), emit a <SUGGESTIONS> tag containing a JSON array of 1-3 contextual follow-up actions the user might want to take next.
 
 Each suggestion object has:
 - "label": Short button text (max 5 words) describing the action
@@ -21,11 +21,10 @@ Each suggestion object has:
 
 Rules:
 - Only suggest genuinely useful and contextually relevant next steps
-- If there is no good follow-up action, skip the <SUGGESTIONS> tag entirely or emit an empty array
-- Maximum 3 suggestions
+- Always include at least 1 suggestion; maximum 3
 - Suggestions should be diverse — offer different directions the user could take
 - The promptText should be specific enough to be useful but open enough for the user to customize
-- NEVER use both <SUGGESTIONS> and <ASK_USER> in the same response — pick one. Use <SUGGESTIONS> when you've already completed your response and are offering follow-up actions; use <ASK_USER> when you need clarification before proceeding.
+- You MUST always include <SUGGESTIONS> in every response, UNLESS you are using <ASK_USER> in the same response. When <ASK_USER> is present, do NOT include <SUGGESTIONS>. In all other responses, <SUGGESTIONS> is mandatory — never omit it.
 
 IMPORTANT: When you use <SUGGESTIONS> immediately after using <VIDEO_SUGGEST> (i.e. you just suggested video ideas), you MUST suggest exactly these three actions:
 1. "Create a video" (icon: "Video", promptText: "Let's create a video from one of these ideas ")
@@ -36,7 +35,6 @@ CRITICAL: You MUST always include the closing </SUGGESTIONS> tag. Never leave a 
   examples: [
     `<SUGGESTIONS>[{"label":"Try different style","icon":"Palette","promptText":"Recreate this with a watercolor painting style "},{"label":"Generate variations","icon":"RefreshCw","promptText":"Generate 4 variations of the same concept with different compositions "},{"label":"Create a video","icon":"Video","promptText":"Turn this into a short animated video "}]</SUGGESTIONS>`,
     `<SUGGESTIONS>[{"label":"Refine the details","icon":"Pencil","promptText":"Refine the image with more detailed "},{"label":"Change aspect ratio","icon":"Layers","promptText":"Recreate this in a 9:16 portrait format "}]</SUGGESTIONS>`,
-    `<SUGGESTIONS>[]</SUGGESTIONS>`,
   ],
   waitForOutput: false,
   maxOccurrences: 1,
