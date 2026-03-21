@@ -556,7 +556,7 @@ describe("Agent 2 LLM integration: VIDEO", () => {
         {
           role: "user",
           content:
-            "[Image ID: img-abc123] Suggestion: Golden Sunset\nAspect Ratio: 16:9\nPrompt: A golden sunset over the ocean\n\nCreate a video from this image. Animate it with a slow camera push-in and gentle waves.",
+            "[Image ID: img-abc123] Suggestion: Golden Sunset\nAspect Ratio: 16:9\nPrompt: A golden sunset over the ocean\n\nCreate a video from this image. I already know exactly what I want — don't ask me any questions. Animate it with a slow camera push-in and gentle waves. Duration: 5 seconds. Style: cinematic.",
         },
       ]);
 
@@ -728,7 +728,7 @@ describe("Agent 2 LLM integration: VIDEO_SUGGEST", () => {
     "sends think, text, and video suggest events for a video idea request",
     async () => {
       const { events, finalContent } = await runPipeline(
-        "Give me 4 video ideas for a 15-second 16:9 landscape travel vlog about Tokyo street food"
+        "Give me exactly 4 video ideas for a 15-second 16:9 landscape travel vlog about Tokyo street food. I already know what I want — don't ask clarifying questions, just give me the ideas directly."
       );
 
       assertThinkEvent(events);
@@ -746,7 +746,7 @@ describe("Agent 2 LLM integration: VIDEO_SUGGEST", () => {
     "defaults to 4 video suggestions",
     async () => {
       const { events, finalContent } = await runPipeline(
-        "Suggest 4 video ideas for a 30-second 9:16 vertical coffee brand social media ad"
+        "Suggest exactly 4 video ideas for a 30-second 9:16 vertical coffee brand social media ad. Don't ask me any questions — I know exactly what I want, just give me the ideas."
       );
 
       const placeholders = events.filter(
@@ -764,7 +764,7 @@ describe("Agent 2 LLM integration: VIDEO_SUGGEST", () => {
     "each video suggest part contains a videoIdea field",
     async () => {
       const { finalContent } = await runPipeline(
-        "Give me 4 video ideas for a 15-second 16:9 underwater nature documentary short"
+        "Give me exactly 4 video ideas for a 15-second 16:9 underwater nature documentary short. Skip any clarifying questions — I've already decided on all the details, just generate the ideas."
       );
 
       const parts = finalContent.filter((p) => p.type === "agent_video_suggest");
