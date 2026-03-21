@@ -3377,7 +3377,37 @@ export default function ChatInterface({
             }
 
             // Process content events
-            if (event.type === "internal_think") {
+            if (event.type === "shot_list_start") {
+              // Show loading placeholder in chat (same as first message)
+              variantContent.push({
+                type: "agent_shot_list",
+                title: "",
+                columns: [],
+                rows: [],
+                status: "streaming",
+              } as any);
+
+              // Broadcast generating event to the room
+              if (desktopId) {
+                (async () => {
+                  try {
+                    const { getViewportVisibleCenterPosition } = await import("@/lib/desktop/types");
+                    const pos = getViewportVisibleCenterPosition(700, 300);
+                    window.dispatchEvent(
+                      new CustomEvent("desktop-table-generating", {
+                        detail: { desktopId, posX: pos.x, posY: pos.y },
+                      })
+                    );
+                  } catch {
+                    window.dispatchEvent(
+                      new CustomEvent("desktop-table-generating", {
+                        detail: { desktopId, posX: 0, posY: 0 },
+                      })
+                    );
+                  }
+                })();
+              }
+            } else if (event.type === "internal_think") {
               // Add internal_think part
               variantContent.push({
                 type: "internal_think",
@@ -3394,6 +3424,47 @@ export default function ChatInterface({
                   variantContent[placeholderIdx] = event.part;
                 } else {
                   variantContent.push(event.part);
+                }
+
+                // Auto-create desktop asset for shot lists
+                if (desktopId) {
+                  (async () => {
+                    try {
+                      const { getViewportVisibleCenterPosition } = await import("@/lib/desktop/types");
+                      const tableH = 40 + event.part.rows.length * 36 + 40;
+                      const pos = getViewportVisibleCenterPosition(700, tableH);
+                      const assetRes = await fetch(`/api/desktop/${desktopId}/assets`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          assets: [{
+                            assetType: "table",
+                            metadata: {
+                              title: event.part.title,
+                              columns: event.part.columns,
+                              rows: event.part.rows,
+                              chatId: chatId,
+                              status: "complete",
+                            },
+                            posX: pos.x,
+                            posY: pos.y,
+                            width: 700,
+                            height: tableH,
+                          }],
+                        }),
+                      });
+                      if (assetRes.ok) {
+                        const assetData = await assetRes.json();
+                        window.dispatchEvent(
+                          new CustomEvent("desktop-asset-added", {
+                            detail: { assets: assetData.assets, desktopId },
+                          })
+                        );
+                      }
+                    } catch (e) {
+                      console.error("Failed to add variant shot list asset to desktop:", e);
+                    }
+                  })();
                 }
               } else {
                 variantContent.push(event.part);
