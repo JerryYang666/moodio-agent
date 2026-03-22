@@ -1,5 +1,6 @@
 "use client";
 
+import { useRef } from "react";
 import { useTranslations } from "next-intl";
 import { Button } from "@heroui/button";
 import { Tooltip } from "@heroui/tooltip";
@@ -29,18 +30,43 @@ export default function DesktopToolbar({
   onCanvasModeChange,
 }: DesktopToolbarProps) {
   const t = useTranslations("desktop");
+  const toolbarRef = useRef<HTMLDivElement>(null);
+
+  /** Get the actual canvas container dimensions (not the full window). */
+  const getContainerSize = () => {
+    const parent = toolbarRef.current?.parentElement;
+    if (!parent) return { width: window.innerWidth, height: window.innerHeight };
+    const rect = parent.getBoundingClientRect();
+    return { width: rect.width, height: rect.height };
+  };
+
+  /**
+   * Zoom around the viewport center so assets don't shift unexpectedly.
+   * Same math as the wheel-zoom handler in DesktopCanvas.
+   */
+  const zoomAroundCenter = (newZoom: number) => {
+    const { width, height } = getContainerSize();
+    const centerX = width / 2;
+    const centerY = height / 2;
+    const scale = newZoom / camera.zoom;
+    onCameraChange({
+      x: centerX - (centerX - camera.x) * scale,
+      y: centerY - (centerY - camera.y) * scale,
+      zoom: newZoom,
+    });
+  };
 
   const zoomIn = () => {
-    const newZoom = Math.min(MAX_ZOOM, camera.zoom * 1.25);
-    onCameraChange({ ...camera, zoom: newZoom });
+    zoomAroundCenter(Math.min(MAX_ZOOM, camera.zoom * 1.25));
   };
 
   const zoomOut = () => {
-    const newZoom = Math.max(MIN_ZOOM, camera.zoom / 1.25);
-    onCameraChange({ ...camera, zoom: newZoom });
+    zoomAroundCenter(Math.max(MIN_ZOOM, camera.zoom / 1.25));
   };
 
   const fitToView = () => {
+    const { width: vw, height: vh } = getContainerSize();
+
     if (assets.length === 0) {
       onCameraChange({ x: 0, y: 0, zoom: 1 });
       return;
@@ -63,8 +89,6 @@ export default function DesktopToolbar({
     const bboxW = maxX - minX + padding * 2;
     const bboxH = maxY - minY + padding * 2;
 
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
     const zoom = Math.min(
       MAX_ZOOM,
       Math.max(MIN_ZOOM, Math.min(vw / bboxW, vh / bboxH))
@@ -81,11 +105,11 @@ export default function DesktopToolbar({
   };
 
   const resetZoom = () => {
-    onCameraChange({ ...camera, zoom: 1 });
+    zoomAroundCenter(1);
   };
 
   return (
-    <div className="absolute bottom-4 right-4 flex items-center gap-1 bg-background/80 backdrop-blur-sm rounded-xl border border-divider p-1 shadow-sm z-10">
+    <div ref={toolbarRef} className="absolute bottom-4 right-4 flex items-center gap-1 bg-background/80 backdrop-blur-sm rounded-xl border border-divider p-1 shadow-sm z-10">
       <Tooltip
         content={canvasMode === "move" ? t("moveModeTooltip") : t("selectModeTooltip")}
         closeDelay={0}
