@@ -121,8 +121,13 @@ export default function VideoSuggestAsset({
 
   const handleCancel = useCallback(() => {
     setIsEditing(false);
+    sendEvent?.("video_suggest_updated", {
+      assetId: asset.id,
+      title: meta.title || "",
+      videoIdea: meta.videoIdea || "",
+    });
     sendEvent?.("text_deselected", { assetId: asset.id });
-  }, [sendEvent, asset.id]);
+  }, [sendEvent, asset.id, meta.title, meta.videoIdea]);
 
   const handleModalClose = useCallback(() => {
     // Treat closing the modal as cancel
