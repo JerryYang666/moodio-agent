@@ -214,21 +214,20 @@ export default function VideoSuggestAsset({
         )}
       </div>
 
-      {/* Full-screen edit modal */}
       <Modal
         isOpen={isEditing}
         onClose={handleModalClose}
-        size="full"
+        size="5xl"
         scrollBehavior="inside"
         classNames={{
           wrapper: "z-[9999]",
           backdrop: "z-[9998]",
+          base: "max-h-[85vh] overflow-hidden",
         }}
         hideCloseButton
       >
         <ModalContent>
-          <ModalBody className="p-0 flex flex-row h-full">
-            {/* Left: full image preview */}
+          <ModalBody className="p-0 flex flex-row h-[75vh]">
             <div className="flex-1 min-w-0 bg-black flex items-center justify-center">
               {src ? (
                 <img
@@ -242,9 +241,7 @@ export default function VideoSuggestAsset({
               )}
             </div>
 
-            {/* Right: edit panel */}
             <div className="w-[400px] min-w-[400px] flex flex-col bg-background border-l border-divider">
-              {/* Header */}
               <div className="flex items-center justify-between px-5 py-4 border-b border-divider">
                 <h3 className="text-lg font-semibold">Edit Video Idea</h3>
                 <div className="flex gap-1">
@@ -259,7 +256,6 @@ export default function VideoSuggestAsset({
                 </div>
               </div>
 
-              {/* Fields */}
               <div
                 className="flex-1 p-5 flex flex-col gap-4 overflow-auto"
                 onClick={(e) => e.stopPropagation()}
@@ -289,7 +285,6 @@ export default function VideoSuggestAsset({
                 </div>
               </div>
 
-              {/* Footer */}
               <div className="flex gap-2 justify-end px-5 py-4 border-t border-divider">
                 <Button variant="flat" onPress={handleCancel}>
                   Cancel
