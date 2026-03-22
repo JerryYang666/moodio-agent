@@ -20,9 +20,11 @@ import { getVideoModel } from "@/lib/video/models";
 import ImageDetailModal, { ImageInfo } from "./image-detail-modal";
 import ImageDrawingModal from "./image-drawing-modal";
 import ChatMessage from "./chat-message";
-import ChatInput, { ChatInputRef } from "./chat-input";
+import ChatInput, { ChatInputRef, type AssetParamValue } from "./chat-input";
 import ParallelMessage from "./parallel-message";
 import AssetPickerModal, { type AssetSummary } from "./asset-picker-modal";
+import { PersistentAssetsPanel } from "./persistent-assets-panel";
+import { useGetPersistentAssetsQuery, useUpdatePersistentAssetsMutation } from "@/lib/redux/services/next-api";
 import { siteConfig } from "@/config/site";
 import { useVoiceRecorder } from "./use-voice-recorder";
 import { SYSTEM_PROMPT_STORAGE_KEY } from "@/components/test-kit";
@@ -69,8 +71,6 @@ import {
   MAX_PERSISTENT_REFERENCE_IMAGES,
 } from "@/lib/chat/persistent-assets-types";
 import type { PersistentAssets, PersistentReferenceImage } from "@/lib/chat/persistent-assets-types";
-import { PersistentAssetsPanel } from "./persistent-assets-panel";
-import { useGetPersistentAssetsQuery, useUpdatePersistentAssetsMutation } from "@/lib/redux/services/next-api";
 import { getPreselectImages } from "./preselect-images-utils";
 import type { JSONContent } from "@tiptap/react";
 import { useResearchTelemetry } from "@/hooks/use-research-telemetry";
@@ -286,10 +286,12 @@ export default function ChatInterface({
   const [pendingVideos, setPendingVideos] = useState<PendingVideo[]>([]);
   const [isAssetPickerOpen, setIsAssetPickerOpen] = useState(false);
   const toggleAssetPicker = useCallback(() => setIsAssetPickerOpen((v) => !v), []);
-  // Track which picker mode is active: "pending" for regular images, "persistent" for persistent assets
-  const [assetPickerMode, setAssetPickerMode] = useState<"pending" | "persistent">("pending");
+  // Track which picker mode is active: "pending" for regular images, "persistent" for persistent assets, "assetParam" for type:"asset" params
+  const [assetPickerMode, setAssetPickerMode] = useState<"pending" | "persistent" | "assetParam">("pending");
+  const [activeAssetParamName, setActiveAssetParamName] = useState<string | null>(null);
+  const [assetParamValues, setAssetParamValues] = useState<Record<string, AssetParamValue | null>>({});
   const [precisionEditing, setPrecisionEditing] = useState(false);
-
+  
   // Persistent assets state - loaded from server via RTK Query
   const { data: persistentAssetsData } = useGetPersistentAssetsQuery(chatId || "", {
     skip: !chatId,
@@ -299,7 +301,6 @@ export default function ChatInterface({
     ...EMPTY_PERSISTENT_ASSETS,
     referenceImages: [] as Array<PersistentReferenceImage & { imageUrl?: string }>,
   };
-
   const [menuState, setMenuState] = useState<MenuState>(INITIAL_MENU_STATE);
 
   // Load saved menu state from localStorage after hydration
@@ -545,11 +546,36 @@ export default function ChatInterface({
   // Check if current video model supports end images
   const videoModelSupportsEndImage = useMemo(() => {
     if (menuState.mode !== "video" || !menuState.videoModelId) return false;
-    // We'll check this by looking at the video models API data cached in VideoModeParams
-    // For now, import getVideoModel directly
     const model = getVideoModel(menuState.videoModelId);
     return !!model?.imageParams?.endImage;
   }, [menuState.mode, menuState.videoModelId]);
+
+  // Check if current video model has imageParams (first/last frame)
+  const videoModelHasImageParams = useMemo(() => {
+    if (menuState.mode !== "video" || !menuState.videoModelId) return false;
+    const model = getVideoModel(menuState.videoModelId);
+    return !!model?.imageParams;
+  }, [menuState.mode, menuState.videoModelId]);
+
+  // Compute asset param slots from the current video model (type: "asset" params)
+  const assetParamSlots = useMemo(() => {
+    if (menuState.mode !== "video" || !menuState.videoModelId) return [];
+    const model = getVideoModel(menuState.videoModelId);
+    if (!model) return [];
+    return model.params
+      .filter((p) => p.type === "asset" && (!p.status || p.status === "active"))
+      .map((p) => ({
+        name: p.name,
+        label: p.label || p.name,
+        required: p.required,
+        acceptTypes: p.acceptTypes as ("image" | "video")[] | undefined,
+      }));
+  }, [menuState.mode, menuState.videoModelId]);
+
+  // Clear asset param values when the model changes
+  useEffect(() => {
+    setAssetParamValues({});
+  }, [menuState.videoModelId]);
 
   // Modal state for agent images
   const { isOpen, onOpen, onOpenChange, onClose } = useDisclosure();
@@ -1329,6 +1355,18 @@ export default function ChatInterface({
     setIsAssetPickerOpen(true);
   }, []);
 
+  // Open asset picker for a specific asset param slot
+  const openAssetParamPicker = useCallback((paramName: string) => {
+    setActiveAssetParamName(paramName);
+    setAssetPickerMode("assetParam");
+    setIsAssetPickerOpen(true);
+  }, []);
+
+  // Clear an asset param value
+  const clearAssetParam = useCallback((paramName: string) => {
+    setAssetParamValues((prev) => ({ ...prev, [paramName]: null }));
+  }, []);
+
   // Upload a file and add to persistent reference images
   const uploadAndAddPersistentReferenceImage = useCallback(
     async (file: File) => {
@@ -1354,12 +1392,14 @@ export default function ChatInterface({
           title: file.name,
         });
       } else {
+        console.error("Persistent reference image upload failed:", result.error);
         addToast({ title: t("chat.uploadFailed"), color: "danger" });
       }
     },
-    [persistentAssets, addPersistentReferenceImage, addToast, t]
+    [persistentAssets, addPersistentReferenceImage, t]
   );
 
+  // Get the appropriate upload handler based on asset picker mode
   // Unified file upload handler that routes video vs image files
   const handleFilesUpload = useCallback(
     async (files: File[]) => {
@@ -1378,7 +1418,18 @@ export default function ChatInterface({
 
   const handleAssetUpload = useCallback(
     async (files: File[]) => {
-      if (assetPickerMode === "persistent") {
+      if (assetPickerMode === "assetParam" && activeAssetParamName) {
+        const file = files[0];
+        if (!file) return;
+        const result = await uploadImage(file);
+        if (result.success) {
+          setAssetParamValues((prev) => ({
+            ...prev,
+            [activeAssetParamName]: { imageId: result.data.imageId, displayUrl: result.data.imageUrl },
+          }));
+        }
+        setActiveAssetParamName(null);
+      } else if (assetPickerMode === "persistent") {
         for (const file of files) {
           await uploadAndAddPersistentReferenceImage(file);
         }
@@ -1386,7 +1437,7 @@ export default function ChatInterface({
         await handleFilesUpload(files);
       }
     },
-    [assetPickerMode, handleFilesUpload, uploadAndAddPersistentReferenceImage]
+    [assetPickerMode, activeAssetParamName, handleFilesUpload, uploadAndAddPersistentReferenceImage, uploadImage]
   );
 
   // Listen for asset selection events from the hover sidebar
@@ -1497,15 +1548,17 @@ export default function ChatInterface({
 
   const handleAssetPicked = useCallback(
     (asset: AssetSummary) => {
-      if (assetPickerMode === "persistent") {
+      if (assetPickerMode === "assetParam" && activeAssetParamName) {
+        const displayUrl = asset.videoUrl || asset.imageUrl;
+        setAssetParamValues((prev) => ({ ...prev, [activeAssetParamName]: { imageId: asset.imageId, displayUrl } }));
+        setActiveAssetParamName(null);
+      } else if (assetPickerMode === "persistent") {
         addPersistentReferenceImage({
           imageId: asset.imageId,
           url: asset.imageUrl,
           title: asset.generationDetails?.title || t("chat.selectedAsset"),
         });
-        return;
-      }
-      if (asset.assetType === "video") {
+      } else if (asset.assetType === "video") {
         if (!canAddVideo(pendingVideos)) {
           addToast({ title: t("chat.maxVideosReached", { max: MAX_PENDING_VIDEOS }), color: "warning" });
           return;
@@ -1525,11 +1578,12 @@ export default function ChatInterface({
         });
       }
     },
-    [addAssetImage, addPersistentReferenceImage, assetPickerMode, pendingVideos, t]
+    [addAssetImage, addPersistentReferenceImage, assetPickerMode, activeAssetParamName, pendingVideos, t]
   );
 
   const pendingImagesRef = useRef(pendingImages);
   pendingImagesRef.current = pendingImages;
+
   const pendingVideosRef = useRef(pendingVideos);
   pendingVideosRef.current = pendingVideos;
 
@@ -1537,6 +1591,7 @@ export default function ChatInterface({
     async (assets: AssetSummary[]) => {
       if (assetPickerMode === "persistent") {
         for (const asset of assets) {
+          if (persistentAssets.referenceImages.length >= MAX_PERSISTENT_REFERENCE_IMAGES) break;
           await addPersistentReferenceImage({
             imageId: asset.imageId,
             url: asset.imageUrl,
@@ -1565,7 +1620,7 @@ export default function ChatInterface({
         }
       }
     },
-    [addAssetImage, addPersistentReferenceImage, assetPickerMode, t]
+    [addAssetImage, addPersistentReferenceImage, assetPickerMode, persistentAssets, t]
   );
 
   // Handler to open drawing modal for an image
@@ -1995,6 +2050,7 @@ export default function ChatInterface({
     setInput("");
     setPendingImages([]);
     setPendingVideos([]);
+    setAssetParamValues({});
     setPrecisionEditing(false);
     
     // Clear the draft since we're sending the message
@@ -2063,7 +2119,7 @@ export default function ChatInterface({
           partIndex: img.partIndex,
           variantId: img.variantId,
         })),
-        // Reference images are now in persistent assets (loaded from S3 on server side)
+        // Reference images are now sourced from persistent assets (server-side)
         // Include video sources
         videoSources: currentPendingVideos.map((vid) => ({
           videoId: vid.videoId,
@@ -2082,7 +2138,11 @@ export default function ChatInterface({
       // Pass video-specific params
       if (menuState.mode === "video") {
         payload.videoModelId = menuState.videoModelId;
-        payload.videoParams = menuState.videoParams;
+        const mergedVideoParams = { ...menuState.videoParams };
+        for (const [paramName, val] of Object.entries(assetParamValues)) {
+          if (val) mergedVideoParams[paramName] = val.imageId;
+        }
+        payload.videoParams = mergedVideoParams;
       }
 
       // Pass the mode so the backend knows whether to use agent or direct generation
@@ -3308,16 +3368,6 @@ export default function ChatInterface({
 
   return (
     <div className="flex flex-col h-full relative">
-      {/* Persistent Assets button - upper right corner */}
-      {chatId && (
-        <div className="absolute top-2 right-2 z-10">
-          <PersistentAssetsPanel
-            chatId={chatId}
-            persistentAssets={persistentAssets}
-            onOpenAssetPicker={openPersistentAssetPicker}
-          />
-        </div>
-      )}
       <div
         ref={scrollAreaRef}
         className="flex-1 overflow-y-auto space-y-6 pr-2 pt-4 scrollbar-hide"
@@ -3464,6 +3514,15 @@ export default function ChatInterface({
         </div>
       )}
 
+      {/* Persistent Assets Panel - positioned at top-right of chat */}
+      {chatId && (
+        <PersistentAssetsPanel
+          chatId={chatId}
+          persistentAssets={persistentAssets}
+          onOpenAssetPicker={openPersistentAssetPicker}
+        />
+      )}
+
       <ChatInput
         ref={chatInputRef}
         input={input}
@@ -3497,7 +3556,12 @@ export default function ChatInterface({
         videoCost={videoCost}
         videoCostLoading={videoCostLoading}
         videoModelSupportsEndImage={videoModelSupportsEndImage}
+        videoModelHasImageParams={videoModelHasImageParams}
         onHeightChange={handleChatInputHeightChange}
+        assetParamSlots={assetParamSlots}
+        assetParamValues={assetParamValues}
+        onOpenAssetParamPicker={openAssetParamPicker}
+        onClearAssetParam={clearAssetParam}
       />
 
       <AssetPickerModal
@@ -3506,11 +3570,18 @@ export default function ChatInterface({
         onSelect={handleAssetPicked}
         onSelectMultiple={handleAssetPickedMultiple}
         onUpload={handleAssetUpload}
-        multiSelect
+        multiSelect={assetPickerMode !== "assetParam"}
         maxSelectCount={
-          assetPickerMode === "persistent"
+          assetPickerMode === "assetParam"
+            ? 1
+            : assetPickerMode === "persistent"
             ? MAX_PERSISTENT_REFERENCE_IMAGES - persistentAssets.referenceImages.length
             : MAX_PENDING_IMAGES - pendingImagesRef.current.length
+        }
+        acceptTypes={
+          assetPickerMode === "assetParam" && activeAssetParamName
+            ? assetParamSlots.find((s) => s.name === activeAssetParamName)?.acceptTypes
+            : undefined
         }
       />
 
