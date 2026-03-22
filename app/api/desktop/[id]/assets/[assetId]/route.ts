@@ -101,6 +101,41 @@ export async function PATCH(
       return NextResponse.json({ asset: enrichAsset(updated) });
     }
 
+    // Video suggest patch (read-modify-write title/videoIdea fields)
+    if (body.videoSuggestPatch && typeof body.videoSuggestPatch === "object") {
+      const { title, videoIdea } = body.videoSuggestPatch;
+
+      const [existing] = await db
+        .select()
+        .from(desktopAssets)
+        .where(and(eq(desktopAssets.id, assetId), eq(desktopAssets.desktopId, id)));
+
+      if (!existing) {
+        return NextResponse.json({ error: "Asset not found" }, { status: 404 });
+      }
+
+      if (existing.assetType !== "video_suggest") {
+        return NextResponse.json({ error: "videoSuggestPatch is only supported for video_suggest assets" }, { status: 400 });
+      }
+
+      const meta = existing.metadata as Record<string, unknown>;
+      const patchedMetadata = { ...meta };
+      if (typeof title === "string") patchedMetadata.title = title;
+      if (typeof videoIdea === "string") patchedMetadata.videoIdea = videoIdea;
+
+      const [updated] = await db
+        .update(desktopAssets)
+        .set({ metadata: patchedMetadata })
+        .where(and(eq(desktopAssets.id, assetId), eq(desktopAssets.desktopId, id)))
+        .returning();
+
+      if (!updated) {
+        return NextResponse.json({ error: "Asset not found" }, { status: 404 });
+      }
+
+      return NextResponse.json({ asset: enrichAsset(updated) });
+    }
+
     // Text content patch for text assets (read-modify-write the content field)
     if (body.textPatch && typeof body.textPatch === "object") {
       const { content } = body.textPatch;
