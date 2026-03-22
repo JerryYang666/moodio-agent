@@ -27,7 +27,8 @@
     "remove": "제거",
     "on": "켜기",
     "off": "끄기",
-    "send": "보내기"
+    "send": "보내기",
+    "optional": "선택 사항"
   },
   "share": {
     "searchUser": "사용자 검색",

@@ -291,8 +291,10 @@ export default function ChatInterface({
   const [pendingVideos, setPendingVideos] = useState<PendingVideo[]>([]);
   const [isAssetPickerOpen, setIsAssetPickerOpen] = useState(false);
   const toggleAssetPicker = useCallback(() => setIsAssetPickerOpen((v) => !v), []);
-  // Track which picker mode is active: "pending" for regular images, "reference" for reference images
-  const [assetPickerMode, setAssetPickerMode] = useState<"pending" | "reference">("pending");
+  // Track which picker mode is active: "pending" for regular images, "reference" for reference images, "assetParam" for type:"asset" params
+  const [assetPickerMode, setAssetPickerMode] = useState<"pending" | "reference" | "assetParam">("pending");
+  const [activeAssetParamName, setActiveAssetParamName] = useState<string | null>(null);
+  const [assetParamValues, setAssetParamValues] = useState<Record<string, string | null>>({});
   const [precisionEditing, setPrecisionEditing] = useState(false);
   
   // Reference images state - persistent images that don't get cleared on send
@@ -562,11 +564,36 @@ export default function ChatInterface({
   // Check if current video model supports end images
   const videoModelSupportsEndImage = useMemo(() => {
     if (menuState.mode !== "video" || !menuState.videoModelId) return false;
-    // We'll check this by looking at the video models API data cached in VideoModeParams
-    // For now, import getVideoModel directly
     const model = getVideoModel(menuState.videoModelId);
     return !!model?.imageParams?.endImage;
   }, [menuState.mode, menuState.videoModelId]);
+
+  // Check if current video model has imageParams (first/last frame)
+  const videoModelHasImageParams = useMemo(() => {
+    if (menuState.mode !== "video" || !menuState.videoModelId) return false;
+    const model = getVideoModel(menuState.videoModelId);
+    return !!model?.imageParams;
+  }, [menuState.mode, menuState.videoModelId]);
+
+  // Compute asset param slots from the current video model (type: "asset" params)
+  const assetParamSlots = useMemo(() => {
+    if (menuState.mode !== "video" || !menuState.videoModelId) return [];
+    const model = getVideoModel(menuState.videoModelId);
+    if (!model) return [];
+    return model.params
+      .filter((p) => p.type === "asset" && (!p.status || p.status === "active"))
+      .map((p) => ({
+        name: p.name,
+        label: p.label || p.name,
+        required: p.required,
+        acceptTypes: p.acceptTypes as ("image" | "video")[] | undefined,
+      }));
+  }, [menuState.mode, menuState.videoModelId]);
+
+  // Clear asset param values when the model changes
+  useEffect(() => {
+    setAssetParamValues({});
+  }, [menuState.videoModelId]);
 
   // Modal state for agent images
   const { isOpen, onOpen, onOpenChange, onClose } = useDisclosure();
@@ -1380,6 +1407,18 @@ export default function ChatInterface({
     setIsAssetPickerOpen(true);
   }, []);
 
+  // Open asset picker for a specific asset param slot
+  const openAssetParamPicker = useCallback((paramName: string) => {
+    setActiveAssetParamName(paramName);
+    setAssetPickerMode("assetParam");
+    setIsAssetPickerOpen(true);
+  }, []);
+
+  // Clear an asset param value
+  const clearAssetParam = useCallback((paramName: string) => {
+    setAssetParamValues((prev) => ({ ...prev, [paramName]: null }));
+  }, []);
+
   // Upload a file and add to reference images
   const uploadAndAddReferenceImage = useCallback(
     async (file: File) => {
@@ -1452,7 +1491,15 @@ export default function ChatInterface({
 
   const handleAssetUpload = useCallback(
     async (files: File[]) => {
-      if (assetPickerMode === "reference") {
+      if (assetPickerMode === "assetParam" && activeAssetParamName) {
+        const file = files[0];
+        if (!file) return;
+        const result = await uploadImage(file);
+        if (result.success) {
+          setAssetParamValues((prev) => ({ ...prev, [activeAssetParamName]: result.data.imageUrl }));
+        }
+        setActiveAssetParamName(null);
+      } else if (assetPickerMode === "reference") {
         for (const file of files) {
           await uploadAndAddReferenceImage(file);
         }
@@ -1460,7 +1507,7 @@ export default function ChatInterface({
         await handleFilesUpload(files);
       }
     },
-    [assetPickerMode, handleFilesUpload, uploadAndAddReferenceImage]
+    [assetPickerMode, activeAssetParamName, handleFilesUpload, uploadAndAddReferenceImage, uploadImage]
   );
 
   // Listen for asset selection events from the hover sidebar
@@ -1571,7 +1618,11 @@ export default function ChatInterface({
 
   const handleAssetPicked = useCallback(
     (asset: AssetSummary) => {
-      if (assetPickerMode === "reference") {
+      if (assetPickerMode === "assetParam" && activeAssetParamName) {
+        const url = asset.videoUrl || asset.imageUrl;
+        setAssetParamValues((prev) => ({ ...prev, [activeAssetParamName]: url }));
+        setActiveAssetParamName(null);
+      } else if (assetPickerMode === "reference") {
         addReferenceImage({
           imageId: asset.imageId,
           url: asset.imageUrl,
@@ -1597,7 +1648,7 @@ export default function ChatInterface({
         });
       }
     },
-    [addAssetImage, addReferenceImage, assetPickerMode, pendingVideos, t]
+    [addAssetImage, addReferenceImage, assetPickerMode, activeAssetParamName, pendingVideos, t]
   );
 
   const pendingImagesRef = useRef(pendingImages);
@@ -2071,6 +2122,7 @@ export default function ChatInterface({
     setInput("");
     setPendingImages([]);
     setPendingVideos([]);
+    setAssetParamValues({});
     setPrecisionEditing(false);
     
     // Clear the draft since we're sending the message
@@ -2163,7 +2215,11 @@ export default function ChatInterface({
       // Pass video-specific params
       if (menuState.mode === "video") {
         payload.videoModelId = menuState.videoModelId;
-        payload.videoParams = menuState.videoParams;
+        const mergedVideoParams = { ...menuState.videoParams };
+        for (const [paramName, url] of Object.entries(assetParamValues)) {
+          if (url) mergedVideoParams[paramName] = url;
+        }
+        payload.videoParams = mergedVideoParams;
       }
 
       // Pass the mode so the backend knows whether to use agent or direct generation
@@ -3575,7 +3631,12 @@ export default function ChatInterface({
         videoCost={videoCost}
         videoCostLoading={videoCostLoading}
         videoModelSupportsEndImage={videoModelSupportsEndImage}
+        videoModelHasImageParams={videoModelHasImageParams}
         onHeightChange={handleChatInputHeightChange}
+        assetParamSlots={assetParamSlots}
+        assetParamValues={assetParamValues}
+        onOpenAssetParamPicker={openAssetParamPicker}
+        onClearAssetParam={clearAssetParam}
       />
 
       <AssetPickerModal
@@ -3584,11 +3645,18 @@ export default function ChatInterface({
         onSelect={handleAssetPicked}
         onSelectMultiple={handleAssetPickedMultiple}
         onUpload={handleAssetUpload}
-        multiSelect
+        multiSelect={assetPickerMode !== "assetParam"}
         maxSelectCount={
-          assetPickerMode === "reference"
+          assetPickerMode === "assetParam"
+            ? 1
+            : assetPickerMode === "reference"
             ? MAX_REFERENCE_IMAGES - referenceImagesRef.current.length
             : MAX_PENDING_IMAGES - pendingImagesRef.current.length
+        }
+        acceptTypes={
+          assetPickerMode === "assetParam" && activeAssetParamName
+            ? assetParamSlots.find((s) => s.name === activeAssetParamName)?.acceptTypes
+            : undefined
         }
       />
 

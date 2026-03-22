@@ -12,7 +12,10 @@ export type VideoModelParamType =
   | "number"
   | "boolean"
   | "enum"
-  | "string_array";
+  | "string_array"
+  | "asset";
+
+export type AssetAcceptType = "image" | "video";
 
 /**
  * Parameter status controls visibility and behavior:
@@ -34,6 +37,7 @@ export interface VideoModelParam {
   max?: number; // For number types
   maxItems?: number; // For array types - maximum number of items allowed
   status?: VideoModelParamStatus; // Defaults to "active" if not specified
+  acceptTypes?: AssetAcceptType[]; // For "asset" type - which asset types the picker allows
 }
 
 export type VideoProvider = "fal" | "kie";
@@ -740,10 +744,7 @@ const veo31: VideoModelConfig = {
   id: "veo-3.1",
   name: "Veo 3.1",
   description:
-    "Google DeepMind's state-of-the-art image-to-video model with optional audio generation",
-  imageParams: {
-    sourceImage: "image_url",
-  },
+    "Google DeepMind's state-of-the-art video generation model — supports both text-to-video and image-to-video",
   providers: [
     { provider: "fal", providerModelId: "fal-ai/veo3.1/image-to-video" },
     { provider: "kie", providerModelId: "veo3", paramMapping: { image_url: "imageUrls" }, paramOverrides: { negative_prompt: { status: "disabled" }, seed: { status: "disabled" }, auto_fix: { status: "disabled" }, resolution: { status: "disabled" } } },
@@ -758,11 +759,12 @@ const veo31: VideoModelConfig = {
     },
     {
       name: "image_url",
-      label: "Source Image",
-      type: "string",
-      required: true,
+      label: "Reference Image",
+      type: "asset",
+      required: false,
+      acceptTypes: ["image"],
       description:
-        "URL of the image to animate (720p+ in 16:9 or 9:16 will work best)",
+        "Optional image — if provided, generates video from this image; otherwise generates from text only",
     },
     {
       name: "aspect_ratio",
@@ -1423,6 +1425,12 @@ export function validateAndMergeParams(
         }
         break;
 
+      case "asset":
+        if (typeof userValue !== "string") {
+          throw new Error(`Parameter ${param.name} must be a URL string`);
+        }
+        break;
+
       case "string_array":
         if (!Array.isArray(userValue)) {
           throw new Error(
@@ -1479,6 +1487,7 @@ export function getModelConfigForApi(modelId: string) {
         min: p.min,
         max: p.max,
         maxItems: p.maxItems,
+        acceptTypes: p.acceptTypes,
       })),
   };
 }
@@ -1522,6 +1531,9 @@ function describeModelParams(model: VideoModelConfig): string {
     } else if (param.type === "string_array") {
       desc += "array of strings";
       if (param.maxItems) desc += ` (max ${param.maxItems})`;
+    } else if (param.type === "asset") {
+      const accepts = param.acceptTypes?.join("/") || "image";
+      desc += `${accepts} URL (user picks via asset picker)`;
     }
 
     if (param.default !== undefined) {
@@ -1551,7 +1563,12 @@ export function getVideoModelsPromptText(): string {
   for (const model of VIDEO_MODELS) {
     const header = `Model: "${model.name}" (modelId: "${model.id}")`;
     const desc = model.description ? `  ${model.description}` : "";
-    const modelType = model.imageParams ? "  Type: image-to-video (requires source image)" : "  Type: text-to-video (no source image needed)";
+    const hasOptionalRefImage = model.params.some((p) => p.type === "asset" && !p.required);
+    const modelType = model.imageParams
+      ? "  Type: image-to-video (requires source image)"
+      : hasOptionalRefImage
+      ? "  Type: text-to-video with optional reference image"
+      : "  Type: text-to-video (no source image needed)";
     const supportsEndImage = model.imageParams?.endImage ? "  Supports end image: yes" : "";
     const params = describeModelParams(model);
 

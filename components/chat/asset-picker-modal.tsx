@@ -319,6 +319,7 @@ export default function AssetPickerModal({
   hideLibraryTab = false,
   multiSelect = false,
   maxSelectCount,
+  acceptTypes,
 }: {
   isOpen: boolean;
   onOpenChange: () => void;
@@ -332,6 +333,8 @@ export default function AssetPickerModal({
   multiSelect?: boolean;
   /** Max number of images that can be selected (multiSelect mode) */
   maxSelectCount?: number;
+  /** When provided, only show assets of these types (and restrict upload accordingly) */
+  acceptTypes?: ("image" | "video")[];
 }) {
   const t = useTranslations();
   const [loading, setLoading] = useState(false);
@@ -433,8 +436,14 @@ export default function AssetPickerModal({
       if (recordedVideoUrl) URL.revokeObjectURL(recordedVideoUrl);
       setRecordedVideoUrl(null);
       if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+    } else if (acceptTypes && acceptTypes.length > 0) {
+      if (acceptTypes.includes("video") && !acceptTypes.includes("image")) {
+        setCameraMode("video");
+      } else if (acceptTypes.includes("image") && !acceptTypes.includes("video")) {
+        setCameraMode("photo");
+      }
     }
-  }, [tabKey]);
+  }, [tabKey, acceptTypes]);
 
   const visibleCollections = useMemo(() => {
     const all = collections;
@@ -507,6 +516,12 @@ export default function AssetPickerModal({
 
   const filteredAssets = useMemo(() => {
     let result = assets;
+    if (acceptTypes && acceptTypes.length > 0) {
+      result = result.filter((a) => {
+        const type = a.assetType || "image";
+        return acceptTypes.includes(type);
+      });
+    }
     const q = query.trim().toLowerCase();
     if (q) {
       result = result.filter((a) =>
@@ -519,7 +534,7 @@ export default function AssetPickerModal({
       );
     }
     return result;
-  }, [assets, query, filterRating]);
+  }, [assets, query, filterRating, acceptTypes]);
 
   // Camera functions
   const startCamera = useCallback(async () => {
@@ -768,7 +783,8 @@ export default function AssetPickerModal({
                 {tabKey === "camera" ? (
                   /* ── Camera Tab ── */
                   <div className="flex flex-col gap-4 items-center">
-                    {/* Photo / Video mode toggle */}
+                    {/* Photo / Video mode toggle — hidden when acceptTypes restricts to one type */}
+                    {(!acceptTypes || acceptTypes.length === 0 || (acceptTypes.includes("image") && acceptTypes.includes("video"))) && (
                     <div className="flex gap-2">
                       <Button
                         size="sm"
@@ -787,6 +803,7 @@ export default function AssetPickerModal({
                         {t("assetPicker.videoMode")}
                       </Button>
                     </div>
+                    )}
 
                     {cameraError && (
                       <div className="text-sm text-danger text-center py-4">
@@ -940,19 +957,29 @@ export default function AssetPickerModal({
                       type="file"
                       ref={fileInputRef}
                       className="hidden"
-                      accept={[
-                        ...siteConfig.upload.allowedImageTypes,
-                        ...siteConfig.upload.allowedVideoTypes,
-                      ].join(", ")}
+                      accept={(() => {
+                        if (!acceptTypes || acceptTypes.length === 0) {
+                          return [...siteConfig.upload.allowedImageTypes, ...siteConfig.upload.allowedVideoTypes].join(", ");
+                        }
+                        const types: string[] = [];
+                        if (acceptTypes.includes("image")) types.push(...siteConfig.upload.allowedImageTypes);
+                        if (acceptTypes.includes("video")) types.push(...siteConfig.upload.allowedVideoTypes);
+                        return types.join(", ");
+                      })()}
                       multiple
                       onChange={(e) => {
                         const fileList = e.target.files;
                         if (!fileList || fileList.length === 0) return;
                         const maxBytes = siteConfig.upload.maxFileSizeMB * 1024 * 1024;
-                        const validTypes = [
-                          ...siteConfig.upload.allowedImageTypes,
-                          ...siteConfig.upload.allowedVideoTypes,
-                        ];
+                        const validTypes = (() => {
+                          if (!acceptTypes || acceptTypes.length === 0) {
+                            return [...siteConfig.upload.allowedImageTypes, ...siteConfig.upload.allowedVideoTypes];
+                          }
+                          const t: string[] = [];
+                          if (acceptTypes.includes("image")) t.push(...siteConfig.upload.allowedImageTypes);
+                          if (acceptTypes.includes("video")) t.push(...siteConfig.upload.allowedVideoTypes);
+                          return t;
+                        })();
                         const validFiles: File[] = [];
                         for (const file of Array.from(fileList)) {
                           if (file.size > maxBytes) {

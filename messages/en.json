@@ -27,7 +27,8 @@
     "remove": "Remove",
     "on": "On",
     "off": "Off",
-    "send": "Send"
+    "send": "Send",
+    "optional": "Optional"
   },
   "share": {
     "searchUser": "Search User",

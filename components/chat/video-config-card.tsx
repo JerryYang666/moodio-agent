@@ -125,11 +125,15 @@ export default function VideoConfigCard({
   }, [modelConfig]);
 
   const gridParams = useMemo(
-    () => visibleParams.filter((p) => p.type !== "string"),
+    () => visibleParams.filter((p) => p.type !== "string" && p.type !== "asset"),
     [visibleParams]
   );
   const textParams = useMemo(
     () => visibleParams.filter((p) => p.type === "string"),
+    [visibleParams]
+  );
+  const assetParams = useMemo(
+    () => visibleParams.filter((p) => p.type === "asset"),
     [visibleParams]
   );
 
@@ -657,6 +661,30 @@ export default function VideoConfigCard({
                 <div className="text-xs whitespace-pre-wrap">
                   {String(value) || "—"}
                 </div>
+              )}
+            </div>
+          );
+        })}
+
+        {/* Asset-type params (type: "asset") - preview thumbnails */}
+        {assetParams.map((param) => {
+          const value = editedParams[param.name];
+          const url = typeof value === "string" ? value : null;
+          return (
+            <div key={param.name} className="flex items-center gap-2">
+              <div className="text-xs text-default-400">
+                {param.label || param.name}:
+              </div>
+              {url ? (
+                <div className="w-12 h-8 rounded overflow-hidden border border-divider">
+                  <img
+                    src={url}
+                    alt={param.label || param.name}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              ) : (
+                <span className="text-xs text-default-300">—</span>
               )}
             </div>
           );

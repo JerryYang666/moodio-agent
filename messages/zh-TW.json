@@ -27,7 +27,8 @@
     "remove": "移除",
     "on": "開",
     "off": "關",
-    "send": "傳送"
+    "send": "傳送",
+    "optional": "可選"
   },
   "share": {
     "searchUser": "搜尋使用者",
