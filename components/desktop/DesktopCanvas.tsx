@@ -11,7 +11,7 @@ import PublicVideoAsset from "./assets/PublicVideoAsset";
 import TableAsset from "./assets/TableAsset";
 import { hasWriteAccess, type Permission } from "@/lib/permissions";
 import type { CanvasMode } from "./DesktopToolbar";
-import { AI_IMAGE_DRAG_MIME, AI_TEXT_DRAG_MIME, AI_SHOTLIST_DRAG_MIME } from "@/components/chat/asset-dnd";
+import { AI_IMAGE_DRAG_MIME, AI_TEXT_DRAG_MIME, AI_SHOTLIST_DRAG_MIME, AI_VIDEO_SUGGEST_DRAG_MIME } from "@/components/chat/asset-dnd";
 import {
   Trash2,
   MessageSquare,
@@ -83,6 +83,18 @@ interface DesktopCanvasProps {
   textLocks?: Map<string, { userId: string; sessionId: string; firstName: string }>;
   onTextCommit?: (assetId: string, content: string) => void;
   onVideoSuggestCommit?: (assetId: string, updates: { title: string; videoIdea: string }) => void;
+  onExternalVideoSuggestDrop?: (
+    payload: {
+      imageId: string;
+      url: string;
+      title: string;
+      videoIdea: string;
+      prompt?: string;
+      aspectRatio?: string;
+      chatId?: string | null;
+    },
+    position: { x: number; y: number }
+  ) => void;
   onAddAssetAtPosition?: (worldPos: { x: number; y: number }) => void;
 }
 
@@ -163,6 +175,7 @@ export default function DesktopCanvas({
   textLocks,
   onTextCommit,
   onVideoSuggestCommit,
+  onExternalVideoSuggestDrop,
   onAddAssetAtPosition,
 }: DesktopCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -349,6 +362,37 @@ export default function DesktopCanvas({
     }
   }, []);
 
+  const parseAiVideoSuggestDropPayload = useCallback((e: React.DragEvent) => {
+    try {
+      const json = e.dataTransfer.getData(AI_VIDEO_SUGGEST_DRAG_MIME);
+      if (!json) return null;
+      const parsed = JSON.parse(json) as {
+        imageId?: unknown;
+        url?: unknown;
+        title?: unknown;
+        videoIdea?: unknown;
+        prompt?: unknown;
+        aspectRatio?: unknown;
+        chatId?: unknown;
+      };
+      if (typeof parsed.imageId !== "string" || typeof parsed.url !== "string") return null;
+      return {
+        imageId: parsed.imageId,
+        url: parsed.url,
+        title: typeof parsed.title === "string" ? parsed.title : "",
+        videoIdea: typeof parsed.videoIdea === "string" ? parsed.videoIdea : "",
+        prompt: typeof parsed.prompt === "string" ? parsed.prompt : undefined,
+        aspectRatio: typeof parsed.aspectRatio === "string" ? parsed.aspectRatio : undefined,
+        chatId:
+          typeof parsed.chatId === "string" || parsed.chatId === null
+            ? parsed.chatId
+            : undefined,
+      };
+    } catch {
+      return null;
+    }
+  }, []);
+
   const parseAiShotlistDropPayload = useCallback((e: React.DragEvent) => {
     try {
       const json = e.dataTransfer.getData(AI_SHOTLIST_DRAG_MIME);
@@ -380,13 +424,14 @@ export default function DesktopCanvas({
       if (
         (onExternalImageDrop && types.includes(AI_IMAGE_DRAG_MIME)) ||
         (onExternalTextDrop && types.includes(AI_TEXT_DRAG_MIME)) ||
-        (onExternalShotlistDrop && types.includes(AI_SHOTLIST_DRAG_MIME))
+        (onExternalShotlistDrop && types.includes(AI_SHOTLIST_DRAG_MIME)) ||
+        (onExternalVideoSuggestDrop && types.includes(AI_VIDEO_SUGGEST_DRAG_MIME))
       ) {
         e.preventDefault();
         e.dataTransfer.dropEffect = "copy";
       }
     },
-    [canEdit, onExternalImageDrop, onExternalTextDrop, onExternalShotlistDrop]
+    [canEdit, onExternalImageDrop, onExternalTextDrop, onExternalShotlistDrop, onExternalVideoSuggestDrop]
   );
 
   const handleDrop = useCallback(
@@ -419,8 +464,17 @@ export default function DesktopCanvas({
         onExternalShotlistDrop!(shotlistPayload, world);
         return;
       }
+
+      const videoSuggestPayload = onExternalVideoSuggestDrop ? parseAiVideoSuggestDropPayload(e) : null;
+      if (videoSuggestPayload) {
+        e.preventDefault();
+        e.stopPropagation();
+        const world = screenToWorld(e.clientX, e.clientY);
+        onExternalVideoSuggestDrop!(videoSuggestPayload, world);
+        return;
+      }
     },
-    [canEdit, onExternalImageDrop, onExternalTextDrop, onExternalShotlistDrop, parseAiImageDropPayload, parseAiTextDropPayload, parseAiShotlistDropPayload, screenToWorld]
+    [canEdit, onExternalImageDrop, onExternalTextDrop, onExternalShotlistDrop, onExternalVideoSuggestDrop, parseAiImageDropPayload, parseAiTextDropPayload, parseAiShotlistDropPayload, parseAiVideoSuggestDropPayload, screenToWorld]
   );
 
   const handlePointerDown = useCallback(
@@ -802,6 +856,15 @@ export default function DesktopCanvas({
               : ("library" as const),
         }
       : null;
+  const floatingBarVideoSuggestInfo = singleSelectedAsset?.assetType === "video_suggest"
+    ? {
+        assetId: singleSelectedAsset.id,
+        imageId: (singleSelectedAsset.metadata as Record<string, unknown>)?.imageId as string | undefined,
+        url: singleSelectedAsset.imageUrl,
+        title: ((singleSelectedAsset.metadata as Record<string, unknown>)?.title as string) || "",
+        videoIdea: ((singleSelectedAsset.metadata as Record<string, unknown>)?.videoIdea as string) || "",
+      }
+    : null;
   const floatingBarChatId = singleSelectedAsset &&
     typeof (singleSelectedAsset.metadata as Record<string, unknown>)?.chatId === "string"
     ? ((singleSelectedAsset.metadata as Record<string, unknown>).chatId as string)
@@ -1173,6 +1236,28 @@ export default function DesktopCanvas({
                         url: floatingBarVideoInfo.url,
                         title: floatingBarVideoInfo.title,
                         source: floatingBarVideoInfo.source,
+                      },
+                    })
+                  );
+                }}
+                title={t("sendToChat")}
+              >
+                <SendHorizontal size={13} />
+                {t("sendToChat")}
+              </button>
+            )}
+            {floatingBarVideoSuggestInfo?.imageId && floatingBarVideoSuggestInfo.url && (
+              <button
+                className="flex items-center gap-1.5 px-2 py-1 text-xs hover:bg-default-100 rounded-md transition-colors whitespace-nowrap"
+                onClick={() => {
+                  window.dispatchEvent(
+                    new CustomEvent("moodio-videosuggest-to-chat", {
+                      detail: {
+                        assetId: floatingBarVideoSuggestInfo.assetId,
+                        imageId: floatingBarVideoSuggestInfo.imageId,
+                        url: floatingBarVideoSuggestInfo.url,
+                        title: floatingBarVideoSuggestInfo.title,
+                        videoIdea: floatingBarVideoSuggestInfo.videoIdea,
                       },
                     })
                   );

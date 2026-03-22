@@ -573,6 +573,61 @@ export default function DesktopDetailPage({
     [desktopId, t]
   );
 
+  const handleExternalVideoSuggestDrop = useCallback(
+    async (
+      payload: {
+        imageId: string;
+        url: string;
+        title: string;
+        videoIdea: string;
+        prompt?: string;
+        aspectRatio?: string;
+        chatId?: string | null;
+      },
+      position: { x: number; y: number }
+    ) => {
+      try {
+        const res = await fetch(`/api/desktop/${desktopId}/assets`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            assets: [
+              {
+                assetType: "video_suggest",
+                metadata: {
+                  imageId: payload.imageId,
+                  chatId: payload.chatId ?? undefined,
+                  title: payload.title,
+                  videoIdea: payload.videoIdea,
+                  prompt: payload.prompt || "",
+                  aspectRatio: payload.aspectRatio || "",
+                },
+                posX: position.x,
+                posY: position.y,
+                width: 340,
+                height: 100,
+              },
+            ],
+          }),
+        });
+        if (!res.ok) throw new Error("Failed to add dropped video suggest to desktop");
+        const data = await res.json();
+        window.dispatchEvent(
+          new CustomEvent("desktop-asset-added", {
+            detail: { assets: data.assets, desktopId },
+          })
+        );
+      } catch (error) {
+        console.error("Failed to drop video suggest onto desktop:", error);
+        addToast({
+          title: t("failedToAddImage"),
+          color: "danger",
+        });
+      }
+    },
+    [desktopId, t]
+  );
+
   const handleCellCommit = useCallback(
     (assetId: string, rowId: string, colIndex: number, value: string) => {
       applyRemoteEvent({
@@ -610,12 +665,7 @@ export default function DesktopDetailPage({
         payload: { assetId, metadata: updates },
       });
 
-      // Find the asset to get its message pointer
-      const currentAssets = detail?.assets ?? [];
-      const asset = currentAssets.find((a) => a.id === assetId);
-      const meta = asset?.metadata as Record<string, unknown> | undefined;
-
-      // Persist to DB
+      // Persist to DB only (no chat sync)
       try {
         const existing = await fetch(`/api/desktop/${desktopId}/assets/${assetId}`).then((r) => r.json());
         if (existing?.asset) {
@@ -629,44 +679,8 @@ export default function DesktopDetailPage({
       } catch (error) {
         console.error("Failed to save video suggest content:", error);
       }
-
-      // Sync to chat if we have a message pointer
-      if (
-        meta &&
-        typeof meta.messageTimestamp === "number" &&
-        typeof meta.partTypeIndex === "number" &&
-        typeof meta.chatId === "string"
-      ) {
-        try {
-          await fetch(`/api/chat/${meta.chatId}/parts`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              messageTimestamp: meta.messageTimestamp,
-              messageVariantId: meta.messageVariantId || undefined,
-              partType: "agent_video_suggest",
-              partTypeIndex: meta.partTypeIndex,
-              updates,
-            }),
-          });
-          // Dispatch event so the chat panel can pick up the change
-          window.dispatchEvent(
-            new CustomEvent("video-suggest-synced-from-desktop", {
-              detail: {
-                chatId: meta.chatId,
-                messageTimestamp: meta.messageTimestamp,
-                messageVariantId: meta.messageVariantId,
-                partTypeIndex: meta.partTypeIndex,
-                updates,
-              },
-            })
-          );
-        } catch (error) {
-          console.error("Failed to sync video suggest edit to chat:", error);
-        }
-      }
     },
-    [desktopId, applyRemoteEvent, detail?.assets]
+    [desktopId, applyRemoteEvent]
   );
 
   const handleOpenChat = useCallback(
@@ -1009,6 +1023,7 @@ export default function DesktopDetailPage({
           onExternalImageDrop={canEdit ? handleExternalImageDrop : undefined}
           onExternalTextDrop={canEdit ? handleExternalTextDrop : undefined}
           onExternalShotlistDrop={canEdit ? handleExternalShotlistDrop : undefined}
+          onExternalVideoSuggestDrop={canEdit ? handleExternalVideoSuggestDrop : undefined}
           onAddAssetAtPosition={canEdit ? handleAddAssetAtPosition : undefined}
         />
         <DesktopToolbar

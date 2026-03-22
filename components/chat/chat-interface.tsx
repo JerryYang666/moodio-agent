@@ -1149,48 +1149,6 @@ export default function ChatInterface({
     return () => window.removeEventListener(SUGGESTION_BUBBLE_EVENT, handler);
   }, [handleSuggestionBubbleActivate]);
 
-  // Listen for video suggest edits synced from the desktop canvas
-  useEffect(() => {
-    const handler = (e: Event) => {
-      const detail = (e as CustomEvent).detail;
-      if (!detail) return;
-      const { chatId: syncedChatId, messageTimestamp, messageVariantId, partTypeIndex, updates } = detail;
-      // Only apply if it's for the current chat
-      if (syncedChatId !== chatIdRef.current) return;
-
-      setMessages((prev) => {
-        const byVariantIdx = messageVariantId
-          ? prev.findIndex((m) => m.variantId === messageVariantId)
-          : -1;
-        const msgIdx =
-          byVariantIdx !== -1
-            ? byVariantIdx
-            : prev.findIndex((m) => m.createdAt === messageTimestamp);
-        if (msgIdx === -1) return prev;
-
-        const msg = prev[msgIdx];
-        if (!Array.isArray(msg.content)) return prev;
-
-        const newContent = [...msg.content];
-        let typeCount = 0;
-        for (let i = 0; i < newContent.length; i++) {
-          if (newContent[i].type === "agent_video_suggest") {
-            if (typeCount === partTypeIndex) {
-              newContent[i] = { ...newContent[i], ...updates };
-              const newMessages = [...prev];
-              newMessages[msgIdx] = { ...msg, content: newContent };
-              return newMessages;
-            }
-            typeCount++;
-          }
-        }
-        return prev;
-      });
-    };
-
-    window.addEventListener("video-suggest-synced-from-desktop", handler);
-    return () => window.removeEventListener("video-suggest-synced-from-desktop", handler);
-  }, []);
 
   // Add an asset from the library to pending images
   const addAssetImage = useCallback(
@@ -1551,6 +1509,32 @@ export default function ChatInterface({
     return () =>
       window.removeEventListener("moodio-video-selected", handler as any);
   }, [t]);
+
+  // Listen for video suggest "Send to Chat" from desktop: add image to pending + insert title/description into input
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const ce = e as CustomEvent;
+      const d = ce.detail as any;
+      if (!d?.imageId || !d?.url) return;
+      // Add the image to pending images
+      addAssetImage({
+        assetId: d.assetId || d.imageId,
+        url: d.url,
+        title: d.title || "Video idea",
+        imageId: d.imageId,
+      });
+      // Insert title and description into chat input
+      const parts: string[] = [];
+      if (d.title) parts.push(d.title);
+      if (d.videoIdea) parts.push(d.videoIdea);
+      if (parts.length > 0 && chatInputRef.current) {
+        chatInputRef.current.insertText(parts.join("\n"));
+      }
+    };
+    window.addEventListener("moodio-videosuggest-to-chat", handler as any);
+    return () =>
+      window.removeEventListener("moodio-videosuggest-to-chat", handler as any);
+  }, [addAssetImage]);
 
   const handleAssetDrop = useCallback(
     async (payload: any) => {
@@ -3045,8 +3029,7 @@ export default function ChatInterface({
   );
 
   // Handle agent_video_suggest part edits (title/videoIdea).
-  // Updates local state, persists to S3, and syncs to any desktop asset that
-  // references this message via matching messageTimestamp + partTypeIndex.
+  // Updates local state and persists to S3 only (no desktop sync).
   const handleVideoSuggestPartUpdate = useCallback(
     (
       messageTimestamp: number,
@@ -3054,48 +3037,15 @@ export default function ChatInterface({
       partTypeIndex: number,
       updates: { title: string; videoIdea: string }
     ): Promise<void> => {
-      // Reuse the generic handler for state update + S3 persistence
-      const persistPromise = handlePartUpdate(
+      return handlePartUpdate(
         messageTimestamp,
         messageVariantId,
         "agent_video_suggest",
         partTypeIndex,
         updates
       );
-
-      // Additionally sync to desktop: find any video_suggest asset that references this message part
-      if (desktopId) {
-        (async () => {
-          try {
-            const res = await fetch(`/api/desktop/${desktopId}/assets/sync-video-suggest`, {
-              method: "PATCH",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                messageTimestamp,
-                messageVariantId,
-                partTypeIndex,
-                updates,
-              }),
-            });
-            if (res.ok) {
-              const data = await res.json();
-              if (data.asset) {
-                window.dispatchEvent(
-                  new CustomEvent("desktop-asset-updated", {
-                    detail: { asset: data.asset, desktopId },
-                  })
-                );
-              }
-            }
-          } catch (e) {
-            console.error("Failed to sync video suggest edit to desktop:", e);
-          }
-        })();
-      }
-
-      return persistPromise;
     },
-    [handlePartUpdate, desktopId]
+    [handlePartUpdate]
   );
 
   // Handle direct video status updates from DirectVideoCard
