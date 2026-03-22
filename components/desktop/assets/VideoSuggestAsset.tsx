@@ -6,6 +6,7 @@ import type { EnrichedDesktopAsset } from "./types";
 import { Spinner } from "@heroui/spinner";
 import { Button } from "@heroui/button";
 import { Input, Textarea } from "@heroui/input";
+import { Modal, ModalContent, ModalBody } from "@heroui/modal";
 import { Pencil, Check, X } from "lucide-react";
 
 interface VideoSuggestLock {
@@ -109,29 +110,24 @@ export default function VideoSuggestAsset({
     [meta.title, meta.videoIdea, isLockedByOther, sendEvent, asset.id]
   );
 
-  const handleSave = useCallback(
-    (e: React.MouseEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      setIsEditing(false);
-      sendEvent?.("text_deselected", { assetId: asset.id });
-      if (onContentCommit) {
-        onContentCommit(asset.id, { title: editTitle, videoIdea: editVideoIdea });
-        sendEvent?.("video_suggest_updated", { assetId: asset.id, title: editTitle, videoIdea: editVideoIdea });
-      }
-    },
-    [asset.id, editTitle, editVideoIdea, onContentCommit, sendEvent]
-  );
+  const handleSave = useCallback(() => {
+    setIsEditing(false);
+    sendEvent?.("text_deselected", { assetId: asset.id });
+    if (onContentCommit) {
+      onContentCommit(asset.id, { title: editTitle, videoIdea: editVideoIdea });
+      sendEvent?.("video_suggest_updated", { assetId: asset.id, title: editTitle, videoIdea: editVideoIdea });
+    }
+  }, [asset.id, editTitle, editVideoIdea, onContentCommit, sendEvent]);
 
-  const handleCancel = useCallback(
-    (e: React.MouseEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      setIsEditing(false);
-      sendEvent?.("text_deselected", { assetId: asset.id });
-    },
-    [sendEvent, asset.id]
-  );
+  const handleCancel = useCallback(() => {
+    setIsEditing(false);
+    sendEvent?.("text_deselected", { assetId: asset.id });
+  }, [sendEvent, asset.id]);
+
+  const handleModalClose = useCallback(() => {
+    // Treat closing the modal as cancel
+    handleCancel();
+  }, [handleCancel]);
 
   const handleTitleChange = useCallback(
     (value: string) => {
@@ -153,105 +149,159 @@ export default function VideoSuggestAsset({
   const lockHue = lockInfo ? hashToHue(lockInfo.userId) : 0;
 
   return (
-    <div
-      className="w-full h-full flex flex-row overflow-hidden bg-background rounded-lg group/vs relative"
-      style={
-        isLockedByOther
-          ? { boxShadow: `inset 0 0 0 2px hsl(${lockHue}, 70%, 60%)` }
-          : isLockedByMe
-            ? { boxShadow: "inset 0 0 0 2px hsl(var(--heroui-primary))" }
-            : undefined
-      }
-    >
-      {/* Lock indicator */}
-      {isLockedByOther && lockInfo && (
-        <span
-          className="absolute -top-3 left-1 text-[9px] px-1 rounded text-white whitespace-nowrap z-10"
-          style={{ backgroundColor: `hsl(${lockHue}, 70%, 50%)` }}
-        >
-          {lockInfo.firstName} is editing
-        </span>
-      )}
+    <>
+      <div
+        className="w-full h-full flex flex-row overflow-hidden bg-background rounded-lg group/vs relative"
+        style={
+          isLockedByOther
+            ? { boxShadow: `inset 0 0 0 2px hsl(${lockHue}, 70%, 60%)` }
+            : isLockedByMe
+              ? { boxShadow: "inset 0 0 0 2px hsl(var(--heroui-primary))" }
+              : undefined
+        }
+      >
+        {/* Lock indicator */}
+        {isLockedByOther && lockInfo && (
+          <span
+            className="absolute -top-3 left-1 text-[9px] px-1 rounded text-white whitespace-nowrap z-10"
+            style={{ backgroundColor: `hsl(${lockHue}, 70%, 50%)` }}
+          >
+            {lockInfo.firstName} is editing
+          </span>
+        )}
 
-      {/* Thumbnail */}
-      <div className="w-[120px] min-w-[120px] h-full relative bg-default-100">
-        {src ? (
-          <img
-            src={src}
-            alt={meta.title || "Video idea"}
-            draggable={false}
-            className="w-full h-full object-cover"
-            onLoad={(e) => {
-              const img = e.currentTarget;
-              onImageLoad(asset.id, img.naturalWidth, img.naturalHeight);
-            }}
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            <Spinner size="sm" />
-          </div>
-        )}
-      </div>
-      {/* Content */}
-      <div className="flex-1 p-2.5 flex flex-col justify-center min-w-0 overflow-hidden">
-        {isEditing ? (
-          <div
-            className="flex flex-col gap-1.5"
-            onClick={(e) => e.stopPropagation()}
-            onPointerDown={(e) => e.stopPropagation()}
-          >
-            <Input
-              size="sm"
-              value={editTitle}
-              onValueChange={handleTitleChange}
-              variant="bordered"
-              classNames={{ input: "text-xs" }}
-              placeholder="Title"
+        {/* Thumbnail */}
+        <div className="w-[120px] min-w-[120px] h-full relative bg-default-100">
+          {src ? (
+            <img
+              src={src}
+              alt={meta.title || "Video idea"}
+              draggable={false}
+              className="w-full h-full object-cover"
+              onLoad={(e) => {
+                const img = e.currentTarget;
+                onImageLoad(asset.id, img.naturalWidth, img.naturalHeight);
+              }}
             />
-            <Textarea
-              size="sm"
-              value={editVideoIdea}
-              onValueChange={handleVideoIdeaChange}
-              variant="bordered"
-              minRows={1}
-              maxRows={3}
-              classNames={{ input: "text-[11px]" }}
-              placeholder="Video idea"
-            />
-            <div className="flex gap-1 justify-end">
-              <Button isIconOnly size="sm" variant="light" onClick={handleCancel}>
-                <X size={12} />
-              </Button>
-              <Button isIconOnly size="sm" color="primary" onClick={handleSave}>
-                <Check size={12} />
-              </Button>
+          ) : (
+            <div className="w-full h-full flex items-center justify-center">
+              <Spinner size="sm" />
             </div>
+          )}
+        </div>
+        {/* Content */}
+        <div className="flex-1 p-2.5 flex flex-col justify-center min-w-0 overflow-hidden">
+          <p className="font-semibold text-xs truncate">{meta.title || ""}</p>
+          {meta.videoIdea && (
+            <p className="text-[11px] text-default-500 mt-1 line-clamp-3 leading-tight">
+              {meta.videoIdea}
+            </p>
+          )}
+        </div>
+        {/* Edit button */}
+        {!isEditing && !isLockedByOther && onContentCommit && (
+          <div className="absolute top-1 right-1 opacity-0 group-hover/vs:opacity-100 transition-opacity">
+            <Button
+              isIconOnly
+              size="sm"
+              variant="solid"
+              className="bg-background/80 backdrop-blur-sm"
+              onClick={handleEditClick}
+            >
+              <Pencil size={12} />
+            </Button>
           </div>
-        ) : (
-          <>
-            <p className="font-semibold text-xs truncate">{meta.title || ""}</p>
-            {meta.videoIdea && (
-              <p className="text-[11px] text-default-500 mt-1 line-clamp-3 leading-tight">
-                {meta.videoIdea}
-              </p>
-            )}
-          </>
         )}
       </div>
-      {/* Edit button */}
-      {!isEditing && !isLockedByOther && onContentCommit && (
-        <div className="absolute top-1 right-1 opacity-0 group-hover/vs:opacity-100 transition-opacity">
-          <Button
-            isIconOnly
-            size="sm"
-            variant="solid"
-            className="bg-background/80 backdrop-blur-sm"
-            onClick={handleEditClick}
-          >
-            <Pencil size={12} />
-          </Button>
-        </div>
-      )}
-    </div>
+
+      {/* Full-screen edit modal */}
+      <Modal
+        isOpen={isEditing}
+        onClose={handleModalClose}
+        size="full"
+        scrollBehavior="inside"
+        classNames={{
+          wrapper: "z-[9999]",
+          backdrop: "z-[9998]",
+        }}
+        hideCloseButton
+      >
+        <ModalContent>
+          <ModalBody className="p-0 flex flex-row h-full">
+            {/* Left: full image preview */}
+            <div className="flex-1 min-w-0 bg-black flex items-center justify-center">
+              {src ? (
+                <img
+                  src={src}
+                  alt={editTitle || "Video idea"}
+                  className="max-w-full max-h-full object-contain"
+                  draggable={false}
+                />
+              ) : (
+                <Spinner size="lg" color="white" />
+              )}
+            </div>
+
+            {/* Right: edit panel */}
+            <div className="w-[400px] min-w-[400px] flex flex-col bg-background border-l border-divider">
+              {/* Header */}
+              <div className="flex items-center justify-between px-5 py-4 border-b border-divider">
+                <h3 className="text-lg font-semibold">Edit Video Idea</h3>
+                <div className="flex gap-1">
+                  <Button
+                    isIconOnly
+                    size="sm"
+                    variant="light"
+                    onPress={handleCancel}
+                  >
+                    <X size={16} />
+                  </Button>
+                </div>
+              </div>
+
+              {/* Fields */}
+              <div
+                className="flex-1 p-5 flex flex-col gap-4 overflow-auto"
+                onClick={(e) => e.stopPropagation()}
+                onPointerDown={(e) => e.stopPropagation()}
+              >
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-sm font-medium text-foreground">Title</label>
+                  <Input
+                    value={editTitle}
+                    onValueChange={handleTitleChange}
+                    variant="bordered"
+                    placeholder="Title"
+                    autoFocus
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5 flex-1">
+                  <label className="text-sm font-medium text-foreground">Video Idea</label>
+                  <Textarea
+                    value={editVideoIdea}
+                    onValueChange={handleVideoIdeaChange}
+                    variant="bordered"
+                    minRows={6}
+                    maxRows={20}
+                    placeholder="Describe the video idea..."
+                    classNames={{ inputWrapper: "flex-1", input: "h-full" }}
+                  />
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="flex gap-2 justify-end px-5 py-4 border-t border-divider">
+                <Button variant="flat" onPress={handleCancel}>
+                  Cancel
+                </Button>
+                <Button color="primary" onPress={handleSave} startContent={<Check size={16} />}>
+                  Save
+                </Button>
+              </div>
+            </div>
+          </ModalBody>
+        </ModalContent>
+      </Modal>
+    </>
   );
 }
