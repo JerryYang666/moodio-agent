@@ -26,7 +26,6 @@ import AssetPickerModal, { type AssetSummary } from "./asset-picker-modal";
 import { PersistentAssetsPanel } from "./persistent-assets-panel";
 import { useGetPersistentAssetsQuery, useUpdatePersistentAssetsMutation } from "@/lib/redux/services/next-api";
 import { siteConfig } from "@/config/site";
-import { useFeatureFlag } from "@/lib/feature-flags";
 import { useVoiceRecorder } from "./use-voice-recorder";
 import { SYSTEM_PROMPT_STORAGE_KEY } from "@/components/test-kit";
 import {
@@ -297,8 +296,7 @@ export default function ChatInterface({
   const { data: persistentAssetsData } = useGetPersistentAssetsQuery(chatId || "", {
     skip: !chatId,
   });
-  const [updatePersistentAssets] = useUpdatePersistentAssetsMutation();
-  const showReferenceImages = useFeatureFlag<boolean>("reference_images") ?? false;
+  const [updatePersistentAssets, { isLoading: isPersistentAssetsSaving }] = useUpdatePersistentAssetsMutation();
   const persistentAssets = persistentAssetsData?.persistentAssets ?? {
     ...EMPTY_PERSISTENT_ASSETS,
     referenceImages: [] as Array<PersistentReferenceImage & { imageUrl?: string }>,
@@ -3542,12 +3540,13 @@ export default function ChatInterface({
       )}
 
       {/* Persistent Assets Panel - positioned at top-right of chat */}
-      {chatId && showReferenceImages && (
+      {chatId && (
         <div className="absolute top-3 left-3 z-40">
           <PersistentAssetsPanel
             chatId={chatId}
             persistentAssets={persistentAssets}
             onOpenAssetPicker={openPersistentAssetPicker}
+            isSavingExternal={isPersistentAssetsSaving}
           />
         </div>
       )}
@@ -3608,7 +3607,9 @@ export default function ChatInterface({
             : MAX_PENDING_IMAGES - pendingImagesRef.current.length
         }
         acceptTypes={
-          assetPickerMode === "assetParam" && activeAssetParamName
+          assetPickerMode === "persistent"
+            ? ["image"]
+            : assetPickerMode === "assetParam" && activeAssetParamName
             ? assetParamSlots.find((s) => s.name === activeAssetParamName)?.acceptTypes
             : undefined
         }

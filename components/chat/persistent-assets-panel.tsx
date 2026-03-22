@@ -4,12 +4,13 @@ import { useState, useCallback, useEffect } from "react";
 import { useTranslations } from "next-intl";
 import { Button } from "@heroui/button";
 import { Popover, PopoverTrigger, PopoverContent } from "@heroui/popover";
+import { Tooltip } from "@heroui/tooltip";
 import { Textarea } from "@heroui/input";
 import { Dropdown, DropdownTrigger, DropdownMenu, DropdownItem } from "@heroui/dropdown";
 import { Badge } from "@heroui/badge";
 import { Spinner } from "@heroui/spinner";
 import { addToast } from "@heroui/toast";
-import { Pin, X, Plus, ChevronDown, ImagePlus, Type } from "lucide-react";
+import { Pin, X, Plus, ChevronDown, ImagePlus, Type, BookImage } from "lucide-react";
 import {
   PersistentAssets,
   PersistentReferenceImage,
@@ -31,6 +32,7 @@ interface PersistentAssetsPanelProps {
     referenceImages: Array<PersistentReferenceImage & { imageUrl?: string }>;
   };
   onOpenAssetPicker: () => void;
+  isSavingExternal?: boolean;
 }
 
 const TAG_LABELS: Record<ReferenceImageTag, string> = {
@@ -45,6 +47,7 @@ export function PersistentAssetsPanel({
   chatId,
   persistentAssets,
   onOpenAssetPicker,
+  isSavingExternal,
 }: PersistentAssetsPanelProps) {
   const t = useTranslations("chat");
   const [isOpen, setIsOpen] = useState(false);
@@ -120,8 +123,10 @@ export function PersistentAssetsPanel({
   );
 
   const handleTextChunkBlur = useCallback(() => {
-    save(localAssets);
-  }, [localAssets, save]);
+    if (localAssets.textChunk !== persistentAssets.textChunk) {
+      save(localAssets);
+    }
+  }, [localAssets, persistentAssets.textChunk, save]);
 
   // Called from parent after asset picker selects images
   const addReferenceImage = useCallback(
@@ -139,30 +144,33 @@ export function PersistentAssetsPanel({
   );
 
   return (
-    <Popover
-      placement="bottom-end"
-      isOpen={isOpen}
-      onOpenChange={setIsOpen}
-      offset={8}
-    >
-      <PopoverTrigger>
-        <Button
-          isIconOnly
-          variant="light"
-          size="sm"
-          aria-label={t("persistentAssets")}
+    <Tooltip content={t("persistentAssets")} isDisabled={isOpen} delay={400}>
+      <div>
+        <Popover
+          placement="bottom-start"
+          isOpen={isOpen}
+          onOpenChange={setIsOpen}
+          offset={8}
         >
-          <Badge
-            content={assetCount}
-            color="primary"
-            size="sm"
-            isInvisible={assetCount === 0}
-            placement="top-right"
-          >
-            <Pin size={18} />
-          </Badge>
-        </Button>
-      </PopoverTrigger>
+          <PopoverTrigger>
+            <Button
+              isIconOnly
+              variant="light"
+              size="sm"
+              aria-label={t("persistentAssets")}
+              isLoading={!isOpen && isSavingExternal}
+            >
+              <Badge
+                content={assetCount}
+                color="primary"
+                size="sm"
+                isInvisible={assetCount === 0}
+                placement="top-right"
+              >
+                <BookImage size={18} />
+              </Badge>
+            </Button>
+          </PopoverTrigger>
       <PopoverContent className="w-[400px] max-h-[500px] overflow-y-auto p-0">
         <div className="p-4 space-y-4">
           {/* Header */}
@@ -191,6 +199,7 @@ export function PersistentAssetsPanel({
                   startContent={<Plus size={14} />}
                   className="h-7 text-xs"
                   onPress={() => {
+                    setIsOpen(false);
                     onOpenAssetPicker();
                   }}
                 >
@@ -294,7 +303,9 @@ export function PersistentAssetsPanel({
           </div>
         </div>
       </PopoverContent>
-    </Popover>
+        </Popover>
+      </div>
+    </Tooltip>
   );
 }
 
