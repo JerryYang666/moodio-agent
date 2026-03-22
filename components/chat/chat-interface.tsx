@@ -3543,7 +3543,7 @@ export default function ChatInterface({
 
       {/* Persistent Assets Panel - positioned at top-right of chat */}
       {chatId && showReferenceImages && (
-        <div className="absolute top-3 right-3 z-40">
+        <div className="absolute top-3 left-3 z-40">
           <PersistentAssetsPanel
             chatId={chatId}
             persistentAssets={persistentAssets}
