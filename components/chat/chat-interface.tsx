@@ -565,7 +565,7 @@ export default function ChatInterface({
     // We'll check this by looking at the video models API data cached in VideoModeParams
     // For now, import getVideoModel directly
     const model = getVideoModel(menuState.videoModelId);
-    return !!model?.imageParams.endImage;
+    return !!model?.imageParams?.endImage;
   }, [menuState.mode, menuState.videoModelId]);
 
   // Modal state for agent images

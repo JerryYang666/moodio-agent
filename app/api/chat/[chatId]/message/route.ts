@@ -27,6 +27,7 @@ import {
   getVideoModel,
   validateAndMergeParams,
   DEFAULT_VIDEO_MODEL_ID,
+  TEXT_TO_VIDEO_PLACEHOLDER_IMAGE_ID,
 } from "@/lib/video/models";
 import { submitVideoGeneration } from "@/lib/video/video-client";
 import { videoGenerations } from "@/lib/db/schema";
@@ -778,9 +779,11 @@ export async function POST(
       }
 
       const sourceImageId = imageIds[0];
-      if (!sourceImageId) {
+      const isTextToVideo = !model.imageParams;
+
+      if (!isTextToVideo && !sourceImageId) {
         return NextResponse.json(
-          { error: "Source image is required for video generation" },
+          { error: "Source image is required for this model" },
           { status: 400 }
         );
       }
@@ -791,11 +794,17 @@ export async function POST(
       const fullParams: Record<string, any> = {
         prompt: content,
         ...videoParams,
-        [model.imageParams.sourceImage]: getSignedImageUrl(sourceImageId),
       };
-      if (endImageId && model.imageParams.endImage) {
-        fullParams[model.imageParams.endImage] = getSignedImageUrl(endImageId);
+      if (!isTextToVideo && sourceImageId) {
+        fullParams[model.imageParams!.sourceImage] = getSignedImageUrl(sourceImageId);
+        if (endImageId && model.imageParams!.endImage) {
+          fullParams[model.imageParams!.endImage] = getSignedImageUrl(endImageId);
+        }
       }
+
+      const effectiveSourceImageId = isTextToVideo
+        ? TEXT_TO_VIDEO_PLACEHOLDER_IMAGE_ID
+        : sourceImageId;
 
       // Validate and merge with defaults
       let mergedParams: Record<string, any>;
@@ -839,7 +848,7 @@ export async function POST(
                   userId: payload.userId,
                   modelId,
                   status: "pending",
-                  sourceImageId,
+                  sourceImageId: effectiveSourceImageId,
                   endImageId,
                   params: mergedParams,
                 })

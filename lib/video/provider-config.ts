@@ -15,13 +15,17 @@ const ACTIVE_PROVIDERS: Partial<Record<string, VideoProvider>> = {
   "hailuo-2.3-pro": "fal",
   "hailuo-02-pro": "fal",
   "wan-v2.6": "kie",
-  "kling-v2.6-pro": "fal",
+  "kling-v2.6-pro": "kie",
   "kling-o1-pro": "fal",
   "kling-o3-pro": "fal",
-  "kling-v3-pro": "fal",
-  "veo-3.1": "fal",
-  "veo-3.1-first-last-frame": "fal",
-  "sora-2-pro": "fal",
+  "kling-v3-pro": "kie",
+  "veo-3.1": "kie",
+  "veo-3.1-first-last-frame": "kie",
+  "sora-2-pro": "kie",
+  "sora-2-standard": "kie",
+  "sora-2-text-to-video": "kie",
+  "sora-2-pro-text-to-video": "kie",
+  "kling-2.6-text-to-video": "kie",
 };
 
 /**

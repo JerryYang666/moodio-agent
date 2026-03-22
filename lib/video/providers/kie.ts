@@ -37,6 +37,7 @@ interface KieFileUploadResponse {
 const IMAGE_URL_KEYS = new Set([
   "image_url",
   "image_urls",
+  "imageUrls",
   "start_image_url",
   "end_image_url",
   "first_frame_url",
@@ -200,13 +201,62 @@ async function prepareInputParams(
   return prepared;
 }
 
+// ---------------------------------------------------------------------------
+// Model-specific param transforms (keep higher layers clean)
+// ---------------------------------------------------------------------------
+
+function applySoraTransforms(params: Record<string, any>): Record<string, any> {
+  const out = { ...params };
+  if (out.aspect_ratio === "16:9") out.aspect_ratio = "landscape";
+  else if (out.aspect_ratio === "9:16") out.aspect_ratio = "portrait";
+  out.remove_watermark = true;
+  return out;
+}
+
+function applyKlingTransforms(params: Record<string, any>): Record<string, any> {
+  const out = { ...params };
+  if ("generate_audio" in out) {
+    out.sound = out.generate_audio;
+    delete out.generate_audio;
+  }
+  if (typeof out.start_image_url === "string") {
+    out.image_urls = [out.start_image_url];
+    delete out.start_image_url;
+  }
+  return out;
+}
+
+function isVeoModel(providerModelId: string): boolean {
+  return providerModelId === "veo3" || providerModelId.startsWith("veo3");
+}
+
+function isSoraModel(providerModelId: string): boolean {
+  return providerModelId.startsWith("sora-2");
+}
+
+function isKlingModel(providerModelId: string): boolean {
+  return providerModelId.startsWith("kling-");
+}
+
 export class KieVideoProvider implements VideoProviderClient {
   async submitGeneration(
     providerModelId: string,
     params: Record<string, any>,
     webhookUrl: string
   ): Promise<{ requestId: string }> {
-    const input = await prepareInputParams(params);
+    let transformed = { ...params };
+
+    if (isSoraModel(providerModelId)) {
+      transformed = applySoraTransforms(transformed);
+    } else if (isKlingModel(providerModelId)) {
+      transformed = applyKlingTransforms(transformed);
+    }
+
+    if (isVeoModel(providerModelId)) {
+      return this.submitVeoGeneration(providerModelId, transformed, webhookUrl);
+    }
+
+    const input = await prepareInputParams(transformed);
 
     const requestBody = {
       model: providerModelId,
@@ -233,6 +283,66 @@ export class KieVideoProvider implements VideoProviderClient {
 
     if (json.code !== 200) {
       throw new Error(`Kie createTask error (${json.code}): ${json.msg}`);
+    }
+
+    return { requestId: json.data.taskId };
+  }
+
+  /**
+   * Veo 3.1 uses a different endpoint with a flat body (no `input` wrapper).
+   * Auto-detects generationType based on presence of images and model variant.
+   */
+  private async submitVeoGeneration(
+    providerModelId: string,
+    params: Record<string, any>,
+    webhookUrl: string
+  ): Promise<{ requestId: string }> {
+    const { prompt, imageUrls, aspect_ratio, duration, generate_audio, ...rest } = params;
+
+    let imageUrlsArray: string[] | undefined;
+    if (imageUrls) {
+      const raw = Array.isArray(imageUrls) ? imageUrls : [imageUrls];
+      imageUrlsArray = await reuploadArray(raw);
+    }
+
+    const hasImages = imageUrlsArray && imageUrlsArray.length > 0;
+    const generationType = hasImages
+      ? "FIRST_AND_LAST_FRAMES_2_VIDEO"
+      : "TEXT_2_VIDEO";
+
+    const requestBody: Record<string, any> = {
+      model: providerModelId,
+      callBackUrl: webhookUrl,
+      prompt: prompt || "",
+      generationType,
+    };
+
+    if (imageUrlsArray && imageUrlsArray.length > 0) {
+      requestBody.imageUrls = imageUrlsArray;
+    }
+    if (aspect_ratio !== undefined) requestBody.aspect_ratio = aspect_ratio;
+    if (duration !== undefined) requestBody.duration = duration;
+    if (generate_audio !== undefined) requestBody.generate_audio = generate_audio;
+
+    console.log("[Kie Veo Submit] Request:", JSON.stringify(requestBody, null, 2));
+
+    const res = await fetch(`${KIE_API_BASE}/api/v1/veo/generate`, {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify(requestBody),
+    });
+
+    if (!res.ok) {
+      const text = await res.text();
+      console.error("[Kie Veo Submit] HTTP error:", res.status, text);
+      throw new Error(`Kie Veo generate failed (${res.status}): ${text}`);
+    }
+
+    const json: KieCreateTaskResponse = await res.json();
+    console.log("[Kie Veo Submit] Response:", JSON.stringify(json, null, 2));
+
+    if (json.code !== 200) {
+      throw new Error(`Kie Veo generate error (${json.code}): ${json.msg}`);
     }
 
     return { requestId: json.data.taskId };

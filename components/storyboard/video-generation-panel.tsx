@@ -37,7 +37,7 @@ interface VideoModelConfig {
   id: string;
   name: string;
   description?: string;
-  imageParams: {
+  imageParams?: {
     sourceImage: string;
     endImage?: string;
   };
@@ -168,7 +168,7 @@ export default function VideoGenerationPanel({
   const [showUndoOverlay, setShowUndoOverlay] = useState(false);
   const pendingGenerationRef = useRef<{
     modelId: string;
-    sourceImageId: string;
+    sourceImageId: string | null;
     endImageId: string | null;
     params: Record<string, any>;
   } | null>(null);
@@ -216,8 +216,9 @@ export default function VideoGenerationPanel({
     for (const param of model.params) {
       // Skip image params - handled separately
       if (
+        model.imageParams && (
         param.name === model.imageParams.sourceImage ||
-        param.name === model.imageParams.endImage
+        param.name === model.imageParams.endImage)
       ) {
         continue;
       }
@@ -263,8 +264,9 @@ export default function VideoGenerationPanel({
       for (const param of model.params) {
         // Skip image params
         if (
+          model.imageParams && (
           param.name === model.imageParams.sourceImage ||
-          param.name === model.imageParams.endImage
+          param.name === model.imageParams.endImage)
         ) {
           continue;
         }
@@ -439,7 +441,7 @@ export default function VideoGenerationPanel({
       return;
     }
 
-    if (!sourceImageId) {
+    if (selectedModel?.imageParams && !sourceImageId) {
       setError(t("selectSourceImageError"));
       return;
     }
@@ -561,7 +563,8 @@ export default function VideoGenerationPanel({
 
           <Divider />
 
-          {/* Source Image */}
+          {/* Source Image — hidden for text-to-video models */}
+          {selectedModel?.imageParams && (
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium">{t("sourceImage")}</span>
@@ -615,9 +618,10 @@ export default function VideoGenerationPanel({
               </button>
             )}
           </div>
+          )}
 
           {/* End Image (optional) */}
-          {selectedModel?.imageParams.endImage && (
+          {selectedModel?.imageParams?.endImage && (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium">{t("endImage")}</span>
@@ -679,8 +683,8 @@ export default function VideoGenerationPanel({
           {selectedModel?.params
             .filter(
               (p) =>
-                p.name !== selectedModel.imageParams.sourceImage &&
-                p.name !== selectedModel.imageParams.endImage
+                p.name !== selectedModel.imageParams?.sourceImage &&
+                p.name !== selectedModel.imageParams?.endImage
             )
             .map((param) => {
               const value = params[param.name] ?? param.default ?? "";
@@ -902,7 +906,7 @@ export default function VideoGenerationPanel({
               className="w-full text-sm sm:text-base"
               startContent={!submitting && <Sparkles size={18} />}
               isLoading={submitting}
-              isDisabled={!sourceImageId || !params.prompt?.trim() || isUploading || showUndoOverlay || insufficientCredits}
+              isDisabled={(!selectedModel?.imageParams ? false : !sourceImageId) || !params.prompt?.trim() || isUploading || showUndoOverlay || insufficientCredits}
               onPress={handleGenerate}
             >
               {submitting ? (

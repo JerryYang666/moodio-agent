@@ -117,8 +117,8 @@ export default function VideoConfigCard({
     return modelConfig.params.filter(
       (p) =>
         p.name !== "prompt" &&
-        p.name !== modelConfig.imageParams.sourceImage &&
-        p.name !== modelConfig.imageParams.endImage &&
+        p.name !== modelConfig.imageParams?.sourceImage &&
+        p.name !== modelConfig.imageParams?.endImage &&
         p.status !== "hidden" &&
         p.status !== "disabled"
     );
@@ -133,7 +133,10 @@ export default function VideoConfigCard({
     [visibleParams]
   );
 
+  const isTextToVideo = modelConfig && !modelConfig.imageParams;
+
   const selectedSourceImage = useMemo(() => {
+    if (isTextToVideo) return null;
     if (part.config.sourceImageId) {
       const match = sourceImages.find(
         (img) => img.imageId === part.config.sourceImageId
@@ -141,7 +144,7 @@ export default function VideoConfigCard({
       if (match) return match;
     }
     return sourceImages[sourceImages.length - 1] || null;
-  }, [sourceImages, part.config.sourceImageId]);
+  }, [sourceImages, part.config.sourceImageId, isTextToVideo]);
 
   const costParamsKey = useMemo(() => {
     const entries = Object.entries(editedParams)
@@ -188,7 +191,7 @@ export default function VideoConfigCard({
   }, [part.config.modelId, costParamsKey, status]);
 
   const handleCreate = useCallback(async () => {
-    if (!selectedSourceImage) {
+    if (!isTextToVideo && !selectedSourceImage) {
       addToast({
         title: t("video.noSourceImage"),
         description: t("video.noSourceImageDesc"),
@@ -219,8 +222,8 @@ export default function VideoConfigCard({
         modelId: part.config.modelId,
         modelName: part.config.modelName,
         prompt: editedPrompt,
-        sourceImageId: selectedSourceImage.imageId,
-        sourceImageUrl: selectedSourceImage.imageUrl,
+        sourceImageId: selectedSourceImage?.imageId || "",
+        sourceImageUrl: selectedSourceImage?.imageUrl,
         params: editedParams,
       });
       setStatus("created");
@@ -236,7 +239,7 @@ export default function VideoConfigCard({
     try {
       const result = await generateVideo({
         modelId: part.config.modelId,
-        sourceImageId: selectedSourceImage.imageId,
+        sourceImageId: selectedSourceImage?.imageId || null,
         params: {
           prompt: editedPrompt,
           ...editedParams,
@@ -261,7 +264,7 @@ export default function VideoConfigCard({
                   assetType: "video",
                   metadata: {
                     generationId: result.generationId,
-                    imageId: selectedSourceImage.imageId,
+                    imageId: selectedSourceImage?.imageId || "",
                     title: editedPrompt.slice(0, 80),
                     prompt: editedPrompt,
                     status: "processing",
@@ -306,6 +309,7 @@ export default function VideoConfigCard({
       setCreating(false);
     }
   }, [
+    isTextToVideo,
     selectedSourceImage,
     part.config,
     editedPrompt,
@@ -659,7 +663,7 @@ export default function VideoConfigCard({
         })}
 
         {/* Source Image Preview */}
-        {selectedSourceImage && (
+        {!isTextToVideo && selectedSourceImage && (
           <div className="flex items-center gap-2">
             <div className="text-xs text-default-400">
               {t("video.sourceImage")}:
@@ -680,7 +684,7 @@ export default function VideoConfigCard({
         )}
 
         {/* No source image warning */}
-        {!selectedSourceImage && status === "pending" && (
+        {!isTextToVideo && !selectedSourceImage && status === "pending" && (
           <div className="text-xs text-warning bg-warning-50 p-2 rounded-lg">
             {t("video.noSourceImageInChat")}
           </div>
@@ -710,7 +714,7 @@ export default function VideoConfigCard({
             className="w-full"
             startContent={creating ? undefined : <Sparkles size={16} />}
             isLoading={creating}
-            isDisabled={!selectedSourceImage || creating || insufficientCredits}
+            isDisabled={(!isTextToVideo && !selectedSourceImage) || creating || insufficientCredits}
             onPress={handleCreate}
           >
             {creating ? (

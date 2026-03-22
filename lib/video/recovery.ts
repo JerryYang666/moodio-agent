@@ -14,8 +14,11 @@ import {
   uploadVideo,
   downloadFromUrl,
   generateVideoId,
+  generateImageId,
 } from "@/lib/storage/s3";
 import { recordEvent } from "@/lib/telemetry";
+import { TEXT_TO_VIDEO_PLACEHOLDER_IMAGE_ID } from "./models";
+import { extractFirstFrameViaLambda } from "./frame-extract";
 
 // Stale threshold: 20 minutes
 const STALE_THRESHOLD_MS = 20 * 60 * 1000;
@@ -158,12 +161,28 @@ export async function recoverGeneration(generation: {
       // Success! Process and save the video
       const { videoId } = await processVideoResult(generation.id, recoveryResult.result);
 
+      let effectiveSourceImageId = generation.sourceImageId;
+      let effectiveThumbnailId = generation.sourceImageId;
+
+      if (generation.sourceImageId === TEXT_TO_VIDEO_PLACEHOLDER_IMAGE_ID) {
+        try {
+          const frameImageId = generateImageId();
+          await extractFirstFrameViaLambda(videoId, frameImageId);
+          effectiveSourceImageId = frameImageId;
+          effectiveThumbnailId = frameImageId;
+          console.log(`[Recovery] Extracted first frame for text-to-video: ${frameImageId}`);
+        } catch (frameError) {
+          console.error(`[Recovery] First-frame extraction failed, keeping placeholder:`, frameError);
+        }
+      }
+
       await db
         .update(videoGenerations)
         .set({
           status: "completed",
           videoId,
-          thumbnailImageId: generation.sourceImageId, // Use source as thumbnail
+          sourceImageId: effectiveSourceImageId,
+          thumbnailImageId: effectiveThumbnailId,
           seed: recoveryResult.result.seed,
           completedAt: new Date(),
         })

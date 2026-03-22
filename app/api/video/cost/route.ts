@@ -64,7 +64,7 @@ export async function GET(request: NextRequest) {
     const mergedParams = { ...params };
 
     // Add placeholder for required image params to pass validation
-    if (model.imageParams.sourceImage && !mergedParams[model.imageParams.sourceImage]) {
+    if (model.imageParams?.sourceImage && !mergedParams[model.imageParams.sourceImage]) {
       mergedParams[model.imageParams.sourceImage] = "placeholder";
     }
 

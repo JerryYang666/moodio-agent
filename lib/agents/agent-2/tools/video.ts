@@ -20,13 +20,14 @@ To create a video configuration, output a <VIDEO> tag with a JSON object that in
 If the user doesn't specify a model, use the default model. If the user asks for a specific model by name, use the matching modelId. Choose parameters that are valid for the selected model — different models support different parameters.
 
 Rules for video creation:
-1. A source image from the conversation is REQUIRED. By default, the system uses the most recent image, but you can specify a particular image by including "sourceImageId" in the <VIDEO> JSON (e.g., \`"sourceImageId": "abc123"\`). Use this when the user asks to animate a specific image that is not the most recent one.
-2. If there are NO images in the conversation, do NOT output a <VIDEO> tag directly. Instead, first use <IMAGE_GENERATE_SYNC> to create an image. Once you receive the imageId from the sync result, output a <VIDEO> tag with that imageId as "sourceImageId".
-3. Write a detailed, descriptive prompt about the motion, camera movement, and animation.
-4. Choose parameters that best match the user's request.
-5. Only output ONE <VIDEO> tag per response.
-6. You MUST also include a <TEXT> response explaining what video configuration you've prepared.
-7. Do NOT output <IMAGE> image suggestions when outputting a <VIDEO> tag.`,
+1. For image-to-video models (those with a source image parameter): a source image from the conversation is REQUIRED. By default, the system uses the most recent image, but you can specify a particular image by including "sourceImageId" in the <VIDEO> JSON (e.g., \`"sourceImageId": "abc123"\`). Use this when the user asks to animate a specific image that is not the most recent one.
+2. For text-to-video models (those marked "Type: text-to-video"): NO source image is needed. You can use these models even when there are no images in the conversation.
+3. If using an image-to-video model and there are NO images in the conversation, do NOT output a <VIDEO> tag directly. Instead, first use <IMAGE_GENERATE_SYNC> to create an image. Once you receive the imageId from the sync result, output a <VIDEO> tag with that imageId as "sourceImageId".
+4. Write a detailed, descriptive prompt about the motion, camera movement, and animation.
+5. Choose parameters that best match the user's request.
+6. Only output ONE <VIDEO> tag per response.
+7. You MUST also include a <TEXT> response explaining what video configuration you've prepared.
+8. Do NOT output <IMAGE> image suggestions when outputting a <VIDEO> tag.`,
   examples: [
     `<VIDEO>{"modelId": "seedance-v1.5-pro", "prompt": "Gentle camera push-in on the scene. Soft ambient movement with natural swaying of elements. Subtle lighting shifts create a dreamy atmosphere. Cinematic slow motion feel with smooth transitions.", "duration": "5", "aspect_ratio": "16:9", "resolution": "720p", "generate_audio": true, "camera_fixed": false}</VIDEO>`,
   ],
@@ -47,8 +48,8 @@ Rules for video creation:
     for (const param of modelApiConfig.params) {
       if (
         param.name === "prompt" ||
-        param.name === model.imageParams.sourceImage ||
-        param.name === model.imageParams.endImage
+        (model.imageParams && param.name === model.imageParams.sourceImage) ||
+        (model.imageParams && param.name === model.imageParams.endImage)
       ) continue;
       if (parsed[param.name] !== undefined) {
         videoParams[param.name] = parsed[param.name];

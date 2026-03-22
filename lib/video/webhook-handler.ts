@@ -18,6 +18,8 @@ import {
 } from "@/lib/storage/s3";
 import { recordEvent } from "@/lib/telemetry";
 import type { VideoGenerationResult } from "./providers";
+import { TEXT_TO_VIDEO_PLACEHOLDER_IMAGE_ID } from "./models";
+import { extractFirstFrameViaLambda } from "./frame-extract";
 
 /**
  * Look up a generation by its provider request ID.
@@ -66,12 +68,28 @@ export async function processVideoResult(
       .where(eq(videoGenerations.id, generationId))
       .limit(1);
 
+    let effectiveSourceImageId = generation?.sourceImageId;
+    let effectiveThumbnailId = generation?.sourceImageId || thumbnailId;
+
+    if (generation?.sourceImageId === TEXT_TO_VIDEO_PLACEHOLDER_IMAGE_ID) {
+      try {
+        const frameImageId = generateImageId();
+        await extractFirstFrameViaLambda(videoId, frameImageId);
+        effectiveSourceImageId = frameImageId;
+        effectiveThumbnailId = frameImageId;
+        console.log(`[Webhook] Extracted first frame for text-to-video: ${frameImageId}`);
+      } catch (frameError) {
+        console.error(`[Webhook] First-frame extraction failed, keeping placeholder:`, frameError);
+      }
+    }
+
     await db
       .update(videoGenerations)
       .set({
         status: "completed",
         videoId,
-        thumbnailImageId: generation?.sourceImageId || thumbnailId,
+        sourceImageId: effectiveSourceImageId,
+        thumbnailImageId: effectiveThumbnailId,
         seed: result.seed,
         completedAt: new Date(),
       })
