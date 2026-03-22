@@ -20,7 +20,7 @@ import { getVideoModel } from "@/lib/video/models";
 import ImageDetailModal, { ImageInfo } from "./image-detail-modal";
 import ImageDrawingModal from "./image-drawing-modal";
 import ChatMessage from "./chat-message";
-import ChatInput, { ChatInputRef } from "./chat-input";
+import ChatInput, { ChatInputRef, type AssetParamValue } from "./chat-input";
 import ParallelMessage from "./parallel-message";
 import AssetPickerModal, { type AssetSummary } from "./asset-picker-modal";
 import { siteConfig } from "@/config/site";
@@ -294,7 +294,7 @@ export default function ChatInterface({
   // Track which picker mode is active: "pending" for regular images, "reference" for reference images, "assetParam" for type:"asset" params
   const [assetPickerMode, setAssetPickerMode] = useState<"pending" | "reference" | "assetParam">("pending");
   const [activeAssetParamName, setActiveAssetParamName] = useState<string | null>(null);
-  const [assetParamValues, setAssetParamValues] = useState<Record<string, string | null>>({});
+  const [assetParamValues, setAssetParamValues] = useState<Record<string, AssetParamValue | null>>({});
   const [precisionEditing, setPrecisionEditing] = useState(false);
   
   // Reference images state - persistent images that don't get cleared on send
@@ -1496,7 +1496,10 @@ export default function ChatInterface({
         if (!file) return;
         const result = await uploadImage(file);
         if (result.success) {
-          setAssetParamValues((prev) => ({ ...prev, [activeAssetParamName]: result.data.imageUrl }));
+          setAssetParamValues((prev) => ({
+            ...prev,
+            [activeAssetParamName]: { imageId: result.data.imageId, displayUrl: result.data.imageUrl },
+          }));
         }
         setActiveAssetParamName(null);
       } else if (assetPickerMode === "reference") {
@@ -1619,8 +1622,8 @@ export default function ChatInterface({
   const handleAssetPicked = useCallback(
     (asset: AssetSummary) => {
       if (assetPickerMode === "assetParam" && activeAssetParamName) {
-        const url = asset.videoUrl || asset.imageUrl;
-        setAssetParamValues((prev) => ({ ...prev, [activeAssetParamName]: url }));
+        const displayUrl = asset.videoUrl || asset.imageUrl;
+        setAssetParamValues((prev) => ({ ...prev, [activeAssetParamName]: { imageId: asset.imageId, displayUrl } }));
         setActiveAssetParamName(null);
       } else if (assetPickerMode === "reference") {
         addReferenceImage({
@@ -2216,8 +2219,8 @@ export default function ChatInterface({
       if (menuState.mode === "video") {
         payload.videoModelId = menuState.videoModelId;
         const mergedVideoParams = { ...menuState.videoParams };
-        for (const [paramName, url] of Object.entries(assetParamValues)) {
-          if (url) mergedVideoParams[paramName] = url;
+        for (const [paramName, val] of Object.entries(assetParamValues)) {
+          if (val) mergedVideoParams[paramName] = val.imageId;
         }
         payload.videoParams = mergedVideoParams;
       }

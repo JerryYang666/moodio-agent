@@ -82,6 +82,13 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Sign image IDs for type: "asset" params
+    for (const param of model.params) {
+      if (param.type === "asset" && typeof fullParams[param.name] === "string" && fullParams[param.name]) {
+        fullParams[param.name] = getSignedImageUrl(fullParams[param.name]);
+      }
+    }
+
     const effectiveSourceImageId = isTextToVideo
       ? TEXT_TO_VIDEO_PLACEHOLDER_IMAGE_ID
       : sourceImageId;

@@ -1427,7 +1427,7 @@ export function validateAndMergeParams(
 
       case "asset":
         if (typeof userValue !== "string") {
-          throw new Error(`Parameter ${param.name} must be a URL string`);
+          throw new Error(`Parameter ${param.name} must be a string`);
         }
         break;
 

@@ -64,6 +64,11 @@ export type AssetParamSlot = {
   acceptTypes?: ("image" | "video")[];
 };
 
+export type AssetParamValue = {
+  imageId: string;
+  displayUrl: string;
+};
+
 interface ChatInputProps {
   input: string;
   onInputChange: (value: string) => void;
@@ -130,8 +135,8 @@ interface ChatInputProps {
   onHeightChange?: (height: number) => void;
   /** Asset param slots for type: "asset" video model params (rendered in Video Frames Area) */
   assetParamSlots?: AssetParamSlot[];
-  /** Current values for asset param slots: param name -> URL */
-  assetParamValues?: Record<string, string | null>;
+  /** Current values for asset param slots: param name -> {imageId, displayUrl} */
+  assetParamValues?: Record<string, AssetParamValue | null>;
   /** Handler to open asset picker for a specific asset param */
   onOpenAssetParamPicker?: (paramName: string) => void;
   /** Handler to clear an asset param value */
@@ -912,12 +917,12 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
 
                   {/* Asset param slots for type: "asset" params */}
                   {assetParamSlots.map((slot) => {
-                    const url = assetParamValues[slot.name];
-                    return url ? (
+                    const val = assetParamValues[slot.name];
+                    return val ? (
                       <div key={slot.name} className="relative w-fit group">
                         <div className="h-20 w-20 rounded-lg border border-divider overflow-hidden relative">
                           <img
-                            src={url}
+                            src={val.displayUrl}
                             alt={slot.label}
                             className="w-full h-full object-cover"
                           />

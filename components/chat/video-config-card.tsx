@@ -94,6 +94,9 @@ export default function VideoConfigCard({
 
   // Editable state — initialized from the part config (which may already contain saved edits)
   const [editedPrompt, setEditedPrompt] = useState(part.config.prompt);
+  const [assetParamImageIds] = useState<Record<string, string>>(() => {
+    return { ...part.config.assetParamImageIds };
+  });
   const [editedParams, setEditedParams] = useState<Record<string, any>>(() => {
     const initial = { ...part.config.params };
     if (part.config.assetParamImageIds) {
@@ -213,6 +216,12 @@ export default function VideoConfigCard({
       return;
     }
 
+    // Build params for API: substitute display URLs back to image IDs for asset params
+    const paramsForApi = { ...editedParams };
+    for (const [paramName, imageId] of Object.entries(assetParamImageIds)) {
+      if (imageId) paramsForApi[paramName] = imageId;
+    }
+
     const hasEdits =
       editedPrompt !== part.config.prompt ||
       JSON.stringify(editedParams) !== JSON.stringify(part.config.params);
@@ -222,7 +231,7 @@ export default function VideoConfigCard({
         config: {
           ...part.config,
           prompt: editedPrompt,
-          params: editedParams,
+          params: paramsForApi,
         },
         ...(hasEdits
           ? { userEdited: true, userEditedAt: Date.now() }
@@ -237,7 +246,7 @@ export default function VideoConfigCard({
         prompt: editedPrompt,
         sourceImageId: selectedSourceImage?.imageId || "",
         sourceImageUrl: selectedSourceImage?.imageUrl,
-        params: editedParams,
+        params: paramsForApi,
       });
       setStatus("created");
       onStatusChange?.("created");
@@ -255,7 +264,7 @@ export default function VideoConfigCard({
         sourceImageId: selectedSourceImage?.imageId || null,
         params: {
           prompt: editedPrompt,
-          ...editedParams,
+          ...paramsForApi,
         },
       }).unwrap();
 
@@ -327,6 +336,7 @@ export default function VideoConfigCard({
     part.config,
     editedPrompt,
     editedParams,
+    assetParamImageIds,
     generateVideo,
     monitorGeneration,
     desktopId,

@@ -143,6 +143,7 @@ export default function VideoGenerationPanel({
   const [endImageId, setEndImageId] = useState<string | null>(null);
   const [endImageUrl, setEndImageUrl] = useState<string | null>(null);
   const [params, setParams] = useState<Record<string, any>>({});
+  const [assetParamDisplayUrls, setAssetParamDisplayUrls] = useState<Record<string, string>>({});
 
   // Asset picker state
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -400,8 +401,8 @@ export default function VideoGenerationPanel({
       setEndImageId(asset.imageId);
       setEndImageUrl(asset.imageUrl);
     } else {
-      const url = asset.videoUrl || asset.imageUrl;
-      handleParamChange(pickerTarget, url);
+      handleParamChange(pickerTarget, asset.imageId);
+      setAssetParamDisplayUrls((prev) => ({ ...prev, [pickerTarget]: asset.videoUrl || asset.imageUrl }));
     }
   }, [pickerTarget]);
 
@@ -427,7 +428,8 @@ export default function VideoGenerationPanel({
         setEndImageId(result.data.imageId);
         setEndImageUrl(result.data.imageUrl);
       } else {
-        handleParamChange(pickerTarget, result.data.imageUrl);
+        handleParamChange(pickerTarget, result.data.imageId);
+        setAssetParamDisplayUrls((prev) => ({ ...prev, [pickerTarget]: result.data.imageUrl }));
       }
     } else {
       console.error("Upload error:", result.error);
@@ -696,7 +698,8 @@ export default function VideoGenerationPanel({
               const value = params[param.name] ?? param.default ?? "";
 
               if (param.type === "asset") {
-                const urlValue = typeof value === "string" ? value : "";
+                const imageId = typeof value === "string" ? value : "";
+                const displayUrl = assetParamDisplayUrls[param.name] || "";
                 const isUploadingThis = uploadingTarget === param.name;
                 return (
                   <div key={param.name} className="space-y-2">
@@ -713,13 +716,13 @@ export default function VideoGenerationPanel({
                         onPress={() => openPicker(param.name, param.acceptTypes as ("image" | "video")[] | undefined)}
                         isDisabled={isUploadingThis}
                       >
-                        {urlValue ? tCommon("change") : tCommon("select")}
+                        {imageId ? tCommon("change") : tCommon("select")}
                       </Button>
                     </div>
-                    {urlValue || isUploadingThis ? (
+                    {(imageId && displayUrl) || isUploadingThis ? (
                       <div className="relative rounded-lg overflow-hidden border border-divider">
                         <Image
-                          src={isUploadingThis && uploadPreviewUrl ? uploadPreviewUrl : urlValue}
+                          src={isUploadingThis && uploadPreviewUrl ? uploadPreviewUrl : displayUrl}
                           alt={param.label || param.name}
                           classNames={{
                             wrapper: "w-full aspect-video",
@@ -736,7 +739,14 @@ export default function VideoGenerationPanel({
                             size="sm"
                             variant="flat"
                             className="absolute top-2 right-2 z-20 bg-background/80"
-                            onPress={() => handleParamChange(param.name, undefined)}
+                            onPress={() => {
+                              handleParamChange(param.name, undefined);
+                              setAssetParamDisplayUrls((prev) => {
+                                const next = { ...prev };
+                                delete next[param.name];
+                                return next;
+                              });
+                            }}
                           >
                             <X size={14} />
                           </Button>
