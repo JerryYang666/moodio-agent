@@ -1533,7 +1533,7 @@ function describeModelParams(model: VideoModelConfig): string {
       if (param.maxItems) desc += ` (max ${param.maxItems})`;
     } else if (param.type === "asset") {
       const accepts = param.acceptTypes?.join("/") || "image";
-      desc += `${accepts} URL (user picks via asset picker)`;
+      desc += `${accepts} reference — pass the Image ID (e.g. "abc123") of an image from the conversation`;
     }
 
     if (param.default !== undefined) {

@@ -94,8 +94,17 @@ export default function VideoConfigCard({
 
   // Editable state — initialized from the part config (which may already contain saved edits)
   const [editedPrompt, setEditedPrompt] = useState(part.config.prompt);
-  const [editedParams, setEditedParams] = useState<Record<string, any>>({
-    ...part.config.params,
+  const [editedParams, setEditedParams] = useState<Record<string, any>>(() => {
+    const initial = { ...part.config.params };
+    if (part.config.assetParamImageIds) {
+      for (const [paramName, imageId] of Object.entries(part.config.assetParamImageIds)) {
+        const match = sourceImages.find((img) => img.imageId === imageId);
+        if (match) {
+          initial[paramName] = match.imageUrl;
+        }
+      }
+    }
+    return initial;
   });
 
   // Cost estimation

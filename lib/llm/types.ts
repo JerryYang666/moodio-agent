@@ -56,6 +56,7 @@ export type MessageContentPart =
         sourceImageId?: string; // Reference to an image in the chat
         sourceImageUrl?: string; // CloudFront URL for display
         params: Record<string, any>; // Model-specific parameters (duration, resolution, etc.)
+        assetParamImageIds?: Record<string, string>; // param name -> image ID for type: "asset" params
       };
       status: "pending" | "creating" | "created" | "error";
       generationId?: string; // Set after video creation starts
