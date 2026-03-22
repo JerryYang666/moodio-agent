@@ -68,6 +68,7 @@ interface VideoConfigCardProps {
     sourceImageId: string;
     sourceImageUrl?: string;
     params: Record<string, any>;
+    assetImages?: Array<{ imageId: string; imageUrl?: string }>;
   }) => void;
   onPartUpdate?: (updates: Partial<AgentVideoPart>) => Promise<void> | void;
 }
@@ -240,6 +241,13 @@ export default function VideoConfigCard({
     }
 
     if (!desktopId && onSendAsVideoMessage) {
+      const assetImages: Array<{ imageId: string; imageUrl?: string }> = [];
+      for (const [, imageId] of Object.entries(assetParamImageIds)) {
+        if (!imageId) continue;
+        const match = sourceImages.find((img) => img.imageId === imageId);
+        assetImages.push({ imageId, imageUrl: match?.imageUrl });
+      }
+
       onSendAsVideoMessage({
         modelId: part.config.modelId,
         modelName: part.config.modelName,
@@ -247,6 +255,7 @@ export default function VideoConfigCard({
         sourceImageId: selectedSourceImage?.imageId || "",
         sourceImageUrl: selectedSourceImage?.imageUrl,
         params: paramsForApi,
+        assetImages,
       });
       setStatus("created");
       onStatusChange?.("created");

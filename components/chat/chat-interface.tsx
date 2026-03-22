@@ -2752,6 +2752,7 @@ export default function ChatInterface({
       sourceImageId: string;
       sourceImageUrl?: string;
       params: Record<string, any>;
+      assetImages?: Array<{ imageId: string; imageUrl?: string }>;
     }) => {
       if (isSending) return;
 
@@ -2760,12 +2761,26 @@ export default function ChatInterface({
       if (config.prompt) {
         parts.push({ type: "text", text: config.prompt });
       }
-      parts.push({
-        type: "image",
-        imageId: config.sourceImageId,
-        imageUrl: config.sourceImageUrl,
-        source: "ai_generated" as const,
-      });
+      if (config.sourceImageId) {
+        parts.push({
+          type: "image",
+          imageId: config.sourceImageId,
+          imageUrl: config.sourceImageUrl,
+          source: "ai_generated" as const,
+        });
+      }
+      if (config.assetImages) {
+        for (const asset of config.assetImages) {
+          if (asset.imageId) {
+            parts.push({
+              type: "image",
+              imageId: asset.imageId,
+              imageUrl: asset.imageUrl,
+              source: "ai_generated" as const,
+            });
+          }
+        }
+      }
 
       const userMessage: Message = {
         role: "user",
@@ -2812,18 +2827,28 @@ export default function ChatInterface({
           }
         };
 
+        const imageIds: string[] = [];
+        const imageSources: Array<{ imageId: string; source: string }> = [];
+        if (config.sourceImageId) {
+          imageIds.push(config.sourceImageId);
+          imageSources.push({ imageId: config.sourceImageId, source: "ai_generated" });
+        }
+        if (config.assetImages) {
+          for (const asset of config.assetImages) {
+            if (asset.imageId && !imageIds.includes(asset.imageId)) {
+              imageIds.push(asset.imageId);
+              imageSources.push({ imageId: asset.imageId, source: "ai_generated" });
+            }
+          }
+        }
+
         const payload = {
           content: config.prompt,
           mode: "video",
           videoModelId: config.modelId,
           videoParams: config.params,
-          imageIds: [config.sourceImageId],
-          imageSources: [
-            {
-              imageId: config.sourceImageId,
-              source: "ai_generated",
-            },
-          ],
+          imageIds,
+          imageSources,
         };
 
         const res = await fetch(`/api/chat/${currentChatId}/message`, {
