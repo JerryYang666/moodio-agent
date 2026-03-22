@@ -18,6 +18,9 @@ interface VideoSuggestCardProps {
   onExpandClick?: (part: any) => void;
   /** Callback when user saves edits to title/videoIdea */
   onSave?: (updates: { title: string; videoIdea: string }) => void;
+  /** Enable drag-to-desktop */
+  draggable?: boolean;
+  onDragStart?: (e: React.DragEvent) => void;
 }
 
 export default function VideoSuggestCard({
@@ -27,6 +30,8 @@ export default function VideoSuggestCard({
   onClick,
   onExpandClick,
   onSave,
+  draggable,
+  onDragStart,
 }: VideoSuggestCardProps) {
   const t = useTranslations();
   const [isEditing, setIsEditing] = useState(false);
@@ -76,6 +81,8 @@ export default function VideoSuggestCard({
         isSelected && "border-4 border-primary",
         effectiveStatus === "generated" && !isEditing && "hover:shadow-md cursor-pointer"
       )}
+      draggable={draggable && !isEditing}
+      onDragStart={onDragStart}
     >
       <CardBody
         className="p-0 overflow-hidden"

@@ -17,7 +17,7 @@ import { addToast } from "@heroui/toast";
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { useTranslations } from "next-intl";
 import { useAuth } from "@/hooks/use-auth";
-import { AI_IMAGE_DRAG_MIME, AI_TEXT_DRAG_MIME } from "./asset-dnd";
+import { AI_IMAGE_DRAG_MIME, AI_TEXT_DRAG_MIME, AI_VIDEO_SUGGEST_DRAG_MIME } from "./asset-dnd";
 import SendToDesktopModal from "@/components/desktop/SendToDesktopModal";
 import { getViewportVisibleCenterPosition } from "@/lib/desktop/types";
 import VideoPromptBlock from "./video-prompt-block";
@@ -252,6 +252,25 @@ export default function ChatMessage({
       e.dataTransfer.effectAllowed = "copy";
     } catch (err) {
       console.error("Failed to start AI image drag", err);
+    }
+  };
+
+  const handleVideoSuggestDragStart = (e: React.DragEvent, part: any) => {
+    if (part.status !== "generated" || !part.imageId || !part.imageUrl) return;
+    const payload = {
+      imageId: part.imageId,
+      url: part.imageUrl,
+      title: part.title || "",
+      videoIdea: part.videoIdea || "",
+      prompt: part.prompt || "",
+      aspectRatio: part.aspectRatio || "",
+      chatId: chatId || null,
+    };
+    try {
+      e.dataTransfer.setData(AI_VIDEO_SUGGEST_DRAG_MIME, JSON.stringify(payload));
+      e.dataTransfer.effectAllowed = "copy";
+    } catch (err) {
+      console.error("Failed to start video suggest drag", err);
     }
   };
 
@@ -598,6 +617,8 @@ export default function ChatMessage({
                         part={part}
                         isSelected={isSelected}
                         effectiveStatus={effectiveStatus}
+                        draggable={effectiveStatus === "generated"}
+                        onDragStart={(e) => handleVideoSuggestDragStart(e, part)}
                         onClick={() =>
                           effectiveStatus === "generated" &&
                           msgIndex !== undefined &&
