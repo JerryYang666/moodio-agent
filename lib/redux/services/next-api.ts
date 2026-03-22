@@ -2,6 +2,20 @@ import { createApi } from "@reduxjs/toolkit/query/react";
 import { createBaseQueryWithReauth } from "./base-query";
 import type { FeatureFlagsResponse } from "@/lib/feature-flags/types";
 import type { Permission } from "@/lib/permissions";
+import type { PersistentAssets } from "@/lib/chat/persistent-assets-types";
+
+// Types for persistent assets (with derived imageUrl for display)
+export interface PersistentAssetsResponse {
+  persistentAssets: PersistentAssets & {
+    referenceImages: Array<PersistentAssets["referenceImages"][number] & { imageUrl?: string }>;
+  };
+}
+
+export interface UpdatePersistentAssetsRequest {
+  chatId: string;
+  referenceImages: PersistentAssets["referenceImages"];
+  textChunk: string;
+}
 
 // Types for credits
 export interface CreditsBalanceResponse {
@@ -59,7 +73,7 @@ export interface CollectionItem {
 export const nextApi = createApi({
   reducerPath: "nextApi",
   baseQuery: createBaseQueryWithReauth(""),
-  tagTypes: ["FeatureFlags", "Credits", "Collections"],
+  tagTypes: ["FeatureFlags", "Credits", "Collections", "PersistentAssets"],
 
   endpoints: (builder) => ({
     getFeatureFlags: builder.query<FeatureFlagsResponse, void>({
@@ -125,6 +139,27 @@ export const nextApi = createApi({
       }),
       invalidatesTags: ["Collections"],
     }),
+
+    getPersistentAssets: builder.query<PersistentAssetsResponse, string>({
+      query: (chatId) => `/api/chat/${chatId}/persistent-assets`,
+      providesTags: (_result, _error, chatId) => [
+        { type: "PersistentAssets", id: chatId },
+      ],
+    }),
+
+    updatePersistentAssets: builder.mutation<
+      PersistentAssetsResponse,
+      UpdatePersistentAssetsRequest
+    >({
+      query: ({ chatId, ...body }) => ({
+        url: `/api/chat/${chatId}/persistent-assets`,
+        method: "PUT",
+        body,
+      }),
+      invalidatesTags: (_result, _error, { chatId }) => [
+        { type: "PersistentAssets", id: chatId },
+      ],
+    }),
   }),
 });
 
@@ -136,4 +171,6 @@ export const {
   useCreateCollectionMutation,
   useRenameCollectionMutation,
   useDeleteCollectionMutation,
+  useGetPersistentAssetsQuery,
+  useUpdatePersistentAssetsMutation,
 } = nextApi;

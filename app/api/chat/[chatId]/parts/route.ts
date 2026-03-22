@@ -5,7 +5,7 @@ import { db } from "@/lib/db";
 import { chats } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getChatHistory, saveChatHistory } from "@/lib/storage/s3";
-import type { MessageContentPart } from "@/lib/llm/types";
+import type { Message, MessageContentPart } from "@/lib/llm/types";
 
 const UPDATABLE_PART_TYPES = new Set<MessageContentPart["type"]>([
   "agent_video",
@@ -40,9 +40,7 @@ function findNthPartIndex(
 }
 
 function resolvePart(
-  messages: ReturnType<typeof getChatHistory> extends Promise<infer T>
-    ? T
-    : never,
+  messages: Message[],
   messageTimestamp: number | undefined,
   messageVariantId: string | undefined,
   partType: string,
@@ -181,7 +179,7 @@ export async function PATCH(
       return NextResponse.json({ error: "Chat not found" }, { status: 404 });
     }
 
-    const messages = await getChatHistory(chatId);
+    const { messages, persistentAssets } = await getChatHistory(chatId);
 
     const resolved = resolvePart(
       messages,
@@ -229,7 +227,7 @@ export async function PATCH(
     const newMessages = [...messages];
     newMessages[msgIdx] = { ...message, content: newContent };
 
-    await saveChatHistory(chatId, newMessages);
+    await saveChatHistory(chatId, newMessages, persistentAssets);
 
     return NextResponse.json({ success: true });
   } catch (error) {

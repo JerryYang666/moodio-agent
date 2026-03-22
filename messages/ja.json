@@ -218,7 +218,15 @@
     "tagStyle": "スタイル",
     "selectTag": "タグを選択",
     "collapseReferenceImages": "参照画像を折りたたむ",
-    "expandReferenceImages": "参照画像を展開"
+    "expandReferenceImages": "参照画像を展開",
+    "persistentAssets": "常駐アセット",
+    "persistentAssetsInfo": "ここにあるアイテムは常にすべてのメッセージに含まれ、コンテキスト制限の対象外です。",
+    "persistentTextChunk": "常駐テキスト",
+    "persistentTextChunkPlaceholder": "常駐のコンテキスト、指示、メモを追加します。すべてのメッセージに含まれます...",
+    "persistentTextChunkCount": "{count}/{max}",
+    "persistentAssetsSaved": "常駐アセットを保存しました",
+    "persistentAssetsSaving": "保存中...",
+    "persistentAssetsSaveError": "常駐アセットの保存に失敗しました"
   },
   "profile": {
     "title": "プロフィール設定",

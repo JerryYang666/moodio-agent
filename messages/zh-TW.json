@@ -218,7 +218,15 @@
     "tagStyle": "風格",
     "selectTag": "選擇標籤",
     "collapseReferenceImages": "收起參考圖片",
-    "expandReferenceImages": "展開參考圖片"
+    "expandReferenceImages": "展開參考圖片",
+    "persistentAssets": "常駐素材",
+    "persistentAssetsInfo": "此處的內容會始終包含在每條訊息中，不受上下文限制。",
+    "persistentTextChunk": "常駐文字",
+    "persistentTextChunkPlaceholder": "新增常駐的上下文、指示或筆記，將包含在每條訊息中...",
+    "persistentTextChunkCount": "{count}/{max}",
+    "persistentAssetsSaved": "常駐素材已儲存",
+    "persistentAssetsSaving": "儲存中...",
+    "persistentAssetsSaveError": "儲存常駐素材失敗"
   },
   "profile": {
     "title": "個人檔案設定",

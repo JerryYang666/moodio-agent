@@ -218,7 +218,15 @@
     "tagStyle": "스타일",
     "selectTag": "태그 선택",
     "collapseReferenceImages": "참조 이미지 접기",
-    "expandReferenceImages": "참조 이미지 펼치기"
+    "expandReferenceImages": "참조 이미지 펼치기",
+    "persistentAssets": "고정 에셋",
+    "persistentAssetsInfo": "여기에 있는 항목은 항상 모든 메시지에 포함되며 컨텍스트 제한의 영향을 받지 않습니다.",
+    "persistentTextChunk": "고정 텍스트",
+    "persistentTextChunkPlaceholder": "모든 메시지에 포함될 고정 컨텍스트, 지침 또는 메모를 추가하세요...",
+    "persistentTextChunkCount": "{count}/{max}",
+    "persistentAssetsSaved": "고정 에셋이 저장되었습니다",
+    "persistentAssetsSaving": "저장 중...",
+    "persistentAssetsSaveError": "고정 에셋 저장 실패"
   },
   "profile": {
     "title": "프로필 설정",

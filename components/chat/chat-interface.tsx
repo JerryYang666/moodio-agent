@@ -23,6 +23,8 @@ import ChatMessage from "./chat-message";
 import ChatInput, { ChatInputRef, type AssetParamValue } from "./chat-input";
 import ParallelMessage from "./parallel-message";
 import AssetPickerModal, { type AssetSummary } from "./asset-picker-modal";
+import { PersistentAssetsPanel } from "./persistent-assets-panel";
+import { useGetPersistentAssetsQuery, useUpdatePersistentAssetsMutation } from "@/lib/redux/services/next-api";
 import { siteConfig } from "@/config/site";
 import { useVoiceRecorder } from "./use-voice-recorder";
 import { SYSTEM_PROMPT_STORAGE_KEY } from "@/components/test-kit";
@@ -65,17 +67,10 @@ import {
   ChatDraft,
 } from "./draft-utils";
 import {
-  ReferenceImage,
-  ReferenceImageTag,
-  MAX_REFERENCE_IMAGES,
-  canAddReferenceImage,
-} from "./reference-image-types";
-import {
-  saveReferenceImages,
-  loadReferenceImages,
-  saveReferenceImagesCollapsed,
-  loadReferenceImagesCollapsed,
-} from "./reference-image-utils";
+  EMPTY_PERSISTENT_ASSETS,
+  MAX_PERSISTENT_REFERENCE_IMAGES,
+} from "@/lib/chat/persistent-assets-types";
+import type { PersistentAssets, PersistentReferenceImage } from "@/lib/chat/persistent-assets-types";
 import { getPreselectImages } from "./preselect-images-utils";
 import type { JSONContent } from "@tiptap/react";
 import { useResearchTelemetry } from "@/hooks/use-research-telemetry";
@@ -291,20 +286,21 @@ export default function ChatInterface({
   const [pendingVideos, setPendingVideos] = useState<PendingVideo[]>([]);
   const [isAssetPickerOpen, setIsAssetPickerOpen] = useState(false);
   const toggleAssetPicker = useCallback(() => setIsAssetPickerOpen((v) => !v), []);
-  // Track which picker mode is active: "pending" for regular images, "reference" for reference images, "assetParam" for type:"asset" params
-  const [assetPickerMode, setAssetPickerMode] = useState<"pending" | "reference" | "assetParam">("pending");
+  // Track which picker mode is active: "pending" for regular images, "persistent" for persistent assets, "assetParam" for type:"asset" params
+  const [assetPickerMode, setAssetPickerMode] = useState<"pending" | "persistent" | "assetParam">("pending");
   const [activeAssetParamName, setActiveAssetParamName] = useState<string | null>(null);
   const [assetParamValues, setAssetParamValues] = useState<Record<string, AssetParamValue | null>>({});
   const [precisionEditing, setPrecisionEditing] = useState(false);
   
-  // Reference images state - persistent images that don't get cleared on send
-  const [referenceImages, setReferenceImages] = useState<ReferenceImage[]>([]);
-  const [isReferenceImagesCollapsed, setIsReferenceImagesCollapsed] = useState(() => {
-    if (typeof window !== "undefined") {
-      return loadReferenceImagesCollapsed();
-    }
-    return false;
+  // Persistent assets state - loaded from server via RTK Query
+  const { data: persistentAssetsData } = useGetPersistentAssetsQuery(chatId || "", {
+    skip: !chatId,
   });
+  const [updatePersistentAssets] = useUpdatePersistentAssetsMutation();
+  const persistentAssets = persistentAssetsData?.persistentAssets ?? {
+    ...EMPTY_PERSISTENT_ASSETS,
+    referenceImages: [] as Array<PersistentReferenceImage & { imageUrl?: string }>,
+  };
   const [menuState, setMenuState] = useState<MenuState>(INITIAL_MENU_STATE);
 
   // Load saved menu state from localStorage after hydration
@@ -365,21 +361,7 @@ export default function ChatInterface({
     setIsDraftLoaded(true);
   }, [chatId, isDraftLoaded]);
 
-  // Load reference images on mount or when chatId changes (separate from draft)
-  useEffect(() => {
-    const loaded = loadReferenceImages(chatId);
-    setReferenceImages(loaded);
-  }, [chatId]);
-
-  // Save reference images when they change
-  useEffect(() => {
-    saveReferenceImages(chatId, referenceImages);
-  }, [chatId, referenceImages]);
-
-  // Save collapsed state when it changes
-  useEffect(() => {
-    saveReferenceImagesCollapsed(isReferenceImagesCollapsed);
-  }, [isReferenceImagesCollapsed]);
+  // Persistent assets are loaded via RTK Query (useGetPersistentAssetsQuery above)
 
   // Track previous isSending state to detect when AI response completes
   const prevIsSendingRef = useRef(isSending);
@@ -1255,66 +1237,32 @@ export default function ChatInterface({
     [pendingImages, t, removePendingImage]
   );
 
-  // Add a reference image
-  const addReferenceImage = useCallback(
-    (asset: {
-      imageId: string;
-      url: string;
-      title?: string;
-    }, tag: ReferenceImageTag = "none", source: "library" | "upload" | "ai_generated" = "library") => {
-      if (!canAddReferenceImage(referenceImages)) {
+  // Add a reference image via persistent assets API
+  const addPersistentReferenceImage = useCallback(
+    async (asset: { imageId: string; url: string; title?: string }) => {
+      if (!chatId) return;
+      if (persistentAssets.referenceImages.length >= MAX_PERSISTENT_REFERENCE_IMAGES) {
         addToast({
-          title: t("chat.maxImagesReached", { max: MAX_REFERENCE_IMAGES }),
+          title: t("chat.maxImagesReached", { max: MAX_PERSISTENT_REFERENCE_IMAGES }),
           color: "warning",
         });
         return;
       }
-
-      if (referenceImages.some((img) => img.imageId === asset.imageId)) {
-        addToast({
-          title: t("chat.imageAlreadyAdded"),
-          color: "warning",
-        });
+      if (persistentAssets.referenceImages.some((img) => img.imageId === asset.imageId)) {
+        addToast({ title: t("chat.imageAlreadyAdded"), color: "warning" });
         return;
       }
-
-      const newImage: ReferenceImage = {
-        imageId: asset.imageId,
-        url: asset.url,
-        title: asset.title,
-        tag,
-      };
-
-      setReferenceImages((prev) => [...prev, newImage]);
-
-      trackResearch({
+      await updatePersistentAssets({
         chatId,
-        eventType: "reference_image_added",
-        imageId: asset.imageId,
-        metadata: { tag, source },
+        referenceImages: [
+          ...persistentAssets.referenceImages,
+          { imageId: asset.imageId, tag: "subject" as const, title: asset.title },
+        ],
+        textChunk: persistentAssets.textChunk,
       });
     },
-    [referenceImages, t, chatId, trackResearch]
+    [chatId, persistentAssets, updatePersistentAssets, addToast, t]
   );
-
-  // Remove a reference image
-  const removeReferenceImage = useCallback((imageId: string) => {
-    setReferenceImages((prev) => prev.filter((img) => img.imageId !== imageId));
-  }, []);
-
-  // Update a reference image's tag
-  const updateReferenceImageTag = useCallback((imageId: string, tag: ReferenceImageTag) => {
-    setReferenceImages((prev) =>
-      prev.map((img) =>
-        img.imageId === imageId ? { ...img, tag } : img
-      )
-    );
-  }, []);
-
-  // Toggle reference images collapsed state
-  const toggleReferenceImagesCollapsed = useCallback(() => {
-    setIsReferenceImagesCollapsed((prev) => !prev);
-  }, []);
 
   // Pre-select images from the last user message with images.
   // Instead of directly adding to pending, show them as a suggestion
@@ -1395,9 +1343,9 @@ export default function ChatInterface({
     }
   }, [initialMessages, isLoading, applyPreselectImages, extractPostMessageSuggestions]);
 
-  // Open asset picker for reference images
-  const openReferenceImagePicker = useCallback(() => {
-    setAssetPickerMode("reference");
+  // Open asset picker for persistent reference images
+  const openPersistentAssetPicker = useCallback(() => {
+    setAssetPickerMode("persistent");
     setIsAssetPickerOpen(true);
   }, []);
 
@@ -1419,57 +1367,36 @@ export default function ChatInterface({
     setAssetParamValues((prev) => ({ ...prev, [paramName]: null }));
   }, []);
 
-  // Upload a file and add to reference images
-  const uploadAndAddReferenceImage = useCallback(
+  // Upload a file and add to persistent reference images
+  const uploadAndAddPersistentReferenceImage = useCallback(
     async (file: File) => {
-      // Validate file before upload
       const validationError = validateFile(file);
       if (validationError) {
         addToast({
-          title:
-            validationError.code === "FILE_TOO_LARGE"
-              ? t("chat.fileSizeTooLarge", { maxSize: getMaxFileSizeMB() })
-              : t("chat.uploadFailed"),
+          title: validationError.code === "FILE_TOO_LARGE"
+            ? t("chat.fileSizeTooLarge", { maxSize: getMaxFileSizeMB() })
+            : t("chat.uploadFailed"),
           color: "danger",
         });
         return;
       }
-
-      if (!canAddReferenceImage(referenceImages)) {
-        addToast({
-          title: t("chat.maxImagesReached", { max: MAX_REFERENCE_IMAGES }),
-          color: "warning",
-        });
+      if (persistentAssets.referenceImages.length >= MAX_PERSISTENT_REFERENCE_IMAGES) {
+        addToast({ title: t("chat.maxImagesReached", { max: MAX_PERSISTENT_REFERENCE_IMAGES }), color: "warning" });
         return;
       }
-
-      if (shouldCompressFile(file)) {
-        addToast({
-          title: t("chat.fileWillBeCompressed", { threshold: getCompressThresholdMB() }),
-          color: "warning",
-        });
-      }
-
       const result = await uploadImage(file);
-
       if (result.success) {
-        // Add to reference images with default tag
-        const newImage: ReferenceImage = {
+        await addPersistentReferenceImage({
           imageId: result.data.imageId,
           url: result.data.imageUrl,
           title: file.name,
-          tag: "subject",
-        };
-        setReferenceImages((prev) => [...prev, newImage]);
-      } else {
-        console.error("Reference image upload failed:", result.error);
-        addToast({
-          title: t("chat.uploadFailed"),
-          color: "danger",
         });
+      } else {
+        console.error("Persistent reference image upload failed:", result.error);
+        addToast({ title: t("chat.uploadFailed"), color: "danger" });
       }
     },
-    [referenceImages, t]
+    [persistentAssets, addPersistentReferenceImage, t]
   );
 
   // Get the appropriate upload handler based on asset picker mode
@@ -1502,15 +1429,15 @@ export default function ChatInterface({
           }));
         }
         setActiveAssetParamName(null);
-      } else if (assetPickerMode === "reference") {
+      } else if (assetPickerMode === "persistent") {
         for (const file of files) {
-          await uploadAndAddReferenceImage(file);
+          await uploadAndAddPersistentReferenceImage(file);
         }
       } else {
         await handleFilesUpload(files);
       }
     },
-    [assetPickerMode, activeAssetParamName, handleFilesUpload, uploadAndAddReferenceImage, uploadImage]
+    [assetPickerMode, activeAssetParamName, handleFilesUpload, uploadAndAddPersistentReferenceImage, uploadImage]
   );
 
   // Listen for asset selection events from the hover sidebar
@@ -1625,12 +1552,12 @@ export default function ChatInterface({
         const displayUrl = asset.videoUrl || asset.imageUrl;
         setAssetParamValues((prev) => ({ ...prev, [activeAssetParamName]: { imageId: asset.imageId, displayUrl } }));
         setActiveAssetParamName(null);
-      } else if (assetPickerMode === "reference") {
-        addReferenceImage({
+      } else if (assetPickerMode === "persistent") {
+        addPersistentReferenceImage({
           imageId: asset.imageId,
           url: asset.imageUrl,
           title: asset.generationDetails?.title || t("chat.selectedAsset"),
-        }, "subject");
+        });
       } else if (asset.assetType === "video") {
         if (!canAddVideo(pendingVideos)) {
           addToast({ title: t("chat.maxVideosReached", { max: MAX_PENDING_VIDEOS }), color: "warning" });
@@ -1651,27 +1578,25 @@ export default function ChatInterface({
         });
       }
     },
-    [addAssetImage, addReferenceImage, assetPickerMode, activeAssetParamName, pendingVideos, t]
+    [addAssetImage, addPersistentReferenceImage, assetPickerMode, activeAssetParamName, pendingVideos, t]
   );
 
   const pendingImagesRef = useRef(pendingImages);
   pendingImagesRef.current = pendingImages;
-  const referenceImagesRef = useRef(referenceImages);
-  referenceImagesRef.current = referenceImages;
 
   const pendingVideosRef = useRef(pendingVideos);
   pendingVideosRef.current = pendingVideos;
 
   const handleAssetPickedMultiple = useCallback(
-    (assets: AssetSummary[]) => {
-      if (assetPickerMode === "reference") {
+    async (assets: AssetSummary[]) => {
+      if (assetPickerMode === "persistent") {
         for (const asset of assets) {
-          if (!canAddReferenceImage(referenceImagesRef.current)) break;
-          addReferenceImage({
+          if (persistentAssets.referenceImages.length >= MAX_PERSISTENT_REFERENCE_IMAGES) break;
+          await addPersistentReferenceImage({
             imageId: asset.imageId,
             url: asset.imageUrl,
             title: asset.generationDetails?.title || t("chat.selectedAsset"),
-          }, "subject");
+          });
         }
       } else {
         for (const asset of assets) {
@@ -1695,7 +1620,7 @@ export default function ChatInterface({
         }
       }
     },
-    [addAssetImage, addReferenceImage, assetPickerMode, t]
+    [addAssetImage, addPersistentReferenceImage, assetPickerMode, persistentAssets, t]
   );
 
   // Handler to open drawing modal for an image
@@ -2194,12 +2119,7 @@ export default function ChatInterface({
           partIndex: img.partIndex,
           variantId: img.variantId,
         })),
-        // Include reference images with their tags
-        referenceImages: referenceImages.map((img) => ({
-          imageId: img.imageId,
-          tag: img.tag,
-          title: img.title,
-        })),
+        // Reference images are now sourced from persistent assets (server-side)
         // Include video sources
         videoSources: currentPendingVideos.map((vid) => ({
           videoId: vid.videoId,
@@ -2904,7 +2824,6 @@ export default function ChatInterface({
               source: "ai_generated",
             },
           ],
-          referenceImages: [],
         };
 
         const res = await fetch(`/api/chat/${currentChatId}/message`, {
@@ -3595,6 +3514,15 @@ export default function ChatInterface({
         </div>
       )}
 
+      {/* Persistent Assets Panel - positioned at top-right of chat */}
+      {chatId && (
+        <PersistentAssetsPanel
+          chatId={chatId}
+          persistentAssets={persistentAssets}
+          onOpenAssetPicker={openPersistentAssetPicker}
+        />
+      )}
+
       <ChatInput
         ref={chatInputRef}
         input={input}
@@ -3625,12 +3553,6 @@ export default function ChatInterface({
         hasUploadingImages={hasUploadingImages(pendingImages)}
         initialEditorContent={loadedDraft?.editorContent || (loadedDraft?.plainText ? loadedDraft.plainText : undefined)}
         onBlur={saveDraft}
-        referenceImages={referenceImages}
-        onAddReferenceImage={openReferenceImagePicker}
-        onRemoveReferenceImage={removeReferenceImage}
-        onUpdateReferenceImageTag={updateReferenceImageTag}
-        isReferenceImagesCollapsed={isReferenceImagesCollapsed}
-        onToggleReferenceImagesCollapsed={toggleReferenceImagesCollapsed}
         videoCost={videoCost}
         videoCostLoading={videoCostLoading}
         videoModelSupportsEndImage={videoModelSupportsEndImage}
@@ -3652,8 +3574,8 @@ export default function ChatInterface({
         maxSelectCount={
           assetPickerMode === "assetParam"
             ? 1
-            : assetPickerMode === "reference"
-            ? MAX_REFERENCE_IMAGES - referenceImagesRef.current.length
+            : assetPickerMode === "persistent"
+            ? MAX_PERSISTENT_REFERENCE_IMAGES - persistentAssets.referenceImages.length
             : MAX_PENDING_IMAGES - pendingImagesRef.current.length
         }
         acceptTypes={

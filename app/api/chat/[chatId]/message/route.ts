@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { chats } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getChatHistory, saveChatHistory } from "@/lib/storage/s3";
+import { PersistentAssets } from "@/lib/chat/persistent-assets-types";
 import {
   uploadImage,
   getSignedImageUrl,
@@ -126,12 +127,13 @@ async function postProcessMessages(opts: {
   assistantMessages: Message[];
   imageSources: ImageSourceEntry[];
   userId: string;
+  persistentAssets?: PersistentAssets;
 }) {
-  const { chatId, chat, history, userMessage, assistantMessages, imageSources, userId } = opts;
+  const { chatId, chat, history, userMessage, assistantMessages, imageSources, userId, persistentAssets } = opts;
 
   const historyWithSelections = applyImageSelections(history, imageSources);
   const updatedHistory = [...historyWithSelections, userMessage, ...assistantMessages];
-  await saveChatHistory(chatId, updatedHistory);
+  await saveChatHistory(chatId, updatedHistory, persistentAssets);
 
   // Use the first variant for thumbnail calculation
   const primaryMessage = assistantMessages[0];
@@ -316,24 +318,7 @@ export async function POST(
       json.imageQuantity <= MAX_SUGGESTIONS_HARD_CAP
         ? json.imageQuantity
         : undefined;
-    // Parse reference images with their tags
-    const rawReferenceImages = Array.isArray(json.referenceImages)
-      ? json.referenceImages
-      : [];
-    const referenceImages: ReferenceImageEntry[] = rawReferenceImages
-      .filter((entry: any) => typeof entry?.imageId === "string")
-      .map((entry: any) => ({
-        imageId: entry.imageId as string,
-        tag:
-          entry.tag === "none" ||
-          entry.tag === "subject" ||
-          entry.tag === "scene" ||
-          entry.tag === "item" ||
-          entry.tag === "style"
-            ? (entry.tag as ReferenceImageEntry["tag"])
-            : "none",
-        title: typeof entry.title === "string" ? entry.title : undefined,
-      }));
+    // Reference images are now loaded from persistent assets in S3 (see below)
 
     // Parse video sources
     type VideoSourceEntry = {
@@ -399,7 +384,6 @@ export async function POST(
         imageCount: imageIds.length,
         imageIds,
         imageSources,
-        referenceImages,
         precisionEditing,
         systemPromptOverride,
         aspectRatioOverride,
@@ -431,7 +415,7 @@ export async function POST(
     }
 
     // Get existing history
-    const history = await getChatHistory(chatId);
+    const { messages: history, persistentAssets } = await getChatHistory(chatId);
     console.log(
       "[Perf] Chat history Got",
       `[${Date.now() - requestStartTime}ms]`
@@ -448,7 +432,6 @@ export async function POST(
       aspectRatio: aspectRatioOverride,
       imageQuantity,
       precisionEditing: precisionEditing || undefined,
-      referenceImages: referenceImages.length > 0 ? referenceImages : undefined,
       videoModelId: mode === "video" ? videoModelId : undefined,
       videoParams: mode === "video" ? videoParams : undefined,
     };
@@ -751,6 +734,7 @@ export async function POST(
               assistantMessages: [assistantMessage],
               imageSources,
               userId: payload.userId,
+              persistentAssets,
             });
           })
           .catch((err) => {
@@ -986,6 +970,7 @@ export async function POST(
               assistantMessages: [assistantMessage],
               imageSources,
               userId: payload.userId,
+              persistentAssets,
             });
           })
           .catch((err) => {
@@ -1016,9 +1001,10 @@ export async function POST(
         imageSizeOverride,
         imageModelId,
         messageTimestamp, // Pass timestamp for frontend sync
-        referenceImages, // Pass reference images with tags
+        persistentAssets.referenceImages, // Reference images from persistent assets
         imageQuantity, // Pass user-selected image quantity (undefined = smart)
         expertise, // Pass expertise selection for system prompt
+        persistentAssets.textChunk, // Persistent text chunk for system prompt
       );
 
     // Handle background completion (saving history)
@@ -1049,6 +1035,7 @@ export async function POST(
             assistantMessages: messagesToSave,
             imageSources,
             userId: payload.userId,
+            persistentAssets,
           });
         })
         .catch((err) => {

@@ -108,7 +108,7 @@ export async function POST(
     }
 
     // Get existing history
-    const history = await getChatHistory(chatId);
+    const { messages: history, persistentAssets } = await getChatHistory(chatId);
     console.log(
       "[Variant] Chat history retrieved",
       `[${Date.now() - requestStartTime}ms]`
@@ -182,12 +182,8 @@ export async function POST(
       }
     }
 
-    // Extract reference images from the original user message metadata
-    const referenceImages = userMessage.metadata?.referenceImages?.map((ref) => ({
-      imageId: ref.imageId,
-      tag: (ref.tag as "none" | "subject" | "scene" | "item" | "style") || "none",
-      title: ref.title,
-    }));
+    // Use reference images from persistent assets
+    const referenceImages = persistentAssets.referenceImages;
 
     console.log(
       "[Variant] Calling agent-2 for new variant",
@@ -212,6 +208,8 @@ export async function POST(
         messageTimestamp, // messageTimestamp for frontend sync
         referenceImages, // referenceImages
         userMessage.metadata?.imageQuantity, // maxImageQuantity
+        undefined, // expertise
+        persistentAssets.textChunk, // persistentTextChunk
       );
 
     // Handle background completion (saving the new variant to history)
@@ -249,7 +247,7 @@ export async function POST(
             ...history.slice(insertIndex),
           ];
 
-          await saveChatHistory(chatId, updatedHistory);
+          await saveChatHistory(chatId, updatedHistory, persistentAssets);
           console.log(
             `[Variant] New variant saved to history at index ${insertIndex}`
           );

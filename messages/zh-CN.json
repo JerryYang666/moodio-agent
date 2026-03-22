@@ -218,7 +218,15 @@
     "tagStyle": "风格",
     "selectTag": "选择标签",
     "collapseReferenceImages": "收起参考图片",
-    "expandReferenceImages": "展开参考图片"
+    "expandReferenceImages": "展开参考图片",
+    "persistentAssets": "常驻素材",
+    "persistentAssetsInfo": "此处的内容会始终包含在每条消息中，不受上下文限制。",
+    "persistentTextChunk": "常驻文本",
+    "persistentTextChunkPlaceholder": "添加常驻的上下文、指示或笔记，将包含在每条消息中...",
+    "persistentTextChunkCount": "{count}/{max}",
+    "persistentAssetsSaved": "常驻素材已保存",
+    "persistentAssetsSaving": "保存中...",
+    "persistentAssetsSaveError": "保存常驻素材失败"
   },
   "profile": {
     "title": "个人设置",

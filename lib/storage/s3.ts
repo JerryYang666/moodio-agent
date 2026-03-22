@@ -7,6 +7,10 @@ import {
 import { getSignedUrl } from "@aws-sdk/cloudfront-signer";
 import { getSignedUrl as getS3SignedUrl } from "@aws-sdk/s3-request-presigner";
 import { Message, MessageContentPart } from "@/lib/llm/types";
+import {
+  PersistentAssets,
+  EMPTY_PERSISTENT_ASSETS,
+} from "@/lib/chat/persistent-assets-types";
 import { randomUUID } from "crypto";
 import { siteConfig } from "@/config/site";
 import { compressImageIfNeeded } from "@/lib/image/compress";
@@ -32,6 +36,7 @@ const IS_DEV = process.env.NODE_ENV === "development";
 
 export interface ChatHistory {
   messages: Message[];
+  persistentAssets?: PersistentAssets;
 }
 
 /**
@@ -201,11 +206,19 @@ function stripDerivedUrls(messages: Message[]): Message[] {
   });
 }
 
-export async function saveChatHistory(chatId: string, messages: Message[]) {
+export async function saveChatHistory(
+  chatId: string,
+  messages: Message[],
+  persistentAssets?: PersistentAssets
+) {
   const key = `chats/${chatId}.json`;
   // Strip all derived URL fields before saving.
   const cleanedMessages = stripDerivedUrls(messages);
-  const content = JSON.stringify({ messages: cleanedMessages });
+  const data: ChatHistory = { messages: cleanedMessages };
+  if (persistentAssets !== undefined) {
+    data.persistentAssets = persistentAssets;
+  }
+  const content = JSON.stringify(data);
 
   await s3Client.send(
     new PutObjectCommand({
@@ -287,7 +300,9 @@ function addDerivedUrls(messages: Message[]): Message[] {
   });
 }
 
-export async function getChatHistory(chatId: string): Promise<Message[]> {
+export async function getChatHistory(
+  chatId: string
+): Promise<{ messages: Message[]; persistentAssets: PersistentAssets }> {
   const key = `chats/${chatId}.json`;
 
   try {
@@ -299,19 +314,66 @@ export async function getChatHistory(chatId: string): Promise<Message[]> {
     );
 
     if (!response.Body) {
-      return [];
+      return { messages: [], persistentAssets: EMPTY_PERSISTENT_ASSETS };
     }
 
     const str = await response.Body.transformToString();
     const data = JSON.parse(str) as ChatHistory;
     // Generate fresh derived URLs on retrieval
-    return addDerivedUrls(data.messages);
+    return {
+      messages: addDerivedUrls(data.messages),
+      persistentAssets: data.persistentAssets ?? EMPTY_PERSISTENT_ASSETS,
+    };
   } catch (error: any) {
     if (error.name === "NoSuchKey") {
-      return [];
+      return { messages: [], persistentAssets: EMPTY_PERSISTENT_ASSETS };
     }
     throw error;
   }
+}
+
+/**
+ * Save only the persistent assets for a chat, preserving existing messages.
+ */
+export async function savePersistentAssets(
+  chatId: string,
+  assets: PersistentAssets
+): Promise<void> {
+  const key = `chats/${chatId}.json`;
+
+  // Load existing chat data
+  let existingMessages: Message[] = [];
+  try {
+    const response = await s3Client.send(
+      new GetObjectCommand({
+        Bucket: BUCKET_NAME,
+        Key: key,
+      })
+    );
+    if (response.Body) {
+      const str = await response.Body.transformToString();
+      const data = JSON.parse(str) as ChatHistory;
+      existingMessages = data.messages || [];
+    }
+  } catch (error: any) {
+    if (error.name !== "NoSuchKey") {
+      throw error;
+    }
+  }
+
+  const content = JSON.stringify({
+    messages: existingMessages,
+    persistentAssets: assets,
+  });
+
+  await s3Client.send(
+    new PutObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: key,
+      Body: content,
+      ContentType: "application/json",
+    })
+  );
 }
 
 export async function downloadImage(imageId: string): Promise<Buffer | null> {

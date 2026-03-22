@@ -45,7 +45,7 @@ export async function POST(
     }
 
     // Get original chat history
-    const history = await getChatHistory(chatId);
+    const { messages: history } = await getChatHistory(chatId);
 
     // Validate index (must be a user message and not the first one logic handled by frontend, but checking bounds here)
     if (messageIndex >= history.length) {
