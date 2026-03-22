@@ -6,7 +6,7 @@ import {
   savePricingFormula,
   validateFormula,
 } from "@/lib/pricing";
-import { VIDEO_MODELS } from "@/lib/video/models";
+import { VIDEO_MODELS, getModelConfigForApi } from "@/lib/video/models";
 import { getActiveProvider } from "@/lib/video/provider-config";
 
 /**
@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
   try {
     const formulas = await getAllPricingFormulas();
 
-    // Include model info for reference
+    // Include model info with provider-resolved params (respects overrides and status)
     const models = VIDEO_MODELS.map((m) => {
       let provider: string | null = null;
       try {
@@ -35,18 +35,21 @@ export async function GET(request: NextRequest) {
         provider = variant.provider;
       } catch {}
 
+      const resolved = getModelConfigForApi(m.id);
       return {
         id: m.id,
         name: m.name,
         provider,
-        params: m.params
-          .filter((p) => !p.status || p.status === "active")
-          .map((p) => ({
-            name: p.name,
-            type: p.type,
-            options: p.options,
-            default: p.default,
-          })),
+        params: resolved
+          ? resolved.params
+              .filter((p) => p.type !== "asset")
+              .map((p) => ({
+                name: p.name,
+                type: p.type,
+                options: p.options,
+                default: p.default,
+              }))
+          : [],
       };
     });
 

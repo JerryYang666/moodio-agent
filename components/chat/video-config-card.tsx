@@ -94,8 +94,20 @@ export default function VideoConfigCard({
 
   // Editable state — initialized from the part config (which may already contain saved edits)
   const [editedPrompt, setEditedPrompt] = useState(part.config.prompt);
-  const [editedParams, setEditedParams] = useState<Record<string, any>>({
-    ...part.config.params,
+  const [assetParamImageIds] = useState<Record<string, string>>(() => {
+    return { ...part.config.assetParamImageIds };
+  });
+  const [editedParams, setEditedParams] = useState<Record<string, any>>(() => {
+    const initial = { ...part.config.params };
+    if (part.config.assetParamImageIds) {
+      for (const [paramName, imageId] of Object.entries(part.config.assetParamImageIds)) {
+        const match = sourceImages.find((img) => img.imageId === imageId);
+        if (match) {
+          initial[paramName] = match.imageUrl;
+        }
+      }
+    }
+    return initial;
   });
 
   // Cost estimation
@@ -125,11 +137,15 @@ export default function VideoConfigCard({
   }, [modelConfig]);
 
   const gridParams = useMemo(
-    () => visibleParams.filter((p) => p.type !== "string"),
+    () => visibleParams.filter((p) => p.type !== "string" && p.type !== "asset"),
     [visibleParams]
   );
   const textParams = useMemo(
     () => visibleParams.filter((p) => p.type === "string"),
+    [visibleParams]
+  );
+  const assetParams = useMemo(
+    () => visibleParams.filter((p) => p.type === "asset"),
     [visibleParams]
   );
 
@@ -200,6 +216,12 @@ export default function VideoConfigCard({
       return;
     }
 
+    // Build params for API: substitute display URLs back to image IDs for asset params
+    const paramsForApi = { ...editedParams };
+    for (const [paramName, imageId] of Object.entries(assetParamImageIds)) {
+      if (imageId) paramsForApi[paramName] = imageId;
+    }
+
     const hasEdits =
       editedPrompt !== part.config.prompt ||
       JSON.stringify(editedParams) !== JSON.stringify(part.config.params);
@@ -209,7 +231,7 @@ export default function VideoConfigCard({
         config: {
           ...part.config,
           prompt: editedPrompt,
-          params: editedParams,
+          params: paramsForApi,
         },
         ...(hasEdits
           ? { userEdited: true, userEditedAt: Date.now() }
@@ -224,7 +246,7 @@ export default function VideoConfigCard({
         prompt: editedPrompt,
         sourceImageId: selectedSourceImage?.imageId || "",
         sourceImageUrl: selectedSourceImage?.imageUrl,
-        params: editedParams,
+        params: paramsForApi,
       });
       setStatus("created");
       onStatusChange?.("created");
@@ -242,7 +264,7 @@ export default function VideoConfigCard({
         sourceImageId: selectedSourceImage?.imageId || null,
         params: {
           prompt: editedPrompt,
-          ...editedParams,
+          ...paramsForApi,
         },
       }).unwrap();
 
@@ -314,6 +336,7 @@ export default function VideoConfigCard({
     part.config,
     editedPrompt,
     editedParams,
+    assetParamImageIds,
     generateVideo,
     monitorGeneration,
     desktopId,
@@ -657,6 +680,30 @@ export default function VideoConfigCard({
                 <div className="text-xs whitespace-pre-wrap">
                   {String(value) || "—"}
                 </div>
+              )}
+            </div>
+          );
+        })}
+
+        {/* Asset-type params (type: "asset") - preview thumbnails */}
+        {assetParams.map((param) => {
+          const value = editedParams[param.name];
+          const url = typeof value === "string" ? value : null;
+          return (
+            <div key={param.name} className="flex items-center gap-2">
+              <div className="text-xs text-default-400">
+                {param.label || param.name}:
+              </div>
+              {url ? (
+                <div className="w-12 h-8 rounded overflow-hidden border border-divider">
+                  <img
+                    src={url}
+                    alt={param.label || param.name}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              ) : (
+                <span className="text-xs text-default-300">—</span>
               )}
             </div>
           );

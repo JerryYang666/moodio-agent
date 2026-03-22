@@ -47,6 +47,18 @@ type PendingImageRenderItem =
   | { type: "single"; image: PendingImage }
   | { type: "deck"; markedImage: PendingImage; originalImage: PendingImage };
 
+export type AssetParamSlot = {
+  name: string;
+  label: string;
+  required: boolean;
+  acceptTypes?: ("image" | "video")[];
+};
+
+export type AssetParamValue = {
+  imageId: string;
+  displayUrl: string;
+};
+
 interface ChatInputProps {
   input: string;
   onInputChange: (value: string) => void;
@@ -96,8 +108,18 @@ interface ChatInputProps {
   videoCostLoading?: boolean;
   /** Whether the selected video model supports end images */
   videoModelSupportsEndImage?: boolean;
+  /** Whether the selected video model has imageParams (first/last frame) */
+  videoModelHasImageParams?: boolean;
   /** Callback when the input container height changes */
   onHeightChange?: (height: number) => void;
+  /** Asset param slots for type: "asset" video model params (rendered in Video Frames Area) */
+  assetParamSlots?: AssetParamSlot[];
+  /** Current values for asset param slots: param name -> {imageId, displayUrl} */
+  assetParamValues?: Record<string, AssetParamValue | null>;
+  /** Handler to open asset picker for a specific asset param */
+  onOpenAssetParamPicker?: (paramName: string) => void;
+  /** Handler to clear an asset param value */
+  onClearAssetParam?: (paramName: string) => void;
 }
 
 /** Ref handle for ChatInput to allow getting editor content */
@@ -143,7 +165,12 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
   videoCost,
   videoCostLoading,
   videoModelSupportsEndImage,
+  videoModelHasImageParams,
   onHeightChange,
+  assetParamSlots = [],
+  assetParamValues = {},
+  onOpenAssetParamPicker,
+  onClearAssetParam,
 }, ref) {
   const t = useTranslations();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -525,7 +552,7 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
         <div className="flex flex-col">
           {/* Video Frames Area - shows frame slots in video mode */}
           <AnimatePresence>
-            {isExpanded && menuState.mode === "video" && (
+            {isExpanded && menuState.mode === "video" && (videoModelHasImageParams || assetParamSlots.length > 0) && (
               <motion.div
                 initial={{ height: 0, opacity: 0 }}
                 animate={{ height: "auto", opacity: 1 }}
@@ -538,7 +565,9 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
                   <span className="text-xs text-default-500">{t("chat.videoSourceImages")}</span>
                 </div>
                 <div className="flex gap-3 mb-2">
-                  {/* Source frame slot */}
+                  {/* Source frame slot - only when model has imageParams */}
+                  {videoModelHasImageParams && (
+                    <>
                   {pendingImages[0] ? (
                     <div className="relative w-fit group">
                       <div className="h-20 w-20 rounded-lg border border-divider overflow-hidden relative">
@@ -599,6 +628,8 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
                         {t("chat.videoAddSource")}
                       </span>
                     </button>
+                  )}
+                    </>
                   )}
 
                   {/* End frame slot - only when model supports it */}
@@ -667,6 +698,50 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
                       )}
                     </>
                   )}
+
+                  {/* Asset param slots for type: "asset" params */}
+                  {assetParamSlots.map((slot) => {
+                    const val = assetParamValues[slot.name];
+                    return val ? (
+                      <div key={slot.name} className="relative w-fit group">
+                        <div className="h-20 w-20 rounded-lg border border-divider overflow-hidden relative">
+                          <img
+                            src={val.displayUrl}
+                            alt={slot.label}
+                            className="w-full h-full object-cover"
+                          />
+                          <div className="absolute top-1 left-1 z-10">
+                            <span className="text-[9px] font-semibold bg-primary/90 text-primary-foreground px-1.5 py-0.5 rounded">
+                              {slot.label}
+                            </span>
+                          </div>
+                        </div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onClearAssetParam?.(slot.name);
+                          }}
+                          className="absolute -top-2 -right-2 bg-default-100 rounded-full p-1 shadow-sm border border-divider z-10 hover:bg-default-200"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        key={slot.name}
+                        onClick={() => onOpenAssetParamPicker?.(slot.name)}
+                        className="h-20 w-20 rounded-lg border-2 border-dashed border-default-300 hover:border-primary hover:bg-primary/5 flex flex-col items-center justify-center transition-colors gap-1"
+                      >
+                        <ImagePlus size={18} className="text-default-400" />
+                        <span className="text-[9px] text-default-400 text-center leading-tight px-1">
+                          {slot.label}
+                        </span>
+                        {!slot.required && (
+                          <span className="text-[8px] text-default-300">{t("common.optional")}</span>
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
               </motion.div>
             )}

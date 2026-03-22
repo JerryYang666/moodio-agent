@@ -27,7 +27,8 @@
     "remove": "削除",
     "on": "オン",
     "off": "オフ",
-    "send": "送信"
+    "send": "送信",
+    "optional": "任意"
   },
   "share": {
     "searchUser": "ユーザーを検索",

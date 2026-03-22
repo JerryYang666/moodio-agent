@@ -23,7 +23,7 @@ import { useGenerateVideoMutation } from "@/lib/redux/services/next-api";
 interface VideoModelParam {
   name: string;
   label: string;
-  type: "string" | "number" | "boolean" | "enum" | "string_array";
+  type: "string" | "number" | "boolean" | "enum" | "string_array" | "asset";
   required: boolean;
   default?: string | number | boolean | string[];
   options?: Array<string | number>;
@@ -31,6 +31,7 @@ interface VideoModelParam {
   min?: number;
   max?: number;
   maxItems?: number;
+  acceptTypes?: ("image" | "video")[];
 }
 
 interface VideoModelConfig {
@@ -142,10 +143,12 @@ export default function VideoGenerationPanel({
   const [endImageId, setEndImageId] = useState<string | null>(null);
   const [endImageUrl, setEndImageUrl] = useState<string | null>(null);
   const [params, setParams] = useState<Record<string, any>>({});
+  const [assetParamDisplayUrls, setAssetParamDisplayUrls] = useState<Record<string, string>>({});
 
   // Asset picker state
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [pickerTarget, setPickerTarget] = useState<"source" | "end">("source");
+  const [pickerTarget, setPickerTarget] = useState<string>("source");
+  const [pickerAcceptTypes, setPickerAcceptTypes] = useState<("image" | "video")[] | undefined>(undefined);
 
   // String array input state (for voice_ids etc.)
   const [arrayInputValues, setArrayInputValues] = useState<
@@ -153,7 +156,7 @@ export default function VideoGenerationPanel({
   >({});
 
   // Upload state
-  const [uploadingTarget, setUploadingTarget] = useState<"source" | "end" | null>(null);
+  const [uploadingTarget, setUploadingTarget] = useState<string | null>(null);
   const [uploadPreviewUrl, setUploadPreviewUrl] = useState<string | null>(null);
   const isUploading = uploadingTarget !== null;
 
@@ -384,8 +387,9 @@ export default function VideoGenerationPanel({
     setParams((prev) => ({ ...prev, [name]: value }));
   };
 
-  const openPicker = (target: "source" | "end") => {
+  const openPicker = (target: string, assetAcceptTypes?: ("image" | "video")[]) => {
     setPickerTarget(target);
+    setPickerAcceptTypes(assetAcceptTypes);
     setPickerOpen(true);
   };
 
@@ -393,16 +397,18 @@ export default function VideoGenerationPanel({
     if (pickerTarget === "source") {
       setSourceImageId(asset.imageId);
       setSourceImageUrl(asset.imageUrl);
-    } else {
+    } else if (pickerTarget === "end") {
       setEndImageId(asset.imageId);
       setEndImageUrl(asset.imageUrl);
+    } else {
+      handleParamChange(pickerTarget, asset.imageId);
+      setAssetParamDisplayUrls((prev) => ({ ...prev, [pickerTarget]: asset.videoUrl || asset.imageUrl }));
     }
   }, [pickerTarget]);
 
   const handleUpload = useCallback(async (files: File[]) => {
     const file = files[0];
     if (!file) return;
-    // Create local preview and show uploading state
     const localPreview = URL.createObjectURL(file);
     setUploadPreviewUrl(localPreview);
     setUploadingTarget(pickerTarget);
@@ -418,16 +424,18 @@ export default function VideoGenerationPanel({
       if (pickerTarget === "source") {
         setSourceImageId(result.data.imageId);
         setSourceImageUrl(result.data.imageUrl);
-      } else {
+      } else if (pickerTarget === "end") {
         setEndImageId(result.data.imageId);
         setEndImageUrl(result.data.imageUrl);
+      } else {
+        handleParamChange(pickerTarget, result.data.imageId);
+        setAssetParamDisplayUrls((prev) => ({ ...prev, [pickerTarget]: result.data.imageUrl }));
       }
     } else {
       console.error("Upload error:", result.error);
       setError(t("failedToUploadImage"));
     }
 
-    // Clean up
     URL.revokeObjectURL(localPreview);
     setUploadPreviewUrl(null);
     setUploadingTarget(null);
@@ -689,6 +697,76 @@ export default function VideoGenerationPanel({
             .map((param) => {
               const value = params[param.name] ?? param.default ?? "";
 
+              if (param.type === "asset") {
+                const imageId = typeof value === "string" ? value : "";
+                const displayUrl = assetParamDisplayUrls[param.name] || "";
+                const isUploadingThis = uploadingTarget === param.name;
+                return (
+                  <div key={param.name} className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">
+                        {param.label}
+                        {!param.required && (
+                          <span className="text-xs text-default-400 ml-1">({tCommon("optional")})</span>
+                        )}
+                      </span>
+                      <Button
+                        size="sm"
+                        variant="flat"
+                        onPress={() => openPicker(param.name, param.acceptTypes as ("image" | "video")[] | undefined)}
+                        isDisabled={isUploadingThis}
+                      >
+                        {imageId ? tCommon("change") : tCommon("select")}
+                      </Button>
+                    </div>
+                    {(imageId && displayUrl) || isUploadingThis ? (
+                      <div className="relative rounded-lg overflow-hidden border border-divider">
+                        <Image
+                          src={isUploadingThis && uploadPreviewUrl ? uploadPreviewUrl : displayUrl}
+                          alt={param.label || param.name}
+                          classNames={{
+                            wrapper: "w-full aspect-video",
+                            img: `w-full h-full object-cover ${isUploadingThis ? "opacity-50" : ""}`,
+                          }}
+                        />
+                        {isUploadingThis ? (
+                          <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                            <Spinner size="lg" color="white" />
+                          </div>
+                        ) : (
+                          <Button
+                            isIconOnly
+                            size="sm"
+                            variant="flat"
+                            className="absolute top-2 right-2 z-20 bg-background/80"
+                            onPress={() => {
+                              handleParamChange(param.name, undefined);
+                              setAssetParamDisplayUrls((prev) => {
+                                const next = { ...prev };
+                                delete next[param.name];
+                                return next;
+                              });
+                            }}
+                          >
+                            <X size={14} />
+                          </Button>
+                        )}
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => openPicker(param.name, param.acceptTypes as ("image" | "video")[] | undefined)}
+                        className="w-full aspect-video rounded-lg border-2 border-dashed border-default-300 flex flex-col items-center justify-center gap-2 hover:border-primary transition-colors"
+                      >
+                        <ImageIcon size={32} className="text-default-400" />
+                        <span className="text-sm text-default-500">
+                          {param.description || param.label}
+                        </span>
+                      </button>
+                    )}
+                  </div>
+                );
+              }
+
               if (param.type === "enum" && param.options) {
                 return (
                   <Select
@@ -933,6 +1011,7 @@ export default function VideoGenerationPanel({
         onOpenChange={closePicker}
         onSelect={handleAssetSelect}
         onUpload={handleUpload}
+        acceptTypes={pickerAcceptTypes}
       />
     </>
   );

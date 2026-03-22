@@ -112,6 +112,7 @@ export default function VideoModeParams({
         (model.imageParams && param.name === model.imageParams.sourceImage) ||
         (model.imageParams && param.name === model.imageParams.endImage) ||
         param.name === "prompt" ||
+        param.type === "asset" ||
         param.status === "hidden" ||
         param.status === "disabled"
       )
@@ -159,6 +160,7 @@ export default function VideoModeParams({
         p.name !== "prompt" &&
         p.name !== selectedModel.imageParams?.sourceImage &&
         p.name !== selectedModel.imageParams?.endImage &&
+        p.type !== "asset" &&
         p.status !== "hidden" &&
         p.status !== "disabled"
     );
@@ -343,6 +345,7 @@ export default function VideoModeParams({
             selectedKeys={videoModelId ? new Set([videoModelId]) : new Set()}
             selectionMode="single"
             variant="flat"
+            className="max-h-[60vh] overflow-y-auto"
             onSelectionChange={(keys) => {
               const selected = Array.from(keys)[0] as string;
               if (selected && selected !== videoModelId) {
