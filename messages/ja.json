@@ -226,7 +226,13 @@
     "persistentTextChunkCount": "{count}/{max}",
     "persistentAssetsSaved": "常駐アセットを保存しました",
     "persistentAssetsSaving": "保存中...",
-    "persistentAssetsSaveError": "常駐アセットの保存に失敗しました"
+    "persistentAssetsSaveError": "常駐アセットの保存に失敗しました",
+    "uploadDocument": "PDF または DOCX をアップロード",
+    "uploadDocumentTooLarge": "ファイルが大きすぎます（最大 5 MB）",
+    "uploadDocumentInvalidType": "PDF と DOCX ファイルのみ対応しています",
+    "uploadDocumentFailed": "ドキュメントからテキストを抽出できませんでした",
+    "uploadDocumentSuccess": "ドキュメントのテキストをインポートしました",
+    "uploadDocumentTruncated": "ドキュメントのテキストは文字数制限に合わせて切り詰められました"
   },
   "profile": {
     "title": "プロフィール設定",

@@ -226,7 +226,13 @@
     "persistentTextChunkCount": "{count}/{max}",
     "persistentAssetsSaved": "常驻素材已保存",
     "persistentAssetsSaving": "保存中...",
-    "persistentAssetsSaveError": "保存常驻素材失败"
+    "persistentAssetsSaveError": "保存常驻素材失败",
+    "uploadDocument": "上传 PDF 或 DOCX",
+    "uploadDocumentTooLarge": "文件过大（最大 5 MB）",
+    "uploadDocumentInvalidType": "仅支持 PDF 和 DOCX 文件",
+    "uploadDocumentFailed": "无法从文档中提取文本",
+    "uploadDocumentSuccess": "文档文本已导入",
+    "uploadDocumentTruncated": "文档文本已截断以符合字符限制"
   },
   "profile": {
     "title": "个人设置",

@@ -226,7 +226,13 @@
     "persistentTextChunkCount": "{count}/{max}",
     "persistentAssetsSaved": "常駐素材已儲存",
     "persistentAssetsSaving": "儲存中...",
-    "persistentAssetsSaveError": "儲存常駐素材失敗"
+    "persistentAssetsSaveError": "儲存常駐素材失敗",
+    "uploadDocument": "上傳 PDF 或 DOCX",
+    "uploadDocumentTooLarge": "檔案過大（最大 5 MB）",
+    "uploadDocumentInvalidType": "僅支援 PDF 和 DOCX 檔案",
+    "uploadDocumentFailed": "無法從文件中擷取文字",
+    "uploadDocumentSuccess": "文件文字已匯入",
+    "uploadDocumentTruncated": "文件文字已截斷以符合字元限制"
   },
   "profile": {
     "title": "個人檔案設定",

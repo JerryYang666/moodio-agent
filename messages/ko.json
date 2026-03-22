@@ -226,7 +226,13 @@
     "persistentTextChunkCount": "{count}/{max}",
     "persistentAssetsSaved": "고정 에셋이 저장되었습니다",
     "persistentAssetsSaving": "저장 중...",
-    "persistentAssetsSaveError": "고정 에셋 저장 실패"
+    "persistentAssetsSaveError": "고정 에셋 저장 실패",
+    "uploadDocument": "PDF 또는 DOCX 업로드",
+    "uploadDocumentTooLarge": "파일이 너무 큽니다 (최대 5 MB)",
+    "uploadDocumentInvalidType": "PDF 및 DOCX 파일만 지원됩니다",
+    "uploadDocumentFailed": "문서에서 텍스트를 추출하지 못했습니다",
+    "uploadDocumentSuccess": "문서 텍스트를 가져왔습니다",
+    "uploadDocumentTruncated": "문서 텍스트가 글자 수 제한에 맞게 잘렸습니다"
   },
   "profile": {
     "title": "프로필 설정",

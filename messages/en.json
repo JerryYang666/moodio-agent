@@ -226,7 +226,13 @@
     "persistentTextChunkCount": "{count}/{max}",
     "persistentAssetsSaved": "Persistent assets saved",
     "persistentAssetsSaving": "Saving...",
-    "persistentAssetsSaveError": "Failed to save persistent assets"
+    "persistentAssetsSaveError": "Failed to save persistent assets",
+    "uploadDocument": "Upload PDF or DOCX",
+    "uploadDocumentTooLarge": "File is too large (max 5 MB)",
+    "uploadDocumentInvalidType": "Only PDF and DOCX files are supported",
+    "uploadDocumentFailed": "Failed to extract text from document",
+    "uploadDocumentSuccess": "Document text imported",
+    "uploadDocumentTruncated": "Document text was truncated to fit the character limit"
   },
   "profile": {
     "title": "Profile Settings",

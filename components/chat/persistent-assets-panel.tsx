@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useTranslations } from "next-intl";
 import { Button } from "@heroui/button";
 import { Popover, PopoverTrigger, PopoverContent } from "@heroui/popover";
@@ -10,7 +10,7 @@ import { Dropdown, DropdownTrigger, DropdownMenu, DropdownItem } from "@heroui/d
 import { Badge } from "@heroui/badge";
 import { Spinner } from "@heroui/spinner";
 import { addToast } from "@heroui/toast";
-import { Pin, X, Plus, ChevronDown, ImagePlus, Type, BookImage } from "lucide-react";
+import { Pin, X, Plus, ChevronDown, ImagePlus, Type, BookImage, FileUp } from "lucide-react";
 import {
   PersistentAssets,
   PersistentReferenceImage,
@@ -53,6 +53,8 @@ export function PersistentAssetsPanel({
   const [isOpen, setIsOpen] = useState(false);
   const [localAssets, setLocalAssets] = useState<PersistentAssets>(persistentAssets);
   const [updateAssets, { isLoading: isSaving }] = useUpdatePersistentAssetsMutation();
+  const [isParsing, setIsParsing] = useState(false);
+  const docInputRef = useRef<HTMLInputElement>(null);
 
   // Sync local state when server data changes
   useEffect(() => {
@@ -141,6 +143,68 @@ export function PersistentAssetsPanel({
       save(updated);
     },
     [localAssets, save]
+  );
+
+  const handleDocumentUpload = useCallback(
+    async (file: File) => {
+      const MAX_DOC_SIZE = 5 * 1024 * 1024;
+      if (file.size > MAX_DOC_SIZE) {
+        addToast({ title: t("uploadDocumentTooLarge"), color: "danger", timeout: 3000 });
+        return;
+      }
+      const validTypes = [
+        "application/pdf",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      ];
+      if (!validTypes.includes(file.type)) {
+        addToast({ title: t("uploadDocumentInvalidType"), color: "danger", timeout: 3000 });
+        return;
+      }
+
+      setIsParsing(true);
+      try {
+        const formData = new FormData();
+        formData.append("file", file);
+        const res = await fetch("/api/parse-document", { method: "POST", body: formData });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          if (data.error === "FILE_TOO_LARGE") {
+            addToast({ title: t("uploadDocumentTooLarge"), color: "danger", timeout: 3000 });
+          } else if (data.error === "INVALID_TYPE") {
+            addToast({ title: t("uploadDocumentInvalidType"), color: "danger", timeout: 3000 });
+          } else {
+            addToast({ title: t("uploadDocumentFailed"), color: "danger", timeout: 3000 });
+          }
+          return;
+        }
+        const { text } = await res.json();
+        if (!text || text.trim().length === 0) {
+          addToast({ title: t("uploadDocumentFailed"), color: "danger", timeout: 3000 });
+          return;
+        }
+
+        const current = localAssets.textChunk;
+        const combined = current ? `${current}\n\n${text}` : text;
+        const truncated = combined.slice(0, MAX_TEXT_CHUNK_LENGTH);
+        const wasTruncated = combined.length > MAX_TEXT_CHUNK_LENGTH;
+
+        const updated = { ...localAssets, textChunk: truncated };
+        setLocalAssets(updated);
+        await save(updated);
+
+        if (wasTruncated) {
+          addToast({ title: t("uploadDocumentTruncated"), color: "warning", timeout: 4000 });
+        } else {
+          addToast({ title: t("uploadDocumentSuccess"), color: "success", timeout: 2000 });
+        }
+      } catch {
+        addToast({ title: t("uploadDocumentFailed"), color: "danger", timeout: 3000 });
+      } finally {
+        setIsParsing(false);
+        if (docInputRef.current) docInputRef.current.value = "";
+      }
+    },
+    [localAssets, save, t]
   );
 
   return (
@@ -274,11 +338,36 @@ export function PersistentAssetsPanel({
 
           {/* Text Chunk Section */}
           <div className="space-y-2">
-            <div className="flex items-center gap-1.5">
-              <Type size={14} className="text-default-500" />
-              <span className="text-xs font-medium text-default-600">
-                {t("persistentTextChunk")}
-              </span>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
+                <Type size={14} className="text-default-500" />
+                <span className="text-xs font-medium text-default-600">
+                  {t("persistentTextChunk")}
+                </span>
+              </div>
+              <Tooltip content={t("uploadDocument")} delay={300}>
+                <Button
+                  size="sm"
+                  variant="flat"
+                  isIconOnly
+                  className="h-7 w-7 min-w-0"
+                  isLoading={isParsing}
+                  onPress={() => docInputRef.current?.click()}
+                  aria-label={t("uploadDocument")}
+                >
+                  <FileUp size={14} />
+                </Button>
+              </Tooltip>
+              <input
+                ref={docInputRef}
+                type="file"
+                accept=".pdf,.docx"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleDocumentUpload(file);
+                }}
+              />
             </div>
             <Textarea
               value={localAssets.textChunk}
