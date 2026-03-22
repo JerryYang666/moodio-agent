@@ -52,6 +52,16 @@ interface KieWebhookPayload {
     resultJson?: string;
     failCode?: string;
     failMsg?: string;
+    info?: {
+      resultUrls?: string[];
+      result_urls?: string[];
+      seeds?: number[];
+      has_audio_list?: boolean[];
+      media_ids?: string[];
+      resolution?: string;
+    };
+    promptJson?: string;
+    fallbackFlag?: boolean;
   };
 }
 
@@ -129,22 +139,32 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ received: true, status: "failed" });
   }
 
-  if (state !== "success") {
+  // Some models (e.g. veo3 via generationType payloads) return code 200 with
+  // no state field, and put result URLs in data.info instead of resultJson.
+  const isInfoSuccess =
+    !state && payload.code === 200 && payload.data.info?.resultUrls?.length;
+
+  if (state !== "success" && !isInfoSuccess) {
     console.log(
       `[Webhook/Kie] Non-terminal state "${state}" for generation ${generation.id}, ignoring`
     );
     return NextResponse.json({ received: true, status: "ignored" });
   }
 
-  // Parse resultJson to extract video URL
   let resultUrls: string[] = [];
-  try {
-    if (payload.data.resultJson) {
-      const parsed = JSON.parse(payload.data.resultJson);
-      resultUrls = parsed.resultUrls ?? [];
+
+  if (isInfoSuccess) {
+    resultUrls =
+      payload.data.info!.resultUrls ?? payload.data.info!.result_urls ?? [];
+  } else {
+    try {
+      if (payload.data.resultJson) {
+        const parsed = JSON.parse(payload.data.resultJson);
+        resultUrls = parsed.resultUrls ?? [];
+      }
+    } catch (e) {
+      console.error("[Webhook/Kie] Failed to parse resultJson:", e);
     }
-  } catch (e) {
-    console.error("[Webhook/Kie] Failed to parse resultJson:", e);
   }
 
   if (resultUrls.length === 0) {
@@ -161,10 +181,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ received: true, status: "failed" });
   }
 
-  // Transform into the VideoGenerationResult shape our shared handler expects
+  const seed = payload.data.info?.seeds?.[0] ?? 0;
+
   const videoResult = {
     video: { url: resultUrls[0] },
-    seed: 0,
+    seed,
   };
 
   waitUntil(processVideoResult(generation.id, videoResult));
