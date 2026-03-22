@@ -62,12 +62,18 @@ export interface VideoModelConfig {
   name: string;
   description?: string;
   params: VideoModelParam[];
-  imageParams: {
+  imageParams?: {
     sourceImage: string;
     endImage?: string;
   };
   providers: ProviderVariant[];
 }
+
+/**
+ * Placeholder image ID used for text-to-video models.
+ * Points to a real image in S3 at images/text-to-video-placeholder.
+ */
+export const TEXT_TO_VIDEO_PLACEHOLDER_IMAGE_ID = "text-to-video-placeholder";
 
 /**
  * Seedance v1.5 Pro - Image to Video
@@ -430,7 +436,7 @@ const klingV26Pro: VideoModelConfig = {
   },
   providers: [
     { provider: "fal", providerModelId: "fal-ai/kling-video/v2.6/pro/image-to-video" },
-    { provider: "kie", providerModelId: "PLACEHOLDER_kie_kling_v26_pro" },
+    { provider: "kie", providerModelId: "kling-2.6/image-to-video", paramMapping: { start_image_url: "image_urls", generate_audio: "sound" }, paramOverrides: { negative_prompt: { status: "disabled" }, end_image_url: { status: "disabled" }, voice_ids: { status: "disabled" } } },
   ],
   params: [
     {
@@ -638,7 +644,7 @@ const klingV3Pro: VideoModelConfig = {
   },
   providers: [
     { provider: "fal", providerModelId: "fal-ai/kling-video/v3/pro/image-to-video" },
-    { provider: "kie", providerModelId: "PLACEHOLDER_kie_kling_v3_pro" },
+    { provider: "kie", providerModelId: "kling-3.0/video", paramMapping: { start_image_url: "image_urls", generate_audio: "sound" }, paramOverrides: { negative_prompt: { status: "disabled" }, cfg_scale: { status: "disabled" } } },
   ],
   params: [
     {
@@ -740,7 +746,7 @@ const veo31: VideoModelConfig = {
   },
   providers: [
     { provider: "fal", providerModelId: "fal-ai/veo3.1/image-to-video" },
-    { provider: "kie", providerModelId: "PLACEHOLDER_kie_veo_31" },
+    { provider: "kie", providerModelId: "veo3", paramMapping: { image_url: "imageUrls" }, paramOverrides: { negative_prompt: { status: "disabled" }, seed: { status: "disabled" }, auto_fix: { status: "disabled" }, resolution: { status: "disabled" } } },
   ],
   params: [
     {
@@ -834,7 +840,7 @@ const veo31FirstLastFrame: VideoModelConfig = {
   },
   providers: [
     { provider: "fal", providerModelId: "fal-ai/veo3.1/first-last-frame-to-video" },
-    { provider: "kie", providerModelId: "PLACEHOLDER_kie_veo_31_first_last_frame" },
+    { provider: "kie", providerModelId: "veo3", paramMapping: { first_frame_url: "imageUrls" }, paramOverrides: { negative_prompt: { status: "disabled" }, seed: { status: "disabled" }, auto_fix: { status: "disabled" }, resolution: { status: "disabled" } } },
   ],
   params: [
     {
@@ -933,7 +939,7 @@ const sora2Pro: VideoModelConfig = {
   },
   providers: [
     { provider: "fal", providerModelId: "fal-ai/sora-2/image-to-video/pro" },
-    { provider: "kie", providerModelId: "PLACEHOLDER_kie_sora_2_pro" },
+    { provider: "kie", providerModelId: "sora-2-pro-image-to-video", paramMapping: { image_url: "image_urls" }, paramOverrides: { delete_video: { status: "disabled" } } },
   ],
   params: [
     {
@@ -991,6 +997,197 @@ const sora2Pro: VideoModelConfig = {
 };
 
 /**
+ * Sora 2 Standard - Image to Video
+ * OpenAI's stable image-to-video model via KIE
+ */
+const sora2Standard: VideoModelConfig = {
+  id: "sora-2-standard",
+  name: "Sora 2 Standard",
+  description:
+    "OpenAI's stable image-to-video generation model for reliable video creation",
+  imageParams: {
+    sourceImage: "image_url",
+  },
+  providers: [
+    { provider: "kie", providerModelId: "sora-2-image-to-video", paramMapping: { image_url: "image_urls" } },
+  ],
+  params: [
+    {
+      name: "prompt",
+      label: "Prompt",
+      type: "string",
+      required: true,
+      description: "The text prompt describing the video to generate",
+    },
+    {
+      name: "image_url",
+      label: "Source Image",
+      type: "string",
+      required: true,
+      description: "The URL of the image to use as the first frame",
+    },
+    {
+      name: "aspect_ratio",
+      label: "Aspect Ratio",
+      type: "enum",
+      required: false,
+      default: "landscape",
+      options: ["landscape", "portrait"],
+      description: "Aspect ratio of the generated video",
+    },
+    {
+      name: "n_frames",
+      label: "Frame Count",
+      type: "enum",
+      required: false,
+      default: "10",
+      options: ["10", "15"],
+      description: "Number of frames (10 ≈ short clip, 15 ≈ longer clip)",
+    },
+  ],
+};
+
+/**
+ * Sora 2 Standard - Text to Video
+ * OpenAI's stable text-to-video model via KIE
+ */
+const sora2TextToVideo: VideoModelConfig = {
+  id: "sora-2-text-to-video",
+  name: "Sora 2 Text-to-Video",
+  description:
+    "OpenAI's stable text-to-video generation model — no source image required",
+  providers: [
+    { provider: "kie", providerModelId: "sora-2-text-to-video" },
+  ],
+  params: [
+    {
+      name: "prompt",
+      label: "Prompt",
+      type: "string",
+      required: true,
+      description: "The text prompt describing the video to generate",
+    },
+    {
+      name: "aspect_ratio",
+      label: "Aspect Ratio",
+      type: "enum",
+      required: false,
+      default: "landscape",
+      options: ["landscape", "portrait"],
+      description: "Aspect ratio of the generated video",
+    },
+    {
+      name: "n_frames",
+      label: "Frame Count",
+      type: "enum",
+      required: false,
+      default: "10",
+      options: ["10", "15"],
+      description: "Number of frames (10 ≈ short clip, 15 ≈ longer clip)",
+    },
+  ],
+};
+
+/**
+ * Sora 2 Pro - Text to Video
+ * OpenAI's high-quality text-to-video model via KIE
+ */
+const sora2ProTextToVideo: VideoModelConfig = {
+  id: "sora-2-pro-text-to-video",
+  name: "Sora 2 Pro Text-to-Video",
+  description:
+    "OpenAI's high-quality text-to-video generation model — no source image required",
+  providers: [
+    { provider: "kie", providerModelId: "sora-2-pro-text-to-video" },
+  ],
+  params: [
+    {
+      name: "prompt",
+      label: "Prompt",
+      type: "string",
+      required: true,
+      description: "The text prompt describing the video to generate",
+    },
+    {
+      name: "aspect_ratio",
+      label: "Aspect Ratio",
+      type: "enum",
+      required: false,
+      default: "landscape",
+      options: ["landscape", "portrait"],
+      description: "Aspect ratio of the generated video",
+    },
+    {
+      name: "n_frames",
+      label: "Frame Count",
+      type: "enum",
+      required: false,
+      default: "10",
+      options: ["10", "15"],
+      description: "Number of frames (10 ≈ short clip, 15 ≈ longer clip)",
+    },
+    {
+      name: "size",
+      label: "Size",
+      type: "enum",
+      required: false,
+      default: "standard",
+      options: ["standard", "high"],
+      description: "Output size: standard or high quality",
+    },
+  ],
+};
+
+/**
+ * Kling 2.6 - Text to Video
+ * Kling's text-to-video model via KIE
+ */
+const kling26TextToVideo: VideoModelConfig = {
+  id: "kling-2.6-text-to-video",
+  name: "Kling 2.6 Text-to-Video",
+  description:
+    "Kling's text-to-video generation model with audio support — no source image required",
+  providers: [
+    { provider: "kie", providerModelId: "kling-2.6/text-to-video" },
+  ],
+  params: [
+    {
+      name: "prompt",
+      label: "Prompt",
+      type: "string",
+      required: true,
+      description: "The text prompt describing the video to generate",
+    },
+    {
+      name: "sound",
+      label: "Generate Audio",
+      type: "boolean",
+      required: false,
+      default: true,
+      description: "Whether to generate audio for the video",
+    },
+    {
+      name: "aspect_ratio",
+      label: "Aspect Ratio",
+      type: "enum",
+      required: false,
+      default: "16:9",
+      options: ["1:1", "16:9", "9:16"],
+      description: "Aspect ratio of the generated video",
+    },
+    {
+      name: "duration",
+      label: "Duration (seconds)",
+      type: "enum",
+      required: false,
+      default: "5",
+      options: ["5", "10"],
+      description: "Duration of the generated video in seconds",
+    },
+  ],
+};
+
+/**
  * Registry of all supported video models
  */
 export const VIDEO_MODELS: VideoModelConfig[] = [
@@ -1006,6 +1203,10 @@ export const VIDEO_MODELS: VideoModelConfig[] = [
   veo31,
   veo31FirstLastFrame,
   sora2Pro,
+  sora2Standard,
+  sora2TextToVideo,
+  sora2ProTextToVideo,
+  kling26TextToVideo,
 ];
 
 /**
@@ -1264,7 +1465,7 @@ export function getModelConfigForApi(modelId: string) {
     id: model.id,
     name: model.name,
     description: model.description,
-    imageParams: model.imageParams,
+    imageParams: model.imageParams || null,
     params: params
       .filter((p) => !p.status || p.status === "active")
       .map((p) => ({
@@ -1300,8 +1501,8 @@ function describeModelParams(model: VideoModelConfig): string {
   for (const param of params) {
     if (param.status === "hidden" || param.status === "disabled") continue;
     if (param.name === "prompt") continue;
-    if (param.name === model.imageParams.sourceImage) continue;
-    if (param.name === model.imageParams.endImage) continue;
+    if (model.imageParams && param.name === model.imageParams.sourceImage) continue;
+    if (model.imageParams && param.name === model.imageParams.endImage) continue;
 
     let desc = `- ${param.name}`;
     if (param.label) desc += ` (${param.label})`;
@@ -1350,11 +1551,12 @@ export function getVideoModelsPromptText(): string {
   for (const model of VIDEO_MODELS) {
     const header = `Model: "${model.name}" (modelId: "${model.id}")`;
     const desc = model.description ? `  ${model.description}` : "";
-    const supportsEndImage = model.imageParams.endImage ? "  Supports end image: yes" : "  Supports end image: no";
+    const modelType = model.imageParams ? "  Type: image-to-video (requires source image)" : "  Type: text-to-video (no source image needed)";
+    const supportsEndImage = model.imageParams?.endImage ? "  Supports end image: yes" : "";
     const params = describeModelParams(model);
 
     sections.push(
-      [header, desc, supportsEndImage, "  Parameters:", params.split("\n").map((l) => "  " + l).join("\n")].filter(Boolean).join("\n")
+      [header, desc, modelType, supportsEndImage, "  Parameters:", params.split("\n").map((l) => "  " + l).join("\n")].filter(Boolean).join("\n")
     );
   }
 

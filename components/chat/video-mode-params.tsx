@@ -109,8 +109,8 @@ export default function VideoModeParams({
     const initialParams: Record<string, any> = {};
     for (const param of model.params) {
       if (
-        param.name === model.imageParams.sourceImage ||
-        param.name === model.imageParams.endImage ||
+        (model.imageParams && param.name === model.imageParams.sourceImage) ||
+        (model.imageParams && param.name === model.imageParams.endImage) ||
         param.name === "prompt" ||
         param.status === "hidden" ||
         param.status === "disabled"
@@ -157,8 +157,8 @@ export default function VideoModeParams({
     return selectedModel.params.filter(
       (p) =>
         p.name !== "prompt" &&
-        p.name !== selectedModel.imageParams.sourceImage &&
-        p.name !== selectedModel.imageParams.endImage &&
+        p.name !== selectedModel.imageParams?.sourceImage &&
+        p.name !== selectedModel.imageParams?.endImage &&
         p.status !== "hidden" &&
         p.status !== "disabled"
     );

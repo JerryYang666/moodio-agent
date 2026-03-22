@@ -814,8 +814,8 @@ export class Agent1 implements Agent {
         for (const param of modelApiConfig.params) {
           if (
             param.name === "prompt" ||
-            param.name === model.imageParams.sourceImage ||
-            param.name === model.imageParams.endImage
+            (model.imageParams && param.name === model.imageParams.sourceImage) ||
+            (model.imageParams && param.name === model.imageParams.endImage)
           ) continue;
           if (videoConfig[param.name] !== undefined) {
             videoParams[param.name] = videoConfig[param.name];

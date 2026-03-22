@@ -8,6 +8,7 @@ import {
   getVideoModel,
   validateAndMergeParams,
   DEFAULT_VIDEO_MODEL_ID,
+  TEXT_TO_VIDEO_PLACEHOLDER_IMAGE_ID,
 } from "@/lib/video/models";
 import { deductCredits, assertSufficientCredits, InsufficientCreditsError } from "@/lib/credits";
 import { calculateCost } from "@/lib/pricing";
@@ -62,24 +63,28 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate required source image
-    if (!sourceImageId) {
+    // Validate required source image (only for image-to-video models)
+    const isTextToVideo = !model.imageParams;
+
+    if (!isTextToVideo && !sourceImageId) {
       return NextResponse.json(
-        { error: "sourceImageId is required" },
+        { error: "sourceImageId is required for this model" },
         { status: 400 }
       );
     }
 
     // Build the full params with image URLs
-    const fullParams = {
-      ...params,
-      [model.imageParams.sourceImage]: getSignedImageUrl(sourceImageId),
-    };
-
-    // Add end image if provided and model supports it
-    if (endImageId && model.imageParams.endImage) {
-      fullParams[model.imageParams.endImage] = getSignedImageUrl(endImageId);
+    const fullParams = { ...params };
+    if (!isTextToVideo && sourceImageId) {
+      fullParams[model.imageParams!.sourceImage] = getSignedImageUrl(sourceImageId);
+      if (endImageId && model.imageParams!.endImage) {
+        fullParams[model.imageParams!.endImage] = getSignedImageUrl(endImageId);
+      }
     }
+
+    const effectiveSourceImageId = isTextToVideo
+      ? TEXT_TO_VIDEO_PLACEHOLDER_IMAGE_ID
+      : sourceImageId;
 
     // Validate and merge with defaults
     let mergedParams: Record<string, any>;
@@ -133,7 +138,7 @@ export async function POST(request: NextRequest) {
         userId: payload.userId,
         modelId,
         status: "pending",
-        sourceImageId,
+        sourceImageId: effectiveSourceImageId,
         endImageId: endImageId || null,
         params: mergedParams,
       })
@@ -177,7 +182,7 @@ export async function POST(request: NextRequest) {
           generationId: generation.id,
           providerRequestId: requestId,
           modelId,
-          sourceImageId,
+          sourceImageId: effectiveSourceImageId,
           endImageId: endImageId || null,
           params: mergedParams,
           cost,
@@ -190,7 +195,7 @@ export async function POST(request: NextRequest) {
         recordResearchEvent({
           userId: payload.userId,
           eventType: "video_generation_started",
-          imageId: sourceImageId,
+          imageId: effectiveSourceImageId,
           metadata: {
             modelId,
             modelName: model.name,

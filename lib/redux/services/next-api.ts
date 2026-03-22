@@ -11,7 +11,7 @@ export interface CreditsBalanceResponse {
 // Types for video generation
 export interface GenerateVideoRequest {
   modelId?: string;
-  sourceImageId: string;
+  sourceImageId: string | null;
   endImageId?: string | null;
   params: Record<string, unknown>;
 }
