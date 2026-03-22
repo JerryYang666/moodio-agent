@@ -1351,8 +1351,21 @@ function AssetCardContent({
     }
     case "link":
       return <LinkAsset asset={asset} />;
-    case "video_suggest":
-      return <VideoSuggestAsset asset={asset} onImageLoad={onImageLoad} onContentCommit={onVideoSuggestCommit} />;
+    case "video_suggest": {
+      const vsLock = textLocks?.get(asset.id);
+      const isVsLockedByOther = !!vsLock && vsLock.userId !== currentUserId;
+      return (
+        <VideoSuggestAsset
+          asset={asset}
+          onImageLoad={onImageLoad}
+          onContentCommit={onVideoSuggestCommit}
+          sendEvent={sendEvent}
+          currentUserId={currentUserId}
+          isLockedByOther={isVsLockedByOther}
+          lockInfo={isVsLockedByOther ? vsLock : undefined}
+        />
+      );
+    }
     case "table": {
       const assetPrefix = `${asset.id}:`;
       const assetCellLocks = new Map<string, { userId: string; sessionId: string; firstName: string }>();

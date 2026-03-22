@@ -136,6 +136,19 @@ export default function DesktopDetailPage({
             payload: { assetId, metadata: { content } },
           });
         }
+      } else if (event.type === "video_suggest_updated") {
+        const { assetId, title, videoIdea } = event.payload || {};
+        if (assetId) {
+          const updates: Record<string, unknown> = {};
+          if (typeof title === "string") updates.title = title;
+          if (typeof videoIdea === "string") updates.videoIdea = videoIdea;
+          if (Object.keys(updates).length > 0) {
+            applyRemoteEvent({
+              type: "asset_updated",
+              payload: { assetId, metadata: updates },
+            });
+          }
+        }
       } else if (event.type === "table_generating") {
         const posX = typeof event.payload?.posX === "number" ? event.payload.posX : 0;
         const posY = typeof event.payload?.posY === "number" ? event.payload.posY : 0;
@@ -665,17 +678,13 @@ export default function DesktopDetailPage({
         payload: { assetId, metadata: updates },
       });
 
-      // Persist to DB only (no chat sync)
+      // Persist to DB via server-side read-modify-write (no GET needed)
       try {
-        const existing = await fetch(`/api/desktop/${desktopId}/assets/${assetId}`).then((r) => r.json());
-        if (existing?.asset) {
-          const newMeta = { ...existing.asset.metadata, ...updates };
-          await fetch(`/api/desktop/${desktopId}/assets/${assetId}`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ metadata: newMeta }),
-          });
-        }
+        await fetch(`/api/desktop/${desktopId}/assets/${assetId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ videoSuggestPatch: updates }),
+        });
       } catch (error) {
         console.error("Failed to save video suggest content:", error);
       }
