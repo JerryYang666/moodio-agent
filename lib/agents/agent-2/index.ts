@@ -221,6 +221,7 @@ export class Agent2 implements Agent {
     referenceImages?: ReferenceImageEntry[],
     maxImageQuantity?: number,
     expertise?: Expertise,
+    persistentTextChunk?: string,
   ): Promise<ParallelAgentResponse> {
     const startTime = requestStartTime || Date.now();
     const variantTimestamp = messageTimestamp || Date.now();
@@ -292,6 +293,7 @@ export class Agent2 implements Agent {
               imageIds: allImageIds,
               imageBase64Promises,
               referenceImages: refImages,
+              persistentTextChunk,
               precisionEditing,
               aspectRatioOverride,
               imageSizeOverride,
@@ -390,6 +392,7 @@ export class Agent2 implements Agent {
       systemPromptOverride: ctx.systemPromptOverride,
       maxImageQuantity: ctx.maxImageQuantity,
       expertise: ctx.expertise,
+      persistentTextChunk: ctx.persistentTextChunk,
     });
 
     // 2. Parse input

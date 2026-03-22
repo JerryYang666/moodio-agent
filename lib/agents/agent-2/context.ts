@@ -29,6 +29,9 @@ export interface RequestContext {
   imageBase64Promises: Promise<string | undefined>[];
   referenceImages: ReferenceImageEntry[];
 
+  // Persistent chat context
+  persistentTextChunk: string;
+
   // User overrides that directly control tool behavior
   precisionEditing: boolean;
   aspectRatioOverride?: string;
@@ -65,6 +68,7 @@ export interface CreateRequestContextInput {
   imageIds?: string[];
   imageBase64Promises?: Promise<string | undefined>[];
   referenceImages?: ReferenceImageEntry[];
+  persistentTextChunk?: string;
   precisionEditing?: boolean;
   aspectRatioOverride?: string;
   imageSizeOverride?: ImageSize;
@@ -113,6 +117,7 @@ export function createRequestContext(input: CreateRequestContextInput): RequestC
     imageIds: input.imageIds || [],
     imageBase64Promises: input.imageBase64Promises || [],
     referenceImages: input.referenceImages || [],
+    persistentTextChunk: input.persistentTextChunk || "",
     precisionEditing: input.precisionEditing || false,
     aspectRatioOverride: validatedAspectRatio,
     imageSizeOverride: validatedImageSize,

@@ -151,11 +151,6 @@ export interface MessageMetadata {
   aspectRatio?: string;
   imageQuantity?: number;
   precisionEditing?: boolean;
-  referenceImages?: Array<{
-    imageId: string;
-    tag?: string;
-    title?: string;
-  }>;
   videoModelId?: string;
   videoParams?: Record<string, any>;
 }

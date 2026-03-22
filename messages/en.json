@@ -217,7 +217,15 @@
     "tagStyle": "Style",
     "selectTag": "Select tag",
     "collapseReferenceImages": "Collapse reference images",
-    "expandReferenceImages": "Expand reference images"
+    "expandReferenceImages": "Expand reference images",
+    "persistentAssets": "Persistent Assets",
+    "persistentAssetsInfo": "Items here are always included in every message, not subject to context limits.",
+    "persistentTextChunk": "Persistent Text",
+    "persistentTextChunkPlaceholder": "Add persistent context, instructions, or notes that will be included in every message...",
+    "persistentTextChunkCount": "{count}/{max}",
+    "persistentAssetsSaved": "Persistent assets saved",
+    "persistentAssetsSaving": "Saving...",
+    "persistentAssetsSaveError": "Failed to save persistent assets"
   },
   "profile": {
     "title": "Profile Settings",

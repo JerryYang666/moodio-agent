@@ -41,7 +41,7 @@ export async function GET(
       return NextResponse.json({ error: "Chat not found" }, { status: 404 });
     }
 
-    const messages = await getChatHistory(chatId);
+    const { messages, persistentAssets } = await getChatHistory(chatId);
 
     // Collect direct_video generation IDs so we can reconcile with DB state
     const directVideoGenerationIds: string[] = [];
@@ -235,13 +235,26 @@ export async function GET(
       });
 
       waitUntil(
-        saveChatHistory(chatId, updatedForS3).catch((err) => {
+        saveChatHistory(chatId, updatedForS3, persistentAssets).catch((err) => {
           console.error("[Chat GET] Background S3 update failed:", err);
         })
       );
     }
 
-    return NextResponse.json({ chat, messages: processedMessages });
+    // Add derived URLs for persistent reference images
+    const processedPersistentAssets = {
+      ...persistentAssets,
+      referenceImages: persistentAssets.referenceImages.map((img) => ({
+        ...img,
+        imageUrl: getImageUrl(img.imageId),
+      })),
+    };
+
+    return NextResponse.json({
+      chat,
+      messages: processedMessages,
+      persistentAssets: processedPersistentAssets,
+    });
   } catch (error) {
     console.error("Error fetching chat:", error);
     return NextResponse.json(
