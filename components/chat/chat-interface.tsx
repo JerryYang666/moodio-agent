@@ -26,6 +26,7 @@ import AssetPickerModal, { type AssetSummary } from "./asset-picker-modal";
 import { PersistentAssetsPanel } from "./persistent-assets-panel";
 import { useGetPersistentAssetsQuery, useUpdatePersistentAssetsMutation } from "@/lib/redux/services/next-api";
 import { siteConfig } from "@/config/site";
+import { useFeatureFlag } from "@/lib/feature-flags";
 import { useVoiceRecorder } from "./use-voice-recorder";
 import { SYSTEM_PROMPT_STORAGE_KEY } from "@/components/test-kit";
 import {
@@ -297,6 +298,7 @@ export default function ChatInterface({
     skip: !chatId,
   });
   const [updatePersistentAssets] = useUpdatePersistentAssetsMutation();
+  const showReferenceImages = useFeatureFlag<boolean>("reference_images") ?? false;
   const persistentAssets = persistentAssetsData?.persistentAssets ?? {
     ...EMPTY_PERSISTENT_ASSETS,
     referenceImages: [] as Array<PersistentReferenceImage & { imageUrl?: string }>,
@@ -3540,12 +3542,14 @@ export default function ChatInterface({
       )}
 
       {/* Persistent Assets Panel - positioned at top-right of chat */}
-      {chatId && (
-        <PersistentAssetsPanel
-          chatId={chatId}
-          persistentAssets={persistentAssets}
-          onOpenAssetPicker={openPersistentAssetPicker}
-        />
+      {chatId && showReferenceImages && (
+        <div className="absolute top-3 right-3 z-40">
+          <PersistentAssetsPanel
+            chatId={chatId}
+            persistentAssets={persistentAssets}
+            onOpenAssetPicker={openPersistentAssetPicker}
+          />
+        </div>
       )}
 
       <ChatInput

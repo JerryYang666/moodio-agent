@@ -4,7 +4,6 @@ import { useState, useCallback, useEffect } from "react";
 import { useTranslations } from "next-intl";
 import { Button } from "@heroui/button";
 import { Popover, PopoverTrigger, PopoverContent } from "@heroui/popover";
-import { Tooltip } from "@heroui/tooltip";
 import { Textarea } from "@heroui/input";
 import { Dropdown, DropdownTrigger, DropdownMenu, DropdownItem } from "@heroui/dropdown";
 import { Badge } from "@heroui/badge";
@@ -147,26 +146,22 @@ export function PersistentAssetsPanel({
       offset={8}
     >
       <PopoverTrigger>
-        <div>
-          <Tooltip content={t("persistentAssets")}>
-            <Badge
-              content={assetCount}
-              color="primary"
-              size="sm"
-              isInvisible={assetCount === 0}
-              placement="top-right"
-            >
-              <Button
-                isIconOnly
-                variant="light"
-                size="sm"
-                aria-label={t("persistentAssets")}
-              >
-                <Pin size={18} />
-              </Button>
-            </Badge>
-          </Tooltip>
-        </div>
+        <Button
+          isIconOnly
+          variant="light"
+          size="sm"
+          aria-label={t("persistentAssets")}
+        >
+          <Badge
+            content={assetCount}
+            color="primary"
+            size="sm"
+            isInvisible={assetCount === 0}
+            placement="top-right"
+          >
+            <Pin size={18} />
+          </Badge>
+        </Button>
       </PopoverTrigger>
       <PopoverContent className="w-[400px] max-h-[500px] overflow-y-auto p-0">
         <div className="p-4 space-y-4">
