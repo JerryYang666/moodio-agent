@@ -1,4 +1,6 @@
 import type { VideoProviderClient, VideoGenerationResult } from "./index";
+import sharp from "sharp";
+import { uploadTempImage, getSignedTempImageUrl } from "@/lib/storage/s3";
 
 const KIE_API_BASE = "https://api.kie.ai";
 const KIE_FILE_UPLOAD_BASE = "https://kieai.redpandaai.co";
@@ -74,7 +76,7 @@ async function inferExtension(url: string): Promise<string> {
       const ext = `.${match[1].toLowerCase()}`;
       if (Object.values(MIME_TO_EXT).includes(ext)) return ext;
     }
-  } catch {}
+  } catch { }
 
   try {
     const head = await fetch(url, { method: "HEAD" });
@@ -134,6 +136,34 @@ async function reuploadSingle(value: string): Promise<string> {
 
 async function reuploadArray(value: string[]): Promise<string[]> {
   return Promise.all(value.map(uploadToKie));
+}
+
+const KIE_SUPPORTED_IMAGE_EXTS = new Set([".jpg", ".jpeg", ".png"]);
+
+/**
+ * Ensure an image URL is in a format KIE accepts for elements (jpeg/png only).
+ * If the image is webp/gif/etc, fetch it, convert to JPEG via sharp,
+ * upload the converted buffer to S3, and return a signed URL.
+ */
+async function ensureKieSupportedFormat(url: string): Promise<string> {
+  const ext = await inferExtension(url);
+  if (KIE_SUPPORTED_IMAGE_EXTS.has(ext)) return url;
+
+  console.log(
+    `[Kie Element] Converting ${ext} image to JPEG for KIE compatibility`
+  );
+
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Failed to fetch image for conversion: ${res.status}`);
+  const buffer = Buffer.from(await res.arrayBuffer());
+  const jpegBuffer = await sharp(buffer).jpeg({ quality: 90 }).toBuffer();
+  const imageId = await uploadTempImage(jpegBuffer, "image/jpeg");
+  return getSignedTempImageUrl(imageId);
+}
+
+async function reuploadElementArray(urls: string[]): Promise<string[]> {
+  const converted = await Promise.all(urls.map(ensureKieSupportedFormat));
+  return Promise.all(converted.map(uploadToKie));
 }
 
 // ---------------------------------------------------------------------------
@@ -202,7 +232,7 @@ async function prepareInputParams(
     for (const elem of prepared.kling_elements) {
       if (Array.isArray(elem.element_input_urls)) {
         uploadTasks.push(
-          reuploadArray(elem.element_input_urls).then((urls) => {
+          reuploadElementArray(elem.element_input_urls).then((urls) => {
             elem.element_input_urls = urls;
           })
         );

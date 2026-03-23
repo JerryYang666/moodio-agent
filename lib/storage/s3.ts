@@ -79,6 +79,59 @@ export async function uploadImage(
 }
 
 /**
+ * Upload a temporary image to S3 under the temp-images/ prefix.
+ * Skips server-side compression — caller is responsible for format.
+ * These are intermediate artifacts (e.g. format-converted element images)
+ * that don't need to be in the main images collection.
+ */
+export async function uploadTempImage(
+  file: Buffer,
+  contentType: string
+): Promise<string> {
+  const imageId = randomUUID();
+  const key = `temp-images/${imageId}`;
+
+  await s3Client.send(
+    new PutObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: key,
+      Body: file,
+      ContentType: contentType,
+    })
+  );
+
+  return imageId;
+}
+
+/**
+ * Generate a signed CloudFront URL for a temp image.
+ */
+export function getSignedTempImageUrl(
+  imageId: string,
+  expirationSeconds?: number
+): string {
+  if (
+    !CLOUDFRONT_DOMAIN ||
+    !CLOUDFRONT_KEY_PAIR_ID ||
+    !CLOUDFRONT_PRIVATE_KEY
+  ) {
+    return `https://${CLOUDFRONT_DOMAIN || "s3-fallback"}/temp-images/${imageId}`;
+  }
+
+  const url = `https://${CLOUDFRONT_DOMAIN}/temp-images/${imageId}`;
+  const expiration =
+    expirationSeconds || siteConfig.cloudfront.signedUrlExpirationSeconds;
+  const dateLessThan = new Date(Date.now() + expiration * 1000);
+
+  return getSignedUrl({
+    url,
+    keyPairId: CLOUDFRONT_KEY_PAIR_ID,
+    dateLessThan: dateLessThan.toISOString(),
+    privateKey: CLOUDFRONT_PRIVATE_KEY,
+  });
+}
+
+/**
  * Generate a unique image ID for tracking purposes
  * Use this to pre-generate an ID before starting image generation
  * Then pass it to uploadImage() when the image is ready
