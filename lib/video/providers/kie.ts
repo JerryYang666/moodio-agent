@@ -164,6 +164,7 @@ interface KieTaskDetailResponse {
  *  1. Wrap bare string values whose key ends with `_urls` into arrays.
  *  2. Re-upload any external image URLs via Kie's File Upload API so
  *     the task endpoint can reliably determine the file type.
+ *  3. Re-upload image URLs nested inside kling_elements[].element_input_urls.
  */
 async function prepareInputParams(
   params: Record<string, any>
@@ -197,6 +198,18 @@ async function prepareInputParams(
     }
   }
 
+  if (Array.isArray(prepared.kling_elements)) {
+    for (const elem of prepared.kling_elements) {
+      if (Array.isArray(elem.element_input_urls)) {
+        uploadTasks.push(
+          reuploadArray(elem.element_input_urls).then((urls) => {
+            elem.element_input_urls = urls;
+          })
+        );
+      }
+    }
+  }
+
   await Promise.all(uploadTasks);
   return prepared;
 }
@@ -223,6 +236,8 @@ function applyKlingTransforms(params: Record<string, any>): Record<string, any> 
     out.image_urls = [out.start_image_url];
     delete out.start_image_url;
   }
+  if (out.mode === undefined) out.mode = "pro";
+  if (out.multi_shots === undefined) out.multi_shots = false;
   return out;
 }
 

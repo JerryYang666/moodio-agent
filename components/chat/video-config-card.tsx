@@ -36,6 +36,9 @@ import { useGenerateVideoMutation } from "@/lib/redux/services/next-api";
 import { getViewportVisibleCenterPosition } from "@/lib/desktop/types";
 import type { MessageContentPart } from "@/lib/llm/types";
 import { getVideoModel, type VideoModelParam } from "@/lib/video/models";
+import { MultiShotEditor } from "./multi-shot-editor";
+import { KlingElementEditor } from "./kling-element-editor";
+import type { MultiPromptShot, KlingElement } from "@/lib/video/models";
 
 type AgentVideoPart = Extract<MessageContentPart, { type: "agent_video" }>;
 
@@ -108,6 +111,19 @@ export default function VideoConfigCard({
         }
       }
     }
+    // Resolve image IDs in kling_elements to display URLs
+    if (Array.isArray(initial.kling_elements)) {
+      initial.kling_elements = initial.kling_elements.map(
+        (el: KlingElement) => ({
+          ...el,
+          element_input_urls: (el.element_input_urls || []).map((idOrUrl: string) => {
+            if (idOrUrl.startsWith("http")) return idOrUrl;
+            const match = sourceImages.find((img) => img.imageId === idOrUrl);
+            return match ? match.imageUrl : idOrUrl;
+          }),
+        })
+      );
+    }
     return initial;
   });
 
@@ -138,7 +154,7 @@ export default function VideoConfigCard({
   }, [modelConfig]);
 
   const gridParams = useMemo(
-    () => visibleParams.filter((p) => p.type !== "string" && p.type !== "asset"),
+    () => visibleParams.filter((p) => p.type !== "string" && p.type !== "asset" && p.type !== "multi_prompt" && p.type !== "kling_elements"),
     [visibleParams]
   );
   const textParams = useMemo(
@@ -147,6 +163,14 @@ export default function VideoConfigCard({
   );
   const assetParams = useMemo(
     () => visibleParams.filter((p) => p.type === "asset"),
+    [visibleParams]
+  );
+  const hasMultiPrompt = useMemo(
+    () => visibleParams.some((p) => p.type === "multi_prompt"),
+    [visibleParams]
+  );
+  const hasKlingElements = useMemo(
+    () => visibleParams.some((p) => p.type === "kling_elements"),
     [visibleParams]
   );
 
@@ -693,6 +717,26 @@ export default function VideoConfigCard({
             </div>
           );
         })}
+
+        {/* Multi-Shot Editor */}
+        {hasMultiPrompt && editedParams.multi_shots && (
+          <MultiShotEditor
+            shots={(editedParams.multi_prompt as MultiPromptShot[]) || []}
+            onChange={(shots) => handleParamChange("multi_prompt", shots)}
+            disabled={!isEditable}
+            compact
+          />
+        )}
+
+        {/* Kling Element Editor */}
+        {hasKlingElements && (
+          <KlingElementEditor
+            elements={(editedParams.kling_elements as KlingElement[]) || []}
+            onChange={(elements) => handleParamChange("kling_elements", elements)}
+            disabled={!isEditable}
+            compact
+          />
+        )}
 
         {/* Asset-type params (type: "asset") - preview thumbnails */}
         {assetParams.map((param) => {

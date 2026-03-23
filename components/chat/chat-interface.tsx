@@ -16,7 +16,7 @@ import {
   NotificationPermissionModalRef,
 } from "@/components/notification-permission-modal";
 import { Message, MessageContentPart, isGeneratedImagePart } from "@/lib/llm/types";
-import { getVideoModel } from "@/lib/video/models";
+import { getVideoModel, type KlingElement } from "@/lib/video/models";
 import ImageDetailModal, { ImageInfo } from "./image-detail-modal";
 import ImageDrawingModal from "./image-drawing-modal";
 import ChatMessage from "./chat-message";
@@ -287,8 +287,10 @@ export default function ChatInterface({
   const [isAssetPickerOpen, setIsAssetPickerOpen] = useState(false);
   const toggleAssetPicker = useCallback(() => setIsAssetPickerOpen((v) => !v), []);
   // Track which picker mode is active: "pending" for regular images, "persistent" for persistent assets, "assetParam" for type:"asset" params
-  const [assetPickerMode, setAssetPickerMode] = useState<"pending" | "persistent" | "assetParam">("pending");
+  const [assetPickerMode, setAssetPickerMode] = useState<"pending" | "persistent" | "assetParam" | "elementImages">("pending");
   const [activeAssetParamName, setActiveAssetParamName] = useState<string | null>(null);
+  const [activeElementIndex, setActiveElementIndex] = useState<number | null>(null);
+  const [activeElementMaxImages, setActiveElementMaxImages] = useState(4);
   const [assetParamValues, setAssetParamValues] = useState<Record<string, AssetParamValue | null>>({});
   const [precisionEditing, setPrecisionEditing] = useState(false);
   
@@ -525,6 +527,7 @@ export default function ChatInterface({
         searchParams.set("modelId", menuState.videoModelId);
         Object.entries(menuState.videoParams).forEach(([key, value]) => {
           if (key !== "prompt" && value !== undefined && value !== null && value !== "") {
+            if (Array.isArray(value) || (typeof value === "object" && value !== null)) return;
             searchParams.set(key, String(value));
           }
         });
@@ -555,6 +558,15 @@ export default function ChatInterface({
     if (menuState.mode !== "video" || !menuState.videoModelId) return false;
     const model = getVideoModel(menuState.videoModelId);
     return !!model?.imageParams;
+  }, [menuState.mode, menuState.videoModelId]);
+
+  const videoModelParams = useMemo(() => {
+    if (menuState.mode !== "video" || !menuState.videoModelId) return [];
+    const model = getVideoModel(menuState.videoModelId);
+    if (!model) return [];
+    return model.params.filter(
+      (p) => p.status !== "hidden" && p.status !== "disabled"
+    );
   }, [menuState.mode, menuState.videoModelId]);
 
   // Compute asset param slots from the current video model (type: "asset" params)
@@ -1370,6 +1382,13 @@ export default function ChatInterface({
     setIsAssetPickerOpen(true);
   }, []);
 
+  const openElementImagePicker = useCallback((elementIndex: number, maxImages: number) => {
+    setActiveElementIndex(elementIndex);
+    setActiveElementMaxImages(maxImages);
+    setAssetPickerMode("elementImages");
+    setIsAssetPickerOpen(true);
+  }, []);
+
   // Clear an asset param value
   const clearAssetParam = useCallback((paramName: string) => {
     setAssetParamValues((prev) => ({ ...prev, [paramName]: null }));
@@ -1426,7 +1445,28 @@ export default function ChatInterface({
 
   const handleAssetUpload = useCallback(
     async (files: File[]) => {
-      if (assetPickerMode === "assetParam" && activeAssetParamName) {
+      if (assetPickerMode === "elementImages" && activeElementIndex !== null) {
+        const urls: string[] = [];
+        for (const file of files) {
+          const result = await uploadImage(file);
+          if (result.success) urls.push(result.data.imageUrl);
+        }
+        if (urls.length > 0) {
+          const elements = [...((menuState.videoParams?.kling_elements as KlingElement[]) || [])];
+          const el = elements[activeElementIndex];
+          if (el) {
+            elements[activeElementIndex] = {
+              ...el,
+              element_input_urls: [...el.element_input_urls, ...urls].slice(0, 4),
+            };
+            setMenuState((prev) => ({
+              ...prev,
+              videoParams: { ...prev.videoParams, kling_elements: elements },
+            }));
+          }
+        }
+        setActiveElementIndex(null);
+      } else if (assetPickerMode === "assetParam" && activeAssetParamName) {
         const file = files[0];
         if (!file) return;
         const result = await uploadImage(file);
@@ -1445,7 +1485,7 @@ export default function ChatInterface({
         await handleFilesUpload(files);
       }
     },
-    [assetPickerMode, activeAssetParamName, handleFilesUpload, uploadAndAddPersistentReferenceImage, uploadImage]
+    [assetPickerMode, activeAssetParamName, activeElementIndex, menuState.videoParams?.kling_elements, handleFilesUpload, uploadAndAddPersistentReferenceImage, uploadImage]
   );
 
   // Listen for asset selection events from the hover sidebar
@@ -1589,7 +1629,21 @@ export default function ChatInterface({
 
   const handleAssetPicked = useCallback(
     (asset: AssetSummary) => {
-      if (assetPickerMode === "assetParam" && activeAssetParamName) {
+      if (assetPickerMode === "elementImages" && activeElementIndex !== null) {
+        const elements = [...((menuState.videoParams?.kling_elements as KlingElement[]) || [])];
+        const el = elements[activeElementIndex];
+        if (el) {
+          elements[activeElementIndex] = {
+            ...el,
+            element_input_urls: [...el.element_input_urls, asset.imageUrl],
+          };
+          setMenuState((prev) => ({
+            ...prev,
+            videoParams: { ...prev.videoParams, kling_elements: elements },
+          }));
+        }
+        setActiveElementIndex(null);
+      } else if (assetPickerMode === "assetParam" && activeAssetParamName) {
         const displayUrl = asset.videoUrl || asset.imageUrl;
         setAssetParamValues((prev) => ({ ...prev, [activeAssetParamName]: { imageId: asset.imageId, displayUrl } }));
         setActiveAssetParamName(null);
@@ -1619,7 +1673,7 @@ export default function ChatInterface({
         });
       }
     },
-    [addAssetImage, addPersistentReferenceImage, assetPickerMode, activeAssetParamName, pendingVideos, t]
+    [addAssetImage, addPersistentReferenceImage, assetPickerMode, activeAssetParamName, activeElementIndex, menuState.videoParams?.kling_elements, pendingVideos, t]
   );
 
   const pendingImagesRef = useRef(pendingImages);
@@ -1630,7 +1684,22 @@ export default function ChatInterface({
 
   const handleAssetPickedMultiple = useCallback(
     async (assets: AssetSummary[]) => {
-      if (assetPickerMode === "persistent") {
+      if (assetPickerMode === "elementImages" && activeElementIndex !== null) {
+        const elements = [...((menuState.videoParams?.kling_elements as KlingElement[]) || [])];
+        const el = elements[activeElementIndex];
+        if (el) {
+          const newUrls = assets.map((a) => a.imageUrl);
+          elements[activeElementIndex] = {
+            ...el,
+            element_input_urls: [...el.element_input_urls, ...newUrls].slice(0, 4),
+          };
+          setMenuState((prev) => ({
+            ...prev,
+            videoParams: { ...prev.videoParams, kling_elements: elements },
+          }));
+        }
+        setActiveElementIndex(null);
+      } else if (assetPickerMode === "persistent") {
         for (const asset of assets) {
           if (persistentAssets.referenceImages.length >= MAX_PERSISTENT_REFERENCE_IMAGES) break;
           await addPersistentReferenceImage({
@@ -1661,7 +1730,7 @@ export default function ChatInterface({
         }
       }
     },
-    [addAssetImage, addPersistentReferenceImage, assetPickerMode, persistentAssets, t]
+    [addAssetImage, addPersistentReferenceImage, assetPickerMode, activeElementIndex, menuState.videoParams?.kling_elements, persistentAssets, t]
   );
 
   // Handler to open drawing modal for an image
@@ -3646,6 +3715,8 @@ export default function ChatInterface({
         videoCostLoading={videoCostLoading}
         videoModelSupportsEndImage={videoModelSupportsEndImage}
         videoModelHasImageParams={videoModelHasImageParams}
+        videoModelParams={videoModelParams}
+        onPickElementImages={openElementImagePicker}
         onHeightChange={handleChatInputHeightChange}
         assetParamSlots={assetParamSlots}
         assetParamValues={assetParamValues}
@@ -3661,14 +3732,18 @@ export default function ChatInterface({
         onUpload={handleAssetUpload}
         multiSelect={assetPickerMode !== "assetParam"}
         maxSelectCount={
-          assetPickerMode === "assetParam"
+          assetPickerMode === "elementImages"
+            ? activeElementMaxImages
+            : assetPickerMode === "assetParam"
             ? 1
             : assetPickerMode === "persistent"
             ? MAX_PERSISTENT_REFERENCE_IMAGES - persistentAssets.referenceImages.length
             : MAX_PENDING_IMAGES - pendingImagesRef.current.length
         }
         acceptTypes={
-          assetPickerMode === "persistent"
+          assetPickerMode === "elementImages"
+            ? ["image"]
+            : assetPickerMode === "persistent"
             ? ["image"]
             : assetPickerMode === "assetParam" && activeAssetParamName
             ? assetParamSlots.find((s) => s.name === activeAssetParamName)?.acceptTypes

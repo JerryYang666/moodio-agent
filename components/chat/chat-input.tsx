@@ -26,6 +26,9 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import MenuConfiguration, { MenuState } from "./menu-configuration";
+import { MultiShotEditor } from "./multi-shot-editor";
+import { KlingElementEditor } from "./kling-element-editor";
+import type { MultiPromptShot, KlingElement } from "@/lib/video/models";
 import { PendingImage, MAX_PENDING_IMAGES } from "./pending-image-types";
 import { PendingVideo, MAX_PENDING_VIDEOS } from "./pending-video-types";
 import clsx from "clsx";
@@ -110,6 +113,10 @@ interface ChatInputProps {
   videoModelSupportsEndImage?: boolean;
   /** Whether the selected video model has imageParams (first/last frame) */
   videoModelHasImageParams?: boolean;
+  /** Active visible params for the selected video model (provider-filtered) */
+  videoModelParams?: Array<{ name: string; type: string }>;
+  /** Opens the asset picker for element images. Called with (elementIndex, maxImages). */
+  onPickElementImages?: (elementIndex: number, maxImages: number) => void;
   /** Callback when the input container height changes */
   onHeightChange?: (height: number) => void;
   /** Asset param slots for type: "asset" video model params (rendered in Video Frames Area) */
@@ -166,6 +173,8 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
   videoCostLoading,
   videoModelSupportsEndImage,
   videoModelHasImageParams,
+  videoModelParams = [],
+  onPickElementImages,
   onHeightChange,
   assetParamSlots = [],
   assetParamValues = {},
@@ -211,9 +220,14 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
   }, [onHeightChange]);
 
   // Convert pending images to mention items for the textbox
+  const supportsElements = useMemo(
+    () => videoModelParams.some((p) => p.type === "kling_elements"),
+    [videoModelParams]
+  );
+
   const mentionItems: MentionItem[] = useMemo(() => {
-    return pendingImages
-      .filter((img) => !img.isUploading && !img.isCompressing) // Only show ready images
+    const imageItems = pendingImages
+      .filter((img) => !img.isUploading && !img.isCompressing)
       .map((img) => ({
         id: img.imageId,
         type: "image",
@@ -221,7 +235,25 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
         thumbnail: img.url,
         metadata: { source: img.source },
       }));
-  }, [pendingImages, t]);
+
+    if (!supportsElements || menuState.mode !== "video") return imageItems;
+
+    const klingElements = (menuState.videoParams?.kling_elements as KlingElement[]) || [];
+    const elementItems = klingElements
+      .filter((el) => el.name)
+      .map((el) => ({
+        id: el.name,
+        type: "element",
+        label: el.name,
+        thumbnail: el.element_input_urls[0] || undefined,
+        metadata: {
+          description: el.description,
+          element_input_urls: el.element_input_urls,
+        },
+      }));
+
+    return [...imageItems, ...elementItems];
+  }, [pendingImages, t, supportsElements, menuState.mode, menuState.videoParams?.kling_elements]);
 
   // Handle inserting a mention chip when clicking on a pending image
   const handleInsertImageMention = useCallback((imageId: string) => {
@@ -1367,6 +1399,68 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
               )}
             </Tooltip>
           </div>
+
+          {/* Multi-Shot Editor (above menu bar in video mode) */}
+          <AnimatePresence>
+            {isExpanded && menuState.mode === "video" &&
+              videoModelParams.some((p) => p.type === "multi_prompt") &&
+              menuState.videoParams?.multi_shots && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="overflow-hidden"
+              >
+                <div className="px-2 py-1.5 border-t border-divider">
+                  <MultiShotEditor
+                    shots={(menuState.videoParams?.multi_prompt as MultiPromptShot[]) || []}
+                    onChange={(shots) =>
+                      onMenuStateChange({
+                        ...menuState,
+                        videoParams: {
+                          ...menuState.videoParams,
+                          multi_prompt: shots,
+                        },
+                      })
+                    }
+                    compact
+                  />
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Kling Element Editor (above menu bar in video mode) */}
+          <AnimatePresence>
+            {isExpanded && menuState.mode === "video" &&
+              videoModelParams.some((p) => p.type === "kling_elements") && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="overflow-hidden"
+              >
+                <div className="px-2 py-1.5 border-t border-divider">
+                  <KlingElementEditor
+                    elements={(menuState.videoParams?.kling_elements as KlingElement[]) || []}
+                    onChange={(elements) =>
+                      onMenuStateChange({
+                        ...menuState,
+                        videoParams: {
+                          ...menuState.videoParams,
+                          kling_elements: elements,
+                        },
+                      })
+                    }
+                    onPickImages={onPickElementImages}
+                    compact
+                  />
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* Menu Configuration (Bottom) */}
           <AnimatePresence>

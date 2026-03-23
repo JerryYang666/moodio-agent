@@ -317,7 +317,7 @@ export default function VideoModeParams({
       );
     }
 
-    // Skip string_array in compact param bar (too complex for inline display)
+    // Skip string_array, multi_prompt, kling_elements in compact param bar
     return null;
   };
 

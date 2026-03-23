@@ -18,24 +18,25 @@ function prepareParams(params: Record<string, any>): Record<string, any> {
   const prepared: Record<string, any> = {};
 
   for (const [key, value] of Object.entries(params)) {
-    // Skip image URLs - they're not relevant for pricing
     if (key.includes("url") || key.includes("image")) continue;
+    if (Array.isArray(value) || (typeof value === "object" && value !== null)) continue;
 
     if (typeof value === "boolean") {
-      // Convert booleans to 1/0 for formula compatibility
       prepared[key] = value ? 1 : 0;
     } else if (typeof value === "string") {
-      // Try to parse as number
       const num = parseFloat(value);
       if (!isNaN(num)) {
         prepared[key] = num;
       } else {
-        // Keep string for comparison (e.g., resolution == "1080p")
         prepared[key] = value;
       }
     } else {
       prepared[key] = value;
     }
+  }
+
+  if (typeof prepared.mode === "string") {
+    prepared.mode_is_pro = prepared.mode === "pro" ? 1 : 0;
   }
 
   return prepared;

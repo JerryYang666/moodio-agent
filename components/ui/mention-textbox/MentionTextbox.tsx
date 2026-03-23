@@ -116,6 +116,21 @@ export const MentionTextbox = forwardRef<MentionTextboxRef, MentionTextboxProps>
           renderHTML({ node }) {
             const item = stateRef.current.mentionItems.find((i) => i.id === node.attrs.id);
             const thumbnail = item?.thumbnail;
+            const isElement = item?.type === "element";
+            
+            if (isElement) {
+              return [
+                "span",
+                { 
+                  class: "mention-chip mention-chip-element",
+                  "data-mention-id": node.attrs.id,
+                  "data-mention-label": node.attrs.label,
+                  "data-mention-type": "element",
+                },
+                ["span", { class: "mention-chip-element-icon" }, "✦"],
+                ["span", { class: "mention-chip-label" }, `@${node.attrs.label}`],
+              ];
+            }
             
             if (thumbnail) {
               return [
@@ -416,7 +431,10 @@ export const MentionTextbox = forwardRef<MentionTextboxRef, MentionTextboxProps>
             "[&_.mention-chip]:border [&_.mention-chip]:border-divider",
             "[&_.mention-chip-thumbnail]:w-4 [&_.mention-chip-thumbnail]:h-4",
             "[&_.mention-chip-thumbnail]:rounded-sm [&_.mention-chip-thumbnail]:object-cover",
-            "[&_.mention-chip-thumbnail]:mr-1"
+            "[&_.mention-chip-thumbnail]:mr-1",
+            "[&_.mention-chip-element]:bg-secondary-100 [&_.mention-chip-element]:border-secondary-200",
+            "[&_.mention-chip-element]:text-secondary-700",
+            "[&_.mention-chip-element-icon]:mr-0.5 [&_.mention-chip-element-icon]:text-secondary-500"
           )}
         />
 

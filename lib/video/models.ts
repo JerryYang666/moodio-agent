@@ -13,7 +13,20 @@ export type VideoModelParamType =
   | "boolean"
   | "enum"
   | "string_array"
-  | "asset";
+  | "asset"
+  | "multi_prompt"
+  | "kling_elements";
+
+export interface MultiPromptShot {
+  prompt: string;
+  duration: number;
+}
+
+export interface KlingElement {
+  name: string;
+  description: string;
+  element_input_urls: string[];
+}
 
 export type AssetAcceptType = "image" | "video";
 
@@ -647,8 +660,25 @@ const klingV3Pro: VideoModelConfig = {
     endImage: "end_image_url",
   },
   providers: [
-    { provider: "fal", providerModelId: "fal-ai/kling-video/v3/pro/image-to-video" },
-    { provider: "kie", providerModelId: "kling-3.0/video", paramMapping: { start_image_url: "image_urls", generate_audio: "sound" }, paramOverrides: { negative_prompt: { status: "disabled" }, cfg_scale: { status: "disabled" } } },
+    {
+      provider: "fal",
+      providerModelId: "fal-ai/kling-video/v3/pro/image-to-video",
+      paramOverrides: {
+        mode: { status: "disabled" },
+        multi_shots: { status: "disabled" },
+        multi_prompt: { status: "disabled" },
+        kling_elements: { status: "disabled" },
+      },
+    },
+    {
+      provider: "kie",
+      providerModelId: "kling-3.0/video",
+      paramMapping: { start_image_url: "image_urls", generate_audio: "sound" },
+      paramOverrides: {
+        negative_prompt: { status: "disabled" },
+        cfg_scale: { status: "disabled" },
+      },
+    },
   ],
   params: [
     {
@@ -657,7 +687,7 @@ const klingV3Pro: VideoModelConfig = {
       type: "string",
       required: false,
       description:
-        "Text prompt for video generation. Supports speech in quotes for audio generation.",
+        "Text prompt for video generation. Supports speech in quotes for audio generation. Use @element_name to reference elements.",
     },
     {
       name: "start_image_url",
@@ -706,6 +736,16 @@ const klingV3Pro: VideoModelConfig = {
       description: "The aspect ratio of the generated video frame",
     },
     {
+      name: "mode",
+      label: "Mode",
+      type: "enum",
+      required: false,
+      default: "pro",
+      options: ["std", "pro"],
+      description:
+        "Generation mode. std has standard resolution, pro has higher resolution",
+    },
+    {
       name: "negative_prompt",
       label: "Negative Prompt",
       type: "string",
@@ -732,6 +772,32 @@ const klingV3Pro: VideoModelConfig = {
       default: true,
       description:
         "Generate native audio for the video. Supports Chinese and English voice output.",
+    },
+    {
+      name: "multi_shots",
+      label: "Multi-Shot Mode",
+      type: "boolean",
+      required: false,
+      default: false,
+      description:
+        "Enable multi-shot mode. When true, uses multi_prompt array for per-shot prompts instead of the main prompt.",
+    },
+    {
+      name: "multi_prompt",
+      label: "Shot Prompts",
+      type: "multi_prompt",
+      required: false,
+      description:
+        "Shot prompts for multi-shot mode. Each shot has a prompt (max 500 chars) and duration (1-12s). Max 5 shots. Use @element_name to reference elements.",
+    },
+    {
+      name: "kling_elements",
+      label: "Element References",
+      type: "kling_elements",
+      required: false,
+      maxItems: 3,
+      description:
+        "Referenced elements. Define elements with a name, description, and 2-4 reference image IDs from the conversation. Reference in prompts using @element_name syntax. Max 3 elements.",
     },
   ],
 };
@@ -1450,6 +1516,98 @@ export function validateAndMergeParams(
           );
         }
         break;
+
+      case "multi_prompt":
+        if (!Array.isArray(userValue)) {
+          throw new Error(
+            `Parameter ${param.name} must be an array of shot objects`
+          );
+        }
+        if (userValue.length > 5) {
+          throw new Error(
+            `Parameter ${param.name} allows maximum 5 shots`
+          );
+        }
+        for (const shot of userValue) {
+          if (typeof shot !== "object" || shot === null) {
+            throw new Error(
+              `Each shot in ${param.name} must be an object with prompt and duration`
+            );
+          }
+          if (typeof shot.prompt !== "string") {
+            throw new Error(
+              `Each shot in ${param.name} must have a string prompt`
+            );
+          }
+          if (shot.prompt.length > 500) {
+            throw new Error(
+              `Shot prompt in ${param.name} must be at most 500 characters`
+            );
+          }
+          const dur =
+            typeof shot.duration === "string"
+              ? parseInt(shot.duration, 10)
+              : shot.duration;
+          if (typeof dur !== "number" || isNaN(dur) || dur < 1 || dur > 12) {
+            throw new Error(
+              `Shot duration in ${param.name} must be an integer between 1 and 12`
+            );
+          }
+        }
+        break;
+
+      case "kling_elements":
+        if (!Array.isArray(userValue)) {
+          throw new Error(
+            `Parameter ${param.name} must be an array of element objects`
+          );
+        }
+        if (
+          param.maxItems !== undefined &&
+          userValue.length > param.maxItems
+        ) {
+          throw new Error(
+            `Parameter ${param.name} allows maximum ${param.maxItems} elements`
+          );
+        }
+        for (const elem of userValue) {
+          if (typeof elem !== "object" || elem === null) {
+            throw new Error(
+              `Each element in ${param.name} must be an object with name, description, and element_input_urls`
+            );
+          }
+          if (typeof elem.name !== "string" || !elem.name) {
+            throw new Error(
+              `Each element in ${param.name} must have a non-empty name`
+            );
+          }
+          if (typeof elem.description !== "string") {
+            throw new Error(
+              `Each element in ${param.name} must have a description`
+            );
+          }
+          if (!Array.isArray(elem.element_input_urls)) {
+            throw new Error(
+              `Each element in ${param.name} must have an element_input_urls array`
+            );
+          }
+          if (
+            elem.element_input_urls.length < 2 ||
+            elem.element_input_urls.length > 4
+          ) {
+            throw new Error(
+              `Each element in ${param.name} must have 2-4 image URLs`
+            );
+          }
+          for (const url of elem.element_input_urls) {
+            if (typeof url !== "string") {
+              throw new Error(
+                `Element image URLs in ${param.name} must be strings`
+              );
+            }
+          }
+        }
+        break;
     }
 
     // Override default with user value
@@ -1534,6 +1692,10 @@ function describeModelParams(model: VideoModelConfig): string {
     } else if (param.type === "asset") {
       const accepts = param.acceptTypes?.join("/") || "image";
       desc += `${accepts} reference — pass the Image ID (e.g. "abc123") of an image from the conversation`;
+    } else if (param.type === "multi_prompt") {
+      desc += `array of shots, each: {prompt: string (max 500 chars, use @element_name to reference elements), duration: number (1-12 seconds)}. Max 5 shots. Only used when multi_shots is true`;
+    } else if (param.type === "kling_elements") {
+      desc += `array of element references, each: {name: string (referenced in prompt as @name), description: string, element_input_urls: string[] (2-4 Image IDs from the conversation — pass the Image ID e.g. "abc123", NOT a URL)}. Max 3 elements`;
     }
 
     if (param.default !== undefined) {

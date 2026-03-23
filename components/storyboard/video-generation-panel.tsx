@@ -19,11 +19,13 @@ import { useCredits } from "@/hooks/use-credits";
 import { uploadImage, shouldCompressFile, getCompressThresholdMB } from "@/lib/upload/client";
 import UndoSendOverlay from "./undo-send-overlay";
 import { useGenerateVideoMutation } from "@/lib/redux/services/next-api";
+import { MultiShotEditor } from "@/components/chat/multi-shot-editor";
+import { KlingElementEditor } from "@/components/chat/kling-element-editor";
 
 interface VideoModelParam {
   name: string;
   label: string;
-  type: "string" | "number" | "boolean" | "enum" | "string_array" | "asset";
+  type: "string" | "number" | "boolean" | "enum" | "string_array" | "asset" | "multi_prompt" | "kling_elements";
   required: boolean;
   default?: string | number | boolean | string[];
   options?: Array<string | number>;
@@ -921,6 +923,34 @@ export default function VideoGenerationPanel({
                         />
                       )}
                     </div>
+                  </div>
+                );
+              }
+
+              // Multi-prompt type - rendered by MultiShotEditor
+              if (param.type === "multi_prompt") {
+                const multiShotsEnabled = params.multi_shots === true;
+                if (!multiShotsEnabled) return null;
+                const shots = Array.isArray(value) ? value : [];
+                return (
+                  <div key={param.name} className="space-y-2">
+                    <MultiShotEditor
+                      shots={shots}
+                      onChange={(s) => handleParamChange(param.name, s)}
+                    />
+                  </div>
+                );
+              }
+
+              // Kling elements type - rendered by KlingElementEditor
+              if (param.type === "kling_elements") {
+                const elements = Array.isArray(value) ? value : [];
+                return (
+                  <div key={param.name} className="space-y-2">
+                    <KlingElementEditor
+                      elements={elements}
+                      onChange={(e) => handleParamChange(param.name, e)}
+                    />
                   </div>
                 );
               }
