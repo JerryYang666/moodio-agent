@@ -872,6 +872,12 @@ export default function DesktopCanvas({
         content: ((singleSelectedAsset.metadata as Record<string, unknown>)?.content as string) || "",
       }
     : null;
+  const floatingBarTableInfo = singleSelectedAsset?.assetType === "table"
+    ? {
+        assetId: singleSelectedAsset.id,
+        meta: singleSelectedAsset.metadata as unknown as { title: string; columns: string[]; rows: Array<{ id: string; cells: Array<{ value: string }> }> },
+      }
+    : null;
   const floatingBarChatId = singleSelectedAsset &&
     typeof (singleSelectedAsset.metadata as Record<string, unknown>)?.chatId === "string"
     ? ((singleSelectedAsset.metadata as Record<string, unknown>).chatId as string)
@@ -1293,6 +1299,27 @@ export default function DesktopCanvas({
                 {t("sendToChat")}
               </button>
             )}
+            {floatingBarTableInfo?.meta && (
+              <button
+                className="flex items-center gap-1.5 px-2 py-1 text-xs hover:bg-default-100 rounded-md transition-colors whitespace-nowrap"
+                onClick={() => {
+                  const { meta } = floatingBarTableInfo;
+                  const lines = meta.rows.map((row) =>
+                    meta.columns.map((col, ci) => `${col}: ${row.cells[ci]?.value ?? ""}`).join(" | ")
+                  );
+                  const text = `[${meta.title || t("shotList")}]\n${lines.join("\n")}`;
+                  window.dispatchEvent(
+                    new CustomEvent("moodio-batch-to-chat", {
+                      detail: { text },
+                    })
+                  );
+                }}
+                title={t("sendToChat")}
+              >
+                <SendHorizontal size={13} />
+                {t("sendToChat")}
+              </button>
+            )}
             {singleSelectedAsset && onCopyToCollection && (
               <button
                 className="flex items-center gap-1.5 px-2 py-1 text-xs hover:bg-default-100 rounded-md transition-colors whitespace-nowrap"
@@ -1320,12 +1347,13 @@ export default function DesktopCanvas({
       {/* Selection count indicator with batch send-to-chat */}
       {selectedIds.size > 1 && (() => {
         const selectedAssets = assets.filter((a) => selectedIds.has(a.id));
-        const allImageOrText = selectedAssets.every(
-          (a) => a.assetType === "image" || a.assetType === "text"
+        const allImageOrTextOrTable = selectedAssets.every(
+          (a) => a.assetType === "image" || a.assetType === "text" || a.assetType === "table"
         );
         const imageAssets = selectedAssets.filter((a) => a.assetType === "image");
         const textAssets = selectedAssets.filter((a) => a.assetType === "text");
-        const canBatchSend = allImageOrText && imageAssets.length <= MAX_PENDING_IMAGES;
+        const tableAssets = selectedAssets.filter((a) => a.assetType === "table");
+        const canBatchSend = allImageOrTextOrTable && imageAssets.length <= MAX_PENDING_IMAGES;
 
         return (
           <div
@@ -1349,7 +1377,18 @@ export default function DesktopCanvas({
                   const textParts = textAssets
                     .map((a) => ((a.metadata as any)?.content as string) || "")
                     .filter(Boolean);
-                  const text = textParts.join("\n\n");
+
+                  const tableParts = tableAssets.map((a) => {
+                    const meta = a.metadata as any;
+                    const cols = (meta.columns || []) as string[];
+                    const rows = (meta.rows || []) as Array<{ id: string; cells: Array<{ value: string }> }>;
+                    const lines = rows.map((row) =>
+                      cols.map((col, ci) => `${col}: ${row.cells[ci]?.value ?? ""}`).join(" | ")
+                    );
+                    return `[${meta.title || t("shotList")}]\n${lines.join("\n")}`;
+                  });
+
+                  const text = [...textParts, ...tableParts].filter(Boolean).join("\n\n");
 
                   window.dispatchEvent(
                     new CustomEvent("moodio-batch-to-chat", {

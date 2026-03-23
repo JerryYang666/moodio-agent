@@ -498,6 +498,8 @@
     "generatingShotList": "Generating shot list...",
     "shotList": "Shot List",
     "shotCount": "{count} shots",
+    "sendRowsToChat": "Send to Chat",
+    "rowsSelected": "{count} selected",
     "desktopActions": "Desktop actions",
     "imageTitle": "Image",
     "bringForward": "Bring Forward",

@@ -1073,6 +1073,8 @@
     "generatingShotList": "ショットリストを生成中...",
     "shotList": "ショットリスト",
     "shotCount": "{count} ショット",
+    "sendRowsToChat": "チャットに送信",
+    "rowsSelected": "{count}件選択中",
     "desktopActions": "デスクトップのアクション",
     "imageTitle": "画像",
     "bringForward": "前面へ移動",

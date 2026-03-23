@@ -1073,6 +1073,8 @@
     "generatingShotList": "正在生成鏡頭清單...",
     "shotList": "鏡頭清單",
     "shotCount": "{count} 個鏡頭",
+    "sendRowsToChat": "傳送到聊天",
+    "rowsSelected": "已選擇 {count} 項",
     "desktopActions": "桌面操作",
     "imageTitle": "圖片",
     "bringForward": "上移一層",

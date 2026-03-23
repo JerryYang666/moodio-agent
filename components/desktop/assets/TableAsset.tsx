@@ -3,7 +3,7 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { useTranslations } from "next-intl";
 import { Spinner } from "@heroui/spinner";
-import { Clapperboard } from "lucide-react";
+import { Clapperboard, SendHorizontal, Check } from "lucide-react";
 import type { TableAssetMeta } from "@/lib/desktop/types";
 import type { EnrichedDesktopAsset } from "./types";
 
@@ -36,6 +36,7 @@ export default function TableAsset({ asset, sendEvent, cellLocks, currentUserId,
   const [editingCell, setEditingCell] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
   const [localCellOverride, setLocalCellOverride] = useState<{ key: string; value: string } | null>(null);
+  const [selectedRowIds, setSelectedRowIds] = useState<Set<string>>(new Set());
   const inputRef = useRef<HTMLInputElement>(null);
   const lastBroadcast = useRef(0);
   const pendingBroadcast = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -204,6 +205,53 @@ export default function TableAsset({ asset, sendEvent, cellLocks, currentUserId,
     [commitEdit, editingCell, sendEvent, asset.id]
   );
 
+  const toggleRowSelection = useCallback(
+    (rowId: string, e: React.MouseEvent) => {
+      e.stopPropagation();
+      setSelectedRowIds((prev) => {
+        const next = new Set(prev);
+        if (next.has(rowId)) {
+          next.delete(rowId);
+        } else {
+          next.add(rowId);
+        }
+        return next;
+      });
+    },
+    []
+  );
+
+  const toggleAllRows = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      setSelectedRowIds((prev) =>
+        prev.size === meta.rows.length ? new Set() : new Set(meta.rows.map((r) => r.id))
+      );
+    },
+    [meta.rows]
+  );
+
+  const handleSendSelectedToChat = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (selectedRowIds.size === 0) return;
+
+      const selectedRows = meta.rows.filter((r) => selectedRowIds.has(r.id));
+      const lines = selectedRows.map((row) =>
+        meta.columns.map((col, ci) => `${col}: ${row.cells[ci]?.value ?? ""}`).join(" | ")
+      );
+      const text = `[${meta.title || t("shotList")}]\n${lines.join("\n")}`;
+
+      window.dispatchEvent(
+        new CustomEvent("moodio-batch-to-chat", {
+          detail: { text },
+        })
+      );
+      setSelectedRowIds(new Set());
+    },
+    [selectedRowIds, meta, t]
+  );
+
   if (isStreaming) {
     return (
       <div className="w-full h-full flex flex-col items-center justify-center gap-3 bg-background p-4">
@@ -223,8 +271,20 @@ export default function TableAsset({ asset, sendEvent, cellLocks, currentUserId,
           {meta.title || t("shotList")}
         </span>
         <span className="text-[10px] text-default-400 ml-auto shrink-0">
-          {t("shotCount", { count: meta.rows.length })}
+          {selectedRowIds.size > 0
+            ? t("rowsSelected", { count: selectedRowIds.size })
+            : t("shotCount", { count: meta.rows.length })}
         </span>
+        {selectedRowIds.size > 0 && (
+          <button
+            className="flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium bg-primary text-primary-foreground rounded-md hover:opacity-90 transition-opacity shrink-0"
+            onClick={handleSendSelectedToChat}
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            <SendHorizontal size={10} />
+            {t("sendRowsToChat")}
+          </button>
+        )}
       </div>
 
       {/* Table -- stopPropagation only on the table so cell clicks don't trigger canvas drag */}
@@ -234,6 +294,24 @@ export default function TableAsset({ asset, sendEvent, cellLocks, currentUserId,
       >
         <thead>
           <tr>
+            <th
+              className="w-7 px-1 py-1.5 text-center bg-default-50 border-b border-r border-divider sticky top-[33px] z-5"
+              onClick={toggleAllRows}
+            >
+              <div
+                className={`w-3.5 h-3.5 mx-auto rounded-sm border cursor-pointer flex items-center justify-center transition-colors ${
+                  selectedRowIds.size === meta.rows.length && meta.rows.length > 0
+                    ? "bg-primary border-primary"
+                    : selectedRowIds.size > 0
+                      ? "bg-primary/40 border-primary"
+                      : "border-default-300 hover:border-default-400"
+                }`}
+              >
+                {selectedRowIds.size > 0 && (
+                  <Check size={10} className="text-primary-foreground" strokeWidth={3} />
+                )}
+              </div>
+            </th>
             {meta.columns.map((col, i) => (
               <th
                 key={i}
@@ -245,8 +323,26 @@ export default function TableAsset({ asset, sendEvent, cellLocks, currentUserId,
           </tr>
         </thead>
         <tbody>
-          {meta.rows.map((row) => (
-            <tr key={row.id} className="hover:bg-default-50/50">
+          {meta.rows.map((row) => {
+            const isRowSelected = selectedRowIds.has(row.id);
+            return (
+            <tr key={row.id} className={isRowSelected ? "bg-primary/5" : "hover:bg-default-50/50"}>
+              <td
+                className="w-7 px-1 py-1.5 text-center border-b border-r border-divider cursor-pointer"
+                onClick={(e) => toggleRowSelection(row.id, e)}
+              >
+                <div
+                  className={`w-3.5 h-3.5 mx-auto rounded-sm border flex items-center justify-center transition-colors ${
+                    isRowSelected
+                      ? "bg-primary border-primary"
+                      : "border-default-300 hover:border-default-400"
+                  }`}
+                >
+                  {isRowSelected && (
+                    <Check size={10} className="text-primary-foreground" strokeWidth={3} />
+                  )}
+                </div>
+              </td>
               {row.cells.map((cell, ci) => {
                 const key = cellKey(row.id, ci);
                 const isEditing = editingCell === key;
@@ -299,7 +395,8 @@ export default function TableAsset({ asset, sendEvent, cellLocks, currentUserId,
                 );
               })}
             </tr>
-          ))}
+            );
+          })}
         </tbody>
       </table>
     </div>
