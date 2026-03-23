@@ -237,7 +237,7 @@ function hasOverlap(
  * Given a preferred position, nudge it so it does not overlap any existing
  * asset. Tries right, down, left, up in a spiral pattern.
  */
-function findNonOverlappingPosition(
+export function findNonOverlappingPosition(
   preferredX: number,
   preferredY: number,
   newW: number,

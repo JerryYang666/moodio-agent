@@ -13,7 +13,7 @@ import { Button } from "@heroui/button";
 import { Spinner } from "@heroui/spinner";
 import { addToast } from "@heroui/toast";
 import { useTranslations } from "next-intl";
-import { getViewportVisibleCenterPosition, type AssetRect } from "@/lib/desktop/types";
+import { getViewportVisibleCenterPosition, findNonOverlappingPosition, type AssetRect } from "@/lib/desktop/types";
 import { hasWriteAccess, type Permission } from "@/lib/permissions";
 
 interface SendToDesktopModalProps {
@@ -61,7 +61,9 @@ async function sendAssetsToDesktop(
                     ? { w: 700, h: 40 + (Array.isArray((a.metadata as any)?.rows) ? (a.metadata as any).rows.length * 36 : 0) + 40 }
                     : { w: 400, h: 300 };
           const pos = getViewportVisibleCenterPosition(sizeByType.w, sizeByType.h);
-          return { ...a, posX: pos.x + i * 280, posY: pos.y };
+          const vp = typeof window !== "undefined" ? window.__desktopViewport : undefined;
+          const adjusted = findNonOverlappingPosition(pos.x + i * 280, pos.y, sizeByType.w, sizeByType.h, vp?.assetRects);
+          return { ...a, posX: adjusted.x, posY: adjusted.y };
         }
         return {
           ...a,

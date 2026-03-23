@@ -2513,7 +2513,7 @@ export default function ChatInterface({
                   if (partType === "agent_image" || partType === "agent_video_suggest") {
                     (async () => {
                       try {
-                        const { getViewportVisibleCenterPosition } = await import("@/lib/desktop/types");
+                        const { getViewportVisibleCenterPosition, findNonOverlappingPosition } = await import("@/lib/desktop/types");
 
                         // Compute anchor position once per variant
                         if (!desktopAnchorPositions[vId]) {
@@ -2533,8 +2533,12 @@ export default function ChatInterface({
                           desktopPlacedImages[vId] = idx + 1;
                           const col = idx % 2;
                           const row = Math.floor(idx / 2);
-                          posX = anchor.x + col * 310;
-                          posY = anchor.y + row * 310;
+                          const candidateX = anchor.x + col * 310;
+                          const candidateY = anchor.y + row * 310;
+                          const vp = typeof window !== "undefined" ? window.__desktopViewport : undefined;
+                          const adjusted = findNonOverlappingPosition(candidateX, candidateY, 300, 300, vp?.assetRects);
+                          posX = adjusted.x;
+                          posY = adjusted.y;
 
                           const assetRes = await fetch(`/api/desktop/${desktopId}/assets`, {
                             method: "POST",
@@ -2574,8 +2578,12 @@ export default function ChatInterface({
                           const PAIR_GAP = 16;
                           const ROW_GAP = 24;
 
-                          const imgX = anchor.x;
-                          const imgY = anchor.y + idx * (Math.max(IMAGE_H, TEXT_H) + ROW_GAP);
+                          const candidateImgX = anchor.x;
+                          const candidateImgY = anchor.y + idx * (Math.max(IMAGE_H, TEXT_H) + ROW_GAP);
+                          const vp = typeof window !== "undefined" ? window.__desktopViewport : undefined;
+                          const adjustedImg = findNonOverlappingPosition(candidateImgX, candidateImgY, IMAGE_W + PAIR_GAP + TEXT_W, Math.max(IMAGE_H, TEXT_H), vp?.assetRects);
+                          const imgX = adjustedImg.x;
+                          const imgY = adjustedImg.y;
                           const txtX = imgX + IMAGE_W + PAIR_GAP;
                           const txtY = imgY;
 
