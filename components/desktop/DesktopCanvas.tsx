@@ -866,6 +866,12 @@ export default function DesktopCanvas({
         videoIdea: ((singleSelectedAsset.metadata as Record<string, unknown>)?.videoIdea as string) || "",
       }
     : null;
+  const floatingBarTextInfo = singleSelectedAsset?.assetType === "text"
+    ? {
+        assetId: singleSelectedAsset.id,
+        content: ((singleSelectedAsset.metadata as Record<string, unknown>)?.content as string) || "",
+      }
+    : null;
   const floatingBarChatId = singleSelectedAsset &&
     typeof (singleSelectedAsset.metadata as Record<string, unknown>)?.chatId === "string"
     ? ((singleSelectedAsset.metadata as Record<string, unknown>).chatId as string)
@@ -1269,6 +1275,24 @@ export default function DesktopCanvas({
                 {t("sendToChat")}
               </button>
             )}
+            {floatingBarTextInfo?.content && (
+              <button
+                className="flex items-center gap-1.5 px-2 py-1 text-xs hover:bg-default-100 rounded-md transition-colors whitespace-nowrap"
+                onClick={() => {
+                  window.dispatchEvent(
+                    new CustomEvent("moodio-batch-to-chat", {
+                      detail: {
+                        text: floatingBarTextInfo.content,
+                      },
+                    })
+                  );
+                }}
+                title={t("sendToChat")}
+              >
+                <SendHorizontal size={13} />
+                {t("sendToChat")}
+              </button>
+            )}
             {singleSelectedAsset && onCopyToCollection && (
               <button
                 className="flex items-center gap-1.5 px-2 py-1 text-xs hover:bg-default-100 rounded-md transition-colors whitespace-nowrap"
@@ -1304,7 +1328,10 @@ export default function DesktopCanvas({
         const canBatchSend = allImageOrText && imageAssets.length <= MAX_PENDING_IMAGES;
 
         return (
-          <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground px-3 py-1 rounded-full text-xs font-medium shadow z-10 flex items-center gap-2">
+          <div
+            className="absolute top-4 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground px-3 py-1 rounded-full text-xs font-medium shadow z-10 flex items-center gap-2"
+            onPointerDown={(e) => e.stopPropagation()}
+          >
             <span>{t("selected", { count: selectedIds.size })}</span>
             {canBatchSend && (
               <button

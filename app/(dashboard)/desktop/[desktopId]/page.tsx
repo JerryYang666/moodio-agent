@@ -339,6 +339,20 @@ export default function DesktopDetailPage({
     };
   }, [desktopId, fetchDetail, sendEvent, applyRemoteEvent]);
 
+  useEffect(() => {
+    const expandChat = () => {
+      if (isChatPanelCollapsed) {
+        handleChatPanelCollapseChange(false);
+      }
+    };
+    window.addEventListener("moodio-batch-to-chat", expandChat);
+    window.addEventListener("moodio-asset-selected", expandChat);
+    return () => {
+      window.removeEventListener("moodio-batch-to-chat", expandChat);
+      window.removeEventListener("moodio-asset-selected", expandChat);
+    };
+  }, [isChatPanelCollapsed, handleChatPanelCollapseChange]);
+
   const handleCameraChange = useCallback(
     (newCamera: CameraState) => {
       setCamera(newCamera);
