@@ -1044,6 +1044,7 @@
     "failedToAddAsset": "新增資產失敗",
     "uploadFailed": "上傳失敗",
     "sendToChat": "傳送到聊天",
+    "sendAllToChat": "全部傳送到聊天",
     "sendToTimeline": "傳送到時間軸",
     "deleteAllSelected": "刪除全部 {count} 個選取項",
     "moveModeTooltip": "移動畫布（拖曳）",

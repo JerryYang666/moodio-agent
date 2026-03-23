@@ -13,7 +13,7 @@ import { Button } from "@heroui/button";
 import { Spinner } from "@heroui/spinner";
 import { addToast } from "@heroui/toast";
 import { useTranslations } from "next-intl";
-import { getViewportVisibleCenterPosition } from "@/lib/desktop/types";
+import { getViewportVisibleCenterPosition, type AssetRect } from "@/lib/desktop/types";
 import { hasWriteAccess, type Permission } from "@/lib/permissions";
 
 interface SendToDesktopModalProps {

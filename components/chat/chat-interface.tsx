@@ -1513,6 +1513,39 @@ export default function ChatInterface({
       window.removeEventListener("moodio-videosuggest-to-chat", handler as any);
   }, [addAssetImage]);
 
+  // Listen for batch send-to-chat events from desktop multi-select
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const ce = e as CustomEvent;
+      const d = ce.detail as {
+        images?: Array<{ assetId: string; imageId: string; url: string; title?: string }>;
+        text?: string;
+      };
+      if (!d) return;
+
+      // Add all images to pending
+      if (d.images && d.images.length > 0) {
+        for (const img of d.images) {
+          if (!img.imageId || !img.url) continue;
+          addAssetImage({
+            assetId: img.assetId,
+            url: img.url,
+            title: img.title || "Selected asset",
+            imageId: img.imageId,
+          });
+        }
+      }
+
+      // Insert concatenated text into chat input
+      if (d.text && chatInputRef.current) {
+        chatInputRef.current.insertText(d.text);
+      }
+    };
+    window.addEventListener("moodio-batch-to-chat", handler as any);
+    return () =>
+      window.removeEventListener("moodio-batch-to-chat", handler as any);
+  }, [addAssetImage]);
+
   const handleAssetDrop = useCallback(
     async (payload: any) => {
       if (payload?.assetId && payload?.url && payload?.imageId) {
@@ -2408,8 +2441,8 @@ export default function ChatInterface({
                         // Compute anchor position once per variant
                         if (!desktopAnchorPositions[vId]) {
                           desktopAnchorPositions[vId] = getViewportVisibleCenterPosition(
-                            partType === "agent_image" ? 620 : 340,
-                            partType === "agent_image" ? 620 : 440
+                            partType === "agent_image" ? 620 : 616,
+                            partType === "agent_image" ? 620 : 300
                           );
                         }
                         const anchor = desktopAnchorPositions[vId]!;
@@ -2453,39 +2486,59 @@ export default function ChatInterface({
                             );
                           }
                         } else if (partType === "agent_video_suggest") {
-                          // Vertical column layout: 340px wide, 100px tall with 10px gap
+                          // Send as two separate assets: image on left, text on right
                           const idx = desktopPlacedVideoSuggests[vId] || 0;
                           desktopPlacedVideoSuggests[vId] = idx + 1;
-                          posX = anchor.x;
-                          posY = anchor.y + idx * 110;
 
-                          // Compute partTypeIndex: count how many video_suggest parts exist before this one
-                          const partTypeIndex = content.filter(
-                            (p) => p.type === "agent_video_suggest"
-                          ).length - 1;
+                          const IMAGE_W = 300;
+                          const IMAGE_H = 300;
+                          const TEXT_W = 300;
+                          const TEXT_H = 200;
+                          const PAIR_GAP = 16;
+                          const ROW_GAP = 24;
+
+                          const imgX = anchor.x;
+                          const imgY = anchor.y + idx * (Math.max(IMAGE_H, TEXT_H) + ROW_GAP);
+                          const txtX = imgX + IMAGE_W + PAIR_GAP;
+                          const txtY = imgY;
+
+                          const titleStr = evt.part.title || "";
+                          const ideaStr = evt.part.videoIdea || "";
+                          const textContent = titleStr && ideaStr
+                            ? `${titleStr}\n\n${ideaStr}`
+                            : titleStr || ideaStr || "";
 
                           const assetRes = await fetch(`/api/desktop/${desktopId}/assets`, {
                             method: "POST",
                             headers: { "Content-Type": "application/json" },
                             body: JSON.stringify({
-                              assets: [{
-                                assetType: "video_suggest",
-                                metadata: {
-                                  imageId: evt.part.imageId,
-                                  chatId: chatId,
-                                  title: evt.part.title || "",
-                                  videoIdea: evt.part.videoIdea || "",
-                                  prompt: evt.part.prompt || "",
-                                  aspectRatio: evt.part.aspectRatio || "",
-                                  messageTimestamp: variantTimestamp,
-                                  messageVariantId: vId !== "default" ? vId : undefined,
-                                  partTypeIndex: Math.max(0, partTypeIndex),
+                              assets: [
+                                {
+                                  assetType: "image",
+                                  metadata: {
+                                    imageId: evt.part.imageId,
+                                    chatId: chatId,
+                                    title: titleStr,
+                                    prompt: evt.part.prompt || "",
+                                    status: "generated",
+                                  },
+                                  posX: imgX,
+                                  posY: imgY,
+                                  width: IMAGE_W,
+                                  height: IMAGE_H,
                                 },
-                                posX,
-                                posY,
-                                width: 340,
-                                height: 100,
-                              }],
+                                {
+                                  assetType: "text",
+                                  metadata: {
+                                    content: textContent,
+                                    chatId: chatId,
+                                  },
+                                  posX: txtX,
+                                  posY: txtY,
+                                  width: TEXT_W,
+                                  height: TEXT_H,
+                                },
+                              ],
                             }),
                           });
                           if (assetRes.ok) {

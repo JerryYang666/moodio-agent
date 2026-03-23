@@ -1044,6 +1044,7 @@
     "failedToAddAsset": "アセットの追加に失敗しました",
     "uploadFailed": "アップロードに失敗しました",
     "sendToChat": "チャットに送信",
+    "sendAllToChat": "すべてチャットに送信",
     "sendToTimeline": "タイムラインに送信",
     "deleteAllSelected": "選択した {count} 件をすべて削除",
     "moveModeTooltip": "キャンバスを移動（ドラッグ）",
