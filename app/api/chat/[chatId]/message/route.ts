@@ -793,6 +793,25 @@ export async function POST(
         }
       }
 
+      // Resolve image IDs inside kling_elements[].element_input_urls to signed URLs
+      if (Array.isArray(fullParams.kling_elements)) {
+        fullParams.kling_elements = fullParams.kling_elements.map(
+          (el: { name: string; description: string; element_input_urls: string[] }) => ({
+            ...el,
+            element_input_urls: (el.element_input_urls || []).map((idOrUrl: string) => {
+              if (idOrUrl.startsWith("http") && !idOrUrl.includes("moodio.art/images/")) {
+                return idOrUrl;
+              }
+              const cfMatch = idOrUrl.match(/\/images\/([^/?]+)/);
+              if (cfMatch) {
+                return getSignedImageUrl(cfMatch[1]);
+              }
+              return getSignedImageUrl(idOrUrl);
+            }),
+          })
+        );
+      }
+
       const effectiveSourceImageId = isTextToVideo
         ? TEXT_TO_VIDEO_PLACEHOLDER_IMAGE_ID
         : sourceImageId;
