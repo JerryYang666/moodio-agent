@@ -94,9 +94,19 @@ export async function POST(request: NextRequest) {
       fullParams.kling_elements = fullParams.kling_elements.map(
         (el: { name: string; description: string; element_input_urls: string[] }) => ({
           ...el,
-          element_input_urls: (el.element_input_urls || []).map((idOrUrl: string) =>
-            idOrUrl.startsWith("http") ? idOrUrl : getSignedImageUrl(idOrUrl)
-          ),
+          element_input_urls: (el.element_input_urls || []).map((idOrUrl: string) => {
+            // Already a non-CloudFront URL (e.g. KIE temp storage) — pass through
+            if (idOrUrl.startsWith("http") && !idOrUrl.includes("moodio.art/images/")) {
+              return idOrUrl;
+            }
+            // Unsigned CloudFront URL — extract image ID and sign it
+            const cfMatch = idOrUrl.match(/\/images\/([^/?]+)/);
+            if (cfMatch) {
+              return getSignedImageUrl(cfMatch[1]);
+            }
+            // Bare image ID — sign it
+            return getSignedImageUrl(idOrUrl);
+          }),
         })
       );
     }
