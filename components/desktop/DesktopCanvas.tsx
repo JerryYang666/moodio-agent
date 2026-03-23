@@ -10,6 +10,7 @@ import { ImageAsset, VideoAsset, TextAsset, LinkAsset, VideoSuggestAsset } from 
 import PublicVideoAsset from "./assets/PublicVideoAsset";
 import TableAsset from "./assets/TableAsset";
 import { hasWriteAccess, type Permission } from "@/lib/permissions";
+import { MAX_PENDING_IMAGES } from "@/components/chat/pending-image-types";
 import type { CanvasMode } from "./DesktopToolbar";
 import { AI_IMAGE_DRAG_MIME, AI_TEXT_DRAG_MIME, AI_SHOTLIST_DRAG_MIME, AI_VIDEO_SUGGEST_DRAG_MIME } from "@/components/chat/asset-dnd";
 import {
@@ -1292,12 +1293,54 @@ export default function DesktopCanvas({
         );
       })()}
 
-      {/* Selection count indicator */}
-      {selectedIds.size > 1 && (
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground px-3 py-1 rounded-full text-xs font-medium shadow z-10">
-          {t("selected", { count: selectedIds.size })}
-        </div>
-      )}
+      {/* Selection count indicator with batch send-to-chat */}
+      {selectedIds.size > 1 && (() => {
+        const selectedAssets = assets.filter((a) => selectedIds.has(a.id));
+        const allImageOrText = selectedAssets.every(
+          (a) => a.assetType === "image" || a.assetType === "text"
+        );
+        const imageAssets = selectedAssets.filter((a) => a.assetType === "image");
+        const textAssets = selectedAssets.filter((a) => a.assetType === "text");
+        const canBatchSend = allImageOrText && imageAssets.length <= MAX_PENDING_IMAGES;
+
+        return (
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground px-3 py-1 rounded-full text-xs font-medium shadow z-10 flex items-center gap-2">
+            <span>{t("selected", { count: selectedIds.size })}</span>
+            {canBatchSend && (
+              <button
+                className="flex items-center gap-1 px-2 py-0.5 bg-primary-foreground/20 hover:bg-primary-foreground/30 rounded-full transition-colors whitespace-nowrap"
+                onClick={() => {
+                  const images = imageAssets
+                    .filter((a) => a.imageUrl && (a.metadata as any)?.imageId)
+                    .map((a) => ({
+                      assetId: a.id,
+                      imageId: (a.metadata as any).imageId as string,
+                      url: a.imageUrl!,
+                      title: (a.metadata as any)?.title || "",
+                    }));
+
+                  const textParts = textAssets
+                    .map((a) => ((a.metadata as any)?.content as string) || "")
+                    .filter(Boolean);
+                  const text = textParts.join("\n\n");
+
+                  window.dispatchEvent(
+                    new CustomEvent("moodio-batch-to-chat", {
+                      detail: {
+                        images: images.length > 0 ? images : undefined,
+                        text: text || undefined,
+                      },
+                    })
+                  );
+                }}
+              >
+                <SendHorizontal size={11} />
+                {t("sendAllToChat")}
+              </button>
+            )}
+          </div>
+        );
+      })()}
 
     </div>
   );

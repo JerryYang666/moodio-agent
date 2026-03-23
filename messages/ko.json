@@ -1044,6 +1044,7 @@
     "failedToAddAsset": "에셋 추가에 실패했습니다",
     "uploadFailed": "업로드에 실패했습니다",
     "sendToChat": "채팅으로 보내기",
+    "sendAllToChat": "모두 채팅으로 보내기",
     "sendToTimeline": "타임라인으로 보내기",
     "deleteAllSelected": "선택한 {count}개 모두 삭제",
     "moveModeTooltip": "캔버스 이동 (드래그)",

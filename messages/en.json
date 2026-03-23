@@ -469,6 +469,7 @@
     "failedToAddAsset": "Failed to add asset",
     "uploadFailed": "Upload failed",
     "sendToChat": "Send to Chat",
+    "sendAllToChat": "Send all to Chat",
     "sendToTimeline": "Send to Timeline",
     "deleteAllSelected": "Delete all {count} selected",
     "moveModeTooltip": "Move canvas (drag)",

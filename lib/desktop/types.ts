@@ -200,12 +200,96 @@ export function clearDesktopViewport() {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Overlap detection helpers
+// ---------------------------------------------------------------------------
+
+const OVERLAP_GAP = 16; // minimum gap between assets when resolving overlaps
+
+/**
+ * Check if two rectangles overlap (with a small gap).
+ */
+function rectsOverlap(
+  a: { x: number; y: number; w: number; h: number },
+  b: { x: number; y: number; w: number; h: number },
+  gap = OVERLAP_GAP
+): boolean {
+  return (
+    a.x < b.x + b.w + gap &&
+    a.x + a.w + gap > b.x &&
+    a.y < b.y + b.h + gap &&
+    a.y + a.h + gap > b.y
+  );
+}
+
+/**
+ * Check if a candidate position overlaps with any existing asset.
+ */
+function hasOverlap(
+  candidate: { x: number; y: number; w: number; h: number },
+  rects: AssetRect[],
+  gap = OVERLAP_GAP
+): boolean {
+  return rects.some((r) => rectsOverlap(candidate, r, gap));
+}
+
+/**
+ * Given a preferred position, nudge it so it does not overlap any existing
+ * asset. Tries right, down, left, up in a spiral pattern.
+ */
+function findNonOverlappingPosition(
+  preferredX: number,
+  preferredY: number,
+  newW: number,
+  newH: number,
+  rects: AssetRect[] | undefined,
+  gap = OVERLAP_GAP
+): { x: number; y: number } {
+  if (!rects || rects.length === 0) {
+    return { x: preferredX, y: preferredY };
+  }
+
+  const candidate = { x: preferredX, y: preferredY, w: newW, h: newH };
+  if (!hasOverlap(candidate, rects, gap)) {
+    return { x: preferredX, y: preferredY };
+  }
+
+  // Spiral outward: try shifting in each direction with increasing step
+  const step = Math.max(newW, newH) + gap;
+  const directions = [
+    { dx: 1, dy: 0 },  // right
+    { dx: 0, dy: 1 },  // down
+    { dx: -1, dy: 0 }, // left
+    { dx: 0, dy: -1 }, // up
+  ];
+
+  for (let ring = 1; ring <= 20; ring++) {
+    for (const dir of directions) {
+      const cx = preferredX + dir.dx * step * ring;
+      const cy = preferredY + dir.dy * step * ring;
+      const test = { x: cx, y: cy, w: newW, h: newH };
+      if (!hasOverlap(test, rects, gap)) {
+        return { x: cx, y: cy };
+      }
+    }
+  }
+
+  // Fallback: place far to the right of all assets
+  let maxRight = -Infinity;
+  for (const r of rects) {
+    const right = r.x + r.w;
+    if (right > maxRight) maxRight = right;
+  }
+  return { x: maxRight + gap, y: preferredY };
+}
+
 /**
  * Find a good position for a new asset on the desktop.
  *
  * Strategy: find the densest cluster of existing assets and place the new
  * asset to the right of the rightmost asset in that cluster, with a small gap.
  * Falls back to viewport center if no assets exist.
+ * After finding the candidate position, checks for overlaps and nudges if needed.
  *
  * @param newW  Width of the asset being placed (default 400)
  * @param newH  Height of the asset being placed (default 300)
@@ -270,10 +354,10 @@ export function getViewportCenterPosition(newW = 400, newH = 300): { x: number; 
   const GAP = 24;
   const clusterMidY = (clusterTop + clusterBottom) / 2;
 
-  return {
-    x: maxRight + GAP,
-    y: clusterMidY - newH / 2,
-  };
+  const preferredX = maxRight + GAP;
+  const preferredY = clusterMidY - newH / 2;
+
+  return findNonOverlappingPosition(preferredX, preferredY, newW, newH, rects);
 }
 
 /**
@@ -282,6 +366,7 @@ export function getViewportCenterPosition(newW = 400, newH = 300): { x: number; 
  * Unlike `getViewportCenterPosition`, this ignores existing asset clusters and
  * always returns the user's current view center so newly sent assets appear
  * immediately in front of the user.
+ * After finding the candidate position, checks for overlaps and nudges if needed.
  */
 export function getViewportVisibleCenterPosition(
   newW = 400,
@@ -295,5 +380,9 @@ export function getViewportVisibleCenterPosition(
   const { camera, width, height } = vp;
   const centerX = (-camera.x + width / 2) / camera.zoom;
   const centerY = (-camera.y + height / 2) / camera.zoom;
-  return { x: centerX - newW / 2, y: centerY - newH / 2 };
+
+  const preferredX = centerX - newW / 2;
+  const preferredY = centerY - newH / 2;
+
+  return findNonOverlappingPosition(preferredX, preferredY, newW, newH, vp.assetRects);
 }
