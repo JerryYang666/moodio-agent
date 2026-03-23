@@ -18,8 +18,15 @@ import {
 
 import ChatInterface from "./chat-interface";
 import { ChatHistorySelector } from "./chat-history-selector";
+import { PersistentAssetsPanel } from "@/components/chat/persistent-assets-panel";
 import { siteConfig } from "@/config/site";
 import { Message } from "@/lib/llm/types";
+import {
+  useGetPersistentAssetsQuery,
+  useUpdatePersistentAssetsMutation,
+} from "@/lib/redux/services/next-api";
+import { EMPTY_PERSISTENT_ASSETS } from "@/lib/chat/persistent-assets-types";
+import type { PersistentReferenceImage } from "@/lib/chat/persistent-assets-types";
 
 // Min and max width constraints for the resizable panel
 const MIN_PANEL_WIDTH = 320;
@@ -243,6 +250,19 @@ export default function ChatSidePanel({
     localStorage.setItem(siteConfig.activeChatId, chatId);
   }, []);
 
+  const { data: persistentAssetsData } = useGetPersistentAssetsQuery(activeChatId || "", {
+    skip: !activeChatId,
+  });
+  const [, { isLoading: isPersistentAssetsSaving }] = useUpdatePersistentAssetsMutation();
+  const persistentAssets = persistentAssetsData?.persistentAssets ?? {
+    ...EMPTY_PERSISTENT_ASSETS,
+    referenceImages: [] as Array<PersistentReferenceImage & { imageUrl?: string }>,
+  };
+
+  const handleOpenAssetPicker = useCallback(() => {
+    window.dispatchEvent(new Event("open-persistent-asset-picker"));
+  }, []);
+
   // Collapsed state - show only expand button
   if (isCollapsed) {
     return (
@@ -303,15 +323,25 @@ export default function ChatSidePanel({
             onChatSelect={handleChatSelect}
             onNewChat={handleNewChat}
           />
-          <Button
-            isIconOnly
-            variant="light"
-            size="sm"
-            onPress={handleToggleCollapse}
-            title={t("collapseChat")}
-          >
-            <PanelRightClose size={20} />
-          </Button>
+          <div className="flex items-center gap-1">
+            {activeChatId && (
+              <PersistentAssetsPanel
+                chatId={activeChatId}
+                persistentAssets={persistentAssets}
+                onOpenAssetPicker={handleOpenAssetPicker}
+                isSavingExternal={isPersistentAssetsSaving}
+              />
+            )}
+            <Button
+              isIconOnly
+              variant="light"
+              size="sm"
+              onPress={handleToggleCollapse}
+              title={t("collapseChat")}
+            >
+              <PanelRightClose size={20} />
+            </Button>
+          </div>
         </CardHeader>
         
         <Divider />

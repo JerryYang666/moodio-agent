@@ -1349,6 +1349,14 @@ export default function ChatInterface({
     setIsAssetPickerOpen(true);
   }, []);
 
+  useEffect(() => {
+    const handleOpenPersistentAssetPicker = () => {
+      openPersistentAssetPicker();
+    };
+    window.addEventListener("open-persistent-asset-picker", handleOpenPersistentAssetPicker);
+    return () => window.removeEventListener("open-persistent-asset-picker", handleOpenPersistentAssetPicker);
+  }, [openPersistentAssetPicker]);
+
   // Open asset picker for pending images
   const openPendingImagePicker = useCallback(() => {
     setAssetPickerMode("pending");
@@ -3539,8 +3547,8 @@ export default function ChatInterface({
         </div>
       )}
 
-      {/* Persistent Assets Panel - positioned at top-right of chat */}
-      {chatId && (
+      {/* Persistent Assets Panel - positioned at top-left of chat (fullscreen only; in compact/sidebar mode the panel header handles this) */}
+      {chatId && !compactMode && (
         <div className="absolute top-3 left-3 z-40">
           <PersistentAssetsPanel
             chatId={chatId}
