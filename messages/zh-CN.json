@@ -183,6 +183,7 @@
     "videoAddEnd": "添加末帧（可选）",
     "videoLabel": "视频",
     "videoRequiresImage": "视频生成需要源图片",
+    "videoRequiresPrompt": "文字转视频需要输入文本提示",
     "maxVideosReached": "最多允许 {max} 个视频",
     "tooManyAttachments": "附件过多。合计限制为 10 项。",
     "image": "图片",

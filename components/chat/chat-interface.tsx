@@ -2055,6 +2055,15 @@ export default function ChatInterface({
       return;
     }
 
+    // Text-to-video models require a text prompt
+    if (menuState.mode === "video" && !videoModelHasImageParams && !input.trim()) {
+      addToast({
+        title: t("chat.videoRequiresPrompt"),
+        color: "warning",
+      });
+      return;
+    }
+
     // Build the message content with selected image titles
     let currentInput = input;
     const agentImages = pendingImages.filter(

@@ -183,6 +183,7 @@
     "videoAddEnd": "마지막 프레임 추가 (선택)",
     "videoLabel": "비디오",
     "videoRequiresImage": "비디오 생성에는 소스 이미지가 필요합니다",
+    "videoRequiresPrompt": "텍스트-투-비디오 생성에는 텍스트 프롬프트가 필요합니다",
     "maxVideosReached": "최대 {max}개의 비디오만 허용됩니다",
     "tooManyAttachments": "첨부 파일이 너무 많습니다. 합계 10개까지입니다.",
     "image": "이미지",

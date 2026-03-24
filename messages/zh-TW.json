@@ -183,6 +183,7 @@
     "videoAddEnd": "新增末幀（選填）",
     "videoLabel": "影片",
     "videoRequiresImage": "影片生成需要來源圖片",
+    "videoRequiresPrompt": "文字轉影片需要輸入文字提示",
     "maxVideosReached": "最多允許 {max} 個影片",
     "tooManyAttachments": "附件過多。合計上限為 10 項。",
     "image": "圖片",

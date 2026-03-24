@@ -183,6 +183,7 @@
     "videoAddEnd": "最後のフレームを追加（任意）",
     "videoLabel": "動画",
     "videoRequiresImage": "動画生成にはソース画像が必要です",
+    "videoRequiresPrompt": "テキストから動画生成にはプロンプトが必要です",
     "maxVideosReached": "最大{max}本の動画まで許可されています",
     "tooManyAttachments": "添付が多すぎます。合計10件までです。",
     "image": "画像",

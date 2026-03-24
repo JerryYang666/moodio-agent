@@ -183,6 +183,7 @@
     "videoAddEnd": "Add last frame (optional)",
     "videoLabel": "Video",
     "videoRequiresImage": "A source image is required for video generation",
+    "videoRequiresPrompt": "A text prompt is required for text-to-video generation",
     "maxVideosReached": "Maximum {max} video allowed",
     "tooManyAttachments": "Too many attachments. Combined limit is 10 items.",
     "image": "Image",
