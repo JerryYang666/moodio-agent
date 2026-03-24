@@ -991,6 +991,7 @@
       "nextAvailable": "明天可再次签到"
     },
     "personal": "个人",
+    "billingHint": "选择使用哪个账户扣除积分",
     "viewAll": "查看详情",
     "personalAccount": "个人",
     "usedBy": "使用者"

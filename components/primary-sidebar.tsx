@@ -20,6 +20,7 @@ import {
   Sparkles,
   Video,
   Monitor,
+  Check,
 } from "lucide-react";
 import { Avatar } from "@heroui/avatar";
 import { Tooltip } from "@heroui/tooltip";
@@ -287,6 +288,7 @@ export const PrimarySidebar = () => {
           </PopoverTrigger>
           <PopoverContent className="w-56 p-2">
             <div className="flex flex-col gap-1">
+              <p className="text-xs text-default-400 px-3 py-1">{tCredits("billingHint")}</p>
               <button
                 className={clsx(
                   "flex items-center gap-2 px-3 py-2 rounded-lg text-sm w-full text-left transition-colors",
@@ -301,6 +303,7 @@ export const PrimarySidebar = () => {
               >
                 <Bean size={14} />
                 <span className="flex-1">{tCredits("personal")}</span>
+                {activeAccountType === "personal" && <Check size={14} className="text-primary" />}
               </button>
               {teams.map((team) => (
                 <button
@@ -324,6 +327,7 @@ export const PrimarySidebar = () => {
                 >
                   <UsersIcon size={14} />
                   <span className="flex-1 truncate">{team.teamName}</span>
+                  {activeAccountType === "team" && activeTeamName === team.teamName && <Check size={14} className="text-primary" />}
                 </button>
               ))}
               <div className="h-px bg-divider my-1" />

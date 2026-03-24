@@ -991,6 +991,7 @@
       "nextAvailable": "明日チェックインできます"
     },
     "personal": "個人",
+    "billingHint": "クレジットを消費するアカウントを選択",
     "viewAll": "詳細を表示",
     "personalAccount": "個人",
     "usedBy": "使用者"

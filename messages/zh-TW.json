@@ -991,6 +991,7 @@
       "nextAvailable": "明天可再次簽到"
     },
     "personal": "個人",
+    "billingHint": "選擇使用哪個帳戶扣除點數",
     "viewAll": "查看詳情",
     "personalAccount": "個人",
     "usedBy": "使用者"

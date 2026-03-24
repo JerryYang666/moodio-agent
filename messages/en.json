@@ -1077,6 +1077,7 @@
       "nextAvailable": "Next check-in available tomorrow"
     },
     "personal": "Personal",
+    "billingHint": "Select which account to bill credits to",
     "viewAll": "View Details",
     "personalAccount": "Personal",
     "usedBy": "Used By"

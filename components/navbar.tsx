@@ -30,6 +30,7 @@ import {
   Video,
   Monitor,
   Users as UsersIcon,
+  Check,
 } from "lucide-react";
 import { Avatar } from "@heroui/avatar";
 import { Popover, PopoverTrigger, PopoverContent } from "@heroui/popover";
@@ -335,6 +336,7 @@ export const Navbar = () => {
                         {/* Credits with Account Switcher */}
                         {credits !== null && (
                           <div className="flex flex-col gap-1">
+                            <p className="text-xs text-default-400 px-2 py-1">{tCredits("billingHint")}</p>
                             <button
                               className={clsx(
                                 "flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm w-full text-left transition-colors",
@@ -349,6 +351,7 @@ export const Navbar = () => {
                             >
                               <Bean size={14} className="text-primary" />
                               <span className="flex-1">{tCredits("personal")}</span>
+                              {activeAccountType === "personal" && <Check size={14} className="text-primary" />}
                             </button>
                             {teams.map((team) => (
                               <button
@@ -372,6 +375,7 @@ export const Navbar = () => {
                               >
                                 <UsersIcon size={14} />
                                 <span className="flex-1 truncate">{team.teamName}</span>
+                                {activeAccountType === "team" && activeTeamName === team.teamName && <Check size={14} className="text-primary" />}
                               </button>
                             ))}
                             <NextLink
