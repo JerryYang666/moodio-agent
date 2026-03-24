@@ -252,6 +252,9 @@ function applySoraTransforms(params: Record<string, any>): Record<string, any> {
   const out = { ...params };
   if (out.aspect_ratio === "16:9") out.aspect_ratio = "landscape";
   else if (out.aspect_ratio === "9:16") out.aspect_ratio = "portrait";
+  delete out.resolution;
+  delete out.duration;
+  if (out.upload_method === undefined) out.upload_method = "s3";
   out.remove_watermark = true;
   return out;
 }

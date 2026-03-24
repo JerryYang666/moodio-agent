@@ -1007,7 +1007,20 @@ const sora2Pro: VideoModelConfig = {
   },
   providers: [
     { provider: "fal", providerModelId: "fal-ai/sora-2/image-to-video/pro" },
-    { provider: "kie", providerModelId: "sora-2-pro-image-to-video", paramMapping: { image_url: "image_urls" }, paramOverrides: { delete_video: { status: "disabled" } } },
+    {
+      provider: "kie",
+      providerModelId: "sora-2-pro-image-to-video",
+      paramMapping: { image_url: "image_urls" },
+      paramOverrides: {
+        resolution: { status: "disabled" },
+        duration: { status: "disabled" },
+        delete_video: { status: "disabled" },
+        aspect_ratio: {
+          options: ["landscape", "portrait"],
+          default: "landscape",
+        },
+      },
+    },
   ],
   params: [
     {
@@ -1038,9 +1051,27 @@ const sora2Pro: VideoModelConfig = {
       label: "Aspect Ratio",
       type: "enum",
       required: false,
-      default: "auto",
-      options: ["auto", "9:16", "16:9"],
+      default: "landscape",
+      options: ["landscape", "portrait", "9:16", "16:9"],
       description: "Aspect ratio of the generated video",
+    },
+    {
+      name: "n_frames",
+      label: "Frame Count",
+      type: "enum",
+      required: false,
+      default: "10",
+      options: ["10", "15"],
+      description: "Number of frames (10 ≈ short clip, 15 ≈ longer clip)",
+    },
+    {
+      name: "size",
+      label: "Quality",
+      type: "enum",
+      required: false,
+      default: "standard",
+      options: ["standard", "high"],
+      description: "Output quality: standard or high",
     },
     {
       name: "duration",
