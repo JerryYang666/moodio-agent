@@ -564,7 +564,7 @@ export async function POST(
                   // Calculate cost and verify balance
                   const cost = await calculateCost("Image/all", {});
                   if (cost > 0) {
-                    const balance = await getUserBalance(account.accountId);
+                    const balance = await getUserBalance(account.accountId, account.accountType);
                     if (balance < cost) {
                       throw new InsufficientCreditsError();
                     }
