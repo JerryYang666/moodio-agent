@@ -846,6 +846,12 @@
       "subtitle": "リアルタイム",
       "description": "リアルタイムリレーサーバーへのWebSocket往復レイテンシをテストします。",
       "goTo": "レイテンシテスト実行"
+    },
+    "teamManagement": {
+      "title": "チーム管理",
+      "subtitle": "管理",
+      "description": "チーム、メンバー、チームクレジットの表示と管理。",
+      "goTo": "チーム管理へ"
     }
   },
   "dashboard": {

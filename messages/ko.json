@@ -846,6 +846,12 @@
       "subtitle": "실시간",
       "description": "실시간 릴레이 서버로의 WebSocket 왕복 지연 시간을 테스트합니다.",
       "goTo": "지연 시간 테스트"
+    },
+    "teamManagement": {
+      "title": "팀 관리",
+      "subtitle": "관리",
+      "description": "팀, 멤버 및 팀 크레딧을 조회하고 관리합니다.",
+      "goTo": "팀 관리로 이동"
     }
   },
   "dashboard": {

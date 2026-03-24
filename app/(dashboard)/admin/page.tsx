@@ -54,6 +54,34 @@ export default function AdminPage() {
           </CardFooter>
         </Card>
 
+        {/* Team Management Card */}
+        <Card
+          className="py-4 cursor-pointer hover:scale-[1.02] transition-transform"
+          onPress={() => router.push("/admin/team-management")}
+        >
+          <CardHeader className="pb-0 pt-2 px-4 flex-row gap-2 items-center">
+            <UsersRound className="w-6 h-6 text-primary" />
+            <div className="flex flex-col">
+              <p className="text-tiny uppercase font-bold">
+                {t("teamManagement.subtitle")}
+              </p>
+              <h4 className="font-bold text-large">{t("teamManagement.title")}</h4>
+            </div>
+          </CardHeader>
+          <CardBody className="overflow-visible py-2">
+            <p className="text-default-500">{t("teamManagement.description")}</p>
+          </CardBody>
+          <CardFooter>
+            <Button
+              color="primary"
+              variant="flat"
+              onPress={() => router.push("/admin/team-management")}
+            >
+              {t("teamManagement.goTo")}
+            </Button>
+          </CardFooter>
+        </Card>
+
         {/* Chat Management Card */}
         <Card
           className="py-4 cursor-pointer hover:scale-[1.02] transition-transform"
@@ -334,31 +362,6 @@ export default function AdminPage() {
           </CardFooter>
         </Card>
 
-        {/* Team Management Card */}
-        <Card
-          className="py-4 cursor-pointer hover:scale-[1.02] transition-transform"
-          onPress={() => router.push("/admin/team-management")}
-        >
-          <CardHeader className="pb-0 pt-2 px-4 flex-row gap-2 items-center">
-            <UsersRound className="w-6 h-6 text-primary" />
-            <div className="flex flex-col">
-              <p className="text-tiny uppercase font-bold">Management</p>
-              <h4 className="font-bold text-large">Team Management</h4>
-            </div>
-          </CardHeader>
-          <CardBody className="overflow-visible py-2">
-            <p className="text-default-500">View and manage teams, members, and team credits</p>
-          </CardBody>
-          <CardFooter>
-            <Button
-              color="primary"
-              variant="flat"
-              onPress={() => router.push("/admin/team-management")}
-            >
-              Go to Teams
-            </Button>
-          </CardFooter>
-        </Card>
       </div>
     </div>
   );

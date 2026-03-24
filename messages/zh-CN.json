@@ -846,6 +846,12 @@
       "subtitle": "实时服务",
       "description": "测试 WebSocket 到实时中继服务器的往返延迟。",
       "goTo": "运行延迟测试"
+    },
+    "teamManagement": {
+      "title": "团队管理",
+      "subtitle": "管理",
+      "description": "查看和管理团队、成员及团队积分。",
+      "goTo": "前往团队管理"
     }
   },
   "dashboard": {
