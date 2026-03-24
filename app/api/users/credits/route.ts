@@ -3,6 +3,7 @@ import { getAccessToken } from "@/lib/auth/cookies";
 import { verifyAccessToken } from "@/lib/auth/jwt";
 import { db } from "@/lib/db";
 import {
+  users,
   userCredits,
   teamCredits,
   creditTransactions,
@@ -10,6 +11,12 @@ import {
 import { eq, and, desc } from "drizzle-orm";
 import type { AccountType } from "@/lib/credits";
 
+/**
+ * GET /api/users/credits
+ * View endpoint for transaction history. Accepts explicit accountType/accountId
+ * query params so the credits page can browse any account the user has access to
+ * without changing the global billing preference.
+ */
 export async function GET(request: NextRequest) {
   try {
     const accessToken = getAccessToken(request);
@@ -75,10 +82,25 @@ export async function GET(request: NextRequest) {
       balance = credits[0].balance;
     }
 
-    // Get transaction history
-    const transactions = await db
-      .select()
+    // Get transaction history with performer details
+    const rows = await db
+      .select({
+        id: creditTransactions.id,
+        accountId: creditTransactions.accountId,
+        accountType: creditTransactions.accountType,
+        amount: creditTransactions.amount,
+        type: creditTransactions.type,
+        description: creditTransactions.description,
+        performedBy: creditTransactions.performedBy,
+        relatedEntityType: creditTransactions.relatedEntityType,
+        relatedEntityId: creditTransactions.relatedEntityId,
+        createdAt: creditTransactions.createdAt,
+        performedByEmail: users.email,
+        performedByFirstName: users.firstName,
+        performedByLastName: users.lastName,
+      })
       .from(creditTransactions)
+      .leftJoin(users, eq(creditTransactions.performedBy, users.id))
       .where(
         and(
           eq(creditTransactions.accountId, accountId),
@@ -93,7 +115,7 @@ export async function GET(request: NextRequest) {
       balance,
       accountType,
       accountId,
-      transactions,
+      transactions: rows,
     });
   } catch (error) {
     console.error("Error fetching user credits:", error);

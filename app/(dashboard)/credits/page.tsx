@@ -20,10 +20,6 @@ import { Bean, CalendarCheck } from "lucide-react";
 import { api } from "@/lib/api/client";
 import { useCredits } from "@/hooks/use-credits";
 import { useTeams } from "@/hooks/use-team";
-import { useDispatch, useSelector } from "react-redux";
-import { setActiveAccountLocal, resetToPersonalLocal } from "@/lib/redux/slices/activeAccountSlice";
-import type { RootState } from "@/lib/redux/store";
-import { useSetActiveAccountMutation } from "@/lib/redux/services/next-api";
 
 interface Transaction {
   id: string;
@@ -44,11 +40,20 @@ interface CheckinStatus {
 
 export default function CreditsPage() {
   const t = useTranslations("credits");
-  const { balance, loading: balanceLoading, refreshBalance, activeAccountType, activeAccountId } = useCredits();
+  const { activeAccountType, activeAccountId, refreshBalance } = useCredits();
   const { teams } = useTeams();
-  const dispatch = useDispatch();
-  const [setActiveAccountApi] = useSetActiveAccountMutation();
-  const activeAccount = useSelector((state: RootState) => state.activeAccount);
+
+  // Local view state — does NOT change the global billing account
+  const [viewAccountType, setViewAccountType] = useState<"personal" | "team">(activeAccountType);
+  const [viewAccountId, setViewAccountId] = useState<string | null>(activeAccountId);
+
+  // Sync local view with global active account when it changes externally
+  useEffect(() => {
+    setViewAccountType(activeAccountType);
+    setViewAccountId(activeAccountId);
+  }, [activeAccountType, activeAccountId]);
+
+  const [viewBalance, setViewBalance] = useState<number | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [checkinStatus, setCheckinStatus] = useState<CheckinStatus | null>(null);
@@ -57,18 +62,19 @@ export default function CreditsPage() {
   const fetchCredits = useCallback(async () => {
     try {
       const params = new URLSearchParams();
-      if (activeAccountType === "team" && activeAccountId) {
+      if (viewAccountType === "team" && viewAccountId) {
         params.set("accountType", "team");
-        params.set("accountId", activeAccountId);
+        params.set("accountId", viewAccountId);
       }
       const data = await api.get(`/api/users/credits?${params.toString()}`);
+      setViewBalance(data.balance);
       setTransactions(data.transactions);
     } catch (error) {
       console.error("Failed to fetch credits:", error);
     } finally {
       setLoading(false);
     }
-  }, [activeAccountType, activeAccountId]);
+  }, [viewAccountType, viewAccountId]);
 
   const fetchCheckinStatus = useCallback(async () => {
     try {
@@ -80,12 +86,12 @@ export default function CreditsPage() {
   }, []);
 
   useEffect(() => {
-    refreshBalance();
+    setLoading(true);
     fetchCredits();
-    if (activeAccountType === "personal") {
+    if (viewAccountType === "personal") {
       fetchCheckinStatus();
     }
-  }, [refreshBalance, fetchCredits, fetchCheckinStatus, activeAccountType]);
+  }, [fetchCredits, fetchCheckinStatus, viewAccountType]);
 
   const handleCheckin = async () => {
     setClaiming(true);
@@ -129,7 +135,7 @@ export default function CreditsPage() {
     return transactionTypes[type] || type;
   };
 
-  if (loading || balanceLoading) {
+  if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
         <Spinner size="lg" />
@@ -145,23 +151,16 @@ export default function CreditsPage() {
 
       {teams.length > 0 && (
         <Tabs
-          selectedKey={activeAccountType === "team" ? `team:${activeAccountId}` : "personal"}
+          selectedKey={viewAccountType === "team" ? `team:${viewAccountId}` : "personal"}
           onSelectionChange={(key) => {
             const keyStr = String(key);
             if (keyStr === "personal") {
-              dispatch(resetToPersonalLocal());
-              setActiveAccountApi({ accountType: "personal", accountId: null });
+              setViewAccountType("personal");
+              setViewAccountId(null);
             } else if (keyStr.startsWith("team:")) {
               const teamId = keyStr.slice(5);
-              const team = teams.find((t) => t.teamId === teamId);
-              if (team) {
-                dispatch(setActiveAccountLocal({
-                  accountType: "team",
-                  accountId: team.teamId,
-                  teamName: team.teamName,
-                }));
-                setActiveAccountApi({ accountType: "team", accountId: team.teamId });
-              }
+              setViewAccountType("team");
+              setViewAccountId(teamId);
             }
           }}
           variant="underlined"
@@ -186,7 +185,7 @@ export default function CreditsPage() {
                 {t("currentBalance")}
               </p>
               <p className="text-4xl font-bold text-primary">
-                {balance !== null ? balance.toLocaleString() : "0"}
+                {viewBalance !== null ? viewBalance.toLocaleString() : "0"}
               </p>
               <p className="text-sm text-default-500 mt-1">
                 {t("namePlural")}
@@ -197,7 +196,7 @@ export default function CreditsPage() {
       </Card>
 
       {/* Daily Check-in Card */}
-      {activeAccountType === "personal" && checkinStatus && (
+      {viewAccountType === "personal" && checkinStatus && (
         <Card className="bg-linear-to-br from-success/10 to-success/5">
           <CardBody className="py-6">
             <div className="flex items-center justify-between">
@@ -247,7 +246,7 @@ export default function CreditsPage() {
                 <TableColumn>{t("date")}</TableColumn>
                 <TableColumn>{t("type")}</TableColumn>
                 <TableColumn>{t("description")}</TableColumn>
-                {activeAccountType === "team"
+                {viewAccountType === "team"
                   ? <TableColumn>{t("usedBy")}</TableColumn>
                   : <TableColumn className="hidden"><></></TableColumn>
                 }
@@ -271,7 +270,7 @@ export default function CreditsPage() {
                     <TableCell className="text-default-500 text-sm">
                       {tx.description || "-"}
                     </TableCell>
-                    {activeAccountType === "team"
+                    {viewAccountType === "team"
                       ? <TableCell className="text-default-500 text-sm">
                           {tx.performedByFirstName || tx.performedByLastName
                             ? `${tx.performedByFirstName ?? ""} ${tx.performedByLastName ?? ""}`.trim()
