@@ -20,6 +20,50 @@ export interface UpdatePersistentAssetsRequest {
 // Types for credits
 export interface CreditsBalanceResponse {
   balance: number;
+  accountType: string;
+  accountId: string;
+}
+
+// Types for active account
+export interface SetActiveAccountRequest {
+  accountType: "personal" | "team";
+  accountId: string | null;
+}
+
+// Types for teams
+export interface TeamMemberItem {
+  id: string;
+  userId: string;
+  role: string;
+  joinedAt: string;
+  email: string;
+  firstName: string | null;
+  lastName: string | null;
+}
+
+export interface TeamInvitationItem {
+  id: string;
+  email: string;
+  status: string;
+  expiresAt: string;
+  createdAt: string;
+}
+
+export interface TeamItem {
+  teamId: string;
+  teamName: string;
+  ownerId: string;
+  role: string;
+  createdAt: string;
+}
+
+export interface TeamDetailsResponse {
+  id: string;
+  name: string;
+  ownerId: string;
+  members: TeamMemberItem[];
+  pendingInvitations: TeamInvitationItem[];
+  balance: number;
 }
 
 // Types for video generation
@@ -66,20 +110,26 @@ export interface CollectionItem {
 
 /**
  * Next.js API slice
- *
- * Separate from the Flask API to keep concerns separated.
- * Uses the same auth/reauth logic.
  */
 export const nextApi = createApi({
   reducerPath: "nextApi",
   baseQuery: createBaseQueryWithReauth(""),
-  tagTypes: ["FeatureFlags", "Credits", "Collections", "PersistentAssets"],
+  tagTypes: ["FeatureFlags", "Credits", "Collections", "PersistentAssets", "Teams"],
 
   endpoints: (builder) => ({
     getFeatureFlags: builder.query<FeatureFlagsResponse, void>({
       query: () => "/api/users/feature-flags",
       keepUnusedDataFor: 300,
       providesTags: ["FeatureFlags"],
+    }),
+
+    setActiveAccount: builder.mutation<void, SetActiveAccountRequest>({
+      query: (body) => ({
+        url: "/api/users/active-account",
+        method: "PUT",
+        body,
+      }),
+      invalidatesTags: ["Credits"],
     }),
 
     getCreditsBalance: builder.query<CreditsBalanceResponse, void>({
@@ -94,6 +144,88 @@ export const nextApi = createApi({
         body,
       }),
       invalidatesTags: ["Credits"],
+    }),
+
+    // Teams endpoints
+    getUserTeams: builder.query<TeamItem[], void>({
+      query: () => "/api/teams",
+      transformResponse: (response: { teams: TeamItem[] }) => response.teams ?? [],
+      providesTags: ["Teams"],
+    }),
+
+    getTeamDetails: builder.query<TeamDetailsResponse, string>({
+      query: (teamId) => `/api/teams/${teamId}`,
+      transformResponse: (response: { team: TeamDetailsResponse }) => response.team,
+      providesTags: (_result, _error, teamId) => [{ type: "Teams", id: teamId }],
+    }),
+
+    createTeam: builder.mutation<{ team: { id: string; name: string } }, { name: string }>({
+      query: (body) => ({
+        url: "/api/teams",
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["Teams"],
+    }),
+
+    updateTeam: builder.mutation<void, { teamId: string; name: string }>({
+      query: ({ teamId, ...body }) => ({
+        url: `/api/teams/${teamId}`,
+        method: "PATCH",
+        body,
+      }),
+      invalidatesTags: ["Teams"],
+    }),
+
+    deleteTeam: builder.mutation<void, string>({
+      query: (teamId) => ({
+        url: `/api/teams/${teamId}`,
+        method: "DELETE",
+      }),
+      invalidatesTags: ["Teams"],
+    }),
+
+    inviteTeamMember: builder.mutation<void, { teamId: string; email: string }>({
+      query: ({ teamId, ...body }) => ({
+        url: `/api/teams/${teamId}/invite`,
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: (_result, _error, { teamId }) => [{ type: "Teams", id: teamId }],
+    }),
+
+    cancelInvitation: builder.mutation<void, { teamId: string; invitationId: string }>({
+      query: ({ teamId, invitationId }) => ({
+        url: `/api/teams/${teamId}/invite/${invitationId}`,
+        method: "DELETE",
+      }),
+      invalidatesTags: (_result, _error, { teamId }) => [{ type: "Teams", id: teamId }],
+    }),
+
+    updateMemberRole: builder.mutation<void, { teamId: string; memberId: string; role: string }>({
+      query: ({ teamId, memberId, ...body }) => ({
+        url: `/api/teams/${teamId}/members/${memberId}`,
+        method: "PATCH",
+        body,
+      }),
+      invalidatesTags: (_result, _error, { teamId }) => [{ type: "Teams", id: teamId }],
+    }),
+
+    removeMember: builder.mutation<void, { teamId: string; memberId: string }>({
+      query: ({ teamId, memberId }) => ({
+        url: `/api/teams/${teamId}/members/${memberId}`,
+        method: "DELETE",
+      }),
+      invalidatesTags: (_result, _error, { teamId }) => [{ type: "Teams", id: teamId }],
+    }),
+
+    acceptInvitation: builder.mutation<{ teamId: string }, { token: string }>({
+      query: (body) => ({
+        url: "/api/teams/accept-invite",
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["Teams"],
     }),
 
     getCollections: builder.query<CollectionItem[], void>({
@@ -165,8 +297,19 @@ export const nextApi = createApi({
 
 export const {
   useGetFeatureFlagsQuery,
+  useSetActiveAccountMutation,
   useGetCreditsBalanceQuery,
   useGenerateVideoMutation,
+  useGetUserTeamsQuery,
+  useGetTeamDetailsQuery,
+  useCreateTeamMutation,
+  useUpdateTeamMutation,
+  useDeleteTeamMutation,
+  useInviteTeamMemberMutation,
+  useCancelInvitationMutation,
+  useUpdateMemberRoleMutation,
+  useRemoveMemberMutation,
+  useAcceptInvitationMutation,
   useGetCollectionsQuery,
   useCreateCollectionMutation,
   useRenameCollectionMutation,

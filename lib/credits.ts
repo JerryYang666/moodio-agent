@@ -1,9 +1,22 @@
 import { db } from "@/lib/db";
-import { userCredits, creditTransactions } from "@/lib/db/schema";
+import {
+  userCredits,
+  teamCredits,
+  creditTransactions,
+  userActiveAccounts,
+} from "@/lib/db/schema";
 import { eq, sql, and } from "drizzle-orm";
+import type { AccessTokenPayload } from "@/lib/auth/jwt";
 
-// Helper type to support both db and transaction objects
 type DbOrTx = typeof db | any;
+
+export type AccountType = "personal" | "team";
+
+export interface ActiveAccount {
+  accountId: string;
+  accountType: AccountType;
+  performedBy: string;
+}
 
 export class InsufficientCreditsError extends Error {
   constructor(message = "INSUFFICIENT_CREDITS") {
@@ -12,75 +25,125 @@ export class InsufficientCreditsError extends Error {
   }
 }
 
-/**
- * Related entity reference for linking transactions to other records
- */
 export interface RelatedEntity {
-  type: string; // e.g., 'video_generation'
-  id: string; // UUID of the related entity
+  type: string;
+  id: string;
 }
 
 /**
- * Get user credit balance.
- * Creates the userCredits record if it doesn't exist.
+ * Read the user's active billing account from the DB and validate membership.
+ * Falls back to the user's personal account when no preference is stored
+ * or when team membership can no longer be confirmed via the JWT.
+ */
+export async function getActiveAccount(
+  userId: string,
+  payload: AccessTokenPayload
+): Promise<ActiveAccount> {
+  const personal: ActiveAccount = {
+    accountId: userId,
+    accountType: "personal",
+    performedBy: userId,
+  };
+
+  const [row] = await db
+    .select()
+    .from(userActiveAccounts)
+    .where(eq(userActiveAccounts.userId, userId));
+
+  if (!row || row.accountType !== "team" || !row.accountId) {
+    return personal;
+  }
+
+  const membership = payload.teams?.find((t) => t.id === row.accountId);
+  if (!membership) {
+    return personal;
+  }
+
+  return {
+    accountId: row.accountId,
+    accountType: "team",
+    performedBy: userId,
+  };
+}
+
+function getBalanceTable(accountType: AccountType) {
+  return accountType === "team" ? teamCredits : userCredits;
+}
+
+function getIdColumn(accountType: AccountType) {
+  return accountType === "team" ? teamCredits.teamId : userCredits.userId;
+}
+
+/**
+ * Get credit balance for a personal or team account.
+ * Auto-creates the record if it doesn't exist (personal only; team records are created with the team).
  */
 export async function getUserBalance(
-  userId: string,
+  accountId: string,
+  accountType: AccountType = "personal",
   tx: DbOrTx = db
 ): Promise<number> {
+  const table = getBalanceTable(accountType);
+  const idCol = getIdColumn(accountType);
+
   const [record] = await tx
     .select()
-    .from(userCredits)
-    .where(eq(userCredits.userId, userId));
+    .from(table)
+    .where(eq(idCol, accountId));
 
   if (!record) {
-    // Create record if not exists
-    const [newRecord] = await tx
-      .insert(userCredits)
-      .values({ userId, balance: 0 })
-      .returning();
-    return newRecord.balance;
+    if (accountType === "personal") {
+      const [newRecord] = await tx
+        .insert(userCredits)
+        .values({ userId: accountId, balance: 0 })
+        .returning();
+      return newRecord.balance;
+    }
+    return 0;
   }
 
   return record.balance;
 }
 
 /**
- * Verify a user has enough credits. Throws InsufficientCreditsError if not.
+ * Verify an account has enough credits.
  */
 export async function assertSufficientCredits(
-  userId: string,
+  accountId: string,
   amount: number,
+  accountType: AccountType = "personal",
   tx: DbOrTx = db
 ): Promise<void> {
-  const balance = await getUserBalance(userId, tx);
+  const balance = await getUserBalance(accountId, accountType, tx);
   if (balance < Math.abs(amount)) {
     throw new InsufficientCreditsError();
   }
 }
 
 /**
- * Deduct credits from a user.
- * Throws InsufficientCreditsError if balance is too low.
+ * Deduct credits from a personal or team account.
  */
 export async function deductCredits(
-  userId: string,
+  accountId: string,
   amount: number,
   type: string,
   description?: string,
+  performedBy?: string,
   relatedEntity?: RelatedEntity,
+  accountType: AccountType = "personal",
   tx: DbOrTx = db
 ): Promise<void> {
-  // Ensure amount is positive
   const deduction = Math.abs(amount);
   if (deduction === 0) return;
 
+  const table = getBalanceTable(accountType);
+  const idCol = getIdColumn(accountType);
+
   const operation = async (executor: DbOrTx) => {
-    // 1. Get current balance
     const [record] = await executor
       .select()
-      .from(userCredits)
-      .where(eq(userCredits.userId, userId));
+      .from(table)
+      .where(eq(idCol, accountId));
 
     const balance = record?.balance || 0;
 
@@ -88,21 +151,21 @@ export async function deductCredits(
       throw new InsufficientCreditsError();
     }
 
-    // 2. Deduct
     await executor
-      .update(userCredits)
+      .update(table)
       .set({
-        balance: sql`${userCredits.balance} - ${deduction}`,
+        balance: sql`${table.balance} - ${deduction}`,
         updatedAt: new Date(),
       })
-      .where(eq(userCredits.userId, userId));
+      .where(eq(idCol, accountId));
 
-    // 3. Log transaction
     await executor.insert(creditTransactions).values({
-      userId,
+      accountId,
+      accountType,
       amount: -deduction,
       type,
       description,
+      performedBy,
       relatedEntityType: relatedEntity?.type,
       relatedEntityId: relatedEntity?.id,
     });
@@ -116,45 +179,55 @@ export async function deductCredits(
 }
 
 /**
- * Grant (add) credits to a user.
+ * Grant (add) credits to a personal or team account.
  */
 export async function grantCredits(
-  userId: string,
+  accountId: string,
   amount: number,
   type: string,
   description?: string,
   performedBy?: string,
   relatedEntity?: RelatedEntity,
+  accountType: AccountType = "personal",
   tx: DbOrTx = db
 ): Promise<void> {
   const grantAmount = Math.abs(amount);
   if (grantAmount === 0) return;
 
+  const table = getBalanceTable(accountType);
+  const idCol = getIdColumn(accountType);
+
   const operation = async (executor: DbOrTx) => {
-    // 1. Ensure record exists or update
     const [record] = await executor
       .select()
-      .from(userCredits)
-      .where(eq(userCredits.userId, userId));
+      .from(table)
+      .where(eq(idCol, accountId));
 
     if (!record) {
-      await executor.insert(userCredits).values({
-        userId,
-        balance: grantAmount,
-      });
+      if (accountType === "personal") {
+        await executor.insert(userCredits).values({
+          userId: accountId,
+          balance: grantAmount,
+        });
+      } else {
+        await executor.insert(teamCredits).values({
+          teamId: accountId,
+          balance: grantAmount,
+        });
+      }
     } else {
       await executor
-        .update(userCredits)
+        .update(table)
         .set({
-          balance: sql`${userCredits.balance} + ${grantAmount}`,
+          balance: sql`${table.balance} + ${grantAmount}`,
           updatedAt: new Date(),
         })
-        .where(eq(userCredits.userId, userId));
+        .where(eq(idCol, accountId));
     }
 
-    // 2. Log transaction
     await executor.insert(creditTransactions).values({
-      userId,
+      accountId,
+      accountType,
       amount: grantAmount,
       type,
       description,
@@ -173,12 +246,15 @@ export async function grantCredits(
 
 /**
  * Get the original charge transaction for a related entity.
- * Used to look up how much was charged for refunds.
  */
 export async function getChargeForEntity(
   relatedEntity: RelatedEntity,
   tx: DbOrTx = db
-): Promise<{ amount: number; userId: string } | null> {
+): Promise<{
+  amount: number;
+  accountId: string;
+  accountType: AccountType;
+} | null> {
   const [transaction] = await tx
     .select()
     .from(creditTransactions)
@@ -186,7 +262,6 @@ export async function getChargeForEntity(
       and(
         eq(creditTransactions.relatedEntityType, relatedEntity.type),
         eq(creditTransactions.relatedEntityId, relatedEntity.id),
-        // Charges are negative amounts
         sql`${creditTransactions.amount} < 0`
       )
     )
@@ -195,15 +270,14 @@ export async function getChargeForEntity(
   if (!transaction) return null;
 
   return {
-    // Return absolute value (charges are stored as negative)
     amount: Math.abs(transaction.amount),
-    userId: transaction.userId,
+    accountId: transaction.accountId,
+    accountType: transaction.accountType as AccountType,
   };
 }
 
 /**
  * Refund a previous charge by looking up the original transaction.
- * Returns the refunded amount, or null if no charge was found.
  */
 export async function refundCharge(
   relatedEntity: RelatedEntity,
@@ -211,21 +285,22 @@ export async function refundCharge(
   tx: DbOrTx = db
 ): Promise<number | null> {
   const operation = async (executor: DbOrTx) => {
-    // 1. Look up original charge
     const charge = await getChargeForEntity(relatedEntity, executor);
     if (!charge) {
-      console.error(`[Refund] No charge found for ${relatedEntity.type}:${relatedEntity.id}`);
+      console.error(
+        `[Refund] No charge found for ${relatedEntity.type}:${relatedEntity.id}`
+      );
       return null;
     }
 
-    // 2. Grant the refund
     await grantCredits(
-      charge.userId,
+      charge.accountId,
       charge.amount,
       "refund",
       reason,
-      undefined, // performedBy (system)
+      undefined,
       relatedEntity,
+      charge.accountType,
       executor
     );
 

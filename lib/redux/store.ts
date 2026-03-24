@@ -1,6 +1,7 @@
 import { configureStore } from "@reduxjs/toolkit";
 import queryReducer from "./slices/querySlice";
 import uiReducer from "./slices/uiSlice";
+import activeAccountReducer from "./slices/activeAccountSlice";
 import { api } from "./services/api";
 import { nextApi } from "./services/next-api";
 
@@ -8,6 +9,7 @@ export const store = configureStore({
   reducer: {
     query: queryReducer,
     ui: uiReducer,
+    activeAccount: activeAccountReducer,
     [api.reducerPath]: api.reducer,
     [nextApi.reducerPath]: nextApi.reducer,
   },

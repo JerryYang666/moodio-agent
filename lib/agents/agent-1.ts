@@ -22,7 +22,7 @@ import {
   getVideoModelsPromptText,
 } from "@/lib/video/models";
 import { calculateCost } from "@/lib/pricing";
-import { deductCredits, getUserBalance, InsufficientCreditsError } from "@/lib/credits";
+import { deductCredits, getUserBalance, InsufficientCreditsError, AccountType } from "@/lib/credits";
 import {
   fetchTaxonomyTree,
   serializeTaxonomyForLLM,
@@ -112,6 +112,9 @@ interface ParseContext {
   userId: string;
   agent: Agent1;
   maxSuggestions: number;
+  effectiveAccountId: string;
+  effectiveAccountType: AccountType;
+  effectivePerformedBy: string;
 }
 
 export class Agent1 implements Agent {
@@ -130,9 +133,15 @@ export class Agent1 implements Agent {
     aspectRatioOverride?: string,
     imageSizeOverride?: ImageSize,
     imageModelId?: string,
-    maxImageQuantity?: number // User-selected max image quantity (undefined = smart/agent decides)
+    maxImageQuantity?: number, // User-selected max image quantity (undefined = smart/agent decides)
+    accountId?: string,
+    accountType?: AccountType,
+    performedBy?: string
   ): Promise<AgentResponse> {
     const startTime = requestStartTime || Date.now();
+    const effectiveAccountId = accountId || userId;
+    const effectiveAccountType: AccountType = accountType || "personal";
+    const effectivePerformedBy = performedBy || userId;
     console.log(
       "[Perf] Agent processRequest start",
       `[${Date.now() - startTime}ms]`
@@ -193,7 +202,10 @@ export class Agent1 implements Agent {
       startTime,
       isAdmin,
       userId,
-      effectiveMaxSuggestions
+      effectiveMaxSuggestions,
+      effectiveAccountId,
+      effectiveAccountType,
+      effectivePerformedBy
     );
 
     return { stream, completion };
@@ -521,7 +533,10 @@ export class Agent1 implements Agent {
     startTime: number,
     isAdmin: boolean,
     userId: string,
-    maxSuggestions: number = MAX_SUGGESTIONS_HARD_CAP
+    maxSuggestions: number = MAX_SUGGESTIONS_HARD_CAP,
+    effectiveAccountId: string = userId,
+    effectiveAccountType: AccountType = "personal",
+    effectivePerformedBy: string = userId
   ): Promise<AgentResponse> {
     const encoder = new TextEncoder();
     let resolveCompletion: (value: Message) => void;
@@ -580,13 +595,16 @@ export class Agent1 implements Agent {
               }
             }
 
-            const result = await self.callLLMAndParseCore(
-              prepared,
-              startTime,
-              send,
-              userId,
-              maxSuggestions
-            );
+                const result = await self.callLLMAndParseCore(
+                  prepared,
+                  startTime,
+                  send,
+                  userId,
+                  maxSuggestions,
+                  effectiveAccountId,
+                  effectiveAccountType,
+                  effectivePerformedBy
+                );
 
             if (attempt > 0) {
               console.log(
@@ -636,7 +654,10 @@ export class Agent1 implements Agent {
     startTime: number,
     send: (data: any) => void,
     userId: string,
-    maxSuggestions: number = MAX_SUGGESTIONS_HARD_CAP
+    maxSuggestions: number = MAX_SUGGESTIONS_HARD_CAP,
+    effectiveAccountId: string = userId,
+    effectiveAccountType: AccountType = "personal",
+    effectivePerformedBy: string = userId
   ): Promise<Message> {
     console.log("prepared.messages", JSON.stringify(prepared.messages, null, 2));
 
@@ -659,7 +680,7 @@ export class Agent1 implements Agent {
       imageTasks: [],
       finalContent: [],
     };
-    const ctx: ParseContext = { prepared, startTime, send, userId, agent: this, maxSuggestions };
+    const ctx: ParseContext = { prepared, startTime, send, userId, agent: this, maxSuggestions, effectiveAccountId, effectiveAccountType, effectivePerformedBy };
 
     try {
       await this.consumeLLMStream(llmStream, state, ctx);
@@ -755,7 +776,8 @@ export class Agent1 implements Agent {
                 `imageId=${trackingImageId}`
               );
               const part = await ctx.agent.generateImage(
-                suggestion, ctx.prepared, currentIndex, ctx.startTime, ctx.userId, trackingImageId
+                suggestion, ctx.prepared, currentIndex, ctx.startTime, ctx.userId,
+                trackingImageId, ctx.effectiveAccountId, ctx.effectiveAccountType, ctx.effectivePerformedBy
               );
 
               ctx.send({ type: "part_update", imageId: trackingImageId, part });
@@ -1008,7 +1030,10 @@ export class Agent1 implements Agent {
     index: number,
     startTime: number,
     userId: string,
-    preGeneratedImageId?: string
+    preGeneratedImageId?: string,
+    effectiveAccountId?: string,
+    effectiveAccountType?: AccountType,
+    effectivePerformedBy?: string
   ): Promise<MessageContentPart> {
     console.log(
       `[Perf] Image generation start index=${index}`,
@@ -1033,7 +1058,10 @@ export class Agent1 implements Agent {
           index,
           startTime,
           userId,
-          preGeneratedImageId
+          preGeneratedImageId,
+          effectiveAccountId,
+          effectiveAccountType,
+          effectivePerformedBy
         );
 
         if (attempt > 0) {
@@ -1093,7 +1121,10 @@ export class Agent1 implements Agent {
     index: number,
     startTime: number,
     userId: string,
-    preGeneratedImageId?: string
+    preGeneratedImageId?: string,
+    effectiveAccountId?: string,
+    effectiveAccountType?: AccountType,
+    effectivePerformedBy?: string
   ): Promise<MessageContentPart> {
     // Use user-selected aspect ratio if provided, otherwise use agent's suggestion
     // If agent's suggestion is also invalid, fall back to "1:1"
@@ -1157,7 +1188,9 @@ export class Agent1 implements Agent {
       // Calculate cost and verify balance before generating
       const cost = await calculateCost("Image/all", {});
       if (cost > 0) {
-        const balance = await getUserBalance(userId);
+        const acctId = effectiveAccountId || userId;
+        const acctType: AccountType = effectiveAccountType || "personal";
+        const balance = await getUserBalance(acctId, acctType);
         if (balance < cost) {
           throw new InsufficientCreditsError();
         }
@@ -1192,11 +1225,17 @@ export class Agent1 implements Agent {
 
       // Deduct credits only after successful generation
       if (cost > 0) {
+        const acctId = effectiveAccountId || userId;
+        const acctType: AccountType = effectiveAccountType || "personal";
+        const performer = effectivePerformedBy || userId;
         await deductCredits(
-          userId,
+          acctId,
           cost,
           "image_generation",
-          `Image generation (${modelId || "default"})`
+          `Image generation (${modelId || "default"})`,
+          performer,
+          undefined,
+          acctType
         );
       }
 
@@ -1258,9 +1297,15 @@ export class Agent1 implements Agent {
     imageModelId?: string,
     messageTimestamp?: number, // Timestamp to use for all variants (for frontend sync)
     referenceImages?: ReferenceImageEntry[], // Reference images with tags
-    maxImageQuantity?: number // User-selected max image quantity (undefined = smart/agent decides)
+    maxImageQuantity?: number, // User-selected max image quantity (undefined = smart/agent decides)
+    accountId?: string,
+    accountType?: AccountType,
+    performedBy?: string
   ): Promise<ParallelAgentResponse> {
     const startTime = requestStartTime || Date.now();
+    const effectiveAccountId = accountId || userId;
+    const effectiveAccountType: AccountType = accountType || "personal";
+    const effectivePerformedBy = performedBy || userId;
     // Use provided timestamp or generate one
     const variantTimestamp = messageTimestamp || Date.now();
     console.log(
@@ -1370,7 +1415,10 @@ export class Agent1 implements Agent {
                   startTime,
                   send,
                   userId,
-                  effectiveMaxSuggestions
+                  effectiveMaxSuggestions,
+                  effectiveAccountId,
+                  effectiveAccountType,
+                  effectivePerformedBy
                 );
 
                 // Add variantId and createdAt to the result message

@@ -15,9 +15,11 @@ import { Chip } from "@heroui/chip";
 import { Spinner } from "@heroui/spinner";
 import { Button } from "@heroui/button";
 import { addToast } from "@heroui/toast";
+import { Tabs, Tab } from "@heroui/tabs";
 import { Bean, CalendarCheck } from "lucide-react";
 import { api } from "@/lib/api/client";
 import { useCredits } from "@/hooks/use-credits";
+import { useTeams } from "@/hooks/use-team";
 
 interface Transaction {
   id: string;
@@ -25,6 +27,9 @@ interface Transaction {
   type: string;
   description: string | null;
   createdAt: string;
+  performedByEmail?: string;
+  performedByFirstName?: string;
+  performedByLastName?: string;
 }
 
 interface CheckinStatus {
@@ -35,7 +40,20 @@ interface CheckinStatus {
 
 export default function CreditsPage() {
   const t = useTranslations("credits");
-  const { balance, loading: balanceLoading, refreshBalance } = useCredits();
+  const { activeAccountType, activeAccountId, refreshBalance } = useCredits();
+  const { teams } = useTeams();
+
+  // Local view state — does NOT change the global billing account
+  const [viewAccountType, setViewAccountType] = useState<"personal" | "team">(activeAccountType);
+  const [viewAccountId, setViewAccountId] = useState<string | null>(activeAccountId);
+
+  // Sync local view with global active account when it changes externally
+  useEffect(() => {
+    setViewAccountType(activeAccountType);
+    setViewAccountId(activeAccountId);
+  }, [activeAccountType, activeAccountId]);
+
+  const [viewBalance, setViewBalance] = useState<number | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [checkinStatus, setCheckinStatus] = useState<CheckinStatus | null>(null);
@@ -43,14 +61,20 @@ export default function CreditsPage() {
 
   const fetchCredits = useCallback(async () => {
     try {
-      const data = await api.get("/api/users/credits");
+      const params = new URLSearchParams();
+      if (viewAccountType === "team" && viewAccountId) {
+        params.set("accountType", "team");
+        params.set("accountId", viewAccountId);
+      }
+      const data = await api.get(`/api/users/credits?${params.toString()}`);
+      setViewBalance(data.balance);
       setTransactions(data.transactions);
     } catch (error) {
       console.error("Failed to fetch credits:", error);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [viewAccountType, viewAccountId]);
 
   const fetchCheckinStatus = useCallback(async () => {
     try {
@@ -62,10 +86,12 @@ export default function CreditsPage() {
   }, []);
 
   useEffect(() => {
-    refreshBalance();
+    setLoading(true);
     fetchCredits();
-    fetchCheckinStatus();
-  }, [refreshBalance, fetchCredits, fetchCheckinStatus]);
+    if (viewAccountType === "personal") {
+      fetchCheckinStatus();
+    }
+  }, [fetchCredits, fetchCheckinStatus, viewAccountType]);
 
   const handleCheckin = async () => {
     setClaiming(true);
@@ -109,7 +135,7 @@ export default function CreditsPage() {
     return transactionTypes[type] || type;
   };
 
-  if (loading || balanceLoading) {
+  if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
         <Spinner size="lg" />
@@ -123,6 +149,30 @@ export default function CreditsPage() {
         <h1 className="text-2xl font-bold mb-2">{t("title")}</h1>
       </div>
 
+      {teams.length > 0 && (
+        <Tabs
+          selectedKey={viewAccountType === "team" ? `team:${viewAccountId}` : "personal"}
+          onSelectionChange={(key) => {
+            const keyStr = String(key);
+            if (keyStr === "personal") {
+              setViewAccountType("personal");
+              setViewAccountId(null);
+            } else if (keyStr.startsWith("team:")) {
+              const teamId = keyStr.slice(5);
+              setViewAccountType("team");
+              setViewAccountId(teamId);
+            }
+          }}
+          variant="underlined"
+          classNames={{ tabList: "gap-4" }}
+        >
+          <Tab key="personal" title={t("personalAccount")} />
+          {teams.map((team) => (
+            <Tab key={`team:${team.teamId}`} title={team.teamName} />
+          ))}
+        </Tabs>
+      )}
+
       {/* Balance Card */}
       <Card className="bg-linear-to-br from-primary/10 to-primary/5">
         <CardBody className="py-8">
@@ -135,7 +185,7 @@ export default function CreditsPage() {
                 {t("currentBalance")}
               </p>
               <p className="text-4xl font-bold text-primary">
-                {balance !== null ? balance.toLocaleString() : "0"}
+                {viewBalance !== null ? viewBalance.toLocaleString() : "0"}
               </p>
               <p className="text-sm text-default-500 mt-1">
                 {t("namePlural")}
@@ -146,7 +196,7 @@ export default function CreditsPage() {
       </Card>
 
       {/* Daily Check-in Card */}
-      {checkinStatus && (
+      {viewAccountType === "personal" && checkinStatus && (
         <Card className="bg-linear-to-br from-success/10 to-success/5">
           <CardBody className="py-6">
             <div className="flex items-center justify-between">
@@ -196,6 +246,10 @@ export default function CreditsPage() {
                 <TableColumn>{t("date")}</TableColumn>
                 <TableColumn>{t("type")}</TableColumn>
                 <TableColumn>{t("description")}</TableColumn>
+                {viewAccountType === "team"
+                  ? <TableColumn>{t("usedBy")}</TableColumn>
+                  : <TableColumn className="hidden"><></></TableColumn>
+                }
                 <TableColumn className="text-right">{t("amount")}</TableColumn>
               </TableHeader>
               <TableBody>
@@ -216,6 +270,14 @@ export default function CreditsPage() {
                     <TableCell className="text-default-500 text-sm">
                       {tx.description || "-"}
                     </TableCell>
+                    {viewAccountType === "team"
+                      ? <TableCell className="text-default-500 text-sm">
+                          {tx.performedByFirstName || tx.performedByLastName
+                            ? `${tx.performedByFirstName ?? ""} ${tx.performedByLastName ?? ""}`.trim()
+                            : tx.performedByEmail ?? "-"}
+                        </TableCell>
+                      : <TableCell className="hidden"><></></TableCell>
+                    }
                     <TableCell className="text-right">
                       <span
                         className={

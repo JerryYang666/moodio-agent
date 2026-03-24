@@ -23,7 +23,7 @@ import {
 } from "@/lib/image/service";
 import { ImageSize } from "@/lib/image/types";
 import { calculateCost } from "@/lib/pricing";
-import { deductCredits, getUserBalance, assertSufficientCredits, InsufficientCreditsError } from "@/lib/credits";
+import { deductCredits, getUserBalance, assertSufficientCredits, InsufficientCreditsError, getActiveAccount } from "@/lib/credits";
 import {
   getVideoModel,
   validateAndMergeParams,
@@ -263,6 +263,8 @@ export async function POST(
     if (!payload) {
       return NextResponse.json({ error: "Invalid token" }, { status: 401 });
     }
+
+    const account = await getActiveAccount(payload.userId, payload);
 
     const ipAddress =
       request.headers.get("x-forwarded-for") ||
@@ -562,7 +564,7 @@ export async function POST(
                   // Calculate cost and verify balance
                   const cost = await calculateCost("Image/all", {});
                   if (cost > 0) {
-                    const balance = await getUserBalance(payload.userId);
+                    const balance = await getUserBalance(account.accountId);
                     if (balance < cost) {
                       throw new InsufficientCreditsError();
                     }
@@ -649,10 +651,13 @@ export async function POST(
                   // Deduct credits
                   if (cost > 0) {
                     await deductCredits(
-                      payload.userId,
+                      account.accountId,
                       cost,
                       "image_generation",
-                      `Direct image generation (${imageModelId || "default"})`
+                      `Direct image generation (${imageModelId || "default"})`,
+                      account.performedBy,
+                      undefined,
+                      account.accountType,
                     );
                   }
 
@@ -849,7 +854,7 @@ export async function POST(
 
             try {
               // Check balance before doing any work
-              await assertSufficientCredits(payload.userId, cost);
+              await assertSufficientCredits(account.accountId, cost, account.accountType);
 
               // Create generation record (no credit deduction yet)
               const [generation] = await db
@@ -900,11 +905,13 @@ export async function POST(
               // Submission succeeded — deduct credits and update record atomically
               await db.transaction(async (tx) => {
                 await deductCredits(
-                  payload.userId,
+                  account.accountId,
                   cost,
                   "video_generation",
                   `Generated video with model ${model.name} (chat)`,
+                  account.performedBy,
                   { type: "video_generation", id: generation.id },
+                  account.accountType,
                   tx
                 );
 
@@ -1024,6 +1031,9 @@ export async function POST(
         imageQuantity, // Pass user-selected image quantity (undefined = smart)
         expertise, // Pass expertise selection for system prompt
         persistentAssets.textChunk, // Persistent text chunk for system prompt
+        account.accountId,
+        account.accountType,
+        account.performedBy,
       );
 
     // Handle background completion (saving history)

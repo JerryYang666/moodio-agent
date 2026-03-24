@@ -2,9 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAccessToken } from "@/lib/auth/cookies";
 import { verifyAccessToken } from "@/lib/auth/jwt";
 import { db } from "@/lib/db";
-import { userCredits } from "@/lib/db/schema";
+import { userCredits, teamCredits } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
-import { grantCredits, deductCredits } from "@/lib/credits";
+import {
+  grantCredits,
+  deductCredits,
+  type AccountType,
+} from "@/lib/credits";
 
 export async function POST(request: NextRequest) {
   try {
@@ -19,11 +23,38 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { userId, amount, description } = body;
+    const {
+      userId,
+      amount,
+      description,
+      accountType = "personal" as AccountType,
+      teamId,
+    } = body;
 
-    if (!userId || amount === undefined || amount === null) {
+    const targetAccountType = accountType as AccountType;
+    let targetAccountId: string;
+
+    if (targetAccountType === "team") {
+      if (!teamId) {
+        return NextResponse.json(
+          { error: "teamId is required for team accounts" },
+          { status: 400 }
+        );
+      }
+      targetAccountId = teamId;
+    } else {
+      if (!userId) {
+        return NextResponse.json(
+          { error: "userId is required for personal accounts" },
+          { status: 400 }
+        );
+      }
+      targetAccountId = userId;
+    }
+
+    if (amount === undefined || amount === null) {
       return NextResponse.json(
-        { error: "userId and amount are required" },
+        { error: "amount is required" },
         { status: 400 }
       );
     }
@@ -36,40 +67,55 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Use shared credit functions
     if (amountNum > 0) {
       await grantCredits(
-        userId,
+        targetAccountId,
         amountNum,
         "admin_grant",
         description || null,
-        payload.userId
+        payload.userId,
+        undefined,
+        targetAccountType
       );
     } else {
-      // Deducting (amountNum is negative)
       await deductCredits(
-        userId,
+        targetAccountId,
         Math.abs(amountNum),
         "admin_grant",
-        description || null
+        description || null,
+        payload.userId,
+        undefined,
+        targetAccountType
       );
     }
 
-    // Get updated balance
-    const [updatedCredits] = await db
-      .select()
-      .from(userCredits)
-      .where(eq(userCredits.userId, userId))
-      .limit(1);
+    // Get updated balance from the appropriate table
+    let balance = 0;
+    if (targetAccountType === "team") {
+      const [record] = await db
+        .select()
+        .from(teamCredits)
+        .where(eq(teamCredits.teamId, targetAccountId))
+        .limit(1);
+      balance = record?.balance ?? 0;
+    } else {
+      const [record] = await db
+        .select()
+        .from(userCredits)
+        .where(eq(userCredits.userId, targetAccountId))
+        .limit(1);
+      balance = record?.balance ?? 0;
+    }
 
     return NextResponse.json({
       success: true,
-      balance: updatedCredits?.balance || 0,
+      balance,
+      accountType: targetAccountType,
+      accountId: targetAccountId,
     });
   } catch (error: any) {
     console.error("Error adjusting credits:", error);
-    
-    // Handle insufficient credits error
+
     if (error.name === "InsufficientCreditsError") {
       return NextResponse.json(
         { error: "Insufficient credits for deduction" },

@@ -19,6 +19,7 @@ import {
   deductCredits,
   assertSufficientCredits,
   InsufficientCreditsError,
+  type AccountType,
 } from "@/lib/credits";
 import { recordEvent, sanitizeGeminiResponse } from "@/lib/telemetry";
 
@@ -215,7 +216,7 @@ export class ImageGenerateHandler implements ToolHandler {
     // Verify balance before doing any work
     const cost = await calculateCost("Image/all", {});
     if (cost > 0) {
-      await assertSufficientCredits(ctx.userId, cost);
+      await assertSufficientCredits(ctx.effectiveAccountId, cost, ctx.effectiveAccountType);
     }
 
     const modelId = ctx.imageModelId;
@@ -250,10 +251,13 @@ export class ImageGenerateHandler implements ToolHandler {
     // Deduct credits after successful generation
     if (cost > 0) {
       await deductCredits(
-        ctx.userId,
+        ctx.effectiveAccountId,
         cost,
         "image_generation",
-        `Image generation (${modelId || "default"})`
+        `Image generation (${modelId || "default"})`,
+        ctx.effectivePerformedBy,
+        undefined,
+        ctx.effectiveAccountType
       );
     }
 

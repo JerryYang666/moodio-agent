@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAccessToken } from "@/lib/auth/cookies";
 import { verifyAccessToken } from "@/lib/auth/jwt";
 import { db } from "@/lib/db";
-import { creditTransactions, users } from "@/lib/db/schema";
+import { creditTransactions, users, teams } from "@/lib/db/schema";
 import { desc, eq, inArray } from "drizzle-orm";
 
 export async function GET(request: NextRequest) {
@@ -20,7 +20,8 @@ export async function GET(request: NextRequest) {
     const allTransactions = await db
       .select({
         id: creditTransactions.id,
-        userId: creditTransactions.userId,
+        accountId: creditTransactions.accountId,
+        accountType: creditTransactions.accountType,
         amount: creditTransactions.amount,
         type: creditTransactions.type,
         description: creditTransactions.description,
@@ -33,10 +34,31 @@ export async function GET(request: NextRequest) {
         userLastName: users.lastName,
       })
       .from(creditTransactions)
-      .leftJoin(users, eq(creditTransactions.userId, users.id))
+      .leftJoin(users, eq(creditTransactions.accountId, users.id))
       .orderBy(desc(creditTransactions.createdAt));
 
-    // Get performer info in a separate query for transactions with performedBy
+    // Resolve team names for team transactions
+    const teamIds = Array.from(
+      new Set(
+        allTransactions
+          .filter((t) => t.accountType === "team")
+          .map((t) => t.accountId)
+      )
+    );
+
+    const teamMap: Record<string, string> = {};
+    if (teamIds.length > 0) {
+      const teamRecords = await db
+        .select({ id: teams.id, name: teams.name })
+        .from(teams)
+        .where(inArray(teams.id, teamIds));
+
+      for (const t of teamRecords) {
+        teamMap[t.id] = t.name;
+      }
+    }
+
+    // Resolve performer info
     const performerIds = Array.from(
       new Set(
         allTransactions
@@ -66,14 +88,15 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const transactionsWithPerformer = allTransactions.map((t) => ({
+    const transactionsWithDetails = allTransactions.map((t) => ({
       ...t,
+      teamName: t.accountType === "team" ? (teamMap[t.accountId] ?? null) : null,
       performerEmail: t.performedBy ? performerMap[t.performedBy]?.email : null,
       performerFirstName: t.performedBy ? performerMap[t.performedBy]?.firstName : null,
       performerLastName: t.performedBy ? performerMap[t.performedBy]?.lastName : null,
     }));
 
-    return NextResponse.json({ transactions: transactionsWithPerformer });
+    return NextResponse.json({ transactions: transactionsWithDetails });
   } catch (error) {
     console.error("Error fetching credit transactions:", error);
     return NextResponse.json(

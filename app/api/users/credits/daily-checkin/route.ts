@@ -26,7 +26,8 @@ async function getLastCheckin(userId: string) {
     .from(creditTransactions)
     .where(
       and(
-        eq(creditTransactions.userId, userId),
+        eq(creditTransactions.accountId, userId),
+        eq(creditTransactions.accountType, "personal"),
         eq(creditTransactions.type, "daily_checkin")
       )
     )

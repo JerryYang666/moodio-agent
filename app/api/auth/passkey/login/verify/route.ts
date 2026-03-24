@@ -8,6 +8,7 @@ import { generateAccessToken } from "@/lib/auth/jwt";
 import { generateRefreshToken, createRefreshToken } from "@/lib/auth/tokens";
 import { setAuthCookies } from "@/lib/auth/cookies";
 import { setCloudFrontCookies } from "@/lib/auth/cloudfront-cookies";
+import { getUserTeamMemberships } from "@/lib/teams";
 
 export async function POST(request: NextRequest) {
   try {
@@ -64,12 +65,14 @@ export async function POST(request: NextRequest) {
        await deleteAuthChallenge(challengeRecord.challenge);
        
        // Generate tokens
+       const teamMemberships = await getUserTeamMemberships(user.id);
        const accessToken = await generateAccessToken(
          user.id,
          user.email,
          user.roles as string[],
          user.firstName || undefined,
-         user.lastName || undefined
+         user.lastName || undefined,
+         teamMemberships
        );
 
        const refreshToken = generateRefreshToken();

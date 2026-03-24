@@ -2,9 +2,21 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAccessToken } from "@/lib/auth/cookies";
 import { verifyAccessToken } from "@/lib/auth/jwt";
 import { db } from "@/lib/db";
-import { userCredits, creditTransactions } from "@/lib/db/schema";
-import { eq, desc } from "drizzle-orm";
+import {
+  users,
+  userCredits,
+  teamCredits,
+  creditTransactions,
+} from "@/lib/db/schema";
+import { eq, and, desc } from "drizzle-orm";
+import type { AccountType } from "@/lib/credits";
 
+/**
+ * GET /api/users/credits
+ * View endpoint for transaction history. Accepts explicit accountType/accountId
+ * query params so the credits page can browse any account the user has access to
+ * without changing the global billing preference.
+ */
 export async function GET(request: NextRequest) {
   try {
     const accessToken = getAccessToken(request);
@@ -17,43 +29,93 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Get or create user credits
-    let credits = await db
-      .select()
-      .from(userCredits)
-      .where(eq(userCredits.userId, payload.userId))
-      .limit(1);
-
-    if (credits.length === 0) {
-      // Auto-create credits record with 0 balance
-      const [newCredit] = await db
-        .insert(userCredits)
-        .values({
-          userId: payload.userId,
-          balance: 0,
-        })
-        .returning();
-      credits = [newCredit];
-    }
-
-    // Get pagination params
     const { searchParams } = new URL(request.url);
+    const accountType = (searchParams.get("accountType") || "personal") as AccountType;
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "20");
     const offset = (page - 1) * limit;
 
-    // Get transaction history
-    const transactions = await db
-      .select()
+    let accountId: string;
+
+    if (accountType === "team") {
+      accountId = searchParams.get("accountId") || "";
+      if (!accountId) {
+        return NextResponse.json(
+          { error: "accountId is required for team accounts" },
+          { status: 400 }
+        );
+      }
+      const membership = payload.teams?.find((t) => t.id === accountId);
+      if (!membership) {
+        return NextResponse.json(
+          { error: "You are not a member of this team" },
+          { status: 403 }
+        );
+      }
+    } else {
+      accountId = payload.userId;
+    }
+
+    // Get balance
+    let balance: number;
+    if (accountType === "team") {
+      const [record] = await db
+        .select()
+        .from(teamCredits)
+        .where(eq(teamCredits.teamId, accountId))
+        .limit(1);
+      balance = record?.balance ?? 0;
+    } else {
+      let credits = await db
+        .select()
+        .from(userCredits)
+        .where(eq(userCredits.userId, accountId))
+        .limit(1);
+
+      if (credits.length === 0) {
+        const [newCredit] = await db
+          .insert(userCredits)
+          .values({ userId: accountId, balance: 0 })
+          .returning();
+        credits = [newCredit];
+      }
+      balance = credits[0].balance;
+    }
+
+    // Get transaction history with performer details
+    const rows = await db
+      .select({
+        id: creditTransactions.id,
+        accountId: creditTransactions.accountId,
+        accountType: creditTransactions.accountType,
+        amount: creditTransactions.amount,
+        type: creditTransactions.type,
+        description: creditTransactions.description,
+        performedBy: creditTransactions.performedBy,
+        relatedEntityType: creditTransactions.relatedEntityType,
+        relatedEntityId: creditTransactions.relatedEntityId,
+        createdAt: creditTransactions.createdAt,
+        performedByEmail: users.email,
+        performedByFirstName: users.firstName,
+        performedByLastName: users.lastName,
+      })
       .from(creditTransactions)
-      .where(eq(creditTransactions.userId, payload.userId))
+      .leftJoin(users, eq(creditTransactions.performedBy, users.id))
+      .where(
+        and(
+          eq(creditTransactions.accountId, accountId),
+          eq(creditTransactions.accountType, accountType)
+        )
+      )
       .orderBy(desc(creditTransactions.createdAt))
       .limit(limit)
       .offset(offset);
 
     return NextResponse.json({
-      balance: credits[0].balance,
-      transactions,
+      balance,
+      accountType,
+      accountId,
+      transactions: rows,
     });
   } catch (error) {
     console.error("Error fetching user credits:", error);

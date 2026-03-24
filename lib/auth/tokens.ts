@@ -9,6 +9,7 @@ import { eq, and, gt, lt } from "drizzle-orm";
 import { v4 as uuidv4 } from "uuid";
 import { siteConfig } from "@/config/site";
 import { generateAccessToken } from "./jwt";
+import { getUserTeamMemberships } from "@/lib/teams";
 
 /**
  * Result type for refresh operations
@@ -166,12 +167,14 @@ export async function refreshAccessToken(
       .where(eq(refreshTokens.id, tokenRecord.id));
 
     // Generate new tokens
+    const teamMemberships = await getUserTeamMemberships(user.id);
     const newAccessToken = await generateAccessToken(
       user.id,
       user.email,
       user.roles as string[],
       user.firstName || undefined,
-      user.lastName || undefined
+      user.lastName || undefined,
+      teamMemberships
     );
 
     const newRefreshToken = generateRefreshToken();

@@ -31,7 +31,8 @@ import { SearchIcon } from "@/components/icons";
 
 interface AdminCreditTransaction {
   id: string;
-  userId: string;
+  accountId: string;
+  accountType: string;
   amount: number;
   type: string;
   description: string | null;
@@ -39,9 +40,10 @@ interface AdminCreditTransaction {
   relatedEntityType: string | null;
   relatedEntityId: string | null;
   createdAt: string;
-  userEmail: string;
+  userEmail: string | null;
   userFirstName: string | null;
   userLastName: string | null;
+  teamName: string | null;
   performerEmail: string | null;
   performerFirstName: string | null;
   performerLastName: string | null;
@@ -131,9 +133,12 @@ export default function CreditTransactionsPage() {
       filtered = filtered.filter((t) => {
         const userName = `${t.userFirstName || ""} ${t.userLastName || ""}`.trim();
         const description = t.description?.toLowerCase() || "";
+        const accountLabel = t.accountType === "team"
+          ? (t.teamName || "").toLowerCase()
+          : (t.userEmail || "").toLowerCase();
         return (
           t.id.toLowerCase().includes(lowerFilter) ||
-          t.userEmail.toLowerCase().includes(lowerFilter) ||
+          accountLabel.includes(lowerFilter) ||
           userName.toLowerCase().includes(lowerFilter) ||
           description.includes(lowerFilter) ||
           t.type.toLowerCase().includes(lowerFilter)
@@ -313,7 +318,7 @@ export default function CreditTransactionsPage() {
               }
             >
               <TableHeader>
-                <TableColumn>USER</TableColumn>
+                <TableColumn>ACCOUNT</TableColumn>
                 <TableColumn>AMOUNT</TableColumn>
                 <TableColumn>TYPE</TableColumn>
                 <TableColumn>DESCRIPTION</TableColumn>
@@ -333,22 +338,33 @@ export default function CreditTransactionsPage() {
                   return (
                     <TableRow key={item.id} className="cursor-pointer">
                       <TableCell>
-                        <UserAvatar
-                          name={
-                            item.userFirstName && item.userLastName
-                              ? `${item.userFirstName} ${item.userLastName}`
-                              : item.userFirstName || item.userEmail
-                          }
-                          description={item.userEmail}
-                          avatarProps={{
-                            name: (
-                              item.userFirstName?.charAt(0) ||
-                              item.userEmail?.charAt(0) ||
-                              "?"
-                            ).toUpperCase(),
-                            color: "primary",
-                          }}
-                        />
+                        {item.accountType === "team" ? (
+                          <UserAvatar
+                            name={item.teamName || "Team"}
+                            description="Team account"
+                            avatarProps={{
+                              name: (item.teamName?.charAt(0) || "T").toUpperCase(),
+                              color: "secondary",
+                            }}
+                          />
+                        ) : (
+                          <UserAvatar
+                            name={
+                              item.userFirstName && item.userLastName
+                                ? `${item.userFirstName} ${item.userLastName}`
+                                : item.userFirstName || item.userEmail || "Unknown"
+                            }
+                            description={item.userEmail || ""}
+                            avatarProps={{
+                              name: (
+                                item.userFirstName?.charAt(0) ||
+                                item.userEmail?.charAt(0) ||
+                                "?"
+                              ).toUpperCase(),
+                              color: "primary",
+                            }}
+                          />
+                        )}
                       </TableCell>
                       <TableCell>
                         <div
@@ -457,20 +473,33 @@ export default function CreditTransactionsPage() {
                       </Chip>
                     </div>
 
-                    {/* User */}
+                    {/* Account */}
                     <div className="flex items-center justify-between">
-                      <span className="text-default-500">User</span>
+                      <span className="text-default-500">Account</span>
                       <div className="text-right">
-                        <p className="font-medium">
-                          {selectedTransaction.userFirstName &&
-                          selectedTransaction.userLastName
-                            ? `${selectedTransaction.userFirstName} ${selectedTransaction.userLastName}`
-                            : selectedTransaction.userFirstName ||
-                              selectedTransaction.userEmail}
-                        </p>
-                        <p className="text-sm text-default-400">
-                          {selectedTransaction.userEmail}
-                        </p>
+                        {selectedTransaction.accountType === "team" ? (
+                          <>
+                            <p className="font-medium">
+                              {selectedTransaction.teamName || "Unknown Team"}
+                            </p>
+                            <p className="text-sm text-default-400">
+                              Team account
+                            </p>
+                          </>
+                        ) : (
+                          <>
+                            <p className="font-medium">
+                              {selectedTransaction.userFirstName &&
+                              selectedTransaction.userLastName
+                                ? `${selectedTransaction.userFirstName} ${selectedTransaction.userLastName}`
+                                : selectedTransaction.userFirstName ||
+                                  selectedTransaction.userEmail}
+                            </p>
+                            <p className="text-sm text-default-400">
+                              {selectedTransaction.userEmail}
+                            </p>
+                          </>
+                        )}
                       </div>
                     </div>
 

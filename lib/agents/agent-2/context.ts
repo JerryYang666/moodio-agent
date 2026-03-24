@@ -1,5 +1,6 @@
 import { ImageSize } from "@/lib/image/types";
 import { MessageContentPart } from "@/lib/llm/types";
+import type { AccountType } from "@/lib/credits";
 
 /** Reference image with tag for context */
 export interface ReferenceImageEntry {
@@ -23,6 +24,11 @@ export interface RequestContext {
   userId: string;
   isAdmin: boolean;
   requestStartTime: number;
+
+  // Account (for credit operations)
+  effectiveAccountId: string;
+  effectiveAccountType: AccountType;
+  effectivePerformedBy: string;
 
   // User-provided images
   imageIds: string[];
@@ -65,6 +71,9 @@ export interface CreateRequestContextInput {
   userId: string;
   isAdmin: boolean;
   requestStartTime?: number;
+  accountId?: string;
+  accountType?: AccountType;
+  performedBy?: string;
   imageIds?: string[];
   imageBase64Promises?: Promise<string | undefined>[];
   referenceImages?: ReferenceImageEntry[];
@@ -114,6 +123,9 @@ export function createRequestContext(input: CreateRequestContextInput): RequestC
     userId: input.userId,
     isAdmin: input.isAdmin,
     requestStartTime: input.requestStartTime || Date.now(),
+    effectiveAccountId: input.accountId || input.userId,
+    effectiveAccountType: input.accountType || "personal",
+    effectivePerformedBy: input.performedBy || input.userId,
     imageIds: input.imageIds || [],
     imageBase64Promises: input.imageBase64Promises || [],
     referenceImages: input.referenceImages || [],

@@ -7,6 +7,7 @@ import { generateAccessToken } from "@/lib/auth/jwt";
 import { generateRefreshToken, createRefreshToken } from "@/lib/auth/tokens";
 import { setAuthCookies } from "@/lib/auth/cookies";
 import { setCloudFrontCookies } from "@/lib/auth/cloudfront-cookies";
+import { getUserTeamMemberships } from "@/lib/teams";
 
 export async function POST(request: NextRequest) {
   try {
@@ -48,12 +49,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const teamMemberships = await getUserTeamMemberships(user[0].id);
     const accessToken = await generateAccessToken(
       user[0].id,
       user[0].email,
       user[0].roles as string[],
       user[0].firstName || undefined,
-      user[0].lastName || undefined
+      user[0].lastName || undefined,
+      teamMemberships
     );
     const refreshToken = generateRefreshToken();
 

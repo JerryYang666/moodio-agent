@@ -10,7 +10,7 @@ import OpenAI, { toFile } from "openai";
 import { getSystemPrompt } from "./system-prompts";
 import { recordEvent, sanitizeOpenAIResponse } from "@/lib/telemetry";
 import { calculateCost } from "@/lib/pricing";
-import { deductCredits, getUserBalance, InsufficientCreditsError } from "@/lib/credits";
+import { deductCredits, getUserBalance, InsufficientCreditsError, AccountType } from "@/lib/credits";
 
 interface Suggestion {
   title: string;
@@ -37,9 +37,16 @@ export class Agent0 implements Agent {
     systemPromptOverride?: string,
     aspectRatioOverride?: string,
     imageSizeOverride?: ImageSize,
-    imageModelId?: string
+    imageModelId?: string,
+    _maxImageQuantity?: number,
+    accountId?: string,
+    accountType?: AccountType,
+    performedBy?: string
   ): Promise<AgentResponse> {
     const startTime = requestStartTime || Date.now();
+    const effectiveAccountId = accountId || userId;
+    const effectiveAccountType: AccountType = accountType || "personal";
+    const effectivePerformedBy = performedBy || userId;
     console.log(
       "[Perf] Agent processRequest start",
       `[${Date.now() - startTime}ms]`
@@ -187,7 +194,10 @@ export class Agent0 implements Agent {
       userImageId,
       client,
       startTime,
-      userId
+      userId,
+      effectiveAccountId,
+      effectiveAccountType,
+      effectivePerformedBy
     );
     return { stream, completion };
   }
@@ -197,7 +207,10 @@ export class Agent0 implements Agent {
     userImageId: string | undefined,
     client: OpenAI,
     startTime: number,
-    userId: string
+    userId: string,
+    effectiveAccountId: string,
+    effectiveAccountType: AccountType,
+    effectivePerformedBy: string
   ) {
     const encoder = new TextEncoder();
     let controller: any = null;
@@ -297,7 +310,7 @@ export class Agent0 implements Agent {
           // Check balance before generating (deduct only on success)
           const cost = await calculateCost("Image/all", {});
           if (cost > 0) {
-            const balance = await getUserBalance(userId);
+            const balance = await getUserBalance(effectiveAccountId, effectiveAccountType);
             if (balance < cost) {
               throw new InsufficientCreditsError();
             }
@@ -360,10 +373,13 @@ export class Agent0 implements Agent {
           // Deduct credits only after successful generation
           if (cost > 0) {
             await deductCredits(
-              userId,
+              effectiveAccountId,
               cost,
               "image_generation",
-              `Image generation (gpt-image-1)`
+              `Image generation (gpt-image-1)`,
+              effectivePerformedBy,
+              undefined,
+              effectiveAccountType
             );
           }
 
