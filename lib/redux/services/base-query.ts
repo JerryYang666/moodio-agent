@@ -1,15 +1,9 @@
 import { fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 import type { BaseQueryFn, FetchArgs, FetchBaseQueryError } from "@reduxjs/toolkit/query/react";
+import type { RootState } from "../store";
 
 /**
- * Base query with automatic token refresh on 401 errors
- * 
- * When an API call returns 401 (Unauthorized):
- * 1. Attempts to refresh the access token via /api/auth/refresh
- * 2. Retries the original request with the new token
- * 3. If refresh fails, redirects to login page
- * 
- * This ensures users stay logged in during API calls, not just page navigation
+ * Base query with automatic token refresh on 401 errors and active account header injection.
  */
 export const createBaseQueryWithReauth = (baseUrl: string): BaseQueryFn<
   string | FetchArgs,
@@ -18,7 +12,15 @@ export const createBaseQueryWithReauth = (baseUrl: string): BaseQueryFn<
 > => {
   const baseQuery = fetchBaseQuery({ 
     baseUrl,
-    credentials: "include", // Send cookies (JWT tokens)
+    credentials: "include",
+    prepareHeaders: (headers, { getState }) => {
+      const state = getState() as RootState;
+      const { accountType, accountId } = state.activeAccount;
+      if (accountType === "team" && accountId) {
+        headers.set("X-Credit-Account", `team:${accountId}`);
+      }
+      return headers;
+    },
   });
 
   return async (args, api, extraOptions) => {

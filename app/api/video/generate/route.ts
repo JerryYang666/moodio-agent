@@ -10,7 +10,7 @@ import {
   DEFAULT_VIDEO_MODEL_ID,
   TEXT_TO_VIDEO_PLACEHOLDER_IMAGE_ID,
 } from "@/lib/video/models";
-import { deductCredits, assertSufficientCredits, InsufficientCreditsError } from "@/lib/credits";
+import { deductCredits, assertSufficientCredits, resolveActiveAccount, InsufficientCreditsError } from "@/lib/credits";
 import { calculateCost } from "@/lib/pricing";
 import { submitVideoGeneration } from "@/lib/video/video-client";
 import { getSignedImageUrl } from "@/lib/storage/s3";
@@ -39,6 +39,8 @@ export async function POST(request: NextRequest) {
   if (!payload) {
     return NextResponse.json({ error: "Invalid token" }, { status: 401 });
   }
+
+  const account = resolveActiveAccount(request, payload);
 
   const ipAddress =
     request.headers.get("x-forwarded-for") ||
@@ -131,7 +133,7 @@ export async function POST(request: NextRequest) {
 
     // Check balance before doing any work
     try {
-      await assertSufficientCredits(payload.userId, cost);
+      await assertSufficientCredits(account.accountId, cost, account.accountType);
     } catch (error: any) {
       if (
         error.message === "INSUFFICIENT_CREDITS" ||
@@ -184,11 +186,13 @@ export async function POST(request: NextRequest) {
       // Submission succeeded — deduct credits and update record atomically
       await db.transaction(async (tx) => {
         await deductCredits(
-          payload.userId,
+          account.accountId,
           cost,
           "video_generation",
           `Generated video with model ${model.name}`,
+          account.performedBy,
           { type: "video_generation", id: generation.id },
+          account.accountType,
           tx
         );
 

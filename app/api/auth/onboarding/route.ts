@@ -7,6 +7,7 @@ import { eq } from "drizzle-orm";
 import { setAccessTokenCookie } from "@/lib/auth/cookies";
 import { setCloudFrontCookies } from "@/lib/auth/cloudfront-cookies";
 import { grantCredits } from "@/lib/credits";
+import { getUserTeamMemberships } from "@/lib/teams";
 
 const SIGNUP_BONUS_CREDITS = 300;
 
@@ -57,12 +58,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Generate new access token with updated info
+    const teamMemberships = await getUserTeamMemberships(updatedUser.id);
     const newAccessToken = await generateAccessToken(
       updatedUser.id,
       updatedUser.email,
       updatedUser.roles,
       updatedUser.firstName || undefined,
-      updatedUser.lastName || undefined
+      updatedUser.lastName || undefined,
+      teamMemberships
     );
 
     const response = NextResponse.json({

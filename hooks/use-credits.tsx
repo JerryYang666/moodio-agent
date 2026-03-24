@@ -1,48 +1,43 @@
 "use client";
 
 import { useCallback } from "react";
+import { useSelector } from "react-redux";
 import { useAuth } from "@/hooks/use-auth";
 import { useGetCreditsBalanceQuery } from "@/lib/redux/services/next-api";
+import type { RootState } from "@/lib/redux/store";
 
 interface UseCreditsReturn {
   balance: number | null;
   loading: boolean;
   error: string | null;
   refreshBalance: () => void;
+  activeAccountType: "personal" | "team";
+  activeAccountId: string | null;
+  activeTeamName: string | null;
 }
 
-/**
- * Hook to access user's credit balance using RTK Query.
- *
- * Benefits over the previous Context-based approach:
- * - Automatic cache invalidation when video generation succeeds
- * - No need for manual refreshBalance() calls in most cases
- * - Shared cache across all components using this hook
- * - Built-in loading and error states
- *
- * The balance automatically updates when:
- * - User logs in/out
- * - Video generation completes (via cache tag invalidation)
- * - refreshBalance() is called manually
- */
 export function useCredits(): UseCreditsReturn {
   const { user } = useAuth();
+  const { accountType, accountId, teamName } = useSelector(
+    (state: RootState) => state.activeAccount
+  );
 
-  // Skip the query if user is not logged in
-  const { data, isLoading, error, refetch } = useGetCreditsBalanceQuery(undefined, {
-    skip: !user,
-  });
+  const queryParams =
+    accountType === "team" && accountId
+      ? { accountType: accountType as "team", accountId }
+      : undefined;
 
-  // Provide a manual refresh function for edge cases.
-  // Wrapped in try-catch because refetch() throws if the query was skipped
-  // (e.g., during auth state transitions or when called from a background
-  // streaming loop after the user navigated away).
+  const { data, isLoading, error, refetch } = useGetCreditsBalanceQuery(
+    queryParams,
+    { skip: !user }
+  );
+
   const refreshBalance = useCallback(() => {
     if (user) {
       try {
         refetch();
       } catch {
-        // Query not started yet — safe to ignore
+        // Query not started yet
       }
     }
   }, [user, refetch]);
@@ -52,5 +47,8 @@ export function useCredits(): UseCreditsReturn {
     loading: isLoading,
     error: error ? "Failed to fetch balance" : null,
     refreshBalance,
+    activeAccountType: accountType,
+    activeAccountId: accountId,
+    activeTeamName: teamName,
   };
 }

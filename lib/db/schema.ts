@@ -273,20 +273,20 @@ export const userCredits = pgTable("user_credits", {
 
 /**
  * Credit Transactions table
- * Stores credit transaction history
+ * Stores credit transaction history for both personal (user) and team accounts.
+ * accountId is polymorphic: references users.id when accountType='personal',
+ * or teams.id when accountType='team'. No DB-level FK (application-validated).
  */
 export const creditTransactions = pgTable("credit_transactions", {
   id: uuid("id").primaryKey().defaultRandom(),
-  userId: uuid("user_id")
-    .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-  amount: bigint("amount", { mode: "number" }).notNull(), // positive for credits, negative for debits
-  type: varchar("type", { length: 50 }).notNull(), // 'admin_grant', 'video_generation', 'refund', etc.
+  accountId: uuid("account_id").notNull(),
+  accountType: varchar("account_type", { length: 20 }).notNull().default("personal"), // 'personal' | 'team'
+  amount: bigint("amount", { mode: "number" }).notNull(),
+  type: varchar("type", { length: 50 }).notNull(),
   description: text("description"),
-  performedBy: uuid("performed_by").references(() => users.id), // admin who performed the action
-  // Link to related entity (e.g., video generation)
-  relatedEntityType: varchar("related_entity_type", { length: 50 }), // 'video_generation', etc.
-  relatedEntityId: uuid("related_entity_id"), // ID of the related entity
+  performedBy: uuid("performed_by").references(() => users.id),
+  relatedEntityType: varchar("related_entity_type", { length: 50 }),
+  relatedEntityId: uuid("related_entity_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -541,3 +541,84 @@ export type NewDesktopShare = typeof desktopShares.$inferInsert;
 
 export type DesktopAsset = typeof desktopAssets.$inferSelect;
 export type NewDesktopAsset = typeof desktopAssets.$inferInsert;
+
+/**
+ * Teams table
+ * A user can create multiple teams; ownerId is not unique.
+ */
+export const teams = pgTable("teams", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: varchar("name", { length: 100 }).notNull(),
+  ownerId: uuid("owner_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+/**
+ * Team Members table
+ * Tracks membership and within-team roles.
+ */
+export const teamMembers = pgTable(
+  "team_members",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    teamId: uuid("team_id")
+      .notNull()
+      .references(() => teams.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    role: varchar("role", { length: 20 }).notNull().default("member"), // 'owner' | 'admin' | 'member'
+    joinedAt: timestamp("joined_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    uniqueTeamUser: unique().on(table.teamId, table.userId),
+  })
+);
+
+/**
+ * Team Invitations table
+ * Pending email-based invitations to join a team.
+ */
+export const teamInvitations = pgTable("team_invitations", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  teamId: uuid("team_id")
+    .notNull()
+    .references(() => teams.id, { onDelete: "cascade" }),
+  email: varchar("email", { length: 255 }).notNull(),
+  invitedBy: uuid("invited_by")
+    .notNull()
+    .references(() => users.id),
+  status: varchar("status", { length: 20 }).notNull().default("pending"), // 'pending' | 'accepted' | 'expired' | 'cancelled'
+  token: varchar("token", { length: 255 }).notNull().unique(),
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+/**
+ * Team Credits table
+ * One balance record per team (mirrors userCredits structure).
+ */
+export const teamCredits = pgTable("team_credits", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  teamId: uuid("team_id")
+    .notNull()
+    .unique()
+    .references(() => teams.id, { onDelete: "cascade" }),
+  balance: bigint("balance", { mode: "number" }).notNull().default(0),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export type Team = typeof teams.$inferSelect;
+export type NewTeam = typeof teams.$inferInsert;
+
+export type TeamMember = typeof teamMembers.$inferSelect;
+export type NewTeamMember = typeof teamMembers.$inferInsert;
+
+export type TeamInvitation = typeof teamInvitations.$inferSelect;
+export type NewTeamInvitation = typeof teamInvitations.$inferInsert;
+
+export type TeamCredit = typeof teamCredits.$inferSelect;
+export type NewTeamCredit = typeof teamCredits.$inferInsert;

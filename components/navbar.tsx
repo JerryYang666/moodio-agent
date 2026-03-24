@@ -29,6 +29,7 @@ import {
   Sparkles,
   Video,
   Monitor,
+  Users as UsersIcon,
 } from "lucide-react";
 import { Avatar } from "@heroui/avatar";
 import { Popover, PopoverTrigger, PopoverContent } from "@heroui/popover";
@@ -36,6 +37,9 @@ import { Button } from "@heroui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { useChat } from "@/hooks/use-chat";
 import { useCredits } from "@/hooks/use-credits";
+import { useTeams } from "@/hooks/use-team";
+import { useDispatch } from "react-redux";
+import { setActiveAccount, resetToPersonal } from "@/lib/redux/slices/activeAccountSlice";
 import { useFeatureFlag } from "@/lib/feature-flags";
 import { ChatHistorySelector } from "@/components/chat/chat-history-selector";
 import { siteConfig } from "@/config/site";
@@ -45,7 +49,9 @@ export const Navbar = () => {
   const router = useRouter();
   const { user, logout } = useAuth();
   const { refreshChats } = useChat();
-  const { balance: credits } = useCredits();
+  const { balance: credits, activeAccountType, activeTeamName } = useCredits();
+  const { teams } = useTeams();
+  const dispatch = useDispatch();
   const t = useTranslations();
   const tCredits = useTranslations("credits");
   const showDesktop = useFeatureFlag<boolean>("user_desktop") ?? false;
@@ -324,17 +330,54 @@ export const Navbar = () => {
                     </PopoverTrigger>
                     <PopoverContent>
                       <div className="flex flex-col gap-2 p-2 min-w-48">
-                        {/* Credits */}
+                        {/* Credits with Account Switcher */}
                         {credits !== null && (
-                          <NextLink
-                            href="/credits"
-                            onClick={() => setIsMenuOpen(false)}
-                            className="flex items-center gap-2 px-2 py-1.5 rounded-lg transition-colors hover:bg-default-100"
-                          >
-                            <Bean size={16} className="text-primary" />
-                            <span className="font-medium">{credits.toLocaleString()}</span>
-                            <span className="text-default-400 text-sm">{tCredits("namePlural")}</span>
-                          </NextLink>
+                          <div className="flex flex-col gap-1">
+                            <button
+                              className={clsx(
+                                "flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm w-full text-left transition-colors",
+                                activeAccountType === "personal"
+                                  ? "bg-primary/10 text-primary font-medium"
+                                  : "hover:bg-default-100"
+                              )}
+                              onClick={() => dispatch(resetToPersonal())}
+                            >
+                              <Bean size={14} className="text-primary" />
+                              <span className="flex-1">{tCredits("personal")}</span>
+                            </button>
+                            {teams.map((team) => (
+                              <button
+                                key={team.teamId}
+                                className={clsx(
+                                  "flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm w-full text-left transition-colors",
+                                  activeAccountType === "team" && activeTeamName === team.teamName
+                                    ? "bg-primary/10 text-primary font-medium"
+                                    : "hover:bg-default-100"
+                                )}
+                                onClick={() =>
+                                  dispatch(
+                                    setActiveAccount({
+                                      accountType: "team",
+                                      accountId: team.teamId,
+                                      teamName: team.teamName,
+                                    })
+                                  )
+                                }
+                              >
+                                <UsersIcon size={14} />
+                                <span className="flex-1 truncate">{team.teamName}</span>
+                              </button>
+                            ))}
+                            <NextLink
+                              href="/credits"
+                              onClick={() => setIsMenuOpen(false)}
+                              className="flex items-center gap-2 px-2 py-1.5 rounded-lg transition-colors hover:bg-default-100"
+                            >
+                              <Bean size={16} className="text-primary" />
+                              <span className="font-medium">{credits.toLocaleString()}</span>
+                              <span className="text-default-400 text-sm">{tCredits("namePlural")}</span>
+                            </NextLink>
+                          </div>
                         )}
                         {/* Profile */}
                         <NextLink

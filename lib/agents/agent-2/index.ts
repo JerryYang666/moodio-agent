@@ -12,6 +12,7 @@ import {
   StreamEvent,
   createRequestContext,
 } from "./context";
+import type { AccountType } from "@/lib/credits";
 import { ToolRegistry } from "./tools/registry";
 import { SystemPromptConstructor } from "./core/system-prompt";
 import { InputParser } from "./core/input-parser";
@@ -94,6 +95,9 @@ export class Agent2 implements Agent {
     imageSizeOverride?: ImageSize,
     imageModelId?: string,
     maxImageQuantity?: number,
+    accountId?: string,
+    accountType?: AccountType,
+    performedBy?: string,
   ): Promise<AgentResponse> {
     const startTime = requestStartTime || Date.now();
     console.log("[Perf] Agent2 processRequest start", `[${Date.now() - startTime}ms]`);
@@ -139,6 +143,9 @@ export class Agent2 implements Agent {
           userId,
           isAdmin,
           requestStartTime: startTime,
+          accountId,
+          accountType,
+          performedBy,
           imageIds: allImageIds,
           imageBase64Promises,
           referenceImages,
@@ -222,6 +229,9 @@ export class Agent2 implements Agent {
     maxImageQuantity?: number,
     expertise?: Expertise,
     persistentTextChunk?: string,
+    accountId?: string,
+    accountType?: AccountType,
+    performedBy?: string,
   ): Promise<ParallelAgentResponse> {
     const startTime = requestStartTime || Date.now();
     const variantTimestamp = messageTimestamp || Date.now();
@@ -290,6 +300,9 @@ export class Agent2 implements Agent {
               userId,
               isAdmin,
               requestStartTime: startTime,
+              accountId,
+              accountType,
+              performedBy,
               imageIds: allImageIds,
               imageBase64Promises,
               referenceImages: refImages,

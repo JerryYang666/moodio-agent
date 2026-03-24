@@ -17,12 +17,19 @@ function getJWTSecret(): Uint8Array {
   return new TextEncoder().encode(secret);
 }
 
+export interface TeamMembership {
+  id: string;
+  name: string;
+  role: "owner" | "admin" | "member";
+}
+
 export interface AccessTokenPayload {
   userId: string;
   email?: string;
   roles?: string[];
   firstName?: string;
   lastName?: string;
+  teams?: TeamMembership[];
 }
 
 /**
@@ -33,7 +40,8 @@ export async function generateAccessToken(
   email?: string,
   roles?: string[],
   firstName?: string,
-  lastName?: string
+  lastName?: string,
+  teams?: TeamMembership[]
 ): Promise<string> {
   const secret = getJWTSecret();
 
@@ -43,6 +51,7 @@ export async function generateAccessToken(
   if (roles) payload.roles = roles;
   if (firstName) payload.firstName = firstName;
   if (lastName) payload.lastName = lastName;
+  if (teams && teams.length > 0) payload.teams = teams;
 
   const token = await new SignJWT(payload)
     .setProtectedHeader({ alg: "HS256" })
@@ -86,6 +95,10 @@ export async function verifyAccessToken(
     
     if (payload.lastName && typeof payload.lastName === "string") {
       result.lastName = payload.lastName;
+    }
+
+    if (Array.isArray(payload.teams)) {
+      result.teams = payload.teams as TeamMembership[];
     }
 
     return result;

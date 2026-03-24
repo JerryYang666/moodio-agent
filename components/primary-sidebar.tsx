@@ -11,6 +11,7 @@ import {
   Shield,
   LogOut,
   User as UserIcon,
+  Users as UsersIcon,
   BookOpen,
   Bean,
   PencilRuler,
@@ -24,6 +25,9 @@ import { Avatar } from "@heroui/avatar";
 import { Tooltip } from "@heroui/tooltip";
 import { useAuth } from "@/hooks/use-auth";
 import { useCredits } from "@/hooks/use-credits";
+import { useTeams } from "@/hooks/use-team";
+import { useDispatch } from "react-redux";
+import { setActiveAccount, resetToPersonal } from "@/lib/redux/slices/activeAccountSlice";
 import { useFeatureFlag } from "@/lib/feature-flags";
 import { motion } from "framer-motion";
 import { Button } from "@heroui/button";
@@ -39,7 +43,9 @@ import { siteConfig } from "@/config/site";
 export const PrimarySidebar = () => {
   const pathname = usePathname();
   const { user, logout } = useAuth();
-  const { balance: credits } = useCredits();
+  const { balance: credits, activeAccountType, activeTeamName } = useCredits();
+  const { teams } = useTeams();
+  const dispatch = useDispatch();
   const t = useTranslations("nav");
   const tCredits = useTranslations("credits");
   const tLanguage = useTranslations("language");
@@ -102,14 +108,14 @@ export const PrimarySidebar = () => {
       )}
     >
       {/* Logo */}
-      <NextLink href="/" className="mb-8">
+      <NextLink href="/" className="mb-4 shrink-0">
         <div className="bg-primary/10 p-2 rounded-xl transition-transform hover:scale-110">
           <BotMessageSquare className="text-primary" size={24} />
         </div>
       </NextLink>
 
-      {/* Navigation Items */}
-      <div className="flex flex-col gap-1 w-full px-1 items-center flex-1">
+      {/* Scrollable Navigation Items */}
+      <div className="flex flex-col gap-1 w-full px-1 items-center flex-1 min-h-0 overflow-y-auto overflow-x-hidden scrollbar-hide">
         {navItems.map((item) => {
           const isActive = item.isActive
             ? item.isActive(pathname || "")
@@ -214,39 +220,120 @@ export const PrimarySidebar = () => {
         </div>
       </div>
 
-      {/* Credits Display */}
+      {/* Bottom pinned section: Teams, Credits, Profile, Collapse */}
+      <div className="shrink-0 flex flex-col items-center w-full">
+        {/* Teams Link */}
+        {user && (
+          <Tooltip content={t("teams")} placement="right" closeDelay={0}>
+            <NextLink
+              href="/teams"
+              className={clsx(
+                "flex flex-col items-center gap-0.5 px-2 py-1.5 mt-2 rounded-xl transition-all duration-300 relative z-0",
+                pathname?.startsWith("/teams")
+                  ? "text-primary"
+                  : "text-default-500 hover:bg-default-100 hover:text-default-900"
+              )}
+            >
+              <UsersIcon size={18} />
+              {!collapsed && (
+                <span className="text-[10px] leading-tight font-medium truncate max-w-full">
+                  {t("teams")}
+                </span>
+              )}
+              {pathname?.startsWith("/teams") && (
+                <motion.div
+                  layoutId="active-indicator"
+                  className="absolute inset-0 bg-primary/10 rounded-xl -z-10 shadow-sm"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                />
+              )}
+            </NextLink>
+          </Tooltip>
+        )}
+
+      {/* Credits Display with Account Switcher */}
       {user && credits !== null && (
-        <Tooltip
-          content={tCredits("balance", { count: credits })}
-          placement="right"
-          closeDelay={0}
-        >
-          <NextLink
-            href="/credits"
-            className={clsx(
-              "flex flex-col items-center gap-1 px-2 py-1.5 mt-4 rounded-xl transition-all duration-300 relative z-0",
-              pathname === "/credits"
-                ? "text-primary"
-                : "text-default-500 hover:bg-default-100 hover:text-default-900"
-            )}
-          >
-            <Bean size={18} />
-            <span className="text-xs font-medium">{credits}</span>
-            {pathname === "/credits" && (
-              <motion.div
-                layoutId="active-indicator"
-                className="absolute inset-0 bg-primary/10 rounded-xl -z-10 shadow-sm"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-              />
-            )}
-          </NextLink>
-        </Tooltip>
+        <Popover placement="right" showArrow>
+          <PopoverTrigger>
+            <button
+              className={clsx(
+                "flex flex-col items-center gap-1 px-2 py-1.5 mt-1 rounded-xl transition-all duration-300 relative z-0 outline-none",
+                pathname === "/credits"
+                  ? "text-primary"
+                  : "text-default-500 hover:bg-default-100 hover:text-default-900"
+              )}
+            >
+              <div className="relative">
+                <Bean size={18} />
+                {activeAccountType === "team" && (
+                  <div className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-secondary rounded-full" />
+                )}
+              </div>
+              <span className="text-xs font-medium">{credits}</span>
+              {pathname === "/credits" && (
+                <motion.div
+                  layoutId="active-indicator"
+                  className="absolute inset-0 bg-primary/10 rounded-xl -z-10 shadow-sm"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                />
+              )}
+            </button>
+          </PopoverTrigger>
+          <PopoverContent className="w-56 p-2">
+            <div className="flex flex-col gap-1">
+              <button
+                className={clsx(
+                  "flex items-center gap-2 px-3 py-2 rounded-lg text-sm w-full text-left transition-colors",
+                  activeAccountType === "personal"
+                    ? "bg-primary/10 text-primary font-medium"
+                    : "hover:bg-default-100"
+                )}
+                onClick={() => dispatch(resetToPersonal())}
+              >
+                <Bean size={14} />
+                <span className="flex-1">{tCredits("personal")}</span>
+              </button>
+              {teams.map((team) => (
+                <button
+                  key={team.teamId}
+                  className={clsx(
+                    "flex items-center gap-2 px-3 py-2 rounded-lg text-sm w-full text-left transition-colors",
+                    activeAccountType === "team" && activeTeamName === team.teamName
+                      ? "bg-primary/10 text-primary font-medium"
+                      : "hover:bg-default-100"
+                  )}
+                  onClick={() =>
+                    dispatch(
+                      setActiveAccount({
+                        accountType: "team",
+                        accountId: team.teamId,
+                        teamName: team.teamName,
+                      })
+                    )
+                  }
+                >
+                  <UsersIcon size={14} />
+                  <span className="flex-1 truncate">{team.teamName}</span>
+                </button>
+              ))}
+              <div className="h-px bg-divider my-1" />
+              <NextLink
+                href="/credits"
+                className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm hover:bg-default-100 text-default-500"
+              >
+                {tCredits("viewAll")}
+              </NextLink>
+            </div>
+          </PopoverContent>
+        </Popover>
       )}
 
       {/* User Profile */}
-      <div className="mt-auto pt-4 pb-2 px-2 w-full flex flex-col items-center gap-4">
+      <div className="pt-2 pb-2 px-2 w-full flex flex-col items-center gap-3">
         <Tooltip content={tLanguage("switchLanguage")} placement="right" closeDelay={0}>
           <div>
             <LanguageSwitch />
@@ -315,6 +402,7 @@ export const PrimarySidebar = () => {
       >
         {collapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
       </button>
+      </div>
     </motion.aside>
   );
 };

@@ -15,9 +15,14 @@ import { Chip } from "@heroui/chip";
 import { Spinner } from "@heroui/spinner";
 import { Button } from "@heroui/button";
 import { addToast } from "@heroui/toast";
+import { Tabs, Tab } from "@heroui/tabs";
 import { Bean, CalendarCheck } from "lucide-react";
 import { api } from "@/lib/api/client";
 import { useCredits } from "@/hooks/use-credits";
+import { useTeams } from "@/hooks/use-team";
+import { useDispatch, useSelector } from "react-redux";
+import { setActiveAccount, resetToPersonal } from "@/lib/redux/slices/activeAccountSlice";
+import type { RootState } from "@/lib/redux/store";
 
 interface Transaction {
   id: string;
@@ -25,6 +30,9 @@ interface Transaction {
   type: string;
   description: string | null;
   createdAt: string;
+  performedByEmail?: string;
+  performedByFirstName?: string;
+  performedByLastName?: string;
 }
 
 interface CheckinStatus {
@@ -35,7 +43,10 @@ interface CheckinStatus {
 
 export default function CreditsPage() {
   const t = useTranslations("credits");
-  const { balance, loading: balanceLoading, refreshBalance } = useCredits();
+  const { balance, loading: balanceLoading, refreshBalance, activeAccountType, activeAccountId } = useCredits();
+  const { teams } = useTeams();
+  const dispatch = useDispatch();
+  const activeAccount = useSelector((state: RootState) => state.activeAccount);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [checkinStatus, setCheckinStatus] = useState<CheckinStatus | null>(null);
@@ -43,14 +54,19 @@ export default function CreditsPage() {
 
   const fetchCredits = useCallback(async () => {
     try {
-      const data = await api.get("/api/users/credits");
+      const params = new URLSearchParams();
+      if (activeAccountType === "team" && activeAccountId) {
+        params.set("accountType", "team");
+        params.set("accountId", activeAccountId);
+      }
+      const data = await api.get(`/api/users/credits?${params.toString()}`);
       setTransactions(data.transactions);
     } catch (error) {
       console.error("Failed to fetch credits:", error);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [activeAccountType, activeAccountId]);
 
   const fetchCheckinStatus = useCallback(async () => {
     try {
@@ -64,8 +80,10 @@ export default function CreditsPage() {
   useEffect(() => {
     refreshBalance();
     fetchCredits();
-    fetchCheckinStatus();
-  }, [refreshBalance, fetchCredits, fetchCheckinStatus]);
+    if (activeAccountType === "personal") {
+      fetchCheckinStatus();
+    }
+  }, [refreshBalance, fetchCredits, fetchCheckinStatus, activeAccountType]);
 
   const handleCheckin = async () => {
     setClaiming(true);
@@ -123,6 +141,35 @@ export default function CreditsPage() {
         <h1 className="text-2xl font-bold mb-2">{t("title")}</h1>
       </div>
 
+      {teams.length > 0 && (
+        <Tabs
+          selectedKey={activeAccountType === "team" ? `team:${activeAccountId}` : "personal"}
+          onSelectionChange={(key) => {
+            const keyStr = String(key);
+            if (keyStr === "personal") {
+              dispatch(resetToPersonal());
+            } else if (keyStr.startsWith("team:")) {
+              const teamId = keyStr.slice(5);
+              const team = teams.find((t) => t.teamId === teamId);
+              if (team) {
+                dispatch(setActiveAccount({
+                  accountType: "team",
+                  accountId: team.teamId,
+                  teamName: team.teamName,
+                }));
+              }
+            }
+          }}
+          variant="underlined"
+          classNames={{ tabList: "gap-4" }}
+        >
+          <Tab key="personal" title={t("personalAccount")} />
+          {teams.map((team) => (
+            <Tab key={`team:${team.teamId}`} title={team.teamName} />
+          ))}
+        </Tabs>
+      )}
+
       {/* Balance Card */}
       <Card className="bg-linear-to-br from-primary/10 to-primary/5">
         <CardBody className="py-8">
@@ -146,7 +193,7 @@ export default function CreditsPage() {
       </Card>
 
       {/* Daily Check-in Card */}
-      {checkinStatus && (
+      {activeAccountType === "personal" && checkinStatus && (
         <Card className="bg-linear-to-br from-success/10 to-success/5">
           <CardBody className="py-6">
             <div className="flex items-center justify-between">
@@ -196,6 +243,10 @@ export default function CreditsPage() {
                 <TableColumn>{t("date")}</TableColumn>
                 <TableColumn>{t("type")}</TableColumn>
                 <TableColumn>{t("description")}</TableColumn>
+                {activeAccountType === "team"
+                  ? <TableColumn>{t("usedBy")}</TableColumn>
+                  : <TableColumn className="hidden"><></></TableColumn>
+                }
                 <TableColumn className="text-right">{t("amount")}</TableColumn>
               </TableHeader>
               <TableBody>
@@ -216,6 +267,14 @@ export default function CreditsPage() {
                     <TableCell className="text-default-500 text-sm">
                       {tx.description || "-"}
                     </TableCell>
+                    {activeAccountType === "team"
+                      ? <TableCell className="text-default-500 text-sm">
+                          {tx.performedByFirstName || tx.performedByLastName
+                            ? `${tx.performedByFirstName ?? ""} ${tx.performedByLastName ?? ""}`.trim()
+                            : tx.performedByEmail ?? "-"}
+                        </TableCell>
+                      : <TableCell className="hidden"><></></TableCell>
+                    }
                     <TableCell className="text-right">
                       <span
                         className={
