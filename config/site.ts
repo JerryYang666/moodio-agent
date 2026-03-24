@@ -78,7 +78,7 @@ export const siteConfig = {
   // CloudFront Configuration
   cloudfront: {
     signedUrlExpirationSeconds: 30 * 60, // 30 minutes default expiration for legacy signed URLs
-    signedCookieExpirationSeconds: 30 * 60, // 30 minutes default expiration for signed cookies
+    signedCookieExpirationSeconds: 60 * 60, // 1 hour default expiration for signed cookies
     signedCookieClockSkewSeconds: 60, // Allow CloudFront policy to outlive cookie by 60s
     cookieDomain: process.env.CLOUDFRONT_COOKIE_DOMAIN,
   },
