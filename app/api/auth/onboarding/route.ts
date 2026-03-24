@@ -53,7 +53,10 @@ export async function POST(request: NextRequest) {
         updatedUser.id,
         SIGNUP_BONUS_CREDITS,
         "signup_bonus",
-        "New user signup bonus"
+        "New user signup bonus",
+        undefined,
+        undefined,
+        "personal"
       );
     }
 

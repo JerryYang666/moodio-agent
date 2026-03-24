@@ -80,7 +80,7 @@ function getIdColumn(accountType: AccountType) {
  */
 export async function getUserBalance(
   accountId: string,
-  accountType: AccountType = "personal",
+  accountType: AccountType,
   tx: DbOrTx = db
 ): Promise<number> {
   const table = getBalanceTable(accountType);
@@ -111,7 +111,7 @@ export async function getUserBalance(
 export async function assertSufficientCredits(
   accountId: string,
   amount: number,
-  accountType: AccountType = "personal",
+  accountType: AccountType,
   tx: DbOrTx = db
 ): Promise<void> {
   const balance = await getUserBalance(accountId, accountType, tx);
@@ -127,10 +127,10 @@ export async function deductCredits(
   accountId: string,
   amount: number,
   type: string,
-  description?: string,
-  performedBy?: string,
-  relatedEntity?: RelatedEntity,
-  accountType: AccountType = "personal",
+  description: string | undefined,
+  performedBy: string | undefined,
+  relatedEntity: RelatedEntity | undefined,
+  accountType: AccountType,
   tx: DbOrTx = db
 ): Promise<void> {
   const deduction = Math.abs(amount);
@@ -185,10 +185,10 @@ export async function grantCredits(
   accountId: string,
   amount: number,
   type: string,
-  description?: string,
-  performedBy?: string,
-  relatedEntity?: RelatedEntity,
-  accountType: AccountType = "personal",
+  description: string | undefined,
+  performedBy: string | undefined,
+  relatedEntity: RelatedEntity | undefined,
+  accountType: AccountType,
   tx: DbOrTx = db
 ): Promise<void> {
   const grantAmount = Math.abs(amount);

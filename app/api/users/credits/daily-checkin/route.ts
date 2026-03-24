@@ -105,10 +105,13 @@ export async function POST(request: NextRequest) {
       payload.userId,
       DAILY_CHECKIN_AMOUNT,
       "daily_checkin",
-      "Daily check-in reward"
+      "Daily check-in reward",
+      undefined,
+      undefined,
+      "personal"
     );
 
-    const balance = await getUserBalance(payload.userId);
+    const balance = await getUserBalance(payload.userId, "personal");
 
     return NextResponse.json({
       success: true,
