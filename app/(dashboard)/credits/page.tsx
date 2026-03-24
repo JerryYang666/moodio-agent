@@ -272,9 +272,11 @@ export default function CreditsPage() {
                     </TableCell>
                     {viewAccountType === "team"
                       ? <TableCell className="text-default-500 text-sm">
-                          {tx.performedByFirstName || tx.performedByLastName
-                            ? `${tx.performedByFirstName ?? ""} ${tx.performedByLastName ?? ""}`.trim()
-                            : tx.performedByEmail ?? "-"}
+                          {tx.amount > 0
+                            ? "-"
+                            : tx.performedByFirstName || tx.performedByLastName
+                              ? `${tx.performedByFirstName ?? ""} ${tx.performedByLastName ?? ""}`.trim()
+                              : tx.performedByEmail ?? "-"}
                         </TableCell>
                       : <TableCell className="hidden"><></></TableCell>
                     }
