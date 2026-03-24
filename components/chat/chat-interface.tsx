@@ -2046,8 +2046,8 @@ export default function ChatInterface({
     )
       return;
 
-    // Video mode requires a source image
-    if (menuState.mode === "video" && pendingImages.length === 0) {
+    // Video mode requires a source image for image-to-video models
+    if (menuState.mode === "video" && videoModelHasImageParams && pendingImages.length === 0) {
       addToast({
         title: t("chat.videoRequiresImage"),
         color: "warning",

@@ -1370,7 +1370,7 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
                   aria-label={t("chat.send")}
                   onPress={onSend}
                   isLoading={isSending}
-                  isDisabled={isRecording || isTranscribing || hasUploadingImages || pendingImages.length === 0}
+                  isDisabled={isRecording || isTranscribing || hasUploadingImages || (videoModelHasImageParams && pendingImages.length === 0)}
                   className="shrink-0"
                   size="sm"
                 >
