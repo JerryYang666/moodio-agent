@@ -3,9 +3,9 @@ import {
   userCredits,
   teamCredits,
   creditTransactions,
+  userActiveAccounts,
 } from "@/lib/db/schema";
 import { eq, sql, and } from "drizzle-orm";
-import type { NextRequest } from "next/server";
 import type { AccessTokenPayload } from "@/lib/auth/jwt";
 
 type DbOrTx = typeof db | any;
@@ -31,38 +31,38 @@ export interface RelatedEntity {
 }
 
 /**
- * Parse the X-Credit-Account header and validate membership via the JWT payload.
- * Returns the resolved account or defaults to the user's personal account.
+ * Read the user's active billing account from the DB and validate membership.
+ * Falls back to the user's personal account when no preference is stored
+ * or when team membership can no longer be confirmed via the JWT.
  */
-export function resolveActiveAccount(
-  request: NextRequest,
+export async function getActiveAccount(
+  userId: string,
   payload: AccessTokenPayload
-): ActiveAccount {
-  const header = request.headers.get("x-credit-account");
+): Promise<ActiveAccount> {
+  const personal: ActiveAccount = {
+    accountId: userId,
+    accountType: "personal",
+    performedBy: userId,
+  };
 
-  if (!header || !header.startsWith("team:")) {
-    return {
-      accountId: payload.userId,
-      accountType: "personal",
-      performedBy: payload.userId,
-    };
+  const [row] = await db
+    .select()
+    .from(userActiveAccounts)
+    .where(eq(userActiveAccounts.userId, userId));
+
+  if (!row || row.accountType !== "team" || !row.accountId) {
+    return personal;
   }
 
-  const teamId = header.slice("team:".length);
-
-  const membership = payload.teams?.find((t) => t.id === teamId);
+  const membership = payload.teams?.find((t) => t.id === row.accountId);
   if (!membership) {
-    return {
-      accountId: payload.userId,
-      accountType: "personal",
-      performedBy: payload.userId,
-    };
+    return personal;
   }
 
   return {
-    accountId: teamId,
+    accountId: row.accountId,
     accountType: "team",
-    performedBy: payload.userId,
+    performedBy: userId,
   };
 }
 

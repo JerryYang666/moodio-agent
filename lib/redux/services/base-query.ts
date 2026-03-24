@@ -1,9 +1,8 @@
 import { fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 import type { BaseQueryFn, FetchArgs, FetchBaseQueryError } from "@reduxjs/toolkit/query/react";
-import type { RootState } from "../store";
 
 /**
- * Base query with automatic token refresh on 401 errors and active account header injection.
+ * Base query with automatic token refresh on 401 errors.
  */
 export const createBaseQueryWithReauth = (baseUrl: string): BaseQueryFn<
   string | FetchArgs,
@@ -13,14 +12,6 @@ export const createBaseQueryWithReauth = (baseUrl: string): BaseQueryFn<
   const baseQuery = fetchBaseQuery({ 
     baseUrl,
     credentials: "include",
-    prepareHeaders: (headers, { getState }) => {
-      const state = getState() as RootState;
-      const { accountType, accountId } = state.activeAccount;
-      if (accountType === "team" && accountId) {
-        headers.set("X-Credit-Account", `team:${accountId}`);
-      }
-      return headers;
-    },
   });
 
   return async (args, api, extraOptions) => {

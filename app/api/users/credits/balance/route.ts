@@ -4,7 +4,7 @@ import { verifyAccessToken } from "@/lib/auth/jwt";
 import { db } from "@/lib/db";
 import { userCredits, teamCredits } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
-import type { AccountType } from "@/lib/credits";
+import { getActiveAccount } from "@/lib/credits";
 
 export async function GET(request: NextRequest) {
   try {
@@ -18,35 +18,19 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { searchParams } = new URL(request.url);
-    const accountType = (searchParams.get("accountType") || "personal") as AccountType;
-    const accountId = searchParams.get("accountId");
+    const account = await getActiveAccount(payload.userId, payload);
 
-    if (accountType === "team") {
-      if (!accountId) {
-        return NextResponse.json(
-          { error: "accountId is required for team accounts" },
-          { status: 400 }
-        );
-      }
-      const membership = payload.teams?.find((t) => t.id === accountId);
-      if (!membership) {
-        return NextResponse.json(
-          { error: "You are not a member of this team" },
-          { status: 403 }
-        );
-      }
-
+    if (account.accountType === "team") {
       const [record] = await db
         .select()
         .from(teamCredits)
-        .where(eq(teamCredits.teamId, accountId))
+        .where(eq(teamCredits.teamId, account.accountId))
         .limit(1);
 
       return NextResponse.json({
         balance: record?.balance ?? 0,
         accountType: "team",
-        accountId,
+        accountId: account.accountId,
       });
     }
 

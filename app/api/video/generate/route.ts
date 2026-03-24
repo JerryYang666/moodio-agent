@@ -10,7 +10,7 @@ import {
   DEFAULT_VIDEO_MODEL_ID,
   TEXT_TO_VIDEO_PLACEHOLDER_IMAGE_ID,
 } from "@/lib/video/models";
-import { deductCredits, assertSufficientCredits, resolveActiveAccount, InsufficientCreditsError } from "@/lib/credits";
+import { deductCredits, assertSufficientCredits, getActiveAccount, InsufficientCreditsError } from "@/lib/credits";
 import { calculateCost } from "@/lib/pricing";
 import { submitVideoGeneration } from "@/lib/video/video-client";
 import { getSignedImageUrl } from "@/lib/storage/s3";
@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid token" }, { status: 401 });
   }
 
-  const account = resolveActiveAccount(request, payload);
+  const account = await getActiveAccount(payload.userId, payload);
 
   const ipAddress =
     request.headers.get("x-forwarded-for") ||

@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback } from "react";
-import { useSelector } from "react-redux";
+import { useCallback, useEffect, useRef } from "react";
+import { useDispatch, useSelector } from "react-redux";
 import { useAuth } from "@/hooks/use-auth";
-import { useGetCreditsBalanceQuery } from "@/lib/redux/services/next-api";
+import { useGetCreditsBalanceQuery, useGetUserTeamsQuery } from "@/lib/redux/services/next-api";
+import { setActiveAccountLocal } from "@/lib/redux/slices/activeAccountSlice";
 import type { RootState } from "@/lib/redux/store";
 
 interface UseCreditsReturn {
@@ -18,19 +19,44 @@ interface UseCreditsReturn {
 
 export function useCredits(): UseCreditsReturn {
   const { user } = useAuth();
+  const dispatch = useDispatch();
   const { accountType, accountId, teamName } = useSelector(
     (state: RootState) => state.activeAccount
   );
 
-  const queryParams =
-    accountType === "team" && accountId
-      ? { accountType: accountType as "team", accountId }
-      : undefined;
-
   const { data, isLoading, error, refetch } = useGetCreditsBalanceQuery(
-    queryParams,
+    undefined,
     { skip: !user }
   );
+  const { data: teams } = useGetUserTeamsQuery(undefined, { skip: !user });
+
+  // Sync Redux slice from the balance response (single source of truth)
+  const prevAccountKey = useRef<string | null>(null);
+  useEffect(() => {
+    if (!data) return;
+    const key = `${data.accountType}:${data.accountId}`;
+    if (key === prevAccountKey.current) return;
+    prevAccountKey.current = key;
+
+    if (data.accountType === "team" && data.accountId) {
+      const team = teams?.find((t) => t.teamId === data.accountId);
+      dispatch(
+        setActiveAccountLocal({
+          accountType: "team",
+          accountId: data.accountId,
+          teamName: team?.teamName ?? null,
+        })
+      );
+    } else {
+      dispatch(
+        setActiveAccountLocal({
+          accountType: "personal",
+          accountId: null,
+          teamName: null,
+        })
+      );
+    }
+  }, [data, teams, dispatch]);
 
   const refreshBalance = useCallback(() => {
     if (user) {

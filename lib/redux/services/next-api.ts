@@ -24,9 +24,10 @@ export interface CreditsBalanceResponse {
   accountId: string;
 }
 
-export interface CreditsBalanceRequest {
-  accountType?: "personal" | "team";
-  accountId?: string;
+// Types for active account
+export interface SetActiveAccountRequest {
+  accountType: "personal" | "team";
+  accountId: string | null;
 }
 
 // Types for teams
@@ -122,17 +123,18 @@ export const nextApi = createApi({
       providesTags: ["FeatureFlags"],
     }),
 
-    getCreditsBalance: builder.query<CreditsBalanceResponse, CreditsBalanceRequest | void>({
-      query: (params) => {
-        const searchParams = new URLSearchParams();
-        if (params?.accountType) searchParams.set("accountType", params.accountType);
-        if (params?.accountId) searchParams.set("accountId", params.accountId);
-        const qs = searchParams.toString();
-        return `/api/users/credits/balance${qs ? `?${qs}` : ""}`;
-      },
-      providesTags: (_result, _error, params) => [
-        { type: "Credits", id: params?.accountType === "team" ? `team:${params?.accountId}` : "personal" },
-      ],
+    setActiveAccount: builder.mutation<void, SetActiveAccountRequest>({
+      query: (body) => ({
+        url: "/api/users/active-account",
+        method: "PUT",
+        body,
+      }),
+      invalidatesTags: ["Credits"],
+    }),
+
+    getCreditsBalance: builder.query<CreditsBalanceResponse, void>({
+      query: () => "/api/users/credits/balance",
+      providesTags: ["Credits"],
     }),
 
     generateVideo: builder.mutation<GenerateVideoResponse, GenerateVideoRequest>({
@@ -295,6 +297,7 @@ export const nextApi = createApi({
 
 export const {
   useGetFeatureFlagsQuery,
+  useSetActiveAccountMutation,
   useGetCreditsBalanceQuery,
   useGenerateVideoMutation,
   useGetUserTeamsQuery,

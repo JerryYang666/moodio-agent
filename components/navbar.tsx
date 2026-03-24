@@ -39,7 +39,8 @@ import { useChat } from "@/hooks/use-chat";
 import { useCredits } from "@/hooks/use-credits";
 import { useTeams } from "@/hooks/use-team";
 import { useDispatch } from "react-redux";
-import { setActiveAccount, resetToPersonal } from "@/lib/redux/slices/activeAccountSlice";
+import { setActiveAccountLocal, resetToPersonalLocal } from "@/lib/redux/slices/activeAccountSlice";
+import { useSetActiveAccountMutation } from "@/lib/redux/services/next-api";
 import { useFeatureFlag } from "@/lib/feature-flags";
 import { ChatHistorySelector } from "@/components/chat/chat-history-selector";
 import { siteConfig } from "@/config/site";
@@ -52,6 +53,7 @@ export const Navbar = () => {
   const { balance: credits, activeAccountType, activeTeamName } = useCredits();
   const { teams } = useTeams();
   const dispatch = useDispatch();
+  const [setActiveAccountApi] = useSetActiveAccountMutation();
   const t = useTranslations();
   const tCredits = useTranslations("credits");
   const showDesktop = useFeatureFlag<boolean>("user_desktop") ?? false;
@@ -340,7 +342,10 @@ export const Navbar = () => {
                                   ? "bg-primary/10 text-primary font-medium"
                                   : "hover:bg-default-100"
                               )}
-                              onClick={() => dispatch(resetToPersonal())}
+                              onClick={() => {
+                                dispatch(resetToPersonalLocal());
+                                setActiveAccountApi({ accountType: "personal", accountId: null });
+                              }}
                             >
                               <Bean size={14} className="text-primary" />
                               <span className="flex-1">{tCredits("personal")}</span>
@@ -354,15 +359,16 @@ export const Navbar = () => {
                                     ? "bg-primary/10 text-primary font-medium"
                                     : "hover:bg-default-100"
                                 )}
-                                onClick={() =>
+                                onClick={() => {
                                   dispatch(
-                                    setActiveAccount({
+                                    setActiveAccountLocal({
                                       accountType: "team",
                                       accountId: team.teamId,
                                       teamName: team.teamName,
                                     })
-                                  )
-                                }
+                                  );
+                                  setActiveAccountApi({ accountType: "team", accountId: team.teamId });
+                                }}
                               >
                                 <UsersIcon size={14} />
                                 <span className="flex-1 truncate">{team.teamName}</span>

@@ -23,7 +23,7 @@ import {
 } from "@/lib/image/service";
 import { ImageSize } from "@/lib/image/types";
 import { calculateCost } from "@/lib/pricing";
-import { deductCredits, getUserBalance, assertSufficientCredits, InsufficientCreditsError, resolveActiveAccount } from "@/lib/credits";
+import { deductCredits, getUserBalance, assertSufficientCredits, InsufficientCreditsError, getActiveAccount } from "@/lib/credits";
 import {
   getVideoModel,
   validateAndMergeParams,
@@ -264,7 +264,7 @@ export async function POST(
       return NextResponse.json({ error: "Invalid token" }, { status: 401 });
     }
 
-    const account = resolveActiveAccount(request, payload);
+    const account = await getActiveAccount(payload.userId, payload);
 
     const ipAddress =
       request.headers.get("x-forwarded-for") ||

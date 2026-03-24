@@ -21,8 +21,9 @@ import { api } from "@/lib/api/client";
 import { useCredits } from "@/hooks/use-credits";
 import { useTeams } from "@/hooks/use-team";
 import { useDispatch, useSelector } from "react-redux";
-import { setActiveAccount, resetToPersonal } from "@/lib/redux/slices/activeAccountSlice";
+import { setActiveAccountLocal, resetToPersonalLocal } from "@/lib/redux/slices/activeAccountSlice";
 import type { RootState } from "@/lib/redux/store";
+import { useSetActiveAccountMutation } from "@/lib/redux/services/next-api";
 
 interface Transaction {
   id: string;
@@ -46,6 +47,7 @@ export default function CreditsPage() {
   const { balance, loading: balanceLoading, refreshBalance, activeAccountType, activeAccountId } = useCredits();
   const { teams } = useTeams();
   const dispatch = useDispatch();
+  const [setActiveAccountApi] = useSetActiveAccountMutation();
   const activeAccount = useSelector((state: RootState) => state.activeAccount);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
@@ -147,16 +149,18 @@ export default function CreditsPage() {
           onSelectionChange={(key) => {
             const keyStr = String(key);
             if (keyStr === "personal") {
-              dispatch(resetToPersonal());
+              dispatch(resetToPersonalLocal());
+              setActiveAccountApi({ accountType: "personal", accountId: null });
             } else if (keyStr.startsWith("team:")) {
               const teamId = keyStr.slice(5);
               const team = teams.find((t) => t.teamId === teamId);
               if (team) {
-                dispatch(setActiveAccount({
+                dispatch(setActiveAccountLocal({
                   accountType: "team",
                   accountId: team.teamId,
                   teamName: team.teamName,
                 }));
+                setActiveAccountApi({ accountType: "team", accountId: team.teamId });
               }
             }
           }}

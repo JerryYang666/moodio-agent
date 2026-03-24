@@ -622,3 +622,22 @@ export type NewTeamInvitation = typeof teamInvitations.$inferInsert;
 
 export type TeamCredit = typeof teamCredits.$inferSelect;
 export type NewTeamCredit = typeof teamCredits.$inferInsert;
+
+/**
+ * User Active Accounts table
+ * Stores which credit account (personal or team) each user is currently billing to.
+ * Absence of a row means "personal" (the default).
+ */
+export const userActiveAccounts = pgTable("user_active_accounts", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .notNull()
+    .unique()
+    .references(() => users.id, { onDelete: "cascade" }),
+  accountType: varchar("account_type", { length: 20 }).notNull().default("personal"), // 'personal' | 'team'
+  accountId: uuid("account_id"), // null = personal (userId is implicit); teamId when accountType='team'
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export type UserActiveAccount = typeof userActiveAccounts.$inferSelect;
+export type NewUserActiveAccount = typeof userActiveAccounts.$inferInsert;
