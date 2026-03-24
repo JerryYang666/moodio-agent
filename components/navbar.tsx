@@ -51,7 +51,7 @@ export const Navbar = () => {
   const router = useRouter();
   const { user, logout } = useAuth();
   const { refreshChats } = useChat();
-  const { balance: credits, activeAccountType, activeTeamName } = useCredits();
+  const { balance: credits, activeAccountType, activeTeamName, refreshBalance } = useCredits();
   const { teams } = useTeams();
   const dispatch = useDispatch();
   const [setActiveAccountApi] = useSetActiveAccountMutation();
@@ -380,7 +380,7 @@ export const Navbar = () => {
                             ))}
                             <NextLink
                               href="/credits"
-                              onClick={() => setIsMenuOpen(false)}
+                              onClick={() => { refreshBalance(); setIsMenuOpen(false); }}
                               className="flex items-center gap-2 px-2 py-1.5 rounded-lg transition-colors hover:bg-default-100"
                             >
                               <Bean size={16} className="text-primary" />

@@ -45,7 +45,7 @@ import { siteConfig } from "@/config/site";
 export const PrimarySidebar = () => {
   const pathname = usePathname();
   const { user, logout } = useAuth();
-  const { balance: credits, activeAccountType, activeTeamName } = useCredits();
+  const { balance: credits, activeAccountType, activeTeamName, refreshBalance } = useCredits();
   const { teams } = useTeams();
   const dispatch = useDispatch();
   const [setActiveAccountApi] = useSetActiveAccountMutation();
@@ -267,6 +267,7 @@ export const PrimarySidebar = () => {
                   ? "text-primary"
                   : "text-default-500 hover:bg-default-100 hover:text-default-900"
               )}
+              onClick={refreshBalance}
             >
               <div className="relative">
                 <Bean size={18} />
