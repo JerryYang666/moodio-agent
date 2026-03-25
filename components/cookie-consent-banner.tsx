@@ -36,7 +36,7 @@ export const CookieConsentBanner = () => {
   if (!visible) return null;
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-[9999] p-4">
+    <div className="fixed bottom-0 left-0 right-0 z-9999 p-4">
       <div className="max-w-xl mx-auto bg-content1 border border-divider rounded-xl shadow-lg p-4 flex flex-col sm:flex-row items-center gap-3">
         <p className="text-sm text-default-600 flex-1">
           {t("cookieBannerText")}{" "}
