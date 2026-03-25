@@ -17,9 +17,11 @@ import { Button } from "@heroui/button";
 import { addToast } from "@heroui/toast";
 import { Tabs, Tab } from "@heroui/tabs";
 import { Bean, CalendarCheck } from "lucide-react";
+import NextLink from "next/link";
 import { api } from "@/lib/api/client";
 import { useCredits } from "@/hooks/use-credits";
 import { useTeams } from "@/hooks/use-team";
+import { LegalFooter } from "@/components/legal-footer";
 
 interface Transaction {
   id: string;
@@ -195,6 +197,19 @@ export default function CreditsPage() {
         </CardBody>
       </Card>
 
+      {/* Payment Legal Disclosure */}
+      <p className="text-xs text-default-500 text-center -mt-4">
+        {t("paymentDisclosure")}{" "}
+        <NextLink href="/legal/subscription-terms" className="underline hover:text-default-700">
+          {t("subscriptionTerms")}
+        </NextLink>
+        {" "}{t("paymentDisclosureAnd")}{" "}
+        <NextLink href="/legal/refunds" className="underline hover:text-default-700">
+          {t("refundPolicy")}
+        </NextLink>
+        .{" "}{t("paymentDisclosureWithdrawal")}
+      </p>
+
       {/* Daily Check-in Card */}
       {viewAccountType === "personal" && checkinStatus && (
         <Card className="bg-linear-to-br from-success/10 to-success/5">
@@ -297,6 +312,8 @@ export default function CreditsPage() {
           )}
         </CardBody>
       </Card>
+
+      <LegalFooter className="pt-8" />
     </div>
   );
 }

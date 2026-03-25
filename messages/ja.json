@@ -82,7 +82,9 @@
     "passwordPlaceholder": "パスワードを入力",
     "invalidCredentials": "メールアドレスまたはパスワードが無効です",
     "backToOtp": "メールログインコードに戻る",
-    "emailRequired": "まずメールアドレスを入力してください"
+    "emailRequired": "まずメールアドレスを入力してください",
+    "createAccountTitle": "アカウントを作成",
+    "createAndVerify": "アカウント作成＆認証"
   },
   "onboarding": {
     "welcomeTitle": "moodio agentへようこそ！",
@@ -1001,7 +1003,12 @@
     "billingHint": "クレジットを消費するアカウントを選択",
     "viewAll": "詳細を表示",
     "personalAccount": "個人",
-    "usedBy": "使用者"
+    "usedBy": "使用者",
+    "paymentDisclosure": "購入することで、当社の",
+    "subscriptionTerms": "サブスクリプション規約",
+    "paymentDisclosureAnd": "および",
+    "refundPolicy": "返金ポリシー",
+    "paymentDisclosureWithdrawal": "に同意したものとみなされます。即時アクセスに同意し、サービス開始後は撤回権を放棄することを了承します。"
   },
   "teams": {
     "title": "チーム",
@@ -1147,5 +1154,21 @@
     "imageTitle": "画像",
     "bringForward": "前面へ移動",
     "sendBackward": "背面へ移動"
+  },
+  "legal": {
+    "terms": "利用規約",
+    "privacy": "プライバシー",
+    "cookies": "Cookie",
+    "dmca": "DMCA",
+    "termsOfService": "利用規約",
+    "privacyPolicy": "プライバシーポリシー",
+    "acceptableUsePolicy": "利用ポリシー",
+    "agreePrefix": "以下に同意します：",
+    "and": "および",
+    "mustAgreeToTerms": "アカウントを作成するには、利用規約、プライバシーポリシー、および利用ポリシーに同意する必要があります。",
+    "backToHome": "ホームに戻る",
+    "cookieBannerText": "当サイトではCookieを使用してエクスペリエンスを向上させています。サイトの利用を続けることで、Cookieの使用に同意したものとみなされます。",
+    "cookiePolicyLink": "詳しく見る",
+    "cookieAccept": "同意する"
   }
 }

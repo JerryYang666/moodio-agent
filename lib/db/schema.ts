@@ -641,3 +641,22 @@ export const userActiveAccounts = pgTable("user_active_accounts", {
 
 export type UserActiveAccount = typeof userActiveAccounts.$inferSelect;
 export type NewUserActiveAccount = typeof userActiveAccounts.$inferInsert;
+
+/**
+ * User Consents table
+ * Records when users accept legal agreements (Terms, Privacy, AUP).
+ * A new row is inserted each time the user accepts a new version.
+ * California law requires 3+ years retention.
+ */
+export const userConsents = pgTable("user_consents", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  termsVersion: varchar("terms_version", { length: 20 }).notNull(), // e.g. "2026-03-24"
+  acceptedFromIp: varchar("accepted_from_ip", { length: 100 }),
+  acceptedAt: timestamp("accepted_at").defaultNow().notNull(),
+});
+
+export type UserConsent = typeof userConsents.$inferSelect;
+export type NewUserConsent = typeof userConsents.$inferInsert;

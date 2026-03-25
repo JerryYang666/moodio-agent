@@ -6,10 +6,12 @@ import { Input } from "@heroui/input";
 import { InputOtp } from "@heroui/input-otp";
 import { Button } from "@heroui/button";
 import { Card } from "@heroui/card";
+import { Checkbox } from "@heroui/checkbox";
 import { siteConfig } from "@/config/site";
 import { startAuthentication } from "@simplewebauthn/browser";
 import { Key, Lock, Eye, EyeOff } from "lucide-react";
 import { LanguageSwitch } from "@/components/language-switch";
+import { LegalFooter } from "@/components/legal-footer";
 
 export default function LoginPage() {
   const t = useTranslations();
@@ -21,6 +23,8 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [passkeyLoading, setPasskeyLoading] = useState(false);
   const [error, setError] = useState("");
+  const [isNewUser, setIsNewUser] = useState(false);
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
 
   const OTP_LENGTH = siteConfig.auth.otp.length;
 
@@ -42,6 +46,8 @@ export default function LoginPage() {
         throw new Error(data.error || t("auth.failedToSendOtp"));
       }
 
+      setIsNewUser(data.isNewUser === true);
+      setAgreedToTerms(false);
       setStep("otp");
     } catch (err) {
       setError(err instanceof Error ? err.message : t("auth.failedToSendOtp"));
@@ -54,6 +60,11 @@ export default function LoginPage() {
     const otpCode = code || otp;
     if (otpCode.length !== OTP_LENGTH) return;
 
+    if (isNewUser && !agreedToTerms) {
+      setError(t("legal.mustAgreeToTerms"));
+      return;
+    }
+
     setError("");
     setLoading(true);
 
@@ -61,7 +72,11 @@ export default function LoginPage() {
       const response = await fetch("/api/auth/verify-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, code: otpCode }),
+        body: JSON.stringify({
+          email,
+          code: otpCode,
+          ...(isNewUser && { agreedToTerms: true }),
+        }),
       });
 
       const data = await response.json();
@@ -158,13 +173,13 @@ export default function LoginPage() {
 
   const handleOTPChange = (value: string) => {
     setOtp(value);
-    if (value.length === OTP_LENGTH) {
+    if (value.length === OTP_LENGTH && (!isNewUser || agreedToTerms)) {
       setTimeout(() => handleVerifyOTP(value), 100);
     }
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen">
+    <div className="flex flex-col items-center justify-center min-h-screen">
       <Card className="w-full max-w-md p-8">
         <div className="space-y-6">
           <div className="text-center relative">
@@ -177,7 +192,9 @@ export default function LoginPage() {
                 ? t("auth.signInTitle")
                 : step === "password"
                   ? t("auth.signInWithPassword")
-                  : t("auth.enterOtpCode", { count: OTP_LENGTH })}
+                  : isNewUser
+                    ? t("auth.createAccountTitle")
+                    : t("auth.enterOtpCode", { count: OTP_LENGTH })}
             </p>
           </div>
 
@@ -343,6 +360,47 @@ export default function LoginPage() {
                 )}
               </div>
 
+              {isNewUser && (
+                <Checkbox
+                  isSelected={agreedToTerms}
+                  onValueChange={setAgreedToTerms}
+                  size="sm"
+                  className="items-start"
+                >
+                  <span className="text-sm">
+                    {t("legal.agreePrefix")}{" "}
+                    <a
+                      href="/legal/terms"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary underline"
+                    >
+                      {t("legal.termsOfService")}
+                    </a>
+                    {", "}
+                    <a
+                      href="/legal/privacy"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary underline"
+                    >
+                      {t("legal.privacyPolicy")}
+                    </a>
+                    {", "}
+                    {t("legal.and")}{" "}
+                    <a
+                      href="/legal/acceptable-use"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary underline"
+                    >
+                      {t("legal.acceptableUsePolicy")}
+                    </a>
+                    .
+                  </span>
+                </Checkbox>
+              )}
+
               <div className="flex flex-col space-y-2">
                 <Button
                   color="primary"
@@ -350,9 +408,15 @@ export default function LoginPage() {
                   className="w-full"
                   onPress={() => handleVerifyOTP()}
                   isLoading={loading}
-                  isDisabled={otp.length !== OTP_LENGTH || loading}
+                  isDisabled={
+                    otp.length !== OTP_LENGTH ||
+                    loading ||
+                    (isNewUser && !agreedToTerms)
+                  }
                 >
-                  {t("auth.verifyAndLogin")}
+                  {isNewUser
+                    ? t("auth.createAndVerify")
+                    : t("auth.verifyAndLogin")}
                 </Button>
 
                 <Button
@@ -383,6 +447,7 @@ export default function LoginPage() {
           )}
         </div>
       </Card>
+      <LegalFooter className="mt-6 mb-4" />
     </div>
   );
 }

@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { users } from "@/lib/db/schema";
+import { users, userConsents } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { verifyOTP } from "@/lib/auth/otp";
 import { generateAccessToken } from "@/lib/auth/jwt";
@@ -17,7 +17,7 @@ import { getUserTeamMemberships } from "@/lib/teams";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { email, code } = body;
+    const { email, code, agreedToTerms } = body;
 
     // Validate input
     if (!email || typeof email !== "string") {
@@ -52,6 +52,17 @@ export async function POST(request: NextRequest) {
         { error: "Invalid or expired code" },
         { status: 401 }
       );
+    }
+
+    // Log consent if this is a new user who agreed to terms
+    if (agreedToTerms) {
+      await db.insert(userConsents).values({
+        userId,
+        termsVersion: "2026-03-24",
+        acceptedFromIp:
+          request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+          "unknown",
+      });
     }
 
     // Generate tokens with full user information

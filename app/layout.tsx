@@ -6,6 +6,7 @@ import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getMessages } from "next-intl/server";
 
 import { Providers } from "./providers";
+import { CookieConsentBanner } from "@/components/cookie-consent-banner";
 
 import { siteConfig } from "@/config/site";
 import { fontSans } from "@/config/fonts";
@@ -65,6 +66,7 @@ export default async function RootLayout({
         <NextIntlClientProvider messages={messages}>
           <Providers themeProps={{ attribute: "class", defaultTheme: "dark", enableSystem: true }}>
             {children}
+            <CookieConsentBanner />
           </Providers>
         </NextIntlClientProvider>
       </body>

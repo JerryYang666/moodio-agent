@@ -29,9 +29,11 @@ export async function POST(request: NextRequest) {
       .limit(1);
 
     let userId: string;
+    let isNewUser = false;
 
     if (user.length === 0) {
       // Create new user
+      isNewUser = true;
       const newUser = await db
         .insert(users)
         .values({
@@ -43,6 +45,8 @@ export async function POST(request: NextRequest) {
       userId = newUser[0].id;
     } else {
       userId = user[0].id;
+      // Existing user who never completed onboarding is still "new"
+      isNewUser = (user[0].roles as string[]).includes("new_user");
     }
 
     // Generate and save OTP
@@ -56,6 +60,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       message: "OTP sent to your email",
+      isNewUser,
     });
   } catch (error) {
     console.error("Error in request-otp:", error);
