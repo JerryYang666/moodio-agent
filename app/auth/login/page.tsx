@@ -24,6 +24,7 @@ export default function LoginPage() {
   const [passkeyLoading, setPasskeyLoading] = useState(false);
   const [error, setError] = useState("");
   const [isNewUser, setIsNewUser] = useState(false);
+  const [needsConsent, setNeedsConsent] = useState(false);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
 
   const OTP_LENGTH = siteConfig.auth.otp.length;
@@ -47,6 +48,7 @@ export default function LoginPage() {
       }
 
       setIsNewUser(data.isNewUser === true);
+      setNeedsConsent(data.needsConsent === true);
       setAgreedToTerms(false);
       setStep("otp");
     } catch (err) {
@@ -60,7 +62,7 @@ export default function LoginPage() {
     const otpCode = code || otp;
     if (otpCode.length !== OTP_LENGTH) return;
 
-    if (isNewUser && !agreedToTerms) {
+    if (needsConsent && !agreedToTerms) {
       setError(t("legal.mustAgreeToTerms"));
       return;
     }
@@ -75,7 +77,7 @@ export default function LoginPage() {
         body: JSON.stringify({
           email,
           code: otpCode,
-          ...(isNewUser && { agreedToTerms: true }),
+          ...(needsConsent && { agreedToTerms: true }),
         }),
       });
 
@@ -98,6 +100,11 @@ export default function LoginPage() {
     e?.preventDefault();
     if (!password) return;
 
+    if (needsConsent && !agreedToTerms) {
+      setError(t("legal.mustAgreeToTerms"));
+      return;
+    }
+
     setError("");
     setLoading(true);
 
@@ -105,12 +112,22 @@ export default function LoginPage() {
       const response = await fetch("/api/auth/login-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({
+          email,
+          password,
+          ...(needsConsent && { agreedToTerms: true }),
+        }),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
+        if (data.needsConsent) {
+          setNeedsConsent(true);
+          setAgreedToTerms(false);
+          setError(t("legal.mustAgreeToTerms"));
+          return;
+        }
         throw new Error(data.error || t("auth.invalidCredentials"));
       }
 
@@ -173,7 +190,7 @@ export default function LoginPage() {
 
   const handleOTPChange = (value: string) => {
     setOtp(value);
-    if (value.length === OTP_LENGTH && (!isNewUser || agreedToTerms)) {
+    if (value.length === OTP_LENGTH && (!needsConsent || agreedToTerms)) {
       setTimeout(() => handleVerifyOTP(value), 100);
     }
   };
@@ -319,11 +336,54 @@ export default function LoginPage() {
                   size="lg"
                   className="w-full"
                   isLoading={loading}
-                  isDisabled={!password || loading}
+                  isDisabled={!password || loading || (needsConsent && !agreedToTerms)}
                 >
                   {t("auth.signInWithPassword")}
                 </Button>
               </form>
+
+              {needsConsent && (
+                <div className="flex justify-center">
+                  <Checkbox
+                    isSelected={agreedToTerms}
+                    onValueChange={setAgreedToTerms}
+                    size="sm"
+                    className="items-start"
+                  >
+                    <span className="text-sm">
+                      {t("legal.agreePrefix")}{" "}
+                      <a
+                        href="/legal/terms"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary underline"
+                      >
+                        {t("legal.termsOfService")}
+                      </a>
+                      {", "}
+                      <a
+                        href="/legal/privacy"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary underline"
+                      >
+                        {t("legal.privacyPolicy")}
+                      </a>
+                      {", "}
+                      {t("legal.and")}{" "}
+                      <a
+                        href="/legal/acceptable-use"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary underline"
+                      >
+                        {t("legal.acceptableUsePolicy")}
+                      </a>
+                      .
+                    </span>
+                  </Checkbox>
+                </div>
+              )}
 
               <Button
                 color="default"
@@ -360,48 +420,50 @@ export default function LoginPage() {
                 )}
               </div>
 
-              {isNewUser && (
-                <Checkbox
-                  isSelected={agreedToTerms}
-                  onValueChange={setAgreedToTerms}
-                  size="sm"
-                  className="items-start"
-                >
-                  <span className="text-sm">
-                    {t("legal.agreePrefix")}{" "}
-                    <a
-                      href="/legal/terms"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-primary underline"
-                    >
-                      {t("legal.termsOfService")}
-                    </a>
-                    {", "}
-                    <a
-                      href="/legal/privacy"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-primary underline"
-                    >
-                      {t("legal.privacyPolicy")}
-                    </a>
-                    {", "}
-                    {t("legal.and")}{" "}
-                    <a
-                      href="/legal/acceptable-use"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-primary underline"
-                    >
-                      {t("legal.acceptableUsePolicy")}
-                    </a>
-                    .
-                  </span>
-                </Checkbox>
+              {needsConsent && (
+                <div className="flex justify-center">
+                  <Checkbox
+                    isSelected={agreedToTerms}
+                    onValueChange={setAgreedToTerms}
+                    size="sm"
+                    className="items-start"
+                  >
+                    <span className="text-sm">
+                      {t("legal.agreePrefix")}{" "}
+                      <a
+                        href="/legal/terms"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary underline"
+                      >
+                        {t("legal.termsOfService")}
+                      </a>
+                      {", "}
+                      <a
+                        href="/legal/privacy"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary underline"
+                      >
+                        {t("legal.privacyPolicy")}
+                      </a>
+                      {", "}
+                      {t("legal.and")}{" "}
+                      <a
+                        href="/legal/acceptable-use"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary underline"
+                      >
+                        {t("legal.acceptableUsePolicy")}
+                      </a>
+                      .
+                    </span>
+                  </Checkbox>
+                </div>
               )}
 
-              <div className="flex flex-col space-y-2">
+              <div className="flex flex-col space-y-2 mt-4">
                 <Button
                   color="primary"
                   size="lg"
@@ -411,7 +473,7 @@ export default function LoginPage() {
                   isDisabled={
                     otp.length !== OTP_LENGTH ||
                     loading ||
-                    (isNewUser && !agreedToTerms)
+                    (needsConsent && !agreedToTerms)
                   }
                 >
                   {isNewUser

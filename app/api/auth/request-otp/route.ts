@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { users } from "@/lib/db/schema";
+import { users, userConsents } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { generateOTP, createOTP } from "@/lib/auth/otp";
 import { sendOTPEmail } from "@/lib/auth/email";
@@ -30,9 +30,9 @@ export async function POST(request: NextRequest) {
 
     let userId: string;
     let isNewUser = false;
+    let needsConsent = true;
 
     if (user.length === 0) {
-      // Create new user
       isNewUser = true;
       const newUser = await db
         .insert(users)
@@ -45,8 +45,15 @@ export async function POST(request: NextRequest) {
       userId = newUser[0].id;
     } else {
       userId = user[0].id;
-      // Existing user who never completed onboarding is still "new"
       isNewUser = (user[0].roles as string[]).includes("new_user");
+
+      const consent = await db
+        .select({ id: userConsents.id })
+        .from(userConsents)
+        .where(eq(userConsents.userId, userId))
+        .limit(1);
+
+      needsConsent = consent.length === 0;
     }
 
     // Generate and save OTP
@@ -61,6 +68,7 @@ export async function POST(request: NextRequest) {
       success: true,
       message: "OTP sent to your email",
       isNewUser,
+      needsConsent,
     });
   } catch (error) {
     console.error("Error in request-otp:", error);

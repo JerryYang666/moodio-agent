@@ -63,6 +63,20 @@ export async function POST(request: NextRequest) {
           request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
           "unknown",
       });
+    } else {
+      // Verify existing users have prior consent on record
+      const existingConsent = await db
+        .select({ id: userConsents.id })
+        .from(userConsents)
+        .where(eq(userConsents.userId, userId))
+        .limit(1);
+
+      if (existingConsent.length === 0) {
+        return NextResponse.json(
+          { error: "You must agree to the terms and conditions" },
+          { status: 400 }
+        );
+      }
     }
 
     // Generate tokens with full user information
