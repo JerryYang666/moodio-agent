@@ -11,6 +11,7 @@ import { startRegistration } from "@simplewebauthn/browser";
 import { Key, Lock, Eye, EyeOff } from "lucide-react";
 import { addToast } from "@heroui/toast";
 import { siteConfig } from "@/config/site";
+import { LegalFooter } from "@/components/legal-footer";
 
 export default function ProfilePage() {
   const t = useTranslations();
@@ -438,6 +439,8 @@ export default function ProfilePage() {
           </div>
         </CardBody>
       </Card>
+
+      <LegalFooter className="pt-8" />
     </div>
   );
 }

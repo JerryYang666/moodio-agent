@@ -82,7 +82,9 @@
     "passwordPlaceholder": "비밀번호를 입력하세요",
     "invalidCredentials": "이메일 또는 비밀번호가 올바르지 않습니다",
     "backToOtp": "이메일 로그인 코드로 돌아가기",
-    "emailRequired": "먼저 이메일을 입력해 주세요"
+    "emailRequired": "먼저 이메일을 입력해 주세요",
+    "createAccountTitle": "계정 만들기",
+    "createAndVerify": "계정 생성 및 인증"
   },
   "onboarding": {
     "welcomeTitle": "moodio agent에 오신 것을 환영합니다!",
@@ -1001,7 +1003,12 @@
     "billingHint": "크레딧을 차감할 계정을 선택하세요",
     "viewAll": "상세 보기",
     "personalAccount": "개인",
-    "usedBy": "사용자"
+    "usedBy": "사용자",
+    "paymentDisclosure": "구매 시 당사의",
+    "subscriptionTerms": "구독 약관",
+    "paymentDisclosureAnd": "및",
+    "refundPolicy": "환불 정책",
+    "paymentDisclosureWithdrawal": "에 동의하는 것으로 간주됩니다. 즉시 액세스에 동의하며, 서비스가 시작되면 철회권을 포기함을 인정합니다."
   },
   "teams": {
     "title": "팀",
@@ -1147,5 +1154,21 @@
     "imageTitle": "이미지",
     "bringForward": "앞으로 가져오기",
     "sendBackward": "뒤로 보내기"
+  },
+  "legal": {
+    "terms": "약관",
+    "privacy": "개인정보",
+    "cookies": "쿠키",
+    "dmca": "DMCA",
+    "termsOfService": "서비스 약관",
+    "privacyPolicy": "개인정보 처리방침",
+    "acceptableUsePolicy": "이용 정책",
+    "agreePrefix": "다음에 동의합니다:",
+    "and": "및",
+    "mustAgreeToTerms": "계정을 만들려면 서비스 약관, 개인정보 처리방침 및 이용 정책에 동의해야 합니다.",
+    "backToHome": "홈으로 돌아가기",
+    "cookieBannerText": "당사는 쿠키를 사용하여 경험을 개선합니다. 사이트를 계속 이용하면 쿠키 사용에 동의하는 것으로 간주됩니다.",
+    "cookiePolicyLink": "자세히 알아보기",
+    "cookieAccept": "수락"
   }
 }

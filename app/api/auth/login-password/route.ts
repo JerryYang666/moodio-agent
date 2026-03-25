@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { users } from "@/lib/db/schema";
+import { users, userConsents } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { verifyPassword, dummyVerify } from "@/lib/auth/password";
 import { generateAccessToken } from "@/lib/auth/jwt";
@@ -12,7 +12,7 @@ import { getUserTeamMemberships } from "@/lib/teams";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { email, password } = body;
+    const { email, password, agreedToTerms } = body;
 
     if (!email || typeof email !== "string") {
       return NextResponse.json({ error: "Email is required" }, { status: 400 });
@@ -47,6 +47,32 @@ export async function POST(request: NextRequest) {
         { error: "Invalid email or password" },
         { status: 401 }
       );
+    }
+
+    // Check consent status
+    const existingConsent = await db
+      .select({ id: userConsents.id })
+      .from(userConsents)
+      .where(eq(userConsents.userId, user[0].id))
+      .limit(1);
+
+    const hasConsent = existingConsent.length > 0;
+
+    if (!hasConsent && !agreedToTerms) {
+      return NextResponse.json(
+        { error: "You must agree to the terms and conditions", needsConsent: true },
+        { status: 400 }
+      );
+    }
+
+    if (!hasConsent && agreedToTerms) {
+      await db.insert(userConsents).values({
+        userId: user[0].id,
+        termsVersion: "2026-03-24",
+        acceptedFromIp:
+          request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+          "unknown",
+      });
     }
 
     const teamMemberships = await getUserTeamMemberships(user[0].id);

@@ -82,7 +82,9 @@
     "passwordPlaceholder": "Enter your password",
     "invalidCredentials": "Invalid email or password",
     "backToOtp": "Back to email login code",
-    "emailRequired": "Please enter your email first"
+    "emailRequired": "Please enter your email first",
+    "createAccountTitle": "Create your account",
+    "createAndVerify": "Create Account & Verify"
   },
   "onboarding": {
     "welcomeTitle": "Welcome to moodio agent!",
@@ -1087,6 +1089,11 @@
     "billingHint": "Select which account to bill credits to",
     "viewAll": "View Details",
     "personalAccount": "Personal",
+    "paymentDisclosure": "By purchasing, you agree to our",
+    "subscriptionTerms": "Subscription Terms",
+    "paymentDisclosureAnd": "and",
+    "refundPolicy": "Refund Policy",
+    "paymentDisclosureWithdrawal": "I consent to immediate access and acknowledge that I lose my right of withdrawal once the service begins.",
     "usedBy": "Used By"
   },
   "teams": {
@@ -1147,5 +1154,21 @@
   "mention": {
     "noItemsAvailable": "No images available",
     "noMatchingItems": "No matching images"
+  },
+  "legal": {
+    "terms": "Terms",
+    "privacy": "Privacy",
+    "cookies": "Cookies",
+    "dmca": "DMCA",
+    "termsOfService": "Terms of Service",
+    "privacyPolicy": "Privacy Policy",
+    "acceptableUsePolicy": "Acceptable Use Policy",
+    "agreePrefix": "I agree to the",
+    "and": "and",
+    "mustAgreeToTerms": "You must agree to the Terms of Service, Privacy Policy, and Acceptable Use Policy to create an account.",
+    "backToHome": "Back to Home",
+    "cookieBannerText": "We use cookies to improve your experience. By continuing to use our site, you accept our use of cookies.",
+    "cookiePolicyLink": "Learn more",
+    "cookieAccept": "Accept"
   }
 }

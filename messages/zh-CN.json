@@ -82,7 +82,9 @@
     "passwordPlaceholder": "请输入密码",
     "invalidCredentials": "邮箱或密码无效",
     "backToOtp": "返回邮箱验证码登录",
-    "emailRequired": "请先输入邮箱"
+    "emailRequired": "请先输入邮箱",
+    "createAccountTitle": "创建您的账号",
+    "createAndVerify": "创建账号并验证"
   },
   "onboarding": {
     "welcomeTitle": "欢迎使用 moodio agent！",
@@ -1001,7 +1003,12 @@
     "billingHint": "选择使用哪个账户扣除积分",
     "viewAll": "查看详情",
     "personalAccount": "个人",
-    "usedBy": "使用者"
+    "usedBy": "使用者",
+    "paymentDisclosure": "购买即表示您同意我们的",
+    "subscriptionTerms": "订阅条款",
+    "paymentDisclosureAnd": "和",
+    "refundPolicy": "退款政策",
+    "paymentDisclosureWithdrawal": "我同意立即获得访问权限，并确认一旦服务开始，我将放弃撤回权。"
   },
   "teams": {
     "title": "团队",
@@ -1147,5 +1154,21 @@
     "imageTitle": "图片",
     "bringForward": "上移一层",
     "sendBackward": "下移一层"
+  },
+  "legal": {
+    "terms": "条款",
+    "privacy": "隐私",
+    "cookies": "Cookie",
+    "dmca": "DMCA",
+    "termsOfService": "服务条款",
+    "privacyPolicy": "隐私政策",
+    "acceptableUsePolicy": "可接受使用政策",
+    "agreePrefix": "我同意",
+    "and": "和",
+    "mustAgreeToTerms": "您必须同意服务条款、隐私政策和可接受使用政策才能创建账号。",
+    "backToHome": "返回首页",
+    "cookieBannerText": "我们使用Cookie来改善您的体验。继续使用我们的网站即表示您接受我们使用Cookie。",
+    "cookiePolicyLink": "了解更多",
+    "cookieAccept": "接受"
   }
 }

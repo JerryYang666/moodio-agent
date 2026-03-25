@@ -8,6 +8,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { Sparkles, ArrowRight } from "lucide-react";
 import { RecentActivity } from "@/components/dashboard/RecentActivity";
 import { InspirationSection } from "@/components/dashboard/InspirationSection";
+import { LegalFooter } from "@/components/legal-footer";
 
 export default function Home() {
   const router = useRouter();
@@ -30,7 +31,7 @@ export default function Home() {
   const displayName = user.firstName || user.email.split("@")[0];
 
   return (
-    <div className="flex flex-col h-full overflow-hidden pb-6">
+    <div className="flex flex-col h-full overflow-hidden">
       {/* Elegant Top Bar */}
       <section className="relative overflow-hidden border-b border-default-100 bg-linear-to-r from-default-50 via-primary-50/30 to-default-50 dark:from-background dark:via-primary-900/10 dark:to-background mb-4">
         <div className="relative z-10 max-w-[1600px] mx-auto px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -81,6 +82,8 @@ export default function Home() {
           <InspirationSection />
         </div>
       </main>
+
+      <LegalFooter className="mt-auto pt-1 pb-1 shrink-0" />
     </div>
   );
 }

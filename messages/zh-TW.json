@@ -82,7 +82,9 @@
     "passwordPlaceholder": "請輸入密碼",
     "invalidCredentials": "電子郵件或密碼無效",
     "backToOtp": "返回電子郵件驗證碼登入",
-    "emailRequired": "請先輸入電子郵件"
+    "emailRequired": "請先輸入電子郵件",
+    "createAccountTitle": "建立您的帳號",
+    "createAndVerify": "建立帳號並驗證"
   },
   "onboarding": {
     "welcomeTitle": "歡迎使用 moodio agent！",
@@ -1001,7 +1003,12 @@
     "billingHint": "選擇使用哪個帳戶扣除點數",
     "viewAll": "查看詳情",
     "personalAccount": "個人",
-    "usedBy": "使用者"
+    "usedBy": "使用者",
+    "paymentDisclosure": "購買即表示您同意我們的",
+    "subscriptionTerms": "訂閱條款",
+    "paymentDisclosureAnd": "和",
+    "refundPolicy": "退款政策",
+    "paymentDisclosureWithdrawal": "我同意立即取得存取權限，並確認一旦服務開始，我將放棄撤回權。"
   },
   "teams": {
     "title": "團隊",
@@ -1147,5 +1154,21 @@
     "imageTitle": "圖片",
     "bringForward": "上移一層",
     "sendBackward": "下移一層"
+  },
+  "legal": {
+    "terms": "條款",
+    "privacy": "隱私",
+    "cookies": "Cookie",
+    "dmca": "DMCA",
+    "termsOfService": "服務條款",
+    "privacyPolicy": "隱私權政策",
+    "acceptableUsePolicy": "可接受使用政策",
+    "agreePrefix": "我同意",
+    "and": "和",
+    "mustAgreeToTerms": "您必須同意服務條款、隱私權政策和可接受使用政策才能建立帳號。",
+    "backToHome": "返回首頁",
+    "cookieBannerText": "我們使用Cookie來改善您的體驗。繼續使用我們的網站即表示您接受我們使用Cookie。",
+    "cookiePolicyLink": "了解更多",
+    "cookieAccept": "接受"
   }
 }
