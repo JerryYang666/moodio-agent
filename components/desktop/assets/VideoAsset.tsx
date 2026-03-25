@@ -4,7 +4,7 @@ import { useRef, useCallback } from "react";
 import { useTranslations } from "next-intl";
 import type { VideoAssetMeta } from "@/lib/desktop/types";
 import type { EnrichedDesktopAsset } from "./types";
-import { Play, Pause, Loader2, Clock, AlertCircle, Video } from "lucide-react";
+import { Play, Pause, Loader2, Clock, AlertCircle, Video, Maximize2 } from "lucide-react";
 import { useVideo } from "@/components/video-provider";
 import FakeProgressBar from "@/components/video/fake-progress-bar";
 import VideoStatusOverlay from "@/components/video/video-status-overlay";
@@ -19,6 +19,7 @@ interface VideoAssetProps {
     naturalWidth: number,
     naturalHeight: number
   ) => void;
+  onFocusAsset?: (asset: EnrichedDesktopAsset) => void;
 }
 
 export default function VideoAsset({
@@ -26,6 +27,7 @@ export default function VideoAsset({
   playing,
   onPlayToggle,
   onImageLoad,
+  onFocusAsset,
 }: VideoAssetProps) {
   const t = useTranslations("desktop");
   const meta = asset.metadata as unknown as VideoAssetMeta;
@@ -154,6 +156,21 @@ export default function VideoAsset({
           </div>
         )}
       </div>
+
+      {/* Focus button — top-right */}
+      {onFocusAsset && (
+        <button
+          type="button"
+          className="absolute top-2 right-2 z-10 w-7 h-7 rounded-full bg-black/60 flex items-center justify-center backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity"
+          onClick={(e) => {
+            e.stopPropagation();
+            onFocusAsset(asset);
+          }}
+          title="Focus on asset"
+        >
+          <Maximize2 size={13} className="text-white" />
+        </button>
+      )}
 
       {/* Play button overlay on hover — completed only */}
       {isCompleted && (

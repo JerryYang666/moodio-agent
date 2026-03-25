@@ -23,6 +23,7 @@ import {
   Plus,
   ArrowUp,
   ArrowDown,
+  Maximize2,
 } from "lucide-react";
 
 const MIN_ZOOM = 0.1;
@@ -217,8 +218,39 @@ export default function DesktopCanvas({
         next.set(assetId, { w: naturalWidth, h: naturalHeight });
         return next;
       });
+      // Persist correct aspect-ratio dimensions if the asset has no stored size
+      const asset = assets.find((a) => a.id === assetId);
+      if (asset && asset.width == null && asset.height == null && onAssetResize) {
+        const scale = DEFAULT_ASSET_WIDTH / naturalWidth;
+        onAssetResize(assetId, DEFAULT_ASSET_WIDTH, naturalHeight * scale);
+      }
     },
-    []
+    [assets, onAssetResize]
+  );
+
+  const handleFocusAsset = useCallback(
+    (asset: EnrichedDesktopAsset) => {
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const dims = getAssetDimensions(asset, naturalDims.get(asset.id));
+      const viewportW = rect.width;
+      const viewportH = rect.height;
+      // Zoom so asset fills ~80% of viewport
+      const zoom = Math.min(
+        (viewportW * 0.8) / dims.w,
+        (viewportH * 0.8) / dims.h,
+        MAX_ZOOM
+      );
+      // Center the asset in the viewport
+      const assetCenterX = asset.posX + dims.w / 2;
+      const assetCenterY = asset.posY + dims.h / 2;
+      onCameraChange({
+        x: viewportW / 2 - assetCenterX * zoom,
+        y: viewportH / 2 - assetCenterY * zoom,
+        zoom,
+      });
+    },
+    [naturalDims, onCameraChange]
   );
 
   const handleResizePointerDown = useCallback(
@@ -1008,6 +1040,7 @@ export default function DesktopCanvas({
                 playing={playingAssetId === asset.id}
                 onPlayToggle={onAssetClick ? () => onAssetClick(asset) : undefined}
                 onImageLoad={handleImageLoad}
+                onFocusAsset={handleFocusAsset}
                 sendEvent={sendEvent}
                 cellLocks={cellLocks}
                 textLocks={textLocks}
@@ -1417,6 +1450,7 @@ function AssetCardContent({
   playing,
   onPlayToggle,
   onImageLoad,
+  onFocusAsset,
   sendEvent,
   cellLocks,
   textLocks,
@@ -1429,6 +1463,7 @@ function AssetCardContent({
   playing?: boolean;
   onPlayToggle?: () => void;
   onImageLoad: (assetId: string, naturalWidth: number, naturalHeight: number) => void;
+  onFocusAsset?: (asset: EnrichedDesktopAsset) => void;
   sendEvent?: (type: string, payload: Record<string, unknown>) => void;
   cellLocks?: Map<string, { userId: string; sessionId: string; firstName: string }>;
   textLocks?: Map<string, { userId: string; sessionId: string; firstName: string }>;
@@ -1439,11 +1474,11 @@ function AssetCardContent({
 }) {
   switch (asset.assetType) {
     case "image":
-      return <ImageAsset asset={asset} onImageLoad={onImageLoad} />;
+      return <ImageAsset asset={asset} onImageLoad={onImageLoad} onFocusAsset={onFocusAsset} />;
     case "video":
-      return <VideoAsset asset={asset} playing={playing} onPlayToggle={onPlayToggle} onImageLoad={onImageLoad} />;
+      return <VideoAsset asset={asset} playing={playing} onPlayToggle={onPlayToggle} onImageLoad={onImageLoad} onFocusAsset={onFocusAsset} />;
     case "public_video":
-      return <PublicVideoAsset asset={asset} playing={playing} onPlayToggle={onPlayToggle} onImageLoad={onImageLoad} />;
+      return <PublicVideoAsset asset={asset} playing={playing} onPlayToggle={onPlayToggle} onImageLoad={onImageLoad} onFocusAsset={onFocusAsset} />;
     case "text": {
       const textLock = textLocks?.get(asset.id);
       const isTextLockedByOther = !!textLock && textLock.userId !== currentUserId;
