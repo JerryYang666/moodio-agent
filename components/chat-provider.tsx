@@ -5,6 +5,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useCredits } from "@/hooks/use-credits";
 import { usePathname, useRouter } from "next/navigation";
 import { addToast } from "@heroui/toast";
+import { siteConfig } from "@/config/site";
 
 export interface Chat {
   id: string;
@@ -205,12 +206,24 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             if (currentCount > startCount) {
               // Generation finished!
 
-              // Determine if we should notify
-              const isChatOpen = pathname === `/chat/${chatId}`;
+              const isChatPage = pathname === `/chat/${chatId}`;
               const isHidden = document.hidden;
 
-              // Notify if: Tab is hidden OR User is not on the specific chat page
-              if (isHidden || !isChatOpen) {
+              // Check if the chat side panel is expanded and showing this chat
+              // (side panel exists on /browse, /storyboard, and /desktop/* pages)
+              const isChatVisibleInSidePanel = (() => {
+                try {
+                  if (localStorage.getItem(siteConfig.chatPanelCollapsed) === "true") return false;
+                  if (localStorage.getItem(siteConfig.activeChatId) !== chatId) return false;
+                  return pathname === "/browse" || pathname === "/storyboard" || pathname.startsWith("/desktop/");
+                } catch {
+                  return false;
+                }
+              })();
+
+              const isChatVisible = isChatPage || isChatVisibleInSidePanel;
+
+              if (isHidden || !isChatVisible) {
                 try {
                   if (
                     "Notification" in window &&
@@ -233,7 +246,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                 }
 
                 // Also show toast if user is active in app but on different page
-                if (!isHidden && !isChatOpen) {
+                if (!isHidden && !isChatVisible) {
                   addToast({
                     title: "Image Ready",
                     description: "Your image generation is complete!",
