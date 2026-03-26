@@ -1041,6 +1041,7 @@ export default function DesktopCanvas({
                 onPlayToggle={onAssetClick ? () => onAssetClick(asset) : undefined}
                 onImageLoad={handleImageLoad}
                 onFocusAsset={handleFocusAsset}
+                zoom={camera.zoom}
                 sendEvent={sendEvent}
                 cellLocks={cellLocks}
                 textLocks={textLocks}
@@ -1451,6 +1452,7 @@ function AssetCardContent({
   onPlayToggle,
   onImageLoad,
   onFocusAsset,
+  zoom,
   sendEvent,
   cellLocks,
   textLocks,
@@ -1464,6 +1466,7 @@ function AssetCardContent({
   onPlayToggle?: () => void;
   onImageLoad: (assetId: string, naturalWidth: number, naturalHeight: number) => void;
   onFocusAsset?: (asset: EnrichedDesktopAsset) => void;
+  zoom: number;
   sendEvent?: (type: string, payload: Record<string, unknown>) => void;
   cellLocks?: Map<string, { userId: string; sessionId: string; firstName: string }>;
   textLocks?: Map<string, { userId: string; sessionId: string; firstName: string }>;
@@ -1474,11 +1477,11 @@ function AssetCardContent({
 }) {
   switch (asset.assetType) {
     case "image":
-      return <ImageAsset asset={asset} onImageLoad={onImageLoad} onFocusAsset={onFocusAsset} />;
+      return <ImageAsset asset={asset} onImageLoad={onImageLoad} onFocusAsset={onFocusAsset} zoom={zoom} />;
     case "video":
-      return <VideoAsset asset={asset} playing={playing} onPlayToggle={onPlayToggle} onImageLoad={onImageLoad} onFocusAsset={onFocusAsset} />;
+      return <VideoAsset asset={asset} playing={playing} onPlayToggle={onPlayToggle} onImageLoad={onImageLoad} onFocusAsset={onFocusAsset} zoom={zoom} />;
     case "public_video":
-      return <PublicVideoAsset asset={asset} playing={playing} onPlayToggle={onPlayToggle} onImageLoad={onImageLoad} onFocusAsset={onFocusAsset} />;
+      return <PublicVideoAsset asset={asset} playing={playing} onPlayToggle={onPlayToggle} onImageLoad={onImageLoad} onFocusAsset={onFocusAsset} zoom={zoom} />;
     case "text": {
       const textLock = textLocks?.get(asset.id);
       const isTextLockedByOther = !!textLock && textLock.userId !== currentUserId;

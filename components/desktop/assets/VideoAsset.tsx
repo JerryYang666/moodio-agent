@@ -20,6 +20,7 @@ interface VideoAssetProps {
     naturalHeight: number
   ) => void;
   onFocusAsset?: (asset: EnrichedDesktopAsset) => void;
+  zoom: number;
 }
 
 export default function VideoAsset({
@@ -28,6 +29,7 @@ export default function VideoAsset({
   onPlayToggle,
   onImageLoad,
   onFocusAsset,
+  zoom,
 }: VideoAssetProps) {
   const t = useTranslations("desktop");
   const meta = asset.metadata as unknown as VideoAssetMeta;
@@ -161,7 +163,8 @@ export default function VideoAsset({
       {onFocusAsset && (
         <button
           type="button"
-          className="absolute top-2 right-2 z-10 w-7 h-7 rounded-full bg-black/60 flex items-center justify-center backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity"
+          className="absolute top-0 right-0 z-10 w-7 h-7 rounded-full bg-black/60 flex items-center justify-center backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity"
+          style={{ transform: `scale(${1 / zoom})`, transformOrigin: "top right", margin: `${8 / zoom}px` }}
           onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => {
             e.stopPropagation();
