@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef } from "react";
 import { useTranslations } from "next-intl";
 import type { PublicVideoAssetMeta } from "@/lib/desktop/types";
 import type { EnrichedDesktopAsset } from "./types";
-import { Video, Play, Pause } from "lucide-react";
+import { Video, Play, Pause, Maximize2 } from "lucide-react";
 
 interface PublicVideoAssetProps {
   asset: EnrichedDesktopAsset;
@@ -15,6 +15,7 @@ interface PublicVideoAssetProps {
     naturalWidth: number,
     naturalHeight: number
   ) => void;
+  onFocusAsset?: (asset: EnrichedDesktopAsset) => void;
 }
 
 export default function PublicVideoAsset({
@@ -22,6 +23,7 @@ export default function PublicVideoAsset({
   playing,
   onPlayToggle,
   onImageLoad,
+  onFocusAsset,
 }: PublicVideoAssetProps) {
   const t = useTranslations("desktop");
   const meta = asset.metadata as unknown as PublicVideoAssetMeta;
@@ -124,6 +126,21 @@ export default function PublicVideoAsset({
           <Play size={10} fill="white" />
         </div>
       </div>
+
+      {/* Focus button — top-right */}
+      {onFocusAsset && (
+        <button
+          type="button"
+          className="absolute top-2 right-2 z-10 w-7 h-7 rounded-full bg-black/60 flex items-center justify-center backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity"
+          onClick={(e) => {
+            e.stopPropagation();
+            onFocusAsset(asset);
+          }}
+          title="Focus on asset"
+        >
+          <Maximize2 size={13} className="text-white" />
+        </button>
+      )}
 
       {/* Play button overlay on hover */}
       <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-1">
