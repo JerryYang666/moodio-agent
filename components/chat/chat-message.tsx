@@ -245,6 +245,7 @@ export default function ChatMessage({
       title: part.title,
       prompt: part.prompt,
       status: part.status,
+      aspectRatio: part.aspectRatio || undefined,
       chatId: chatId || null,
     };
     try {

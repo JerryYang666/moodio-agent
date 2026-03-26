@@ -457,11 +457,15 @@ export default function DesktopDetailPage({
         title?: string;
         prompt?: string;
         status?: "loading" | "generated" | "error";
+        aspectRatio?: string;
         chatId?: string | null;
       },
       position: { x: number; y: number }
     ) => {
       try {
+        const { aspectRatioDimensions } = await import("@/lib/desktop/types");
+        const dims = aspectRatioDimensions(payload.aspectRatio, 300);
+
         const res = await fetch(`/api/desktop/${desktopId}/assets`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -475,9 +479,11 @@ export default function DesktopDetailPage({
                   title: payload.title || t("videoTitle"),
                   prompt: payload.prompt || "",
                   status: payload.status || "generated",
+                  aspectRatio: payload.aspectRatio || undefined,
                 },
                 posX: position.x,
                 posY: position.y,
+                ...(dims ? { width: dims.w, height: dims.h } : {}),
               },
             ],
           }),

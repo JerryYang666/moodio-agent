@@ -5,7 +5,26 @@ export type ImageAssetMeta = {
   prompt?: string;
   status?: string;
   modelId?: string;
+  aspectRatio?: string;
 };
+
+/**
+ * Convert an aspect ratio string (e.g. "16:9") into pixel dimensions
+ * that fit within the given target width.
+ * Returns `null` if the string is not a valid "W:H" ratio.
+ */
+export function aspectRatioDimensions(
+  aspectRatio: string | undefined | null,
+  targetWidth = 300
+): { w: number; h: number } | null {
+  if (!aspectRatio) return null;
+  const parts = aspectRatio.split(":");
+  if (parts.length !== 2) return null;
+  const rw = Number(parts[0]);
+  const rh = Number(parts[1]);
+  if (!rw || !rh || !Number.isFinite(rw) || !Number.isFinite(rh)) return null;
+  return { w: targetWidth, h: Math.round(targetWidth * (rh / rw)) };
+}
 
 export type VideoAssetMeta = {
   imageId: string;

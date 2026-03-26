@@ -2539,7 +2539,11 @@ export default function ChatInterface({
                   if (partType === "agent_image" || partType === "agent_video_suggest") {
                     (async () => {
                       try {
-                        const { getViewportVisibleCenterPosition, findNonOverlappingPosition } = await import("@/lib/desktop/types");
+                        const { getViewportVisibleCenterPosition, findNonOverlappingPosition, aspectRatioDimensions } = await import("@/lib/desktop/types");
+
+                        const arDims = aspectRatioDimensions(evt.part.aspectRatio, 300);
+                        const imgW = arDims?.w ?? 300;
+                        const imgH = arDims?.h ?? 300;
 
                         // Compute anchor position once per variant
                         if (!desktopAnchorPositions[vId]) {
@@ -2554,15 +2558,14 @@ export default function ChatInterface({
                         let posY: number;
 
                         if (partType === "agent_image") {
-                          // 2x2 grid layout: 300px wide with 10px gap
                           const idx = desktopPlacedImages[vId] || 0;
                           desktopPlacedImages[vId] = idx + 1;
                           const col = idx % 2;
                           const row = Math.floor(idx / 2);
-                          const candidateX = anchor.x + col * 310;
-                          const candidateY = anchor.y + row * 310;
+                          const candidateX = anchor.x + col * (imgW + 10);
+                          const candidateY = anchor.y + row * (imgH + 10);
                           const vp = typeof window !== "undefined" ? window.__desktopViewport : undefined;
-                          const adjusted = findNonOverlappingPosition(candidateX, candidateY, 300, 300, vp?.assetRects);
+                          const adjusted = findNonOverlappingPosition(candidateX, candidateY, imgW, imgH, vp?.assetRects);
                           posX = adjusted.x;
                           posY = adjusted.y;
 
@@ -2578,9 +2581,12 @@ export default function ChatInterface({
                                   title: evt.part.title || "",
                                   prompt: evt.part.prompt || "",
                                   status: "generated",
+                                  aspectRatio: evt.part.aspectRatio || undefined,
                                 },
                                 posX,
                                 posY,
+                                width: imgW,
+                                height: imgH,
                               }],
                             }),
                           });
@@ -2593,12 +2599,11 @@ export default function ChatInterface({
                             );
                           }
                         } else if (partType === "agent_video_suggest") {
-                          // Send as two separate assets: image on left, text on right
                           const idx = desktopPlacedVideoSuggests[vId] || 0;
                           desktopPlacedVideoSuggests[vId] = idx + 1;
 
-                          const IMAGE_W = 300;
-                          const IMAGE_H = 300;
+                          const IMAGE_W = imgW;
+                          const IMAGE_H = imgH;
                           const TEXT_W = 300;
                           const TEXT_H = 200;
                           const PAIR_GAP = 16;
@@ -2632,6 +2637,7 @@ export default function ChatInterface({
                                     title: titleStr,
                                     prompt: evt.part.prompt || "",
                                     status: "generated",
+                                    aspectRatio: evt.part.aspectRatio || undefined,
                                   },
                                   posX: imgX,
                                   posY: imgY,

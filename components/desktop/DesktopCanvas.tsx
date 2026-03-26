@@ -6,6 +6,7 @@ import type { DesktopAsset } from "@/lib/db/schema";
 import type { CameraState } from "@/hooks/use-desktop";
 import type { RemoteCursor } from "@/hooks/use-desktop-ws";
 import type { EnrichedDesktopAsset } from "./assets";
+import { aspectRatioDimensions } from "@/lib/desktop/types";
 import { ImageAsset, VideoAsset, TextAsset, LinkAsset, VideoSuggestAsset } from "./assets";
 import PublicVideoAsset from "./assets/PublicVideoAsset";
 import TableAsset from "./assets/TableAsset";
@@ -65,6 +66,7 @@ interface DesktopCanvasProps {
       title?: string;
       prompt?: string;
       status?: "loading" | "generated" | "error";
+      aspectRatio?: string;
       chatId?: string | null;
     },
     position: { x: number; y: number }
@@ -145,6 +147,12 @@ function getAssetDimensions(
     const scale = DEFAULT_ASSET_WIDTH / naturalDims.w;
     return { w: DEFAULT_ASSET_WIDTH, h: naturalDims.h * scale };
   }
+  const meta = asset.metadata as Record<string, unknown>;
+  const arDims = aspectRatioDimensions(
+    typeof meta?.aspectRatio === "string" ? meta.aspectRatio : undefined,
+    DEFAULT_ASSET_WIDTH
+  );
+  if (arDims) return arDims;
   return { w: DEFAULT_ASSET_WIDTH, h: DEFAULT_ASSET_WIDTH };
 }
 
@@ -218,11 +226,19 @@ export default function DesktopCanvas({
         next.set(assetId, { w: naturalWidth, h: naturalHeight });
         return next;
       });
-      // Persist correct aspect-ratio dimensions if the asset has no stored size
       const asset = assets.find((a) => a.id === assetId);
       if (asset && asset.width == null && asset.height == null && onAssetResize) {
-        const scale = DEFAULT_ASSET_WIDTH / naturalWidth;
-        onAssetResize(assetId, DEFAULT_ASSET_WIDTH, naturalHeight * scale);
+        const meta = asset.metadata as Record<string, unknown>;
+        const arDims = aspectRatioDimensions(
+          typeof meta?.aspectRatio === "string" ? meta.aspectRatio : undefined,
+          DEFAULT_ASSET_WIDTH
+        );
+        if (arDims) {
+          onAssetResize(assetId, arDims.w, arDims.h);
+        } else {
+          const scale = DEFAULT_ASSET_WIDTH / naturalWidth;
+          onAssetResize(assetId, DEFAULT_ASSET_WIDTH, Math.round(naturalHeight * scale));
+        }
       }
     },
     [assets, onAssetResize]
@@ -358,6 +374,7 @@ export default function DesktopCanvas({
         title?: unknown;
         prompt?: unknown;
         status?: unknown;
+        aspectRatio?: unknown;
         chatId?: unknown;
       };
       if (typeof parsed.imageId !== "string" || typeof parsed.url !== "string") {
@@ -370,6 +387,7 @@ export default function DesktopCanvas({
         title: typeof parsed.title === "string" ? parsed.title : undefined,
         prompt: typeof parsed.prompt === "string" ? parsed.prompt : undefined,
         status,
+        aspectRatio: typeof parsed.aspectRatio === "string" ? parsed.aspectRatio : undefined,
         chatId:
           typeof parsed.chatId === "string" || parsed.chatId === null
             ? parsed.chatId

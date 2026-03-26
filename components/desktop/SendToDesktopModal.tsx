@@ -13,7 +13,7 @@ import { Button } from "@heroui/button";
 import { Spinner } from "@heroui/spinner";
 import { addToast } from "@heroui/toast";
 import { useTranslations } from "next-intl";
-import { getViewportVisibleCenterPosition, findNonOverlappingPosition, type AssetRect } from "@/lib/desktop/types";
+import { getViewportVisibleCenterPosition, findNonOverlappingPosition, aspectRatioDimensions, type AssetRect } from "@/lib/desktop/types";
 import { hasWriteAccess, type Permission } from "@/lib/permissions";
 
 interface SendToDesktopModalProps {
@@ -50,11 +50,14 @@ async function sendAssetsToDesktop(
     body: JSON.stringify({
       assets: assets.map((a, i) => {
         if (useViewportPlacement) {
+          const arDims = (a.assetType === "image" || a.assetType === "video" || a.assetType === "public_video")
+            ? aspectRatioDimensions((a.metadata as any)?.aspectRatio, 300)
+            : null;
           const sizeByType =
             a.assetType === "image"
-              ? { w: 300, h: 300 }
+              ? (arDims ?? { w: 300, h: 300 })
               : a.assetType === "video" || a.assetType === "public_video"
-                ? { w: 300, h: 300 }
+                ? (arDims ?? { w: 300, h: 300 })
                 : a.assetType === "text"
                   ? { w: 300, h: 200 }
                   : a.assetType === "table"
