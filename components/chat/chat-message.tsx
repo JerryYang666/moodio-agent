@@ -304,9 +304,16 @@ export default function ChatMessage({
       },
     };
 
+    const proseClasses = clsx(
+      "prose prose-sm max-w-none",
+      "[--tw-prose-body:currentColor] [--tw-prose-headings:currentColor] [--tw-prose-bold:currentColor] [--tw-prose-counters:currentColor] [--tw-prose-bullets:currentColor] [--tw-prose-code:currentColor] [--tw-prose-links:currentColor]"
+    );
+
     if (typeof content === "string") {
       return (
-        <MarkdownRenderer components={markdownComponents}>{content}</MarkdownRenderer>
+        <div className={proseClasses}>
+          <MarkdownRenderer components={markdownComponents}>{content}</MarkdownRenderer>
+        </div>
       );
     }
 
@@ -373,9 +380,11 @@ export default function ChatMessage({
           switch (group.groupType) {
             case "text":
               return group.parts.map((part: any, i) => (
-                <MarkdownRenderer key={`text-${gi}-${i}`} components={markdownComponents}>
-                  {part.text}
-                </MarkdownRenderer>
+                <div key={`text-${gi}-${i}`} className={proseClasses}>
+                  <MarkdownRenderer components={markdownComponents}>
+                    {part.text}
+                  </MarkdownRenderer>
+                </div>
               ));
 
             case "image":
@@ -749,11 +758,6 @@ export default function ChatMessage({
         >
           <CardBody className="p-3 overflow-x-auto">
             <div
-              className={clsx(
-                "prose dark:prose-invert prose-sm max-w-none",
-                isUser &&
-                  "prose-headings:text-primary-foreground prose-p:text-primary-foreground prose-strong:text-primary-foreground prose-code:text-primary-foreground"
-              )}
               onContextMenu={handleTextContextMenu}
               onDragStart={handleTextDragStart}
             >

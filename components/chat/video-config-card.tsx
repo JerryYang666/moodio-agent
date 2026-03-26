@@ -111,19 +111,6 @@ export default function VideoConfigCard({
         }
       }
     }
-    // Resolve image IDs in kling_elements to display URLs
-    if (Array.isArray(initial.kling_elements)) {
-      initial.kling_elements = initial.kling_elements.map(
-        (el: KlingElement) => ({
-          ...el,
-          element_input_urls: (el.element_input_urls || []).map((idOrUrl: string) => {
-            if (idOrUrl.startsWith("http")) return idOrUrl;
-            const match = sourceImages.find((img) => img.imageId === idOrUrl);
-            return match ? match.imageUrl : idOrUrl;
-          }),
-        })
-      );
-    }
     return initial;
   });
 
@@ -186,6 +173,14 @@ export default function VideoConfigCard({
     }
     return sourceImages[sourceImages.length - 1] || null;
   }, [sourceImages, part.config.sourceImageId, isTextToVideo]);
+
+  const resolveImageUrl = useCallback(
+    (imageId: string) => {
+      const match = sourceImages.find((img) => img.imageId === imageId);
+      return match?.imageUrl;
+    },
+    [sourceImages]
+  );
 
   const costParamsKey = useMemo(() => {
     const entries = Object.entries(editedParams)
@@ -735,6 +730,7 @@ export default function VideoConfigCard({
             onChange={(elements) => handleParamChange("kling_elements", elements)}
             disabled={!isEditable}
             compact
+            resolveImageUrl={resolveImageUrl}
           />
         )}
 

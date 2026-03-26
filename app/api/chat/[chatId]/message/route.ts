@@ -798,12 +798,13 @@ export async function POST(
         }
       }
 
-      // Resolve image IDs inside kling_elements[].element_input_urls to signed URLs
+      // Resolve image IDs inside kling_elements to signed URLs for the provider API
       if (Array.isArray(fullParams.kling_elements)) {
         fullParams.kling_elements = fullParams.kling_elements.map(
-          (el: { name: string; description: string; element_input_urls: string[] }) => ({
-            ...el,
-            element_input_urls: (el.element_input_urls || []).map((idOrUrl: string) => {
+          (el: { name: string; description: string; element_input_ids?: string[]; element_input_urls?: string[] }) => ({
+            name: el.name,
+            description: el.description,
+            element_input_urls: (el.element_input_ids || el.element_input_urls || []).map((idOrUrl: string) => {
               if (idOrUrl.startsWith("http") && !idOrUrl.includes("moodio.art/images/")) {
                 return idOrUrl;
               }

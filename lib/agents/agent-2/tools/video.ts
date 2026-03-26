@@ -68,6 +68,17 @@ Rules for video creation:
       }
     }
 
+    // Normalize kling_elements: ensure element_input_ids field name is used
+    if (Array.isArray(videoParams.kling_elements)) {
+      videoParams.kling_elements = videoParams.kling_elements.map(
+        (el: Record<string, any>) => ({
+          name: el.name,
+          description: el.description,
+          element_input_ids: el.element_input_ids || el.element_input_urls || [],
+        })
+      );
+    }
+
     return {
       type: "agent_video" as const,
       config: {

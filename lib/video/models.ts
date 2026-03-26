@@ -25,7 +25,7 @@ export interface MultiPromptShot {
 export interface KlingElement {
   name: string;
   description: string;
-  element_input_urls: string[];
+  element_input_ids: string[];
 }
 
 export type AssetAcceptType = "image" | "video";
@@ -1617,23 +1617,21 @@ export function validateAndMergeParams(
               `Each element in ${param.name} must have a description`
             );
           }
-          if (!Array.isArray(elem.element_input_urls)) {
+          const urls = elem.element_input_urls || elem.element_input_ids || [];
+          if (!Array.isArray(urls)) {
             throw new Error(
-              `Each element in ${param.name} must have an element_input_urls array`
+              `Each element in ${param.name} must have an element_input_urls or element_input_ids array`
             );
           }
-          if (
-            elem.element_input_urls.length < 2 ||
-            elem.element_input_urls.length > 4
-          ) {
+          if (urls.length < 2 || urls.length > 4) {
             throw new Error(
-              `Each element in ${param.name} must have 2-4 image URLs`
+              `Each element in ${param.name} must have 2-4 images`
             );
           }
-          for (const url of elem.element_input_urls) {
-            if (typeof url !== "string") {
+          for (const v of urls) {
+            if (typeof v !== "string") {
               throw new Error(
-                `Element image URLs in ${param.name} must be strings`
+                `Element images in ${param.name} must be strings`
               );
             }
           }
@@ -1726,7 +1724,7 @@ function describeModelParams(model: VideoModelConfig): string {
     } else if (param.type === "multi_prompt") {
       desc += `array of shots, each: {prompt: string (max 500 chars, use @element_name to reference elements), duration: number (1-12 seconds)}. Max 5 shots. Only used when multi_shots is true`;
     } else if (param.type === "kling_elements") {
-      desc += `array of element references, each: {name: string (referenced in prompt as @name), description: string, element_input_urls: string[] (2-4 Image IDs from the conversation — pass the Image ID e.g. "abc123", NOT a URL)}. Max 3 elements`;
+      desc += `array of element references, each: {name: string (referenced in prompt as @name), description: string, element_input_ids: string[] (2-4 Image IDs from the conversation — pass the Image ID e.g. "abc123", NOT a URL)}. Max 3 elements`;
     }
 
     if (param.default !== undefined) {

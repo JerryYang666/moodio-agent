@@ -15,8 +15,10 @@ interface KlingElementEditorProps {
   onChange: (elements: KlingElement[]) => void;
   disabled?: boolean;
   compact?: boolean;
-  /** Opens the asset picker. Called with (elementIndex, maxImages) — the parent should open the picker and call addImageUrls when done. */
+  /** Opens the asset picker. Called with (elementIndex, maxImages) — the parent should open the picker and call addImageId when done. */
   onPickImages?: (elementIndex: number, maxImages: number) => void;
+  /** Resolve an image ID to a display URL. */
+  resolveImageUrl?: (imageId: string) => string | undefined;
 }
 
 export function KlingElementEditor({
@@ -25,6 +27,7 @@ export function KlingElementEditor({
   disabled = false,
   compact = false,
   onPickImages,
+  resolveImageUrl,
 }: KlingElementEditorProps) {
   const [expandedIndex, setExpandedIndex] = useState<number | null>(
     elements.length === 0 ? null : 0
@@ -35,7 +38,7 @@ export function KlingElementEditor({
     const newElement: KlingElement = {
       name: "element_",
       description: "",
-      element_input_urls: [],
+      element_input_ids: [],
     };
     onChange([...elements, newElement]);
     setExpandedIndex(elements.length);
@@ -60,23 +63,23 @@ export function KlingElementEditor({
     [elements, onChange]
   );
 
-  const addImageUrl = useCallback(
-    (elementIndex: number, url: string) => {
+  const addImageId = useCallback(
+    (elementIndex: number, imageId: string) => {
       const el = elements[elementIndex];
-      if (!el || el.element_input_urls.length >= MAX_IMAGES) return;
+      if (!el || el.element_input_ids.length >= MAX_IMAGES) return;
       updateElement(elementIndex, {
-        element_input_urls: [...el.element_input_urls, url],
+        element_input_ids: [...el.element_input_ids, imageId],
       });
     },
     [elements, updateElement]
   );
 
-  const removeImageUrl = useCallback(
+  const removeImageId = useCallback(
     (elementIndex: number, imageIndex: number) => {
       const el = elements[elementIndex];
       if (!el) return;
       updateElement(elementIndex, {
-        element_input_urls: el.element_input_urls.filter(
+        element_input_ids: el.element_input_ids.filter(
           (_, i) => i !== imageIndex
         ),
       });
@@ -118,7 +121,7 @@ export function KlingElementEditor({
       <div className="space-y-2">
         {elements.map((el, index) => {
           const isExpanded = expandedIndex === index;
-          const imageCount = el.element_input_urls.length;
+          const imageCount = el.element_input_ids.length;
           const isValid =
             el.name.length > "element_".length &&
             imageCount >= MIN_IMAGES &&
@@ -222,26 +225,35 @@ export function KlingElementEditor({
                       </p>
                     )}
                     <div className="flex flex-wrap gap-1.5">
-                      {el.element_input_urls.map((url, imgIdx) => (
-                        <div
-                          key={imgIdx}
-                          className="relative w-12 h-12 rounded-md overflow-hidden border border-divider group"
-                        >
-                          <img
-                            src={url}
-                            alt=""
-                            className="w-full h-full object-cover"
-                          />
-                          {!disabled && (
-                            <button
-                              onClick={() => removeImageUrl(index, imgIdx)}
-                              className="absolute top-0 right-0 p-0.5 bg-black/60 text-white rounded-bl-md opacity-0 group-hover:opacity-100 transition-opacity"
-                            >
-                              <X size={10} />
-                            </button>
-                          )}
-                        </div>
-                      ))}
+                      {el.element_input_ids.map((imageId, imgIdx) => {
+                        const displayUrl = resolveImageUrl?.(imageId);
+                        return (
+                          <div
+                            key={imgIdx}
+                            className="relative w-12 h-12 rounded-md overflow-hidden border border-divider group"
+                          >
+                            {displayUrl ? (
+                              <img
+                                src={displayUrl}
+                                alt=""
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-full h-full bg-default-100 flex items-center justify-center text-[8px] text-default-400 p-0.5 break-all">
+                                {imageId.slice(0, 8)}
+                              </div>
+                            )}
+                            {!disabled && (
+                              <button
+                                onClick={() => removeImageId(index, imgIdx)}
+                                className="absolute top-0 right-0 p-0.5 bg-black/60 text-white rounded-bl-md opacity-0 group-hover:opacity-100 transition-opacity"
+                              >
+                                <X size={10} />
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 </div>

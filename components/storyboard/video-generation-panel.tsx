@@ -146,6 +146,7 @@ export default function VideoGenerationPanel({
   const [endImageUrl, setEndImageUrl] = useState<string | null>(null);
   const [params, setParams] = useState<Record<string, any>>({});
   const [assetParamDisplayUrls, setAssetParamDisplayUrls] = useState<Record<string, string>>({});
+  const [elementImageUrls, setElementImageUrls] = useState<Record<string, string>>({});
 
   // Asset picker state
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -394,6 +395,11 @@ export default function VideoGenerationPanel({
     setPickerAcceptTypes(assetAcceptTypes);
     setPickerOpen(true);
   };
+
+  const resolveElementImageUrl = useCallback(
+    (imageId: string) => elementImageUrls[imageId],
+    [elementImageUrls]
+  );
 
   const handleAssetSelect = useCallback((asset: AssetSummary) => {
     if (pickerTarget === "source") {
@@ -950,6 +956,7 @@ export default function VideoGenerationPanel({
                     <KlingElementEditor
                       elements={elements}
                       onChange={(e) => handleParamChange(param.name, e)}
+                      resolveImageUrl={resolveElementImageUrl}
                     />
                   </div>
                 );

@@ -223,6 +223,28 @@ function stripDerivedUrls(messages: Message[]): Message[] {
       if (part.type === "agent_video") {
         const { config, ...rest } = part;
         const { sourceImageUrl, ...cleanConfig } = config;
+        // Normalize kling_elements: rename legacy element_input_urls -> element_input_ids,
+        // and extract bare image IDs from any CloudFront URLs that may have leaked in.
+        if (cleanConfig.params?.kling_elements && Array.isArray(cleanConfig.params.kling_elements)) {
+          cleanConfig.params = {
+            ...cleanConfig.params,
+            kling_elements: cleanConfig.params.kling_elements.map(
+              (el: Record<string, any>) => {
+                const ids = (el.element_input_ids || el.element_input_urls || []).map(
+                  (v: string) => {
+                    const cfMatch = v.match(/\/images\/([^/?]+)/);
+                    return cfMatch ? cfMatch[1] : v;
+                  }
+                );
+                return {
+                  name: el.name,
+                  description: el.description,
+                  element_input_ids: ids,
+                };
+              }
+            ),
+          };
+        }
         return {
           ...rest,
           config: cleanConfig,
@@ -307,14 +329,28 @@ function addDerivedUrls(messages: Message[]): Message[] {
         };
       }
       if (part.type === "agent_video") {
+        const enrichedConfig = {
+          ...part.config,
+          sourceImageUrl: part.config.sourceImageId
+            ? getImageUrl(part.config.sourceImageId)
+            : undefined,
+        };
+        // Normalize legacy element_input_urls -> element_input_ids
+        if (enrichedConfig.params?.kling_elements && Array.isArray(enrichedConfig.params.kling_elements)) {
+          enrichedConfig.params = {
+            ...enrichedConfig.params,
+            kling_elements: enrichedConfig.params.kling_elements.map(
+              (el: Record<string, any>) => ({
+                name: el.name,
+                description: el.description,
+                element_input_ids: el.element_input_ids || el.element_input_urls || [],
+              })
+            ),
+          };
+        }
         return {
           ...part,
-          config: {
-            ...part.config,
-            sourceImageUrl: part.config.sourceImageId
-              ? getImageUrl(part.config.sourceImageId)
-              : undefined,
-          },
+          config: enrichedConfig,
         };
       }
       if (part.type === "direct_video") {

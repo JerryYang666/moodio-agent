@@ -291,6 +291,7 @@ export default function ChatInterface({
   const [activeAssetParamName, setActiveAssetParamName] = useState<string | null>(null);
   const [activeElementIndex, setActiveElementIndex] = useState<number | null>(null);
   const [activeElementMaxImages, setActiveElementMaxImages] = useState(4);
+  const [elementImageUrls, setElementImageUrls] = useState<Record<string, string>>({});
   const [assetParamValues, setAssetParamValues] = useState<Record<string, AssetParamValue | null>>({});
   const [precisionEditing, setPrecisionEditing] = useState(false);
   
@@ -1389,6 +1390,11 @@ export default function ChatInterface({
     setIsAssetPickerOpen(true);
   }, []);
 
+  const resolveElementImageUrl = useCallback(
+    (imageId: string) => elementImageUrls[imageId],
+    [elementImageUrls]
+  );
+
   // Clear an asset param value
   const clearAssetParam = useCallback((paramName: string) => {
     setAssetParamValues((prev) => ({ ...prev, [paramName]: null }));
@@ -1446,24 +1452,29 @@ export default function ChatInterface({
   const handleAssetUpload = useCallback(
     async (files: File[]) => {
       if (assetPickerMode === "elementImages" && activeElementIndex !== null) {
-        const urls: string[] = [];
+        const uploadedPairs: Array<{ imageId: string; imageUrl: string }> = [];
         for (const file of files) {
           const result = await uploadImage(file);
-          if (result.success) urls.push(result.data.imageUrl);
+          if (result.success) uploadedPairs.push({ imageId: result.data.imageId, imageUrl: result.data.imageUrl });
         }
-        if (urls.length > 0) {
+        if (uploadedPairs.length > 0) {
           const elements = [...((menuState.videoParams?.kling_elements as KlingElement[]) || [])];
           const el = elements[activeElementIndex];
           if (el) {
             elements[activeElementIndex] = {
               ...el,
-              element_input_urls: [...el.element_input_urls, ...urls].slice(0, 4),
+              element_input_ids: [...el.element_input_ids, ...uploadedPairs.map((p) => p.imageId)].slice(0, 4),
             };
             setMenuState((prev) => ({
               ...prev,
               videoParams: { ...prev.videoParams, kling_elements: elements },
             }));
           }
+          setElementImageUrls((prev) => {
+            const next = { ...prev };
+            for (const p of uploadedPairs) next[p.imageId] = p.imageUrl;
+            return next;
+          });
         }
         setActiveElementIndex(null);
       } else if (assetPickerMode === "assetParam" && activeAssetParamName) {
@@ -1635,13 +1646,14 @@ export default function ChatInterface({
         if (el) {
           elements[activeElementIndex] = {
             ...el,
-            element_input_urls: [...el.element_input_urls, asset.imageUrl],
+            element_input_ids: [...el.element_input_ids, asset.imageId],
           };
           setMenuState((prev) => ({
             ...prev,
             videoParams: { ...prev.videoParams, kling_elements: elements },
           }));
         }
+        setElementImageUrls((prev) => ({ ...prev, [asset.imageId]: asset.imageUrl }));
         setActiveElementIndex(null);
       } else if (assetPickerMode === "assetParam" && activeAssetParamName) {
         const displayUrl = asset.videoUrl || asset.imageUrl;
@@ -1688,16 +1700,21 @@ export default function ChatInterface({
         const elements = [...((menuState.videoParams?.kling_elements as KlingElement[]) || [])];
         const el = elements[activeElementIndex];
         if (el) {
-          const newUrls = assets.map((a) => a.imageUrl);
+          const newIds = assets.map((a) => a.imageId);
           elements[activeElementIndex] = {
             ...el,
-            element_input_urls: [...el.element_input_urls, ...newUrls].slice(0, 4),
+            element_input_ids: [...el.element_input_ids, ...newIds].slice(0, 4),
           };
           setMenuState((prev) => ({
             ...prev,
             videoParams: { ...prev.videoParams, kling_elements: elements },
           }));
         }
+        setElementImageUrls((prev) => {
+          const next = { ...prev };
+          for (const a of assets) next[a.imageId] = a.imageUrl;
+          return next;
+        });
         setActiveElementIndex(null);
       } else if (assetPickerMode === "persistent") {
         for (const asset of assets) {
@@ -3734,6 +3751,7 @@ export default function ChatInterface({
         videoModelHasImageParams={videoModelHasImageParams}
         videoModelParams={videoModelParams}
         onPickElementImages={openElementImagePicker}
+        resolveElementImageUrl={resolveElementImageUrl}
         onHeightChange={handleChatInputHeightChange}
         assetParamSlots={assetParamSlots}
         assetParamValues={assetParamValues}

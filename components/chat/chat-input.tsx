@@ -117,6 +117,8 @@ interface ChatInputProps {
   videoModelParams?: Array<{ name: string; type: string }>;
   /** Opens the asset picker for element images. Called with (elementIndex, maxImages). */
   onPickElementImages?: (elementIndex: number, maxImages: number) => void;
+  /** Resolve an element image ID to a display URL. */
+  resolveElementImageUrl?: (imageId: string) => string | undefined;
   /** Callback when the input container height changes */
   onHeightChange?: (height: number) => void;
   /** Asset param slots for type: "asset" video model params (rendered in Video Frames Area) */
@@ -175,6 +177,7 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
   videoModelHasImageParams,
   videoModelParams = [],
   onPickElementImages,
+  resolveElementImageUrl,
   onHeightChange,
   assetParamSlots = [],
   assetParamValues = {},
@@ -238,6 +241,7 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
 
     if (!supportsElements || menuState.mode !== "video") return imageItems;
 
+    const imageUrlMap = new Map(pendingImages.map((img) => [img.imageId, img.url]));
     const klingElements = (menuState.videoParams?.kling_elements as KlingElement[]) || [];
     const elementItems = klingElements
       .filter((el) => el.name)
@@ -245,15 +249,23 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
         id: el.name,
         type: "element",
         label: el.name,
-        thumbnail: el.element_input_urls[0] || undefined,
+        thumbnail: (el.element_input_ids[0] && (resolveElementImageUrl?.(el.element_input_ids[0]) || imageUrlMap.get(el.element_input_ids[0]))) || undefined,
         metadata: {
           description: el.description,
-          element_input_urls: el.element_input_urls,
+          element_input_ids: el.element_input_ids,
         },
       }));
 
     return [...imageItems, ...elementItems];
-  }, [pendingImages, t, supportsElements, menuState.mode, menuState.videoParams?.kling_elements]);
+  }, [pendingImages, t, supportsElements, menuState.mode, menuState.videoParams?.kling_elements, resolveElementImageUrl]);
+
+  // Resolve element image IDs to display URLs using the parent's resolver or pending images
+  const resolveElementImageUrlLocal = useCallback(
+    (imageId: string) => {
+      return resolveElementImageUrl?.(imageId) ?? pendingImages.find((img) => img.imageId === imageId)?.url;
+    },
+    [resolveElementImageUrl, pendingImages]
+  );
 
   // Handle inserting a mention chip when clicking on a pending image
   const handleInsertImageMention = useCallback((imageId: string) => {
@@ -1455,6 +1467,7 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
                       })
                     }
                     onPickImages={onPickElementImages}
+                    resolveImageUrl={resolveElementImageUrlLocal}
                     compact
                   />
                 </div>
