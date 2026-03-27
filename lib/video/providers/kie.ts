@@ -131,17 +131,19 @@ async function uploadToKie(url: string): Promise<string> {
 }
 
 async function reuploadSingle(value: string): Promise<string> {
-  return uploadToKie(value);
+  const converted = await ensureKieSupportedFormat(value);
+  return uploadToKie(converted);
 }
 
 async function reuploadArray(value: string[]): Promise<string[]> {
-  return Promise.all(value.map(uploadToKie));
+  const converted = await Promise.all(value.map(ensureKieSupportedFormat));
+  return Promise.all(converted.map(uploadToKie));
 }
 
 const KIE_SUPPORTED_IMAGE_EXTS = new Set([".jpg", ".jpeg", ".png"]);
 
 /**
- * Ensure an image URL is in a format KIE accepts for elements (jpeg/png only).
+ * Ensure an image URL is in a format KIE accepts (jpeg/png only).
  * If the image is webp/gif/etc, fetch it, convert to JPEG via sharp,
  * upload the converted buffer to S3, and return a signed URL.
  */
