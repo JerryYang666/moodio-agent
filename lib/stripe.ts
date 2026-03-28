@@ -22,7 +22,14 @@ export async function getOrCreateStripeCustomer(
     .limit(1);
 
   if (user?.stripeCustomerId) {
-    return user.stripeCustomerId;
+    try {
+      const existing = await stripe.customers.retrieve(user.stripeCustomerId);
+      if (!existing.deleted) {
+        return user.stripeCustomerId;
+      }
+    } catch (err: any) {
+      if (err?.code !== "resource_missing") throw err;
+    }
   }
 
   const customer = await stripe.customers.create({
