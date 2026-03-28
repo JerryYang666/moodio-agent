@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useTranslations } from "next-intl";
 import {
   Table,
@@ -25,10 +25,11 @@ import {
   useDisclosure,
 } from "@heroui/modal";
 import { Spinner } from "@heroui/spinner";
+import { Pagination } from "@heroui/pagination";
 import { addToast } from "@heroui/toast";
 import { api } from "@/lib/api/client";
 import { useAuth } from "@/hooks/use-auth";
-import { Plus, Edit, CreditCard, Package } from "lucide-react";
+import { Plus, Edit, CreditCard, Package, Activity, Search, Eye } from "lucide-react";
 
 interface SubscriptionPlan {
   id: string;
@@ -50,6 +51,17 @@ interface CreditPackage {
   stripePriceId: string;
   isActive: boolean;
   sortOrder: number;
+  createdAt: string;
+}
+
+interface StripeEventRow {
+  id: string;
+  stripeEventId: string;
+  eventType: string;
+  userId: string | null;
+  userEmail: string | null;
+  stripeCustomerId: string | null;
+  metadata: Record<string, any>;
   createdAt: string;
 }
 
@@ -96,6 +108,20 @@ export default function StripeAdminPage() {
   });
   const [savingPkg, setSavingPkg] = useState(false);
 
+  // Event log state
+  const [events, setEvents] = useState<StripeEventRow[]>([]);
+  const [eventsLoading, setEventsLoading] = useState(true);
+  const [eventSearch, setEventSearch] = useState("");
+  const [eventTypeFilter, setEventTypeFilter] = useState("all");
+  const [eventPage, setEventPage] = useState(1);
+  const eventsPerPage = 15;
+  const {
+    isOpen: isEventDetailOpen,
+    onOpen: onEventDetailOpen,
+    onOpenChange: onEventDetailOpenChange,
+  } = useDisclosure();
+  const [selectedEvent, setSelectedEvent] = useState<StripeEventRow | null>(null);
+
   useEffect(() => {
     if (user?.roles.includes("admin")) {
       fetchAll();
@@ -104,17 +130,21 @@ export default function StripeAdminPage() {
 
   const fetchAll = async () => {
     setLoading(true);
+    setEventsLoading(true);
     try {
-      const [planData, pkgData] = await Promise.all([
+      const [planData, pkgData, eventData] = await Promise.all([
         api.get("/api/admin/subscription-plans"),
         api.get("/api/admin/credit-packages"),
+        api.get("/api/admin/stripe-events"),
       ]);
       setPlans(planData);
       setPackages(pkgData);
+      setEvents(eventData);
     } catch {
       addToast({ title: "Failed to load Stripe configuration", color: "danger" });
     } finally {
       setLoading(false);
+      setEventsLoading(false);
     }
   };
 
@@ -255,6 +285,43 @@ export default function StripeAdminPage() {
   }
 
   const formatPrice = (cents: number) => `$${(cents / 100).toFixed(2)}`;
+
+  const eventTypes = useMemo(
+    () => Array.from(new Set(events.map((e) => e.eventType))).sort(),
+    [events]
+  );
+
+  const filteredEvents = useMemo(() => {
+    let filtered = events;
+    if (eventTypeFilter !== "all") {
+      filtered = filtered.filter((e) => e.eventType === eventTypeFilter);
+    }
+    if (eventSearch) {
+      const q = eventSearch.toLowerCase();
+      filtered = filtered.filter(
+        (e) =>
+          e.stripeEventId.toLowerCase().includes(q) ||
+          e.eventType.toLowerCase().includes(q) ||
+          e.userEmail?.toLowerCase().includes(q) ||
+          e.stripeCustomerId?.toLowerCase().includes(q)
+      );
+    }
+    return filtered;
+  }, [events, eventTypeFilter, eventSearch]);
+
+  const eventPages = Math.ceil(filteredEvents.length / eventsPerPage);
+  const eventItems = useMemo(() => {
+    const start = (eventPage - 1) * eventsPerPage;
+    return filteredEvents.slice(start, start + eventsPerPage);
+  }, [eventPage, filteredEvents]);
+
+  const eventTypeColor = (type: string): "success" | "primary" | "warning" | "danger" | "default" => {
+    if (type.includes("deleted") || type.includes("failed")) return "danger";
+    if (type.includes("created")) return "success";
+    if (type.includes("updated")) return "warning";
+    if (type.includes("completed")) return "primary";
+    return "default";
+  };
 
   return (
     <div className="space-y-8">
@@ -552,6 +619,169 @@ export default function StripeAdminPage() {
                   isDisabled={!pkgForm.name || !pkgForm.credits || !pkgForm.priceCents || !pkgForm.stripePriceId}
                 >
                   {tCommon("save")}
+                </Button>
+              </ModalFooter>
+            </>
+          )}
+        </ModalContent>
+      </Modal>
+
+      {/* Stripe Event Log */}
+      <Card>
+        <CardHeader className="flex-col items-start gap-3">
+          <div className="flex items-center justify-between w-full">
+            <div className="flex items-center gap-2">
+              <Activity size={18} className="text-primary" />
+              <h2 className="text-lg font-semibold">{t("eventLog")}</h2>
+            </div>
+            <Chip size="sm" variant="flat">
+              {filteredEvents.length} {t("events")}
+            </Chip>
+          </div>
+          <div className="flex flex-wrap gap-3 w-full">
+            <Input
+              size="sm"
+              placeholder={t("searchEvents")}
+              value={eventSearch}
+              onValueChange={(v) => { setEventSearch(v); setEventPage(1); }}
+              startContent={<Search size={14} />}
+              className="max-w-xs"
+            />
+            <Select
+              size="sm"
+              selectedKeys={[eventTypeFilter]}
+              onSelectionChange={(keys) => {
+                const val = Array.from(keys)[0] as string;
+                if (val) { setEventTypeFilter(val); setEventPage(1); }
+              }}
+              className="max-w-[250px]"
+              items={[{ key: "all", label: t("allTypes") }, ...eventTypes.map((type) => ({ key: type, label: type }))]}
+            >
+              {(item) => <SelectItem key={item.key}>{item.label}</SelectItem>}
+            </Select>
+          </div>
+        </CardHeader>
+        <CardBody>
+          <Table
+            aria-label="Stripe events"
+            removeWrapper
+            onRowAction={(key) => {
+              const evt = events.find((e) => e.id === key);
+              if (evt) { setSelectedEvent(evt); onEventDetailOpen(); }
+            }}
+            selectionMode="single"
+            bottomContent={
+              eventPages > 1 ? (
+                <div className="flex w-full justify-center">
+                  <Pagination
+                    isCompact
+                    showControls
+                    showShadow
+                    color="primary"
+                    page={eventPage}
+                    total={eventPages}
+                    onChange={setEventPage}
+                  />
+                </div>
+              ) : null
+            }
+          >
+            <TableHeader>
+              <TableColumn>{t("eventTime")}</TableColumn>
+              <TableColumn>{t("eventType")}</TableColumn>
+              <TableColumn>{t("eventUser")}</TableColumn>
+              <TableColumn>{t("eventCustomer")}</TableColumn>
+              <TableColumn>{t("actions")}</TableColumn>
+            </TableHeader>
+            <TableBody
+              emptyContent={eventsLoading ? <Spinner /> : t("noEvents")}
+              items={eventItems}
+            >
+              {(evt) => (
+                <TableRow key={evt.id}>
+                  <TableCell className="whitespace-nowrap text-sm">
+                    {new Date(evt.createdAt).toLocaleString()}
+                  </TableCell>
+                  <TableCell>
+                    <Chip size="sm" variant="flat" color={eventTypeColor(evt.eventType)}>
+                      {evt.eventType}
+                    </Chip>
+                  </TableCell>
+                  <TableCell>
+                    {evt.userEmail ? (
+                      <span className="text-sm">{evt.userEmail}</span>
+                    ) : evt.userId ? (
+                      <code className="text-xs text-default-400">{evt.userId.slice(0, 8)}...</code>
+                    ) : (
+                      <span className="text-default-300">-</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {evt.stripeCustomerId ? (
+                      <code className="text-xs bg-default-100 px-2 py-0.5 rounded">
+                        {evt.stripeCustomerId}
+                      </code>
+                    ) : (
+                      <span className="text-default-300">-</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <Button
+                      size="sm"
+                      variant="flat"
+                      isIconOnly
+                      onPress={() => { setSelectedEvent(evt); onEventDetailOpen(); }}
+                    >
+                      <Eye size={14} />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </CardBody>
+      </Card>
+
+      {/* Event Detail Modal */}
+      <Modal isOpen={isEventDetailOpen} onOpenChange={onEventDetailOpenChange} size="2xl" scrollBehavior="inside">
+        <ModalContent>
+          {(onClose) => (
+            <>
+              <ModalHeader className="flex-col items-start">
+                <span>{selectedEvent?.eventType}</span>
+                <span className="text-xs text-default-400 font-mono font-normal">
+                  {selectedEvent?.stripeEventId}
+                </span>
+              </ModalHeader>
+              <ModalBody>
+                {selectedEvent && (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      <div>
+                        <p className="text-default-500">{t("eventTime")}</p>
+                        <p>{new Date(selectedEvent.createdAt).toLocaleString()}</p>
+                      </div>
+                      <div>
+                        <p className="text-default-500">{t("eventUser")}</p>
+                        <p>{selectedEvent.userEmail || selectedEvent.userId || "-"}</p>
+                      </div>
+                      <div>
+                        <p className="text-default-500">{t("eventCustomer")}</p>
+                        <p className="font-mono text-xs">{selectedEvent.stripeCustomerId || "-"}</p>
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-default-500 text-sm mb-2">{t("eventMetadata")}</p>
+                      <pre className="text-xs bg-default-100 p-3 rounded-lg overflow-auto max-h-96 font-mono">
+                        {JSON.stringify(selectedEvent.metadata, null, 2)}
+                      </pre>
+                    </div>
+                  </div>
+                )}
+              </ModalBody>
+              <ModalFooter>
+                <Button variant="light" onPress={onClose}>
+                  {tCommon("close")}
                 </Button>
               </ModalFooter>
             </>
