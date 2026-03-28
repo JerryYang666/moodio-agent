@@ -464,7 +464,19 @@
     "taxonomy": "分类",
     "filters": "筛选",
     "activeFiltersCount": "{count} 个已选",
-    "clearAll": "清除全部"
+    "clearAll": "清除全部",
+    "manageSubscription": "管理订阅",
+    "paywall": {
+      "title": "需要订阅",
+      "description": "订阅后即可使用视频素材搜索库。",
+      "subscribe": "立即订阅",
+      "feature1": "无限视频素材搜索",
+      "feature2": "高级筛选和分类浏览",
+      "feature3": "AI 智能搜索助手",
+      "noPlan": "暂无可用的订阅方案，请稍后再试。",
+      "checkoutSuccess": "订阅激活成功！欢迎使用浏览功能。",
+      "checkoutCanceled": "结账已取消。"
+    }
   },
   "video": {
     "generateVideo": "生成视频",
@@ -702,6 +714,36 @@
       "exampleAspectRatioDesc": "21:9 提取为 21（取第一个非数字字符之前的数字）。超宽屏费用增加 1.5 倍",
       "exampleMinMax": "最低收费",
       "exampleMinMaxDesc": "至少 50 积分，或时长 × 15（取较高者）"
+    },
+    "stripe": {
+      "title": "Stripe 支付",
+      "subtitle": "支付",
+      "description": "管理 Stripe 支付的订阅计划和积分包。",
+      "goTo": "管理支付",
+      "subscriptionPlans": "订阅计划",
+      "creditPackages": "积分包",
+      "addPlan": "添加计划",
+      "editPlan": "编辑计划",
+      "addPackage": "添加积分包",
+      "editPackage": "编辑积分包",
+      "planName": "计划名称",
+      "planDescription": "描述",
+      "packageName": "积分包名称",
+      "stripePriceId": "Stripe 价格 ID",
+      "stripePriceIdHelp": "从 Stripe 控制面板 → 产品 → 价格 ID 复制",
+      "price": "价格",
+      "priceCents": "价格（美分）",
+      "interval": "周期",
+      "credits": "积分",
+      "order": "排序",
+      "sortOrder": "排列顺序",
+      "sortOrderHelp": "数字越小排列越靠前",
+      "status": "启用",
+      "actions": "操作",
+      "noPlans": "尚未配置订阅计划",
+      "noPackages": "尚未配置积分包",
+      "planSaved": "订阅计划已保存",
+      "packageSaved": "积分包已保存"
     },
     "testingGroups": {
       "title": "测试组",
@@ -987,7 +1029,8 @@
       "video_generation": "视频生成",
       "image_generation": "图片生成",
       "daily_checkin": "每日签到",
-      "refund": "退款"
+      "refund": "退款",
+      "purchase": "积分购买"
     },
     "date": "日期",
     "type": "类型",
@@ -1004,6 +1047,10 @@
     "viewAll": "查看详情",
     "personalAccount": "个人",
     "usedBy": "使用者",
+    "buyCredits": "购买积分",
+    "buyNow": "立即购买",
+    "purchaseSuccess": "积分购买成功！",
+    "purchaseCanceled": "购买已取消。",
     "paymentDisclosure": "购买即表示您同意我们的",
     "subscriptionTerms": "订阅条款",
     "paymentDisclosureAnd": "和",

@@ -464,7 +464,19 @@
     "taxonomy": "タクソノミー",
     "filters": "フィルター",
     "activeFiltersCount": "{count} 件選択中",
-    "clearAll": "すべてクリア"
+    "clearAll": "すべてクリア",
+    "manageSubscription": "サブスクリプション管理",
+    "paywall": {
+      "title": "サブスクリプションが必要です",
+      "description": "動画クリップ検索ライブラリにアクセスするにはサブスクリプションが必要です。",
+      "subscribe": "今すぐ登録",
+      "feature1": "無制限の動画クリップ検索",
+      "feature2": "高度なフィルタリングとカテゴリブラウジング",
+      "feature3": "AI搭載検索アシスタント",
+      "noPlan": "現在利用可能なサブスクリプションプランはありません。後ほどお試しください。",
+      "checkoutSuccess": "サブスクリプションが有効になりました！ブラウズへようこそ。",
+      "checkoutCanceled": "チェックアウトがキャンセルされました。"
+    }
   },
   "video": {
     "generateVideo": "動画を生成",
@@ -702,6 +714,36 @@
       "exampleAspectRatioDesc": "21:9は21として抽出（最初の非数字文字より前の数字）。ウルトラワイドは1.5倍のコスト",
       "exampleMinMax": "最低料金",
       "exampleMinMaxDesc": "最低50クレジット、または時間×15のいずれか高い方"
+    },
+    "stripe": {
+      "title": "Stripe 決済",
+      "subtitle": "決済",
+      "description": "Stripe 決済のサブスクリプションプランとクレジットパッケージを管理します。",
+      "goTo": "決済管理",
+      "subscriptionPlans": "サブスクリプションプラン",
+      "creditPackages": "クレジットパッケージ",
+      "addPlan": "プランを追加",
+      "editPlan": "プランを編集",
+      "addPackage": "パッケージを追加",
+      "editPackage": "パッケージを編集",
+      "planName": "プラン名",
+      "planDescription": "説明",
+      "packageName": "パッケージ名",
+      "stripePriceId": "Stripe 価格 ID",
+      "stripePriceIdHelp": "Stripe ダッシュボード → 商品 → 価格 ID からコピー",
+      "price": "価格",
+      "priceCents": "価格（セント）",
+      "interval": "間隔",
+      "credits": "クレジット",
+      "order": "順序",
+      "sortOrder": "表示順",
+      "sortOrderHelp": "数字が小さいほど先に表示",
+      "status": "有効",
+      "actions": "操作",
+      "noPlans": "サブスクリプションプランが未設定です",
+      "noPackages": "クレジットパッケージが未設定です",
+      "planSaved": "サブスクリプションプランを保存しました",
+      "packageSaved": "クレジットパッケージを保存しました"
     },
     "testingGroups": {
       "title": "テストグループ",
@@ -987,7 +1029,8 @@
       "video_generation": "動画生成",
       "image_generation": "画像生成",
       "daily_checkin": "デイリーチェックイン",
-      "refund": "返金"
+      "refund": "返金",
+      "purchase": "クレジット購入"
     },
     "date": "日付",
     "type": "種類",
@@ -1004,6 +1047,10 @@
     "viewAll": "詳細を表示",
     "personalAccount": "個人",
     "usedBy": "使用者",
+    "buyCredits": "クレジット購入",
+    "buyNow": "購入する",
+    "purchaseSuccess": "クレジットの購入が完了しました！",
+    "purchaseCanceled": "購入がキャンセルされました。",
     "paymentDisclosure": "購入することで、当社の",
     "subscriptionTerms": "サブスクリプション規約",
     "paymentDisclosureAnd": "および",

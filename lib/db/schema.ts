@@ -30,6 +30,7 @@ export const users = pgTable("users", {
   passwordHash: text("password_hash"),
   roles: jsonb("roles").$type<string[]>().notNull().default(["new_user"]), // Array of role names
   testingGroups: jsonb("testing_groups").$type<string[]>().notNull().default([]), // Array of testing group UUIDs
+  stripeCustomerId: varchar("stripe_customer_id", { length: 255 }).unique(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -286,7 +287,7 @@ export const creditTransactions = pgTable("credit_transactions", {
   description: text("description"),
   performedBy: uuid("performed_by").references(() => users.id),
   relatedEntityType: varchar("related_entity_type", { length: 50 }),
-  relatedEntityId: uuid("related_entity_id"),
+  relatedEntityId: varchar("related_entity_id", { length: 255 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -660,3 +661,66 @@ export const userConsents = pgTable("user_consents", {
 
 export type UserConsent = typeof userConsents.$inferSelect;
 export type NewUserConsent = typeof userConsents.$inferInsert;
+
+/**
+ * Subscriptions table
+ * Tracks active Stripe subscription state per user.
+ */
+export const subscriptions = pgTable("subscriptions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .notNull()
+    .unique()
+    .references(() => users.id, { onDelete: "cascade" }),
+  stripeSubscriptionId: varchar("stripe_subscription_id", { length: 255 })
+    .notNull()
+    .unique(),
+  stripePriceId: varchar("stripe_price_id", { length: 255 }).notNull(),
+  status: varchar("status", { length: 50 }).notNull().default("incomplete"),
+  currentPeriodStart: timestamp("current_period_start").notNull(),
+  currentPeriodEnd: timestamp("current_period_end").notNull(),
+  cancelAtPeriodEnd: boolean("cancel_at_period_end").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export type Subscription = typeof subscriptions.$inferSelect;
+export type NewSubscription = typeof subscriptions.$inferInsert;
+
+/**
+ * Subscription Plans table
+ * Admin-configurable subscription plans. The checkout route reads the active
+ * plan from this table — no env var needed. Single-tier for now, extensible.
+ */
+export const subscriptionPlans = pgTable("subscription_plans", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: varchar("name", { length: 100 }).notNull(),
+  description: text("description"),
+  stripePriceId: varchar("stripe_price_id", { length: 255 }).notNull().unique(),
+  priceCents: integer("price_cents").notNull(),
+  interval: varchar("interval", { length: 20 }).notNull().default("month"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export type SubscriptionPlan = typeof subscriptionPlans.$inferSelect;
+export type NewSubscriptionPlan = typeof subscriptionPlans.$inferInsert;
+
+/**
+ * Credit Packages table
+ * Admin-configurable one-time credit purchase packages.
+ */
+export const creditPackages = pgTable("credit_packages", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: varchar("name", { length: 100 }).notNull(),
+  credits: integer("credits").notNull(),
+  priceCents: integer("price_cents").notNull(),
+  stripePriceId: varchar("stripe_price_id", { length: 255 }).notNull().unique(),
+  isActive: boolean("is_active").notNull().default(true),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type CreditPackage = typeof creditPackages.$inferSelect;
+export type NewCreditPackage = typeof creditPackages.$inferInsert;

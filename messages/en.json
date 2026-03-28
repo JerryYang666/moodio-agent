@@ -551,7 +551,19 @@
     "taxonomy": "Taxonomy",
     "filters": "Filters",
     "activeFiltersCount": "{count} active",
-    "clearAll": "Clear all"
+    "clearAll": "Clear all",
+    "manageSubscription": "Manage Subscription",
+    "paywall": {
+      "title": "Subscription Required",
+      "description": "Subscribe to access our video clip search library.",
+      "subscribe": "Subscribe Now",
+      "feature1": "Unlimited video clip searches",
+      "feature2": "Advanced filtering and taxonomy browsing",
+      "feature3": "AI-powered search assistant",
+      "noPlan": "No subscription plan is currently available. Please check back later.",
+      "checkoutSuccess": "Subscription activated! Welcome to Browse.",
+      "checkoutCanceled": "Checkout was canceled."
+    }
   },
   "video": {
     "generateVideo": "Generate Video",
@@ -789,6 +801,36 @@
       "exampleAspectRatioDesc": "21:9 extracts as 21 (numbers before the first non-digit character). Ultra-wide costs 1.5× more",
       "exampleMinMax": "Minimum charge",
       "exampleMinMaxDesc": "At least 50 credits, or duration × 15 if higher"
+    },
+    "stripe": {
+      "title": "Stripe Payments",
+      "subtitle": "Payments",
+      "description": "Manage subscription plans and credit packages for Stripe payments.",
+      "goTo": "Manage Payments",
+      "subscriptionPlans": "Subscription Plans",
+      "creditPackages": "Credit Packages",
+      "addPlan": "Add Plan",
+      "editPlan": "Edit Plan",
+      "addPackage": "Add Package",
+      "editPackage": "Edit Package",
+      "planName": "Plan Name",
+      "planDescription": "Description",
+      "packageName": "Package Name",
+      "stripePriceId": "Stripe Price ID",
+      "stripePriceIdHelp": "Copy from your Stripe Dashboard → Products → Price ID",
+      "price": "Price",
+      "priceCents": "Price (cents)",
+      "interval": "Interval",
+      "credits": "Credits",
+      "order": "Order",
+      "sortOrder": "Sort Order",
+      "sortOrderHelp": "Lower numbers appear first",
+      "status": "Active",
+      "actions": "Actions",
+      "noPlans": "No subscription plans configured yet",
+      "noPackages": "No credit packages configured yet",
+      "planSaved": "Subscription plan saved",
+      "packageSaved": "Credit package saved"
     },
     "testingGroups": {
       "title": "Testing Groups",
@@ -1074,7 +1116,8 @@
       "video_generation": "Video Generation",
       "image_generation": "Image Generation",
       "daily_checkin": "Daily Check-in",
-      "refund": "Refund"
+      "refund": "Refund",
+      "purchase": "Credit Purchase"
     },
     "date": "Date",
     "type": "Type",
@@ -1095,7 +1138,11 @@
     "paymentDisclosureAnd": "and",
     "refundPolicy": "Refund Policy",
     "paymentDisclosureWithdrawal": "I consent to immediate access and acknowledge that I lose my right of withdrawal once the service begins.",
-    "usedBy": "Used By"
+    "usedBy": "Used By",
+    "buyCredits": "Buy Credits",
+    "buyNow": "Buy Now",
+    "purchaseSuccess": "Credits purchased successfully!",
+    "purchaseCanceled": "Purchase was canceled."
   },
   "teams": {
     "title": "Teams",
