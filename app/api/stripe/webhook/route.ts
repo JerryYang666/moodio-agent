@@ -153,20 +153,21 @@ async function handleSubscriptionUpsert(sub: Stripe.Subscription) {
     updatedAt: new Date(),
   };
 
-  const [existing] = await db
-    .select({ id: subscriptions.id })
-    .from(subscriptions)
-    .where(eq(subscriptions.stripeSubscriptionId, sub.id))
-    .limit(1);
-
-  if (existing) {
-    await db
-      .update(subscriptions)
-      .set(values)
-      .where(eq(subscriptions.stripeSubscriptionId, sub.id));
-  } else {
-    await db.insert(subscriptions).values(values);
-  }
+  await db
+    .insert(subscriptions)
+    .values(values)
+    .onConflictDoUpdate({
+      target: subscriptions.userId,
+      set: {
+        stripeSubscriptionId: values.stripeSubscriptionId,
+        stripePriceId: values.stripePriceId,
+        status: values.status,
+        currentPeriodStart: values.currentPeriodStart,
+        currentPeriodEnd: values.currentPeriodEnd,
+        cancelAtPeriodEnd: values.cancelAtPeriodEnd,
+        updatedAt: values.updatedAt,
+      },
+    });
 }
 
 /**
