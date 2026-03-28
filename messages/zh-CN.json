@@ -53,6 +53,7 @@
     "annotationPlatform": "标注平台",
     "home": "首页",
     "profile": "个人资料",
+    "payments": "支付",
     "logout": "退出登录",
     "teams": "团队",
     "listView": "列表视图",
@@ -268,6 +269,34 @@
     "passwordSetSuccess": "密码设置成功",
     "otpSentForPassword": "验证码已发送到您的邮箱",
     "enterOtpAndNewPassword": "请输入邮箱中的验证码和新密码"
+  },
+  "payments": {
+    "title": "支付与订阅",
+    "subtitle": "查看您的订阅状态和支付记录",
+    "fetchError": "加载支付记录失败",
+    "portalError": "打开订阅管理失败",
+    "subscription": {
+      "title": "订阅",
+      "periodEnd": "续费日期：{date}",
+      "cancelWarning": "您的订阅将在当前计费周期结束后取消。",
+      "manage": "管理订阅",
+      "portal": "账单中心",
+      "none": "您目前没有有效的订阅。",
+      "browseCta": "浏览方案"
+    },
+    "history": {
+      "title": "支付记录",
+      "date": "日期",
+      "description": "描述",
+      "type": "类型",
+      "amount": "金额",
+      "status": "状态",
+      "receipt": "收据",
+      "view": "查看",
+      "empty": "暂无支付记录",
+      "typeSubscription": "订阅",
+      "typeCredit": "积分"
+    }
   },
   "projects": {
     "title": "项目",
@@ -743,7 +772,17 @@
       "noPlans": "尚未配置订阅计划",
       "noPackages": "尚未配置积分包",
       "planSaved": "订阅计划已保存",
-      "packageSaved": "积分包已保存"
+      "packageSaved": "积分包已保存",
+      "eventLog": "事件日志",
+      "events": "事件",
+      "searchEvents": "搜索事件...",
+      "allTypes": "所有事件类型",
+      "eventTime": "时间",
+      "eventType": "事件类型",
+      "eventUser": "用户",
+      "eventCustomer": "客户",
+      "eventMetadata": "事件数据",
+      "noEvents": "暂无事件记录"
     },
     "testingGroups": {
       "title": "测试组",

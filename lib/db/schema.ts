@@ -724,3 +724,24 @@ export const creditPackages = pgTable("credit_packages", {
 
 export type CreditPackage = typeof creditPackages.$inferSelect;
 export type NewCreditPackage = typeof creditPackages.$inferInsert;
+
+/**
+ * Stripe Events table
+ * Audit log of every Stripe webhook event received.
+ */
+export const stripeEvents = pgTable("stripe_events", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  stripeEventId: varchar("stripe_event_id", { length: 255 }).notNull().unique(),
+  eventType: varchar("event_type", { length: 100 }).notNull(),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+  stripeCustomerId: varchar("stripe_customer_id", { length: 255 }),
+  metadata: jsonb("metadata").notNull().default({}),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_stripe_events_type").on(table.eventType),
+  index("idx_stripe_events_user").on(table.userId),
+  index("idx_stripe_events_created").on(table.createdAt),
+]);
+
+export type StripeEvent = typeof stripeEvents.$inferSelect;
+export type NewStripeEvent = typeof stripeEvents.$inferInsert;

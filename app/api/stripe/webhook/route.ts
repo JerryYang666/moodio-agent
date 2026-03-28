@@ -3,7 +3,7 @@ import { headers } from "next/headers";
 import Stripe from "stripe";
 import { stripe } from "@/lib/stripe";
 import { db } from "@/lib/db";
-import { subscriptions, users, creditTransactions } from "@/lib/db/schema";
+import { subscriptions, users, creditTransactions, stripeEvents } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { grantCredits } from "@/lib/credits";
 
@@ -37,6 +37,26 @@ export async function POST(request: NextRequest) {
       { error: "Invalid signature" },
       { status: 400 }
     );
+  }
+
+  // Log every event for audit before processing
+  try {
+    const dataObj = event.data.object as Record<string, any>;
+    const stripeCustomerId =
+      typeof dataObj.customer === "string" ? dataObj.customer : null;
+    let userId: string | null = dataObj.metadata?.userId ?? null;
+    if (!userId && stripeCustomerId) {
+      userId = await resolveUserIdFromCustomer(stripeCustomerId);
+    }
+    await db.insert(stripeEvents).values({
+      stripeEventId: event.id,
+      eventType: event.type,
+      userId,
+      stripeCustomerId,
+      metadata: dataObj,
+    }).onConflictDoNothing();
+  } catch (logErr) {
+    console.error("[Stripe Webhook] Failed to log event:", logErr);
   }
 
   try {

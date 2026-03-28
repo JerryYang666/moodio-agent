@@ -53,6 +53,7 @@
     "annotationPlatform": "Annotation Platform",
     "home": "Home",
     "profile": "Profile",
+    "payments": "Payments",
     "logout": "Logout",
     "teams": "Teams",
     "listView": "List View",
@@ -268,6 +269,34 @@
     "passwordSetSuccess": "Password set successfully",
     "otpSentForPassword": "Verification code sent to your email",
     "enterOtpAndNewPassword": "Enter the verification code from your email and your new password"
+  },
+  "payments": {
+    "title": "Payments & Subscriptions",
+    "subtitle": "View your subscription status and payment history",
+    "fetchError": "Failed to load payment history",
+    "portalError": "Failed to open subscription management",
+    "subscription": {
+      "title": "Subscription",
+      "periodEnd": "Renews on {date}",
+      "cancelWarning": "Your subscription will be canceled at the end of the current billing period.",
+      "manage": "Manage Subscription",
+      "portal": "Billing Portal",
+      "none": "You don't have an active subscription.",
+      "browseCta": "Browse Plans"
+    },
+    "history": {
+      "title": "Payment History",
+      "date": "Date",
+      "description": "Description",
+      "type": "Type",
+      "amount": "Amount",
+      "status": "Status",
+      "receipt": "Receipt",
+      "view": "View",
+      "empty": "No payments yet",
+      "typeSubscription": "Subscription",
+      "typeCredit": "Credits"
+    }
   },
   "projects": {
     "title": "Projects",
@@ -829,7 +858,17 @@
       "noPlans": "No subscription plans configured yet",
       "noPackages": "No credit packages configured yet",
       "planSaved": "Subscription plan saved",
-      "packageSaved": "Credit package saved"
+      "packageSaved": "Credit package saved",
+      "eventLog": "Event Log",
+      "events": "events",
+      "searchEvents": "Search events...",
+      "allTypes": "All event types",
+      "eventTime": "Time",
+      "eventType": "Event Type",
+      "eventUser": "User",
+      "eventCustomer": "Customer",
+      "eventMetadata": "Event Data",
+      "noEvents": "No events recorded yet"
     },
     "testingGroups": {
       "title": "Testing Groups",

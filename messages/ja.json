@@ -53,6 +53,7 @@
     "annotationPlatform": "アノテーションプラットフォーム",
     "home": "ホーム",
     "profile": "プロフィール",
+    "payments": "お支払い",
     "logout": "ログアウト",
     "teams": "チーム",
     "listView": "リスト表示",
@@ -268,6 +269,34 @@
     "passwordSetSuccess": "パスワードが正常に設定されました",
     "otpSentForPassword": "認証コードがメールに送信されました",
     "enterOtpAndNewPassword": "メールの認証コードと新しいパスワードを入力してください"
+  },
+  "payments": {
+    "title": "お支払いとサブスクリプション",
+    "subtitle": "サブスクリプションの状態とお支払い履歴を確認",
+    "fetchError": "お支払い履歴の読み込みに失敗しました",
+    "portalError": "サブスクリプション管理を開けませんでした",
+    "subscription": {
+      "title": "サブスクリプション",
+      "periodEnd": "更新日：{date}",
+      "cancelWarning": "現在の請求期間終了後にサブスクリプションがキャンセルされます。",
+      "manage": "サブスクリプションを管理",
+      "portal": "請求ポータル",
+      "none": "有効なサブスクリプションはありません。",
+      "browseCta": "プランを見る"
+    },
+    "history": {
+      "title": "お支払い履歴",
+      "date": "日付",
+      "description": "説明",
+      "type": "種類",
+      "amount": "金額",
+      "status": "ステータス",
+      "receipt": "領収書",
+      "view": "表示",
+      "empty": "お支払い履歴はまだありません",
+      "typeSubscription": "サブスクリプション",
+      "typeCredit": "クレジット"
+    }
   },
   "projects": {
     "title": "プロジェクト",
@@ -743,7 +772,17 @@
       "noPlans": "サブスクリプションプランが未設定です",
       "noPackages": "クレジットパッケージが未設定です",
       "planSaved": "サブスクリプションプランを保存しました",
-      "packageSaved": "クレジットパッケージを保存しました"
+      "packageSaved": "クレジットパッケージを保存しました",
+      "eventLog": "イベントログ",
+      "events": "イベント",
+      "searchEvents": "イベントを検索...",
+      "allTypes": "すべてのイベントタイプ",
+      "eventTime": "時間",
+      "eventType": "イベントタイプ",
+      "eventUser": "ユーザー",
+      "eventCustomer": "顧客",
+      "eventMetadata": "イベントデータ",
+      "noEvents": "イベントはまだ記録されていません"
     },
     "testingGroups": {
       "title": "テストグループ",

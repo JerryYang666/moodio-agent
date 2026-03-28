@@ -21,6 +21,7 @@ import {
   Video,
   Monitor,
   Check,
+  CreditCard,
 } from "lucide-react";
 import { Avatar } from "@heroui/avatar";
 import { Tooltip } from "@heroui/tooltip";
@@ -388,6 +389,16 @@ export const PrimarySidebar = () => {
                     startContent={<UserIcon size={16} />}
                   >
                     {t("profile")}
+                  </Button>
+                </NextLink>
+                <NextLink href="/payments" className="w-full">
+                  <Button
+                    size="sm"
+                    variant="flat"
+                    className="w-full justify-start"
+                    startContent={<CreditCard size={16} />}
+                  >
+                    {t("payments")}
                   </Button>
                 </NextLink>
                 <Button

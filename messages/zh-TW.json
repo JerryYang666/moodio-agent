@@ -53,6 +53,7 @@
     "annotationPlatform": "標註平台",
     "home": "首頁",
     "profile": "個人檔案",
+    "payments": "付款",
     "logout": "登出",
     "teams": "團隊",
     "listView": "清單檢視",
@@ -268,6 +269,34 @@
     "passwordSetSuccess": "密碼設定成功",
     "otpSentForPassword": "驗證碼已傳送至您的電子郵件",
     "enterOtpAndNewPassword": "請輸入電子郵件中的驗證碼和新密碼"
+  },
+  "payments": {
+    "title": "付款與訂閱",
+    "subtitle": "查看您的訂閱狀態和付款紀錄",
+    "fetchError": "載入付款紀錄失敗",
+    "portalError": "無法開啟訂閱管理",
+    "subscription": {
+      "title": "訂閱",
+      "periodEnd": "續費日期：{date}",
+      "cancelWarning": "您的訂閱將在目前計費週期結束後取消。",
+      "manage": "管理訂閱",
+      "portal": "帳單中心",
+      "none": "您目前沒有有效的訂閱。",
+      "browseCta": "瀏覽方案"
+    },
+    "history": {
+      "title": "付款紀錄",
+      "date": "日期",
+      "description": "說明",
+      "type": "類型",
+      "amount": "金額",
+      "status": "狀態",
+      "receipt": "收據",
+      "view": "查看",
+      "empty": "尚無付款紀錄",
+      "typeSubscription": "訂閱",
+      "typeCredit": "點數"
+    }
   },
   "projects": {
     "title": "專案",
@@ -743,7 +772,17 @@
       "noPlans": "尚未設定訂閱方案",
       "noPackages": "尚未設定點數套餐",
       "planSaved": "訂閱方案已儲存",
-      "packageSaved": "點數套餐已儲存"
+      "packageSaved": "點數套餐已儲存",
+      "eventLog": "事件日誌",
+      "events": "事件",
+      "searchEvents": "搜尋事件...",
+      "allTypes": "所有事件類型",
+      "eventTime": "時間",
+      "eventType": "事件類型",
+      "eventUser": "使用者",
+      "eventCustomer": "客戶",
+      "eventMetadata": "事件資料",
+      "noEvents": "尚無事件紀錄"
     },
     "testingGroups": {
       "title": "測試群組",
