@@ -464,7 +464,19 @@
     "taxonomy": "分類",
     "filters": "篩選",
     "activeFiltersCount": "{count} 個已選",
-    "clearAll": "清除全部"
+    "clearAll": "清除全部",
+    "manageSubscription": "管理訂閱",
+    "paywall": {
+      "title": "需要訂閱",
+      "description": "訂閱後即可使用影片素材搜尋庫。",
+      "subscribe": "立即訂閱",
+      "feature1": "無限影片素材搜尋",
+      "feature2": "進階篩選和分類瀏覽",
+      "feature3": "AI 智慧搜尋助手",
+      "noPlan": "目前暫無可用的訂閱方案，請稍後再試。",
+      "checkoutSuccess": "訂閱啟用成功！歡迎使用瀏覽功能。",
+      "checkoutCanceled": "結帳已取消。"
+    }
   },
   "video": {
     "generateVideo": "產生影片",
@@ -702,6 +714,36 @@
       "exampleAspectRatioDesc": "21:9 擷取為 21（第一個非數字字元前的數字）。超寬螢幕費用 1.5 倍",
       "exampleMinMax": "最低收費",
       "exampleMinMaxDesc": "至少 50 點數，或時長 × 15 取較高者"
+    },
+    "stripe": {
+      "title": "Stripe 付款",
+      "subtitle": "付款",
+      "description": "管理 Stripe 付款的訂閱方案和點數套餐。",
+      "goTo": "管理付款",
+      "subscriptionPlans": "訂閱方案",
+      "creditPackages": "點數套餐",
+      "addPlan": "新增方案",
+      "editPlan": "編輯方案",
+      "addPackage": "新增套餐",
+      "editPackage": "編輯套餐",
+      "planName": "方案名稱",
+      "planDescription": "描述",
+      "packageName": "套餐名稱",
+      "stripePriceId": "Stripe 價格 ID",
+      "stripePriceIdHelp": "從 Stripe 控制面板 → 產品 → 價格 ID 複製",
+      "price": "價格",
+      "priceCents": "價格（美分）",
+      "interval": "週期",
+      "credits": "點數",
+      "order": "排序",
+      "sortOrder": "排列順序",
+      "sortOrderHelp": "數字越小排列越前",
+      "status": "啟用",
+      "actions": "操作",
+      "noPlans": "尚未設定訂閱方案",
+      "noPackages": "尚未設定點數套餐",
+      "planSaved": "訂閱方案已儲存",
+      "packageSaved": "點數套餐已儲存"
     },
     "testingGroups": {
       "title": "測試群組",
@@ -987,7 +1029,8 @@
       "video_generation": "影片生成",
       "image_generation": "圖片生成",
       "daily_checkin": "每日簽到",
-      "refund": "退款"
+      "refund": "退款",
+      "purchase": "積分購買"
     },
     "date": "日期",
     "type": "類型",
@@ -1004,6 +1047,10 @@
     "viewAll": "查看詳情",
     "personalAccount": "個人",
     "usedBy": "使用者",
+    "buyCredits": "購買積分",
+    "buyNow": "立即購買",
+    "purchaseSuccess": "積分購買成功！",
+    "purchaseCanceled": "購買已取消。",
     "paymentDisclosure": "購買即表示您同意我們的",
     "subscriptionTerms": "訂閱條款",
     "paymentDisclosureAnd": "和",

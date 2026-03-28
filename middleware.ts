@@ -25,6 +25,7 @@ function isPublicPath(pathname: string): boolean {
     "/api/video/webhook",
     "/api/video/webhook/fal",
     "/api/video/webhook/kie",
+    "/api/stripe/webhook",
   ];
 
   if (publicPaths.includes(pathname)) {

@@ -1,24 +1,30 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
+import { useSearchParams } from "next/navigation";
 import { useSelector } from "react-redux";
 import { useFeatureFlag } from "@/lib/feature-flags";
+import { useSubscription } from "@/hooks/use-subscription";
 import FilterMenu from "@/components/browse/FilterMenu";
 import SearchBar from "@/components/browse/SearchBar";
 import Breadcrumb from "@/components/browse/Breadcrumb";
 import VideoGrid from "@/components/browse/VideoGrid";
+import SubscriptionPaywall from "@/components/browse/SubscriptionPaywall";
 import ChatSidePanel from "@/components/chat/chat-side-panel";
 import { siteConfig } from "@/config/site";
 import { SlidersHorizontal, Filter } from "lucide-react";
 import { Button } from "@heroui/button";
 import { Badge } from "@heroui/badge";
+import { Spinner } from "@heroui/spinner";
+import { addToast } from "@heroui/toast";
 import {
   Drawer,
   DrawerContent,
   DrawerHeader,
   DrawerBody,
 } from "@heroui/drawer";
+import { api } from "@/lib/api/client";
 import type { RootState } from "@/lib/redux/store";
 
 const DEFAULT_CHAT_PANEL_WIDTH = 380;
@@ -41,9 +47,35 @@ const useDisableBodyScroll = (enabled: boolean) => {
 
 export default function BrowsePage() {
   const t = useTranslations("browse");
+  const searchParams = useSearchParams();
   const showBrowse = useFeatureFlag<boolean>("user_retrieval") ?? false;
+  const { hasSubscription, loading: subLoading, refresh: refreshSub } = useSubscription();
   const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
   const [isFilterCollapsed, setIsFilterCollapsed] = useState(false);
+  const checkoutHandled = useRef(false);
+
+  useEffect(() => {
+    if (checkoutHandled.current) return;
+    const checkout = searchParams.get("checkout");
+    if (checkout === "success") {
+      checkoutHandled.current = true;
+      addToast({ title: t("paywall.checkoutSuccess"), color: "success" });
+      refreshSub();
+      window.history.replaceState(null, "", window.location.pathname);
+    } else if (checkout === "canceled") {
+      checkoutHandled.current = true;
+      addToast({ title: t("paywall.checkoutCanceled"), color: "warning" });
+      window.history.replaceState(null, "", window.location.pathname);
+    }
+  }, [searchParams, t, refreshSub]);
+
+  // Manage subscription handler
+  const handleManageSubscription = async () => {
+    try {
+      const { url } = await api.post("/api/stripe/portal");
+      if (url) window.location.href = url;
+    } catch { /* noop */ }
+  };
 
   // Chat panel state — mirrors the pattern from storyboard page
   const [isChatPanelCollapsed, setIsChatPanelCollapsed] = useState(() => {
@@ -83,7 +115,7 @@ export default function BrowsePage() {
     (isAigc !== undefined ? 1 : 0);
 
   // Only disable body scroll when the full browse UI is active
-  useDisableBodyScroll(showBrowse);
+  useDisableBodyScroll(showBrowse && hasSubscription);
 
   if (!showBrowse) {
     return (
@@ -92,6 +124,18 @@ export default function BrowsePage() {
         <p>{t("comingSoon")}</p>
       </div>
     );
+  }
+
+  if (subLoading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <Spinner size="lg" />
+      </div>
+    );
+  }
+
+  if (!hasSubscription) {
+    return <SubscriptionPaywall />;
   }
 
   return (
@@ -139,6 +183,15 @@ export default function BrowsePage() {
               placeholder={t("searchPlaceholder")}
               className="flex-1 min-w-0"
             />
+
+            <Button
+              variant="flat"
+              size="sm"
+              className="hidden lg:flex shrink-0 text-xs"
+              onPress={handleManageSubscription}
+            >
+              {t("manageSubscription")}
+            </Button>
 
             {/* Mobile filter trigger button — visible only below lg breakpoint */}
             <Button
