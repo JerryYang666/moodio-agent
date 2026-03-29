@@ -712,6 +712,35 @@ export default function DesktopDetailPage({
     [desktopId, applyRemoteEvent]
   );
 
+  const handleAssetRename = useCallback(
+    async (assetId: string, newTitle: string) => {
+      // Find the current asset to read-modify-write its metadata
+      const asset = detail?.assets.find((a) => a.id === assetId);
+      if (!asset) return;
+
+      const currentMeta = asset.metadata as Record<string, unknown>;
+      const updatedMeta = { ...currentMeta, title: newTitle };
+
+      // Optimistic update
+      applyRemoteEvent({
+        type: "asset_updated",
+        payload: { assetId, metadata: { title: newTitle } },
+      });
+
+      try {
+        await fetch(`/api/desktop/${desktopId}/assets/${assetId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ metadata: updatedMeta }),
+        });
+        sendEvent("asset_updated", { assetId, metadata: { title: newTitle } });
+      } catch (error) {
+        console.error("Failed to rename asset:", error);
+      }
+    },
+    [desktopId, detail?.assets, applyRemoteEvent, sendEvent]
+  );
+
   const handleOpenChat = useCallback(
     (chatId: string) => {
       // Open the chat in the side panel instead of navigating away
@@ -1054,6 +1083,7 @@ export default function DesktopDetailPage({
           onExternalShotlistDrop={canEdit ? handleExternalShotlistDrop : undefined}
           onExternalVideoSuggestDrop={canEdit ? handleExternalVideoSuggestDrop : undefined}
           onAddAssetAtPosition={canEdit ? handleAddAssetAtPosition : undefined}
+          onAssetRename={canEdit ? handleAssetRename : undefined}
         />
         <DesktopToolbar
           camera={camera}

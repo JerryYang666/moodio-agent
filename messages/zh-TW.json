@@ -1153,7 +1153,8 @@
     "desktopActions": "畫布操作",
     "imageTitle": "圖片",
     "bringForward": "上移一層",
-    "sendBackward": "下移一層"
+    "sendBackward": "下移一層",
+    "rename": "重新命名"
   },
   "legal": {
     "terms": "條款",
