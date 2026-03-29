@@ -24,7 +24,6 @@ import {
   DrawerHeader,
   DrawerBody,
 } from "@heroui/drawer";
-import { api } from "@/lib/api/client";
 import type { RootState } from "@/lib/redux/store";
 
 const DEFAULT_CHAT_PANEL_WIDTH = 380;
@@ -68,14 +67,6 @@ export default function BrowsePage() {
       window.history.replaceState(null, "", window.location.pathname);
     }
   }, [searchParams, t, refreshSub]);
-
-  // Manage subscription handler
-  const handleManageSubscription = async () => {
-    try {
-      const { url } = await api.post("/api/stripe/portal");
-      if (url) window.location.href = url;
-    } catch { /* noop */ }
-  };
 
   // Chat panel state — mirrors the pattern from storyboard page
   const [isChatPanelCollapsed, setIsChatPanelCollapsed] = useState(() => {
@@ -183,15 +174,6 @@ export default function BrowsePage() {
               placeholder={t("searchPlaceholder")}
               className="flex-1 min-w-0"
             />
-
-            <Button
-              variant="flat"
-              size="sm"
-              className="hidden lg:flex shrink-0 text-xs"
-              onPress={handleManageSubscription}
-            >
-              {t("manageSubscription")}
-            </Button>
 
             {/* Mobile filter trigger button — visible only below lg breakpoint */}
             <Button
