@@ -6,8 +6,9 @@ import { Card, CardBody, CardHeader } from "@heroui/card";
 import { Button } from "@heroui/button";
 import { Spinner } from "@heroui/spinner";
 import { Checkbox } from "@heroui/checkbox";
+import { Chip } from "@heroui/chip";
 import { addToast } from "@heroui/toast";
-import { Bean, ShoppingCart } from "lucide-react";
+import { Bean, ShoppingCart, User, Users } from "lucide-react";
 import { api, ApiError } from "@/lib/api/client";
 import { STRIPE_ERROR_CODES, type StripeErrorCode } from "@/lib/stripe-errors";
 import { useSubscription } from "@/hooks/use-subscription";
@@ -19,7 +20,13 @@ interface CreditPackage {
   priceCents: number;
 }
 
-export default function CreditPackageCards() {
+interface CreditPackageCardsProps {
+  accountType: "personal" | "team";
+  accountId: string;
+  teamName?: string;
+}
+
+export default function CreditPackageCards({ accountType, accountId, teamName }: CreditPackageCardsProps) {
   const t = useTranslations("credits");
   const tLegal = useTranslations("legal");
   const tStripeErrors = useTranslations("stripeErrors");
@@ -45,6 +52,8 @@ export default function CreditPackageCards() {
       const { url } = await api.post("/api/stripe/checkout", {
         mode: "credits",
         packageId,
+        accountType,
+        accountId,
         ...(needsPaymentConsent && { agreedToPaymentTerms: true }),
       });
       if (url) window.location.href = url;
@@ -70,11 +79,21 @@ export default function CreditPackageCards() {
 
   return (
     <Card>
-      <CardHeader className="pb-0 pt-4 px-4 flex-col items-start">
+      <CardHeader className="pb-0 pt-4 px-4 flex-col items-start gap-2">
         <div className="flex items-center gap-2">
           <ShoppingCart size={18} className="text-primary" />
           <h2 className="text-lg font-semibold">{t("buyCredits")}</h2>
         </div>
+        <Chip
+          variant="flat"
+          color={accountType === "team" ? "secondary" : "default"}
+          size="sm"
+          startContent={accountType === "team" ? <Users size={12} /> : <User size={12} />}
+        >
+          {accountType === "team"
+            ? t("purchasingForTeam", { teamName: teamName ?? "" })
+            : t("purchasingForPersonal")}
+        </Chip>
       </CardHeader>
       <CardBody className="gap-4">
         {needsPaymentConsent && (

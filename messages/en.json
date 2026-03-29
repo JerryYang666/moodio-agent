@@ -1188,7 +1188,10 @@
     "buyCredits": "Buy Credits",
     "buyNow": "Buy Now",
     "purchaseSuccess": "Credits purchased successfully!",
-    "purchaseCanceled": "Purchase was canceled."
+    "purchaseCanceled": "Purchase was canceled.",
+    "purchasingForPersonal": "Adding credits to your personal account",
+    "purchasingForTeam": "Adding credits to {teamName}",
+    "teamPurchaseNotAllowed": "Only team owners and admins can purchase credits for the team"
   },
   "teams": {
     "title": "Teams",

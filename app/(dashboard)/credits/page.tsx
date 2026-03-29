@@ -22,6 +22,7 @@ import NextLink from "next/link";
 import { api } from "@/lib/api/client";
 import { useCredits } from "@/hooks/use-credits";
 import { useTeams } from "@/hooks/use-team";
+import { useAuth } from "@/hooks/use-auth";
 import { LegalFooter } from "@/components/legal-footer";
 import CreditPackageCards from "@/components/credits/CreditPackageCards";
 
@@ -46,7 +47,8 @@ export default function CreditsPage() {
   const t = useTranslations("credits");
   const searchParams = useSearchParams();
   const { activeAccountType, activeAccountId, refreshBalance } = useCredits();
-  const { teams } = useTeams();
+  const { teams, isOwnerOrAdmin } = useTeams();
+  const { user } = useAuth();
 
   // Local view state — does NOT change the global billing account
   const [viewAccountType, setViewAccountType] = useState<"personal" | "team">(activeAccountType);
@@ -232,7 +234,19 @@ export default function CreditsPage() {
       </p>
 
       {/* Buy Credits */}
-      {viewAccountType === "personal" && <CreditPackageCards />}
+      {viewAccountType === "personal" && user && (
+        <CreditPackageCards
+          accountType="personal"
+          accountId={user.id}
+        />
+      )}
+      {viewAccountType === "team" && viewAccountId && isOwnerOrAdmin(viewAccountId) && (
+        <CreditPackageCards
+          accountType="team"
+          accountId={viewAccountId}
+          teamName={teams.find((t) => t.teamId === viewAccountId)?.teamName}
+        />
+      )}
 
       {/* Daily Check-in Card */}
       {viewAccountType === "personal" && checkinStatus && (

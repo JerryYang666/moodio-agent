@@ -110,12 +110,49 @@ export async function POST(request: NextRequest) {
     }
 
     // mode === "credits"
-    const { packageId } = body;
+    const { packageId, accountType, accountId } = body;
     if (!packageId) {
       return NextResponse.json(
         { error: "packageId is required for credit purchases" },
         { status: 400 }
       );
+    }
+
+    if (!accountType || !accountId) {
+      return NextResponse.json(
+        { error: "accountType and accountId are required" },
+        { status: 400 }
+      );
+    }
+
+    if (accountType !== "personal" && accountType !== "team") {
+      return NextResponse.json(
+        { error: "accountType must be 'personal' or 'team'" },
+        { status: 400 }
+      );
+    }
+
+    if (accountType === "personal" && accountId !== payload.userId) {
+      return NextResponse.json(
+        { error: "Cannot purchase credits for another user" },
+        { status: 403 }
+      );
+    }
+
+    if (accountType === "team") {
+      const membership = payload.teams?.find((t) => t.id === accountId);
+      if (!membership) {
+        return NextResponse.json(
+          { error: "You are not a member of this team" },
+          { status: 403 }
+        );
+      }
+      if (membership.role !== "owner" && membership.role !== "admin") {
+        return NextResponse.json(
+          { error: "Only team owners and admins can purchase credits for the team" },
+          { status: 403 }
+        );
+      }
     }
 
     const [pkg] = await db
@@ -131,24 +168,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const creditsMeta = {
+      userId: payload.userId,
+      packageId: pkg.id,
+      credits: String(pkg.credits),
+      accountType,
+      accountId,
+    };
+
+    const successParams = new URLSearchParams({ checkout: "success", accountType, accountId });
+    const cancelParams = new URLSearchParams({ checkout: "canceled" });
+
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       mode: "payment",
       line_items: [{ price: pkg.stripePriceId, quantity: 1 }],
-      success_url: `${appUrl}/credits?checkout=success`,
-      cancel_url: `${appUrl}/credits?checkout=canceled`,
+      success_url: `${appUrl}/credits?${successParams.toString()}`,
+      cancel_url: `${appUrl}/credits?${cancelParams.toString()}`,
       payment_intent_data: {
-        metadata: {
-          userId: payload.userId,
-          packageId: pkg.id,
-          credits: String(pkg.credits),
-        },
+        metadata: creditsMeta,
       },
-      metadata: {
-        userId: payload.userId,
-        packageId: pkg.id,
-        credits: String(pkg.credits),
-      },
+      metadata: creditsMeta,
     });
 
     return NextResponse.json({ url: session.url });

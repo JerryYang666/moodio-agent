@@ -3,9 +3,9 @@ import { headers } from "next/headers";
 import Stripe from "stripe";
 import { stripe } from "@/lib/stripe";
 import { db } from "@/lib/db";
-import { subscriptions, users, creditTransactions, stripeEvents } from "@/lib/db/schema";
+import { subscriptions, users, teams, creditTransactions, stripeEvents } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
-import { grantCredits } from "@/lib/credits";
+import { grantCredits, type AccountType } from "@/lib/credits";
 
 /**
  * POST /api/stripe/webhook
@@ -90,7 +90,8 @@ export async function POST(request: NextRequest) {
 
 /**
  * Handle completed checkout sessions.
- * For one-time (credit) payments, grant credits to the user.
+ * For one-time (credit) payments, validate metadata and target account,
+ * grant credits on success, or auto-refund if anything is invalid.
  * Subscription fulfillment is handled by the subscription.* events.
  */
 async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
@@ -99,9 +100,41 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   const userId = session.metadata?.userId;
   const credits = Number(session.metadata?.credits);
   const packageId = session.metadata?.packageId;
+  const accountType = session.metadata?.accountType as AccountType | undefined;
+  const accountId = session.metadata?.accountId;
 
-  if (!userId || !credits || !packageId) {
-    console.error("[Stripe Webhook] Missing metadata on checkout session:", session.id);
+  // Step 1: Validate all required metadata is present
+  if (!userId || !credits || !packageId || !accountType || !accountId) {
+    console.error("[Stripe Webhook] Missing required metadata on checkout session:", {
+      sessionId: session.id,
+      userId,
+      credits,
+      packageId,
+      accountType,
+      accountId,
+    });
+    await autoRefund(session, "missing_metadata");
+    return;
+  }
+
+  if (accountType !== "personal" && accountType !== "team") {
+    console.error("[Stripe Webhook] Invalid accountType in metadata:", {
+      sessionId: session.id,
+      accountType,
+    });
+    await autoRefund(session, "invalid_account_type");
+    return;
+  }
+
+  // Step 2: Validate target account exists in DB
+  const accountExists = await verifyAccountExists(accountType, accountId);
+  if (!accountExists) {
+    console.error("[Stripe Webhook] Target account does not exist:", {
+      sessionId: session.id,
+      accountType,
+      accountId,
+    });
+    await autoRefund(session, "account_not_found");
     return;
   }
 
@@ -119,15 +152,67 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
 
   if (existing) return;
 
+  // Step 3: Grant credits to the correct account
   await grantCredits(
-    userId,
+    accountId,
     credits,
     "purchase",
     `Purchased ${credits} credits`,
-    undefined,
+    userId,
     { type: "stripe_checkout", id: session.id },
-    "personal"
+    accountType
   );
+}
+
+async function verifyAccountExists(
+  accountType: AccountType,
+  accountId: string
+): Promise<boolean> {
+  if (accountType === "personal") {
+    const [user] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.id, accountId))
+      .limit(1);
+    return !!user;
+  }
+
+  const [team] = await db
+    .select({ id: teams.id })
+    .from(teams)
+    .where(eq(teams.id, accountId))
+    .limit(1);
+  return !!team;
+}
+
+async function autoRefund(session: Stripe.Checkout.Session, reason: string) {
+  const piId = typeof session.payment_intent === "string"
+    ? session.payment_intent
+    : session.payment_intent?.id;
+
+  if (!piId) {
+    console.error("[Stripe Webhook] Cannot refund -- no payment_intent on session:", session.id);
+    return;
+  }
+
+  try {
+    const refund = await stripe.refunds.create({
+      payment_intent: piId,
+      metadata: { autoRefundReason: reason, sessionId: session.id },
+    });
+    console.error("[Stripe Webhook] Auto-refunded payment:", {
+      sessionId: session.id,
+      refundId: refund.id,
+      reason,
+    });
+  } catch (err) {
+    console.error("[Stripe Webhook] CRITICAL: Auto-refund FAILED:", {
+      sessionId: session.id,
+      paymentIntentId: piId,
+      reason,
+      error: err,
+    });
+  }
 }
 
 /**
