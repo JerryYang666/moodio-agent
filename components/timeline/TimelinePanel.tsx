@@ -81,22 +81,6 @@ export default function TimelinePanel({
 
   const activeClipId = clips[safeActiveClipIndex]?.id ?? null;
 
-  // Keyboard shortcut: Backspace/Delete removes the active clip
-  useEffect(() => {
-    if (!isExpanded) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key !== "Backspace" && e.key !== "Delete") return;
-      // Don't hijack input/textarea/select
-      const tag = (e.target as HTMLElement)?.tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
-      if (activeClipId) {
-        e.preventDefault();
-        onRemoveClip(activeClipId);
-      }
-    };
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [isExpanded, activeClipId, onRemoveClip]);
 
   const handleActiveClipChange = useCallback((index: number) => {
     setActiveClipIndex(index);
