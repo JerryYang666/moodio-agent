@@ -25,6 +25,7 @@ import {
   ArrowUp,
   ArrowDown,
   Maximize2,
+  Pencil,
 } from "lucide-react";
 
 const MIN_ZOOM = 0.1;
@@ -100,6 +101,7 @@ interface DesktopCanvasProps {
     position: { x: number; y: number }
   ) => void;
   onAddAssetAtPosition?: (worldPos: { x: number; y: number }) => void;
+  onAssetRename?: (assetId: string, newTitle: string) => void;
 }
 
 interface ContextMenuState {
@@ -187,6 +189,7 @@ export default function DesktopCanvas({
   onVideoSuggestCommit,
   onExternalVideoSuggestDrop,
   onAddAssetAtPosition,
+  onAssetRename,
 }: DesktopCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const isPanning = useRef(false);
@@ -214,6 +217,11 @@ export default function DesktopCanvas({
   const resizeHandle = useRef<string>("");
   const [resizeDims, setResizeDims] = useState<{ w: number; h: number; posX: number; posY: number } | null>(null);
   const lastResizeSend = useRef(0);
+
+  // Rename state
+  const [renamingAssetId, setRenamingAssetId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const renameInputRef = useRef<HTMLInputElement>(null);
 
   const t = useTranslations("desktop");
   const canEdit = hasWriteAccess(permission);
@@ -855,6 +863,33 @@ export default function DesktopCanvas({
     setContextMenu(null);
   }, [selectedIds, onAssetDelete, onAssetBatchDelete]);
 
+  const startRename = useCallback(
+    (asset: EnrichedDesktopAsset) => {
+      const meta = asset.metadata as Record<string, unknown>;
+      const currentTitle = (typeof meta.title === "string" ? meta.title : "") ||
+        (typeof meta.prompt === "string" ? meta.prompt : "") || "";
+      setRenameValue(currentTitle);
+      setRenamingAssetId(asset.id);
+      setContextMenu(null);
+      // Focus the input after it renders
+      setTimeout(() => renameInputRef.current?.focus(), 0);
+    },
+    []
+  );
+
+  const commitRename = useCallback(() => {
+    if (renamingAssetId && onAssetRename && renameValue.trim()) {
+      onAssetRename(renamingAssetId, renameValue.trim());
+    }
+    setRenamingAssetId(null);
+    setRenameValue("");
+  }, [renamingAssetId, renameValue, onAssetRename]);
+
+  const cancelRename = useCallback(() => {
+    setRenamingAssetId(null);
+    setRenameValue("");
+  }, []);
+
   const contextAsset = contextMenu?.assetId
     ? assets.find((a) => a.id === contextMenu.assetId)
     : null;
@@ -1206,6 +1241,15 @@ export default function DesktopCanvas({
           ) : (
             /* Single-select context menu: z-index + delete */
             <>
+              {contextAsset && onAssetRename && (
+                <button
+                  className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-default-100 transition-colors text-left"
+                  onClick={() => startRename(contextAsset as EnrichedDesktopAsset)}
+                >
+                  <Pencil size={14} />
+                  {t("rename")}
+                </button>
+              )}
               {contextAsset && onZIndexChange && (
                 <>
                   <button
@@ -1241,6 +1285,42 @@ export default function DesktopCanvas({
           )}
         </div>
       )}
+
+      {/* Inline rename input — appears below the asset being renamed */}
+      {renamingAssetId && (() => {
+        const renamingAsset = assets.find((a) => a.id === renamingAssetId);
+        if (!renamingAsset) return null;
+        const dims = getAssetDimensions(renamingAsset, naturalDims.get(renamingAsset.id));
+        const screenX = renamingAsset.posX * camera.zoom + camera.x;
+        const screenY = renamingAsset.posY * camera.zoom + camera.y;
+        const screenW = dims.w * camera.zoom;
+        const screenH = dims.h * camera.zoom;
+        return (
+          <div
+            className="absolute z-[60] flex items-center bg-background border border-divider rounded-lg shadow-lg px-2 py-1"
+            style={{
+              left: screenX + screenW / 2,
+              top: screenY + screenH + 8,
+              transform: "translate(-50%, 0)",
+              minWidth: 200,
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            <input
+              ref={renameInputRef}
+              className="flex-1 bg-transparent text-sm outline-none border-none px-1 py-0.5"
+              value={renameValue}
+              onChange={(e) => setRenameValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") commitRename();
+                if (e.key === "Escape") cancelRename();
+              }}
+              onBlur={commitRename}
+              placeholder={t("rename")}
+            />
+          </div>
+        );
+      })()}
 
       {/* Floating action bar — appears above the single selected asset */}
       {singleSelectedAsset && canEdit && !contextMenu && (() => {

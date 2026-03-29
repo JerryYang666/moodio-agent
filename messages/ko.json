@@ -1153,7 +1153,8 @@
     "desktopActions": "데스크톱 작업",
     "imageTitle": "이미지",
     "bringForward": "앞으로 가져오기",
-    "sendBackward": "뒤로 보내기"
+    "sendBackward": "뒤로 보내기",
+    "rename": "이름 변경"
   },
   "legal": {
     "terms": "약관",

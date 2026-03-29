@@ -507,7 +507,8 @@
     "desktopActions": "Desktop actions",
     "imageTitle": "Image",
     "bringForward": "Bring Forward",
-    "sendBackward": "Send Backward"
+    "sendBackward": "Send Backward",
+    "rename": "Rename"
   },
   "storyboard": {
     "title": "Storyboard",
