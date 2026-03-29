@@ -1040,7 +1040,7 @@ export default function DesktopCanvas({
               onContextMenu={(e) => handleContextMenu(e, asset)}
             >
               <div
-                className={`w-full h-full rounded-xl overflow-hidden bg-background shadow-md transition-shadow duration-150 hover:shadow-lg ${
+                className={`w-full h-full ${asset.assetType === "image" || asset.assetType === "video" || asset.assetType === "public_video" ? "" : "rounded-xl"} overflow-hidden bg-background shadow-md transition-shadow duration-150 hover:shadow-lg ${
                   isSelected
                     ? "ring-2 ring-primary ring-offset-2 ring-offset-background"
                     : remoteSelectorsForAsset?.length

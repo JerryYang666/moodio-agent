@@ -380,6 +380,62 @@ export function getViewportCenterPosition(newW = 400, newH = 300): { x: number; 
 }
 
 /**
+ * Compute grid-based positions for new assets when the user is NOT actively
+ * viewing the desktop.  Assets are laid out in rows of `columnsPerRow`
+ * starting at the canvas origin (x = 0) and growing rightward, then downward.
+ * Existing asset rects are taken into account to avoid any overlap.
+ */
+export function getGridPlacementPositions(
+  newAssets: Array<{ w: number; h: number }>,
+  existingRects: AssetRect[] = [],
+  columnsPerRow = 4,
+  gap = 24
+): Array<{ x: number; y: number }> {
+  const positions: Array<{ x: number; y: number }> = [];
+  const allRects = [...existingRects];
+
+  // Find the starting Y position — just below all existing assets (or 0)
+  let startY = 0;
+  for (const r of allRects) {
+    const bottom = r.y + r.h;
+    if (bottom + gap > startY) startY = bottom + gap;
+  }
+  // If there are no existing assets, start at y = 0
+  if (allRects.length === 0) startY = 0;
+
+  let currentCol = 0;
+  let currentRowY = startY;
+  let currentRowMaxH = 0;
+
+  for (const asset of newAssets) {
+    if (currentCol >= columnsPerRow) {
+      currentCol = 0;
+      currentRowY += currentRowMaxH + gap;
+      currentRowMaxH = 0;
+    }
+
+    const preferredX = currentCol * (asset.w + gap);
+    const preferredY = currentRowY;
+
+    const pos = findNonOverlappingPosition(
+      preferredX,
+      preferredY,
+      asset.w,
+      asset.h,
+      allRects,
+      gap
+    );
+    positions.push(pos);
+    allRects.push({ x: pos.x, y: pos.y, w: asset.w, h: asset.h });
+
+    currentRowMaxH = Math.max(currentRowMaxH, asset.h);
+    currentCol++;
+  }
+
+  return positions;
+}
+
+/**
  * Place an asset at the exact visual center of the current viewport.
  *
  * Unlike `getViewportCenterPosition`, this ignores existing asset clusters and
