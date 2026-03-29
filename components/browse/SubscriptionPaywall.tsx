@@ -5,8 +5,10 @@ import { useTranslations } from "next-intl";
 import { Card, CardBody } from "@heroui/card";
 import { Button } from "@heroui/button";
 import { Spinner } from "@heroui/spinner";
+import { Checkbox } from "@heroui/checkbox";
 import { Lock, CheckCircle } from "lucide-react";
 import { api } from "@/lib/api/client";
+import { useSubscription } from "@/hooks/use-subscription";
 
 interface SubscriptionPlan {
   id: string;
@@ -18,9 +20,15 @@ interface SubscriptionPlan {
 
 export default function SubscriptionPaywall() {
   const t = useTranslations("browse");
+  const tLegal = useTranslations("legal");
+  const { hasPaymentConsent } = useSubscription();
   const [plan, setPlan] = useState<SubscriptionPlan | null>(null);
   const [loading, setLoading] = useState(true);
   const [redirecting, setRedirecting] = useState(false);
+  const [agreedToPaymentTerms, setAgreedToPaymentTerms] = useState(false);
+  const [consentError, setConsentError] = useState("");
+
+  const needsPaymentConsent = !hasPaymentConsent;
 
   useEffect(() => {
     api
@@ -33,10 +41,16 @@ export default function SubscriptionPaywall() {
   }, []);
 
   const handleSubscribe = async () => {
+    if (needsPaymentConsent && !agreedToPaymentTerms) {
+      setConsentError(tLegal("mustAgreeToPaymentTerms"));
+      return;
+    }
+    setConsentError("");
     setRedirecting(true);
     try {
       const { url } = await api.post("/api/stripe/checkout", {
         mode: "subscription",
+        ...(needsPaymentConsent && { agreedToPaymentTerms: true }),
       });
       if (url) {
         window.location.href = url;
@@ -95,11 +109,43 @@ export default function SubscriptionPaywall() {
               </li>
             </ul>
 
+            {needsPaymentConsent && (
+              <div className="flex flex-col gap-1">
+                <Checkbox
+                  isSelected={agreedToPaymentTerms}
+                  onValueChange={(v) => { setAgreedToPaymentTerms(v); setConsentError(""); }}
+                  size="sm"
+                  className="items-start"
+                >
+                  <span className="text-sm">
+                    {tLegal("agreePaymentPrefix")}{" "}
+                    <a href="/legal/subscription-terms" target="_blank" rel="noopener noreferrer" className="text-primary underline">
+                      {tLegal("subscriptionTerms")}
+                    </a>
+                    {", "}
+                    <a href="/legal/refunds" target="_blank" rel="noopener noreferrer" className="text-primary underline">
+                      {tLegal("refundPolicy")}
+                    </a>
+                    {", "}
+                    {tLegal("and")}{" "}
+                    <a href="/legal/privacy" target="_blank" rel="noopener noreferrer" className="text-primary underline">
+                      {tLegal("privacyPolicy")}
+                    </a>
+                    .
+                  </span>
+                </Checkbox>
+                {consentError && (
+                  <p className="text-xs text-danger ml-7">{consentError}</p>
+                )}
+              </div>
+            )}
+
             <Button
               color="primary"
               size="lg"
               className="w-full mt-2"
               isLoading={redirecting}
+              isDisabled={needsPaymentConsent && !agreedToPaymentTerms}
               onPress={handleSubscribe}
             >
               {t("paywall.subscribe")}

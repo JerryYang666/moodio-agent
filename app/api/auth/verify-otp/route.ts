@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { users, userConsents } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { verifyOTP } from "@/lib/auth/otp";
 import { generateAccessToken } from "@/lib/auth/jwt";
 import { generateRefreshToken, createRefreshToken } from "@/lib/auth/tokens";
@@ -58,17 +58,23 @@ export async function POST(request: NextRequest) {
     if (agreedToTerms) {
       await db.insert(userConsents).values({
         userId,
+        consentType: "login",
         termsVersion: "2026-03-24",
         acceptedFromIp:
           request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
           "unknown",
       });
     } else {
-      // Verify existing users have prior consent on record
+      // Verify existing users have prior login consent on record
       const existingConsent = await db
         .select({ id: userConsents.id })
         .from(userConsents)
-        .where(eq(userConsents.userId, userId))
+        .where(
+          and(
+            eq(userConsents.userId, userId),
+            eq(userConsents.consentType, "login")
+          )
+        )
         .limit(1);
 
       if (existingConsent.length === 0) {

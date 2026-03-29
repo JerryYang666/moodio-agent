@@ -22,6 +22,7 @@ import {
   ExternalLink,
   Settings,
   AlertTriangle,
+  XCircle,
 } from "lucide-react";
 import { api } from "@/lib/api/client";
 import { useAuth } from "@/hooks/use-auth";
@@ -50,7 +51,7 @@ const STATUS_COLOR: Record<string, "success" | "warning" | "danger" | "default">
 export default function PaymentsPage() {
   const t = useTranslations("payments");
   const { user, loading: authLoading } = useAuth();
-  const { hasSubscription, subscription } = useSubscription();
+  const { hasSubscription, subscription, refresh: refreshSub } = useSubscription();
 
   const [payments, setPayments] = useState<PaymentItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -79,12 +80,29 @@ export default function PaymentsPage() {
     return payments.slice(start, start + rowsPerPage);
   }, [page, payments]);
 
+  const [canceling, setCanceling] = useState(false);
+
   const handleManageSubscription = async () => {
     try {
       const { url } = await api.post("/api/stripe/portal");
       if (url) window.location.href = url;
     } catch {
       addToast({ title: t("portalError"), color: "danger" });
+    }
+  };
+
+  const handleCancelSubscription = async () => {
+    setCanceling(true);
+    try {
+      const data = await api.post("/api/stripe/cancel", {});
+      if (data.success) {
+        addToast({ title: t("subscription.cancelSuccess"), color: "success" });
+        refreshSub();
+      }
+    } catch {
+      addToast({ title: t("subscription.cancelError"), color: "danger" });
+    } finally {
+      setCanceling(false);
     }
   };
 
@@ -136,13 +154,26 @@ export default function PaymentsPage() {
                   <span>{t("subscription.cancelWarning")}</span>
                 </div>
               )}
-              <Button
-                variant="flat"
-                startContent={<Settings size={16} />}
-                onPress={handleManageSubscription}
-              >
-                {t("subscription.manage")}
-              </Button>
+              <div className="flex gap-2 flex-wrap">
+                <Button
+                  variant="flat"
+                  startContent={<Settings size={16} />}
+                  onPress={handleManageSubscription}
+                >
+                  {t("subscription.manage")}
+                </Button>
+                {!subscription.cancelAtPeriodEnd && (
+                  <Button
+                    variant="flat"
+                    color="danger"
+                    startContent={<XCircle size={16} />}
+                    isLoading={canceling}
+                    onPress={handleCancelSubscription}
+                  >
+                    {t("subscription.cancel")}
+                  </Button>
+                )}
+              </div>
             </div>
           ) : (
             <div className="space-y-3">

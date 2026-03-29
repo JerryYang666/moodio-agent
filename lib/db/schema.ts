@@ -654,6 +654,7 @@ export const userConsents = pgTable("user_consents", {
   userId: uuid("user_id")
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
+  consentType: varchar("consent_type", { length: 20 }).notNull().default("login"), // 'login' | 'payment'
   termsVersion: varchar("terms_version", { length: 20 }).notNull(), // e.g. "2026-03-24"
   acceptedFromIp: varchar("accepted_from_ip", { length: 100 }),
   acceptedAt: timestamp("accepted_at").defaultNow().notNull(),
