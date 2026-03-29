@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { subscriptionPlans, creditPackages, userConsents } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { stripe, getOrCreateStripeCustomer } from "@/lib/stripe";
+import { hasActiveSubscription } from "@/lib/subscription";
 
 /**
  * POST /api/stripe/checkout
@@ -71,6 +72,14 @@ export async function POST(request: NextRequest) {
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
     if (mode === "subscription") {
+      const alreadySubscribed = await hasActiveSubscription(payload.userId);
+      if (alreadySubscribed) {
+        return NextResponse.json(
+          { error: "You already have an active subscription" },
+          { status: 409 }
+        );
+      }
+
       const [plan] = await db
         .select()
         .from(subscriptionPlans)
