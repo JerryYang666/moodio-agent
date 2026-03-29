@@ -5,6 +5,7 @@ import { stripe } from "@/lib/stripe";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
+import { handleStripeError } from "@/lib/stripe-errors";
 
 /**
  * GET /api/stripe/payments
@@ -43,12 +44,8 @@ export async function GET(request: NextRequest) {
     );
 
     return NextResponse.json({ payments });
-  } catch (error: any) {
-    console.error("[Stripe Payments] Error:", error);
-    return NextResponse.json(
-      { error: error.message || "Failed to fetch payments" },
-      { status: 500 }
-    );
+  } catch (error) {
+    return handleStripeError(error, "Stripe Payments");
   }
 }
 

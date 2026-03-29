@@ -1268,5 +1268,21 @@
     "cookieBannerText": "我們使用Cookie來改善您的體驗。繼續使用我們的網站即表示您接受我們使用Cookie。",
     "cookiePolicyLink": "了解更多",
     "cookieAccept": "接受"
+  },
+  "stripeErrors": {
+    "card_declined": "您的卡片被拒絕。請嘗試其他付款方式。",
+    "card_expired": "您的卡片已過期。請更新卡片資訊。",
+    "card_incorrect_cvc": "安全碼（CVC）不正確。請檢查後重試。",
+    "card_incorrect_number": "卡號不正確。請檢查後重試。",
+    "card_insufficient_funds": "您的卡片餘額不足。請嘗試其他付款方式。",
+    "card_processing_error": "處理您的卡片時發生錯誤。請稍後重試。",
+    "card_generic": "無法對您的卡片扣款。請嘗試其他付款方式。",
+    "invalid_request": "付款請求出現問題。請重試。",
+    "authentication_error": "付款服務暫時設定錯誤。請聯繫客服。",
+    "rate_limit": "付款嘗試次數過多。請稍等片刻後重試。",
+    "connection_error": "無法連線付款服務。請檢查網路連線後重試。",
+    "idempotency_error": "此付款已提交。請重新整理頁面後重試。",
+    "api_error": "付款服務發生錯誤。請稍後重試。",
+    "unknown": "發生意外錯誤。請重試或聯繫客服。"
   }
 }

@@ -6,8 +6,10 @@ import { Card, CardBody } from "@heroui/card";
 import { Button } from "@heroui/button";
 import { Spinner } from "@heroui/spinner";
 import { Checkbox } from "@heroui/checkbox";
+import { addToast } from "@heroui/toast";
 import { Lock, CheckCircle } from "lucide-react";
-import { api } from "@/lib/api/client";
+import { api, ApiError } from "@/lib/api/client";
+import { STRIPE_ERROR_CODES, type StripeErrorCode } from "@/lib/stripe-errors";
 import { useSubscription } from "@/hooks/use-subscription";
 
 interface SubscriptionPlan {
@@ -21,6 +23,7 @@ interface SubscriptionPlan {
 export default function SubscriptionPaywall() {
   const t = useTranslations("browse");
   const tLegal = useTranslations("legal");
+  const tStripeErrors = useTranslations("stripeErrors");
   const { hasPaymentConsent } = useSubscription();
   const [plan, setPlan] = useState<SubscriptionPlan | null>(null);
   const [loading, setLoading] = useState(true);
@@ -55,7 +58,12 @@ export default function SubscriptionPaywall() {
       if (url) {
         window.location.href = url;
       }
-    } catch {
+    } catch (err) {
+      const raw = err instanceof ApiError ? err.code : undefined;
+      const code: StripeErrorCode = raw && (STRIPE_ERROR_CODES as readonly string[]).includes(raw)
+        ? (raw as StripeErrorCode)
+        : "unknown";
+      addToast({ title: tStripeErrors(code), color: "danger" });
       setRedirecting(false);
     }
   };

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { subscriptionPlans, creditPackages } from "@/lib/db/schema";
 import { eq, asc } from "drizzle-orm";
+import { handleStripeError } from "@/lib/stripe-errors";
 
 /**
  * GET /api/stripe/packages
@@ -33,11 +34,7 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json(result);
-  } catch (error: any) {
-    console.error("[Stripe Packages] Error:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch packages" },
-      { status: 500 }
-    );
+  } catch (error) {
+    return handleStripeError(error, "Stripe Packages");
   }
 }

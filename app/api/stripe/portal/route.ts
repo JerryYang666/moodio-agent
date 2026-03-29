@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAccessToken } from "@/lib/auth/cookies";
 import { verifyAccessToken } from "@/lib/auth/jwt";
 import { stripe, getOrCreateStripeCustomer } from "@/lib/stripe";
+import { handleStripeError } from "@/lib/stripe-errors";
 
 /**
  * POST /api/stripe/portal
@@ -32,11 +33,7 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json({ url: session.url });
-  } catch (error: any) {
-    console.error("[Stripe Portal] Error:", error);
-    return NextResponse.json(
-      { error: error.message || "Failed to create portal session" },
-      { status: 500 }
-    );
+  } catch (error) {
+    return handleStripeError(error, "Stripe Portal");
   }
 }

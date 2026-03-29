@@ -1268,5 +1268,21 @@
     "cookieBannerText": "We use cookies to improve your experience. By continuing to use our site, you accept our use of cookies.",
     "cookiePolicyLink": "Learn more",
     "cookieAccept": "Accept"
+  },
+  "stripeErrors": {
+    "card_declined": "Your card was declined. Please try a different payment method.",
+    "card_expired": "Your card has expired. Please update your card details.",
+    "card_incorrect_cvc": "The security code (CVC) is incorrect. Please check and try again.",
+    "card_incorrect_number": "The card number is incorrect. Please check and try again.",
+    "card_insufficient_funds": "Your card has insufficient funds. Please try a different payment method.",
+    "card_processing_error": "An error occurred while processing your card. Please try again in a moment.",
+    "card_generic": "Your card could not be charged. Please try a different payment method.",
+    "invalid_request": "Something went wrong with the payment request. Please try again.",
+    "authentication_error": "Payment service is temporarily misconfigured. Please contact support.",
+    "rate_limit": "Too many payment attempts. Please wait a moment and try again.",
+    "connection_error": "Unable to reach the payment service. Please check your connection and try again.",
+    "idempotency_error": "This payment was already submitted. Please refresh and try again.",
+    "api_error": "The payment service encountered an error. Please try again later.",
+    "unknown": "An unexpected error occurred. Please try again or contact support."
   }
 }

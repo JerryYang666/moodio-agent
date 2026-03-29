@@ -3,6 +3,7 @@ import { getAccessToken } from "@/lib/auth/cookies";
 import { verifyAccessToken } from "@/lib/auth/jwt";
 import { stripe } from "@/lib/stripe";
 import { getUserSubscription } from "@/lib/subscription";
+import { handleStripeError } from "@/lib/stripe-errors";
 
 /**
  * POST /api/stripe/cancel
@@ -48,11 +49,7 @@ export async function POST(request: NextRequest) {
         (updated.items.data[0]?.current_period_end ?? updated.start_date) * 1000
       ).toISOString(),
     });
-  } catch (error: any) {
-    console.error("[Stripe Cancel] Error:", error);
-    return NextResponse.json(
-      { error: error.message || "Failed to cancel subscription" },
-      { status: 500 }
-    );
+  } catch (error) {
+    return handleStripeError(error, "Stripe Cancel");
   }
 }

@@ -32,7 +32,8 @@ import {
   AlertTriangle,
   XCircle,
 } from "lucide-react";
-import { api } from "@/lib/api/client";
+import { api, ApiError } from "@/lib/api/client";
+import { STRIPE_ERROR_CODES, type StripeErrorCode } from "@/lib/stripe-errors";
 import { useAuth } from "@/hooks/use-auth";
 import { useSubscription } from "@/hooks/use-subscription";
 
@@ -58,8 +59,16 @@ const STATUS_COLOR: Record<string, "success" | "warning" | "danger" | "default">
 
 export default function PaymentsPage() {
   const t = useTranslations("payments");
+  const tStripeErrors = useTranslations("stripeErrors");
   const { user, loading: authLoading } = useAuth();
   const { hasSubscription, subscription, refresh: refreshSub } = useSubscription();
+
+  const resolveStripeErrorCode = (err: unknown): StripeErrorCode => {
+    const raw = err instanceof ApiError ? err.code : undefined;
+    return raw && (STRIPE_ERROR_CODES as readonly string[]).includes(raw)
+      ? (raw as StripeErrorCode)
+      : "unknown";
+  };
 
   const [payments, setPayments] = useState<PaymentItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -75,8 +84,8 @@ export default function PaymentsPage() {
     try {
       const data = await api.get("/api/stripe/payments");
       setPayments(data.payments ?? []);
-    } catch {
-      addToast({ title: t("fetchError"), color: "danger" });
+    } catch (err) {
+      addToast({ title: tStripeErrors(resolveStripeErrorCode(err)), color: "danger" });
     } finally {
       setLoading(false);
     }
@@ -95,8 +104,8 @@ export default function PaymentsPage() {
     try {
       const { url } = await api.post("/api/stripe/portal");
       if (url) window.location.href = url;
-    } catch {
-      addToast({ title: t("portalError"), color: "danger" });
+    } catch (err) {
+      addToast({ title: tStripeErrors(resolveStripeErrorCode(err)), color: "danger" });
     }
   };
 
@@ -109,8 +118,8 @@ export default function PaymentsPage() {
         cancelModal.onClose();
         refreshSub();
       }
-    } catch {
-      addToast({ title: t("subscription.cancelError"), color: "danger" });
+    } catch (err) {
+      addToast({ title: tStripeErrors(resolveStripeErrorCode(err)), color: "danger" });
     } finally {
       setCanceling(false);
     }

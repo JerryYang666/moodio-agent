@@ -7,6 +7,18 @@ interface ApiClientOptions extends RequestInit {
   skipRefresh?: boolean;
 }
 
+export class ApiError extends Error {
+  code: string | undefined;
+  status: number;
+
+  constructor(message: string, status: number, code?: string) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.code = code;
+  }
+}
+
 /**
  * API client that automatically handles token refresh on 401 errors
  */
@@ -34,7 +46,7 @@ export async function apiClient<T = any>(
       if (typeof window !== "undefined") {
         window.location.href = "/auth/login";
       }
-      throw new Error("Authentication failed");
+      throw new ApiError("Authentication failed", 401);
     }
   }
 
@@ -42,8 +54,10 @@ export async function apiClient<T = any>(
   const data = await response.json();
 
   if (!response.ok) {
-    throw new Error(
-      data.error || `HTTP ${response.status}: ${response.statusText}`
+    throw new ApiError(
+      data.error || `HTTP ${response.status}: ${response.statusText}`,
+      response.status,
+      data.code
     );
   }
 

@@ -6,8 +6,10 @@ import { Card, CardBody, CardHeader } from "@heroui/card";
 import { Button } from "@heroui/button";
 import { Spinner } from "@heroui/spinner";
 import { Checkbox } from "@heroui/checkbox";
+import { addToast } from "@heroui/toast";
 import { Bean, ShoppingCart } from "lucide-react";
-import { api } from "@/lib/api/client";
+import { api, ApiError } from "@/lib/api/client";
+import { STRIPE_ERROR_CODES, type StripeErrorCode } from "@/lib/stripe-errors";
 import { useSubscription } from "@/hooks/use-subscription";
 
 interface CreditPackage {
@@ -20,6 +22,7 @@ interface CreditPackage {
 export default function CreditPackageCards() {
   const t = useTranslations("credits");
   const tLegal = useTranslations("legal");
+  const tStripeErrors = useTranslations("stripeErrors");
   const { hasPaymentConsent } = useSubscription();
   const [packages, setPackages] = useState<CreditPackage[]>([]);
   const [loading, setLoading] = useState(true);
@@ -45,7 +48,12 @@ export default function CreditPackageCards() {
         ...(needsPaymentConsent && { agreedToPaymentTerms: true }),
       });
       if (url) window.location.href = url;
-    } catch {
+    } catch (err) {
+      const raw = err instanceof ApiError ? err.code : undefined;
+      const code: StripeErrorCode = raw && (STRIPE_ERROR_CODES as readonly string[]).includes(raw)
+        ? (raw as StripeErrorCode)
+        : "unknown";
+      addToast({ title: tStripeErrors(code), color: "danger" });
       setBuyingId(null);
     }
   };

@@ -6,6 +6,7 @@ import { subscriptionPlans, creditPackages, userConsents } from "@/lib/db/schema
 import { eq, and } from "drizzle-orm";
 import { stripe, getOrCreateStripeCustomer } from "@/lib/stripe";
 import { hasActiveSubscription } from "@/lib/subscription";
+import { handleStripeError } from "@/lib/stripe-errors";
 
 /**
  * POST /api/stripe/checkout
@@ -151,11 +152,7 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json({ url: session.url });
-  } catch (error: any) {
-    console.error("[Stripe Checkout] Error:", error);
-    return NextResponse.json(
-      { error: error.message || "Failed to create checkout session" },
-      { status: 500 }
-    );
+  } catch (error) {
+    return handleStripeError(error, "Stripe Checkout");
   }
 }
