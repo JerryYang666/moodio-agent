@@ -152,16 +152,26 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
 
   if (existing) return;
 
-  // Step 3: Grant credits to the correct account
-  await grantCredits(
-    accountId,
-    credits,
-    "purchase",
-    `Purchased ${credits} credits`,
-    userId,
-    { type: "stripe_checkout", id: session.id },
-    accountType
-  );
+  // Step 3: Grant credits or refund — must be one or the other
+  try {
+    await grantCredits(
+      accountId as string,
+      credits,
+      "purchase",
+      `Purchased ${credits} credits`,
+      userId,
+      { type: "stripe_checkout", id: session.id },
+      accountType as AccountType
+    );
+  } catch (grantErr) {
+    console.error("[Stripe Webhook] grantCredits failed, triggering auto-refund:", {
+      sessionId: session.id,
+      accountType,
+      accountId,
+      error: grantErr,
+    });
+    await autoRefund(session, "grant_credits_failed");
+  }
 }
 
 async function verifyAccountExists(
