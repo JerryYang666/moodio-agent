@@ -302,7 +302,15 @@
       "view": "보기",
       "empty": "결제 내역이 없습니다",
       "typeSubscription": "구독",
-      "typeCredit": "크레딧"
+      "typeCredit": "크레딧",
+      "statusPaid": "결제 완료",
+      "statusRefunded": "환불 완료",
+      "statusPartiallyRefunded": "부분 환불",
+      "statusOpen": "미결제",
+      "statusVoid": "무효",
+      "statusDraft": "임시",
+      "statusUncollectible": "수금 불가",
+      "statusUnknown": "알 수 없음"
     }
   },
   "projects": {

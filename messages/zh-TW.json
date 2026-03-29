@@ -302,7 +302,15 @@
       "view": "查看",
       "empty": "尚無付款紀錄",
       "typeSubscription": "訂閱",
-      "typeCredit": "點數"
+      "typeCredit": "點數",
+      "statusPaid": "已付款",
+      "statusRefunded": "已退款",
+      "statusPartiallyRefunded": "部分退款",
+      "statusOpen": "待付款",
+      "statusVoid": "已作廢",
+      "statusDraft": "草稿",
+      "statusUncollectible": "無法收回",
+      "statusUnknown": "未知"
     }
   },
   "projects": {

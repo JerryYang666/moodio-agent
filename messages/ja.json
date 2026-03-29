@@ -302,7 +302,15 @@
       "view": "表示",
       "empty": "お支払い履歴はまだありません",
       "typeSubscription": "サブスクリプション",
-      "typeCredit": "クレジット"
+      "typeCredit": "クレジット",
+      "statusPaid": "支払い済み",
+      "statusRefunded": "返金済み",
+      "statusPartiallyRefunded": "一部返金",
+      "statusOpen": "未払い",
+      "statusVoid": "無効",
+      "statusDraft": "下書き",
+      "statusUncollectible": "回収不能",
+      "statusUnknown": "不明"
     }
   },
   "projects": {

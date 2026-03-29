@@ -3,8 +3,8 @@ import { getAccessToken } from "@/lib/auth/cookies";
 import { verifyAccessToken } from "@/lib/auth/jwt";
 import { stripe } from "@/lib/stripe";
 import { db } from "@/lib/db";
-import { users } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { users, teams } from "@/lib/db/schema";
+import { eq, inArray } from "drizzle-orm";
 import { handleStripeError } from "@/lib/stripe-errors";
 
 /**
@@ -93,11 +93,28 @@ async function fetchCreditPurchases(customerId: string): Promise<PaymentItem[]> 
       (s) => s.mode === "payment" && s.payment_status === "paid"
     );
 
+    const teamIds = oneTimePayments
+      .filter((s) => s.metadata?.accountType === "team" && s.metadata?.accountId)
+      .map((s) => s.metadata!.accountId!);
+
+    const teamNameMap = new Map<string, string>();
+    if (teamIds.length > 0) {
+      const uniqueIds = Array.from(new Set(teamIds));
+      const rows = await db
+        .select({ id: teams.id, name: teams.name })
+        .from(teams)
+        .where(inArray(teams.id, uniqueIds));
+      for (const row of rows) {
+        teamNameMap.set(row.id, row.name);
+      }
+    }
+
     const items: PaymentItem[] = [];
     for (const session of oneTimePayments) {
       let receiptUrl: string | null = null;
       let amountCents = session.amount_total ?? 0;
       const currency = session.currency ?? "usd";
+      let status = "paid";
 
       if (session.payment_intent) {
         try {
@@ -111,14 +128,33 @@ async function fetchCreditPurchases(customerId: string): Promise<PaymentItem[]> 
           if (charge && typeof charge !== "string") {
             receiptUrl = charge.receipt_url ?? null;
             amountCents = charge.amount;
+            if (charge.refunded) {
+              status = "refunded";
+            } else if (charge.amount_refunded > 0) {
+              status = "partially_refunded";
+            }
           }
         } catch { /* use session-level data as fallback */ }
       }
 
       const credits = session.metadata?.credits;
-      const description = credits
-        ? `Purchased ${credits} credits`
-        : "Credit purchase";
+      const accountType = session.metadata?.accountType;
+      const accountId = session.metadata?.accountId;
+
+      let description: string;
+      if (credits) {
+        const target =
+          accountType === "team" && accountId
+            ? teamNameMap.get(accountId) ?? "Team"
+            : accountType === "personal"
+              ? "Personal"
+              : undefined;
+        description = target
+          ? `Purchased ${credits} credits → ${target}`
+          : `Purchased ${credits} credits`;
+      } else {
+        description = "Credit purchase";
+      }
 
       items.push({
         id: session.id,
@@ -126,7 +162,7 @@ async function fetchCreditPurchases(customerId: string): Promise<PaymentItem[]> 
         description,
         amountCents,
         currency,
-        status: "paid",
+        status,
         receiptUrl,
         type: "credit_purchase",
       });

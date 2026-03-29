@@ -50,6 +50,8 @@ interface PaymentItem {
 
 const STATUS_COLOR: Record<string, "success" | "warning" | "danger" | "default"> = {
   paid: "success",
+  refunded: "danger",
+  partially_refunded: "warning",
   open: "warning",
   void: "danger",
   draft: "default",
@@ -59,6 +61,7 @@ const STATUS_COLOR: Record<string, "success" | "warning" | "danger" | "default">
 
 export default function PaymentsPage() {
   const t = useTranslations("payments");
+  const tHistory = useTranslations("payments.history");
   const tStripeErrors = useTranslations("stripeErrors");
   const { user, loading: authLoading } = useAuth();
   const { hasSubscription, subscription, refresh: refreshSub } = useSubscription();
@@ -123,6 +126,22 @@ export default function PaymentsPage() {
     } finally {
       setCanceling(false);
     }
+  };
+
+  const STATUS_LABEL_KEY: Record<string, string> = {
+    paid: "statusPaid",
+    refunded: "statusRefunded",
+    partially_refunded: "statusPartiallyRefunded",
+    open: "statusOpen",
+    void: "statusVoid",
+    draft: "statusDraft",
+    uncollectible: "statusUncollectible",
+    unknown: "statusUnknown",
+  };
+
+  const formatStatus = (status: string) => {
+    const key = STATUS_LABEL_KEY[status];
+    return key ? tHistory(key) : status;
   };
 
   const formatAmount = (cents: number, currency: string) => {
@@ -288,7 +307,7 @@ export default function PaymentsPage() {
                       variant="flat"
                       color={STATUS_COLOR[item.status] ?? "default"}
                     >
-                      {item.status}
+                      {formatStatus(item.status)}
                     </Chip>
                   </TableCell>
                   <TableCell>

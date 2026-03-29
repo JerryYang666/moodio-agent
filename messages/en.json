@@ -302,7 +302,15 @@
       "view": "View",
       "empty": "No payments yet",
       "typeSubscription": "Subscription",
-      "typeCredit": "Credits"
+      "typeCredit": "Credits",
+      "statusPaid": "Paid",
+      "statusRefunded": "Refunded",
+      "statusPartiallyRefunded": "Partially Refunded",
+      "statusOpen": "Open",
+      "statusVoid": "Void",
+      "statusDraft": "Draft",
+      "statusUncollectible": "Uncollectible",
+      "statusUnknown": "Unknown"
     }
   },
   "projects": {
