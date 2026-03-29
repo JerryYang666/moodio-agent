@@ -173,6 +173,9 @@ const VideoGrid: React.FC<VideoGridProps> = ({ hideSummary = false, desktopId })
     ? photos.filter((p) => p.key !== selectedPhoto.key)
     : [];
 
+  // Pass all photos so drill-down into similar videos can compute their own similar shots
+  const allPhotos = photos;
+
   // During stale-filter recovery, show spinner instead of generic error
   if (isRecoveringRef.current && (isFetching || isInitialLoading)) {
     return (
@@ -254,6 +257,7 @@ const VideoGrid: React.FC<VideoGridProps> = ({ hideSummary = false, desktopId })
           <VideoDetailView
             selectedPhoto={selectedPhoto}
             similarPhotos={similarPhotos}
+            allPhotos={allPhotos}
             onClose={handleCloseDetail}
             onTargetReady={handleTargetReady}
             videoVisible={!isFlying}

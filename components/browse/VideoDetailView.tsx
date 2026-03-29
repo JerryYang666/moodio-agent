@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef, useLayoutEffect, useEffect, useMemo, useState } from "react";
+import React, { useRef, useLayoutEffect, useEffect, useMemo, useState, useCallback } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@heroui/button";
 import { Chip } from "@heroui/chip";
@@ -88,6 +88,7 @@ function MetadataItem({ label, value }: MetadataItemProps) {
 interface VideoDetailViewProps {
   selectedPhoto: Photo;
   similarPhotos: Photo[];
+  allPhotos: Photo[];
   onClose: () => void;
   onTargetReady: (rect: DOMRect) => void;
   videoVisible: boolean;
@@ -97,11 +98,80 @@ interface VideoDetailViewProps {
 export function VideoDetailView({
   selectedPhoto,
   similarPhotos,
+  allPhotos,
   onClose,
   onTargetReady,
   videoVisible,
   desktopId,
 }: VideoDetailViewProps) {
+  const [photoStack, setPhotoStack] = useState<Photo[]>([]);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onClose]);
+
+  const currentPhoto = photoStack.length > 0 ? photoStack[photoStack.length - 1] : selectedPhoto;
+
+  const currentSimilarPhotos = useMemo(() => {
+    if (photoStack.length === 0) return similarPhotos;
+    return allPhotos.filter((p) => p.key !== currentPhoto.key);
+  }, [photoStack, similarPhotos, allPhotos, currentPhoto.key]);
+
+  const handleSimilarClick = useCallback((photo: Photo) => {
+    setPhotoStack((prev) => [...prev, photo]);
+    scrollContainerRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+  }, []);
+
+  const isFirstLevel = photoStack.length === 0;
+
+  return (
+    <div ref={scrollContainerRef} className="w-full relative">
+      {/* Sticky back button — always returns to the browse grid */}
+      <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-md pb-2 pt-1">
+        <button
+          onClick={onClose}
+          className="flex items-center gap-1.5 text-sm text-default-500 hover:text-default-700 dark:text-default-500 dark:hover:text-default-700 transition-colors"
+        >
+          <ArrowLeft size={16} />
+          <span>Back to results</span>
+        </button>
+      </div>
+
+      <VideoDetailContent
+        key={currentPhoto.key}
+        selectedPhoto={currentPhoto}
+        similarPhotos={currentSimilarPhotos}
+        onTargetReady={isFirstLevel ? onTargetReady : () => {}}
+        videoVisible={isFirstLevel ? videoVisible : true}
+        desktopId={desktopId}
+        onSimilarClick={handleSimilarClick}
+      />
+    </div>
+  );
+}
+
+interface VideoDetailContentProps {
+  selectedPhoto: Photo;
+  similarPhotos: Photo[];
+  onTargetReady: (rect: DOMRect) => void;
+  videoVisible: boolean;
+  desktopId?: string;
+  onSimilarClick: (photo: Photo) => void;
+}
+
+function VideoDetailContent({
+  selectedPhoto,
+  similarPhotos,
+  onTargetReady,
+  videoVisible,
+  desktopId,
+  onSimilarClick,
+}: VideoDetailContentProps) {
   const detail: VideoDetailData = MOCK_VIDEO_DETAIL;
   const videoTargetRef = useRef<HTMLDivElement>(null);
   const { data: videoDetail, isLoading: isLoadingDetail } = useGetVideoDetailQuery(selectedPhoto.id);
@@ -146,14 +216,6 @@ export function VideoDetailView({
       onTargetReady(videoTargetRef.current.getBoundingClientRect());
     }
   }, [onTargetReady]);
-
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [onClose]);
 
   const videoTitle = videoDetail?.content_uuid ?? selectedPhoto.videoName ?? "Untitled";
   const storageKey = videoDetail?.storage_key ?? "";
@@ -215,15 +277,6 @@ export function VideoDetailView({
 
   return (
     <div className="w-full">
-      {/* Back button */}
-      <button
-        onClick={onClose}
-        className="flex items-center gap-1.5 text-sm text-default-500 hover:text-default-700 dark:text-default-500 dark:hover:text-default-700 transition-colors mb-4"
-      >
-        <ArrowLeft size={16} />
-        <span>Back to results</span>
-      </button>
-
       {/* Top section: Video + Info side by side */}
       <div className="flex flex-col lg:flex-row gap-6 mb-6">
         {/* Video player area */}
@@ -388,9 +441,7 @@ export function VideoDetailView({
               <MetadataItem key={group} label={group} value={values.join(", ")} />
             ))}
           </div>
-        ) : (
-          <div className="text-sm text-default-400">No labels available</div>
-        )}
+        ) : null}
       </motion.div>
 
       {/* Similar Shots */}
@@ -407,6 +458,7 @@ export function VideoDetailView({
             photos={similarPhotos}
             targetRowHeight={140}
             spacing={4}
+            onClick={onSimilarClick}
           />
         </VideoVisibilityProvider>
       </motion.div>

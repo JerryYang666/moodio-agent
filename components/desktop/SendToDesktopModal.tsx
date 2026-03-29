@@ -35,6 +35,7 @@ interface DesktopOption {
 }
 
 const SEND_DEBOUNCE_MS = 2000;
+const LAST_DESKTOP_KEY = "moodio:lastSelectedDesktopId";
 
 async function sendAssetsToDesktop(
   targetDesktopId: string,
@@ -105,7 +106,10 @@ export default function SendToDesktopModal({
   const tCommon = useTranslations("common");
 
   const [desktops, setDesktops] = useState<DesktopOption[]>([]);
-  const [selectedDesktopId, setSelectedDesktopId] = useState("");
+  const [selectedDesktopId, setSelectedDesktopId] = useState(() => {
+    if (typeof window === "undefined") return "";
+    return localStorage.getItem(LAST_DESKTOP_KEY) ?? "";
+  });
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
   const inFlightRef = useRef(false);
@@ -186,6 +190,10 @@ export default function SendToDesktopModal({
             hasWriteAccess(d.permission)
         );
         setDesktops(writable);
+        setSelectedDesktopId((prev) => {
+          if (prev && writable.some((d: DesktopOption) => d.id === prev)) return prev;
+          return "";
+        });
       })
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -195,6 +203,7 @@ export default function SendToDesktopModal({
     if (!selectedDesktopId || assets.length === 0) return;
     try {
       await guardedSend(selectedDesktopId, false);
+      localStorage.setItem(LAST_DESKTOP_KEY, selectedDesktopId);
     } catch {
       addToast({
         title: tCommon("error"),
