@@ -283,6 +283,10 @@
       "cancel": "Cancel Subscription",
       "cancelSuccess": "Your subscription will be canceled at the end of the current billing period.",
       "cancelError": "Failed to cancel subscription",
+      "cancelConfirmTitle": "Cancel Subscription",
+      "cancelConfirmBody": "Are you sure you want to cancel your subscription? You will continue to have access until {date}, after which your subscription will not renew.",
+      "cancelConfirmKeep": "Keep Subscription",
+      "cancelConfirmProceed": "Yes, Cancel",
       "portal": "Billing Portal",
       "none": "You don't have an active subscription.",
       "browseCta": "Browse Plans"

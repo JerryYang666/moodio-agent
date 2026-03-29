@@ -11,6 +11,14 @@ import {
   TableCell,
 } from "@heroui/table";
 import { Card, CardBody, CardHeader } from "@heroui/card";
+import {
+  Modal,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
+  useDisclosure,
+} from "@heroui/modal";
 import { Chip } from "@heroui/chip";
 import { Button } from "@heroui/button";
 import { Spinner } from "@heroui/spinner";
@@ -81,6 +89,7 @@ export default function PaymentsPage() {
   }, [page, payments]);
 
   const [canceling, setCanceling] = useState(false);
+  const cancelModal = useDisclosure();
 
   const handleManageSubscription = async () => {
     try {
@@ -97,6 +106,7 @@ export default function PaymentsPage() {
       const data = await api.post("/api/stripe/cancel", {});
       if (data.success) {
         addToast({ title: t("subscription.cancelSuccess"), color: "success" });
+        cancelModal.onClose();
         refreshSub();
       }
     } catch {
@@ -167,8 +177,7 @@ export default function PaymentsPage() {
                     variant="flat"
                     color="danger"
                     startContent={<XCircle size={16} />}
-                    isLoading={canceling}
-                    onPress={handleCancelSubscription}
+                    onPress={cancelModal.onOpen}
                   >
                     {t("subscription.cancel")}
                   </Button>
@@ -294,6 +303,41 @@ export default function PaymentsPage() {
           </Table>
         </CardBody>
       </Card>
+
+      {/* Cancel Subscription Confirmation Modal */}
+      <Modal isOpen={cancelModal.isOpen} onOpenChange={cancelModal.onOpenChange}>
+        <ModalContent>
+          {(onClose) => (
+            <>
+              <ModalHeader className="flex items-center gap-2">
+                <AlertTriangle size={20} className="text-danger" />
+                {t("subscription.cancelConfirmTitle")}
+              </ModalHeader>
+              <ModalBody>
+                <p className="text-default-600">
+                  {t("subscription.cancelConfirmBody", {
+                    date: subscription
+                      ? new Date(subscription.currentPeriodEnd).toLocaleDateString()
+                      : "",
+                  })}
+                </p>
+              </ModalBody>
+              <ModalFooter>
+                <Button variant="flat" onPress={onClose} isDisabled={canceling}>
+                  {t("subscription.cancelConfirmKeep")}
+                </Button>
+                <Button
+                  color="danger"
+                  isLoading={canceling}
+                  onPress={handleCancelSubscription}
+                >
+                  {t("subscription.cancelConfirmProceed")}
+                </Button>
+              </ModalFooter>
+            </>
+          )}
+        </ModalContent>
+      </Modal>
     </div>
   );
 }
