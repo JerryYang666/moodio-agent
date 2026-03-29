@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { users, userConsents } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { verifyPassword, dummyVerify } from "@/lib/auth/password";
 import { generateAccessToken } from "@/lib/auth/jwt";
 import { generateRefreshToken, createRefreshToken } from "@/lib/auth/tokens";
@@ -49,11 +49,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check consent status
+    // Check login consent status
     const existingConsent = await db
       .select({ id: userConsents.id })
       .from(userConsents)
-      .where(eq(userConsents.userId, user[0].id))
+      .where(
+        and(
+          eq(userConsents.userId, user[0].id),
+          eq(userConsents.consentType, "login")
+        )
+      )
       .limit(1);
 
     const hasConsent = existingConsent.length > 0;
@@ -68,6 +73,7 @@ export async function POST(request: NextRequest) {
     if (!hasConsent && agreedToTerms) {
       await db.insert(userConsents).values({
         userId: user[0].id,
+        consentType: "login",
         termsVersion: "2026-03-24",
         acceptedFromIp:
           request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||

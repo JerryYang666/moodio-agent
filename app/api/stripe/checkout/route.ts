@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAccessToken } from "@/lib/auth/cookies";
 import { verifyAccessToken } from "@/lib/auth/jwt";
 import { db } from "@/lib/db";
-import { subscriptionPlans, creditPackages } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { subscriptionPlans, creditPackages, userConsents } from "@/lib/db/schema";
+import { eq, and } from "drizzle-orm";
 import { stripe, getOrCreateStripeCustomer } from "@/lib/stripe";
 
 /**
@@ -23,13 +23,44 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { mode } = body;
+    const { mode, agreedToPaymentTerms } = body;
 
     if (mode !== "subscription" && mode !== "credits") {
       return NextResponse.json(
         { error: "mode must be 'subscription' or 'credits'" },
         { status: 400 }
       );
+    }
+
+    // Check if user has existing payment consent on record
+    const [existingPaymentConsent] = await db
+      .select({ id: userConsents.id })
+      .from(userConsents)
+      .where(
+        and(
+          eq(userConsents.userId, payload.userId),
+          eq(userConsents.consentType, "payment")
+        )
+      )
+      .limit(1);
+
+    if (!existingPaymentConsent) {
+      if (!agreedToPaymentTerms) {
+        return NextResponse.json(
+          { error: "You must agree to the payment terms", needsPaymentConsent: true },
+          { status: 400 }
+        );
+      }
+
+      // Record payment consent
+      await db.insert(userConsents).values({
+        userId: payload.userId,
+        consentType: "payment",
+        termsVersion: "2026-03-24",
+        acceptedFromIp:
+          request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+          "unknown",
+      });
     }
 
     const customerId = await getOrCreateStripeCustomer(

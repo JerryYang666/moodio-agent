@@ -6,6 +6,7 @@ import { api } from "@/lib/api/client";
 
 interface SubscriptionStatus {
   hasActiveSubscription: boolean;
+  hasPaymentConsent: boolean;
   subscription: {
     status: string;
     currentPeriodEnd: string;
@@ -15,6 +16,7 @@ interface SubscriptionStatus {
 
 interface UseSubscriptionReturn {
   hasSubscription: boolean;
+  hasPaymentConsent: boolean;
   subscription: SubscriptionStatus["subscription"];
   loading: boolean;
   refresh: () => void;
@@ -46,6 +48,7 @@ export function useSubscription(): UseSubscriptionReturn {
 
   return {
     hasSubscription: data?.hasActiveSubscription ?? false,
+    hasPaymentConsent: data?.hasPaymentConsent ?? false,
     subscription: data?.subscription ?? null,
     loading,
     refresh: fetch,

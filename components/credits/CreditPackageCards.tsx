@@ -5,8 +5,10 @@ import { useTranslations } from "next-intl";
 import { Card, CardBody, CardHeader } from "@heroui/card";
 import { Button } from "@heroui/button";
 import { Spinner } from "@heroui/spinner";
+import { Checkbox } from "@heroui/checkbox";
 import { Bean, ShoppingCart } from "lucide-react";
 import { api } from "@/lib/api/client";
+import { useSubscription } from "@/hooks/use-subscription";
 
 interface CreditPackage {
   id: string;
@@ -17,9 +19,14 @@ interface CreditPackage {
 
 export default function CreditPackageCards() {
   const t = useTranslations("credits");
+  const tLegal = useTranslations("legal");
+  const { hasPaymentConsent } = useSubscription();
   const [packages, setPackages] = useState<CreditPackage[]>([]);
   const [loading, setLoading] = useState(true);
   const [buyingId, setBuyingId] = useState<string | null>(null);
+  const [agreedToPaymentTerms, setAgreedToPaymentTerms] = useState(false);
+
+  const needsPaymentConsent = !hasPaymentConsent;
 
   useEffect(() => {
     api
@@ -35,6 +42,7 @@ export default function CreditPackageCards() {
       const { url } = await api.post("/api/stripe/checkout", {
         mode: "credits",
         packageId,
+        ...(needsPaymentConsent && { agreedToPaymentTerms: true }),
       });
       if (url) window.location.href = url;
     } catch {
@@ -60,7 +68,32 @@ export default function CreditPackageCards() {
           <h2 className="text-lg font-semibold">{t("buyCredits")}</h2>
         </div>
       </CardHeader>
-      <CardBody>
+      <CardBody className="gap-4">
+        {needsPaymentConsent && (
+          <Checkbox
+            isSelected={agreedToPaymentTerms}
+            onValueChange={setAgreedToPaymentTerms}
+            size="sm"
+            className="items-start"
+          >
+            <span className="text-sm">
+              {tLegal("agreePaymentPrefix")}{" "}
+              <a href="/legal/subscription-terms" target="_blank" rel="noopener noreferrer" className="text-primary underline">
+                {tLegal("subscriptionTerms")}
+              </a>
+              {", "}
+              <a href="/legal/refunds" target="_blank" rel="noopener noreferrer" className="text-primary underline">
+                {tLegal("refundPolicy")}
+              </a>
+              {", "}
+              {tLegal("and")}{" "}
+              <a href="/legal/privacy" target="_blank" rel="noopener noreferrer" className="text-primary underline">
+                {tLegal("privacyPolicy")}
+              </a>
+              .
+            </span>
+          </Checkbox>
+        )}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {packages.map((pkg) => (
             <Card
@@ -83,7 +116,10 @@ export default function CreditPackageCards() {
                   variant="flat"
                   className="w-full mt-1"
                   isLoading={buyingId === pkg.id}
-                  isDisabled={buyingId !== null && buyingId !== pkg.id}
+                  isDisabled={
+                    (buyingId !== null && buyingId !== pkg.id) ||
+                    (needsPaymentConsent && !agreedToPaymentTerms)
+                  }
                   onPress={() => handleBuy(pkg.id)}
                 >
                   {t("buyNow")}

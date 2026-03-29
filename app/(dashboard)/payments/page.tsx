@@ -11,6 +11,14 @@ import {
   TableCell,
 } from "@heroui/table";
 import { Card, CardBody, CardHeader } from "@heroui/card";
+import {
+  Modal,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
+  useDisclosure,
+} from "@heroui/modal";
 import { Chip } from "@heroui/chip";
 import { Button } from "@heroui/button";
 import { Spinner } from "@heroui/spinner";
@@ -22,6 +30,7 @@ import {
   ExternalLink,
   Settings,
   AlertTriangle,
+  XCircle,
 } from "lucide-react";
 import { api } from "@/lib/api/client";
 import { useAuth } from "@/hooks/use-auth";
@@ -50,7 +59,7 @@ const STATUS_COLOR: Record<string, "success" | "warning" | "danger" | "default">
 export default function PaymentsPage() {
   const t = useTranslations("payments");
   const { user, loading: authLoading } = useAuth();
-  const { hasSubscription, subscription } = useSubscription();
+  const { hasSubscription, subscription, refresh: refreshSub } = useSubscription();
 
   const [payments, setPayments] = useState<PaymentItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -79,12 +88,31 @@ export default function PaymentsPage() {
     return payments.slice(start, start + rowsPerPage);
   }, [page, payments]);
 
+  const [canceling, setCanceling] = useState(false);
+  const cancelModal = useDisclosure();
+
   const handleManageSubscription = async () => {
     try {
       const { url } = await api.post("/api/stripe/portal");
       if (url) window.location.href = url;
     } catch {
       addToast({ title: t("portalError"), color: "danger" });
+    }
+  };
+
+  const handleCancelSubscription = async () => {
+    setCanceling(true);
+    try {
+      const data = await api.post("/api/stripe/cancel", {});
+      if (data.success) {
+        addToast({ title: t("subscription.cancelSuccess"), color: "success" });
+        cancelModal.onClose();
+        refreshSub();
+      }
+    } catch {
+      addToast({ title: t("subscription.cancelError"), color: "danger" });
+    } finally {
+      setCanceling(false);
     }
   };
 
@@ -136,13 +164,25 @@ export default function PaymentsPage() {
                   <span>{t("subscription.cancelWarning")}</span>
                 </div>
               )}
-              <Button
-                variant="flat"
-                startContent={<Settings size={16} />}
-                onPress={handleManageSubscription}
-              >
-                {t("subscription.manage")}
-              </Button>
+              <div className="flex gap-2 flex-wrap">
+                <Button
+                  variant="flat"
+                  startContent={<Settings size={16} />}
+                  onPress={handleManageSubscription}
+                >
+                  {t("subscription.manage")}
+                </Button>
+                {!subscription.cancelAtPeriodEnd && (
+                  <Button
+                    variant="flat"
+                    color="danger"
+                    startContent={<XCircle size={16} />}
+                    onPress={cancelModal.onOpen}
+                  >
+                    {t("subscription.cancel")}
+                  </Button>
+                )}
+              </div>
             </div>
           ) : (
             <div className="space-y-3">
@@ -263,6 +303,41 @@ export default function PaymentsPage() {
           </Table>
         </CardBody>
       </Card>
+
+      {/* Cancel Subscription Confirmation Modal */}
+      <Modal isOpen={cancelModal.isOpen} onOpenChange={cancelModal.onOpenChange}>
+        <ModalContent>
+          {(onClose) => (
+            <>
+              <ModalHeader className="flex items-center gap-2">
+                <AlertTriangle size={20} className="text-danger" />
+                {t("subscription.cancelConfirmTitle")}
+              </ModalHeader>
+              <ModalBody>
+                <p className="text-default-600">
+                  {t("subscription.cancelConfirmBody", {
+                    date: subscription
+                      ? new Date(subscription.currentPeriodEnd).toLocaleDateString()
+                      : "",
+                  })}
+                </p>
+              </ModalBody>
+              <ModalFooter>
+                <Button variant="flat" onPress={onClose} isDisabled={canceling}>
+                  {t("subscription.cancelConfirmKeep")}
+                </Button>
+                <Button
+                  color="danger"
+                  isLoading={canceling}
+                  onPress={handleCancelSubscription}
+                >
+                  {t("subscription.cancelConfirmProceed")}
+                </Button>
+              </ModalFooter>
+            </>
+          )}
+        </ModalContent>
+      </Modal>
     </div>
   );
 }
