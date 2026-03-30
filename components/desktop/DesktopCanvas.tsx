@@ -47,7 +47,7 @@ interface DesktopCanvasProps {
   onAssetDelete?: (assetId: string) => void;
   onAssetBatchDelete?: (assetIds: string[]) => void;
   onAssetResize?: (assetId: string, width: number, height: number) => void;
-  onOpenChat?: (chatId: string) => void;
+  onOpenChat?: (chatId: string, messageTimestamp?: number) => void;
   onAssetOpen?: (asset: EnrichedDesktopAsset) => void;
   onAssetClick?: (asset: EnrichedDesktopAsset) => void;
   playingAssetId?: string | null;
@@ -967,6 +967,9 @@ export default function DesktopCanvas({
     typeof (singleSelectedAsset.metadata as Record<string, unknown>)?.chatId === "string"
     ? ((singleSelectedAsset.metadata as Record<string, unknown>).chatId as string)
     : null;
+  const floatingBarMessageTimestamp = singleSelectedAsset
+    ? ((singleSelectedAsset.metadata as Record<string, unknown>)?.messageTimestamp as number | undefined)
+    : undefined;
 
   const worldStyle = {
     transform: `translate(${camera.x}px, ${camera.y}px) scale(${camera.zoom})`,
@@ -1341,7 +1344,7 @@ export default function DesktopCanvas({
             {floatingBarChatId && onOpenChat && (
               <button
                 className="flex items-center gap-1.5 px-2 py-1 text-xs hover:bg-default-100 rounded-md transition-colors whitespace-nowrap"
-                onClick={() => onOpenChat(floatingBarChatId)}
+                onClick={() => onOpenChat(floatingBarChatId, floatingBarMessageTimestamp)}
                 title={t("openInChat")}
               >
                 <MessageSquare size={13} />

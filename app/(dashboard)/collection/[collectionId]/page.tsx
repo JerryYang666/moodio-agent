@@ -1292,7 +1292,13 @@ export default function CollectionPage({
                                   <DropdownItem
                                     key="chat"
                                     startContent={<MessageSquare size={16} />}
-                                    onPress={() => router.push(`/chat/${asset.chatId}`)}
+                                    onPress={() => {
+                                      const params = new URLSearchParams();
+                                      params.set("assetId", asset.imageId);
+                                      const msgTs = (asset.generationDetails as any)?.messageTimestamp;
+                                      if (msgTs) params.set("messageTimestamp", String(msgTs));
+                                      router.push(`/chat/${asset.chatId}?${params.toString()}`);
+                                    }}
                                   >
                                     {t("goToChat")}
                                   </DropdownItem>

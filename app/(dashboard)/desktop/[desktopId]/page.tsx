@@ -742,13 +742,13 @@ export default function DesktopDetailPage({
   );
 
   const handleOpenChat = useCallback(
-    (chatId: string) => {
+    (chatId: string, messageTimestamp?: number) => {
       // Open the chat in the side panel instead of navigating away
       if (isChatPanelCollapsed) {
         handleChatPanelCollapseChange(false);
       }
       window.dispatchEvent(
-        new CustomEvent("open-chat-in-panel", { detail: { chatId } })
+        new CustomEvent("open-chat-in-panel", { detail: { chatId, messageTimestamp } })
       );
     },
     [isChatPanelCollapsed, handleChatPanelCollapseChange]

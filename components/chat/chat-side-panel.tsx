@@ -64,6 +64,7 @@ export default function ChatSidePanel({
   const [activeChatId, setActiveChatId] = useState<string | undefined>(undefined);
   const [initialMessages, setInitialMessages] = useState<Message[]>([]);
   const [isLoadingChat, setIsLoadingChat] = useState(false);
+  const [scrollToMessageTimestamp, setScrollToMessageTimestamp] = useState<number | undefined>(undefined);
   const skipFetchRef = useRef(false);
 
   // Stable key for AnimatePresence: only changes on explicit user navigation
@@ -115,11 +116,13 @@ export default function ChatSidePanel({
   // Listen for programmatic "open this chat" requests from the same window
   useEffect(() => {
     const handleOpenChat = (e: Event) => {
-      const chatId = (e as CustomEvent).detail?.chatId;
+      const detail = (e as CustomEvent).detail;
+      const chatId = detail?.chatId;
       if (chatId && typeof chatId === "string") {
         setActiveChatId(chatId);
         setInitialMessages([]);
         setChatSessionKey(chatId);
+        setScrollToMessageTimestamp(typeof detail.messageTimestamp === "number" ? detail.messageTimestamp : undefined);
         localStorage.setItem(siteConfig.activeChatId, chatId);
       }
     };
@@ -374,6 +377,7 @@ export default function ChatSidePanel({
                   compactMode
                   hideAvatars
                   desktopId={desktopId}
+                  scrollToMessageTimestamp={scrollToMessageTimestamp}
                 />
               </motion.div>
             )}

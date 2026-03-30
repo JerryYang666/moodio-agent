@@ -39,6 +39,8 @@ interface ImageWithMenuProps {
   imageId: string;
   imageUrl: string;
   chatId?: string | null;
+  /** Timestamp of the originating chat message (used for precise back-navigation) */
+  messageTimestamp?: number;
   generationDetails: {
     title: string;
     prompt: string;
@@ -105,6 +107,7 @@ export default function ImageWithMenu({
   imageId,
   imageUrl,
   chatId,
+  messageTimestamp,
   generationDetails,
   onViewDetails,
   children,
@@ -164,11 +167,14 @@ export default function ImageWithMenu({
   };
 
   const handleAddToCollection = async (collectionId: string) => {
+    const details = messageTimestamp
+      ? { ...generationDetails, messageTimestamp }
+      : generationDetails;
     const success = await addImageToCollection(
       collectionId,
       imageId,
       chatId || null,
-      generationDetails
+      details
     );
 
     if (success) {
@@ -178,6 +184,9 @@ export default function ImageWithMenu({
 
   const handleSaveToProject = async () => {
     setIsSavingToProject(true);
+    const details = messageTimestamp
+      ? { ...generationDetails, messageTimestamp }
+      : generationDetails;
     try {
       const res = await fetch("/api/assets", {
         method: "POST",
@@ -185,7 +194,7 @@ export default function ImageWithMenu({
         body: JSON.stringify({
           imageId,
           chatId: chatId || null,
-          generationDetails,
+          generationDetails: details,
         }),
       });
 
@@ -203,6 +212,9 @@ export default function ImageWithMenu({
     if (!newCollectionName.trim()) return;
 
     setIsCreating(true);
+    const details = messageTimestamp
+      ? { ...generationDetails, messageTimestamp }
+      : generationDetails;
     try {
       const collection = await createCollection(newCollectionName.trim());
       if (collection) {
@@ -210,7 +222,7 @@ export default function ImageWithMenu({
           collection.id,
           imageId,
           chatId || null,
-          generationDetails
+          details
         );
         setNewCollectionName("");
         onCreateOpenChange();
@@ -390,6 +402,7 @@ export default function ImageWithMenu({
             metadata: {
               imageId,
               chatId: chatId || undefined,
+              messageTimestamp,
               title: generationDetails.title,
               prompt: generationDetails.prompt,
               status: generationDetails.status,
