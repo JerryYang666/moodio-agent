@@ -177,6 +177,10 @@ interface ChatInterfaceProps {
   hideAvatars?: boolean;
   /** Desktop ID for linking video assets to desktop */
   desktopId?: string;
+  /** Asset ID to locate in chat messages (backward-compat: scans messages for this image ID) */
+  scrollToAssetId?: string;
+  /** Message timestamp to scroll to directly (preferred over assetId scan) */
+  scrollToMessageTimestamp?: number;
 }
 
 export default function ChatInterface({
@@ -187,6 +191,8 @@ export default function ChatInterface({
   compactMode = false,
   hideAvatars = false,
   desktopId,
+  scrollToAssetId,
+  scrollToMessageTimestamp,
 }: ChatInterfaceProps) {
   const t = useTranslations();
   const { user } = useAuth();
@@ -681,6 +687,9 @@ export default function ChatInterface({
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const [chatInputHeight, setChatInputHeight] = useState(0);
   const notificationModalRef = useRef<NotificationPermissionModalRef>(null);
+  // Scroll-to-message: tracks whether we already performed the initial scroll
+  const scrollToMessageDoneRef = useRef(false);
+  const [highlightedTimestamp, setHighlightedTimestamp] = useState<number | undefined>(undefined);
   const lastUserInputRef = useRef<string>("");
   const lastPendingImagesRef = useRef<PendingImage[]>([]);
   const lastEditorContentRef = useRef<JSONContent | null>(null);
@@ -734,8 +743,47 @@ export default function ChatInterface({
   }, []);
 
   useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+    // If we have a scroll-to-message target and haven't scrolled yet, try to locate it
+    if (!scrollToMessageDoneRef.current && messages.length > 0 && (scrollToMessageTimestamp || scrollToAssetId)) {
+      let targetTimestamp: number | undefined = scrollToMessageTimestamp;
+
+      // If no direct timestamp, scan messages to find the one containing the asset
+      if (!targetTimestamp && scrollToAssetId) {
+        for (const msg of messages) {
+          if (Array.isArray(msg.content)) {
+            const hasAsset = msg.content.some(
+              (part) => isGeneratedImagePart(part) && part.imageId === scrollToAssetId
+            );
+            if (hasAsset && msg.createdAt) {
+              targetTimestamp = msg.createdAt;
+              break;
+            }
+          }
+        }
+      }
+
+      if (targetTimestamp) {
+        // Find the DOM element with the matching timestamp
+        const el = scrollAreaRef.current?.querySelector(
+          `[data-message-timestamp="${targetTimestamp}"]`
+        );
+        if (el) {
+          scrollToMessageDoneRef.current = true;
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+          setHighlightedTimestamp(targetTimestamp);
+          // Clear highlight after animation
+          setTimeout(() => setHighlightedTimestamp(undefined), 2000);
+          return;
+        }
+      }
+
+      // Messages loaded but target not found — scroll to bottom as fallback
+      scrollToMessageDoneRef.current = true;
+      scrollToBottom();
+    } else if (scrollToMessageDoneRef.current || (!scrollToMessageTimestamp && !scrollToAssetId)) {
+      scrollToBottom();
+    }
+  }, [messages, scrollToMessageTimestamp, scrollToAssetId]);
 
   useEffect(() => {
     const handleStreamingCacheUpdate = (event: Event) => {
@@ -3580,27 +3628,34 @@ export default function ChatInterface({
         )}
 
         {groupedMessages.map((group, groupIdx) => {
+          const groupTimestamp = group.messages[0]?.createdAt;
+          const isHighlighted = highlightedTimestamp != null && groupTimestamp === highlightedTimestamp;
           if (group.type === "user") {
             return (
-              <ChatMessage
+              <div
                 key={`user-${group.originalIndex}`}
-                message={group.messages[0]}
-                messageIndex={group.originalIndex}
-                chatId={chatId}
-                user={user}
-                selectedImageIds={pendingImages.map((img) => img.imageId)}
-                onAgentImageSelect={handleAgentImageSelect}
-                onAgentTitleClick={handleAgentTitleClick}
-                onAgentExpandClick={handleAgentExpandClick}
-                onUserImageClick={handleUserImageClick}
-                onForkChat={handleForkChat}
-                hideAvatar={hideAvatars}
-                desktopId={desktopId}
-                allMessages={messages}
-                onSendAsVideoMessage={handleSendVideoFromAgent}
-                onPartUpdate={handlePartUpdate}
-                onVideoSuggestPartUpdate={handleVideoSuggestPartUpdate}
-              />
+                data-message-timestamp={groupTimestamp}
+                className={isHighlighted ? "ring-2 ring-primary rounded-lg transition-all duration-500" : undefined}
+              >
+                <ChatMessage
+                  message={group.messages[0]}
+                  messageIndex={group.originalIndex}
+                  chatId={chatId}
+                  user={user}
+                  selectedImageIds={pendingImages.map((img) => img.imageId)}
+                  onAgentImageSelect={handleAgentImageSelect}
+                  onAgentTitleClick={handleAgentTitleClick}
+                  onAgentExpandClick={handleAgentExpandClick}
+                  onUserImageClick={handleUserImageClick}
+                  onForkChat={handleForkChat}
+                  hideAvatar={hideAvatars}
+                  desktopId={desktopId}
+                  allMessages={messages}
+                  onSendAsVideoMessage={handleSendVideoFromAgent}
+                  onPartUpdate={handlePartUpdate}
+                  onVideoSuggestPartUpdate={handleVideoSuggestPartUpdate}
+                />
+              </div>
             );
           } else {
             // Assistant message(s) - use ParallelMessage for variants
@@ -3624,37 +3679,42 @@ export default function ChatInterface({
               );
             });
             return (
-              <ParallelMessage
+              <div
                 key={`assistant-${group.originalIndex}`}
-                variants={group.messages}
-                messageIndex={group.originalIndex}
-                chatId={chatId}
-                user={user}
-                selectedImageIds={pendingImages.map((img) => img.imageId)}
-                onAgentImageSelect={handleAgentImageSelect}
-                onAgentTitleClick={handleAgentTitleClick}
-                onAgentExpandClick={handleAgentExpandClick}
-                onForkChat={handleForkChat}
-                compactMode={compactMode}
-                hideAvatars={hideAvatars}
-                onGenerateVariant={
-                  isLastAssistantGroup && !isDirectGeneration && messageTimestamp
-                    ? () => handleGenerateVariant(messageTimestamp)
-                    : undefined
-                }
-                isGeneratingVariant={
-                  generatingVariantTimestamp === messageTimestamp
-                }
-                isSending={isSending}
-                desktopId={desktopId}
-                allMessages={messages}
-                onDirectVideoStatusUpdate={handleDirectVideoStatusUpdate}
-                onDirectVideoRestore={handleDirectVideoRestore}
-                onSendAsVideoMessage={handleSendVideoFromAgent}
-                onPartUpdate={handlePartUpdate}
-                onVideoSuggestPartUpdate={handleVideoSuggestPartUpdate}
-                isTimestampLoading={isStreamingAssistantGroup}
-              />
+                data-message-timestamp={groupTimestamp}
+                className={isHighlighted ? "ring-2 ring-primary rounded-lg transition-all duration-500" : undefined}
+              >
+                <ParallelMessage
+                  variants={group.messages}
+                  messageIndex={group.originalIndex}
+                  chatId={chatId}
+                  user={user}
+                  selectedImageIds={pendingImages.map((img) => img.imageId)}
+                  onAgentImageSelect={handleAgentImageSelect}
+                  onAgentTitleClick={handleAgentTitleClick}
+                  onAgentExpandClick={handleAgentExpandClick}
+                  onForkChat={handleForkChat}
+                  compactMode={compactMode}
+                  hideAvatars={hideAvatars}
+                  onGenerateVariant={
+                    isLastAssistantGroup && !isDirectGeneration && messageTimestamp
+                      ? () => handleGenerateVariant(messageTimestamp)
+                      : undefined
+                  }
+                  isGeneratingVariant={
+                    generatingVariantTimestamp === messageTimestamp
+                  }
+                  isSending={isSending}
+                  desktopId={desktopId}
+                  allMessages={messages}
+                  onDirectVideoStatusUpdate={handleDirectVideoStatusUpdate}
+                  onDirectVideoRestore={handleDirectVideoRestore}
+                  onSendAsVideoMessage={handleSendVideoFromAgent}
+                  onPartUpdate={handlePartUpdate}
+                  onVideoSuggestPartUpdate={handleVideoSuggestPartUpdate}
+                  isTimestampLoading={isStreamingAssistantGroup}
+                />
+              </div>
             );
           }
         })}

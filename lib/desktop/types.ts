@@ -1,6 +1,7 @@
 export type ImageAssetMeta = {
   imageId: string;
   chatId?: string;
+  messageTimestamp?: number;
   title?: string;
   prompt?: string;
   status?: string;
@@ -31,6 +32,7 @@ export type VideoAssetMeta = {
   videoId?: string;
   generationId?: string; // Links to videoGenerations table as canonical record
   chatId?: string;
+  messageTimestamp?: number;
   title?: string;
   prompt?: string;
   status?: string;
@@ -51,6 +53,7 @@ export type TextAssetMeta = {
   fontSize?: number;
   color?: string;
   chatId?: string;
+  messageTimestamp?: number;
 };
 
 export type LinkAssetMeta = {
@@ -73,6 +76,7 @@ export type TableAssetMeta = {
   columns: string[];
   rows: TableRow[];
   chatId?: string;
+  messageTimestamp?: number;
   status?: "streaming" | "complete";
 };
 

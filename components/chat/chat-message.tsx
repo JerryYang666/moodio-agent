@@ -492,6 +492,7 @@ export default function ChatMessage({
                         imageId={part.imageId || ""}
                         imageUrl={url}
                         chatId={chatId}
+                        messageTimestamp={message.createdAt}
                         desktopId={desktopId}
                         generationDetails={{
                           title: part.title,
@@ -790,7 +791,7 @@ export default function ChatMessage({
           onOpenChange={setSendToDesktopOpen}
           assets={
             pendingTextForDesktop
-              ? [{ assetType: "text", metadata: { content: pendingTextForDesktop, chatId: chatId || undefined } }]
+              ? [{ assetType: "text", metadata: { content: pendingTextForDesktop, chatId: chatId || undefined, messageTimestamp: message.createdAt } }]
               : []
           }
           desktopId={desktopId}
