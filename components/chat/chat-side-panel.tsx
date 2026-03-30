@@ -121,7 +121,9 @@ export default function ChatSidePanel({
       if (chatId && typeof chatId === "string") {
         setActiveChatId(chatId);
         setInitialMessages([]);
-        setChatSessionKey(chatId);
+        // Always generate a unique key so AnimatePresence remounts ChatInterface
+        // even when navigating to the same chat (e.g. different asset in the same thread).
+        setChatSessionKey(`${chatId}-${Date.now()}`);
         setScrollToMessageTimestamp(typeof detail.messageTimestamp === "number" ? detail.messageTimestamp : undefined);
         localStorage.setItem(siteConfig.activeChatId, chatId);
       }

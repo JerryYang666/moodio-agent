@@ -742,46 +742,66 @@ export default function ChatInterface({
     }
   }, []);
 
+  // Reset the scroll-done flag whenever the target changes so re-navigation works
   useEffect(() => {
-    // If we have a scroll-to-message target and haven't scrolled yet, try to locate it
-    if (!scrollToMessageDoneRef.current && messages.length > 0 && (scrollToMessageTimestamp || scrollToAssetId)) {
-      let targetTimestamp: number | undefined = scrollToMessageTimestamp;
+    if (scrollToMessageTimestamp || scrollToAssetId) {
+      scrollToMessageDoneRef.current = false;
+    }
+  }, [scrollToMessageTimestamp, scrollToAssetId]);
 
-      // If no direct timestamp, scan messages to find the one containing the asset
-      if (!targetTimestamp && scrollToAssetId) {
-        for (const msg of messages) {
-          if (Array.isArray(msg.content)) {
-            const hasAsset = msg.content.some(
-              (part) => isGeneratedImagePart(part) && part.imageId === scrollToAssetId
-            );
-            if (hasAsset && msg.createdAt) {
-              targetTimestamp = msg.createdAt;
-              break;
-            }
+  useEffect(() => {
+    if (scrollToMessageDoneRef.current || messages.length === 0 || (!scrollToMessageTimestamp && !scrollToAssetId)) {
+      if (scrollToMessageDoneRef.current || (!scrollToMessageTimestamp && !scrollToAssetId)) {
+        scrollToBottom();
+      }
+      return;
+    }
+
+    let targetTimestamp: number | undefined = scrollToMessageTimestamp;
+
+    if (!targetTimestamp && scrollToAssetId) {
+      for (const msg of messages) {
+        if (Array.isArray(msg.content)) {
+          const hasAsset = msg.content.some(
+            (part) => isGeneratedImagePart(part) && part.imageId === scrollToAssetId
+          );
+          if (hasAsset && msg.createdAt) {
+            targetTimestamp = msg.createdAt;
+            break;
           }
         }
       }
+    }
 
-      if (targetTimestamp) {
-        // Find the DOM element with the matching timestamp
-        const el = scrollAreaRef.current?.querySelector(
-          `[data-message-timestamp="${targetTimestamp}"]`
-        );
-        if (el) {
-          scrollToMessageDoneRef.current = true;
-          el.scrollIntoView({ behavior: "smooth", block: "center" });
-          setHighlightedTimestamp(targetTimestamp);
-          // Clear highlight after animation
-          setTimeout(() => setHighlightedTimestamp(undefined), 2000);
-          return;
-        }
-      }
-
-      // Messages loaded but target not found — scroll to bottom as fallback
+    if (!targetTimestamp) {
       scrollToMessageDoneRef.current = true;
       scrollToBottom();
-    } else if (scrollToMessageDoneRef.current || (!scrollToMessageTimestamp && !scrollToAssetId)) {
-      scrollToBottom();
+      return;
+    }
+
+    const tryScroll = () => {
+      const el = scrollAreaRef.current?.querySelector(
+        `[data-message-timestamp="${targetTimestamp}"]`
+      );
+      if (el) {
+        scrollToMessageDoneRef.current = true;
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        setHighlightedTimestamp(targetTimestamp!);
+        setTimeout(() => setHighlightedTimestamp(undefined), 2000);
+        return true;
+      }
+      return false;
+    };
+
+    if (!tryScroll()) {
+      // DOM element may not be painted yet; retry after next frame
+      const rafId = requestAnimationFrame(() => {
+        if (!tryScroll()) {
+          scrollToMessageDoneRef.current = true;
+          scrollToBottom();
+        }
+      });
+      return () => cancelAnimationFrame(rafId);
     }
   }, [messages, scrollToMessageTimestamp, scrollToAssetId]);
 
