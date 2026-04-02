@@ -28,6 +28,7 @@ import { Spinner } from "@heroui/spinner";
 import { Pagination } from "@heroui/pagination";
 import { addToast } from "@heroui/toast";
 import { api } from "@/lib/api/client";
+import { formatStatementDescriptorPreview } from "@/lib/statement-descriptor";
 import { useAuth } from "@/hooks/use-auth";
 import { Plus, Edit, CreditCard, Package, Activity, Search, Eye } from "lucide-react";
 
@@ -570,6 +571,7 @@ export default function StripeAdminPage() {
                     placeholder="e.g. 500 Credits"
                     value={pkgForm.name}
                     onValueChange={(v) => setPkgForm({ ...pkgForm, name: v })}
+                    description={pkgForm.name ? `Card statement: ${formatStatementDescriptorPreview(pkgForm.name)}` : undefined}
                     isRequired
                   />
                   <div className="grid grid-cols-2 gap-4">
