@@ -4,7 +4,7 @@ import { verifyAccessToken } from "@/lib/auth/jwt";
 import { db } from "@/lib/db";
 import { subscriptionPlans, creditPackages, userConsents } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
-import { stripe, getOrCreateStripeCustomer } from "@/lib/stripe";
+import { stripe, getOrCreateStripeCustomer, sanitizeStatementDescriptorSuffix } from "@/lib/stripe";
 import { hasActiveSubscription } from "@/lib/subscription";
 import { handleStripeError } from "@/lib/stripe-errors";
 
@@ -103,6 +103,9 @@ export async function POST(request: NextRequest) {
         subscription_data: {
           metadata: { userId: payload.userId },
         },
+        payment_intent_data: {
+          statement_descriptor_suffix: sanitizeStatementDescriptorSuffix(plan.name),
+        },
         metadata: { userId: payload.userId },
       });
 
@@ -187,6 +190,7 @@ export async function POST(request: NextRequest) {
       cancel_url: `${appUrl}/credits?${cancelParams.toString()}`,
       payment_intent_data: {
         metadata: creditsMeta,
+        statement_descriptor_suffix: sanitizeStatementDescriptorSuffix(pkg.name),
       },
       metadata: creditsMeta,
     });
