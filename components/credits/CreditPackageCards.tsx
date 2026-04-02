@@ -9,6 +9,7 @@ import { Checkbox } from "@heroui/checkbox";
 import { Chip } from "@heroui/chip";
 import { addToast } from "@heroui/toast";
 import { Bean, ShoppingCart, User, Users } from "lucide-react";
+import NextLink from "next/link";
 import { api, ApiError } from "@/lib/api/client";
 import { STRIPE_ERROR_CODES, type StripeErrorCode } from "@/lib/stripe-errors";
 import { useSubscription } from "@/hooks/use-subscription";
@@ -155,6 +156,17 @@ export default function CreditPackageCards({ accountType, accountId, teamName }:
             </Card>
           ))}
         </div>
+        <p className="text-xs text-default-500 text-center">
+          {t("paymentDisclosure")}{" "}
+          <NextLink href="/legal/subscription-terms" className="underline hover:text-default-700">
+            {t("subscriptionTerms")}
+          </NextLink>
+          {" "}{t("paymentDisclosureAnd")}{" "}
+          <NextLink href="/legal/refunds" className="underline hover:text-default-700">
+            {t("refundPolicy")}
+          </NextLink>
+          .{" "}{t("paymentDisclosureWithdrawal")}
+        </p>
       </CardBody>
     </Card>
   );

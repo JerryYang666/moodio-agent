@@ -18,7 +18,6 @@ import { Button } from "@heroui/button";
 import { addToast } from "@heroui/toast";
 import { Tabs, Tab } from "@heroui/tabs";
 import { Bean, CalendarCheck } from "lucide-react";
-import NextLink from "next/link";
 import { api } from "@/lib/api/client";
 import { useCredits } from "@/hooks/use-credits";
 import { useTeams } from "@/hooks/use-team";
@@ -219,19 +218,6 @@ export default function CreditsPage() {
           </div>
         </CardBody>
       </Card>
-
-      {/* Payment Legal Disclosure */}
-      <p className="text-xs text-default-500 text-center -mt-4">
-        {t("paymentDisclosure")}{" "}
-        <NextLink href="/legal/subscription-terms" className="underline hover:text-default-700">
-          {t("subscriptionTerms")}
-        </NextLink>
-        {" "}{t("paymentDisclosureAnd")}{" "}
-        <NextLink href="/legal/refunds" className="underline hover:text-default-700">
-          {t("refundPolicy")}
-        </NextLink>
-        .{" "}{t("paymentDisclosureWithdrawal")}
-      </p>
 
       {/* Buy Credits */}
       {viewAccountType === "personal" && user && (
