@@ -287,6 +287,12 @@
       "cancelConfirmBody": "Are you sure you want to cancel your subscription? You will continue to have access until {date}, after which your subscription will not renew.",
       "cancelConfirmKeep": "Keep Subscription",
       "cancelConfirmProceed": "Yes, Cancel",
+      "resume": "Resume Subscription",
+      "resumeSuccess": "Your subscription has been resumed and will continue to renew.",
+      "resumeConfirmTitle": "Resume Subscription",
+      "resumeConfirmBody": "Your subscription will resume and automatically renew on {date}. Your payment method on file will be charged.",
+      "resumeConfirmCancel": "Go Back",
+      "resumeConfirmProceed": "Yes, Resume",
       "portal": "Billing Portal",
       "none": "You don't have an active subscription.",
       "browseCta": "Browse Plans"

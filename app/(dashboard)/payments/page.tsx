@@ -31,6 +31,7 @@ import {
   Settings,
   AlertTriangle,
   XCircle,
+  RotateCcw,
 } from "lucide-react";
 import { api, ApiError } from "@/lib/api/client";
 import { STRIPE_ERROR_CODES, type StripeErrorCode } from "@/lib/stripe-errors";
@@ -62,6 +63,7 @@ const STATUS_COLOR: Record<string, "success" | "warning" | "danger" | "default">
 export default function PaymentsPage() {
   const t = useTranslations("payments");
   const tHistory = useTranslations("payments.history");
+  const tCredits = useTranslations("credits");
   const tStripeErrors = useTranslations("stripeErrors");
   const { user, loading: authLoading } = useAuth();
   const { hasSubscription, subscription, refresh: refreshSub } = useSubscription();
@@ -102,6 +104,8 @@ export default function PaymentsPage() {
 
   const [canceling, setCanceling] = useState(false);
   const cancelModal = useDisclosure();
+  const [resuming, setResuming] = useState(false);
+  const resumeModal = useDisclosure();
 
   const handleManageSubscription = async () => {
     try {
@@ -125,6 +129,22 @@ export default function PaymentsPage() {
       addToast({ title: tStripeErrors(resolveStripeErrorCode(err)), color: "danger" });
     } finally {
       setCanceling(false);
+    }
+  };
+
+  const handleResumeSubscription = async () => {
+    setResuming(true);
+    try {
+      const data = await api.post("/api/stripe/resume", {});
+      if (data.success) {
+        addToast({ title: t("subscription.resumeSuccess"), color: "success" });
+        resumeModal.onClose();
+        refreshSub();
+      }
+    } catch (err) {
+      addToast({ title: tStripeErrors(resolveStripeErrorCode(err)), color: "danger" });
+    } finally {
+      setResuming(false);
     }
   };
 
@@ -200,7 +220,16 @@ export default function PaymentsPage() {
                 >
                   {t("subscription.manage")}
                 </Button>
-                {!subscription.cancelAtPeriodEnd && (
+                {subscription.cancelAtPeriodEnd ? (
+                  <Button
+                    variant="flat"
+                    color="primary"
+                    startContent={<RotateCcw size={16} />}
+                    onPress={resumeModal.onOpen}
+                  >
+                    {t("subscription.resume")}
+                  </Button>
+                ) : (
                   <Button
                     variant="flat"
                     color="danger"
@@ -360,6 +389,52 @@ export default function PaymentsPage() {
                   onPress={handleCancelSubscription}
                 >
                   {t("subscription.cancelConfirmProceed")}
+                </Button>
+              </ModalFooter>
+            </>
+          )}
+        </ModalContent>
+      </Modal>
+
+      {/* Resume Subscription Confirmation Modal */}
+      <Modal isOpen={resumeModal.isOpen} onOpenChange={resumeModal.onOpenChange}>
+        <ModalContent>
+          {(onClose) => (
+            <>
+              <ModalHeader className="flex items-center gap-2">
+                <RotateCcw size={20} className="text-primary" />
+                {t("subscription.resumeConfirmTitle")}
+              </ModalHeader>
+              <ModalBody>
+                <p className="text-default-600">
+                  {t("subscription.resumeConfirmBody", {
+                    date: subscription
+                      ? new Date(subscription.currentPeriodEnd).toLocaleDateString()
+                      : "",
+                  })}
+                </p>
+                <p className="text-xs text-default-500">
+                  {tCredits("paymentDisclosure")}{" "}
+                  <a href="/legal/subscription-terms" className="underline hover:text-default-700">
+                    {tCredits("subscriptionTerms")}
+                  </a>
+                  {" "}{tCredits("paymentDisclosureAnd")}{" "}
+                  <a href="/legal/refunds" className="underline hover:text-default-700">
+                    {tCredits("refundPolicy")}
+                  </a>
+                  .{" "}{tCredits("paymentDisclosureWithdrawal")}
+                </p>
+              </ModalBody>
+              <ModalFooter>
+                <Button variant="flat" onPress={onClose} isDisabled={resuming}>
+                  {t("subscription.resumeConfirmCancel")}
+                </Button>
+                <Button
+                  color="primary"
+                  isLoading={resuming}
+                  onPress={handleResumeSubscription}
+                >
+                  {t("subscription.resumeConfirmProceed")}
                 </Button>
               </ModalFooter>
             </>
