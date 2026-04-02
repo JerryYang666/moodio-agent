@@ -31,6 +31,7 @@ import {
   Monitor,
   Users as UsersIcon,
   Check,
+  CreditCard,
 } from "lucide-react";
 import { Avatar } from "@heroui/avatar";
 import { Popover, PopoverTrigger, PopoverContent } from "@heroui/popover";
@@ -397,6 +398,15 @@ export const Navbar = () => {
                         >
                           <UserIcon size={16} />
                           <span>{t("nav.profile")}</span>
+                        </NextLink>
+                        {/* Payments */}
+                        <NextLink
+                          href="/payments"
+                          onClick={() => setIsMenuOpen(false)}
+                          className="flex items-center gap-2 px-2 py-1.5 rounded-lg transition-colors hover:bg-default-100"
+                        >
+                          <CreditCard size={16} />
+                          <span>{t("nav.payments")}</span>
                         </NextLink>
                         <div className="h-px bg-divider my-1" />
                         <div className="flex items-center justify-between gap-4 px-2">

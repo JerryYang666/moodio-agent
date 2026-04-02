@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { users, userConsents } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { generateOTP, createOTP } from "@/lib/auth/otp";
 import { sendOTPEmail } from "@/lib/auth/email";
 import { waitUntil } from "@vercel/functions";
@@ -50,7 +50,12 @@ export async function POST(request: NextRequest) {
       const consent = await db
         .select({ id: userConsents.id })
         .from(userConsents)
-        .where(eq(userConsents.userId, userId))
+        .where(
+          and(
+            eq(userConsents.userId, userId),
+            eq(userConsents.consentType, "login")
+          )
+        )
         .limit(1);
 
       needsConsent = consent.length === 0;

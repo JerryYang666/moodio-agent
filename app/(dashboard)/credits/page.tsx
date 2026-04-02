@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useTranslations } from "next-intl";
+import { useSearchParams } from "next/navigation";
 import { Card, CardBody, CardHeader } from "@heroui/card";
 import {
   Table,
@@ -21,7 +22,9 @@ import NextLink from "next/link";
 import { api } from "@/lib/api/client";
 import { useCredits } from "@/hooks/use-credits";
 import { useTeams } from "@/hooks/use-team";
+import { useAuth } from "@/hooks/use-auth";
 import { LegalFooter } from "@/components/legal-footer";
+import CreditPackageCards from "@/components/credits/CreditPackageCards";
 
 interface Transaction {
   id: string;
@@ -42,8 +45,10 @@ interface CheckinStatus {
 
 export default function CreditsPage() {
   const t = useTranslations("credits");
+  const searchParams = useSearchParams();
   const { activeAccountType, activeAccountId, refreshBalance } = useCredits();
-  const { teams } = useTeams();
+  const { teams, isOwnerOrAdmin } = useTeams();
+  const { user } = useAuth();
 
   // Local view state — does NOT change the global billing account
   const [viewAccountType, setViewAccountType] = useState<"personal" | "team">(activeAccountType);
@@ -94,6 +99,24 @@ export default function CreditsPage() {
       fetchCheckinStatus();
     }
   }, [fetchCredits, fetchCheckinStatus, viewAccountType]);
+
+  const checkoutHandled = useRef(false);
+
+  useEffect(() => {
+    if (checkoutHandled.current) return;
+    const checkout = searchParams.get("checkout");
+    if (checkout === "success") {
+      checkoutHandled.current = true;
+      addToast({ title: t("purchaseSuccess"), color: "success" });
+      refreshBalance();
+      fetchCredits();
+      window.history.replaceState(null, "", window.location.pathname);
+    } else if (checkout === "canceled") {
+      checkoutHandled.current = true;
+      addToast({ title: t("purchaseCanceled"), color: "warning" });
+      window.history.replaceState(null, "", window.location.pathname);
+    }
+  }, [searchParams, t, refreshBalance, fetchCredits]);
 
   const handleCheckin = async () => {
     setClaiming(true);
@@ -209,6 +232,21 @@ export default function CreditsPage() {
         </NextLink>
         .{" "}{t("paymentDisclosureWithdrawal")}
       </p>
+
+      {/* Buy Credits */}
+      {viewAccountType === "personal" && user && (
+        <CreditPackageCards
+          accountType="personal"
+          accountId={user.id}
+        />
+      )}
+      {viewAccountType === "team" && viewAccountId && isOwnerOrAdmin(viewAccountId) && (
+        <CreditPackageCards
+          accountType="team"
+          accountId={viewAccountId}
+          teamName={teams.find((t) => t.teamId === viewAccountId)?.teamName}
+        />
+      )}
 
       {/* Daily Check-in Card */}
       {viewAccountType === "personal" && checkinStatus && (
