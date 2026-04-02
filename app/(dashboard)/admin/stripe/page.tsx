@@ -274,15 +274,7 @@ export default function StripeAdminPage() {
     }
   };
 
-  // --- Render ---
-
-  if (authLoading) {
-    return <Spinner size="lg" className="flex justify-center mt-10" />;
-  }
-
-  if (!user || !user.roles.includes("admin")) {
-    return <div className="p-8 text-center">Unauthorized</div>;
-  }
+  // --- Derived state (hooks must be called unconditionally) ---
 
   const formatPrice = (cents: number) => `$${(cents / 100).toFixed(2)}`;
 
@@ -322,6 +314,16 @@ export default function StripeAdminPage() {
     if (type.includes("completed")) return "primary";
     return "default";
   };
+
+  // --- Render ---
+
+  if (authLoading) {
+    return <Spinner size="lg" className="flex justify-center mt-10" />;
+  }
+
+  if (!user || !user.roles.includes("admin")) {
+    return <div className="p-8 text-center">Unauthorized</div>;
+  }
 
   return (
     <div className="space-y-8">
