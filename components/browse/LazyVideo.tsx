@@ -3,10 +3,13 @@
 import React, { useRef, useEffect, useLayoutEffect, useCallback, useState } from "react";
 import { useVideoVisibility } from "@/hooks/use-video-visibility";
 import { useTabVisibility } from "@/hooks/use-tab-visibility";
+import { isImageContentType, type MediaType } from "@/lib/media";
 
 export interface LazyVideoProps {
     /** Video source URL */
     src: string;
+    /** Retrieval media type */
+    mediaType?: MediaType;
     /** Video width in pixels (used in fixed-size mode) */
     width?: number;
     /** Video height in pixels (used in fixed-size mode) */
@@ -34,12 +37,14 @@ export interface LazyVideoProps {
  */
 export function LazyVideo({
     src,
+    mediaType,
     width,
     height,
     aspectRatio,
     className = "",
     onClick,
 }: LazyVideoProps) {
+    const isImage = isImageContentType(mediaType);
     const isFluid = aspectRatio != null;
     const videoRef = useRef<HTMLVideoElement>(null);
     const { isVisible, isNearViewport, isFarFromViewport } = useVideoVisibility(videoRef);
@@ -142,6 +147,33 @@ export function LazyVideo({
             videoRef.current.style.backgroundColor = "#f3f4f6";
         }
     }, [src]);
+
+    if (isImage) {
+        return (
+            <div
+                className={`relative overflow-hidden shrink-0 bg-neutral-300 dark:bg-neutral-700 ${className}`}
+                style={isFluid
+                    ? { width: "100%", aspectRatio: String(aspectRatio) }
+                    : { width, height }
+                }
+            >
+                {!isLoaded && (
+                    <div className="absolute inset-0 bg-neutral-300 dark:bg-neutral-700 animate-pulse" />
+                )}
+                <img
+                    src={src}
+                    alt=""
+                    loading="lazy"
+                    decoding="async"
+                    onClick={onClick}
+                    onLoad={() => setIsLoaded(true)}
+                    onError={() => setIsLoaded(true)}
+                    className={`w-full h-full object-cover cursor-pointer transition-opacity duration-300 ${isLoaded ? "opacity-100 hover:opacity-80" : "opacity-0"
+                        }`}
+                />
+            </div>
+        );
+    }
 
     return (
         <div
