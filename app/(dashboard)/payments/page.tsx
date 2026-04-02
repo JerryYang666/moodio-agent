@@ -122,8 +122,9 @@ export default function PaymentsPage() {
       const data = await api.post("/api/stripe/cancel", {});
       if (data.success) {
         addToast({ title: t("subscription.cancelSuccess"), color: "success" });
+        await new Promise((r) => setTimeout(r, 2000));
+        await refreshSub();
         cancelModal.onClose();
-        refreshSub();
       }
     } catch (err) {
       addToast({ title: tStripeErrors(resolveStripeErrorCode(err)), color: "danger" });
@@ -138,8 +139,9 @@ export default function PaymentsPage() {
       const data = await api.post("/api/stripe/resume", {});
       if (data.success) {
         addToast({ title: t("subscription.resumeSuccess"), color: "success" });
+        await new Promise((r) => setTimeout(r, 2000));
+        await refreshSub();
         resumeModal.onClose();
-        refreshSub();
       }
     } catch (err) {
       addToast({ title: tStripeErrors(resolveStripeErrorCode(err)), color: "danger" });
