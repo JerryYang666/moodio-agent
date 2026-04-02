@@ -82,7 +82,7 @@ export default function SubscriptionPaywall() {
     : null;
 
   return (
-    <div className="flex flex-col items-center justify-center h-full gap-6 px-4 py-16 max-w-lg mx-auto text-center">
+    <div className="flex flex-col items-center justify-center min-h-full gap-6 px-4 py-16 max-w-lg mx-auto text-center">
       <div className="p-5 bg-primary/15 rounded-full">
         <Lock size={48} className="text-primary" />
       </div>
