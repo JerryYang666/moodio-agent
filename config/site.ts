@@ -100,8 +100,8 @@ export const siteConfig = {
 
   // Upload Configuration
   upload: {
-    maxFileSizeMB: 20,
-    compressThresholdMB: 10,
+    maxFileSizeMB: 30,
+    compressThresholdMB: 6,
     serverCompressThresholdMB: 6,
     allowedImageTypes: ["image/jpeg", "image/png", "image/gif", "image/webp"],
     allowedVideoTypes: ["video/mp4", "video/webm", "video/quicktime", "video/x-msvideo"],
