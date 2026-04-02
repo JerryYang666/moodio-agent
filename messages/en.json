@@ -278,6 +278,7 @@
     "subscription": {
       "title": "Subscription",
       "periodEnd": "Renews on {date}",
+      "endsOn": "Ends on {date}",
       "cancelWarning": "Your subscription will be canceled at the end of the current billing period.",
       "manage": "Manage Subscription",
       "cancel": "Cancel Subscription",

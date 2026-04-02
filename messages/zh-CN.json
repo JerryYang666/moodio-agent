@@ -278,6 +278,7 @@
     "subscription": {
       "title": "订阅",
       "periodEnd": "续费日期：{date}",
+      "endsOn": "到期日期：{date}",
       "cancelWarning": "您的订阅将在当前计费周期结束后取消。",
       "cancel": "取消订阅",
       "cancelSuccess": "您的订阅将在当前计费周期结束后取消。",

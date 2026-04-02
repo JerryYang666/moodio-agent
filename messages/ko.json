@@ -278,6 +278,7 @@
     "subscription": {
       "title": "구독",
       "periodEnd": "갱신일: {date}",
+      "endsOn": "종료일: {date}",
       "cancelWarning": "현재 결제 기간이 끝나면 구독이 취소됩니다.",
       "cancel": "구독 취소",
       "cancelSuccess": "현재 결제 기간이 끝나면 구독이 취소됩니다.",

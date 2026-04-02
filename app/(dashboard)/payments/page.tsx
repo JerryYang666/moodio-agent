@@ -201,7 +201,9 @@ export default function PaymentsPage() {
                   {subscription.status}
                 </Chip>
                 <span className="text-sm text-default-500">
-                  {t("subscription.periodEnd", {
+                  {t(subscription.cancelAtPeriodEnd
+                    ? "subscription.endsOn"
+                    : "subscription.periodEnd", {
                     date: new Date(subscription.currentPeriodEnd).toLocaleDateString(),
                   })}
                 </span>

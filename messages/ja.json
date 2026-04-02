@@ -278,6 +278,7 @@
     "subscription": {
       "title": "サブスクリプション",
       "periodEnd": "更新日：{date}",
+      "endsOn": "終了日：{date}",
       "cancelWarning": "現在の請求期間終了後にサブスクリプションがキャンセルされます。",
       "cancel": "サブスクリプションをキャンセル",
       "cancelSuccess": "現在の請求期間終了後にサブスクリプションがキャンセルされます。",
