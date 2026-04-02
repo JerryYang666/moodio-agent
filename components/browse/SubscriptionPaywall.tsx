@@ -22,6 +22,7 @@ interface SubscriptionPlan {
 
 export default function SubscriptionPaywall() {
   const t = useTranslations("browse");
+  const tCredits = useTranslations("credits");
   const tLegal = useTranslations("legal");
   const tStripeErrors = useTranslations("stripeErrors");
   const { hasPaymentConsent } = useSubscription();
@@ -147,6 +148,18 @@ export default function SubscriptionPaywall() {
                 )}
               </div>
             )}
+
+            <p className="text-xs text-default-500 text-center">
+              {tCredits("paymentDisclosure")}{" "}
+              <a href="/legal/subscription-terms" className="underline hover:text-default-700">
+                {tCredits("subscriptionTerms")}
+              </a>
+              {" "}{tCredits("paymentDisclosureAnd")}{" "}
+              <a href="/legal/refunds" className="underline hover:text-default-700">
+                {tCredits("refundPolicy")}
+              </a>
+              .{" "}{tCredits("paymentDisclosureWithdrawal")}
+            </p>
 
             <Button
               color="primary"
