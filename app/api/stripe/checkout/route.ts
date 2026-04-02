@@ -103,9 +103,6 @@ export async function POST(request: NextRequest) {
         subscription_data: {
           metadata: { userId: payload.userId },
         },
-        payment_intent_data: {
-          statement_descriptor_suffix: sanitizeStatementDescriptorSuffix(plan.name),
-        },
         metadata: { userId: payload.userId },
       });
 
