@@ -5,6 +5,7 @@ import { getAccessToken } from "@/lib/auth/cookies";
 import { verifyAccessToken } from "@/lib/auth/jwt";
 import { and, eq } from "drizzle-orm";
 import { getImageUrl } from "@/lib/storage/s3";
+import { getContentUrl } from "@/lib/config/video.config";
 
 /**
  * GET /api/assets/[assetId]
@@ -83,7 +84,10 @@ export async function GET(
     return NextResponse.json({
       asset: {
         ...asset,
-        imageUrl: getImageUrl(asset.imageId),
+        imageUrl:
+          asset.assetType === "public_image"
+            ? getContentUrl(asset.assetId)
+            : getImageUrl(asset.imageId),
       },
     });
   } catch (error) {

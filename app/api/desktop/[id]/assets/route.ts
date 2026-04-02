@@ -8,6 +8,7 @@ import { getDesktopPermission } from "@/lib/desktop/permissions";
 import { hasWriteAccess } from "@/lib/permissions";
 import { validateAssetMetadata } from "@/lib/desktop/types";
 import { getImageUrl, getVideoUrl } from "@/lib/storage/s3";
+import { getContentUrl } from "@/lib/config/video.config";
 
 /**
  * GET /api/desktop/[id]/assets
@@ -87,6 +88,26 @@ export async function GET(
             completedAt: gen.completedAt,
           };
         }
+      }
+
+      if (asset.assetType === "public_video") {
+        const storageKey = typeof meta.storageKey === "string" ? meta.storageKey : null;
+        return {
+          ...asset,
+          imageUrl: null,
+          videoUrl: storageKey ? getContentUrl(storageKey) : null,
+          generationData: null,
+        };
+      }
+
+      if (asset.assetType === "public_image") {
+        const storageKey = typeof meta.storageKey === "string" ? meta.storageKey : null;
+        return {
+          ...asset,
+          imageUrl: storageKey ? getContentUrl(storageKey) : null,
+          videoUrl: null,
+          generationData: null,
+        };
       }
 
       return {
@@ -178,6 +199,25 @@ export async function POST(
       const meta = asset.metadata as Record<string, unknown>;
       const imgId = typeof meta.imageId === "string" ? meta.imageId : null;
       const vidId = typeof meta.videoId === "string" ? meta.videoId : null;
+
+      if (asset.assetType === "public_video") {
+        const storageKey = typeof meta.storageKey === "string" ? meta.storageKey : null;
+        return {
+          ...asset,
+          imageUrl: null,
+          videoUrl: storageKey ? getContentUrl(storageKey) : null,
+        };
+      }
+
+      if (asset.assetType === "public_image") {
+        const storageKey = typeof meta.storageKey === "string" ? meta.storageKey : null;
+        return {
+          ...asset,
+          imageUrl: storageKey ? getContentUrl(storageKey) : null,
+          videoUrl: null,
+        };
+      }
+
       return {
         ...asset,
         imageUrl: imgId ? getImageUrl(imgId) : null,

@@ -181,6 +181,7 @@ function VideoDetailContent({
   const {
     collections,
     addPublicVideoToCollection,
+    addPublicImageToCollection,
     createCollection,
     getDefaultCollectionName,
   } = useCollections();
@@ -225,46 +226,38 @@ function VideoDetailContent({
   const isImageContent = isImageContentType(mediaType);
 
   const handleAddToCollection = async (collectionId: string) => {
-    if (isImageContent) return;
     if (!storageKey || !contentUuid) return;
-    const success = await addPublicVideoToCollection(
-      collectionId,
-      storageKey,
-      contentUuid,
-      videoTitle
-    );
+    const success = isImageContent
+      ? await addPublicImageToCollection(collectionId, storageKey, contentUuid, videoTitle)
+      : await addPublicVideoToCollection(collectionId, storageKey, contentUuid, videoTitle);
     if (success) {
       addToast({
         title: "Added to collection",
-        description: "Video has been added to the collection",
+        description: `${isImageContent ? "Image" : "Video"} has been added to the collection`,
         color: "success",
       });
     } else {
       addToast({
         title: "Error",
-        description: "Failed to add video to collection",
+        description: `Failed to add ${isImageContent ? "image" : "video"} to collection`,
         color: "danger",
       });
     }
   };
 
   const handleCreateAndAdd = async () => {
-    if (isImageContent) return;
     if (!newCollectionName.trim() || !storageKey || !contentUuid) return;
     setIsCreating(true);
     try {
       const collection = await createCollection(newCollectionName.trim());
       if (collection) {
-        const success = await addPublicVideoToCollection(
-          collection.id,
-          storageKey,
-          contentUuid,
-          videoTitle
-        );
+        const success = isImageContent
+          ? await addPublicImageToCollection(collection.id, storageKey, contentUuid, videoTitle)
+          : await addPublicVideoToCollection(collection.id, storageKey, contentUuid, videoTitle);
         if (success) {
           addToast({
             title: "Added to collection",
-            description: `Video added to "${collection.name}"`,
+            description: `${isImageContent ? "Image" : "Video"} added to "${collection.name}"`,
             color: "success",
           });
         }
@@ -322,7 +315,7 @@ function VideoDetailContent({
                 <DropdownTrigger>
                   <button
                     className="p-2 rounded-md bg-black/50 hover:bg-black/70 transition-colors disabled:opacity-50"
-                    disabled={!videoDetail || isLoadingDetail || isImageContent}
+                    disabled={!videoDetail || isLoadingDetail}
                   >
                     <FolderPlus size={16} className="text-white" />
                   </button>
@@ -372,7 +365,7 @@ function VideoDetailContent({
               {showDesktop && (
                 <button
                   className="p-2 rounded-md bg-black/50 hover:bg-black/70 transition-colors disabled:opacity-50"
-                  disabled={!videoDetail || isLoadingDetail || isImageContent}
+                  disabled={!videoDetail || isLoadingDetail}
                   onClick={onDesktopOpen}
                 >
                   <LayoutDashboard size={16} className="text-white" />
@@ -517,9 +510,11 @@ function VideoDetailContent({
         isOpen={isDesktopOpen}
         onOpenChange={onDesktopOpenChange}
         desktopId={desktopId}
-        assets={videoDetail && !isImageContent ? [
+        assets={videoDetail ? [
           {
-            assetType: "public_video" as const,
+            assetType: isImageContent
+              ? ("public_image" as const)
+              : ("public_video" as const),
             metadata: {
               storageKey: videoDetail.storage_key,
               contentUuid: videoDetail.content_uuid,

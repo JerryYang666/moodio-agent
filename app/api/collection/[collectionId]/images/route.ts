@@ -27,6 +27,11 @@ import { recordResearchEvent } from "@/lib/research-telemetry";
  *   - imageId: content_uuid (required, used as unique identifier)
  *   - assetId: storage_key (required, CloudFront content key)
  *   - assetType: "public_video" (required)
+ *
+ * For public images (browse/retrieval content):
+ *   - imageId: content_uuid (required, used as stable identifier)
+ *   - assetId: storage_key (required, CloudFront content key)
+ *   - assetType: "public_image" (required)
  */
 export async function POST(
   req: NextRequest,
@@ -97,6 +102,13 @@ export async function POST(
       );
     }
 
+    if (resolvedAssetType === "public_image" && !assetId) {
+      return NextResponse.json(
+        { error: "assetId (storage key) is required for public images" },
+        { status: 400 }
+      );
+    }
+
     // Check if asset already exists in collection (check by assetId to avoid duplicates)
     const [existingAsset] = await db
       .select()
@@ -155,6 +167,17 @@ export async function POST(
         recordResearchEvent({
           userId,
           eventType: "video_saved_to_collection",
+          imageId,
+          metadata: {
+            storageKey: resolvedAssetId,
+            collectionId,
+            source: "browse",
+          },
+        });
+      } else if (resolvedAssetType === "public_image") {
+        recordResearchEvent({
+          userId,
+          eventType: "image_saved_to_collection",
           imageId,
           metadata: {
             storageKey: resolvedAssetId,

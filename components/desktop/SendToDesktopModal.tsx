@@ -20,7 +20,7 @@ interface SendToDesktopModalProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
   assets: Array<{
-    assetType: "image" | "video" | "public_video" | "text" | "table";
+    assetType: "image" | "video" | "public_video" | "public_image" | "text" | "table";
     metadata: Record<string, unknown>;
   }>;
   /** When provided, skip desktop selection and send directly to this desktop */
@@ -38,10 +38,10 @@ const SEND_DEBOUNCE_MS = 2000;
 const LAST_DESKTOP_KEY = "moodio:lastSelectedDesktopId";
 
 function getAssetSize(a: SendToDesktopModalProps["assets"][number]): { w: number; h: number } {
-  const arDims = (a.assetType === "image" || a.assetType === "video" || a.assetType === "public_video")
+  const arDims = (a.assetType === "image" || a.assetType === "video" || a.assetType === "public_video" || a.assetType === "public_image")
     ? aspectRatioDimensions((a.metadata as any)?.aspectRatio, 300)
     : null;
-  if (a.assetType === "image") return arDims ?? { w: 300, h: 300 };
+  if (a.assetType === "image" || a.assetType === "public_image") return arDims ?? { w: 300, h: 300 };
   if (a.assetType === "video" || a.assetType === "public_video") return arDims ?? { w: 300, h: 300 };
   if (a.assetType === "text") return { w: 300, h: 200 };
   if (a.assetType === "table") {

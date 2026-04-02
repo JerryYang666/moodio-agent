@@ -6,6 +6,7 @@ import { verifyAccessToken } from "@/lib/auth/jwt";
 import { eq, or, and, desc, sql } from "drizzle-orm";
 import { ensureDefaultProject } from "@/lib/db/projects";
 import { getImageUrl } from "@/lib/storage/s3";
+import { getContentUrl } from "@/lib/config/video.config";
 import { getProjectPermission, hasProjectWritePermission } from "@/lib/project-utils";
 import { PERMISSION_OWNER } from "@/lib/permissions";
 import { TAG_COLOR_MAP } from "@/lib/tag-colors";
@@ -80,6 +81,8 @@ export async function GET(req: NextRequest) {
           .select({
             collectionId: collectionImages.collectionId,
             imageId: collectionImages.imageId,
+            assetId: collectionImages.assetId,
+            assetType: collectionImages.assetType,
           })
           .from(collectionImages)
           .where(sql`${collectionImages.collectionId} IN ${allCollectionIds}`)
@@ -90,6 +93,13 @@ export async function GET(req: NextRequest) {
     const coverMap = new Map<string, string>();
     for (const cover of coverImages) {
       if (cover.collectionId && !coverMap.has(cover.collectionId)) {
+        if (cover.assetType === "public_video") {
+          continue;
+        }
+        if (cover.assetType === "public_image") {
+          coverMap.set(cover.collectionId, getContentUrl(cover.assetId));
+          continue;
+        }
         coverMap.set(cover.collectionId, getImageUrl(cover.imageId));
       }
     }
