@@ -5,12 +5,13 @@ import {
   collectionImages,
   collectionShares,
   collectionTags,
+  folders,
   type CollectionShare,
   users
 } from "@/lib/db/schema";
 import { getAccessToken } from "@/lib/auth/cookies";
 import { verifyAccessToken } from "@/lib/auth/jwt";
-import { eq, and, desc, sql, ne } from "drizzle-orm";
+import { eq, and, desc, sql, ne, isNull } from "drizzle-orm";
 import { getImageUrl, getVideoUrl } from "@/lib/storage/s3";
 import { getContentUrl, getVideoUrl as getPublicVideoUrl } from "@/lib/config/video.config";
 import { getUserPermission } from "@/lib/collection-utils";
@@ -62,11 +63,11 @@ export async function GET(
       );
     }
 
-    // Get assets (images and videos) in collection
+    // Get assets (images and videos) directly in collection (not in sub-folders)
     const rawAssets = await db
       .select()
       .from(collectionImages)
-      .where(eq(collectionImages.collectionId, collectionId))
+      .where(and(eq(collectionImages.collectionId, collectionId), isNull(collectionImages.folderId)))
       .orderBy(desc(collectionImages.addedAt));
 
     // Add CloudFront URLs to assets
@@ -91,6 +92,13 @@ export async function GET(
         videoUrl: asset.assetType === "video" ? getVideoUrl(asset.assetId) : undefined,
       };
     });
+
+    // Get top-level folders in this collection
+    const topLevelFolders = await db
+      .select()
+      .from(folders)
+      .where(and(eq(folders.collectionId, collectionId), isNull(folders.parentId)))
+      .orderBy(folders.sortOrder, folders.name);
 
     // Get shares if user is owner
     let shares: (CollectionShare & { email: string })[] = [];
@@ -134,6 +142,7 @@ export async function GET(
         isOwner: isOwner(permission),
         tags,
       },
+      folders: topLevelFolders,
       images,
       shares,
     });

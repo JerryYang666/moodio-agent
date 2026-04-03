@@ -11,6 +11,7 @@ import {
   findItemById,
   touchCollection,
 } from "@/lib/collection-utils";
+import { getFolderPermission, hasFolderWritePermission } from "@/lib/folder-utils";
 
 /**
  * PATCH /api/collection/[collectionId]/images/[itemId]
@@ -37,8 +38,19 @@ export async function PATCH(
     const { collectionId, itemId } = await params;
 
     // Check permission (must be owner or collaborator)
+    // First check collection-level, then fall back to folder-level if asset is in a folder
     const permission = await getUserPermission(collectionId, userId);
-    if (!hasWritePermission(permission)) {
+    let canWrite = hasWritePermission(permission);
+
+    if (!canWrite) {
+      const existingItemForPerm = await findItemById(itemId, collectionId);
+      if (existingItemForPerm?.folderId) {
+        const folderPerm = await getFolderPermission(existingItemForPerm.folderId, userId);
+        canWrite = hasFolderWritePermission(folderPerm);
+      }
+    }
+
+    if (!canWrite) {
       return NextResponse.json(
         { error: "You don't have permission to update items in this collection" },
         { status: 403 }
@@ -127,8 +139,19 @@ export async function DELETE(
     const { collectionId, itemId } = await params;
 
     // Check permission (must be owner or collaborator)
+    // First check collection-level, then fall back to folder-level if asset is in a folder
     const permission = await getUserPermission(collectionId, userId);
-    if (!hasWritePermission(permission)) {
+    let canWrite = hasWritePermission(permission);
+
+    if (!canWrite) {
+      const existingItemForPerm = await findItemById(itemId, collectionId);
+      if (existingItemForPerm?.folderId) {
+        const folderPerm = await getFolderPermission(existingItemForPerm.folderId, userId);
+        canWrite = hasFolderWritePermission(folderPerm);
+      }
+    }
+
+    if (!canWrite) {
       return NextResponse.json(
         { error: "You don't have permission to remove items from this collection" },
         { status: 403 }

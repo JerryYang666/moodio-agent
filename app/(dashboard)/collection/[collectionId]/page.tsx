@@ -8,8 +8,6 @@ import { Button } from "@heroui/button";
 import { Input } from "@heroui/input";
 import { Spinner } from "@heroui/spinner";
 import { Chip } from "@heroui/chip";
-import { Image } from "@heroui/image";
-import { Select, SelectItem } from "@heroui/select";
 import { PERMISSION_OWNER, PERMISSION_COLLABORATOR, hasWriteAccess, isOwner, type Permission, type SharePermission } from "@/lib/permissions";
 import {
   Modal,
@@ -23,64 +21,30 @@ import { addToast } from "@heroui/toast";
 import {
   Pencil,
   Trash2,
-  Share2,
   ArrowLeft,
   X,
-  MoreVertical,
-  Eye,
-  MessageSquare,
-  Play,
-  Video,
-  Download,
-  Move,
-  Copy,
-  LayoutDashboard,
   Upload,
-  ImagePlus,
-  Search,
-  Star,
-  CheckSquare,
-  Check,
+  Folder,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useCollections } from "@/hooks/use-collections";
 import ImageDetailModal, {
   ImageInfo,
 } from "@/components/chat/image-detail-modal";
-import {
-  Dropdown,
-  DropdownTrigger,
-  DropdownMenu,
-  DropdownItem,
-} from "@heroui/dropdown";
 import SendToDesktopModal from "@/components/desktop/SendToDesktopModal";
 import AssetPickerModal from "@/components/chat/asset-picker-modal";
+import LocationPicker, { type LocationTarget } from "@/components/location-picker";
+import AssetPageActions from "@/components/asset-page-actions";
+import AssetCard from "@/components/asset-card";
+import AssetSearchFilter from "@/components/asset-search-filter";
+import BulkSelectionBar from "@/components/bulk-selection-bar";
+import VideoDetailModal from "@/components/video-detail-modal";
+import { buildDesktopSendPayload } from "@/lib/utils/desktop-payload";
 import { siteConfig } from "@/config/site";
 import { uploadImage, validateFile, getMaxFileSizeMB, shouldCompressFile, getCompressThresholdMB } from "@/lib/upload/client";
 import { useShareModal } from "@/hooks/use-share-modal";
 import ShareModal from "@/components/share-modal";
-
-interface CollectionAsset {
-  id: string;
-  collectionId: string;
-  imageId: string; // Thumbnail/display image ID (content_uuid for public_* assets)
-  assetId: string; // Actual asset ID (storage_key for public_* assets)
-  assetType: "image" | "video" | "public_video" | "public_image";
-  imageUrl: string; // CloudFront URL for image thumbnail/content
-  videoUrl?: string; // CloudFront URL for video (only for videos / public_video)
-  chatId: string | null;
-  generationDetails: {
-    title: string;
-    prompt: string;
-    status: "loading" | "generated" | "error" | "pending" | "processing" | "completed" | "failed";
-    imageUrl?: string;
-    videoUrl?: string;
-    source?: "browse";
-    storageKey?: string;
-  };
-  rating: number | null;
-  addedAt: Date;
-}
+import type { AssetItem } from "@/lib/types/asset";
 
 interface CollectionData {
   collection: {
@@ -93,7 +57,15 @@ interface CollectionData {
     permission: Permission;
     isOwner: boolean;
   };
-  images: CollectionAsset[];
+  folders: Array<{
+    id: string;
+    name: string;
+    collectionId: string;
+    depth: number;
+    createdAt: Date;
+    updatedAt: Date;
+  }>;
+  images: AssetItem[];
   shares: Array<{
     id: string;
     collectionId: string;
@@ -115,6 +87,7 @@ export default function CollectionPage({
   const router = useRouter();
   const t = useTranslations("collections");
   const tCommon = useTranslations("common");
+  const tFolders = useTranslations("folders");
   const { collections, renameCollection, deleteCollection, removeItemFromCollection, refreshCollections } =
     useCollections();
   const [collectionData, setCollectionData] = useState<CollectionData | null>(
@@ -123,6 +96,8 @@ export default function CollectionPage({
   const [loading, setLoading] = useState(true);
   const [isRenaming, setIsRenaming] = useState(false);
   const [newName, setNewName] = useState("");
+  const [newFolderName, setNewFolderName] = useState("");
+  const [isCreatingFolder, setIsCreatingFolder] = useState(false);
 
   // Modals
   const {
@@ -139,6 +114,11 @@ export default function CollectionPage({
     isOpen: isShareOpen,
     onOpen: onShareOpen,
     onOpenChange: onShareOpenChange,
+  } = useDisclosure();
+  const {
+    isOpen: isCreateFolderOpen,
+    onOpen: onCreateFolderOpen,
+    onOpenChange: onCreateFolderOpenChange,
   } = useDisclosure();
 
   const shareModal = useShareModal({
@@ -181,23 +161,22 @@ export default function CollectionPage({
     onOpen: onSendToDesktopOpen,
     onOpenChange: onSendToDesktopOpenChange,
   } = useDisclosure();
-  const [desktopSendAsset, setDesktopSendAsset] = useState<CollectionAsset | null>(null);
+  const [desktopSendAsset, setDesktopSendAsset] = useState<AssetItem | null>(null);
 
   const [selectedImage, setSelectedImage] = useState<ImageInfo | null>(null);
   const [allImages, setAllImages] = useState<ImageInfo[]>([]);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [assetToRemove, setAssetToRemove] = useState<CollectionAsset | null>(null);
-  const [selectedVideo, setSelectedVideo] = useState<CollectionAsset | null>(null);
+  const [assetToRemove, setAssetToRemove] = useState<AssetItem | null>(null);
+  const [selectedVideo, setSelectedVideo] = useState<AssetItem | null>(null);
 
   // Rename item state
-  const [itemToRename, setItemToRename] = useState<CollectionAsset | null>(null);
+  const [itemToRename, setItemToRename] = useState<AssetItem | null>(null);
   const [newItemTitle, setNewItemTitle] = useState("");
   const [isRenamingItem, setIsRenamingItem] = useState(false);
 
   // Move/Copy item state
-  const [itemToMove, setItemToMove] = useState<CollectionAsset | null>(null);
-  const [itemToCopy, setItemToCopy] = useState<CollectionAsset | null>(null);
-  const [selectedTargetCollection, setSelectedTargetCollection] = useState<string>("");
+  const [itemToMove, setItemToMove] = useState<AssetItem | null>(null);
+  const [itemToCopy, setItemToCopy] = useState<AssetItem | null>(null);
   const [isMovingItem, setIsMovingItem] = useState(false);
   const [isCopyingItem, setIsCopyingItem] = useState(false);
 
@@ -232,7 +211,6 @@ export default function CollectionPage({
     onOpen: onBulkDeleteOpen,
     onOpenChange: onBulkDeleteOpenChange,
   } = useDisclosure();
-  const [bulkTargetCollection, setBulkTargetCollection] = useState<string>("");
   const [isBulkMoving, setIsBulkMoving] = useState(false);
   const [isBulkCopying, setIsBulkCopying] = useState(false);
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
@@ -284,6 +262,28 @@ export default function CollectionPage({
     }
   };
 
+  const handleCreateFolder = async (onClose: () => void) => {
+    if (!newFolderName.trim()) return;
+    setIsCreatingFolder(true);
+    try {
+      const res = await fetch(`/api/collection/${collectionId}/folders`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newFolderName.trim() }),
+      });
+      if (res.ok) {
+        await fetchCollectionData();
+        onClose();
+        setNewFolderName("");
+        addToast({ title: tFolders("folderCreated"), color: "success" });
+      }
+    } catch {
+      addToast({ title: tFolders("failedToCreate"), color: "danger" });
+    } finally {
+      setIsCreatingFolder(false);
+    }
+  };
+
   const handleDelete = async () => {
     try {
       const success = await deleteCollection(collectionId);
@@ -323,7 +323,7 @@ export default function CollectionPage({
     }
   };
 
-  const confirmRemoveImage = (asset: CollectionAsset) => {
+  const confirmRemoveImage = (asset: AssetItem) => {
     setAssetToRemove(asset);
     onRemoveImageOpen();
   };
@@ -385,35 +385,30 @@ export default function CollectionPage({
     }
   };
 
-  const openRenameItemModal = (asset: CollectionAsset) => {
+  const openRenameItemModal = (asset: AssetItem) => {
     setItemToRename(asset);
     setNewItemTitle(asset.generationDetails.title);
     onRenameItemOpen();
   };
 
-  const handleMoveItem = async () => {
-    if (!itemToMove || !selectedTargetCollection) return;
+  const handleMoveItem = async (target: LocationTarget) => {
+    if (!itemToMove) return;
     setIsMovingItem(true);
     try {
-      // Use the unique record id for the API call
+      const body: Record<string, unknown> = { action: "move" };
+      if (target.type === "collection") body.targetCollectionId = target.collectionId;
+      else body.targetFolderId = target.folderId;
+
       const res = await fetch(
         `/api/collection/${collectionId}/images/${itemToMove.id}/transfer`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ 
-            targetCollectionId: selectedTargetCollection,
-            action: "move"
-          }),
+          body: JSON.stringify(body),
         }
       );
 
       if (res.ok) {
-        // Get target collection name for toast
-        const targetCollection = availableCollections.find(
-          (col) => col.id === selectedTargetCollection
-        );
-        // Remove from local state using unique record id, not imageId
         setCollectionData((prev) =>
           prev
             ? {
@@ -424,17 +419,9 @@ export default function CollectionPage({
               }
             : null
         );
-        addToast({
-          title: t("itemMoved"),
-          description: itemToMove.assetType === "video" || itemToMove.assetType === "public_video"
-            ? t("videoMovedDesc", { collection: targetCollection?.name || "collection" })
-            : t("imageMovedDesc", { collection: targetCollection?.name || "collection" }),
-          color: "success",
-        });
+        addToast({ title: t("itemMoved"), color: "success" });
         onMoveItemOpenChange();
         setItemToMove(null);
-        setSelectedTargetCollection("");
-        // Refresh collections to update counts
         refreshCollections();
       } else {
         throw new Error("Failed to move item");
@@ -451,45 +438,32 @@ export default function CollectionPage({
     }
   };
 
-  const openMoveItemModal = (asset: CollectionAsset) => {
+  const openMoveItemModal = (asset: AssetItem) => {
     setItemToMove(asset);
-    setSelectedTargetCollection("");
     onMoveItemOpen();
   };
 
-  const handleCopyItem = async () => {
-    if (!itemToCopy || !selectedTargetCollection) return;
+  const handleCopyItem = async (target: LocationTarget) => {
+    if (!itemToCopy) return;
     setIsCopyingItem(true);
     try {
-      // Use the unique record id for the API call
+      const body: Record<string, unknown> = { action: "copy" };
+      if (target.type === "collection") body.targetCollectionId = target.collectionId;
+      else body.targetFolderId = target.folderId;
+
       const res = await fetch(
         `/api/collection/${collectionId}/images/${itemToCopy.id}/transfer`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ 
-            targetCollectionId: selectedTargetCollection,
-            action: "copy"
-          }),
+          body: JSON.stringify(body),
         }
       );
 
       if (res.ok) {
-        // Get target collection name for toast
-        const targetCollection = availableCollections.find(
-          (col) => col.id === selectedTargetCollection
-        );
-        addToast({
-          title: t("itemCopied"),
-          description: itemToCopy.assetType === "video" || itemToCopy.assetType === "public_video"
-            ? t("videoCopiedDesc", { collection: targetCollection?.name || "collection" })
-            : t("imageCopiedDesc", { collection: targetCollection?.name || "collection" }),
-          color: "success",
-        });
+        addToast({ title: t("itemCopied"), color: "success" });
         onCopyItemOpenChange();
         setItemToCopy(null);
-        setSelectedTargetCollection("");
-        // Refresh collections to update counts
         refreshCollections();
       } else {
         throw new Error("Failed to copy item");
@@ -506,9 +480,8 @@ export default function CollectionPage({
     }
   };
 
-  const openCopyItemModal = (asset: CollectionAsset) => {
+  const openCopyItemModal = (asset: AssetItem) => {
     setItemToCopy(asset);
-    setSelectedTargetCollection("");
     onCopyItemOpen();
   };
 
@@ -527,26 +500,26 @@ export default function CollectionPage({
     setSelectedIds(new Set());
   };
 
-  const handleBulkMove = async () => {
-    if (selectedIds.size === 0 || !bulkTargetCollection) return;
+  const handleBulkMove = async (target: LocationTarget) => {
+    if (selectedIds.size === 0) return;
     setIsBulkMoving(true);
     try {
+      const apiBody: Record<string, unknown> = {
+        itemIds: Array.from(selectedIds),
+        action: "move",
+      };
+      if (target.type === "collection") apiBody.targetCollectionId = target.collectionId;
+      else apiBody.targetFolderId = target.folderId;
+
       const res = await fetch(
         `/api/collection/${collectionId}/images/bulk`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            itemIds: Array.from(selectedIds),
-            action: "move",
-            targetCollectionId: bulkTargetCollection,
-          }),
+          body: JSON.stringify(apiBody),
         }
       );
       if (res.ok) {
-        const targetCol = availableCollections.find(
-          (c) => c.id === bulkTargetCollection
-        );
         setCollectionData((prev) =>
           prev
             ? { ...prev, images: prev.images.filter((img) => !selectedIds.has(img.id)) }
@@ -554,10 +527,7 @@ export default function CollectionPage({
         );
         addToast({
           title: t("bulkMoved"),
-          description: t("bulkMovedDesc", {
-            count: selectedIds.size,
-            collection: targetCol?.name || "collection",
-          }),
+          description: t("bulkMovedDesc", { count: selectedIds.size, collection: "" }),
           color: "success",
         });
         onBulkMoveOpenChange();
@@ -573,32 +543,29 @@ export default function CollectionPage({
     }
   };
 
-  const handleBulkCopy = async () => {
-    if (selectedIds.size === 0 || !bulkTargetCollection) return;
+  const handleBulkCopy = async (target: LocationTarget) => {
+    if (selectedIds.size === 0) return;
     setIsBulkCopying(true);
     try {
+      const apiBody: Record<string, unknown> = {
+        itemIds: Array.from(selectedIds),
+        action: "copy",
+      };
+      if (target.type === "collection") apiBody.targetCollectionId = target.collectionId;
+      else apiBody.targetFolderId = target.folderId;
+
       const res = await fetch(
         `/api/collection/${collectionId}/images/bulk`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            itemIds: Array.from(selectedIds),
-            action: "copy",
-            targetCollectionId: bulkTargetCollection,
-          }),
+          body: JSON.stringify(apiBody),
         }
       );
       if (res.ok) {
-        const targetCol = availableCollections.find(
-          (c) => c.id === bulkTargetCollection
-        );
         addToast({
           title: t("bulkCopied"),
-          description: t("bulkCopiedDesc", {
-            count: selectedIds.size,
-            collection: targetCol?.name || "collection",
-          }),
+          description: t("bulkCopiedDesc", { count: selectedIds.size, collection: "" }),
           color: "success",
         });
         onBulkCopyOpenChange();
@@ -653,14 +620,7 @@ export default function CollectionPage({
     }
   };
 
-  // Get available collections for move/copy (exclude current collection)
-  const availableCollections = collections.filter(
-    (col) =>
-      col.id !== collectionId &&
-      hasWriteAccess(col.permission)
-  );
-
-  const handleAssetClick = (asset: CollectionAsset) => {
+  const handleAssetClick = (asset: AssetItem) => {
     if (isSelectionMode) {
       toggleSelection(asset.id);
       return;
@@ -701,7 +661,7 @@ export default function CollectionPage({
     }
   };
 
-  const handleRateAsset = async (asset: CollectionAsset, newRating: number) => {
+  const handleRateAsset = async (asset: AssetItem, newRating: number) => {
     const ratingValue = asset.rating === newRating ? null : newRating;
     setCollectionData((prev) =>
       prev
@@ -748,7 +708,7 @@ export default function CollectionPage({
     }
   };
 
-  const handleVideoDownload = async (asset: CollectionAsset) => {
+  const handleVideoDownload = async (asset: AssetItem) => {
     if (!asset.videoUrl) return;
     try {
       const response = await fetch(asset.videoUrl);
@@ -1014,66 +974,57 @@ export default function CollectionPage({
             <p className="text-default-500">{getAssetCountText()}</p>
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-            {canAddImages && images.length > 0 && (
-              <Button
-                variant={isSelectionMode ? "solid" : "flat"}
-                color={isSelectionMode ? "primary" : "default"}
-                startContent={isSelectionMode ? <X size={18} /> : <CheckSquare size={18} />}
-                onPress={() => isSelectionMode ? exitSelectionMode() : setIsSelectionMode(true)}
-                className="w-full sm:w-auto"
-              >
-                {isSelectionMode ? t("cancelSelection") : t("selectItems")}
-              </Button>
-            )}
-            {canAddImages && (
-              <Button
-                color="primary"
-                variant="flat"
-                startContent={isUploading ? undefined : <ImagePlus size={18} />}
-                onPress={() => setIsUploadPickerOpen(true)}
-                isLoading={isUploading}
-                className={`w-full sm:w-auto ${isSelectionMode ? "invisible" : ""}`}
-                tabIndex={isSelectionMode ? -1 : undefined}
-              >
-                {isCompressing ? t("compressing") : t("uploadImages")}
-              </Button>
-            )}
-            {canEdit && (
-              <>
-                <Button
-                  variant="flat"
-                  startContent={<Pencil size={18} />}
-                  onPress={onRenameOpen}
-                  className={`w-full sm:w-auto ${isSelectionMode ? "invisible" : ""}`}
-                  tabIndex={isSelectionMode ? -1 : undefined}
-                >
-                  {tCommon("rename")}
-                </Button>
-                <Button
-                  variant="flat"
-                  startContent={<Share2 size={18} />}
-                  onPress={onShareOpen}
-                  className={`w-full sm:w-auto ${isSelectionMode ? "invisible" : ""}`}
-                  tabIndex={isSelectionMode ? -1 : undefined}
-                >
-                  {tCommon("share") || "Share"}
-                </Button>
-                <Button
-                  color="danger"
-                  variant="flat"
-                  startContent={<Trash2 size={18} />}
-                  onPress={onDeleteOpen}
-                  className={`w-full sm:w-auto ${isSelectionMode ? "invisible" : ""}`}
-                  tabIndex={isSelectionMode ? -1 : undefined}
-                >
-                  {tCommon("delete")}
-                </Button>
-              </>
-            )}
-          </div>
+          <AssetPageActions
+            hasAssets={images.length > 0}
+            canWrite={canAddImages}
+            canEdit={canEdit}
+            isSelectionMode={isSelectionMode}
+            isUploading={isUploading}
+            isCompressing={isCompressing}
+            onToggleSelection={() => isSelectionMode ? exitSelectionMode() : setIsSelectionMode(true)}
+            onUpload={() => setIsUploadPickerOpen(true)}
+            onCreateFolder={onCreateFolderOpen}
+            onRename={onRenameOpen}
+            onShare={onShareOpen}
+            onDelete={onDeleteOpen}
+            labels={{
+              selectItems: t("selectItems"),
+              cancelSelection: t("cancelSelection"),
+              uploadImages: t("uploadImages"),
+              compressing: t("compressing"),
+              newFolder: tFolders("newFolder"),
+              rename: tCommon("rename"),
+              share: tCommon("share"),
+              delete: tCommon("delete"),
+            }}
+          />
         </div>
       </div>
+
+      {/* Folders Grid */}
+      {collectionData?.folders && collectionData.folders.length > 0 && (
+        <div className="mb-6">
+          <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
+            <Folder size={20} />
+            {tFolders("folders")}
+          </h3>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+            {collectionData.folders.map((folder) => (
+              <Card
+                key={folder.id}
+                isPressable
+                onPress={() => router.push(`/folder/${folder.id}`)}
+                className="hover:bg-default-100 transition-colors"
+              >
+                <CardBody className="flex flex-row items-center gap-3 py-3">
+                  <Folder size={20} className="text-default-500 shrink-0" />
+                  <span className="font-medium truncate">{folder.name}</span>
+                </CardBody>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Assets Grid */}
       {images.length === 0 ? (
@@ -1082,48 +1033,16 @@ export default function CollectionPage({
         </div>
       ) : (
         <>
-          <div className="mb-4 flex flex-wrap items-center gap-3">
-            <Input
-              placeholder={t("searchAssets")}
-              value={assetSearchQuery}
-              onValueChange={setAssetSearchQuery}
-              startContent={<Search size={18} className="text-default-400" />}
-              isClearable
-              onClear={() => setAssetSearchQuery("")}
-              className="max-w-sm"
-            />
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs text-default-500 mr-0.5">{t("filterByRating")}:</span>
-              {[1, 2, 3, 4, 5].map((star) => (
-                <button
-                  key={star}
-                  type="button"
-                  className="p-0.5 leading-none cursor-pointer"
-                  onClick={() => setFilterRating(filterRating === star ? null : star)}
-                >
-                  <Star
-                    size={18}
-                    className={
-                      filterRating !== null && star <= filterRating
-                        ? "text-yellow-400 fill-yellow-400"
-                        : "text-default-300"
-                    }
-                  />
-                </button>
-              ))}
-              {filterRating !== null && (
-                <Button
-                  size="sm"
-                  variant="light"
-                  isIconOnly
-                  onPress={() => setFilterRating(null)}
-                  className="min-w-6 w-6 h-6"
-                >
-                  <X size={14} />
-                </Button>
-              )}
-            </div>
-          </div>
+          <AssetSearchFilter
+            searchQuery={assetSearchQuery}
+            onSearchChange={setAssetSearchQuery}
+            filterRating={filterRating}
+            onFilterRatingChange={setFilterRating}
+            labels={{
+              searchAssets: t("searchAssets"),
+              filterByRating: t("filterByRating"),
+            }}
+          />
           {(() => {
             let filteredImages = images;
             if (assetSearchQuery.trim()) {
@@ -1148,181 +1067,43 @@ export default function CollectionPage({
 
             return (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                {filteredImages.map((asset) => {
-                  const isSelected = selectedIds.has(asset.id);
-                  return (
-                  <Card
+                {filteredImages.map((asset) => (
+                  <AssetCard
                     key={asset.id}
-                    className={`group relative ${isSelectionMode && isSelected ? "ring-2 ring-primary ring-offset-2 ring-offset-background" : ""}`}
-                  >
-                    <CardBody className="p-0 overflow-hidden aspect-square relative rounded-lg">
-                      {asset.assetType === "public_video" && asset.videoUrl ? (
-                        <div
-                          className={`w-full h-full cursor-pointer ${isSelectionMode && isSelected ? "opacity-80" : ""}`}
-                          onClick={() => handleAssetClick(asset)}
-                        >
-                          <video
-                            src={asset.videoUrl}
-                            muted
-                            loop
-                            playsInline
-                            autoPlay
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                      ) : (
-                        <Image
-                          src={asset.imageUrl}
-                          alt={asset.generationDetails.title}
-                          radius="none"
-                          classNames={{
-                            wrapper: `w-full h-full !max-w-full ${isSelectionMode ? "cursor-pointer" : "cursor-pointer"}`,
-                            img: `w-full h-full object-cover transition-opacity ${isSelectionMode && isSelected ? "opacity-80" : ""}`,
-                          }}
-                          onClick={() => handleAssetClick(asset)}
-                        />
-                      )}
-                      {/* Selection checkbox overlay */}
-                      {isSelectionMode && (
-                        <div
-                          className="absolute top-2 left-2 z-20 cursor-pointer"
-                          onClick={(e) => { e.stopPropagation(); toggleSelection(asset.id); }}
-                        >
-                          <div className={`w-6 h-6 rounded-md flex items-center justify-center transition-colors ${isSelected ? "bg-primary text-white" : "bg-background/80 backdrop-blur-sm border border-default-300"}`}>
-                            {isSelected && <Check size={14} />}
-                          </div>
-                        </div>
-                      )}
-                      {/* Video Badge */}
-                      {(asset.assetType === "video" || asset.assetType === "public_video") && (
-                        <div className={`absolute ${isSelectionMode ? "top-2 left-10" : "top-2 left-2"} z-10`}>
-                          <div className="bg-black/70 text-white rounded-full p-1.5 flex items-center gap-1">
-                            <Play size={12} fill="white" />
-                            <span className="text-[10px] font-medium pr-1">{t("video")}</span>
-                          </div>
-                        </div>
-                      )}
-                      <div className="absolute bottom-0 left-0 right-0 z-10 bg-linear-to-t from-black/70 to-transparent pt-6 pb-1.5 px-2">
-                        <p className="text-xs text-white truncate pointer-events-none">
-                          {asset.generationDetails.title}
-                        </p>
-                        <div
-                          className="flex gap-0.5 mt-0.5"
-                          onMouseLeave={() => setHoveredRating(null)}
-                        >
-                          {[1, 2, 3, 4, 5].map((star) => {
-                            const preview = hoveredRating?.assetId === asset.id ? hoveredRating.star : null;
-                            const filled = preview !== null ? star <= preview : star <= (asset.rating ?? 0);
-                            return (
-                              <button
-                                key={star}
-                                type="button"
-                                className="p-0 leading-none cursor-pointer"
-                                onMouseEnter={() => setHoveredRating({ assetId: asset.id, star })}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleRateAsset(asset, star);
-                                }}
-                              >
-                                <Star
-                                  size={14}
-                                  className={
-                                    filled
-                                      ? "text-yellow-400 fill-yellow-400"
-                                      : "text-white/50"
-                                  }
-                                />
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                      {canAddImages && !isSelectionMode && (
-                        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
-                          <Dropdown>
-                              <DropdownTrigger>
-                                <Button
-                                  isIconOnly
-                                  size="sm"
-                                  variant="solid"
-                                  className="bg-background/80 backdrop-blur-sm"
-                                >
-                                  <MoreVertical size={16} />
-                                </Button>
-                              </DropdownTrigger>
-                              <DropdownMenu aria-label="Asset actions">
-                                <DropdownItem
-                                  key="view"
-                                  startContent={<Eye size={16} />}
-                                  onPress={() => handleAssetClick(asset)}
-                                >
-                                  {t("viewDetails")}
-                                </DropdownItem>
-                                <DropdownItem
-                                  key="rename"
-                                  startContent={<Pencil size={16} />}
-                                  onPress={() => openRenameItemModal(asset)}
-                                >
-                                  {tCommon("rename")}
-                                </DropdownItem>
-                                <DropdownItem
-                                  key="move"
-                                  startContent={<Move size={16} />}
-                                  onPress={() => openMoveItemModal(asset)}
-                                  isDisabled={availableCollections.length === 0}
-                                >
-                                  {t("moveTo")}
-                                </DropdownItem>
-                                <DropdownItem
-                                  key="copy"
-                                  startContent={<Copy size={16} />}
-                                  onPress={() => openCopyItemModal(asset)}
-                                  isDisabled={availableCollections.length === 0}
-                                >
-                                  {t("copyTo")}
-                                </DropdownItem>
-                                <DropdownItem
-                                  key="desktop"
-                                  startContent={<LayoutDashboard size={16} />}
-                                  onPress={() => {
-                                    setDesktopSendAsset(asset);
-                                    onSendToDesktopOpen();
-                                  }}
-                                >
-                                  Send to Desktop
-                                </DropdownItem>
-                                {asset.chatId && collection.isOwner ? (
-                                  <DropdownItem
-                                    key="chat"
-                                    startContent={<MessageSquare size={16} />}
-                                    onPress={() => {
-                                      const params = new URLSearchParams();
-                                      params.set("assetId", asset.imageId);
-                                      const msgTs = (asset.generationDetails as any)?.messageTimestamp;
-                                      if (msgTs) params.set("messageTimestamp", String(msgTs));
-                                      router.push(`/chat/${asset.chatId}?${params.toString()}`);
-                                    }}
-                                  >
-                                    {t("goToChat")}
-                                  </DropdownItem>
-                                ) : null}
-                                <DropdownItem
-                                  key="remove"
-                                  className="text-danger"
-                                  color="danger"
-                                  startContent={<Trash2 size={16} />}
-                                  onPress={() => confirmRemoveImage(asset)}
-                                >
-                                  {t("removeFromCollection")}
-                                </DropdownItem>
-                              </DropdownMenu>
-                            </Dropdown>
-                          </div>
-                        )}
-                      </CardBody>
-                    </Card>
-                  );
-                })}
+                    asset={asset}
+                    isSelectionMode={isSelectionMode}
+                    isSelected={selectedIds.has(asset.id)}
+                    canWrite={canAddImages}
+                    showChat={collection.isOwner}
+                    hoveredRating={hoveredRating}
+                    onHoverRating={setHoveredRating}
+                    onClick={handleAssetClick}
+                    onToggleSelection={toggleSelection}
+                    onRate={handleRateAsset}
+                    onRename={openRenameItemModal}
+                    onMove={openMoveItemModal}
+                    onCopy={openCopyItemModal}
+                    onDesktop={(a) => { setDesktopSendAsset(a); onSendToDesktopOpen(); }}
+                    onChat={(a) => {
+                      const params = new URLSearchParams();
+                      params.set("assetId", a.imageId);
+                      const msgTs = (a.generationDetails as any)?.messageTimestamp;
+                      if (msgTs) params.set("messageTimestamp", String(msgTs));
+                      router.push(`/chat/${a.chatId}?${params.toString()}`);
+                    }}
+                    onRemove={confirmRemoveImage}
+                    labels={{
+                      video: t("video"),
+                      viewDetails: t("viewDetails"),
+                      rename: tCommon("rename"),
+                      moveTo: t("moveTo"),
+                      copyTo: t("copyTo"),
+                      sendToDesktop: "Send to Desktop",
+                      goToChat: t("goToChat"),
+                      remove: t("removeFromCollection"),
+                    }}
+                  />
+                ))}
               </div>
             );
           })()}
@@ -1330,169 +1111,73 @@ export default function CollectionPage({
       )}
 
       {/* Floating Bulk Selection Bar */}
-      <AnimatePresence>
-        {isSelectionMode && selectedIds.size > 0 && (
-          <motion.div
-            initial={{ y: 80, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: 80, opacity: 0 }}
-            transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40"
-          >
-            <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-background/95 backdrop-blur-md border border-divider shadow-lg">
-              <span className="text-sm font-medium whitespace-nowrap mr-1">
-                {t("selectedCount", { count: selectedIds.size })}
-              </span>
-              <Button
-                size="sm"
-                variant="flat"
-                onPress={() => {
-                  const currentFiltered = images.filter((a) => {
-                    let pass = true;
-                    if (assetSearchQuery.trim()) {
-                      pass = a.generationDetails.title.toLowerCase().includes(assetSearchQuery.trim().toLowerCase());
-                    }
-                    if (pass && filterRating !== null) {
-                      pass = a.rating !== null && a.rating >= filterRating;
-                    }
-                    return pass;
-                  });
-                  const allSelected = currentFiltered.every((a) => selectedIds.has(a.id));
-                  if (allSelected) {
-                    setSelectedIds(new Set());
-                  } else {
-                    setSelectedIds(new Set(currentFiltered.map((a) => a.id)));
-                  }
-                }}
-              >
-                {(() => {
-                  const currentFiltered = images.filter((a) => {
-                    let pass = true;
-                    if (assetSearchQuery.trim()) {
-                      pass = a.generationDetails.title.toLowerCase().includes(assetSearchQuery.trim().toLowerCase());
-                    }
-                    if (pass && filterRating !== null) {
-                      pass = a.rating !== null && a.rating >= filterRating;
-                    }
-                    return pass;
-                  });
-                  return currentFiltered.every((a) => selectedIds.has(a.id))
-                    ? t("deselectAll")
-                    : t("selectAll");
-                })()}
-              </Button>
-              <div className="w-px h-5 bg-divider mx-1" />
-              <Button
-                size="sm"
-                variant="flat"
-                startContent={<Copy size={14} />}
-                onPress={() => { setBulkTargetCollection(""); onBulkCopyOpen(); }}
-                isDisabled={availableCollections.length === 0}
-              >
-                {t("bulkCopyTo")}
-              </Button>
-              <Button
-                size="sm"
-                variant="flat"
-                startContent={<Move size={14} />}
-                onPress={() => { setBulkTargetCollection(""); onBulkMoveOpen(); }}
-                isDisabled={availableCollections.length === 0}
-              >
-                {t("bulkMoveTo")}
-              </Button>
-              <Button
-                size="sm"
-                variant="flat"
-                color="danger"
-                startContent={<Trash2 size={14} />}
-                onPress={onBulkDeleteOpen}
-              >
-                {t("bulkDelete")}
-              </Button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <BulkSelectionBar
+        visible={isSelectionMode}
+        selectedCount={selectedIds.size}
+        isAllSelected={(() => {
+          const currentFiltered = images.filter((a) => {
+            let pass = true;
+            if (assetSearchQuery.trim()) {
+              pass = a.generationDetails.title.toLowerCase().includes(assetSearchQuery.trim().toLowerCase());
+            }
+            if (pass && filterRating !== null) {
+              pass = a.rating !== null && a.rating >= filterRating;
+            }
+            return pass;
+          });
+          return currentFiltered.length > 0 && currentFiltered.every((a) => selectedIds.has(a.id));
+        })()}
+        onToggleSelectAll={() => {
+          const currentFiltered = images.filter((a) => {
+            let pass = true;
+            if (assetSearchQuery.trim()) {
+              pass = a.generationDetails.title.toLowerCase().includes(assetSearchQuery.trim().toLowerCase());
+            }
+            if (pass && filterRating !== null) {
+              pass = a.rating !== null && a.rating >= filterRating;
+            }
+            return pass;
+          });
+          const allSelected = currentFiltered.every((a) => selectedIds.has(a.id));
+          if (allSelected) {
+            setSelectedIds(new Set());
+          } else {
+            setSelectedIds(new Set(currentFiltered.map((a) => a.id)));
+          }
+        }}
+        onCopy={onBulkCopyOpen}
+        onMove={onBulkMoveOpen}
+        onDelete={onBulkDeleteOpen}
+        labels={{
+          selectedCount: t("selectedCount", { count: selectedIds.size }),
+          selectAll: t("selectAll"),
+          deselectAll: t("deselectAll"),
+          bulkCopyTo: t("bulkCopyTo"),
+          bulkMoveTo: t("bulkMoveTo"),
+          bulkDelete: t("bulkDelete"),
+        }}
+      />
 
-      {/* Bulk Move Modal */}
-      <Modal isOpen={isBulkMoveOpen} onOpenChange={onBulkMoveOpenChange}>
-        <ModalContent>
-          {(onClose) => (
-            <>
-              <ModalHeader>{t("bulkMoveToCollection", { count: selectedIds.size })}</ModalHeader>
-              <ModalBody>
-                {availableCollections.length === 0 ? (
-                  <p className="text-default-500">{t("noOtherCollections")}</p>
-                ) : (
-                  <Select
-                    label={t("selectCollection")}
-                    placeholder={t("chooseCollection")}
-                    selectedKeys={bulkTargetCollection ? [bulkTargetCollection] : []}
-                    onChange={(e) => setBulkTargetCollection(e.target.value)}
-                  >
-                    {availableCollections.map((col) => (
-                      <SelectItem key={col.id}>{col.name}</SelectItem>
-                    ))}
-                  </Select>
-                )}
-              </ModalBody>
-              <ModalFooter>
-                <Button variant="light" onPress={onClose}>
-                  {tCommon("cancel")}
-                </Button>
-                <Button
-                  color="primary"
-                  onPress={handleBulkMove}
-                  isLoading={isBulkMoving}
-                  isDisabled={!bulkTargetCollection}
-                >
-                  {t("move")}
-                </Button>
-              </ModalFooter>
-            </>
-          )}
-        </ModalContent>
-      </Modal>
+      {/* Bulk Move */}
+      <LocationPicker
+        isOpen={isBulkMoveOpen}
+        onOpenChange={(open) => { if (!open) onBulkMoveOpenChange(); }}
+        title={t("bulkMoveToCollection", { count: selectedIds.size })}
+        confirmLabel={t("move")}
+        isLoading={isBulkMoving}
+        excludeCollectionId={collectionId}
+        onConfirm={handleBulkMove}
+      />
 
-      {/* Bulk Copy Modal */}
-      <Modal isOpen={isBulkCopyOpen} onOpenChange={onBulkCopyOpenChange}>
-        <ModalContent>
-          {(onClose) => (
-            <>
-              <ModalHeader>{t("bulkCopyToCollection", { count: selectedIds.size })}</ModalHeader>
-              <ModalBody>
-                {availableCollections.length === 0 ? (
-                  <p className="text-default-500">{t("noOtherCollections")}</p>
-                ) : (
-                  <Select
-                    label={t("selectCollection")}
-                    placeholder={t("chooseCollection")}
-                    selectedKeys={bulkTargetCollection ? [bulkTargetCollection] : []}
-                    onChange={(e) => setBulkTargetCollection(e.target.value)}
-                  >
-                    {availableCollections.map((col) => (
-                      <SelectItem key={col.id}>{col.name}</SelectItem>
-                    ))}
-                  </Select>
-                )}
-              </ModalBody>
-              <ModalFooter>
-                <Button variant="light" onPress={onClose}>
-                  {tCommon("cancel")}
-                </Button>
-                <Button
-                  color="primary"
-                  onPress={handleBulkCopy}
-                  isLoading={isBulkCopying}
-                  isDisabled={!bulkTargetCollection}
-                >
-                  {t("copy")}
-                </Button>
-              </ModalFooter>
-            </>
-          )}
-        </ModalContent>
-      </Modal>
+      {/* Bulk Copy */}
+      <LocationPicker
+        isOpen={isBulkCopyOpen}
+        onOpenChange={(open) => { if (!open) onBulkCopyOpenChange(); }}
+        title={t("bulkCopyToCollection", { count: selectedIds.size })}
+        confirmLabel={t("copy")}
+        isLoading={isBulkCopying}
+        onConfirm={handleBulkCopy}
+      />
 
       {/* Bulk Delete Confirmation Modal */}
       <Modal isOpen={isBulkDeleteOpen} onOpenChange={onBulkDeleteOpenChange}>
@@ -1627,78 +1312,18 @@ export default function CollectionPage({
       />
 
       {/* Video Detail Modal */}
-      <Modal
+      <VideoDetailModal
         isOpen={isVideoDetailOpen}
         onOpenChange={onVideoDetailOpenChange}
-        size="4xl"
-        scrollBehavior="inside"
-      >
-        <ModalContent>
-          {(onClose) => (
-            <>
-              <ModalHeader className="flex items-center gap-2">
-                <Video size={20} />
-                {t("videoDetails")}
-              </ModalHeader>
-              <ModalBody>
-                {selectedVideo && (
-                  <div className="space-y-4">
-                    {/* Video Player */}
-                    <div className="rounded-lg overflow-hidden bg-black">
-                      {selectedVideo.videoUrl ? (
-                        <video
-                          src={selectedVideo.videoUrl}
-                          controls
-                          autoPlay
-                          playsInline
-                          className="w-full max-h-[60vh]"
-                        />
-                      ) : (
-                        <div className="aspect-video flex items-center justify-center">
-                          <Image
-                            src={selectedVideo.imageUrl}
-                            alt={selectedVideo.generationDetails.title}
-                            classNames={{
-                              wrapper: "w-full h-full",
-                              img: "w-full h-full object-contain",
-                            }}
-                          />
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Title & Prompt */}
-                    <div className="bg-default-100 p-4 rounded-lg">
-                      <h4 className="font-medium mb-2">
-                        {selectedVideo.generationDetails.title || t("untitledVideo")}
-                      </h4>
-                      {selectedVideo.generationDetails.prompt && (
-                        <p className="text-sm text-default-600 whitespace-pre-wrap">
-                          {selectedVideo.generationDetails.prompt}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </ModalBody>
-              <ModalFooter>
-                {selectedVideo?.videoUrl && (
-                  <Button
-                    color="primary"
-                    startContent={<Download size={16} />}
-                    onPress={() => handleVideoDownload(selectedVideo)}
-                  >
-                    {tCommon("download")}
-                  </Button>
-                )}
-                <Button variant="light" onPress={onClose}>
-                  {tCommon("close")}
-                </Button>
-              </ModalFooter>
-            </>
-          )}
-        </ModalContent>
-      </Modal>
+        asset={selectedVideo}
+        onDownload={handleVideoDownload}
+        labels={{
+          videoDetails: t("videoDetails"),
+          untitledVideo: t("untitledVideo"),
+          download: tCommon("download"),
+          close: tCommon("close"),
+        }}
+      />
 
       {/* Rename Item Modal */}
       <Modal isOpen={isRenameItemOpen} onOpenChange={onRenameItemOpenChange}>
@@ -1737,133 +1362,67 @@ export default function CollectionPage({
         </ModalContent>
       </Modal>
 
-      {/* Move Item Modal */}
-      <Modal isOpen={isMoveItemOpen} onOpenChange={onMoveItemOpenChange}>
-        <ModalContent>
-          {(onClose) => (
-            <>
-              <ModalHeader>{t("moveToCollection")}</ModalHeader>
-              <ModalBody>
-                {availableCollections.length === 0 ? (
-                  <p className="text-default-500">
-                    {t("noOtherCollections")}
-                  </p>
-                ) : (
-                  <Select
-                    label={t("selectCollection")}
-                    placeholder={t("chooseCollection")}
-                    selectedKeys={selectedTargetCollection ? [selectedTargetCollection] : []}
-                    onChange={(e) => setSelectedTargetCollection(e.target.value)}
-                  >
-                    {availableCollections.map((col) => (
-                      <SelectItem key={col.id}>{col.name}</SelectItem>
-                    ))}
-                  </Select>
-                )}
-              </ModalBody>
-              <ModalFooter>
-                <Button variant="light" onPress={onClose}>
-                  {tCommon("cancel")}
-                </Button>
-                <Button
-                  color="primary"
-                  onPress={handleMoveItem}
-                  isLoading={isMovingItem}
-                  isDisabled={!selectedTargetCollection}
-                >
-                  {t("move")}
-                </Button>
-              </ModalFooter>
-            </>
-          )}
-        </ModalContent>
-      </Modal>
+      {/* Move Item */}
+      <LocationPicker
+        isOpen={isMoveItemOpen}
+        onOpenChange={(open) => { if (!open) onMoveItemOpenChange(); }}
+        title={t("moveToCollection")}
+        confirmLabel={t("move")}
+        isLoading={isMovingItem}
+        excludeCollectionId={collectionId}
+        onConfirm={handleMoveItem}
+      />
 
-      {/* Copy Item Modal */}
-      <Modal isOpen={isCopyItemOpen} onOpenChange={onCopyItemOpenChange}>
-        <ModalContent>
-          {(onClose) => (
-            <>
-              <ModalHeader>{t("copyToCollection")}</ModalHeader>
-              <ModalBody>
-                {availableCollections.length === 0 ? (
-                  <p className="text-default-500">
-                    {t("noOtherCollections")}
-                  </p>
-                ) : (
-                  <Select
-                    label={t("selectCollection")}
-                    placeholder={t("chooseCollection")}
-                    selectedKeys={selectedTargetCollection ? [selectedTargetCollection] : []}
-                    onChange={(e) => setSelectedTargetCollection(e.target.value)}
-                  >
-                    {availableCollections.map((col) => (
-                      <SelectItem key={col.id}>{col.name}</SelectItem>
-                    ))}
-                  </Select>
-                )}
-              </ModalBody>
-              <ModalFooter>
-                <Button variant="light" onPress={onClose}>
-                  {tCommon("cancel")}
-                </Button>
-                <Button
-                  color="primary"
-                  onPress={handleCopyItem}
-                  isLoading={isCopyingItem}
-                  isDisabled={!selectedTargetCollection}
-                >
-                  {t("copy")}
-                </Button>
-              </ModalFooter>
-            </>
-          )}
-        </ModalContent>
-      </Modal>
+      {/* Copy Item */}
+      <LocationPicker
+        isOpen={isCopyItemOpen}
+        onOpenChange={(open) => { if (!open) onCopyItemOpenChange(); }}
+        title={t("copyToCollection")}
+        confirmLabel={t("copy")}
+        isLoading={isCopyingItem}
+        onConfirm={handleCopyItem}
+      />
 
       {/* Send to Desktop Modal */}
       <SendToDesktopModal
         isOpen={isSendToDesktopOpen}
         onOpenChange={onSendToDesktopOpenChange}
-        assets={
-          desktopSendAsset
-            ? [
-                {
-                  assetType: desktopSendAsset.assetType,
-                  metadata:
-                    desktopSendAsset.assetType === "public_video"
-                      ? {
-                          storageKey: desktopSendAsset.assetId,
-                          contentUuid: desktopSendAsset.imageId,
-                          title: desktopSendAsset.generationDetails.title,
-                        }
-                      : desktopSendAsset.assetType === "public_image"
-                        ? {
-                            storageKey: desktopSendAsset.assetId,
-                            contentUuid: desktopSendAsset.imageId,
-                            title: desktopSendAsset.generationDetails.title,
-                          }
-                      : desktopSendAsset.assetType === "video"
-                        ? {
-                            imageId: desktopSendAsset.imageId,
-                            videoId: desktopSendAsset.assetId,
-                            chatId: desktopSendAsset.chatId,
-                            title: desktopSendAsset.generationDetails.title,
-                            prompt: desktopSendAsset.generationDetails.prompt,
-                            status: desktopSendAsset.generationDetails.status,
-                          }
-                        : {
-                            imageId: desktopSendAsset.imageId,
-                            chatId: desktopSendAsset.chatId,
-                            title: desktopSendAsset.generationDetails.title,
-                            prompt: desktopSendAsset.generationDetails.prompt,
-                            status: desktopSendAsset.generationDetails.status,
-                        },
-                },
-              ]
-            : []
-        }
+        assets={desktopSendAsset ? [buildDesktopSendPayload(desktopSendAsset)] : []}
       />
+
+      {/* Create Folder Modal */}
+      <Modal isOpen={isCreateFolderOpen} onOpenChange={onCreateFolderOpenChange}>
+        <ModalContent>
+          {(onClose) => (
+            <>
+              <ModalHeader>{tFolders("createFolder")}</ModalHeader>
+              <ModalBody>
+                <Input
+                  label={tFolders("folderName")}
+                  value={newFolderName}
+                  onValueChange={setNewFolderName}
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleCreateFolder(onClose);
+                  }}
+                />
+              </ModalBody>
+              <ModalFooter>
+                <Button variant="flat" onPress={onClose}>
+                  {tCommon("cancel")}
+                </Button>
+                <Button
+                  color="primary"
+                  onPress={() => handleCreateFolder(onClose)}
+                  isLoading={isCreatingFolder}
+                >
+                  {tCommon("create")}
+                </Button>
+              </ModalFooter>
+            </>
+          )}
+        </ModalContent>
+      </Modal>
 
       {/* Drop zone overlay for external file drag */}
       <AnimatePresence>

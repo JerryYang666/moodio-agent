@@ -25,7 +25,7 @@ import {
   DropdownItem,
 } from "@heroui/dropdown";
 import { Folder, Plus, Share2, FolderOpen, MoreVertical, Pencil, Video, LayoutGrid } from "lucide-react";
-import { useGetCollectionsQuery } from "@/lib/redux/services/next-api";
+import { useGetCollectionsQuery, useGetSharedFoldersQuery } from "@/lib/redux/services/next-api";
 import VideoList from "@/components/storyboard/video-list";
 import CollectionsContent from "@/components/collection/collections-content";
 
@@ -65,13 +65,14 @@ export default function ProjectsPage() {
   const [isRenaming, setIsRenaming] = useState(false);
 
   const { data: collections = [], isLoading: collectionsLoading } = useGetCollectionsQuery();
+  const { data: sharedFolders = [], isLoading: sharedFoldersLoading } = useGetSharedFoldersQuery();
 
   const sharedCollections = useMemo(
     () => collections.filter((c) => !c.isOwner),
     [collections]
   );
 
-  const loading = projectsLoading || collectionsLoading;
+  const loading = projectsLoading || collectionsLoading || sharedFoldersLoading;
 
   useEffect(() => {
     const load = async () => {
@@ -368,6 +369,43 @@ export default function ProjectsPage() {
                             </h3>
                             <Chip size="sm" variant="flat" color="secondary">
                               {c.permission}
+                            </Chip>
+                          </CardFooter>
+                        </Card>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {sharedFolders.length > 0 && (
+                  <div className="mt-10">
+                    <div className="flex items-center gap-2 mb-4">
+                      <Share2 size={18} className="text-default-500" />
+                      <h2 className="text-lg font-semibold">{t("projects.sharedFolders")}</h2>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                      {sharedFolders.map((f) => (
+                        <Card
+                          key={f.id}
+                          isPressable
+                          onPress={() => router.push(`/folder/${f.id}`)}
+                        >
+                          <CardBody className="p-3 pb-1">
+                            <div className="w-full h-36 bg-default-100 rounded-lg overflow-hidden">
+                              <div className="flex items-center justify-center w-full h-full">
+                                <Folder size={40} className="text-default-400" />
+                              </div>
+                            </div>
+                          </CardBody>
+                          <CardFooter className="flex flex-col items-start gap-1 px-3 pt-1 pb-3">
+                            <h3 className="font-semibold text-base truncate w-full">
+                              {f.name}
+                            </h3>
+                            <p className="text-xs text-default-400 truncate w-full">
+                              {f.collectionName}
+                            </p>
+                            <Chip size="sm" variant="flat" color="secondary">
+                              {f.permission}
                             </Chip>
                           </CardFooter>
                         </Card>

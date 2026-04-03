@@ -93,6 +93,49 @@ export interface CollectionTagItem {
   color: string;
 }
 
+// Types for folders
+export interface FolderItem {
+  id: string;
+  collectionId: string;
+  parentId: string | null;
+  userId: string;
+  name: string;
+  path: string;
+  depth: number;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface FolderDetailResponse {
+  folder: FolderItem & { permission: string; isOwner: boolean };
+  collection: { id: string; name: string; projectId: string } | null;
+  childFolders: FolderItem[];
+  images: unknown[];
+  shares: unknown[];
+}
+
+export interface FolderBreadcrumbsResponse {
+  projectId: string;
+  breadcrumbs: Array<{ id: string; name: string; type: "collection" | "folder" }>;
+}
+
+export interface FolderTreeItem {
+  id: string;
+  name: string;
+  parentId: string | null;
+  depth: number;
+}
+
+export interface SharedFolderItem {
+  id: string;
+  name: string;
+  collectionId: string;
+  collectionName: string;
+  permission: string;
+  sharedAt: string;
+}
+
 // Types for collections
 export interface CollectionItem {
   id: string;
@@ -114,7 +157,7 @@ export interface CollectionItem {
 export const nextApi = createApi({
   reducerPath: "nextApi",
   baseQuery: createBaseQueryWithReauth(""),
-  tagTypes: ["FeatureFlags", "Credits", "Collections", "PersistentAssets", "Teams"],
+  tagTypes: ["FeatureFlags", "Credits", "Collections", "PersistentAssets", "Teams", "Folders"],
 
   endpoints: (builder) => ({
     getFeatureFlags: builder.query<FeatureFlagsResponse, void>({
@@ -292,6 +335,115 @@ export const nextApi = createApi({
         { type: "PersistentAssets", id: chatId },
       ],
     }),
+
+    // Folder endpoints
+    getFolders: builder.query<FolderItem[], { collectionId: string; parentId?: string }>({
+      query: ({ collectionId, parentId }) => {
+        const params = parentId ? `?parentId=${parentId}` : "";
+        return `/api/collection/${collectionId}/folders${params}`;
+      },
+      transformResponse: (response: { folders: FolderItem[] }) =>
+        response.folders ?? [],
+      providesTags: (_result, _error, { collectionId }) => [
+        { type: "Folders", id: collectionId },
+      ],
+    }),
+
+    createFolder: builder.mutation<
+      FolderItem,
+      { collectionId: string; name: string; parentId?: string }
+    >({
+      query: ({ collectionId, ...body }) => ({
+        url: `/api/collection/${collectionId}/folders`,
+        method: "POST",
+        body,
+      }),
+      transformResponse: (response: { folder: FolderItem }) =>
+        response.folder,
+      invalidatesTags: ["Folders", "Collections"],
+    }),
+
+    getFolderDetail: builder.query<FolderDetailResponse, string>({
+      query: (folderId) => `/api/folders/${folderId}`,
+      providesTags: (_result, _error, folderId) => [
+        { type: "Folders", id: folderId },
+      ],
+    }),
+
+    renameFolder: builder.mutation<FolderItem, { folderId: string; name: string }>({
+      query: ({ folderId, ...body }) => ({
+        url: `/api/folders/${folderId}`,
+        method: "PATCH",
+        body,
+      }),
+      transformResponse: (response: { folder: FolderItem }) =>
+        response.folder,
+      invalidatesTags: ["Folders"],
+    }),
+
+    deleteFolder: builder.mutation<void, string>({
+      query: (folderId) => ({
+        url: `/api/folders/${folderId}`,
+        method: "DELETE",
+      }),
+      invalidatesTags: ["Folders", "Collections"],
+    }),
+
+    moveFolder: builder.mutation<
+      void,
+      { folderId: string; targetFolderId?: string; targetCollectionId?: string }
+    >({
+      query: ({ folderId, ...body }) => ({
+        url: `/api/folders/${folderId}/move`,
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["Folders", "Collections"],
+    }),
+
+    shareFolder: builder.mutation<
+      void,
+      { folderId: string; sharedWithUserId: string; permission: string }
+    >({
+      query: ({ folderId, ...body }) => ({
+        url: `/api/folders/${folderId}/share`,
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: (_result, _error, { folderId }) => [
+        { type: "Folders", id: folderId },
+      ],
+    }),
+
+    revokeFolderShare: builder.mutation<void, { folderId: string; userId: string }>({
+      query: ({ folderId, userId }) => ({
+        url: `/api/folders/${folderId}/share/${userId}`,
+        method: "DELETE",
+      }),
+      invalidatesTags: (_result, _error, { folderId }) => [
+        { type: "Folders", id: folderId },
+      ],
+    }),
+
+    getFolderBreadcrumbs: builder.query<FolderBreadcrumbsResponse, string>({
+      query: (folderId) => `/api/folders/${folderId}/breadcrumbs`,
+    }),
+
+    getFolderTree: builder.query<FolderTreeItem[], string>({
+      query: (collectionId) => `/api/collection/${collectionId}/folders/tree`,
+      transformResponse: (response: { folders: FolderTreeItem[] }) =>
+        response.folders ?? [],
+      providesTags: (_result, _error, collectionId) => [
+        { type: "Folders", id: `tree-${collectionId}` },
+      ],
+    }),
+
+    getSharedFolders: builder.query<SharedFolderItem[], void>({
+      query: () => `/api/folders/shared`,
+      transformResponse: (response: { folders: SharedFolderItem[] }) =>
+        response.folders ?? [],
+      providesTags: [{ type: "Folders", id: "shared" }],
+    }),
   }),
 });
 
@@ -316,4 +468,15 @@ export const {
   useDeleteCollectionMutation,
   useGetPersistentAssetsQuery,
   useUpdatePersistentAssetsMutation,
+  useGetFoldersQuery,
+  useCreateFolderMutation,
+  useGetFolderDetailQuery,
+  useRenameFolderMutation,
+  useDeleteFolderMutation,
+  useMoveFolderMutation,
+  useShareFolderMutation,
+  useRevokeFolderShareMutation,
+  useGetFolderBreadcrumbsQuery,
+  useGetFolderTreeQuery,
+  useGetSharedFoldersQuery,
 } = nextApi;

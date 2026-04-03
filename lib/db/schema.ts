@@ -12,6 +12,7 @@ import {
   integer,
   smallint,
   index,
+  type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 
 /**
@@ -129,6 +130,30 @@ export const collections = pgTable("collections", {
 });
 
 /**
+ * Folders table
+ * Unlimited-depth nested containers under collections.
+ * Uses ltree materialized path for fast subtree queries.
+ */
+export const folders = pgTable("folders", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  collectionId: uuid("collection_id")
+    .notNull()
+    .references(() => collections.id, { onDelete: "cascade" }),
+  parentId: uuid("parent_id").references((): AnyPgColumn => folders.id, {
+    onDelete: "cascade",
+  }),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 255 }).notNull(),
+  path: text("path").notNull(),
+  depth: integer("depth").notNull().default(0),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+/**
  * Collection Images table
  * Stores assets (images and videos) within projects, optionally within a collection, along with their generation details
  *
@@ -144,6 +169,9 @@ export const collectionImages = pgTable("collection_images", {
     .references(() => projects.id, { onDelete: "cascade" }),
   // Nullable: an asset can live at the project root (no collection)
   collectionId: uuid("collection_id").references(() => collections.id, {
+    onDelete: "cascade",
+  }),
+  folderId: uuid("folder_id").references(() => folders.id, {
     onDelete: "cascade",
   }),
   imageId: varchar("image_id", { length: 255 }).notNull(), // Thumbnail/display image ID (S3 image ID)
@@ -180,6 +208,22 @@ export const collectionShares = pgTable("collection_shares", {
   collectionId: uuid("collection_id")
     .notNull()
     .references(() => collections.id, { onDelete: "cascade" }),
+  sharedWithUserId: uuid("shared_with_user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  permission: varchar("permission", { length: 20 }).notNull(), // 'viewer' or 'collaborator'
+  sharedAt: timestamp("shared_at").defaultNow().notNull(),
+});
+
+/**
+ * Folder Shares table
+ * Manages sharing permissions for folders (mirrors collection_shares pattern)
+ */
+export const folderShares = pgTable("folder_shares", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  folderId: uuid("folder_id")
+    .notNull()
+    .references(() => folders.id, { onDelete: "cascade" }),
   sharedWithUserId: uuid("shared_with_user_id")
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
@@ -354,6 +398,12 @@ export type NewProjectShare = typeof projectShares.$inferInsert;
 
 export type CollectionShare = typeof collectionShares.$inferSelect;
 export type NewCollectionShare = typeof collectionShares.$inferInsert;
+
+export type Folder = typeof folders.$inferSelect;
+export type NewFolder = typeof folders.$inferInsert;
+
+export type FolderShare = typeof folderShares.$inferSelect;
+export type NewFolderShare = typeof folderShares.$inferInsert;
 
 export type Passkey = typeof passkeys.$inferSelect;
 export type NewPasskey = typeof passkeys.$inferInsert;

@@ -11,15 +11,22 @@ import {
   getCollection,
   touchCollection,
 } from "@/lib/collection-utils";
+import {
+  getFolderPermission,
+  hasFolderWritePermission,
+  getFolder,
+  getFolderWithProject,
+  touchFolder,
+} from "@/lib/folder-utils";
 
 type TransferAction = "move" | "copy";
 
 /**
  * POST /api/collection/[collectionId]/images/[itemId]/transfer
- * Move or copy an image/video to a different collection
+ * Move or copy an image/video to a different collection or folder.
  * 
  * itemId is the unique record ID (collection_images.id), not the imageId
- * Body: { targetCollectionId: string, action: "move" | "copy" }
+ * Body: { targetCollectionId?: string, targetFolderId?: string, action: "move" | "copy" }
  */
 export async function POST(
   req: NextRequest,
@@ -40,15 +47,15 @@ export async function POST(
     const { collectionId: sourceCollectionId, itemId } = await params;
 
     const body = await req.json();
-    const { targetCollectionId, action } = body as {
-      targetCollectionId: string;
+    const { targetCollectionId, targetFolderId, action } = body as {
+      targetCollectionId?: string;
+      targetFolderId?: string;
       action: TransferAction;
     };
 
-    // Validate input
-    if (!targetCollectionId || typeof targetCollectionId !== "string") {
+    if (!targetCollectionId && !targetFolderId) {
       return NextResponse.json(
-        { error: "Target collection ID is required" },
+        { error: "Either targetCollectionId or targetFolderId is required" },
         { status: 400 }
       );
     }
@@ -60,51 +67,9 @@ export async function POST(
       );
     }
 
-    if (action === "move" && sourceCollectionId === targetCollectionId) {
-      return NextResponse.json(
-        { error: "Source and target collections are the same" },
-        { status: 400 }
-      );
-    }
-
-    // Check permissions
+    // Check source permissions (collection-level, then folder-level fallback)
     const sourcePermission = await getUserPermission(sourceCollectionId, userId);
-    const targetPermission = await getUserPermission(targetCollectionId, userId);
 
-    // For move: need write access to source
-    // For copy: need at least read access to source
-    if (action === "move" && !hasWritePermission(sourcePermission)) {
-      return NextResponse.json(
-        { error: "You don't have permission to move items from this collection" },
-        { status: 403 }
-      );
-    }
-
-    if (action === "copy" && !sourcePermission) {
-      return NextResponse.json(
-        { error: "You don't have access to the source collection" },
-        { status: 403 }
-      );
-    }
-
-    // Always need write access to target
-    if (!hasWritePermission(targetPermission)) {
-      return NextResponse.json(
-        { error: "You don't have permission to add items to the target collection" },
-        { status: 403 }
-      );
-    }
-
-    // Get target collection
-    const targetCollection = await getCollection(targetCollectionId);
-    if (!targetCollection) {
-      return NextResponse.json(
-        { error: "Target collection not found" },
-        { status: 404 }
-      );
-    }
-
-    // Find the source item by its unique ID
     const sourceItem = await findItemById(itemId, sourceCollectionId);
     if (!sourceItem) {
       return NextResponse.json(
@@ -113,33 +78,112 @@ export async function POST(
       );
     }
 
+    if (action === "move") {
+      let canWriteSource = hasWritePermission(sourcePermission);
+      if (!canWriteSource && sourceItem.folderId) {
+        const folderPerm = await getFolderPermission(sourceItem.folderId, userId);
+        canWriteSource = hasFolderWritePermission(folderPerm);
+      }
+      if (!canWriteSource) {
+        return NextResponse.json(
+          { error: "You don't have permission to move items from this collection" },
+          { status: 403 }
+        );
+      }
+    }
+
+    if (action === "copy" && !sourcePermission) {
+      let hasAccess = false;
+      if (sourceItem.folderId) {
+        const folderPerm = await getFolderPermission(sourceItem.folderId, userId);
+        hasAccess = folderPerm !== null;
+      }
+      if (!hasAccess) {
+        return NextResponse.json(
+          { error: "You don't have access to the source collection" },
+          { status: 403 }
+        );
+      }
+    }
+
+    // Resolve target
+    let resolvedProjectId: string;
+    let resolvedCollectionId: string;
+    let resolvedFolderId: string | null = null;
+
+    if (targetFolderId) {
+      const targetPermission = await getFolderPermission(targetFolderId, userId);
+      if (!hasFolderWritePermission(targetPermission)) {
+        return NextResponse.json(
+          { error: "You don't have permission to add items to the target folder" },
+          { status: 403 }
+        );
+      }
+
+      const targetData = await getFolderWithProject(targetFolderId);
+      if (!targetData) {
+        return NextResponse.json(
+          { error: "Target folder not found" },
+          { status: 404 }
+        );
+      }
+
+      resolvedProjectId = targetData.projectId;
+      resolvedCollectionId = targetData.folder.collectionId;
+      resolvedFolderId = targetFolderId;
+    } else {
+      const targetPermission = await getUserPermission(targetCollectionId!, userId);
+      if (!hasWritePermission(targetPermission)) {
+        return NextResponse.json(
+          { error: "You don't have permission to add items to the target collection" },
+          { status: 403 }
+        );
+      }
+
+      const targetCollection = await getCollection(targetCollectionId!);
+      if (!targetCollection) {
+        return NextResponse.json(
+          { error: "Target collection not found" },
+          { status: 404 }
+        );
+      }
+
+      resolvedProjectId = targetCollection.projectId;
+      resolvedCollectionId = targetCollectionId!;
+    }
+
+    if (action === "move" && sourceCollectionId === resolvedCollectionId && !resolvedFolderId) {
+      return NextResponse.json(
+        { error: "Source and target are the same" },
+        { status: 400 }
+      );
+    }
+
     let resultImage;
 
     if (action === "move") {
-      // Move: update the existing record
       const [movedImage] = await db
         .update(collectionImages)
         .set({
-          collectionId: targetCollectionId,
-          projectId: targetCollection.projectId,
+          collectionId: resolvedCollectionId,
+          projectId: resolvedProjectId,
+          folderId: resolvedFolderId,
         })
         .where(eq(collectionImages.id, itemId))
         .returning();
 
       resultImage = movedImage;
 
-      // Update both collections' timestamps
-      await Promise.all([
-        touchCollection(sourceCollectionId),
-        touchCollection(targetCollectionId),
-      ]);
+      await touchCollection(sourceCollectionId);
+      if (resolvedFolderId) await touchFolder(resolvedFolderId);
+      else await touchCollection(resolvedCollectionId);
     } else {
-      // Copy: create a new record
       const [copiedImage] = await db
         .insert(collectionImages)
         .values({
-          projectId: targetCollection.projectId,
-          collectionId: targetCollectionId,
+          projectId: resolvedProjectId,
+          collectionId: resolvedCollectionId,
+          folderId: resolvedFolderId,
           imageId: sourceItem.imageId,
           assetId: sourceItem.assetId,
           assetType: sourceItem.assetType,
@@ -150,8 +194,8 @@ export async function POST(
 
       resultImage = copiedImage;
 
-      // Only update target collection's timestamp
-      await touchCollection(targetCollectionId);
+      if (resolvedFolderId) await touchFolder(resolvedFolderId);
+      else await touchCollection(resolvedCollectionId);
     }
 
     return NextResponse.json({
@@ -160,9 +204,9 @@ export async function POST(
       image: resultImage,
     });
   } catch (error) {
-    console.error(`Error transferring item between collections:`, error);
+    console.error(`Error transferring item:`, error);
     return NextResponse.json(
-      { error: "Failed to transfer item between collections" },
+      { error: "Failed to transfer item" },
       { status: 500 }
     );
   }
