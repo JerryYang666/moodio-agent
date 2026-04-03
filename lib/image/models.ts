@@ -48,6 +48,24 @@ const nanoBanana2: ImageModelConfig = {
 };
 
 /**
+ * Nano Banana 2 Fast - Image generation + editing via Google Gemini direct
+ */
+const nanoBanana2Fast: ImageModelConfig = {
+  id: "nano-banana-2-fast",
+  name: "Nano Banana 2 Fast",
+  description: "Google Nano Banana 2 via Gemini direct for fast text-to-image and image editing",
+  provider: "google",
+  supports: {
+    generate: true,
+    edit: true,
+  },
+  providerModelIds: {
+    generate: "gemini-3.1-flash-image-preview",
+    edit: "gemini-3.1-flash-image-preview",
+  },
+};
+
+/**
  * ByteDance Seedream v4.5 - Image generation + editing (Fal)
  */
 const seedreamV45: ImageModelConfig = {
@@ -66,7 +84,7 @@ const seedreamV45: ImageModelConfig = {
   },
 };
 
-export const IMAGE_MODELS: ImageModelConfig[] = [nanoBanana2, seedreamV45];
+export const IMAGE_MODELS: ImageModelConfig[] = [nanoBanana2, nanoBanana2Fast, seedreamV45];
 
 export const DEFAULT_IMAGE_MODEL_ID = nanoBanana2.id;
 

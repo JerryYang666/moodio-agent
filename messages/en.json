@@ -727,6 +727,7 @@
     },
     "models": {
       "nano-banana-2": "Nano Banana 2",
+      "nano-banana-2-fast": "Nano Banana 2 Fast",
       "seedream-45": "Seedream 4.5",
       "midjourney": "Midjourney",
       "gpt-52": "gpt-5.2",

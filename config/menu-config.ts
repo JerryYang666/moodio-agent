@@ -30,6 +30,7 @@ export const MENU_CONFIG = {
       default: "nano-banana-2",
       options: {
         "nano-banana-2": { label: "Nano Banana 2" },
+        "nano-banana-2-fast": { label: "Nano Banana 2 Fast" },
         "seedream-45": { label: "Seedream 4.5" },
         midjourney: { label: "Midjourney" },
         "gpt-5.2": { label: "gpt-5.2" },
@@ -115,7 +116,7 @@ export const MENU_CONFIG = {
       availability: {
         model: {
           enabled: true,
-          allowed: ["nano-banana-2", "seedream-45"],
+          allowed: ["nano-banana-2", "nano-banana-2-fast", "seedream-45"],
         },
         expertise: {
           enabled: true,
@@ -154,7 +155,7 @@ export const MENU_CONFIG = {
         imageQuantity: "1",
       },
       availability: {
-        model: { enabled: true, allowed: ["nano-banana-2", "seedream-45"] },
+        model: { enabled: true, allowed: ["nano-banana-2", "nano-banana-2-fast", "seedream-45"] },
         expertise: {
           enabled: false,
           reason: "Expertise is not available in direct image generation mode.",
