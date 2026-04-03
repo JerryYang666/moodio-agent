@@ -42,7 +42,14 @@
     "permission": "권한",
     "viewer": "뷰어",
     "collaborator": "공동 작업자",
-    "currentlySharedWith": "현재 공유 대상"
+    "currentlySharedWith": "현재 공유 대상",
+    "shareWithTeam": "팀과 공유",
+    "shareByEmail": "이메일로 공유",
+    "selectMembers": "멤버 선택",
+    "selectAll": "전체 선택",
+    "shareWithSelected": "선택한 멤버와 공유",
+    "membersSelected": "{count}명의 멤버 선택됨",
+    "noTeams": "아직 팀에 가입하지 않았습니다"
   },
   "nav": {
     "inspiration": "영감",
@@ -1183,7 +1190,12 @@
     "create": "생성",
     "save": "저장",
     "rename": "이름 변경",
-    "delete": "삭제"
+    "delete": "삭제",
+    "tag": "태그",
+    "editTag": "태그 편집",
+    "tagPlaceholder": "예: 프로듀서, 편집자",
+    "tagUpdated": "태그가 업데이트되었습니다",
+    "tagCleared": "태그가 삭제되었습니다"
   },
   "mention": {
     "noItemsAvailable": "사용 가능한 이미지가 없습니다",

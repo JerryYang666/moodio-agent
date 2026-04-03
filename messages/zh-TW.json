@@ -42,7 +42,14 @@
     "permission": "權限",
     "viewer": "檢視者",
     "collaborator": "協作者",
-    "currentlySharedWith": "目前已分享給"
+    "currentlySharedWith": "目前已分享給",
+    "shareWithTeam": "與團隊分享",
+    "shareByEmail": "透過電子郵件分享",
+    "selectMembers": "選擇成員",
+    "selectAll": "全選",
+    "shareWithSelected": "與所選成員分享",
+    "membersSelected": "已選擇 {count} 位成員",
+    "noTeams": "你還沒有加入任何團隊"
   },
   "nav": {
     "inspiration": "靈感",
@@ -1183,7 +1190,12 @@
     "create": "建立",
     "save": "儲存",
     "rename": "重新命名",
-    "delete": "刪除"
+    "delete": "刪除",
+    "tag": "標籤",
+    "editTag": "編輯標籤",
+    "tagPlaceholder": "例如：製作人、編輯",
+    "tagUpdated": "標籤已更新",
+    "tagCleared": "標籤已清除"
   },
   "mention": {
     "noItemsAvailable": "沒有可用的圖片",

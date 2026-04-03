@@ -35,7 +35,18 @@ export interface TeamMemberItem {
   id: string;
   userId: string;
   role: string;
+  tag: string | null;
   joinedAt: string;
+  email: string;
+  firstName: string | null;
+  lastName: string | null;
+}
+
+export interface TeamMemberLightItem {
+  id: string;
+  userId: string;
+  role: string;
+  tag: string | null;
   email: string;
   firstName: string | null;
   lastName: string | null;
@@ -245,7 +256,7 @@ export const nextApi = createApi({
       invalidatesTags: (_result, _error, { teamId }) => [{ type: "Teams", id: teamId }],
     }),
 
-    updateMemberRole: builder.mutation<void, { teamId: string; memberId: string; role: string }>({
+    updateMemberRole: builder.mutation<void, { teamId: string; memberId: string; role?: string; tag?: string | null }>({
       query: ({ teamId, memberId, ...body }) => ({
         url: `/api/teams/${teamId}/members/${memberId}`,
         method: "PATCH",
@@ -269,6 +280,13 @@ export const nextApi = createApi({
         body,
       }),
       invalidatesTags: ["Teams"],
+    }),
+
+    getTeamMembers: builder.query<TeamMemberLightItem[], string>({
+      query: (teamId) => `/api/teams/${teamId}/members`,
+      transformResponse: (response: { members: TeamMemberLightItem[] }) =>
+        response.members ?? [],
+      providesTags: (_result, _error, teamId) => [{ type: "Teams", id: `members-${teamId}` }],
     }),
 
     getCollections: builder.query<CollectionItem[], void>({
@@ -462,6 +480,7 @@ export const {
   useUpdateMemberRoleMutation,
   useRemoveMemberMutation,
   useAcceptInvitationMutation,
+  useGetTeamMembersQuery,
   useGetCollectionsQuery,
   useCreateCollectionMutation,
   useRenameCollectionMutation,

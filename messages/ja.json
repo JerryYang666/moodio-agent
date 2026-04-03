@@ -42,7 +42,14 @@
     "permission": "権限",
     "viewer": "閲覧者",
     "collaborator": "共同編集者",
-    "currentlySharedWith": "現在の共有先"
+    "currentlySharedWith": "現在の共有先",
+    "shareWithTeam": "チームと共有",
+    "shareByEmail": "メールで共有",
+    "selectMembers": "メンバーを選択",
+    "selectAll": "すべて選択",
+    "shareWithSelected": "選択したメンバーと共有",
+    "membersSelected": "{count}人のメンバーを選択中",
+    "noTeams": "まだチームに参加していません"
   },
   "nav": {
     "inspiration": "インスピレーション",
@@ -1183,7 +1190,12 @@
     "create": "作成",
     "save": "保存",
     "rename": "名前変更",
-    "delete": "削除"
+    "delete": "削除",
+    "tag": "タグ",
+    "editTag": "タグを編集",
+    "tagPlaceholder": "例：プロデューサー、エディター",
+    "tagUpdated": "タグが更新されました",
+    "tagCleared": "タグがクリアされました"
   },
   "mention": {
     "noItemsAvailable": "利用可能な画像がありません",

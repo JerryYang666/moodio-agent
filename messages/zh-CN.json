@@ -42,7 +42,14 @@
     "permission": "权限",
     "viewer": "查看者",
     "collaborator": "协作者",
-    "currentlySharedWith": "当前共享给"
+    "currentlySharedWith": "当前共享给",
+    "shareWithTeam": "与团队共享",
+    "shareByEmail": "通过邮箱共享",
+    "selectMembers": "选择成员",
+    "selectAll": "全选",
+    "shareWithSelected": "与所选成员共享",
+    "membersSelected": "已选择 {count} 位成员",
+    "noTeams": "你还没有加入任何团队"
   },
   "nav": {
     "inspiration": "灵感",
@@ -1183,7 +1190,12 @@
     "create": "创建",
     "save": "保存",
     "rename": "重命名",
-    "delete": "删除"
+    "delete": "删除",
+    "tag": "标签",
+    "editTag": "编辑标签",
+    "tagPlaceholder": "例如：制作人、编辑",
+    "tagUpdated": "标签已更新",
+    "tagCleared": "标签已清除"
   },
   "mention": {
     "noItemsAvailable": "暂无可用图片",

@@ -622,6 +622,7 @@ export const teamMembers = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     role: varchar("role", { length: 20 }).notNull().default("member"), // 'owner' | 'admin' | 'member'
+    tag: varchar("tag", { length: 50 }),
     joinedAt: timestamp("joined_at").defaultNow().notNull(),
   },
   (table) => ({

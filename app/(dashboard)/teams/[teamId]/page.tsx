@@ -38,6 +38,8 @@ import {
   ChevronDown,
   Bean,
   X,
+  Check,
+  Tag,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import {
@@ -81,6 +83,8 @@ export default function TeamDetailPage({
 
   const [inviteEmail, setInviteEmail] = useState("");
   const [newTeamName, setNewTeamName] = useState("");
+  const [editingTagFor, setEditingTagFor] = useState<string | null>(null);
+  const [tagValue, setTagValue] = useState("");
 
   const currentMember = team?.members.find((m) => m.userId === user?.id);
   const currentRole = currentMember?.role;
@@ -124,6 +128,21 @@ export default function TeamDetailPage({
       addToast({ title: "Role updated", color: "success" });
     } catch {
       addToast({ title: "Failed to update role", color: "danger" });
+    }
+  };
+
+  const handleTagSave = async (memberId: string) => {
+    try {
+      const trimmed = tagValue.trim();
+      await updateRole({ teamId, memberId, tag: trimmed || null }).unwrap();
+      addToast({
+        title: trimmed ? t("teams.tagUpdated") : t("teams.tagCleared"),
+        color: "success",
+      });
+      setEditingTagFor(null);
+      setTagValue("");
+    } catch {
+      addToast({ title: "Failed to update tag", color: "danger" });
     }
   };
 
@@ -222,6 +241,7 @@ export default function TeamDetailPage({
             <TableHeader>
               <TableColumn>{t("teams.name")}</TableColumn>
               <TableColumn>{t("teams.email")}</TableColumn>
+              <TableColumn>{t("teams.tag")}</TableColumn>
               <TableColumn>{t("teams.role")}</TableColumn>
               <TableColumn>{t("teams.actions")}</TableColumn>
             </TableHeader>
@@ -232,11 +252,72 @@ export default function TeamDetailPage({
                   "—";
                 const isSelf = member.userId === user?.id;
                 const memberIsOwner = member.role === "owner";
+                const isEditingTag = editingTagFor === member.id;
 
                 return (
                   <TableRow key={member.id}>
                     <TableCell>{displayName}</TableCell>
                     <TableCell className="text-default-500">{member.email}</TableCell>
+                    <TableCell>
+                      {isEditingTag ? (
+                        <div className="flex items-center gap-1">
+                          <Input
+                            size="sm"
+                            value={tagValue}
+                            onValueChange={setTagValue}
+                            placeholder={t("teams.tagPlaceholder")}
+                            className="w-36"
+                            maxLength={50}
+                            autoFocus
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") handleTagSave(member.userId);
+                              if (e.key === "Escape") setEditingTagFor(null);
+                            }}
+                          />
+                          <Button
+                            size="sm"
+                            isIconOnly
+                            variant="light"
+                            color="success"
+                            onPress={() => handleTagSave(member.userId)}
+                          >
+                            <Check size={14} />
+                          </Button>
+                          <Button
+                            size="sm"
+                            isIconOnly
+                            variant="light"
+                            onPress={() => setEditingTagFor(null)}
+                          >
+                            <X size={14} />
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1">
+                          {member.tag ? (
+                            <Chip size="sm" variant="flat" color="secondary">
+                              {member.tag}
+                            </Chip>
+                          ) : (
+                            <span className="text-default-300 text-xs">—</span>
+                          )}
+                          {canManage && (
+                            <Button
+                              size="sm"
+                              isIconOnly
+                              variant="light"
+                              className="min-w-6 w-6 h-6"
+                              onPress={() => {
+                                setEditingTagFor(member.id);
+                                setTagValue(member.tag ?? "");
+                              }}
+                            >
+                              <Tag size={12} />
+                            </Button>
+                          )}
+                        </div>
+                      )}
+                    </TableCell>
                     <TableCell>
                       <Chip
                         size="sm"
@@ -257,7 +338,7 @@ export default function TeamDetailPage({
                             </DropdownTrigger>
                             <DropdownMenu
                               aria-label="Change role"
-                              onAction={(key) => handleRoleChange(member.id, key as string)}
+                              onAction={(key) => handleRoleChange(member.userId, key as string)}
                               disabledKeys={[member.role]}
                             >
                               {ROLES.map((role) => (
@@ -270,7 +351,7 @@ export default function TeamDetailPage({
                             color="danger"
                             variant="flat"
                             startContent={<Trash2 size={14} />}
-                            onPress={() => handleRemoveMember(member.id)}
+                            onPress={() => handleRemoveMember(member.userId)}
                           >
                             {t("teams.removeMember")}
                           </Button>

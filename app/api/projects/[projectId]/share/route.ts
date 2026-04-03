@@ -17,9 +17,52 @@ async function isOwner(projectId: string, userId: string): Promise<boolean> {
   return !!project;
 }
 
+async function shareWithSingleUser(
+  projectId: string,
+  sharedWithUserId: string,
+  permission: string,
+  ownerId: string,
+) {
+  if (sharedWithUserId === ownerId) return null;
+
+  const [targetUser] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.id, sharedWithUserId))
+    .limit(1);
+  if (!targetUser) return null;
+
+  const [existingShare] = await db
+    .select()
+    .from(projectShares)
+    .where(
+      and(
+        eq(projectShares.projectId, projectId),
+        eq(projectShares.sharedWithUserId, sharedWithUserId)
+      )
+    )
+    .limit(1);
+
+  if (existingShare) {
+    const [updatedShare] = await db
+      .update(projectShares)
+      .set({ permission })
+      .where(eq(projectShares.id, existingShare.id))
+      .returning();
+    return { share: updatedShare, updated: true };
+  }
+
+  const [newShare] = await db
+    .insert(projectShares)
+    .values({ projectId, sharedWithUserId, permission })
+    .returning();
+  return { share: newShare, updated: false };
+}
+
 /**
  * POST /api/projects/[projectId]/share
- * Share project with a user (owner only)
+ * Share project with one or more users (owner only).
+ * Accepts { sharedWithUserId, permission } or { sharedWithUserIds[], permission }.
  */
 export async function POST(
   req: NextRequest,
@@ -39,7 +82,6 @@ export async function POST(
     const userId = payload.userId;
     const { projectId } = await params;
 
-    // Check if user is owner
     if (!(await isOwner(projectId, userId))) {
       return NextResponse.json(
         { error: "Only the owner can share the project" },
@@ -48,37 +90,36 @@ export async function POST(
     }
 
     const body = await req.json();
-    const { sharedWithUserId, permission } = body;
+    const { sharedWithUserId, sharedWithUserIds, permission } = body;
 
-    if (!sharedWithUserId || !permission) {
-      return NextResponse.json(
-        { error: "sharedWithUserId and permission are required" },
-        { status: 400 }
-      );
-    }
-
-    if (!isValidSharePermission(permission)) {
+    if (!permission || !isValidSharePermission(permission)) {
       return NextResponse.json(
         { error: "permission must be 'viewer' or 'collaborator'" },
         { status: 400 }
       );
     }
 
-    // Check if user exists
-    const [targetUser] = await db
-      .select()
-      .from(users)
-      .where(eq(users.id, sharedWithUserId))
-      .limit(1);
+    // Bulk share
+    if (Array.isArray(sharedWithUserIds) && sharedWithUserIds.length > 0) {
+      const results = await Promise.all(
+        sharedWithUserIds.map((uid: string) =>
+          shareWithSingleUser(projectId, uid, permission, userId)
+        )
+      );
+      return NextResponse.json({
+        shares: results.filter(Boolean),
+        bulk: true,
+      });
+    }
 
-    if (!targetUser) {
+    // Single share (backward-compatible)
+    if (!sharedWithUserId) {
       return NextResponse.json(
-        { error: "User not found" },
-        { status: 404 }
+        { error: "sharedWithUserId or sharedWithUserIds is required" },
+        { status: 400 }
       );
     }
 
-    // Don't allow sharing with self
     if (sharedWithUserId === userId) {
       return NextResponse.json(
         { error: "Cannot share project with yourself" },
@@ -86,46 +127,11 @@ export async function POST(
       );
     }
 
-    // Check if already shared
-    const [existingShare] = await db
-      .select()
-      .from(projectShares)
-      .where(
-        and(
-          eq(projectShares.projectId, projectId),
-          eq(projectShares.sharedWithUserId, sharedWithUserId)
-        )
-      )
-      .limit(1);
-
-    if (existingShare) {
-      // Update existing share permission
-      const [updatedShare] = await db
-        .update(projectShares)
-        .set({ permission })
-        .where(eq(projectShares.id, existingShare.id))
-        .returning();
-
-      return NextResponse.json({
-        share: updatedShare,
-        updated: true,
-      });
+    const result = await shareWithSingleUser(projectId, sharedWithUserId, permission, userId);
+    if (!result) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
-
-    // Create new share
-    const [newShare] = await db
-      .insert(projectShares)
-      .values({
-        projectId,
-        sharedWithUserId,
-        permission,
-      })
-      .returning();
-
-    return NextResponse.json({
-      share: newShare,
-      updated: false,
-    });
+    return NextResponse.json(result);
   } catch (error) {
     console.error("Error sharing project:", error);
     return NextResponse.json(

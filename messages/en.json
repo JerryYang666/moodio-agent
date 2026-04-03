@@ -42,7 +42,14 @@
     "permission": "Permission",
     "viewer": "Viewer",
     "collaborator": "Collaborator",
-    "currentlySharedWith": "Currently Shared With"
+    "currentlySharedWith": "Currently Shared With",
+    "shareWithTeam": "Share with Team",
+    "shareByEmail": "Share by Email",
+    "selectMembers": "Select Members",
+    "selectAll": "Select All",
+    "shareWithSelected": "Share with Selected",
+    "membersSelected": "{count} member(s) selected",
+    "noTeams": "You are not in any team yet"
   },
   "nav": {
     "inspiration": "Inspiration",
@@ -1331,7 +1338,12 @@
     "create": "Create",
     "save": "Save",
     "rename": "Rename",
-    "delete": "Delete"
+    "delete": "Delete",
+    "tag": "Tag",
+    "editTag": "Edit Tag",
+    "tagPlaceholder": "e.g. Producer, Editor",
+    "tagUpdated": "Tag updated",
+    "tagCleared": "Tag cleared"
   },
   "mention": {
     "noItemsAvailable": "No images available",

@@ -80,6 +80,7 @@ export async function getTeamWithMembers(teamId: string, tx: DbOrTx = db) {
       id: teamMembers.id,
       userId: teamMembers.userId,
       role: teamMembers.role,
+      tag: teamMembers.tag,
       joinedAt: teamMembers.joinedAt,
       email: users.email,
       firstName: users.firstName,
@@ -412,4 +413,55 @@ export async function updateTeamName(
     .returning();
 
   return updated;
+}
+
+/**
+ * Get team members only (lightweight, no invitations/credits).
+ * Any team member can call this.
+ */
+export async function getTeamMembersLightweight(
+  teamId: string,
+  tx: DbOrTx = db
+) {
+  return tx
+    .select({
+      id: teamMembers.id,
+      userId: teamMembers.userId,
+      role: teamMembers.role,
+      tag: teamMembers.tag,
+      email: users.email,
+      firstName: users.firstName,
+      lastName: users.lastName,
+    })
+    .from(teamMembers)
+    .innerJoin(users, eq(teamMembers.userId, users.id))
+    .where(eq(teamMembers.teamId, teamId));
+}
+
+/**
+ * Update a member's tag. Only owner/admin can do this.
+ * Pass null or empty string to clear.
+ */
+export async function updateMemberTag(
+  teamId: string,
+  targetUserId: string,
+  tag: string | null,
+  requestedBy: string
+) {
+  const requesterRole = await getMemberRole(teamId, requestedBy);
+  if (!requesterRole || ROLE_HIERARCHY[requesterRole] < ROLE_HIERARCHY.admin) {
+    throw new Error("Only team owner or admin can update member tags");
+  }
+
+  const targetRole = await getMemberRole(teamId, targetUserId);
+  if (!targetRole) throw new Error("Target user is not a member");
+
+  const sanitized = tag && tag.trim().length > 0 ? tag.trim().slice(0, 50) : null;
+
+  await db
+    .update(teamMembers)
+    .set({ tag: sanitized })
+    .where(
+      and(eq(teamMembers.teamId, teamId), eq(teamMembers.userId, targetUserId))
+    );
 }

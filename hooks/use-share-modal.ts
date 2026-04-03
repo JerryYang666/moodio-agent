@@ -37,6 +37,71 @@ export function useShareModal({ shareApiPath, onShareChanged }: UseShareModalOpt
   const [selectedPermission, setSelectedPermission] = useState<SharePermission>(PERMISSION_VIEWER);
   const [isSharing, setIsSharing] = useState(false);
 
+  // Bulk selection state for team-based sharing
+  const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set());
+  const [bulkPermission, setBulkPermission] = useState<SharePermission>(PERMISSION_VIEWER);
+  const [isBulkSharing, setIsBulkSharing] = useState(false);
+
+  const toggleUser = useCallback((userId: string) => {
+    setSelectedUserIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(userId)) {
+        next.delete(userId);
+      } else {
+        next.add(userId);
+      }
+      return next;
+    });
+  }, []);
+
+  const toggleTeam = useCallback(
+    (memberUserIds: string[]) => {
+      setSelectedUserIds((prev) => {
+        const allSelected = memberUserIds.every((uid) => prev.has(uid));
+        const next = new Set(prev);
+        if (allSelected) {
+          memberUserIds.forEach((uid) => next.delete(uid));
+        } else {
+          memberUserIds.forEach((uid) => next.add(uid));
+        }
+        return next;
+      });
+    },
+    []
+  );
+
+  const clearSelection = useCallback(() => {
+    setSelectedUserIds(new Set());
+  }, []);
+
+  const handleBulkShare = useCallback(async () => {
+    if (selectedUserIds.size === 0) return;
+    setIsBulkSharing(true);
+    try {
+      const res = await fetch(shareApiPath, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sharedWithUserIds: Array.from(selectedUserIds),
+          permission: bulkPermission,
+        }),
+      });
+      if (res.ok) {
+        await onShareChanged();
+        setSelectedUserIds(new Set());
+        addToast({
+          title: "Shared",
+          description: `Shared with ${selectedUserIds.size} member(s)`,
+          color: "success",
+        });
+      }
+    } catch {
+      addToast({ title: "Error", description: "Failed to share", color: "danger" });
+    } finally {
+      setIsBulkSharing(false);
+    }
+  }, [selectedUserIds, bulkPermission, shareApiPath, onShareChanged]);
+
   const handleSearchUser = useCallback(async () => {
     if (!searchEmail.trim()) return;
     setIsSearching(true);
@@ -112,9 +177,13 @@ export function useShareModal({ shareApiPath, onShareChanged }: UseShareModalOpt
     setSearchError("");
     setSelectedPermission(PERMISSION_VIEWER);
     setIsSharing(false);
+    setSelectedUserIds(new Set());
+    setBulkPermission(PERMISSION_VIEWER);
+    setIsBulkSharing(false);
   }, []);
 
   return {
+    // Email search (existing)
     searchEmail,
     setSearchEmail,
     searchedUser,
@@ -127,5 +196,14 @@ export function useShareModal({ shareApiPath, onShareChanged }: UseShareModalOpt
     handleShare,
     handleRemoveShare,
     reset,
+    // Bulk team sharing (new)
+    selectedUserIds,
+    toggleUser,
+    toggleTeam,
+    clearSelection,
+    bulkPermission,
+    setBulkPermission,
+    isBulkSharing,
+    handleBulkShare,
   };
 }
