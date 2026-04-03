@@ -12,7 +12,7 @@ import { getAccessToken } from "@/lib/auth/cookies";
 import { verifyAccessToken } from "@/lib/auth/jwt";
 import { eq, and, desc } from "drizzle-orm";
 import { getImageUrl, getVideoUrl } from "@/lib/storage/s3";
-import { getVideoUrl as getPublicVideoUrl } from "@/lib/config/video.config";
+import { getContentUrl, getVideoUrl as getPublicVideoUrl } from "@/lib/config/video.config";
 import { getUserPermission } from "@/lib/collection-utils";
 import { PERMISSION_OWNER, isOwner, type SharePermission } from "@/lib/permissions";
 import { TAG_COLOR_MAP } from "@/lib/tag-colors";
@@ -76,6 +76,13 @@ export async function GET(
           ...asset,
           imageUrl: "",
           videoUrl: getPublicVideoUrl(asset.assetId),
+        };
+      }
+      if (asset.assetType === "public_image") {
+        return {
+          ...asset,
+          imageUrl: getContentUrl(asset.assetId),
+          videoUrl: undefined,
         };
       }
       return {

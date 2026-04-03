@@ -35,13 +35,14 @@ import { Squircle } from "@/components/Squircle";
 import { VideoVisibilityProvider } from "@/hooks/use-video-visibility";
 import { MOCK_VIDEO_DETAIL, type VideoDetailData } from "./video-detail-data";
 import { useGetVideoDetailQuery, type ContentLabel } from "@/lib/redux/services/api";
-import { getVideoUrl as getBrowseVideoUrl } from "@/lib/config/video.config";
+import { getContentUrl } from "@/lib/config/video.config";
 import { useCollections } from "@/hooks/use-collections";
 import { useFeatureFlag } from "@/lib/feature-flags";
 import { hasWriteAccess } from "@/lib/permissions";
 import SendToDesktopModal from "@/components/desktop/SendToDesktopModal";
 import { dispatchSuggestionBubble } from "@/components/chat/suggestion-bubble-types";
 import { BROWSE_VIDEO_ACTIONS } from "@/config/suggestion-bubbles";
+import { isImageContentType, normalizeMediaType } from "@/lib/media";
 
 const ACTION_ICONS = {
   learn: GraduationCap,
@@ -180,6 +181,7 @@ function VideoDetailContent({
   const {
     collections,
     addPublicVideoToCollection,
+    addPublicImageToCollection,
     createCollection,
     getDefaultCollectionName,
   } = useCollections();
@@ -220,25 +222,24 @@ function VideoDetailContent({
   const videoTitle = videoDetail?.content_uuid ?? selectedPhoto.videoName ?? "Untitled";
   const storageKey = videoDetail?.storage_key ?? "";
   const contentUuid = videoDetail?.content_uuid ?? "";
+  const mediaType = normalizeMediaType(videoDetail?.content_type ?? selectedPhoto.mediaType);
+  const isImageContent = isImageContentType(mediaType);
 
   const handleAddToCollection = async (collectionId: string) => {
     if (!storageKey || !contentUuid) return;
-    const success = await addPublicVideoToCollection(
-      collectionId,
-      storageKey,
-      contentUuid,
-      videoTitle
-    );
+    const success = isImageContent
+      ? await addPublicImageToCollection(collectionId, storageKey, contentUuid, videoTitle)
+      : await addPublicVideoToCollection(collectionId, storageKey, contentUuid, videoTitle);
     if (success) {
       addToast({
         title: "Added to collection",
-        description: "Video has been added to the collection",
+        description: `${isImageContent ? "Image" : "Video"} has been added to the collection`,
         color: "success",
       });
     } else {
       addToast({
         title: "Error",
-        description: "Failed to add video to collection",
+        description: `Failed to add ${isImageContent ? "image" : "video"} to collection`,
         color: "danger",
       });
     }
@@ -250,16 +251,13 @@ function VideoDetailContent({
     try {
       const collection = await createCollection(newCollectionName.trim());
       if (collection) {
-        const success = await addPublicVideoToCollection(
-          collection.id,
-          storageKey,
-          contentUuid,
-          videoTitle
-        );
+        const success = isImageContent
+          ? await addPublicImageToCollection(collection.id, storageKey, contentUuid, videoTitle)
+          : await addPublicVideoToCollection(collection.id, storageKey, contentUuid, videoTitle);
         if (success) {
           addToast({
             title: "Added to collection",
-            description: `Video added to "${collection.name}"`,
+            description: `${isImageContent ? "Image" : "Video"} added to "${collection.name}"`,
             color: "success",
           });
         }
@@ -289,14 +287,22 @@ function VideoDetailContent({
             }}
           >
             <div className={`w-full h-full ${videoVisible ? "visible" : "invisible"}`}>
-              <video
-                src={selectedPhoto.src}
-                className="w-full h-full object-cover"
-                autoPlay
-                loop
-                muted
-                playsInline
-              />
+              {isImageContent ? (
+                <img
+                  src={selectedPhoto.src}
+                  alt={selectedPhoto.alt}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <video
+                  src={selectedPhoto.src}
+                  className="w-full h-full object-cover"
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                />
+              )}
             </div>
 
             <motion.div
@@ -389,14 +395,14 @@ function VideoDetailContent({
                   variant="bordered"
                   className="justify-center gap-3 items-center border-default-300 dark:border-default-500 text-default-700 dark:text-default-600 hover:bg-default-100 dark:hover:bg-white/10 w-full"
                   startContent={<Icon size={18} />}
-                  isDisabled={!videoDetail || isLoadingDetail}
-                  onPress={videoDetail ? () => {
+                  isDisabled={!videoDetail || isLoadingDetail || isImageContent}
+                  onPress={videoDetail && !isImageContent ? () => {
                     const factory = BROWSE_VIDEO_ACTIONS[action.icon];
                     if (factory) {
                       const bubble = factory({
                         contentId: videoDetail.id,
                         storageKey: videoDetail.storage_key,
-                        videoUrl: getBrowseVideoUrl(videoDetail.storage_key),
+                        videoUrl: getContentUrl(videoDetail.storage_key),
                       });
                       dispatchSuggestionBubble(bubble.action);
                     }
@@ -506,7 +512,9 @@ function VideoDetailContent({
         desktopId={desktopId}
         assets={videoDetail ? [
           {
-            assetType: "public_video" as const,
+            assetType: isImageContent
+              ? ("public_image" as const)
+              : ("public_video" as const),
             metadata: {
               storageKey: videoDetail.storage_key,
               contentUuid: videoDetail.content_uuid,

@@ -48,6 +48,14 @@ export type PublicVideoAssetMeta = {
   height?: number;
 };
 
+export type PublicImageAssetMeta = {
+  storageKey: string;
+  contentUuid: string;
+  title?: string;
+  width?: number;
+  height?: number;
+};
+
 export type TextAssetMeta = {
   content: string;
   fontSize?: number;
@@ -99,12 +107,13 @@ export type DesktopAssetMetadata =
   | { assetType: "image"; metadata: ImageAssetMeta }
   | { assetType: "video"; metadata: VideoAssetMeta }
   | { assetType: "public_video"; metadata: PublicVideoAssetMeta }
+  | { assetType: "public_image"; metadata: PublicImageAssetMeta }
   | { assetType: "text"; metadata: TextAssetMeta }
   | { assetType: "link"; metadata: LinkAssetMeta }
   | { assetType: "table"; metadata: TableAssetMeta }
   | { assetType: "video_suggest"; metadata: VideoSuggestAssetMeta };
 
-const SUPPORTED_ASSET_TYPES = ["image", "video", "public_video", "text", "link", "table", "video_suggest"] as const;
+const SUPPORTED_ASSET_TYPES = ["image", "video", "public_video", "public_image", "text", "link", "table", "video_suggest"] as const;
 export type SupportedAssetType = (typeof SUPPORTED_ASSET_TYPES)[number];
 
 export function validateAssetMetadata(
@@ -144,6 +153,14 @@ export function validateAssetMetadata(
       }
       if (typeof m.contentUuid !== "string" || !m.contentUuid) {
         return { valid: false, error: "public_video metadata requires a non-empty contentUuid string" };
+      }
+      break;
+    case "public_image":
+      if (typeof m.storageKey !== "string" || !m.storageKey) {
+        return { valid: false, error: "public_image metadata requires a non-empty storageKey string" };
+      }
+      if (typeof m.contentUuid !== "string" || !m.contentUuid) {
+        return { valid: false, error: "public_image metadata requires a non-empty contentUuid string" };
       }
       break;
     case "text":

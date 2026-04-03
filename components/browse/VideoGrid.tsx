@@ -15,21 +15,23 @@ import {
 import { VirtualInfiniteScroll } from "@/components/browse/VirtualInfiniteScroll";
 import { VideoDetailView } from "@/components/browse/VideoDetailView";
 import { Squircle } from "@/components/Squircle";
-import { getVideoUrl } from "@/lib/config/video.config";
+import { getContentUrl } from "@/lib/config/video.config";
 import { useInfiniteContent } from "@/lib/redux/hooks/useInfiniteContent";
 import { VideoVisibilityProvider } from "@/hooks/use-video-visibility";
 import { Loader2 } from "lucide-react";
 import { addToast } from "@heroui/toast";
+import { normalizeMediaType } from "@/lib/media";
 
 // Simple mapping function - dimensions come from API, no async loading needed
 const videoToPhoto = (video: Video): Photo => ({
-  src: getVideoUrl(video.storage_key),
+  src: getContentUrl(video.storage_key),
   width: video.width,
   height: video.height,
   id: video.id,
   key: video.id.toString(),
   alt: video.content_uuid,
   videoName: video.content_uuid,
+  mediaType: normalizeMediaType(video.content_type),
 });
 
 interface VideoGridProps {
@@ -318,14 +320,22 @@ const VideoGrid: React.FC<VideoGridProps> = ({ hideSummary = false, desktopId })
           onAnimationComplete={handleFlyComplete}
         >
           <Squircle className="w-full h-full overflow-hidden">
-            <video
-              src={selectedPhoto.src}
-              className="w-full h-full object-cover"
-              autoPlay
-              loop
-              muted
-              playsInline
-            />
+            {selectedPhoto.mediaType === "image" ? (
+              <img
+                src={selectedPhoto.src}
+                alt={selectedPhoto.alt}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <video
+                src={selectedPhoto.src}
+                className="w-full h-full object-cover"
+                autoPlay
+                loop
+                muted
+                playsInline
+              />
+            )}
           </Squircle>
         </motion.div>
       )}

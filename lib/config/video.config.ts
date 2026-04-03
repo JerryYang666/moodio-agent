@@ -6,12 +6,13 @@
 export const S3_CONTENT_PREFIX = "public-videos" as const;
 
 /**
- * Construct CloudFront URL for video content
+ * Construct CloudFront URL for retrieval content.
  * 
- * @param storageKey - Full storage key from backend (e.g., "public-videos/a3/video_001.webm")
- * @returns Full CloudFront URL (e.g., "https://d123abc.cloudfront.net/public-videos/a3/video_001.webm")
+ * Supports both retrieval storage key families:
+ * - public-videos/...webm
+ * - public-stills/...webp
  */
-export function getVideoUrl(storageKey: string): string {
+export function getContentUrl(storageKey: string): string {
   let cloudfrontDomain = process.env.NEXT_PUBLIC_CLOUDFRONT_URL;
 
   if (!cloudfrontDomain) {
@@ -27,6 +28,13 @@ export function getVideoUrl(storageKey: string): string {
   // Remove leading slash if present
   const cleanKey = storageKey.startsWith('/') ? storageKey.slice(1) : storageKey;
 
-  // Construct full URL - storage_key already includes the bucket prefix (e.g., "public-videos/")
+  // Construct full URL - storage_key already includes the bucket prefix.
   return `${cloudfrontDomain}/${cleanKey}`;
+}
+
+/**
+ * Backward-compatible alias for legacy call sites.
+ */
+export function getVideoUrl(storageKey: string): string {
+  return getContentUrl(storageKey);
 }

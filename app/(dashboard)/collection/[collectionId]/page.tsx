@@ -63,10 +63,10 @@ import ShareModal from "@/components/share-modal";
 interface CollectionAsset {
   id: string;
   collectionId: string;
-  imageId: string; // Thumbnail/display image ID (content_uuid for public_video)
-  assetId: string; // Actual asset ID (storage_key for public_video)
-  assetType: "image" | "video" | "public_video";
-  imageUrl: string; // CloudFront URL for thumbnail (access via signed cookies; empty for public_video)
+  imageId: string; // Thumbnail/display image ID (content_uuid for public_* assets)
+  assetId: string; // Actual asset ID (storage_key for public_* assets)
+  assetType: "image" | "video" | "public_video" | "public_image";
+  imageUrl: string; // CloudFront URL for image thumbnail/content
   videoUrl?: string; // CloudFront URL for video (only for videos / public_video)
   chatId: string | null;
   generationDetails: {
@@ -672,17 +672,19 @@ export default function CollectionPage({
     } else {
       // Build allImages array from collection images (only images, not videos)
       const imagesForNav: ImageInfo[] = (collectionData?.images || [])
-        .filter((img) => img.assetType === "image")
+        .filter((img) => img.assetType === "image" || img.assetType === "public_image")
         .map((img) => ({
           url: img.imageUrl,
           title: img.generationDetails.title,
           prompt: img.generationDetails.prompt,
-          status: img.generationDetails.status as "loading" | "generated" | "error",
-          imageId: img.imageId,
+          status: (
+            img.assetType === "public_image" ? "loading" : img.generationDetails.status
+          ) as "loading" | "generated" | "error",
+          imageId: img.assetType === "public_image" ? undefined : img.imageId,
         }));
 
       const clickedIndex = imagesForNav.findIndex(
-        (img) => img.imageId === asset.imageId
+        (img) => (img.imageId ? img.imageId === asset.imageId : img.url === asset.imageUrl)
       );
 
       setAllImages(imagesForNav);
@@ -691,8 +693,10 @@ export default function CollectionPage({
         url: asset.imageUrl, // Use CloudFront URL from API (signed cookies)
         title: asset.generationDetails.title,
         prompt: asset.generationDetails.prompt,
-        status: asset.generationDetails.status as "loading" | "generated" | "error",
-        imageId: asset.imageId,
+        status: (
+          asset.assetType === "public_image" ? "loading" : asset.generationDetails.status
+        ) as "loading" | "generated" | "error",
+        imageId: asset.assetType === "public_image" ? undefined : asset.imageId,
       });
       onImageDetailOpen();
     }
@@ -957,7 +961,7 @@ export default function CollectionPage({
   const canAddImages = hasWriteAccess(collection.permission);
 
   // Count images and videos separately
-  const imageCount = images.filter((a) => a.assetType === "image").length;
+  const imageCount = images.filter((a) => a.assetType === "image" || a.assetType === "public_image").length;
   const videoCount = images.filter((a) => a.assetType === "video" || a.assetType === "public_video").length;
 
   const getAssetCountText = () => {
@@ -1834,6 +1838,12 @@ export default function CollectionPage({
                           contentUuid: desktopSendAsset.imageId,
                           title: desktopSendAsset.generationDetails.title,
                         }
+                      : desktopSendAsset.assetType === "public_image"
+                        ? {
+                            storageKey: desktopSendAsset.assetId,
+                            contentUuid: desktopSendAsset.imageId,
+                            title: desktopSendAsset.generationDetails.title,
+                          }
                       : desktopSendAsset.assetType === "video"
                         ? {
                             imageId: desktopSendAsset.imageId,

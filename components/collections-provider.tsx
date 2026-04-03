@@ -25,7 +25,7 @@ export interface CollectionImage {
   collectionId: string | null;
   imageId: string;
   assetId: string;
-  assetType: "image" | "video" | "public_video";
+  assetType: "image" | "video" | "public_video" | "public_image";
   chatId: string | null;
   generationDetails: {
     title: string;
@@ -74,6 +74,12 @@ interface CollectionsContextValue {
     contentUuid: string,
     title: string
   ) => Promise<boolean>;
+  addPublicImageToCollection: (
+    collectionId: string,
+    storageKey: string,
+    contentUuid: string,
+    title: string
+  ) => Promise<boolean>;
   removeItemFromCollection: (
     collectionId: string,
     itemId: string
@@ -109,6 +115,10 @@ export function CollectionsProvider({
   const [createCollectionMutation] = useCreateCollectionMutation();
   const [renameCollectionMutation] = useRenameCollectionMutation();
   const [deleteCollectionMutation] = useDeleteCollectionMutation();
+
+  const invalidateCollections = useCallback(() => {
+    dispatch(nextApi.util.invalidateTags(["Collections"]));
+  }, [dispatch]);
 
   const loading = isLoading;
   const error = queryError
@@ -224,12 +234,7 @@ export function CollectionsProvider({
           throw new Error(data.error || "Failed to add image to collection");
         }
 
-        dispatch(
-          nextApi.util.updateQueryData("getCollections", undefined, (draft) => {
-            const col = draft.find((c) => c.id === collectionId);
-            if (col) col.updatedAt = new Date();
-          })
-        );
+        invalidateCollections();
 
         window.dispatchEvent(
           new CustomEvent(ASSETS_UPDATED_EVENT, {
@@ -243,7 +248,7 @@ export function CollectionsProvider({
         return false;
       }
     },
-    [dispatch]
+    [invalidateCollections]
   );
 
   const addVideoToCollection = useCallback(
@@ -271,12 +276,7 @@ export function CollectionsProvider({
           throw new Error(data.error || "Failed to add video to collection");
         }
 
-        dispatch(
-          nextApi.util.updateQueryData("getCollections", undefined, (draft) => {
-            const col = draft.find((c) => c.id === collectionId);
-            if (col) col.updatedAt = new Date();
-          })
-        );
+        invalidateCollections();
 
         window.dispatchEvent(
           new CustomEvent(ASSETS_UPDATED_EVENT, {
@@ -290,7 +290,7 @@ export function CollectionsProvider({
         return false;
       }
     },
-    [dispatch]
+    [invalidateCollections]
   );
 
   const addPublicVideoToCollection = useCallback(
@@ -324,12 +324,7 @@ export function CollectionsProvider({
           throw new Error(data.error || "Failed to add video to collection");
         }
 
-        dispatch(
-          nextApi.util.updateQueryData("getCollections", undefined, (draft) => {
-            const col = draft.find((c) => c.id === collectionId);
-            if (col) col.updatedAt = new Date();
-          })
-        );
+        invalidateCollections();
 
         window.dispatchEvent(
           new CustomEvent(ASSETS_UPDATED_EVENT, {
@@ -343,7 +338,55 @@ export function CollectionsProvider({
         return false;
       }
     },
-    [dispatch]
+    [invalidateCollections]
+  );
+
+  const addPublicImageToCollection = useCallback(
+    async (
+      collectionId: string,
+      storageKey: string,
+      contentUuid: string,
+      title: string
+    ) => {
+      try {
+        const res = await fetch(`/api/collection/${collectionId}/images`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            imageId: contentUuid,
+            assetId: storageKey,
+            assetType: "public_image",
+            chatId: null,
+            generationDetails: {
+              title,
+              status: "generated",
+              prompt: "",
+              source: "browse",
+              storageKey,
+            },
+          }),
+        });
+
+        if (!res.ok) {
+          const data = await res.json();
+          throw new Error(data.error || "Failed to add image to collection");
+        }
+
+        invalidateCollections();
+
+        window.dispatchEvent(
+          new CustomEvent(ASSETS_UPDATED_EVENT, {
+            detail: { collectionId },
+          })
+        );
+
+        return true;
+      } catch (err) {
+        console.error("Error adding public image to collection:", err);
+        return false;
+      }
+    },
+    [invalidateCollections]
   );
 
   const removeItemFromCollection = useCallback(
@@ -426,6 +469,7 @@ export function CollectionsProvider({
     addImageToCollection,
     addVideoToCollection,
     addPublicVideoToCollection,
+    addPublicImageToCollection,
     removeItemFromCollection,
     shareCollection,
     removeShare,

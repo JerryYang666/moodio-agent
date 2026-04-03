@@ -7,11 +7,27 @@ import { eq, and } from "drizzle-orm";
 import { getDesktopPermission } from "@/lib/desktop/permissions";
 import { hasWriteAccess } from "@/lib/permissions";
 import { getImageUrl, getVideoUrl } from "@/lib/storage/s3";
+import { getContentUrl } from "@/lib/config/video.config";
 
 function enrichAsset(asset: typeof desktopAssets.$inferSelect) {
   const meta = asset.metadata as Record<string, unknown>;
+  const storageKey = typeof meta.storageKey === "string" ? meta.storageKey : null;
   const imageId = typeof meta.imageId === "string" ? meta.imageId : null;
   const videoId = typeof meta.videoId === "string" ? meta.videoId : null;
+  if (asset.assetType === "public_video") {
+    return {
+      ...asset,
+      imageUrl: null,
+      videoUrl: storageKey ? getContentUrl(storageKey) : null,
+    };
+  }
+  if (asset.assetType === "public_image") {
+    return {
+      ...asset,
+      imageUrl: storageKey ? getContentUrl(storageKey) : null,
+      videoUrl: null,
+    };
+  }
   return {
     ...asset,
     imageUrl: imageId ? getImageUrl(imageId) : null,

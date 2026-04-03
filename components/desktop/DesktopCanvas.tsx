@@ -1078,7 +1078,7 @@ export default function DesktopCanvas({
               onContextMenu={(e) => handleContextMenu(e, asset)}
             >
               <div
-                className={`w-full h-full ${asset.assetType === "image" || asset.assetType === "video" || asset.assetType === "public_video" ? "" : "rounded-xl"} overflow-hidden bg-background shadow-md transition-shadow duration-150 hover:shadow-lg ${
+                className={`w-full h-full ${asset.assetType === "image" || asset.assetType === "video" || asset.assetType === "public_video" || asset.assetType === "public_image" ? "" : "rounded-xl"} overflow-hidden bg-background shadow-md transition-shadow duration-150 hover:shadow-lg ${
                   isSelected
                     ? "ring-2 ring-primary ring-offset-2 ring-offset-background"
                     : remoteSelectorsForAsset?.length
@@ -1300,7 +1300,7 @@ export default function DesktopCanvas({
         const screenH = dims.h * camera.zoom;
         return (
           <div
-            className="absolute z-[60] flex items-center bg-background border border-divider rounded-lg shadow-lg px-2 py-1"
+            className="absolute z-60 flex items-center bg-background border border-divider rounded-lg shadow-lg px-2 py-1"
             style={{
               left: screenX + screenW / 2,
               top: screenY + screenH + 8,
@@ -1578,6 +1578,7 @@ function AssetCardContent({
 }) {
   switch (asset.assetType) {
     case "image":
+    case "public_image":
       return <ImageAsset asset={asset} onImageLoad={onImageLoad} onFocusAsset={onFocusAsset} zoom={zoom} />;
     case "video":
       return <VideoAsset asset={asset} playing={playing} onPlayToggle={onPlayToggle} onImageLoad={onImageLoad} onFocusAsset={onFocusAsset} zoom={zoom} />;

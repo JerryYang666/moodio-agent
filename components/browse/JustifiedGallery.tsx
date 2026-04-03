@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { LazyVideo } from "./LazyVideo";
 import { Squircle } from "@/components/Squircle";
+import type { MediaType } from "@/lib/media";
 
 export interface Photo {
   src: string;
@@ -12,6 +13,7 @@ export interface Photo {
   key: string;
   id: number;
   videoName: string;
+  mediaType: MediaType;
   dimensionsLoaded?: boolean;
   footer?: React.ReactNode;
   footerHeight?: number;
@@ -105,6 +107,7 @@ export const JustifiedGallery: React.FC<JustifiedGalleryProps> = ({
             >
               <LazyVideo
                 src={photo.src}
+                mediaType={photo.mediaType}
                 aspectRatio={photo.width / photo.height}
                 onClick={() => onClick?.(photo)}
               />
