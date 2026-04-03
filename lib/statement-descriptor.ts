@@ -32,6 +32,16 @@ export function sanitizeStatementDescriptorSuffix(name: string): string {
 }
 
 /**
+ * Build the full statement descriptor (max 22 chars) for wallet payments
+ * (Apple Pay, Google Pay, etc.) where `statement_descriptor_suffix` is ignored.
+ */
+export function buildFullStatementDescriptor(name: string): string {
+  const suffix = sanitizeStatementDescriptorSuffix(name);
+  const full = `${STATEMENT_DESCRIPTOR_PREFIX} ${suffix}`;
+  return full.slice(0, MAX_TOTAL_LENGTH);
+}
+
+/**
  * Build the full statement descriptor as it would appear on a card statement.
  */
 export function formatStatementDescriptorPreview(name: string): string {

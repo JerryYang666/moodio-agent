@@ -2,9 +2,9 @@ import Stripe from "stripe";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
-import { sanitizeStatementDescriptorSuffix } from "@/lib/statement-descriptor";
+import { sanitizeStatementDescriptorSuffix, buildFullStatementDescriptor } from "@/lib/statement-descriptor";
 
-export { sanitizeStatementDescriptorSuffix };
+export { sanitizeStatementDescriptorSuffix, buildFullStatementDescriptor };
 
 export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2026-03-25.dahlia" as Stripe.LatestApiVersion,

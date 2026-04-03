@@ -4,7 +4,7 @@ import { verifyAccessToken } from "@/lib/auth/jwt";
 import { db } from "@/lib/db";
 import { subscriptionPlans, creditPackages, userConsents } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
-import { stripe, getOrCreateStripeCustomer, sanitizeStatementDescriptorSuffix } from "@/lib/stripe";
+import { stripe, getOrCreateStripeCustomer, sanitizeStatementDescriptorSuffix, buildFullStatementDescriptor } from "@/lib/stripe";
 import { hasActiveSubscription } from "@/lib/subscription";
 import { handleStripeError } from "@/lib/stripe-errors";
 
@@ -188,6 +188,7 @@ export async function POST(request: NextRequest) {
       payment_intent_data: {
         metadata: creditsMeta,
         statement_descriptor_suffix: sanitizeStatementDescriptorSuffix(pkg.name),
+        statement_descriptor: buildFullStatementDescriptor(pkg.name),
       },
       metadata: creditsMeta,
     });
