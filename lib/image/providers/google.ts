@@ -12,7 +12,8 @@ function resolveAspectRatio(aspectRatio?: string): string {
 }
 
 function resolveImageSize(imageSize?: ImageSize): "2K" | "4K" {
-  return imageSize === "4k" ? "4K" : "2K";
+  if (imageSize === "4k") return "4K";
+  return "2K";
 }
 
 function detectMimeType(base64: string): string {

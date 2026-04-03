@@ -635,7 +635,7 @@
       "videoDesc": "通过你的提示直接生成视频"
     },
     "models": {
-      "nano-banana-pro": "Nano-banana Pro",
+      "nano-banana-2": "Nano Banana 2",
       "seedream-45": "Seedream 4.5",
       "midjourney": "Midjourney",
       "gpt-52": "gpt-5.2",
@@ -663,6 +663,7 @@
       "9:16": "9:16"
     },
     "imageSizeOptions": {
+      "1k": "1K",
       "2k": "2K",
       "4k": "4K"
     },

@@ -12,7 +12,8 @@ fal.config({
 });
 
 function resolveFalImageSize(size?: ImageSize): "auto_2K" | "auto_4K" {
-  return size === "4k" ? "auto_4K" : "auto_2K";
+  if (size === "4k") return "auto_4K";
+  return "auto_2K";
 }
 
 async function downloadFromUrlWithType(url: string): Promise<{

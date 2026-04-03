@@ -1,40 +1,10 @@
 import type { VideoProviderClient, VideoGenerationResult } from "./index";
-import sharp from "sharp";
-import { uploadTempImage, getSignedTempImageUrl } from "@/lib/storage/s3";
-
-const KIE_API_BASE = "https://api.kie.ai";
-const KIE_FILE_UPLOAD_BASE = "https://kieai.redpandaai.co";
-
-function getApiKey(): string {
-  const key = process.env.KIE_API_KEY;
-  if (!key) throw new Error("KIE_API_KEY environment variable is not set");
-  return key;
-}
-
-function authHeaders(): Record<string, string> {
-  return {
-    Authorization: `Bearer ${getApiKey()}`,
-    "Content-Type": "application/json",
-  };
-}
-
-// ---------------------------------------------------------------------------
-// Kie File Upload — re-upload external URLs so Kie can infer the file type
-// ---------------------------------------------------------------------------
-
-interface KieFileUploadResponse {
-  success: boolean;
-  code: number;
-  msg: string;
-  data: {
-    fileName: string;
-    filePath: string;
-    downloadUrl: string;
-    fileSize: number;
-    mimeType: string;
-    uploadedAt: string;
-  };
-}
+import {
+  KIE_API_BASE,
+  kieAuthHeaders,
+  reuploadForKie,
+  reuploadArrayForKie,
+} from "@/lib/kie/client";
 
 const IMAGE_URL_KEYS = new Set([
   "image_url",
@@ -50,122 +20,16 @@ function isImageUrlParam(key: string): boolean {
   return IMAGE_URL_KEYS.has(key);
 }
 
-const MIME_TO_EXT: Record<string, string> = {
-  "image/jpeg": ".jpg",
-  "image/jpg": ".jpg",
-  "image/png": ".png",
-  "image/webp": ".webp",
-  "image/gif": ".gif",
-  "image/bmp": ".bmp",
-  "image/tiff": ".tiff",
-  "video/mp4": ".mp4",
-  "video/webm": ".webm",
-};
-
-/**
- * Try to determine a file extension for the given URL.
- * 1. Check the URL path for a recognisable extension.
- * 2. Fall back to a HEAD request to read Content-Type.
- * 3. Default to ".jpg" — Kie needs *some* extension.
- */
-async function inferExtension(url: string): Promise<string> {
-  try {
-    const pathname = new URL(url).pathname;
-    const match = pathname.match(/\.([a-zA-Z0-9]{2,5})(?:[?#]|$)/);
-    if (match) {
-      const ext = `.${match[1].toLowerCase()}`;
-      if (Object.values(MIME_TO_EXT).includes(ext)) return ext;
-    }
-  } catch { }
-
-  try {
-    const head = await fetch(url, { method: "HEAD" });
-    const ct = head.headers.get("content-type")?.split(";")[0]?.trim();
-    if (ct && MIME_TO_EXT[ct]) return MIME_TO_EXT[ct];
-  } catch (err) {
-    console.warn("[Kie Upload] HEAD request failed, defaulting to .jpg", err);
-  }
-
-  return ".jpg";
-}
-
-/**
- * Upload an external image URL to Kie's temp storage so the task API
- * receives a URL it can reliably resolve the file type from.
- * URLs already hosted on Kie's temp storage are passed through as-is.
- */
-async function uploadToKie(url: string): Promise<string> {
-  if (url.includes("redpandaai.co")) return url;
-
-  const ext = await inferExtension(url);
-  const fileName = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}${ext}`;
-
-  console.log(
-    `[Kie Upload] Re-uploading external image to Kie temp storage (fileName: ${fileName})`
-  );
-
-  const res = await fetch(`${KIE_FILE_UPLOAD_BASE}/api/file-url-upload`, {
-    method: "POST",
-    headers: authHeaders(),
-    body: JSON.stringify({
-      fileUrl: url,
-      uploadPath: "moodio/video-inputs",
-      fileName,
-    }),
-  });
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Kie file upload failed (${res.status}): ${text}`);
-  }
-
-  const json: KieFileUploadResponse = await res.json();
-  if (!json.success || json.code !== 200) {
-    throw new Error(`Kie file upload error (${json.code}): ${json.msg}`);
-  }
-
-  console.log(
-    `[Kie Upload] OK — ${json.data.mimeType}, ${json.data.fileSize} bytes → ${json.data.downloadUrl}`
-  );
-  return json.data.downloadUrl;
-}
-
 async function reuploadSingle(value: string): Promise<string> {
-  const converted = await ensureKieSupportedFormat(value);
-  return uploadToKie(converted);
+  return reuploadForKie(value, "moodio/video-inputs");
 }
 
 async function reuploadArray(value: string[]): Promise<string[]> {
-  const converted = await Promise.all(value.map(ensureKieSupportedFormat));
-  return Promise.all(converted.map(uploadToKie));
-}
-
-const KIE_SUPPORTED_IMAGE_EXTS = new Set([".jpg", ".jpeg", ".png"]);
-
-/**
- * Ensure an image URL is in a format KIE accepts (jpeg/png only).
- * If the image is webp/gif/etc, fetch it, convert to JPEG via sharp,
- * upload the converted buffer to S3, and return a signed URL.
- */
-async function ensureKieSupportedFormat(url: string): Promise<string> {
-  const ext = await inferExtension(url);
-  if (KIE_SUPPORTED_IMAGE_EXTS.has(ext)) return url;
-
-  console.log(
-    `[Kie Element] Converting ${ext} image to JPEG for KIE compatibility`
-  );
-
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Failed to fetch image for conversion: ${res.status}`);
-  const buffer = Buffer.from(await res.arrayBuffer());
-  const jpegBuffer = await sharp(buffer).jpeg({ quality: 90 }).toBuffer();
-  const imageId = await uploadTempImage(jpegBuffer, "image/jpeg");
-  return getSignedTempImageUrl(imageId);
+  return reuploadArrayForKie(value, "moodio/video-inputs");
 }
 
 async function reuploadElementArray(urls: string[]): Promise<string[]> {
-  const converted = await Promise.all(urls.map(ensureKieSupportedFormat));
-  return Promise.all(converted.map(uploadToKie));
+  return reuploadArrayForKie(urls, "moodio/video-inputs");
 }
 
 // ---------------------------------------------------------------------------
@@ -318,7 +182,7 @@ export class KieVideoProvider implements VideoProviderClient {
 
     const res = await fetch(`${KIE_API_BASE}/api/v1/jobs/createTask`, {
       method: "POST",
-      headers: authHeaders(),
+      headers: kieAuthHeaders(),
       body: JSON.stringify(requestBody),
     });
 
@@ -378,7 +242,7 @@ export class KieVideoProvider implements VideoProviderClient {
 
     const res = await fetch(`${KIE_API_BASE}/api/v1/veo/generate`, {
       method: "POST",
-      headers: authHeaders(),
+      headers: kieAuthHeaders(),
       body: JSON.stringify(requestBody),
     });
 
@@ -466,7 +330,7 @@ export class KieVideoProvider implements VideoProviderClient {
     taskId: string
   ): Promise<KieTaskDetailResponse> {
     const url = `${KIE_API_BASE}/api/v1/jobs/recordInfo?taskId=${encodeURIComponent(taskId)}`;
-    const res = await fetch(url, { headers: authHeaders() });
+    const res = await fetch(url, { headers: kieAuthHeaders() });
 
     if (!res.ok) {
       const text = await res.text();

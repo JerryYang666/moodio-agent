@@ -65,7 +65,7 @@ const SUPPORTED_ASPECT_RATIOS = [
   "21:9",
 ] as const;
 
-const SUPPORTED_IMAGE_SIZES: ImageSize[] = ["2k", "4k"];
+const SUPPORTED_IMAGE_SIZES: ImageSize[] = ["1k", "2k", "4k"];
 
 export interface CreateRequestContextInput {
   userId: string;

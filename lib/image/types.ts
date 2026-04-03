@@ -1,5 +1,5 @@
 export type ImageOperation = "generate" | "edit";
-export type ImageSize = "2k" | "4k";
+export type ImageSize = "1k" | "2k" | "4k";
 
 export interface ImageGenerationInput {
   prompt: string;
@@ -18,7 +18,7 @@ export interface ImageEditInput {
 export interface ImageProviderResult {
   imageBuffer: Buffer;
   contentType: string;
-  provider: "google" | "fal";
+  provider: "google" | "fal" | "kie";
   providerModelId: string;
   response?: any;
 }

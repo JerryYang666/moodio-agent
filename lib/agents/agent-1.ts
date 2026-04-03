@@ -56,7 +56,7 @@ const SUPPORTED_ASPECT_RATIOS = [
 ] as const;
 
 type AspectRatio = (typeof SUPPORTED_ASPECT_RATIOS)[number];
-const SUPPORTED_IMAGE_SIZES: ImageSize[] = ["2k", "4k"];
+const SUPPORTED_IMAGE_SIZES: ImageSize[] = ["1k", "2k", "4k"];
 
 interface Suggestion {
   title: string;

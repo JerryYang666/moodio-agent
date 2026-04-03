@@ -27,9 +27,9 @@ export const MENU_CONFIG = {
 
     model: {
       label: "Model",
-      default: "nano-banana-pro",
+      default: "nano-banana-2",
       options: {
-        "nano-banana-pro": { label: "Nano-banana Pro" },
+        "nano-banana-2": { label: "Nano Banana 2" },
         "seedream-45": { label: "Seedream 4.5" },
         midjourney: { label: "Midjourney" },
         "gpt-5.2": { label: "gpt-5.2" },
@@ -80,6 +80,7 @@ export const MENU_CONFIG = {
       label: "Image Size",
       default: "2k",
       options: {
+        "1k": { label: "1k" },
         "2k": { label: "2k" },
         "4k": { label: "4k" },
       },
@@ -105,7 +106,7 @@ export const MENU_CONFIG = {
   contexts: {
     agent: {
       defaults: {
-        model: "nano-banana-pro",
+        model: "nano-banana-2",
         expertise: "smart",
         aspectRatio: "smart",
         imageSize: "2k",
@@ -114,7 +115,7 @@ export const MENU_CONFIG = {
       availability: {
         model: {
           enabled: true,
-          allowed: ["nano-banana-pro", "seedream-45"],
+          allowed: ["nano-banana-2", "seedream-45"],
         },
         expertise: {
           enabled: true,
@@ -136,7 +137,7 @@ export const MENU_CONFIG = {
         },
         imageSize: {
           enabled: true,
-          allowed: ["2k", "4k"],
+          allowed: ["1k", "2k", "4k"],
         },
         imageQuantity: {
           enabled: true,
@@ -147,13 +148,13 @@ export const MENU_CONFIG = {
 
     image: {
       defaults: {
-        model: "nano-banana-pro",
+        model: "nano-banana-2",
         aspectRatio: "smart",
         imageSize: "2k",
         imageQuantity: "1",
       },
       availability: {
-        model: { enabled: true, allowed: ["nano-banana-pro", "seedream-45"] },
+        model: { enabled: true, allowed: ["nano-banana-2", "seedream-45"] },
         expertise: {
           enabled: false,
           reason: "Expertise is not available in direct image generation mode.",
@@ -174,7 +175,7 @@ export const MENU_CONFIG = {
         },
         imageSize: {
           enabled: true,
-          allowed: ["2k", "4k"],
+          allowed: ["1k", "2k", "4k"],
         },
         imageQuantity: {
           enabled: true,

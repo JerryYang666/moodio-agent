@@ -1,4 +1,4 @@
-export type ImageModelProvider = "google" | "fal";
+export type ImageModelProvider = "google" | "fal" | "kie";
 
 export interface ImageModelConfig {
   id: string;
@@ -16,20 +16,21 @@ export interface ImageModelConfig {
 }
 
 /**
- * Nano-banana Pro (Gemini image) - Image generation + editing
+ * Nano Banana 2 - Image generation + editing via KIE
  */
-const nanoBananaPro: ImageModelConfig = {
-  id: "nano-banana-pro",
-  name: "Nano-banana Pro",
-  description: "Gemini image model for text-to-image and image editing",
-  provider: "google",
+const nanoBanana2: ImageModelConfig = {
+  id: "nano-banana-2",
+  name: "Nano Banana 2",
+  description: "Google Nano Banana 2 via KIE for text-to-image and image editing",
+  provider: "kie",
   supports: {
     generate: true,
     edit: true,
   },
   providerModelIds: {
-    generate: "gemini-3.1-flash-image-preview",
-    edit: "gemini-3.1-flash-image-preview",
+    generate: "nano-banana-2",
+    edit: "nano-banana-2",
+    // Google direct (for future fallback): "gemini-3.1-flash-image-preview"
   },
 };
 
@@ -52,9 +53,9 @@ const seedreamV45: ImageModelConfig = {
   },
 };
 
-export const IMAGE_MODELS: ImageModelConfig[] = [nanoBananaPro, seedreamV45];
+export const IMAGE_MODELS: ImageModelConfig[] = [nanoBanana2, seedreamV45];
 
-export const DEFAULT_IMAGE_MODEL_ID = nanoBananaPro.id;
+export const DEFAULT_IMAGE_MODEL_ID = nanoBanana2.id;
 
 export function getImageModel(modelId: string): ImageModelConfig | undefined {
   return IMAGE_MODELS.find((model) => model.id === modelId);

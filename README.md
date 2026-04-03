@@ -682,7 +682,7 @@ This enrichment happens in both:
 
 | Model | Provider | Capabilities |
 |-------|----------|--------------|
-| Nano-banana Pro | Google (Gemini 3 Pro) | Generate + Edit |
+| Nano Banana 2 | Google (KIE) | Generate + Edit |
 | Seedream 4.5 | ByteDance (Fal.ai) | Generate + Edit |
 
 ### Generation Modes
