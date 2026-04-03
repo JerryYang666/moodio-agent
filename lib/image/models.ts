@@ -1,5 +1,14 @@
 export type ImageModelProvider = "google" | "fal" | "kie";
 
+export type ImageModelPricingParamType = "string" | "number" | "boolean" | "enum";
+
+export interface ImageModelPricingParam {
+  name: string;
+  type: ImageModelPricingParamType;
+  options?: (string | number)[];
+  default?: string | number | boolean;
+}
+
 export interface ImageModelConfig {
   id: string;
   name: string;
@@ -14,6 +23,10 @@ export interface ImageModelConfig {
     edit?: string;
   };
 }
+
+const IMAGE_PRICING_PARAMS: ImageModelPricingParam[] = [
+  { name: "resolution", type: "enum", options: [1, 2, 4], default: 2 },
+];
 
 /**
  * Nano Banana 2 - Image generation + editing via KIE
@@ -59,4 +72,23 @@ export const DEFAULT_IMAGE_MODEL_ID = nanoBanana2.id;
 
 export function getImageModel(modelId: string): ImageModelConfig | undefined {
   return IMAGE_MODELS.find((model) => model.id === modelId);
+}
+
+export const IMAGE_MODEL_IDS = new Set(IMAGE_MODELS.map((m) => m.id));
+
+export function getImageModelConfigForApi(modelId: string) {
+  const model = getImageModel(modelId);
+  if (!model) return null;
+
+  return {
+    id: model.id,
+    name: model.name,
+    provider: model.provider,
+    params: IMAGE_PRICING_PARAMS.map((p) => ({
+      name: p.name,
+      type: p.type,
+      options: p.options,
+      default: p.default,
+    })),
+  };
 }

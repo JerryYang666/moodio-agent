@@ -3,6 +3,8 @@ import { db } from "@/lib/db";
 import { modelPricing } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { getVideoModel } from "@/lib/video/models";
+import { IMAGE_MODEL_IDS } from "@/lib/image/models";
+import type { ImageSize } from "@/lib/image/types";
 
 // Default cost if no formula is defined
 const DEFAULT_COST = 0;
@@ -92,16 +94,31 @@ export async function getModelFormula(
   return null;
 }
 
+const IMAGE_SIZE_MAP: Record<ImageSize, number> = { "1k": 1, "2k": 2, "4k": 4 };
+
 /**
- * Calculate the cost for a video generation.
+ * Convert an ImageSize string to its numeric resolution value for pricing formulas.
+ */
+export function parseImageSizeToNumber(size: ImageSize): number {
+  return IMAGE_SIZE_MAP[size] ?? 2;
+}
+
+/**
+ * Calculate the cost for a generation.
  * Looks up the formula from DB, falls back to default if not found.
+ * For image models, falls back to "Image/all" before returning DEFAULT_COST.
  * Merges model param defaults so formula variables are always defined.
  */
 export async function calculateCost(
   modelId: string,
   params: Record<string, any>
 ): Promise<number> {
-  const formula = await getModelFormula(modelId);
+  let formula = await getModelFormula(modelId);
+
+  // Image model fallback: try "Image/all" if no model-specific formula
+  if (!formula && IMAGE_MODEL_IDS.has(modelId)) {
+    formula = await getModelFormula("Image/all");
+  }
 
   if (!formula) {
     console.warn(`[Pricing] No formula found for model ${modelId}, using default`);
@@ -115,6 +132,13 @@ export async function calculateCost(
       if (param.default !== undefined && paramsWithDefaults[param.name] === undefined) {
         paramsWithDefaults[param.name] = param.default;
       }
+    }
+  }
+
+  // For image models, ensure resolution has a default
+  if (IMAGE_MODEL_IDS.has(modelId) || modelId === "Image/all") {
+    if (paramsWithDefaults.resolution === undefined) {
+      paramsWithDefaults.resolution = 2;
     }
   }
 

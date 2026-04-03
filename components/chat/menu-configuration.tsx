@@ -18,6 +18,7 @@ import {
   Sparkles,
   Info,
   ChevronUp,
+  Bean,
 } from "lucide-react";
 import { AspectRatioIcon } from "./aspect-ratio-icon";
 import VideoModeParams from "./video-mode-params";
@@ -213,11 +214,13 @@ export const resolveMenuState = (
 interface MenuConfigurationProps {
   state: MenuState;
   onStateChange: (newState: MenuState) => void;
+  imageUnitCost?: number | null;
 }
 
 export default function MenuConfiguration({
   state,
   onStateChange,
+  imageUnitCost,
 }: MenuConfigurationProps) {
   const t = useTranslations("menu");
   const getCategoryLabel = (
@@ -306,6 +309,8 @@ export default function MenuConfiguration({
       return undefined;
     };
 
+    const isImageSize = categoryKey === "imageSize";
+
     return (
       <div key={categoryKey} className="flex flex-col gap-0.5">
         <span className="text-[10px] text-default-400 uppercase tracking-wide pl-1">
@@ -327,6 +332,12 @@ export default function MenuConfiguration({
               endContent={<ChevronUp size={14} className="text-default-400" />}
             >
               {selectedLabel}
+              {isImageSize && imageUnitCost != null && imageUnitCost > 0 && (
+                <span className="flex items-center gap-0.5 text-[11px] text-default-500 ml-1">
+                  <Bean size={12} />
+                  {imageUnitCost.toLocaleString()}
+                </span>
+              )}
             </Button>
           </DropdownTrigger>
           <DropdownMenu

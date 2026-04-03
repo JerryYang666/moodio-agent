@@ -22,7 +22,7 @@ import {
   editImageWithModel,
 } from "@/lib/image/service";
 import { ImageSize } from "@/lib/image/types";
-import { calculateCost } from "@/lib/pricing";
+import { calculateCost, parseImageSizeToNumber } from "@/lib/pricing";
 import { deductCredits, getUserBalance, assertSufficientCredits, InsufficientCreditsError, getActiveAccount } from "@/lib/credits";
 import {
   getVideoModel,
@@ -562,7 +562,8 @@ export async function POST(
 
                 try {
                   // Calculate cost and verify balance
-                  const cost = await calculateCost("Image/all", {});
+                  const resolution = parseImageSizeToNumber(imageSizeOverride || "2k");
+                  const cost = await calculateCost(imageModelId || "Image/all", { resolution });
                   if (cost > 0) {
                     const balance = await getUserBalance(account.accountId, account.accountType);
                     if (balance < cost) {
@@ -654,7 +655,7 @@ export async function POST(
                       account.accountId,
                       cost,
                       "image_generation",
-                      `Direct image generation (${imageModelId || "default"})`,
+                      `Direct image generation (${imageModelId || "default"}, ${imageSizeOverride || "2k"})`,
                       account.performedBy,
                       undefined,
                       account.accountType,

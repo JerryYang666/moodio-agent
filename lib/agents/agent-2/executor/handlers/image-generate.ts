@@ -14,7 +14,7 @@ import {
   generateImageWithModel,
 } from "@/lib/image/service";
 import { getImageModel } from "@/lib/image/models";
-import { calculateCost } from "@/lib/pricing";
+import { calculateCost, parseImageSizeToNumber } from "@/lib/pricing";
 import {
   deductCredits,
   assertSufficientCredits,
@@ -213,13 +213,15 @@ export class ImageGenerateHandler implements ToolHandler {
 
     const useImageEditing = effectiveImageBase64.length > 0;
 
+    const modelId = ctx.imageModelId;
+
     // Verify balance before doing any work
-    const cost = await calculateCost("Image/all", {});
+    const resolution = parseImageSizeToNumber(imageSize);
+    const cost = await calculateCost(modelId || "Image/all", { resolution });
     if (cost > 0) {
       await assertSufficientCredits(ctx.effectiveAccountId, cost, ctx.effectiveAccountType);
     }
 
-    const modelId = ctx.imageModelId;
     let result;
 
     if (useImageEditing) {
@@ -254,7 +256,7 @@ export class ImageGenerateHandler implements ToolHandler {
         ctx.effectiveAccountId,
         cost,
         "image_generation",
-        `Image generation (${modelId || "default"})`,
+        `Image generation (${modelId || "default"}, ${imageSize})`,
         ctx.effectivePerformedBy,
         undefined,
         ctx.effectiveAccountType

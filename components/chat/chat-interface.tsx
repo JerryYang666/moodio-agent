@@ -325,6 +325,10 @@ export default function ChatInterface({
   const [videoCost, setVideoCost] = useState<number | null>(null);
   const [videoCostLoading, setVideoCostLoading] = useState(false);
 
+  // Image cost estimation state
+  const [imageCost, setImageCost] = useState<number | null>(null);
+  const [imageCostLoading, setImageCostLoading] = useState(false);
+
   // Drawing modal state for "circle to change" feature (局部重绘)
   const [drawingImage, setDrawingImage] = useState<{
     imageId: string;
@@ -552,6 +556,47 @@ export default function ChatInterface({
     const timeoutId = setTimeout(fetchCost, 300);
     return () => clearTimeout(timeoutId);
   }, [menuState.videoModelId, videoCostParams]);
+
+  // Per-image cost estimation (for image size label + send button)
+  const imageCostKey = useMemo(() => {
+    if (menuState.mode !== "image" && menuState.mode !== "agent") return null;
+    return `${menuState.model}:${menuState.imageSize}`;
+  }, [menuState.mode, menuState.model, menuState.imageSize]);
+
+  useEffect(() => {
+    if (menuState.mode !== "image" && menuState.mode !== "agent") {
+      setImageCost(null);
+      return;
+    }
+    const fetchImageCost = async () => {
+      setImageCostLoading(true);
+      try {
+        const sizeMap: Record<string, number> = { "1k": 1, "2k": 2, "4k": 4 };
+        const resolution = sizeMap[menuState.imageSize] ?? 2;
+        const searchParams = new URLSearchParams();
+        searchParams.set("modelId", menuState.model);
+        searchParams.set("resolution", String(resolution));
+        const res = await fetch(`/api/image/cost?${searchParams.toString()}`);
+        if (res.ok) {
+          const data = await res.json();
+          setImageCost(data.cost);
+        }
+      } catch (e) {
+        console.error("Failed to fetch image cost:", e);
+      } finally {
+        setImageCostLoading(false);
+      }
+    };
+    const timeoutId = setTimeout(fetchImageCost, 300);
+    return () => clearTimeout(timeoutId);
+  }, [imageCostKey]);
+
+  // Total image cost for send button (per-image cost * quantity, image mode only)
+  const imageTotalCost = useMemo(() => {
+    if (menuState.mode !== "image" || imageCost === null) return null;
+    const quantity = parseInt(menuState.imageQuantity, 10) || 1;
+    return imageCost * quantity;
+  }, [menuState.mode, imageCost, menuState.imageQuantity]);
 
   // Check if current video model supports end images
   const videoModelSupportsEndImage = useMemo(() => {
@@ -3833,6 +3878,9 @@ export default function ChatInterface({
         onBlur={saveDraft}
         videoCost={videoCost}
         videoCostLoading={videoCostLoading}
+        imageCost={imageTotalCost}
+        imageCostLoading={imageCostLoading}
+        imageUnitCost={imageCost}
         videoModelSupportsEndImage={videoModelSupportsEndImage}
         videoModelHasImageParams={videoModelHasImageParams}
         videoModelParams={videoModelParams}

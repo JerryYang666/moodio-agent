@@ -8,6 +8,7 @@ import {
 } from "@/lib/pricing";
 import { VIDEO_MODELS, getModelConfigForApi } from "@/lib/video/models";
 import { getActiveProvider } from "@/lib/video/provider-config";
+import { IMAGE_MODELS, getImageModelConfigForApi } from "@/lib/image/models";
 
 /**
  * GET /api/admin/pricing
@@ -53,12 +54,25 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    // Add image generation as a configurable pricing entry
+    // Add individual image models with resolution pricing param
+    for (const im of IMAGE_MODELS) {
+      const config = getImageModelConfigForApi(im.id);
+      if (config) {
+        models.push({
+          id: config.id,
+          name: `Image / ${config.name}`,
+          provider: config.provider,
+          params: config.params,
+        });
+      }
+    }
+
+    // Keep Image/all as a fallback entry
     models.push({
       id: "Image/all",
-      name: "Image (All Models)",
+      name: "Image (Fallback / All Models)",
       provider: null,
-      params: [],
+      params: [{ name: "resolution", type: "enum", options: [1, 2, 4], default: 2 }],
     });
 
     return NextResponse.json({

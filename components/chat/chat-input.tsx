@@ -109,6 +109,12 @@ interface ChatInputProps {
   videoCost?: number | null;
   /** Whether the video cost is loading */
   videoCostLoading?: boolean;
+  /** Estimated image total cost (per-image * quantity, for send button) */
+  imageCost?: number | null;
+  /** Whether the image cost is loading */
+  imageCostLoading?: boolean;
+  /** Per-image unit cost (for display next to image size selector) */
+  imageUnitCost?: number | null;
   /** Whether the selected video model supports end images */
   videoModelSupportsEndImage?: boolean;
   /** Whether the selected video model has imageParams (first/last frame) */
@@ -173,6 +179,9 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
   onBlur,
   videoCost,
   videoCostLoading,
+  imageCost,
+  imageCostLoading,
+  imageUnitCost,
   videoModelSupportsEndImage,
   videoModelHasImageParams,
   videoModelParams = [],
@@ -1395,6 +1404,26 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
                   )}
                   {isExpanded && videoCostLoading && <Spinner size="sm" />}
                 </Button>
+              ) : menuState.mode === "image" && isExpanded && (imageCost !== null || imageCostLoading) ? (
+                <Button
+                  key="send-image"
+                  color="secondary"
+                  aria-label={t("chat.send")}
+                  onPress={onSend}
+                  isLoading={isSending}
+                  isDisabled={isRecording || isTranscribing || hasUploadingImages}
+                  className="shrink-0"
+                  size="sm"
+                >
+                  <Send size={16} />
+                  {!imageCostLoading && imageCost !== null && imageCost !== undefined && (
+                    <span className="flex items-center gap-0.5 font-semibold ml-1">
+                      <Bean size={14} />
+                      {imageCost.toLocaleString()}
+                    </span>
+                  )}
+                  {imageCostLoading && <Spinner size="sm" />}
+                </Button>
               ) : (
                 <Button
                   key="send-default"
@@ -1489,6 +1518,7 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
                   <MenuConfiguration
                     state={menuState}
                     onStateChange={onMenuStateChange}
+                    imageUnitCost={imageUnitCost}
                   />
                 </div>
               </motion.div>

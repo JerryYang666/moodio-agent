@@ -9,7 +9,7 @@ import {
 import OpenAI, { toFile } from "openai";
 import { getSystemPrompt } from "./system-prompts";
 import { recordEvent, sanitizeOpenAIResponse } from "@/lib/telemetry";
-import { calculateCost } from "@/lib/pricing";
+import { calculateCost, parseImageSizeToNumber } from "@/lib/pricing";
 import { deductCredits, getUserBalance, InsufficientCreditsError, AccountType } from "@/lib/credits";
 
 interface Suggestion {
@@ -197,7 +197,9 @@ export class Agent0 implements Agent {
       userId,
       effectiveAccountId,
       effectiveAccountType,
-      effectivePerformedBy
+      effectivePerformedBy,
+      imageSizeOverride,
+      imageModelId
     );
     return { stream, completion };
   }
@@ -210,7 +212,9 @@ export class Agent0 implements Agent {
     userId: string,
     effectiveAccountId: string,
     effectiveAccountType: AccountType,
-    effectivePerformedBy: string
+    effectivePerformedBy: string,
+    imageSizeOverride?: ImageSize,
+    imageModelId?: string
   ) {
     const encoder = new TextEncoder();
     let controller: any = null;
@@ -308,7 +312,8 @@ export class Agent0 implements Agent {
           );
 
           // Check balance before generating (deduct only on success)
-          const cost = await calculateCost("Image/all", {});
+          const resolution = parseImageSizeToNumber(imageSizeOverride || "2k");
+          const cost = await calculateCost(imageModelId || "Image/all", { resolution });
           if (cost > 0) {
             const balance = await getUserBalance(effectiveAccountId, effectiveAccountType);
             if (balance < cost) {
@@ -376,7 +381,7 @@ export class Agent0 implements Agent {
               effectiveAccountId,
               cost,
               "image_generation",
-              `Image generation (gpt-image-1)`,
+              `Image generation (${imageModelId || "default"}, ${imageSizeOverride || "2k"})`,
               effectivePerformedBy,
               undefined,
               effectiveAccountType

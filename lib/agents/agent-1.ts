@@ -21,7 +21,7 @@ import {
   getModelConfigForApi,
   getVideoModelsPromptText,
 } from "@/lib/video/models";
-import { calculateCost } from "@/lib/pricing";
+import { calculateCost, parseImageSizeToNumber } from "@/lib/pricing";
 import { deductCredits, getUserBalance, InsufficientCreditsError, AccountType } from "@/lib/credits";
 import {
   fetchTaxonomyTree,
@@ -1186,7 +1186,8 @@ export class Agent1 implements Agent {
       const modelId = prepared.imageModelId;
 
       // Calculate cost and verify balance before generating
-      const cost = await calculateCost("Image/all", {});
+      const resolution = parseImageSizeToNumber(imageSize);
+      const cost = await calculateCost(modelId || "Image/all", { resolution });
       if (cost > 0) {
         const acctId = effectiveAccountId || userId;
         const acctType: AccountType = effectiveAccountType || "personal";
@@ -1232,7 +1233,7 @@ export class Agent1 implements Agent {
           acctId,
           cost,
           "image_generation",
-          `Image generation (${modelId || "default"})`,
+          `Image generation (${modelId || "default"}, ${imageSize})`,
           performer,
           undefined,
           acctType
