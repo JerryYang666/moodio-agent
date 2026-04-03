@@ -13,7 +13,7 @@ import {
 } from "../types";
 
 const POLL_INTERVAL_MS = 3000;
-const POLL_TIMEOUT_MS = 180_000;
+const POLL_TIMEOUT_MS = 600_000;
 
 function resolveResolution(size?: ImageSize): "1K" | "2K" | "4K" {
   switch (size) {
