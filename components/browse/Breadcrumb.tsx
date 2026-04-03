@@ -6,7 +6,7 @@ import { useTranslations, useLocale } from 'next-intl';
 import type { RootState } from '@/lib/redux/store';
 import { setSelectedFilters, setTextSearch } from '@/lib/redux/slices/querySlice';
 import { useGetPropertiesQuery } from '@/lib/redux/services/api';
-import { FilterChipBar } from '@/components/browse/FilterChipBar';
+import { FilterChipBar, FilterDescription } from '@/components/browse/FilterChipBar';
 import { useFilterChips } from '@/hooks/use-filter-chips';
 
 const Breadcrumb: React.FC = () => {
@@ -41,6 +41,19 @@ const Breadcrumb: React.FC = () => {
       onClearSearch={handleRemoveSearch}
     />
   );
+};
+
+/**
+ * Renders the label description for a single selected filter.
+ * Intended to be placed inside a scrollable container.
+ */
+export const BreadcrumbDescription: React.FC = () => {
+  const locale = useLocale();
+  const { textSearch, selectedFilters } = useSelector((state: RootState) => state.query);
+  const { data: properties } = useGetPropertiesQuery(locale);
+  const filterChips = useFilterChips(properties, selectedFilters);
+
+  return <FilterDescription filterChips={filterChips} searchTerm={textSearch || undefined} />;
 };
 
 export default Breadcrumb;

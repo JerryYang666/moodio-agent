@@ -31,14 +31,8 @@ export function FilterChipBar({
     searchTerm,
     onClearSearch,
 }: FilterChipBarProps) {
-    // Show highlight text when exactly one filter is selected and there is no search term
-    const singleSelectedFilter =
-        filterChips.length === 1 && !searchTerm
-            ? filterChips[0]
-            : null;
-
     return (
-        <div className="mb-4">
+        <div className="mb-1">
             <div className="flex items-center gap-2 flex-wrap">
                 {/* Context text */}
                 <p className="font-normal text-xs leading-4 text-default-500">
@@ -72,29 +66,41 @@ export function FilterChipBar({
                     </Chip>
                 )}
             </div>
+        </div>
+    );
+}
 
-            {/* Single filter highlight */}
-            {singleSelectedFilter && (
-                <div className="mt-2">
-                    <p className="text-2xl font-semibold leading-tight text-foreground">
-                        {singleSelectedFilter.label}
-                    </p>
-                    {singleSelectedFilter.description && (
-                        <div className="mt-1 text-base font-medium text-default-700 leading-relaxed">
-                            <MarkdownRenderer
-                                externalLinksNewTab
-                                linkClassName="text-primary underline underline-offset-2"
-                                components={{
-                                    p: ({ children }: { children?: React.ReactNode }) => <p className="mb-2 last:mb-0">{children}</p>,
-                                    ul: ({ children }: { children?: React.ReactNode }) => <ul className="list-disc pl-5 mb-2 last:mb-0">{children}</ul>,
-                                    ol: ({ children }: { children?: React.ReactNode }) => <ol className="list-decimal pl-5 mb-2 last:mb-0">{children}</ol>,
-                                    li: ({ children }: { children?: React.ReactNode }) => <li className="mb-1 last:mb-0">{children}</li>,
-                                }}
-                            >
-                                {singleSelectedFilter.description}
-                            </MarkdownRenderer>
-                        </div>
-                    )}
+/**
+ * Renders the detailed label description for a single selected filter.
+ * Designed to live inside a scrollable container so it scrolls away with content.
+ */
+export function FilterDescription({ filterChips, searchTerm }: { filterChips: FilterChip[]; searchTerm?: string }) {
+    const singleSelectedFilter =
+        filterChips.length === 1 && !searchTerm
+            ? filterChips[0]
+            : null;
+
+    if (!singleSelectedFilter) return null;
+
+    return (
+        <div className="mb-4">
+            <p className="text-2xl font-semibold leading-tight text-foreground">
+                {singleSelectedFilter.label}
+            </p>
+            {singleSelectedFilter.description && (
+                <div className="mt-1 text-base font-medium text-default-700 leading-relaxed">
+                    <MarkdownRenderer
+                        externalLinksNewTab
+                        linkClassName="text-primary underline underline-offset-2"
+                        components={{
+                            p: ({ children }: { children?: React.ReactNode }) => <p className="mb-2 last:mb-0">{children}</p>,
+                            ul: ({ children }: { children?: React.ReactNode }) => <ul className="list-disc pl-5 mb-2 last:mb-0">{children}</ul>,
+                            ol: ({ children }: { children?: React.ReactNode }) => <ol className="list-decimal pl-5 mb-2 last:mb-0">{children}</ol>,
+                            li: ({ children }: { children?: React.ReactNode }) => <li className="mb-1 last:mb-0">{children}</li>,
+                        }}
+                    >
+                        {singleSelectedFilter.description}
+                    </MarkdownRenderer>
                 </div>
             )}
         </div>

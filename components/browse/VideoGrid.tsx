@@ -37,9 +37,10 @@ const videoToPhoto = (video: Video): Photo => ({
 interface VideoGridProps {
   hideSummary?: boolean;
   desktopId?: string;
+  descriptionSlot?: React.ReactNode;
 }
 
-const VideoGrid: React.FC<VideoGridProps> = ({ hideSummary = false, desktopId }) => {
+const VideoGrid: React.FC<VideoGridProps> = ({ hideSummary = false, desktopId, descriptionSlot }) => {
   const t = useTranslations("browse");
   const locale = useLocale();
   const dispatch = useDispatch();
@@ -244,9 +245,9 @@ const VideoGrid: React.FC<VideoGridProps> = ({ hideSummary = false, desktopId })
 
   return (
     <div className="w-full flex flex-col h-full">
-      {/* Results summary — hidden when detail is open */}
+      {/* Results summary — sticky at the top, hidden when detail is open */}
       {!hideSummary && !selectedPhoto && (
-        <div className="mb-1 text-xs text-default-500 shrink-0">
+        <div className="mb-1 text-xs text-default-500 shrink-0 bg-background py-1">
           {t("showingCount", { current: videos.length, more: hasMore ? "+" : "", total: totalItems })}
           {queryState.textSearch.trim() && queryState.selectedFilters.length > 0 && (
             <span className="text-default-400"> · {t("matchingAnyFilter")}</span>
@@ -274,6 +275,8 @@ const VideoGrid: React.FC<VideoGridProps> = ({ hideSummary = false, desktopId })
           threshold={800}
           resetKey={searchKey}
         >
+          {/* Label description scrolls with the content */}
+          {descriptionSlot}
           <VideoVisibilityProvider>
             <div ref={galleryRef}>
               <JustifiedGallery

@@ -9,6 +9,7 @@ import { useSubscription } from "@/hooks/use-subscription";
 import FilterMenu from "@/components/browse/FilterMenu";
 import SearchBar from "@/components/browse/SearchBar";
 import Breadcrumb from "@/components/browse/Breadcrumb";
+import { BreadcrumbDescription } from "@/components/browse/Breadcrumb";
 import VideoGrid from "@/components/browse/VideoGrid";
 import SubscriptionPaywall from "@/components/browse/SubscriptionPaywall";
 import ChatSidePanel from "@/components/chat/chat-side-panel";
@@ -202,7 +203,7 @@ export default function BrowsePage() {
                 <Breadcrumb />
               </div>
 
-              <VideoGrid />
+              <VideoGrid descriptionSlot={<BreadcrumbDescription />} />
             </div>
           </div>
         </main>
