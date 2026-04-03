@@ -8,7 +8,7 @@ import {
   teamCredits,
   creditTransactions,
 } from "@/lib/db/schema";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, count } from "drizzle-orm";
 import type { AccountType } from "@/lib/credits";
 
 /**
@@ -82,6 +82,17 @@ export async function GET(request: NextRequest) {
       balance = credits[0].balance;
     }
 
+    // Get total count for pagination
+    const [{ total }] = await db
+      .select({ total: count() })
+      .from(creditTransactions)
+      .where(
+        and(
+          eq(creditTransactions.accountId, accountId),
+          eq(creditTransactions.accountType, accountType)
+        )
+      );
+
     // Get transaction history with performer details
     const rows = await db
       .select({
@@ -116,6 +127,9 @@ export async function GET(request: NextRequest) {
       accountType,
       accountId,
       transactions: rows,
+      totalCount: total,
+      page,
+      limit,
     });
   } catch (error) {
     console.error("Error fetching user credits:", error);

@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { hasWriteAccess } from "@/lib/permissions";
 import { Image } from "@heroui/image";
 import { Button } from "@heroui/button";
+import { addToast } from "@heroui/toast";
 import { Input } from "@heroui/input";
 import {
   Modal,
@@ -218,8 +219,9 @@ export default function DirectVideoCard({
         setNewCollectionName("");
         onCreateOpenChange();
       }
-    } catch (error) {
-      console.error("Error creating collection:", error);
+    } catch (error: any) {
+      const msg = error?.status === 409 ? tCollections("duplicateName") : tCollections("createFailed");
+      addToast({ title: tCollections("error"), description: msg, color: "danger" });
     } finally {
       setIsCreating(false);
     }

@@ -488,7 +488,7 @@ export default function AssetsHoverSidebar() {
                   </div>
                 ) : (
                   <div className="grid grid-cols-2 gap-2">
-                    {assets.map((a) => (
+                    {assets.filter((a) => a.imageUrl).map((a) => (
                       <div
                         key={a.id}
                         draggable

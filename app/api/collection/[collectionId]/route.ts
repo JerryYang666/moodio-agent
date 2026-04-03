@@ -10,7 +10,7 @@ import {
 } from "@/lib/db/schema";
 import { getAccessToken } from "@/lib/auth/cookies";
 import { verifyAccessToken } from "@/lib/auth/jwt";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, sql, ne } from "drizzle-orm";
 import { getImageUrl, getVideoUrl } from "@/lib/storage/s3";
 import { getContentUrl, getVideoUrl as getPublicVideoUrl } from "@/lib/config/video.config";
 import { getUserPermission } from "@/lib/collection-utils";
@@ -192,7 +192,38 @@ export async function PATCH(
 
     // Update collection name if provided
     const updatePayload: Record<string, unknown> = { updatedAt: new Date() };
-    if (name) updatePayload.name = name.trim();
+    if (name) {
+      const trimmedName = name.trim();
+
+      // Check for duplicate name within the same project (excluding this collection)
+      const [currentCol] = await db
+        .select({ projectId: collections.projectId })
+        .from(collections)
+        .where(eq(collections.id, collectionId));
+
+      if (currentCol) {
+        const [existing] = await db
+          .select({ id: collections.id })
+          .from(collections)
+          .where(
+            and(
+              eq(collections.projectId, currentCol.projectId),
+              sql`LOWER(${collections.name}) = LOWER(${trimmedName})`,
+              ne(collections.id, collectionId)
+            )
+          )
+          .limit(1);
+
+        if (existing) {
+          return NextResponse.json(
+            { error: "A collection with this name already exists in the project" },
+            { status: 409 }
+          );
+        }
+      }
+
+      updatePayload.name = trimmedName;
+    }
 
     const [updatedCollection] = await db
       .update(collections)

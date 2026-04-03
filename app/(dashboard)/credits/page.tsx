@@ -17,6 +17,7 @@ import { Spinner } from "@heroui/spinner";
 import { Button } from "@heroui/button";
 import { addToast } from "@heroui/toast";
 import { Tabs, Tab } from "@heroui/tabs";
+import { Pagination } from "@heroui/pagination";
 import { Bean, CalendarCheck } from "lucide-react";
 import { api } from "@/lib/api/client";
 import { useCredits } from "@/hooks/use-credits";
@@ -57,13 +58,18 @@ export default function CreditsPage() {
   useEffect(() => {
     setViewAccountType(activeAccountType);
     setViewAccountId(activeAccountId);
+    setPage(1);
   }, [activeAccountType, activeAccountId]);
 
   const [viewBalance, setViewBalance] = useState<number | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [fetchingPage, setFetchingPage] = useState(false);
   const [checkinStatus, setCheckinStatus] = useState<CheckinStatus | null>(null);
   const [claiming, setClaiming] = useState(false);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const rowsPerPage = 20;
 
   const fetchCredits = useCallback(async () => {
     try {
@@ -72,15 +78,19 @@ export default function CreditsPage() {
         params.set("accountType", "team");
         params.set("accountId", viewAccountId);
       }
+      params.set("page", String(page));
+      params.set("limit", String(rowsPerPage));
       const data = await api.get(`/api/users/credits?${params.toString()}`);
       setViewBalance(data.balance);
       setTransactions(data.transactions);
+      setTotalPages(Math.max(1, Math.ceil((data.totalCount ?? 0) / rowsPerPage)));
     } catch (error) {
       console.error("Failed to fetch credits:", error);
     } finally {
-      setLoading(false);
+      setInitialLoading(false);
+      setFetchingPage(false);
     }
-  }, [viewAccountType, viewAccountId]);
+  }, [viewAccountType, viewAccountId, page]);
 
   const fetchCheckinStatus = useCallback(async () => {
     try {
@@ -92,7 +102,7 @@ export default function CreditsPage() {
   }, []);
 
   useEffect(() => {
-    setLoading(true);
+    setFetchingPage(true);
     fetchCredits();
     if (viewAccountType === "personal") {
       fetchCheckinStatus();
@@ -159,7 +169,7 @@ export default function CreditsPage() {
     return transactionTypes[type] || type;
   };
 
-  if (loading) {
+  if (initialLoading) {
     return (
       <div className="flex justify-center items-center h-64">
         <Spinner size="lg" />
@@ -186,6 +196,7 @@ export default function CreditsPage() {
               setViewAccountType("team");
               setViewAccountId(teamId);
             }
+            setPage(1);
           }}
           variant="underlined"
           classNames={{ tabList: "gap-4" }}
@@ -280,7 +291,25 @@ export default function CreditsPage() {
               {t("noTransactions")}
             </div>
           ) : (
-            <Table aria-label="Transaction history" removeWrapper>
+            <Table
+              aria-label="Transaction history"
+              removeWrapper
+              bottomContent={
+                totalPages > 1 ? (
+                  <div className="flex w-full justify-center">
+                    <Pagination
+                      isCompact
+                      showControls
+                      showShadow
+                      color="primary"
+                      page={page}
+                      total={totalPages}
+                      onChange={setPage}
+                    />
+                  </div>
+                ) : null
+              }
+            >
               <TableHeader>
                 <TableColumn>{t("date")}</TableColumn>
                 <TableColumn>{t("type")}</TableColumn>
@@ -291,7 +320,10 @@ export default function CreditsPage() {
                 }
                 <TableColumn className="text-right">{t("amount")}</TableColumn>
               </TableHeader>
-              <TableBody>
+              <TableBody
+                isLoading={fetchingPage}
+                loadingContent={<Spinner size="sm" />}
+              >
                 {transactions.map((tx) => (
                   <TableRow key={tx.id}>
                     <TableCell className="text-default-500 text-sm">

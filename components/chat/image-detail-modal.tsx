@@ -10,6 +10,7 @@ import {
 } from "@heroui/modal";
 import { hasWriteAccess } from "@/lib/permissions";
 import { Button } from "@heroui/button";
+import { addToast } from "@heroui/toast";
 import { Image } from "@heroui/image";
 import { Input } from "@heroui/input";
 import {
@@ -258,8 +259,9 @@ export default function ImageDetailModal({
         onCreateOpenChange();
         startFlyingAnimation();
       }
-    } catch (error) {
-      console.error("Error creating collection:", error);
+    } catch (error: any) {
+      const msg = error?.status === 409 ? tCollections("duplicateName") : tCollections("createFailed");
+      addToast({ title: tCollections("error"), description: msg, color: "danger" });
     } finally {
       setIsCreating(false);
     }

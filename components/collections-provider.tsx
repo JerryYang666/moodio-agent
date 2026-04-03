@@ -152,39 +152,24 @@ export function CollectionsProvider({
 
   const createCollection = useCallback(
     async (name: string, projectId?: string, tags?: { label: string; color: string }[]) => {
-      try {
-        const payload: { name: string; projectId?: string; tags?: { label: string; color: string }[] } = { name };
-        if (projectId) payload.projectId = projectId;
-        if (tags && tags.length > 0) payload.tags = tags;
-        const result = await createCollectionMutation(payload).unwrap();
-        return result;
-      } catch (err) {
-        console.error("Error creating collection:", err);
-        return null;
-      }
+      const payload: { name: string; projectId?: string; tags?: { label: string; color: string }[] } = { name };
+      if (projectId) payload.projectId = projectId;
+      if (tags && tags.length > 0) payload.tags = tags;
+      const result = await createCollectionMutation(payload).unwrap();
+      return result;
     },
     [createCollectionMutation]
   );
 
   const renameCollection = useCallback(
     async (collectionId: string, name: string) => {
-      try {
-        await renameCollectionMutation({ collectionId, name }).unwrap();
-        addToast({
-          title: "Collection renamed",
-          description: "The collection has been renamed successfully",
-          color: "success",
-        });
-        return true;
-      } catch (err) {
-        console.error("Error renaming collection:", err);
-        addToast({
-          title: "Error",
-          description: "Failed to rename collection",
-          color: "danger",
-        });
-        return false;
-      }
+      await renameCollectionMutation({ collectionId, name }).unwrap();
+      addToast({
+        title: "Collection renamed",
+        description: "The collection has been renamed successfully",
+        color: "success",
+      });
+      return true;
     },
     [renameCollectionMutation]
   );

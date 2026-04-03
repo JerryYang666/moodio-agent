@@ -221,13 +221,33 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Check for duplicate name within the same project
+    const trimmedName = name.trim();
+    const [existing] = await db
+      .select({ id: collections.id })
+      .from(collections)
+      .where(
+        and(
+          eq(collections.projectId, resolvedProjectId),
+          sql`LOWER(${collections.name}) = LOWER(${trimmedName})`
+        )
+      )
+      .limit(1);
+
+    if (existing) {
+      return NextResponse.json(
+        { error: "A collection with this name already exists in the project" },
+        { status: 409 }
+      );
+    }
+
     // Create collection
     const [newCollection] = await db
       .insert(collections)
       .values({
         userId,
         projectId: resolvedProjectId,
-        name: name.trim(),
+        name: trimmedName,
       })
       .returning();
 

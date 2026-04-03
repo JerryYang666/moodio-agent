@@ -472,7 +472,11 @@
     "tagPlaceholder": "标签名称",
     "filterByTag": "按标签筛选",
     "clearFilter": "清除",
-    "noCollectionsMatchFilter": "没有与所选标签匹配的收藏集"
+    "noCollectionsMatchFilter": "没有与所选标签匹配的收藏集",
+    "error": "错误",
+    "duplicateName": "此项目中已存在同名的收藏集",
+    "createFailed": "创建收藏集失败",
+    "renameFailed": "重命名收藏集失败"
   },
   "storyboard": {
     "title": "故事板",

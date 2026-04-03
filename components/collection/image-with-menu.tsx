@@ -4,6 +4,7 @@ import { useState, useRef } from "react";
 import { hasWriteAccess } from "@/lib/permissions";
 import { useTranslations } from "next-intl";
 import { Button } from "@heroui/button";
+import { addToast } from "@heroui/toast";
 import {
   Dropdown,
   DropdownTrigger,
@@ -228,8 +229,9 @@ export default function ImageWithMenu({
         onCreateOpenChange();
         startFlyingAnimation();
       }
-    } catch (error) {
-      console.error("Error creating collection:", error);
+    } catch (error: any) {
+      const msg = error?.status === 409 ? tCollections("duplicateName") : tCollections("createFailed");
+      addToast({ title: tCollections("error"), description: msg, color: "danger" });
     } finally {
       setIsCreating(false);
     }

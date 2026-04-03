@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useRef, useLayoutEffect, useEffect, useMemo, useState, useCallback } from "react";
+import { useTranslations } from "next-intl";
 import { motion } from "framer-motion";
 import { Button } from "@heroui/button";
 import { Chip } from "@heroui/chip";
@@ -176,6 +177,7 @@ function VideoDetailContent({
   const detail: VideoDetailData = MOCK_VIDEO_DETAIL;
   const videoTargetRef = useRef<HTMLDivElement>(null);
   const { data: videoDetail, isLoading: isLoadingDetail } = useGetVideoDetailQuery(selectedPhoto.id);
+  const tCollections = useTranslations("collections");
 
   const showDesktop = useFeatureFlag<boolean>("user_desktop") ?? false;
   const {
@@ -264,8 +266,9 @@ function VideoDetailContent({
         setNewCollectionName("");
         onCreateCollectionOpenChange();
       }
-    } catch (error) {
-      console.error("Error creating collection:", error);
+    } catch (error: any) {
+      const msg = error?.status === 409 ? tCollections("duplicateName") : tCollections("createFailed");
+      addToast({ title: tCollections("error"), description: msg, color: "danger" });
     } finally {
       setIsCreating(false);
     }

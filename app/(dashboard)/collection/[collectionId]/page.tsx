@@ -266,20 +266,19 @@ export default function CollectionPage({
     if (!newName.trim()) return;
     setIsRenaming(true);
     try {
-      const success = await renameCollection(collectionId, newName);
-      if (success) {
-        setCollectionData((prev) =>
-          prev
-            ? {
+      await renameCollection(collectionId, newName);
+      setCollectionData((prev) =>
+        prev
+          ? {
               ...prev,
               collection: { ...prev.collection, name: newName },
             }
-            : null
-        );
-        onRenameOpenChange();
-      }
-    } catch (error) {
-      console.error("Error renaming collection:", error);
+          : null
+      );
+      onRenameOpenChange();
+    } catch (error: any) {
+      const msg = error?.status === 409 ? t("duplicateName") : t("renameFailed");
+      addToast({ title: t("error"), description: msg, color: "danger" });
     } finally {
       setIsRenaming(false);
     }

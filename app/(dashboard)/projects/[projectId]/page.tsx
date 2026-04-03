@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Card, CardBody } from "@heroui/card";
 import { Button } from "@heroui/button";
+import { addToast } from "@heroui/toast";
 import { Input } from "@heroui/input";
 import { Spinner } from "@heroui/spinner";
 import { Chip } from "@heroui/chip";
@@ -174,8 +175,9 @@ export default function ProjectDetailPage({
         onCreateCollectionOpenChange();
         router.push(`/collection/${collection.id}`);
       }
-    } catch (e) {
-      console.error("Error creating collection", e);
+    } catch (e: any) {
+      const msg = e?.status === 409 ? tCollections("duplicateName") : tCollections("createFailed");
+      addToast({ title: tCollections("error"), description: msg, color: "danger" });
     }
   };
 
@@ -196,8 +198,9 @@ export default function ProjectDetailPage({
         setCollectionToRename(null);
         setRenameCollectionValue("");
       }
-    } catch (e) {
-      console.error("Error renaming collection", e);
+    } catch (e: any) {
+      const msg = e?.status === 409 ? tCollections("duplicateName") : tCollections("renameFailed");
+      addToast({ title: tCollections("error"), description: msg, color: "danger" });
     }
   };
 

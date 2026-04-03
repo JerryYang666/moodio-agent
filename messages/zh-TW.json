@@ -472,7 +472,11 @@
     "tagPlaceholder": "標籤名稱",
     "filterByTag": "依標籤篩選",
     "clearFilter": "清除",
-    "noCollectionsMatchFilter": "沒有與所選標籤相符的收藏集"
+    "noCollectionsMatchFilter": "沒有與所選標籤相符的收藏集",
+    "error": "錯誤",
+    "duplicateName": "此專案中已存在同名的收藏集",
+    "createFailed": "建立收藏集失敗",
+    "renameFailed": "重新命名收藏集失敗"
   },
   "storyboard": {
     "title": "分鏡腳本",

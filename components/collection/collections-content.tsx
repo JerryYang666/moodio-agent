@@ -15,6 +15,7 @@ import {
   ModalFooter,
   useDisclosure,
 } from "@heroui/modal";
+import { addToast } from "@heroui/toast";
 import { Folder, Plus, Tags } from "lucide-react";
 import { useCollections } from "@/hooks/use-collections";
 import TagInput, { type TagValue } from "@/components/collection/tag-input";
@@ -113,8 +114,9 @@ export default function CollectionsContent({ showHeader = true }: CollectionsCon
         onOpenChange();
         router.push(`/collection/${collection.id}`);
       }
-    } catch (error) {
-      console.error("Error creating collection:", error);
+    } catch (error: any) {
+      const message = error?.status === 409 ? t("duplicateName") : t("createFailed");
+      addToast({ title: t("error"), description: message, color: "danger" });
     } finally {
       setIsCreating(false);
     }
@@ -130,17 +132,16 @@ export default function CollectionsContent({ showHeader = true }: CollectionsCon
     if (!collectionToRename || !renameValue.trim()) return;
     setIsRenaming(true);
     try {
-      const success = await renameCollection(
+      await renameCollection(
         collectionToRename.id,
         renameValue.trim()
       );
-      if (success) {
-        onRenameOpenChange();
-        setCollectionToRename(null);
-        setRenameValue("");
-      }
-    } catch (error) {
-      console.error("Error renaming collection:", error);
+      onRenameOpenChange();
+      setCollectionToRename(null);
+      setRenameValue("");
+    } catch (error: any) {
+      const message = error?.status === 409 ? t("duplicateName") : t("renameFailed");
+      addToast({ title: t("error"), description: message, color: "danger" });
     } finally {
       setIsRenaming(false);
     }

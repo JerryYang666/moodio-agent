@@ -6,6 +6,7 @@ import { useTranslations } from "next-intl";
 import { Card, CardBody, CardHeader } from "@heroui/card";
 import { Spinner } from "@heroui/spinner";
 import { Button } from "@heroui/button";
+import { addToast } from "@heroui/toast";
 import { Chip } from "@heroui/chip";
 import { Image } from "@heroui/image";
 import { Input } from "@heroui/input";
@@ -463,8 +464,9 @@ export default function VideoList({ refreshTrigger, onRestore }: VideoListProps)
         setPendingVideoForCollection(null);
         onCreateOpenChange();
       }
-    } catch (error) {
-      console.error("Error creating collection:", error);
+    } catch (error: any) {
+      const msg = error?.status === 409 ? tCollections("duplicateName") : tCollections("createFailed");
+      addToast({ title: tCollections("error"), description: msg, color: "danger" });
     } finally {
       setIsCreating(false);
     }

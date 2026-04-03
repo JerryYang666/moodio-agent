@@ -472,7 +472,11 @@
     "tagPlaceholder": "Tag name",
     "filterByTag": "Filter by tag",
     "clearFilter": "Clear",
-    "noCollectionsMatchFilter": "No collections match the selected tags"
+    "noCollectionsMatchFilter": "No collections match the selected tags",
+    "error": "Error",
+    "duplicateName": "A collection with this name already exists in the project",
+    "createFailed": "Failed to create collection",
+    "renameFailed": "Failed to rename collection"
   },
   "desktop": {
     "title": "Desktops",

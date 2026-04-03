@@ -472,7 +472,11 @@
     "tagPlaceholder": "タグ名",
     "filterByTag": "タグで絞り込む",
     "clearFilter": "クリア",
-    "noCollectionsMatchFilter": "選択したタグに一致するコレクションはありません"
+    "noCollectionsMatchFilter": "選択したタグに一致するコレクションはありません",
+    "error": "エラー",
+    "duplicateName": "同じ名前のコレクションがこのプロジェクトに既に存在します",
+    "createFailed": "コレクションの作成に失敗しました",
+    "renameFailed": "コレクションの名前変更に失敗しました"
   },
   "storyboard": {
     "title": "ストーリーボード",
