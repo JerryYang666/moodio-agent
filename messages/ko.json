@@ -1417,6 +1417,8 @@
     "permission": "권한",
     "offline": "오프라인",
     "connected": "실시간 동기화 활성",
-    "cellLocked": "{name} 편집 중"
+    "cellLocked": "{name} 편집 중",
+    "grantEditAccessColumns": "{count}개 열에 대한 편집 권한 부여",
+    "grantEditAccessRows": "{count}개 행에 대한 편집 권한 부여"
   }
 }

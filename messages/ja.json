@@ -1417,6 +1417,8 @@
     "permission": "権限",
     "offline": "オフライン",
     "connected": "ライブ同期中",
-    "cellLocked": "{name} が編集中"
+    "cellLocked": "{name} が編集中",
+    "grantEditAccessColumns": "{count}列の編集アクセスを付与",
+    "grantEditAccessRows": "{count}行の編集アクセスを付与"
   }
 }

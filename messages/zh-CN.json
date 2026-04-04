@@ -1417,6 +1417,8 @@
     "permission": "权限",
     "offline": "离线",
     "connected": "实时同步已启用",
-    "cellLocked": "{name} 正在编辑"
+    "cellLocked": "{name} 正在编辑",
+    "grantEditAccessColumns": "授予 {count} 列的编辑权限",
+    "grantEditAccessRows": "授予 {count} 行的编辑权限"
   }
 }
