@@ -235,17 +235,8 @@ export async function POST(
       });
     }
 
-    // 422 without resultUrls = still processing, charge credits (task submitted)
+    // 422 without resultUrls = still processing, do NOT charge yet
     if (json.code === 422) {
-      await deductCredits(
-        account.accountId,
-        cost,
-        "video_upscale",
-        `Upscaled Veo 3.1 video to 4K (processing)`,
-        account.performedBy,
-        { type: "video_generation", id: generation.id },
-        account.accountType
-      );
       return NextResponse.json({
         status: "processing",
         message: json.msg || "4K video is being processed. Please try again in 30+ seconds.",
