@@ -1929,7 +1929,7 @@ function describeModelParams(model: VideoModelConfig): string {
     } else if (param.type === "kling_elements") {
       desc += `array of element references, each: {name: string (referenced in prompt as @name), description: string, element_input_ids: string[] (2-4 Image IDs from the conversation — pass the Image ID e.g. "abc123", NOT a URL)}. Max 3 elements`;
     } else if (param.type === "media_references") {
-      desc += `array of media references, each: {type: "image"|"video", id: string (asset ID from uploads)}. Max 9 images, 3 videos. Referenced in prompt as @image1, @video1, etc.`;
+      desc += `array of media references, each: {type: "image"|"video", id: string (Image ID or Video ID from the conversation — pass the ID e.g. "abc123", NOT a URL)}. Max 9 images, 3 videos. Reference them in the prompt as @image1, @video1, etc. (numbered in order of appearance)`;
     }
 
     if (param.default !== undefined) {

@@ -24,11 +24,12 @@ Rules for video creation:
 2. For text-to-video models (those marked "Type: text-to-video"): NO source image is needed. You can use these models even when there are no images in the conversation.
 3. If using an image-to-video model and there are NO images in the conversation, do NOT output a <VIDEO> tag directly. Instead, first use <IMAGE_GENERATE_SYNC> to create an image. Once you receive the imageId from the sync result, output a <VIDEO> tag with that imageId as "sourceImageId".
 4. For models with optional reference image/asset parameters (type: "asset"): you can pass an Image ID from the conversation as the value. For example, if a model has an "image_url" asset parameter, include \`"image_url": "abc123"\` where "abc123" is the imageId. The system will resolve it to the actual URL. If the user hasn't provided an image and doesn't want one, simply omit the parameter.
-5. Write a detailed, descriptive prompt about the motion, camera movement, and animation.
-6. Choose parameters that best match the user's request.
-7. Only output ONE <VIDEO> tag per response.
-8. You MUST also include a <TEXT> response explaining what video configuration you've prepared.
-9. Do NOT output <IMAGE> image suggestions when outputting a <VIDEO> tag.`,
+5. For models with a "media_references" parameter (e.g., Seedance 2.0 Reference): pass an array of references, each with \`type\` ("image" or "video") and \`id\` (Image ID or Video ID from the conversation). Reference them in the prompt as @image1, @video1, etc. Example: \`"media_references": [{"type": "image", "id": "abc123"}, {"type": "video", "id": "def456"}]\`.
+6. Write a detailed, descriptive prompt about the motion, camera movement, and animation.
+7. Choose parameters that best match the user's request.
+8. Only output ONE <VIDEO> tag per response.
+9. You MUST also include a <TEXT> response explaining what video configuration you've prepared.
+10. Do NOT output <IMAGE> image suggestions when outputting a <VIDEO> tag.`,
   examples: [
     `<VIDEO>{"modelId": "seedance-v1.5-pro", "prompt": "Gentle camera push-in on the scene. Soft ambient movement with natural swaying of elements. Subtle lighting shifts create a dreamy atmosphere. Cinematic slow motion feel with smooth transitions.", "duration": "5", "aspect_ratio": "16:9", "resolution": "720p", "generate_audio": true, "camera_fixed": false}</VIDEO>`,
   ],
@@ -77,6 +78,19 @@ Rules for video creation:
           element_input_ids: el.element_input_ids || el.element_input_urls || [],
         })
       );
+    }
+
+    // Normalize media_references: ensure each entry has type and id
+    if (Array.isArray(videoParams.media_references)) {
+      videoParams.media_references = videoParams.media_references
+        .filter(
+          (ref: any) =>
+            ref &&
+            (ref.type === "image" || ref.type === "video") &&
+            typeof ref.id === "string" &&
+            ref.id
+        )
+        .map((ref: any) => ({ type: ref.type, id: ref.id }));
     }
 
     return {

@@ -38,7 +38,8 @@ import type { MessageContentPart } from "@/lib/llm/types";
 import { getVideoModel, type VideoModelParam } from "@/lib/video/models";
 import { MultiShotEditor } from "./multi-shot-editor";
 import { KlingElementEditor } from "./kling-element-editor";
-import type { MultiPromptShot, KlingElement } from "@/lib/video/models";
+import { SeedanceReferenceEditor } from "./seedance-reference-editor";
+import type { MultiPromptShot, KlingElement, MediaReference } from "@/lib/video/models";
 
 type AgentVideoPart = Extract<MessageContentPart, { type: "agent_video" }>;
 
@@ -58,6 +59,7 @@ const PARAM_ICON_MAP: Record<
 interface VideoConfigCardProps {
   part: AgentVideoPart;
   sourceImages: Array<{ imageId: string; imageUrl: string; title?: string }>;
+  sourceVideos?: Array<{ videoId: string; videoUrl: string }>;
   desktopId?: string;
   chatId?: string;
   onStatusChange?: (
@@ -79,6 +81,7 @@ interface VideoConfigCardProps {
 export default function VideoConfigCard({
   part,
   sourceImages,
+  sourceVideos,
   desktopId,
   chatId,
   onStatusChange,
@@ -160,6 +163,10 @@ export default function VideoConfigCard({
     () => visibleParams.some((p) => p.type === "kling_elements"),
     [visibleParams]
   );
+  const hasMediaReferences = useMemo(
+    () => visibleParams.some((p) => p.type === "media_references"),
+    [visibleParams]
+  );
 
   const isTextToVideo = modelConfig && !modelConfig.imageParams;
 
@@ -180,6 +187,14 @@ export default function VideoConfigCard({
       return match?.imageUrl;
     },
     [sourceImages]
+  );
+
+  const resolveVideoUrl = useCallback(
+    (videoId: string) => {
+      const match = sourceVideos?.find((v) => v.videoId === videoId);
+      return match?.videoUrl;
+    },
+    [sourceVideos]
   );
 
   const costParamsKey = useMemo(() => {
@@ -731,6 +746,17 @@ export default function VideoConfigCard({
             disabled={!isEditable}
             compact
             resolveImageUrl={resolveImageUrl}
+          />
+        )}
+
+        {/* Seedance Media References */}
+        {hasMediaReferences && (
+          <SeedanceReferenceEditor
+            references={(editedParams.media_references as MediaReference[]) || []}
+            onChange={(refs) => handleParamChange("media_references", refs)}
+            disabled={!isEditable}
+            resolveImageUrl={resolveImageUrl}
+            resolveVideoUrl={resolveVideoUrl}
           />
         )}
 

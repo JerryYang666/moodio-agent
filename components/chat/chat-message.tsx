@@ -237,6 +237,26 @@ export default function ChatMessage({
     return images;
   }, [allMessages]);
 
+  const sourceVideosForVideo = useMemo(() => {
+    if (!allMessages) return [];
+    const videos: Array<{ videoId: string; videoUrl: string }> = [];
+    for (const msg of allMessages) {
+      if (!Array.isArray(msg.content)) continue;
+      for (const part of msg.content) {
+        if (part.type === "video" && (part as any).videoId && (part as any).videoUrl) {
+          videos.push({ videoId: (part as any).videoId, videoUrl: (part as any).videoUrl });
+        }
+        if (part.type === "direct_video" && (part as any).generationId) {
+          const p = part as any;
+          if (p.videoUrl) {
+            videos.push({ videoId: p.generationId, videoUrl: p.videoUrl });
+          }
+        }
+      }
+    }
+    return videos;
+  }, [allMessages]);
+
   const handleAgentDragStart = (e: React.DragEvent, part: any) => {
     if (part.status !== "generated" || !part.imageId || !part.imageUrl) return;
     const payload = {
@@ -667,6 +687,7 @@ export default function ChatMessage({
                     key={`video-${gi}-${i}`}
                     part={part}
                     sourceImages={sourceImagesForVideo}
+                    sourceVideos={sourceVideosForVideo}
                     desktopId={desktopId}
                     chatId={chatId}
                     onStatusChange={(status, generationId) => {
