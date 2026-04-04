@@ -225,6 +225,7 @@ export function ProductionTableShareModal({
                       />
                       <Select
                         size="sm"
+                        aria-label={t("permission")}
                         selectedKeys={new Set([permission])}
                         onSelectionChange={(keys) => {
                           const v = Array.from(keys)[0] as string;
@@ -239,6 +240,7 @@ export function ProductionTableShareModal({
                         size="sm"
                         color="primary"
                         isIconOnly
+                        aria-label={t("shareTable")}
                         onPress={handleAddTableShare}
                       >
                         <UserPlus size={14} />
@@ -263,6 +265,7 @@ export function ProductionTableShareModal({
                             size="sm"
                             variant="light"
                             color="danger"
+                            aria-label="Remove share"
                             onPress={() =>
                               handleRemoveTableShare(s.sharedWithUserId)
                             }
@@ -345,6 +348,7 @@ export function ProductionTableShareModal({
                               size="sm"
                               variant="light"
                               color="danger"
+                              aria-label="Remove column share"
                               onPress={() =>
                                 handleRemoveColumnShare(
                                   s.columnId,
@@ -431,6 +435,7 @@ export function ProductionTableShareModal({
                               size="sm"
                               variant="light"
                               color="danger"
+                              aria-label="Remove row share"
                               onPress={() =>
                                 handleRemoveRowShare(
                                   s.rowId,

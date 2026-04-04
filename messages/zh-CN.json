@@ -30,7 +30,8 @@
     "send": "发送",
     "optional": "可选",
     "move": "移动",
-    "copy": "复制"
+    "copy": "复制",
+    "tabsOpen": "{count} 个标签页已打开"
   },
   "share": {
     "searchUser": "搜索用户",
@@ -1413,6 +1414,9 @@
     "columnAccess": "列权限",
     "rowAccess": "行权限",
     "editAccess": "编辑权限",
+    "permission": "权限",
+    "offline": "离线",
+    "connected": "实时同步已启用",
     "cellLocked": "{name} 正在编辑"
   }
 }

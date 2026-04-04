@@ -30,7 +30,8 @@
     "send": "傳送",
     "optional": "可選",
     "move": "移動",
-    "copy": "複製"
+    "copy": "複製",
+    "tabsOpen": "{count} 個分頁已開啟"
   },
   "share": {
     "searchUser": "搜尋使用者",
@@ -1413,6 +1414,9 @@
     "columnAccess": "欄權限",
     "rowAccess": "列權限",
     "editAccess": "編輯權限",
+    "permission": "權限",
+    "offline": "離線",
+    "connected": "即時同步已啟用",
     "cellLocked": "{name} 正在編輯"
   }
 }

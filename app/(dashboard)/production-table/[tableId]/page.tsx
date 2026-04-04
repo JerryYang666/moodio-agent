@@ -467,6 +467,7 @@ export default function ProductionTableDetailPage({
           isIconOnly
           size="sm"
           variant="light"
+          aria-label="Back"
           onPress={() => router.push("/production-table")}
         >
           <ArrowLeft size={16} />
@@ -475,7 +476,7 @@ export default function ProductionTableDetailPage({
       <ProductionTableToolbar
         tableName={table.name}
         connectionState={connectionState}
-        connectedUserCount={connectedUsers.length}
+        connectedUsers={connectedUsers}
         canEdit={canEditStructure}
         onAddColumn={handleAddColumn}
         onAddRow={handleAddRow}

@@ -30,7 +30,8 @@
     "send": "Send",
     "optional": "Optional",
     "move": "Move",
-    "copy": "Copy"
+    "copy": "Copy",
+    "tabsOpen": "{count} tabs open"
   },
   "share": {
     "searchUser": "Search User",
@@ -1413,6 +1414,9 @@
     "columnAccess": "Column Access",
     "rowAccess": "Row Access",
     "editAccess": "Edit Access",
+    "permission": "Permission",
+    "offline": "Offline",
+    "connected": "Live sync active",
     "cellLocked": "Editing by {name}"
   }
 }

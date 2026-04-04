@@ -8,7 +8,6 @@ import { Spinner } from "@heroui/spinner";
 import { Chip } from "@heroui/chip";
 import { useDisclosure } from "@heroui/modal";
 import { addToast } from "@heroui/toast";
-import { Tooltip } from "@heroui/tooltip";
 import { ArrowLeft, Share2, Pencil, Wifi, WifiOff } from "lucide-react";
 import AssetPickerModal, { type AssetSummary } from "@/components/chat/asset-picker-modal";
 import { uploadImage } from "@/lib/upload/client";
@@ -37,20 +36,12 @@ import { useShareModal } from "@/hooks/use-share-modal";
 import ShareModal from "@/components/share-modal";
 import { hasWriteAccess } from "@/lib/permissions";
 import { useResearchTelemetry } from "@/hooks/use-research-telemetry";
+import { PresenceAvatars } from "@/components/PresenceAvatars";
 
 const DEFAULT_CAMERA: CameraState = { x: 0, y: 0, zoom: 1 };
 const VIEWPORT_SAVE_DEBOUNCE = 2000;
 const DEFAULT_CHAT_PANEL_WIDTH = 380;
 const COLLAPSED_CHAT_WIDTH = 48;
-
-function userIdToHslColor(userId: string): string {
-  let hash = 0;
-  for (let i = 0; i < userId.length; i++) {
-    hash = userId.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  const hue = Math.abs(hash) % 360;
-  return `hsl(${hue}, 70%, 50%)`;
-}
 
 export default function DesktopDetailPage({
   params,
@@ -1068,37 +1059,7 @@ export default function DesktopDetailPage({
         <h2 className="font-semibold truncate flex-1">{desktop.name}</h2>
 
         {/* Presence avatars */}
-        {connectedUsers.length > 0 && (
-          <div className="flex items-center -space-x-1.5">
-            {connectedUsers.map((user) => (
-              <Tooltip
-                key={user.userId}
-                content={
-                  <div className="text-xs py-1 px-0.5">
-                    {user.firstName && <div className="font-semibold">{user.firstName}</div>}
-                    <div className="text-default-400">{user.email}</div>
-                    {user.sessionCount > 1 && (
-                      <div className="text-default-500 mt-0.5">{t("tabsOpen", { count: user.sessionCount })}</div>
-                    )}
-                  </div>
-                }
-                placement="bottom"
-              >
-                <div
-                  className="relative w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold text-white border-2 border-background cursor-default"
-                  style={{ backgroundColor: userIdToHslColor(user.userId) }}
-                >
-                  {user.initial}
-                  {user.sessionCount > 1 && (
-                    <span className="absolute -top-1 -right-1 text-[8px] bg-foreground text-background rounded-full w-3.5 h-3.5 flex items-center justify-center border border-background">
-                      {user.sessionCount}
-                    </span>
-                  )}
-                </div>
-              </Tooltip>
-            ))}
-          </div>
-        )}
+        <PresenceAvatars users={connectedUsers} />
 
         {/* Connection state indicator */}
         {connectionState === "connected" && (

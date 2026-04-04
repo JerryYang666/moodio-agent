@@ -30,7 +30,8 @@
     "send": "送信",
     "optional": "任意",
     "move": "移動",
-    "copy": "コピー"
+    "copy": "コピー",
+    "tabsOpen": "{count} タブを開いています"
   },
   "share": {
     "searchUser": "ユーザーを検索",
@@ -1413,6 +1414,9 @@
     "columnAccess": "列アクセス",
     "rowAccess": "行アクセス",
     "editAccess": "編集アクセス",
+    "permission": "権限",
+    "offline": "オフライン",
+    "connected": "ライブ同期中",
     "cellLocked": "{name} が編集中"
   }
 }

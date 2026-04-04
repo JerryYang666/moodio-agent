@@ -1,23 +1,23 @@
 "use client";
 
-import React, { memo, useCallback } from "react";
+import React, { memo } from "react";
 import { useTranslations } from "next-intl";
 import { Button } from "@heroui/button";
-import { Chip } from "@heroui/chip";
-import { Plus, Columns, Rows3, Share2, Wifi, WifiOff } from "lucide-react";
+import { Columns, Rows3, Share2, Wifi, WifiOff } from "lucide-react";
 import {
   Dropdown,
   DropdownTrigger,
   DropdownMenu,
   DropdownItem,
 } from "@heroui/dropdown";
+import { PresenceAvatars, type PresenceUser } from "@/components/PresenceAvatars";
 import type { ConnectionState } from "@/hooks/use-production-table-ws";
 import type { CellType } from "@/lib/production-table/types";
 
 interface ProductionTableToolbarProps {
   tableName: string;
   connectionState: ConnectionState;
-  connectedUserCount: number;
+  connectedUsers: PresenceUser[];
   canEdit: boolean;
   onAddColumn: (cellType: CellType) => void;
   onAddRow: () => void;
@@ -27,7 +27,7 @@ interface ProductionTableToolbarProps {
 export const ProductionTableToolbar = memo(function ProductionTableToolbar({
   tableName,
   connectionState,
-  connectedUserCount,
+  connectedUsers,
   canEdit,
   onAddColumn,
   onAddRow,
@@ -42,16 +42,16 @@ export const ProductionTableToolbar = memo(function ProductionTableToolbar({
         <h2 className="text-lg font-semibold truncate max-w-[300px]">
           {tableName}
         </h2>
-        <Chip
-          size="sm"
-          variant="dot"
-          color={isConnected ? "success" : "warning"}
-          startContent={
-            isConnected ? <Wifi size={10} /> : <WifiOff size={10} />
-          }
-        >
-          {connectedUserCount > 0 ? `${connectedUserCount + 1}` : "1"}
-        </Chip>
+        <PresenceAvatars users={connectedUsers} />
+        {isConnected ? (
+          <div className="text-success" title={t("connected")}>
+            <Wifi size={16} />
+          </div>
+        ) : (
+          <div className="text-warning" title={t("offline")}>
+            <WifiOff size={16} />
+          </div>
+        )}
       </div>
       <div className="flex items-center gap-2">
         {canEdit && (
