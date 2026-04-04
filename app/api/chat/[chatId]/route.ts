@@ -139,6 +139,8 @@ export async function GET(
                 seed: gen.seed ?? undefined,
                 error: gen.error ?? undefined,
                 completedAt: gen.completedAt?.toISOString() ?? undefined,
+                provider: gen.provider ?? undefined,
+                providerRequestId: gen.providerRequestId ?? undefined,
               };
             }
           }
@@ -226,6 +228,8 @@ export async function GET(
                 seed: gen.seed ?? undefined,
                 error: gen.error ?? undefined,
                 completedAt: gen.completedAt?.toISOString() ?? undefined,
+                provider: gen.provider ?? undefined,
+                providerRequestId: gen.providerRequestId ?? undefined,
               };
             }
           }
