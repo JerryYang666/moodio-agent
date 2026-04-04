@@ -780,7 +780,7 @@
     "filterLast30Days": "Last 30 Days",
     "filterDuration": "Duration",
     "upscaleVideo": "Upscale Video",
-    "upscaleVideoDesc": "Get a higher resolution version of this Veo 3.1 video. 1080p is included; 4K costs additional credits.",
+    "upscaleVideoDesc": "Get a higher resolution version of this Veo 3.1 video. Both 1080p and 4K cost credits.",
     "get1080pWithCost": "Get 1080p ({cost} credits)",
     "get4kWithCost": "Get 4K ({cost} credits)",
     "open1080p": "Open 1080p",

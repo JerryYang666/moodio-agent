@@ -632,7 +632,7 @@
     "filterLast30Days": "最近30天",
     "filterDuration": "时长",
     "upscaleVideo": "升级视频分辨率",
-    "upscaleVideoDesc": "获取此 Veo 3.1 视频的更高分辨率版本。1080p 已包含；4K 需额外消耗积分。",
+    "upscaleVideoDesc": "获取此 Veo 3.1 视频的更高分辨率版本。1080p 和 4K 均需消耗积分。",
     "get1080pWithCost": "获取 1080p（{cost} 积分）",
     "get4kWithCost": "获取 4K（{cost} 积分）",
     "open1080p": "打开 1080p",

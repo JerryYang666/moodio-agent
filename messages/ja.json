@@ -632,7 +632,7 @@
     "filterLast30Days": "過去30日間",
     "filterDuration": "再生時間",
     "upscaleVideo": "動画をアップスケール",
-    "upscaleVideoDesc": "この Veo 3.1 動画の高解像度版を取得します。1080p は含まれています。4K には追加クレジットが必要です。",
+    "upscaleVideoDesc": "この Veo 3.1 動画の高解像度版を取得します。1080p と 4K のどちらもクレジットが必要です。",
     "get1080pWithCost": "1080p を取得（{cost} クレジット）",
     "get4kWithCost": "4K を取得（{cost} クレジット）",
     "open1080p": "1080p を開く",
