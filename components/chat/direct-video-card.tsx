@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useTranslations } from "next-intl";
 import { hasWriteAccess } from "@/lib/permissions";
+import { trackResearchEvent } from "@/lib/research-telemetry-client";
 import { Image } from "@heroui/image";
 import { Button } from "@heroui/button";
 import { addToast } from "@heroui/toast";
@@ -231,6 +232,19 @@ export default function DirectVideoCard({
     }
   };
 
+  const handlePlaybackStarted = useMemo(() => {
+    return () => {
+      trackResearchEvent({
+        eventType: "video_playback_started",
+        metadata: {
+          generationId: part.generationId,
+          sourceImageId: part.config.sourceImageId,
+          videoId: part.videoId,
+        },
+      });
+    };
+  }, [part.generationId, part.config.sourceImageId, part.videoId]);
+
   return (
     <>
       <div className="relative group max-w-sm">
@@ -396,6 +410,7 @@ export default function DirectVideoCard({
         onClose={() => setShowModal(false)}
         onRestore={onRestore}
         restoreData={restoreData}
+        onPlaybackStarted={handlePlaybackStarted}
       />
 
       {/* Create Collection Modal (for card-level quick action) */}

@@ -45,8 +45,8 @@ interface ChatMessageProps {
     partIndex: number,
     variantId?: string
   ) => void;
-  onAgentTitleClick: (part: any) => void;
-  onAgentExpandClick?: (part: any) => void;
+  onAgentTitleClick: (part: any, messageIndex?: number) => void;
+  onAgentExpandClick?: (part: any, messageIndex?: number) => void;
   onUserImageClick?: (images: ImageInfo[], index: number) => void;
   onForkChat?: (messageIndex: number) => void;
   hideAvatar?: boolean;
@@ -97,6 +97,14 @@ interface ChatMessageProps {
   timestampAction?: React.ReactNode;
   /** Show loading spinner in place of timestamp (assistant streaming) */
   isTimestampLoading?: boolean;
+  /** Callback when user long-hovers on an agent image (1.5s+) */
+  onImageHoverTrack?: (data: {
+    imageId: string;
+    turnIndex: number;
+    imagePosition: number;
+    variantId?: string;
+    durationMs: number;
+  }) => void;
 }
 
 export default function ChatMessage({
@@ -121,6 +129,7 @@ export default function ChatMessage({
   onVideoSuggestPartUpdate,
   timestampAction,
   isTimestampLoading = false,
+  onImageHoverTrack,
 }: ChatMessageProps) {
   const isUser = message.role === "user";
   const [isForkPopoverOpen, setIsForkPopoverOpen] = useState(false);
@@ -519,7 +528,7 @@ export default function ChatMessage({
                           prompt: part.prompt,
                           status: effectiveStatus,
                         }}
-                        onViewDetails={() => onAgentTitleClick(part)}
+                        onViewDetails={() => onAgentTitleClick(part, msgIndex)}
                         topRightActions={
                           effectiveStatus === "generated" && onAgentExpandClick ? (
                             <Button
@@ -532,7 +541,7 @@ export default function ChatMessage({
                               onClick={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
-                                onAgentExpandClick(part);
+                                onAgentExpandClick(part, msgIndex);
                               }}
                             >
                               <Maximize2 size={16} />
@@ -547,6 +556,18 @@ export default function ChatMessage({
                           maxPreviewHeight={600}
                           className="block"
                           disabled={effectiveStatus !== "generated"}
+                          onHoverTrack={
+                            onImageHoverTrack && part.imageId
+                              ? (durationMs) =>
+                                  onImageHoverTrack({
+                                    imageId: part.imageId!,
+                                    turnIndex: messageIndex,
+                                    imagePosition: i,
+                                    variantId: message.variantId,
+                                    durationMs,
+                                  })
+                              : undefined
+                          }
                         >
                           <Card
                             className={clsx(
@@ -574,7 +595,7 @@ export default function ChatMessage({
                                   effectiveStatus === "generated" ||
                                   effectiveStatus === "error"
                                 ) {
-                                  onAgentTitleClick(part);
+                                  onAgentTitleClick(part, msgIndex);
                                 }
                               }}
                             >

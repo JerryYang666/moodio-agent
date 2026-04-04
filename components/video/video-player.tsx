@@ -10,14 +10,17 @@ import { addToast } from "@heroui/toast";
 import VideoStatusOverlay from "@/components/video/video-status-overlay";
 import { uploadImage } from "@/lib/upload/client";
 
+const PLAYBACK_DEBOUNCE_MS = 30_000;
+
 interface VideoPlayerProps {
   videoUrl: string | null;
-  signedVideoUrl: string | null; // Signed URL for frame capture (CORS-compatible)
+  signedVideoUrl: string | null;
   thumbnailUrl: string | null;
   fallbackImageUrl: string;
   status: "pending" | "processing" | "completed" | "failed";
   videoId?: string;
   onFrameCaptured?: (imageId: string, imageUrl: string) => void;
+  onPlaybackStarted?: () => void;
 }
 
 export default function VideoPlayer({
@@ -28,11 +31,13 @@ export default function VideoPlayer({
   status,
   videoId,
   onFrameCaptured,
+  onPlaybackStarted,
 }: VideoPlayerProps) {
   const t = useTranslations("video");
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isVideoPaused, setIsVideoPaused] = useState(false);
   const [isCapturing, setIsCapturing] = useState(false);
+  const lastPlaybackFiredRef = useRef<number>(0);
 
   // Reset paused state when video URL changes
   useEffect(() => {
@@ -128,7 +133,14 @@ export default function VideoPlayer({
           crossOrigin={useCrossOrigin ? "anonymous" : undefined}
           className="w-full max-h-[40vh] sm:max-h-[60vh]"
           onPause={() => setIsVideoPaused(true)}
-          onPlay={() => setIsVideoPaused(false)}
+          onPlay={() => {
+            setIsVideoPaused(false);
+            const now = Date.now();
+            if (onPlaybackStarted && now - lastPlaybackFiredRef.current > PLAYBACK_DEBOUNCE_MS) {
+              lastPlaybackFiredRef.current = now;
+              onPlaybackStarted();
+            }
+          }}
           onEnded={() => setIsVideoPaused(true)}
         />
         {/* Frame Capture Button - visible when paused */}

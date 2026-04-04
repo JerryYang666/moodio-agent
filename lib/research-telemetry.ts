@@ -11,7 +11,16 @@ export type ResearchEventType =
   | "video_saved_to_collection"
   | "reference_image_added"
   | "chat_forked"
-  | "session_end";
+  | "session_end"
+  | "image_hover_preview"
+  | "canvas_item_added"
+  | "timeline_clip_added"
+  | "video_export_started"
+  | "image_detail_viewed"
+  | "suggestion_clicked"
+  | "video_playback_started"
+  | "canvas_item_removed"
+  | "timeline_clip_removed";
 
 export interface ResearchEventData {
   userId: string;

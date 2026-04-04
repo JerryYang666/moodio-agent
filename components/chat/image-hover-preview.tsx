@@ -18,7 +18,11 @@ interface ImageHoverPreviewProps {
   className?: string;
   /** When true, hover preview is disabled (container still renders) */
   disabled?: boolean;
+  /** Callback fired once per hover when the user hovers for 1.5s+ */
+  onHoverTrack?: (durationMs: number) => void;
 }
+
+const HOVER_TRACK_THRESHOLD_MS = 1500;
 
 export default function ImageHoverPreview({
   src,
@@ -29,6 +33,7 @@ export default function ImageHoverPreview({
   maxPreviewHeight = 500,
   className = "inline-block",
   disabled = false,
+  onHoverTrack,
 }: ImageHoverPreviewProps) {
   const [showPreview, setShowPreview] = useState(false);
   const [previewPosition, setPreviewPosition] = useState({ x: 0, y: 0 });
@@ -36,6 +41,10 @@ export default function ImageHoverPreview({
   const containerRef = useRef<HTMLDivElement>(null);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isHoveringRef = useRef(false);
+
+  // Hover tracking refs
+  const hoverStartRef = useRef<number>(0);
+  const trackFiredRef = useRef(false);
 
   // Handle client-side mounting for portal
   useEffect(() => {
@@ -95,7 +104,13 @@ export default function ImageHoverPreview({
         setShowPreview(true);
       }
     }, delay);
-  }, [delay, calculatePosition, disabled]);
+
+    // Start hover tracking timer
+    if (onHoverTrack) {
+      hoverStartRef.current = Date.now();
+      trackFiredRef.current = false;
+    }
+  }, [delay, calculatePosition, disabled, onHoverTrack]);
 
   const handleMouseLeave = useCallback(() => {
     isHoveringRef.current = false;
@@ -106,8 +121,18 @@ export default function ImageHoverPreview({
       hoverTimeoutRef.current = null;
     }
 
+    // Fire hover tracking if threshold was met
+    if (onHoverTrack && hoverStartRef.current > 0 && !trackFiredRef.current) {
+      const durationMs = Date.now() - hoverStartRef.current;
+      if (durationMs >= HOVER_TRACK_THRESHOLD_MS) {
+        trackFiredRef.current = true;
+        onHoverTrack(durationMs);
+      }
+    }
+    hoverStartRef.current = 0;
+
     setShowPreview(false);
-  }, []);
+  }, [onHoverTrack]);
 
   // Cleanup timeout on unmount
   useEffect(() => {

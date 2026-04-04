@@ -82,6 +82,7 @@ interface VideoDetailModalProps {
   onClose: () => void;
   onRestore?: (data: VideoRestoreData) => void;
   restoreData?: VideoRestoreData | null;
+  onPlaybackStarted?: () => void;
 }
 
 export default function VideoDetailModal({
@@ -90,6 +91,7 @@ export default function VideoDetailModal({
   onClose,
   onRestore,
   restoreData,
+  onPlaybackStarted,
 }: VideoDetailModalProps) {
   const t = useTranslations("video");
   const tCommon = useTranslations("common");
@@ -322,6 +324,7 @@ export default function VideoDetailModal({
                       fallbackImageUrl={video.sourceImageUrl}
                       status={video.status}
                       videoId={video.id}
+                      onPlaybackStarted={onPlaybackStarted}
                     />
 
                     <div className="flex flex-wrap items-center gap-2 sm:gap-4">

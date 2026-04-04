@@ -393,7 +393,7 @@ export default function ChatInterface({
 
   // Save draft on visibility change (tab switch, minimize, etc.) + research session_end
   useEffect(() => {
-    const sendSessionEnd = (trigger: "page_leave" | "inactivity") => {
+    const sendSessionEnd = (trigger: "page_leave" | "tab_switch" | "inactivity") => {
       if (sessionEndSentRef.current || !chatId || sessionTurnCountRef.current === 0) return;
       sessionEndSentRef.current = true;
       const durationSeconds = Math.round((Date.now() - sessionStartRef.current) / 1000);
@@ -411,6 +411,13 @@ export default function ChatInterface({
     const handleVisibilityChange = () => {
       if (document.visibilityState === "hidden") {
         saveDraft();
+        sendSessionEnd("tab_switch");
+      } else if (document.visibilityState === "visible") {
+        // User returned — reset session tracking so future events can fire
+        if (sessionEndSentRef.current) {
+          sessionStartRef.current = Date.now();
+          sessionEndSentRef.current = false;
+        }
       }
     };
 
@@ -739,6 +746,7 @@ export default function ChatInterface({
   const lastUserInputRef = useRef<string>("");
   const lastPendingImagesRef = useRef<PendingImage[]>([]);
   const lastEditorContentRef = useRef<JSONContent | null>(null);
+  const lastUserMessageTextRef = useRef<string>("");
   // One-shot restore params used to prevent VideoModeParams init from
   // overwriting "put back" values with defaults/localStorage.
   const pendingVideoRestoreRef = useRef<{
@@ -1193,7 +1201,7 @@ export default function ChatInterface({
 
   // Handle a suggestion bubble activation (unified handler)
   const handleSuggestionBubbleActivate = useCallback(
-    (action: SuggestionBubbleAction) => {
+    (action: SuggestionBubbleAction, label?: string, icon?: string) => {
       // 1. Apply menu state overrides (mode, expertise, etc.)
       if (action.menuState) {
         setMenuState((prev) =>
@@ -1230,8 +1238,22 @@ export default function ChatInterface({
           setShowCreativeSuggestions(true);
         }
       }
+
+      // 6. Research telemetry: suggestion_clicked
+      if (label) {
+        trackResearch({
+          chatId,
+          eventType: "suggestion_clicked",
+          turnIndex: messages.length > 0 ? messages.length - 1 : undefined,
+          metadata: {
+            label,
+            promptText: action.promptText,
+            icon,
+          },
+        });
+      }
     },
-    [addRetrievalVideo]
+    [addRetrievalVideo, chatId, messages.length, trackResearch]
   );
 
   const refreshCreativeSuggestions = useCallback(() => {
@@ -1277,7 +1299,7 @@ export default function ChatInterface({
     const handler = (e: Event) => {
       const detail = (e as CustomEvent).detail;
       if (detail?.action) {
-        handleSuggestionBubbleActivate(detail.action);
+        handleSuggestionBubbleActivate(detail.action, detail.label, detail.icon);
       }
     };
 
@@ -2310,6 +2332,7 @@ export default function ChatInterface({
     lastUserInputRef.current = input;
     lastPendingImagesRef.current = [...pendingImages];
     lastEditorContentRef.current = chatInputRef.current?.getEditorJSON() || null;
+    lastUserMessageTextRef.current = currentInput;
 
     // Capture current pending images and videos before clearing
     const currentPendingImages = [...pendingImages];
@@ -2988,6 +3011,29 @@ export default function ChatInterface({
     []
   );
 
+  // Research telemetry: image_hover_preview
+  const handleImageHoverTrack = useCallback(
+    (data: {
+      imageId: string;
+      turnIndex: number;
+      imagePosition: number;
+      variantId?: string;
+      durationMs: number;
+    }) => {
+      trackResearch({
+        chatId,
+        eventType: "image_hover_preview",
+        turnIndex: data.turnIndex,
+        imageId: data.imageId,
+        imagePosition: data.imagePosition,
+        variantId: data.variantId,
+        metadata: { durationMs: data.durationMs },
+      });
+    },
+    [chatId, trackResearch]
+  );
+
+
   // Trigger send when input is updated from ask-user confirm
   useEffect(() => {
     if (pendingAskUserSendRef.current && input === pendingAskUserSendRef.current) {
@@ -3027,7 +3073,7 @@ export default function ChatInterface({
   );
 
   const openAgentImageDetail = useCallback(
-    (part: any, openInFullscreen = false) => {
+    (part: any, openInFullscreen = false, messageIndex?: number) => {
       if (part.status !== "generated" && part.status !== "error") return;
 
       const images = collectAllImages();
@@ -3037,7 +3083,7 @@ export default function ChatInterface({
       setAllImages(images);
       setCurrentImageIndex(index >= 0 ? index : 0);
       setSelectedImage({
-        url, // Use CloudFront URL from API (access via signed cookies)
+        url,
         title: part.title,
         prompt: part.prompt,
         imageId: part.imageId,
@@ -3045,16 +3091,27 @@ export default function ChatInterface({
       });
       setOpenImageInFullscreen(openInFullscreen);
       onOpen();
+
+      trackResearch({
+        chatId,
+        eventType: "image_detail_viewed",
+        turnIndex: messageIndex,
+        imageId: part.imageId,
+        imagePosition: index >= 0 ? index : 0,
+        metadata: {
+          openedInFullscreen: openInFullscreen,
+        },
+      });
     },
-    [collectAllImages, onOpen]
+    [collectAllImages, onOpen, chatId, trackResearch]
   );
 
-  const handleAgentTitleClick = (part: any) => {
-    openAgentImageDetail(part, false);
+  const handleAgentTitleClick = (part: any, messageIndex?: number) => {
+    openAgentImageDetail(part, false, messageIndex);
   };
 
-  const handleAgentExpandClick = (part: any) => {
-    openAgentImageDetail(part, true);
+  const handleAgentExpandClick = (part: any, messageIndex?: number) => {
+    openAgentImageDetail(part, true, messageIndex);
   };
 
   const handleImageModalClose = useCallback(() => {
@@ -3097,20 +3154,6 @@ export default function ChatInterface({
         variantId,
       });
 
-      // Find the user's message that preceded this assistant response
-      let userMessage: string | undefined;
-      for (let i = messageIndex - 1; i >= 0; i--) {
-        if (messages[i]?.role === "user") {
-          const content = messages[i].content;
-          userMessage = typeof content === "string"
-            ? content
-            : Array.isArray(content)
-              ? content.filter((p) => p.type === "text").map((p) => (p as any).text).join(" ")
-              : undefined;
-          break;
-        }
-      }
-
       trackResearch({
         chatId,
         eventType: "image_selected",
@@ -3121,7 +3164,7 @@ export default function ChatInterface({
         metadata: {
           prompt: part.prompt,
           aspectRatio: part.aspectRatio,
-          userMessage,
+          userMessage: lastUserMessageTextRef.current || undefined,
         },
       });
     }
@@ -3820,6 +3863,7 @@ export default function ChatInterface({
                   onSendAsVideoMessage={handleSendVideoFromAgent}
                   onPartUpdate={handlePartUpdate}
                   onVideoSuggestPartUpdate={handleVideoSuggestPartUpdate}
+                  onImageHoverTrack={handleImageHoverTrack}
                 />
               </div>
             );
@@ -3879,6 +3923,7 @@ export default function ChatInterface({
                   onPartUpdate={handlePartUpdate}
                   onVideoSuggestPartUpdate={handleVideoSuggestPartUpdate}
                   isTimestampLoading={isStreamingAssistantGroup}
+                  onImageHoverTrack={handleImageHoverTrack}
                 />
               </div>
             );
