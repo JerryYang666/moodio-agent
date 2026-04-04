@@ -32,6 +32,7 @@ import {
   Users as UsersIcon,
   Check,
   CreditCard,
+  Table2,
 } from "lucide-react";
 import { Avatar } from "@heroui/avatar";
 import { Popover, PopoverTrigger, PopoverContent } from "@heroui/popover";
@@ -59,9 +60,10 @@ export const Navbar = () => {
   const t = useTranslations();
   const tCredits = useTranslations("credits");
   const showDesktop = useFeatureFlag<boolean>("user_desktop") ?? false;
+  const showProductionTable = useFeatureFlag<boolean>("user_prod_tbl") ?? false;
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [activeSection, setActiveSection] = useState<
-    "inspiration" | "generation" | "video" | "assets" | "canvas"
+    "inspiration" | "generation" | "video" | "assets" | "canvas" | "productionTable"
   >("inspiration");
 
   useEffect(() => {
@@ -74,6 +76,8 @@ export const Navbar = () => {
       setActiveSection("assets");
     else if (pathname?.startsWith("/desktop"))
       setActiveSection("canvas");
+    else if (pathname?.startsWith("/production-table"))
+      setActiveSection("productionTable");
     else if (pathname?.startsWith("/browse"))
       setActiveSection("inspiration");
   }, [pathname]);
@@ -130,6 +134,16 @@ export const Navbar = () => {
           },
         ]
       : []),
+    ...(showProductionTable
+      ? [
+          {
+            id: "productionTable",
+            label: t("nav.productionTable"),
+            icon: <Table2 size={20} />,
+            href: "/production-table",
+          },
+        ]
+      : []),
   ];
 
   return (
@@ -167,7 +181,7 @@ export const Navbar = () => {
       <NavbarMenu className="pt-0 mt-0 top-12 bottom-0 pb-0 h-[calc(100dvh-3rem)] overflow-hidden flex flex-col">
         <div className="flex flex-col h-full pt-2 pb-4">
           {/* Top Tabs */}
-          <div className={clsx("grid gap-1 px-2 mb-1 shrink-0", showDesktop ? "grid-cols-5" : "grid-cols-4")}>
+          <div className={clsx("grid gap-1 px-2 mb-1 shrink-0", showProductionTable ? (showDesktop ? "grid-cols-6" : "grid-cols-5") : showDesktop ? "grid-cols-5" : "grid-cols-4")}>
             {navTabs.map((tab) => (
               <button
                 key={tab.id}
@@ -266,6 +280,24 @@ export const Navbar = () => {
                   }}
                 >
                   {t("nav.canvas")}
+                </Button>
+              </div>
+            )}
+
+            {activeSection === "productionTable" && (
+              <div className="flex flex-col items-center justify-center h-full text-default-500">
+                <Table2 size={48} className="mb-2 opacity-50" />
+                <p>{t("productionTable.title")}</p>
+                <Button
+                  className="mt-4"
+                  color="primary"
+                  variant="flat"
+                  onPress={() => {
+                    router.push("/production-table");
+                    setIsMenuOpen(false);
+                  }}
+                >
+                  {t("nav.productionTable")}
                 </Button>
               </div>
             )}

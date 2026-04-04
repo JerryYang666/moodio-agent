@@ -309,7 +309,10 @@ func isMutationEvent(eventType string) bool {
 	case "asset_moved", "asset_resized", "asset_added", "asset_removed",
 		"asset_dragging", "asset_resizing", "asset_selected", "asset_deselected",
 		"cell_selected", "cell_deselected", "cell_updated", "table_generating",
-		"asset_z_changed":
+		"asset_z_changed",
+		"pt_cell_selected", "pt_cell_deselected", "pt_cell_updated",
+		"pt_column_added", "pt_column_removed", "pt_column_renamed", "pt_columns_reordered",
+		"pt_row_added", "pt_row_removed", "pt_rows_reordered":
 		return true
 	}
 	return false

@@ -66,7 +66,8 @@
     "logout": "退出登录",
     "teams": "团队",
     "listView": "列表视图",
-    "gridView": "网格视图"
+    "gridView": "网格视图",
+    "productionTable": "制片大表"
   },
   "auth": {
     "signInTitle": "登录以访问您的账户",
@@ -1397,5 +1398,21 @@
     "idempotency_error": "此付款已提交。请刷新页面后重试。",
     "api_error": "支付服务遇到错误。请稍后重试。",
     "unknown": "发生意外错误。请重试或联系客服。"
+  },
+  "productionTable": {
+    "title": "制片大表",
+    "create": "创建大表",
+    "columns": "列",
+    "rows": "行",
+    "addColumn": "添加列",
+    "addRow": "添加行",
+    "textCell": "文本",
+    "mediaCell": "媒体",
+    "reorder": "重新排序",
+    "shareTable": "分享大表",
+    "columnAccess": "列权限",
+    "rowAccess": "行权限",
+    "editAccess": "编辑权限",
+    "cellLocked": "{name} 正在编辑"
   }
 }

@@ -66,7 +66,8 @@
     "logout": "로그아웃",
     "teams": "팀",
     "listView": "목록 보기",
-    "gridView": "그리드 보기"
+    "gridView": "그리드 보기",
+    "productionTable": "제작 시트"
   },
   "auth": {
     "signInTitle": "계정에 로그인하세요",
@@ -1397,5 +1398,21 @@
     "idempotency_error": "이 결제는 이미 제출되었습니다. 페이지를 새로고침한 후 다시 시도해 주세요.",
     "api_error": "결제 서비스에서 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.",
     "unknown": "예상치 못한 오류가 발생했습니다. 다시 시도하거나 고객 지원에 문의해 주세요."
+  },
+  "productionTable": {
+    "title": "제작 시트",
+    "create": "시트 만들기",
+    "columns": "열",
+    "rows": "행",
+    "addColumn": "열 추가",
+    "addRow": "행 추가",
+    "textCell": "텍스트",
+    "mediaCell": "미디어",
+    "reorder": "재정렬",
+    "shareTable": "시트 공유",
+    "columnAccess": "열 접근 권한",
+    "rowAccess": "행 접근 권한",
+    "editAccess": "편집 권한",
+    "cellLocked": "{name} 편집 중"
   }
 }

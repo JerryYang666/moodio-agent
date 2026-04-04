@@ -797,3 +797,172 @@ export const stripeEvents = pgTable("stripe_events", {
 
 export type StripeEvent = typeof stripeEvents.$inferSelect;
 export type NewStripeEvent = typeof stripeEvents.$inferInsert;
+
+// ---------------------------------------------------------------------------
+// Production Tables (制片大表)
+// ---------------------------------------------------------------------------
+
+/**
+ * Production Tables table
+ * Top-level entity representing a collaborative spreadsheet for video production.
+ */
+export const productionTables = pgTable("production_tables", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  teamId: uuid("team_id").references(() => teams.id, { onDelete: "set null" }),
+  name: varchar("name", { length: 255 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+/**
+ * Production Table Columns
+ * Column definitions (heading row). All cells in a column share the same type.
+ */
+export const productionTableColumns = pgTable("production_table_columns", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  tableId: uuid("table_id")
+    .notNull()
+    .references(() => productionTables.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 255 }).notNull(),
+  cellType: varchar("cell_type", { length: 20 }).notNull().default("text"), // "text" | "media"
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+/**
+ * Production Table Rows
+ * Row shells created when user adds a row. Cells within are sparse.
+ */
+export const productionTableRows = pgTable("production_table_rows", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  tableId: uuid("table_id")
+    .notNull()
+    .references(() => productionTables.id, { onDelete: "cascade" }),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+/**
+ * Production Table Cells
+ * Sparse cell storage — only created when a user writes content.
+ * One cell per (columnId, rowId) intersection.
+ */
+export const productionTableCells = pgTable(
+  "production_table_cells",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tableId: uuid("table_id")
+      .notNull()
+      .references(() => productionTables.id, { onDelete: "cascade" }),
+    columnId: uuid("column_id")
+      .notNull()
+      .references(() => productionTableColumns.id, { onDelete: "cascade" }),
+    rowId: uuid("row_id")
+      .notNull()
+      .references(() => productionTableRows.id, { onDelete: "cascade" }),
+    textContent: text("text_content"),
+    mediaAssets: jsonb("media_assets").$type<
+      Array<{
+        assetId: string;
+        imageId: string;
+        assetType: string;
+        thumbnailImageId?: string;
+      }>
+    >(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+    updatedBy: uuid("updated_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
+  },
+  (table) => ({
+    uniqueColumnRow: unique().on(table.columnId, table.rowId),
+  })
+);
+
+/**
+ * Production Table Shares
+ * Table-level sharing (viewer or collaborator).
+ */
+export const productionTableShares = pgTable("production_table_shares", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  tableId: uuid("table_id")
+    .notNull()
+    .references(() => productionTables.id, { onDelete: "cascade" }),
+  sharedWithUserId: uuid("shared_with_user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  permission: varchar("permission", { length: 20 }).notNull(), // 'viewer' | 'collaborator'
+  sharedAt: timestamp("shared_at").defaultNow().notNull(),
+});
+
+/**
+ * Production Table Column Shares
+ * Column-level edit grants. Presence of a record = edit access to that column.
+ */
+export const productionTableColumnShares = pgTable(
+  "production_table_column_shares",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tableId: uuid("table_id")
+      .notNull()
+      .references(() => productionTables.id, { onDelete: "cascade" }),
+    columnId: uuid("column_id")
+      .notNull()
+      .references(() => productionTableColumns.id, { onDelete: "cascade" }),
+    sharedWithUserId: uuid("shared_with_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    sharedAt: timestamp("shared_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    uniqueColumnUser: unique().on(table.columnId, table.sharedWithUserId),
+  })
+);
+
+/**
+ * Production Table Row Shares
+ * Row-level edit grants. Presence of a record = edit access to that row.
+ */
+export const productionTableRowShares = pgTable(
+  "production_table_row_shares",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tableId: uuid("table_id")
+      .notNull()
+      .references(() => productionTables.id, { onDelete: "cascade" }),
+    rowId: uuid("row_id")
+      .notNull()
+      .references(() => productionTableRows.id, { onDelete: "cascade" }),
+    sharedWithUserId: uuid("shared_with_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    sharedAt: timestamp("shared_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    uniqueRowUser: unique().on(table.rowId, table.sharedWithUserId),
+  })
+);
+
+export type ProductionTable = typeof productionTables.$inferSelect;
+export type NewProductionTable = typeof productionTables.$inferInsert;
+
+export type ProductionTableColumn = typeof productionTableColumns.$inferSelect;
+export type NewProductionTableColumn = typeof productionTableColumns.$inferInsert;
+
+export type ProductionTableRow = typeof productionTableRows.$inferSelect;
+export type NewProductionTableRow = typeof productionTableRows.$inferInsert;
+
+export type ProductionTableCell = typeof productionTableCells.$inferSelect;
+export type NewProductionTableCell = typeof productionTableCells.$inferInsert;
+
+export type ProductionTableShare = typeof productionTableShares.$inferSelect;
+export type NewProductionTableShare = typeof productionTableShares.$inferInsert;
+
+export type ProductionTableColumnShare = typeof productionTableColumnShares.$inferSelect;
+export type NewProductionTableColumnShare = typeof productionTableColumnShares.$inferInsert;
+
+export type ProductionTableRowShare = typeof productionTableRowShares.$inferSelect;
+export type NewProductionTableRowShare = typeof productionTableRowShares.$inferInsert;

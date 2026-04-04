@@ -1,6 +1,6 @@
 # moodio-realtime
 
-WebSocket server for real-time collaboration on Moodio desktops. Handles room-based presence, event broadcasting, permission enforcement, and optional cross-region federation via NATS. Sits behind Nginx alongside the main Next.js app.
+WebSocket server for real-time collaboration on Moodio desktops and production tables. Handles room-based presence, event broadcasting, permission enforcement, and optional cross-region federation via NATS. Sits behind Nginx alongside the main Next.js app.
 
 ## Architecture
 
@@ -16,7 +16,7 @@ Browser ──HTTP───────▶  │  Nginx (/*) ────▶ Next
                         └─── Region B ───────────────────────────┘
 ```
 
-Each region runs an independent relay server. When NATS is configured, events are forwarded across regions transparently so users in different regions collaborating on the same desktop see each other's changes in real time.
+Each region runs an independent relay server. When NATS is configured, events are forwarded across regions transparently so users in different regions collaborating on the same desktop or production table see each other's changes in real time.
 
 Without NATS the server operates in single-server mode — no external dependencies beyond the Next.js API.
 
@@ -26,23 +26,37 @@ The server uses [melody](https://github.com/olahol/melody) (a gorilla/websocket 
 
 | File | Purpose |
 |---|---|
-| `main.go` | HTTP server, route setup (`/ws/desktop/{id}`, `/ws/ping`, `/health`, `/check`), EC2 region auto-detection, federation bootstrap |
+| `main.go` | HTTP server, route setup (`/ws/desktop/{id}`, `/ws/production-table/{id}`, `/ws/ping`, `/health`, `/check`), EC2 region auto-detection, federation bootstrap |
 | `room.go` | Room manager, broadcast, session handling, presence events, federation message routing, permission checks |
-| `auth.go` | JWT validation from cookie, permission API call, session ID generation |
+| `auth.go` | JWT validation from cookie, permission API calls (desktop + production table), session ID generation |
 | `federation.go` | `Federator` interface, `FederatedMessage` struct with region ID, encode/decode helpers |
 | `federation_nats.go` | NATS-based `Federator` implementation for cross-region message forwarding |
 | `logging.go` | Region-tagged logging helpers (`logf`, `fatalf`) |
 | `room_test.go` | Functional tests + benchmarks (isolation, permissions, latency under pressure) |
+| `production_table_test.go` | Production table tests (cross-type isolation, PT broadcast, PT permissions, join/disconnect) |
 | `federation_test.go` | Cross-region federation tests using mock federators |
 | `nginx.example.conf` | Example Nginx reverse proxy config |
 | `Dockerfile` | Multi-stage Docker build (golang → distroless) |
 
 ## Connection Flow
 
+### Desktop
+
 1. Client connects to `GET /ws/desktop/{desktopId}` with a `moodio_access_token` cookie
 2. Server validates the JWT (HMAC-SHA256 signature + expiration)
 3. Server calls the Next.js API at `GET /api/desktop/{desktopId}/permission?userId={userId}` to check the user's permission level, forwarding the original cookies
-4. On success, the connection is upgraded to WebSocket and the session joins the room
+4. On success, the connection is upgraded to WebSocket and the session joins room `desktop:{desktopId}`
+
+### Production Table
+
+1. Client connects to `GET /ws/production-table/{tableId}` with a `moodio_access_token` cookie
+2. Server validates the JWT (HMAC-SHA256 signature + expiration)
+3. Server calls the Next.js API at `GET /api/production-table/{tableId}/permission?userId={userId}` to check the user's permission level, forwarding the original cookies
+4. On success, the connection is upgraded to WebSocket and the session joins room `production-table:{tableId}`
+
+### Room ID Namespacing
+
+Both desktop and production table rooms share a single `RoomManager` and melody instance. Room IDs are prefixed by type (`desktop:` or `production-table:`) to guarantee isolation — even if a desktop and a production table happen to share the same UUID, their rooms are distinct.
 
 ## Environment Variables
 
@@ -142,7 +156,7 @@ Log categories:
 
 ### Connecting
 
-Connect to `ws://host/ws/desktop/{desktopId}` with the `moodio_access_token` cookie set.
+Connect to `ws://host/ws/desktop/{desktopId}` or `ws://host/ws/production-table/{tableId}` with the `moodio_access_token` cookie set.
 
 On connect, the server sends a `room_joined` event to the new client:
 
@@ -219,6 +233,21 @@ When a session disconnects, the server broadcasts `session_left` to all remainin
 | `table_generating` | Client → Server → room | Yes | No |
 | `presence_sync_request` | Federation internal | — | — |
 
+#### Production Table Events
+
+| Event | Direction | Mutating | Logged |
+|---|---|---|---|
+| `pt_cell_selected` | Client → Server → room | Yes | No |
+| `pt_cell_deselected` | Client → Server → room | Yes | No |
+| `pt_cell_updated` | Client → Server → room | Yes | No |
+| `pt_column_added` | Client → Server → room | Yes | No |
+| `pt_column_removed` | Client → Server → room | Yes | No |
+| `pt_column_renamed` | Client → Server → room | Yes | No |
+| `pt_columns_reordered` | Client → Server → room | Yes | No |
+| `pt_row_added` | Client → Server → room | Yes | No |
+| `pt_row_removed` | Client → Server → room | Yes | No |
+| `pt_rows_reordered` | Client → Server → room | Yes | No |
+
 ### Permissions
 
 - **editor** — can send all event types
@@ -228,7 +257,7 @@ Permission is checked once at connection time via the Next.js API and cached for
 
 ## Room Model
 
-Rooms are implicit — a room is the set of sessions sharing a `desktopId`. The `RoomManager` maintains an in-memory index (`map[roomId]set[*Session]`) for O(room-size) lookups and broadcasts. Empty rooms are garbage-collected automatically when the last session disconnects.
+Rooms are implicit — a room is the set of sessions sharing a namespaced room ID (e.g. `desktop:{desktopId}` or `production-table:{tableId}`). The `RoomManager` maintains an in-memory index (`map[roomId]set[*Session]`) for O(room-size) lookups and broadcasts. Empty rooms are garbage-collected automatically when the last session disconnects.
 
 Messages are broadcast directly to room members, bypassing Melody's global `BroadcastFilter` to avoid iterating over sessions in unrelated rooms.
 
@@ -252,10 +281,10 @@ go test -v ./...
 ### Run Functional Tests
 
 ```bash
-go test -v -run '^Test(RoomIsolation|JoinEvents|Disconnect|Viewer|Editor|Stamped|ManyRooms|Federation)' ./...
+go test -v -run '^Test(RoomIsolation|JoinEvents|Disconnect|Viewer|Editor|Stamped|ManyRooms|Federation|PT)' ./...
 ```
 
-### Functional Tests
+### Functional Tests (Desktop)
 
 | Test | What it verifies |
 |---|---|
@@ -267,6 +296,17 @@ go test -v -run '^Test(RoomIsolation|JoinEvents|Disconnect|Viewer|Editor|Stamped
 | `TestEditorCanMutate` | Editors can send mutations |
 | `TestStampedIdentity` | Outgoing events have correct userId, firstName, timestamp |
 | `TestManyRoomsIsolation` | 10 rooms, each receives only its own payloads |
+
+### Functional Tests (Production Table)
+
+| Test | What it verifies |
+|---|---|
+| `TestPTRoomIsolation_CrossType` | Desktop room and PT room with the same raw UUID are fully isolated via room ID prefix |
+| `TestPTRoomBroadcast` | Events sent in a PT room reach other participants with stamped identity |
+| `TestPTViewerCannotMutate` | All 10 `pt_*` mutation types blocked for viewers |
+| `TestPTEditorCanMutate` | Editors can send all 10 `pt_*` mutation types |
+| `TestPTJoinAndDisconnect` | `room_joined`, `session_joined`, and `session_left` work correctly in PT rooms |
+| `TestPTMultiRoomIsolation` | 5 PT rooms, each receives only its own payloads |
 
 ### Federation Tests
 
@@ -329,4 +369,4 @@ No latency decay as session count grows. Because broadcasts only touch the targe
 | [google/uuid](https://github.com/google/uuid) | v1.6.0 | Session ID generation |
 | [nats-io/nats.go](https://github.com/nats-io/nats.go) | v1.49.0 | Cross-region federation pub/sub |
 
-Max message size: **4096 bytes** (desktop), **512 bytes** (ping).
+Max message size: **4096 bytes** (desktop, production table), **512 bytes** (ping).

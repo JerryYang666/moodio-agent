@@ -15,6 +15,7 @@ A modern AI-powered creative platform for image and video generation with an int
 - [AI Agent System](#ai-agent-system)
 - [Video Generation](#video-generation)
 - [Desktop & Collaborative Video Sync](#desktop--collaborative-video-sync)
+- [Production Table](#production-table)
 - [Image Generation](#image-generation)
 - [Credits System](#credits-system)
 - [Authentication](#authentication)
@@ -280,6 +281,13 @@ The database uses Drizzle ORM with PostgreSQL. Key tables include:
 | `credit_transactions` | Credit transaction history |
 | `model_pricing` | Admin-configurable pricing formulas |
 | `events` | Telemetry data |
+| `production_tables` | Production table metadata |
+| `production_table_columns` | Column definitions (name, type, sort order) |
+| `production_table_rows` | Row definitions (sort order) |
+| `production_table_cells` | Sparse cell storage (text or media) |
+| `production_table_shares` | Table-level sharing |
+| `production_table_column_shares` | Column-level edit grants |
+| `production_table_row_shares` | Row-level edit grants |
 
 ### Running Migrations
 
@@ -676,6 +684,137 @@ This enrichment happens in both:
 | `video_generation_polling` | `{ generationId }` | Heartbeat: this client is polling the generation |
 | `video_generation_updated` | `{ generationId, status }` | Generation finished: completed or failed |
 
+## Production Table
+
+### Overview
+
+The **Production Table** (制片大表) is a collaborative, spreadsheet-like workspace designed for team-based AI video production. Multiple users can view and edit the same table simultaneously via WebSocket-based real-time sync, with cell-level locking to prevent conflicts.
+
+### Key Capabilities
+
+- **Google Sheet-like interface** — customizable columns, rows, and cell types
+- **Two cell types** — text cells (inline editing) and media cells (images/videos from asset library)
+- **Sparse storage** — columns and rows are created upfront; individual cell records are only created when a user writes content into them
+- **Real-time collaboration** — every operation is broadcast via WebSocket; cell locks are heartbeat-refreshed to prevent concurrent edits
+- **Granular permissions** — table-wide viewing, with edit access grantable at table, column, or row level (additive)
+- **Drag-and-drop reordering** — columns and rows can be reordered via drag handles
+- **Virtualized rendering** — uses `@tanstack/react-virtual` for efficient rendering of large tables
+
+### Architecture
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│                Production Table Detail Page                        │
+│                                                                    │
+│  ┌───────────────────────────────────────────────────────────┐    │
+│  │              ProductionTableToolbar                        │    │
+│  │  (table name, add column/row, share, connection status)   │    │
+│  └───────────────────────────────────────────────────────────┘    │
+│  ┌───────────────────────────────────────────────────────────┐    │
+│  │              ProductionTableGrid                           │    │
+│  │  ┌─────────┬──────────┬───────────┬──────────┐            │    │
+│  │  │ Row #   │ Col A    │ Col B     │ Col C    │            │    │
+│  │  │ (drag)  │ (text)   │ (media)   │ (text)   │            │    │
+│  │  ├─────────┼──────────┼───────────┼──────────┤            │    │
+│  │  │  1      │ TextCell │ MediaCell │ TextCell │            │    │
+│  │  │  2      │ TextCell │ MediaCell │ TextCell │            │    │
+│  │  └─────────┴──────────┴───────────┴──────────┘            │    │
+│  └───────────────────────────────────────────────────────────┘    │
+│                                                                    │
+│  ┌───────────────────────────────────────────────────────────┐    │
+│  │           useProductionTableWS (WebSocket hook)            │    │
+│  │  Connection, cell locks, remote presence, event dispatch   │    │
+│  └───────────────────────────────────────────────────────────┘    │
+└──────────────────────────────────────────────────────────────────┘
+        │                              │
+        ▼                              ▼
+┌───────────────────┐   ┌──────────────────────────────────────┐
+│  WebSocket Server │   │  Next.js API Routes                  │
+│  (Room-scoped     │   │  /api/production-table/*             │
+│   event broadcast)│   │  (CRUD, sharing, permissions, cells) │
+└───────────────────┘   └──────────────────────────────────────┘
+```
+
+### Key Components
+
+| Component | File | Role |
+|-----------|------|------|
+| List page | `app/(dashboard)/production-table/page.tsx` | Table listing with create/rename/delete |
+| Detail page | `app/(dashboard)/production-table/[tableId]/page.tsx` | Full table view with real-time collaboration |
+| `ProductionTableToolbar` | `components/production-table/ProductionTableToolbar.tsx` | Toolbar with add column/row, share, status |
+| `ProductionTableGrid` | `components/production-table/ProductionTableGrid.tsx` | Virtualized grid with drag-and-drop reordering |
+| `HeaderRow` | `components/production-table/HeaderRow.tsx` | Column headers with rename, delete, drag handle |
+| `TextCell` | `components/production-table/TextCell.tsx` | Inline text editing with lock display |
+| `MediaCell` | `components/production-table/MediaCell.tsx` | Media asset grid with AssetPickerModal |
+| `RowHandle` | `components/production-table/RowHandle.tsx` | Row number and drag handle for reordering |
+| `ProductionTableShareModal` | `components/production-table/ProductionTableShareModal.tsx` | Sharing UI with table/column/row access tabs |
+| `useProductionTableWS` | `hooks/use-production-table-ws.ts` | WebSocket hook for real-time sync |
+
+### Database Schema
+
+| Table | Purpose |
+|-------|---------|
+| `production_tables` | Table metadata (name, owner, team) |
+| `production_table_columns` | Column definitions with name, cell type, sort order |
+| `production_table_rows` | Row definitions with sort order |
+| `production_table_cells` | Sparse cell storage (created on first write) |
+| `production_table_shares` | Table-level sharing (viewer/collaborator) |
+| `production_table_column_shares` | Column-level edit grants |
+| `production_table_row_shares` | Row-level edit grants |
+
+### Permission Model
+
+| Level | Viewing | Editing |
+|-------|---------|---------|
+| Owner | Full table | Full table |
+| Collaborator (table-level) | Full table | Full table |
+| Viewer + column grant | Full table | Cells in granted columns only |
+| Viewer + row grant | Full table | Cells in granted rows only |
+| Viewer (no grants) | Full table | None |
+
+Column and row edit grants are **additive** — a user with both a column grant and a row grant can edit cells in either.
+
+### WebSocket Events
+
+| Event | Payload | Description |
+|-------|---------|-------------|
+| `pt_cell_selected` | `{ columnId, rowId }` | Cell lock acquired (heartbeat every 1s) |
+| `pt_cell_deselected` | `{ columnId, rowId }` | Cell lock released |
+| `pt_cell_updated` | `{ columnId, rowId, ... }` | Cell content changed |
+| `pt_column_added` | `{ column }` | New column added |
+| `pt_column_removed` | `{ columnId }` | Column deleted |
+| `pt_column_renamed` | `{ columnId, name }` | Column renamed |
+| `pt_columns_reordered` | `{ columnIds }` | Column order changed |
+| `pt_row_added` | `{ row }` | New row added |
+| `pt_row_removed` | `{ rowId }` | Row deleted |
+| `pt_rows_reordered` | `{ rowIds }` | Row order changed |
+
+### API Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/production-table` | List tables (owned + shared) |
+| POST | `/api/production-table` | Create table |
+| GET | `/api/production-table/[tableId]` | Get enriched table data |
+| PATCH | `/api/production-table/[tableId]` | Rename table |
+| DELETE | `/api/production-table/[tableId]` | Delete table (owner only) |
+| POST | `/api/production-table/[tableId]/columns` | Add column |
+| PATCH | `/api/production-table/[tableId]/columns/[columnId]` | Rename column |
+| DELETE | `/api/production-table/[tableId]/columns/[columnId]` | Delete column |
+| PATCH | `/api/production-table/[tableId]/columns/reorder` | Reorder columns |
+| POST | `/api/production-table/[tableId]/rows` | Add row |
+| DELETE | `/api/production-table/[tableId]/rows/[rowId]` | Delete row |
+| PATCH | `/api/production-table/[tableId]/rows/reorder` | Reorder rows |
+| PUT | `/api/production-table/[tableId]/cells` | Upsert cell content |
+| GET | `/api/production-table/[tableId]/share` | List all shares |
+| POST | `/api/production-table/[tableId]/share` | Add table-level share |
+| DELETE | `/api/production-table/[tableId]/share/[userId]` | Remove table share |
+| POST | `/api/production-table/[tableId]/share/columns` | Grant column edit access |
+| DELETE | `/api/production-table/[tableId]/share/columns` | Revoke column edit access |
+| POST | `/api/production-table/[tableId]/share/rows` | Grant row edit access |
+| DELETE | `/api/production-table/[tableId]/share/rows` | Revoke row edit access |
+| GET | `/api/production-table/[tableId]/permission` | Permission check (used by WS server) |
+
 ## Image Generation
 
 ### Supported Models
@@ -846,6 +985,8 @@ moodio-agent/
 │   │   ├── credits/              # Credit balance
 │   │   ├── desktop/              # Collaborative desktop canvases
 │   │   │   └── [desktopId]/      # Individual desktop view
+│   │   ├── production-table/     # Production table (collaborative spreadsheet)
+│   │   │   └── [tableId]/        # Individual table view
 │   │   ├── profile/              # User profile
 │   │   ├── projects/             # Project management
 │   │   └── storyboard/           # Video generation
@@ -855,6 +996,7 @@ moodio-agent/
 │   │   ├── chat/                 # Chat endpoints
 │   │   ├── collection/           # Collection endpoints
 │   │   ├── desktop/              # Desktop endpoints (CRUD, assets, sharing)
+│   │   ├── production-table/     # Production table endpoints (CRUD, cells, sharing)
 │   │   ├── image/                # Image endpoints
 │   │   ├── projects/             # Project endpoints
 │   │   ├── users/                # User endpoints
@@ -864,6 +1006,7 @@ moodio-agent/
 │   ├── chat/                    # Chat interface components
 │   ├── desktop/                 # Desktop canvas and asset components
 │   │   └── assets/              # Asset renderers (ImageAsset, VideoAsset, etc.)
+│   ├── production-table/        # Production table components (grid, cells, toolbar, share)
 │   ├── storyboard/              # Storyboard-specific components
 │   └── video/                   # Shared video UI primitives
 │       ├── fake-progress-bar.tsx  # Animated generation progress bar
@@ -877,6 +1020,7 @@ moodio-agent/
 │   ├── use-desktop.ts           # Desktop detail state management
 │   ├── use-desktop-ws.ts        # Desktop WebSocket connection
 │   ├── use-desktop-video-sync.ts # Collaborative video polling leadership
+│   ├── use-production-table-ws.ts # Production table WebSocket connection
 │   └── ...                      # Other hooks
 ├── i18n/                         # Internationalization
 ├── lib/                          # Core libraries
@@ -885,6 +1029,7 @@ moodio-agent/
 │   ├── auth/                     # Authentication utilities
 │   ├── config/                   # Configuration
 │   ├── db/                       # Database schema & queries
+│   ├── production-table/         # Production table types, permissions, queries
 │   ├── image/                    # Image generation
 │   ├── llm/                      # LLM providers
 │   ├── providers/                # React providers
@@ -1049,6 +1194,7 @@ The translation files follow a nested JSON structure organized by feature area:
 | `language` | Language switcher |
 | `credits` | Credits system |
 | `mention` | Mention feature |
+| `productionTable` | Production table feature |
 
 #### 4. Pluralization and Variables
 
