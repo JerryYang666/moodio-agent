@@ -243,8 +243,11 @@ export default function VideoDetailModal({
                     </div>
 
                     {video.error && (
-                      <div className="text-xs sm:text-sm text-danger bg-danger-50 p-2 sm:p-3 rounded-lg">
-                        {t(getUserFriendlyErrorKey(video.error))}
+                      <div className="text-xs sm:text-sm text-danger bg-danger-50 p-2 sm:p-3 rounded-lg space-y-1">
+                        <p>{t(getUserFriendlyErrorKey(video.error))}</p>
+                        <p className="text-danger/70">
+                          {t("errorProviderReason", { reason: video.error })}
+                        </p>
                       </div>
                     )}
 

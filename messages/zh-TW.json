@@ -607,6 +607,7 @@
     "requestCancelled": "請求已取消",
     "errorPromptViolation": "您的提示詞可能違反了內容規範，請修改提示詞後重試。",
     "errorGenericFailure": "影片生成失敗，點數已退還，請重試。",
+    "errorProviderReason": "影片生成服務回報的失敗原因：{reason}",
     "videoCreation": "影片建立",
     "createVideo": "建立影片",
     "creating": "建立中...",

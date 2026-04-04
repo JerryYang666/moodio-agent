@@ -607,6 +607,7 @@
     "requestCancelled": "リクエストがキャンセルされました",
     "errorPromptViolation": "プロンプトがコンテンツガイドラインに違反している可能性があります。プロンプトを修正して再度お試しください。",
     "errorGenericFailure": "動画の生成に失敗しました。クレジットは返金されました。再度お試しください。",
+    "errorProviderReason": "動画生成プロバイダーが報告した失敗の原因：{reason}",
     "videoCreation": "動画作成",
     "createVideo": "動画を作成",
     "creating": "作成中...",

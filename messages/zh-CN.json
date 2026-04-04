@@ -607,6 +607,7 @@
     "requestCancelled": "请求已取消",
     "errorPromptViolation": "您的提示词可能违反了内容规范，请修改提示词后重试。",
     "errorGenericFailure": "视频生成失败，积分已退还，请重试。",
+    "errorProviderReason": "视频生成服务反馈的失败原因：{reason}",
     "videoCreation": "视频创建",
     "createVideo": "创建视频",
     "creating": "创建中...",
