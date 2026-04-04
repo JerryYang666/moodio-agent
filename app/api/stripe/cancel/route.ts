@@ -29,6 +29,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (subscription.status === "admin_granted") {
+      return NextResponse.json(
+        { error: "Admin-granted subscriptions cannot be canceled from here. Contact an administrator." },
+        { status: 400 }
+      );
+    }
+
     if (subscription.status === "canceled") {
       return NextResponse.json(
         { error: "Subscription is already canceled" },

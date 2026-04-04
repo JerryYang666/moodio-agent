@@ -197,10 +197,18 @@ export default function PaymentsPage() {
               <div className="flex flex-wrap items-center gap-3">
                 <Chip
                   size="sm"
-                  color={subscription.status === "active" ? "success" : "warning"}
+                  color={
+                    subscription.status === "admin_granted"
+                      ? "secondary"
+                      : subscription.status === "active"
+                        ? "success"
+                        : "warning"
+                  }
                   variant="flat"
                 >
-                  {subscription.status}
+                  {subscription.status === "admin_granted"
+                    ? "Granted by Admin"
+                    : subscription.status}
                 </Chip>
                 <span className="text-sm text-default-500">
                   {t(subscription.cancelAtPeriodEnd
@@ -210,40 +218,47 @@ export default function PaymentsPage() {
                   })}
                 </span>
               </div>
-              {subscription.cancelAtPeriodEnd && (
+              {subscription.cancelAtPeriodEnd && subscription.status !== "admin_granted" && (
                 <div className="flex items-center gap-2 p-3 bg-warning-50 rounded-lg text-warning-700 text-sm">
                   <AlertTriangle size={16} />
                   <span>{t("subscription.cancelWarning")}</span>
                 </div>
               )}
-              <div className="flex gap-2 flex-wrap">
-                <Button
-                  variant="flat"
-                  startContent={<Settings size={16} />}
-                  onPress={handleManageSubscription}
-                >
-                  {t("subscription.manage")}
-                </Button>
-                {subscription.cancelAtPeriodEnd ? (
+              {subscription.status === "admin_granted" ? (
+                <p className="text-sm text-default-500">
+                  This subscription was granted by an administrator. To make
+                  changes, contact your admin.
+                </p>
+              ) : (
+                <div className="flex gap-2 flex-wrap">
                   <Button
                     variant="flat"
-                    color="primary"
-                    startContent={<RotateCcw size={16} />}
-                    onPress={resumeModal.onOpen}
+                    startContent={<Settings size={16} />}
+                    onPress={handleManageSubscription}
                   >
-                    {t("subscription.resume")}
+                    {t("subscription.manage")}
                   </Button>
-                ) : (
-                  <Button
-                    variant="flat"
-                    color="danger"
-                    startContent={<XCircle size={16} />}
-                    onPress={cancelModal.onOpen}
-                  >
-                    {t("subscription.cancel")}
-                  </Button>
-                )}
-              </div>
+                  {subscription.cancelAtPeriodEnd ? (
+                    <Button
+                      variant="flat"
+                      color="primary"
+                      startContent={<RotateCcw size={16} />}
+                      onPress={resumeModal.onOpen}
+                    >
+                      {t("subscription.resume")}
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="flat"
+                      color="danger"
+                      startContent={<XCircle size={16} />}
+                      onPress={cancelModal.onOpen}
+                    >
+                      {t("subscription.cancel")}
+                    </Button>
+                  )}
+                </div>
+              )}
             </div>
           ) : (
             <div className="space-y-3">

@@ -237,20 +237,35 @@ async function handleSubscriptionUpsert(sub: Stripe.Subscription) {
 
   const priceId = sub.items.data[0]?.price?.id ?? "";
   const item = sub.items.data[0];
+  const stripePeriodEnd = new Date((item?.current_period_end ?? sub.start_date) * 1000);
   const values = {
     userId,
     stripeSubscriptionId: sub.id,
     stripePriceId: priceId,
     status: sub.status,
     currentPeriodStart: new Date((item?.current_period_start ?? sub.start_date) * 1000),
-    currentPeriodEnd: new Date((item?.current_period_end ?? sub.start_date) * 1000),
+    currentPeriodEnd: stripePeriodEnd,
     cancelAtPeriodEnd: sub.cancel_at_period_end,
     updatedAt: new Date(),
   };
 
+  const [existing] = await db
+    .select({ status: subscriptions.status, currentPeriodEnd: subscriptions.currentPeriodEnd })
+    .from(subscriptions)
+    .where(eq(subscriptions.userId, userId))
+    .limit(1);
+
+  let effectiveEndDate = stripePeriodEnd;
+  if (
+    existing?.status === "admin_granted" &&
+    new Date(existing.currentPeriodEnd) > stripePeriodEnd
+  ) {
+    effectiveEndDate = new Date(existing.currentPeriodEnd);
+  }
+
   await db
     .insert(subscriptions)
-    .values(values)
+    .values({ ...values, currentPeriodEnd: effectiveEndDate })
     .onConflictDoUpdate({
       target: subscriptions.userId,
       set: {
@@ -258,7 +273,7 @@ async function handleSubscriptionUpsert(sub: Stripe.Subscription) {
         stripePriceId: values.stripePriceId,
         status: values.status,
         currentPeriodStart: values.currentPeriodStart,
-        currentPeriodEnd: values.currentPeriodEnd,
+        currentPeriodEnd: effectiveEndDate,
         cancelAtPeriodEnd: values.cancelAtPeriodEnd,
         updatedAt: values.updatedAt,
       },
