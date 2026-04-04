@@ -62,7 +62,7 @@ const ICON_MAP: Record<string, React.ElementType> = {
 interface SuggestionBubbleGroupProps {
   suggestions: SuggestionBubble[];
   /** Direct callback — used when rendered inside chat-interface */
-  onActivate?: (action: SuggestionBubbleAction) => void;
+  onActivate?: (action: SuggestionBubbleAction, label?: string, icon?: string) => void;
   /** If true, dispatch via window event instead of onActivate */
   useEvent?: boolean;
   className?: string;
@@ -74,11 +74,11 @@ export default function SuggestionBubbleGroup({
   useEvent = false,
   className,
 }: SuggestionBubbleGroupProps) {
-  const handleClick = (action: SuggestionBubbleAction) => {
+  const handleClick = (bubble: SuggestionBubble) => {
     if (useEvent) {
-      dispatchSuggestionBubble(action);
+      dispatchSuggestionBubble(bubble.action, bubble.label, bubble.icon);
     } else if (onActivate) {
-      onActivate(action);
+      onActivate(bubble.action, bubble.label, bubble.icon);
     }
   };
 
@@ -93,7 +93,7 @@ export default function SuggestionBubbleGroup({
             size="sm"
             className="border-default-300 dark:border-default-500 text-default-600 dark:text-default-400 hover:bg-default-100 dark:hover:bg-white/10"
             startContent={Icon ? <Icon size={14} /> : undefined}
-            onPress={() => handleClick(bubble.action)}
+            onPress={() => handleClick(bubble)}
           >
             {bubble.label}
           </Button>

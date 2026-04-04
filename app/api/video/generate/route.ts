@@ -173,6 +173,26 @@ export async function POST(request: NextRequest) {
       })
       .returning();
 
+    // Research telemetry — fire early so we capture the event even if the provider call hangs
+    if (await isFeatureFlagEnabled(payload.userId, "res_telemetry")) {
+      recordResearchEvent({
+        userId: payload.userId,
+        chatId: body.chatId ?? undefined,
+        eventType: "video_generation_started",
+        imageId: effectiveSourceImageId,
+        metadata: {
+          modelId,
+          sourceImageId: effectiveSourceImageId,
+          videoPrompt: params.prompt ?? undefined,
+          duration: mergedParams.duration ?? undefined,
+          aspectRatio: mergedParams.aspect_ratio ?? undefined,
+          modelName: model.name,
+          generationId: generation.id,
+          cost,
+        },
+      });
+    }
+
     // Submit to provider
     try {
       const { requestId, provider, providerModelId } = await submitVideoGeneration(
@@ -220,21 +240,6 @@ export async function POST(request: NextRequest) {
         },
         ipAddress
       );
-
-      // Research telemetry
-      if (await isFeatureFlagEnabled(payload.userId, "res_telemetry")) {
-        recordResearchEvent({
-          userId: payload.userId,
-          eventType: "video_generation_started",
-          imageId: effectiveSourceImageId,
-          metadata: {
-            modelId,
-            modelName: model.name,
-            prompt: params.prompt,
-            cost,
-          },
-        });
-      }
 
       return NextResponse.json({
         success: true,

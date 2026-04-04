@@ -51,6 +51,7 @@ import FakeProgressBar from "@/components/video/fake-progress-bar";
 import VideoStatusOverlay from "@/components/video/video-status-overlay";
 import VideoPlayOverlay from "@/components/video/video-play-overlay";
 import VideoDetailModal from "@/components/video/video-detail-modal";
+import { trackResearchEvent } from "@/lib/research-telemetry-client";
 
 interface VideoGeneration {
   id: string;
@@ -1055,6 +1056,16 @@ export default function VideoList({ refreshTrigger, onRestore }: VideoListProps)
               }
             : null
         }
+        onPlaybackStarted={selectedVideo ? () => {
+          trackResearchEvent({
+            eventType: "video_playback_started",
+            metadata: {
+              generationId: selectedVideo.id,
+              sourceImageId: selectedVideo.sourceImageId,
+              videoId: selectedVideo.videoId,
+            },
+          });
+        } : undefined}
       />
 
       {/* Flying Images Animation */}

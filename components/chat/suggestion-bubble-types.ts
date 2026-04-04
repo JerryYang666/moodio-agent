@@ -56,15 +56,19 @@ export const SUGGESTION_BUBBLE_EVENT = "suggestion-bubble-activate";
 
 export interface SuggestionBubbleEventDetail {
   action: SuggestionBubbleAction;
+  label?: string;
+  icon?: string;
 }
 
 /** Dispatch a suggestion bubble action via window CustomEvent */
 export function dispatchSuggestionBubble(
-  action: SuggestionBubbleAction
+  action: SuggestionBubbleAction,
+  label?: string,
+  icon?: string,
 ): void {
   window.dispatchEvent(
     new CustomEvent<SuggestionBubbleEventDetail>(SUGGESTION_BUBBLE_EVENT, {
-      detail: { action },
+      detail: { action, label, icon },
     })
   );
 }

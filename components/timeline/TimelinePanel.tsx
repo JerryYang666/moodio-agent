@@ -42,6 +42,12 @@ interface TimelinePanelProps {
     updates: Partial<Omit<TimelineClip, "id">>
   ) => void;
   desktopId?: string;
+  /** Callback for telemetry when export is triggered */
+  onExportTrack?: (data: {
+    clipCount: number;
+    clips: Array<{ clipId: string; assetId: string; trimStart: number; trimEnd: number }>;
+    outputFormat: string;
+  }) => void;
 }
 
 const PANEL_HEIGHT = 260;
@@ -61,6 +67,7 @@ export default function TimelinePanel({
   onClearTimeline,
   onUpdateClip,
   desktopId,
+  onExportTrack,
 }: TimelinePanelProps) {
   const [activeClipIndex, setActiveClipIndex] = useState(0);
   const [exportState, setExportState] = useState<ExportState>({
@@ -148,6 +155,21 @@ export default function TimelinePanel({
   const handleExport = useCallback(async (format: OutputFormat) => {
     if (!desktopId || clips.length === 0) return;
     setExportState({ status: "exporting" });
+
+    // Research telemetry: video_export_started
+    if (onExportTrack) {
+      onExportTrack({
+        clipCount: clips.length,
+        clips: clips.map((c) => ({
+          clipId: c.id,
+          assetId: c.assetId,
+          trimStart: c.trimStart ?? 0,
+          trimEnd: c.trimEnd ?? c.duration,
+        })),
+        outputFormat: format,
+      });
+    }
+
     try {
       const payload = buildExportRequest(clips, desktopId, format);
       const res = await fetch("/api/render/export", {

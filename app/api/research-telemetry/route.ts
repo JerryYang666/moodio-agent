@@ -18,6 +18,15 @@ const ALLOWED_EVENT_TYPES = new Set<ResearchEventType>([
   "reference_image_added",
   "chat_forked",
   "session_end",
+  "image_hover_preview",
+  "canvas_item_added",
+  "timeline_clip_added",
+  "video_export_started",
+  "image_detail_viewed",
+  "suggestion_clicked",
+  "video_playback_started",
+  "canvas_item_removed",
+  "timeline_clip_removed",
 ]);
 
 export async function POST(request: NextRequest) {
@@ -54,7 +63,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid event type" }, { status: 400 });
     }
 
-    await recordResearchEvent({
+    // Fire-and-forget: never block the response on DB writes
+    void recordResearchEvent({
       userId: payload.userId,
       chatId: body.chatId,
       sessionId: body.sessionId,
@@ -64,6 +74,8 @@ export async function POST(request: NextRequest) {
       imagePosition: body.imagePosition,
       variantId: body.variantId,
       metadata: body.metadata,
+    }).catch((err) => {
+      console.error("[ResearchTelemetry] Failed to record event:", err);
     });
 
     return NextResponse.json({ ok: true });
