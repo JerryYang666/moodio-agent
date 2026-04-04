@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAccessToken } from "@/lib/auth/cookies";
 import { verifyAccessToken } from "@/lib/auth/jwt";
 import { db } from "@/lib/db";
-import { users, userCredits } from "@/lib/db/schema";
+import { users, userCredits, subscriptions } from "@/lib/db/schema";
 import { desc, eq } from "drizzle-orm";
 
 export async function GET(request: NextRequest) {
@@ -28,15 +28,25 @@ export async function GET(request: NextRequest) {
         createdAt: users.createdAt,
         updatedAt: users.updatedAt,
         credits: userCredits.balance,
+        subscriptionStatus: subscriptions.status,
+        subscriptionEnd: subscriptions.currentPeriodEnd,
       })
       .from(users)
       .leftJoin(userCredits, eq(users.id, userCredits.userId))
+      .leftJoin(subscriptions, eq(users.id, subscriptions.userId))
       .orderBy(desc(users.createdAt));
 
-    // Map null credits to 0
+    const now = new Date();
     const usersWithCredits = allUsers.map((user) => ({
       ...user,
       credits: user.credits ?? 0,
+      isProSubscriber:
+        (user.subscriptionStatus === "active" ||
+          user.subscriptionStatus === "trialing" ||
+          user.subscriptionStatus === "admin_granted") &&
+        user.subscriptionEnd != null &&
+        new Date(user.subscriptionEnd) > now,
+      subscriptionEnd: user.subscriptionEnd?.toISOString() ?? null,
     }));
 
     return NextResponse.json({ users: usersWithCredits });

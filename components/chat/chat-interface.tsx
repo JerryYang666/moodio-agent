@@ -2293,15 +2293,17 @@ export default function ChatInterface({
       return;
     }
 
-    // Build the message content with selected image titles
+    // Build the message content with selected image titles (agent mode only)
     let currentInput = input;
-    const agentImages = pendingImages.filter(
-      (img) => img.source === "ai_generated"
-    );
-    if (agentImages.length > 0) {
-      const titles = agentImages.map((img) => img.title || "image").join(", ");
-      const prefix = `I select ${titles}`;
-      currentInput = currentInput ? `${prefix}\n\n${currentInput}` : prefix;
+    if (menuState.mode === "agent") {
+      const agentImages = pendingImages.filter(
+        (img) => img.source === "ai_generated"
+      );
+      if (agentImages.length > 0) {
+        const titles = agentImages.map((img) => img.title || "image").join(", ");
+        const prefix = `I select ${titles}`;
+        currentInput = currentInput ? `${prefix}\n\n${currentInput}` : prefix;
+      }
     }
 
     // Save the original input for potential retry exhausted scenario

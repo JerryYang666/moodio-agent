@@ -31,7 +31,7 @@ import { User } from "@/hooks/use-auth";
 import { Pagination } from "@heroui/pagination";
 import { SearchIcon } from "@/components/icons";
 import { addToast } from "@heroui/toast";
-import { Bean, FlaskConical, Copy } from "lucide-react";
+import { Bean, FlaskConical, Copy, Crown } from "lucide-react";
 
 interface InvitationCode {
   code: string;
@@ -49,6 +49,8 @@ interface TestingGroup {
 interface UserWithCredits extends User {
   credits: number;
   testingGroups: string[];
+  isProSubscriber: boolean;
+  subscriptionEnd: string | null;
 }
 
 export default function AdminPage() {
@@ -108,6 +110,16 @@ export default function AdminPage() {
   const [creditsAmount, setCreditsAmount] = useState("");
   const [creditsDescription, setCreditsDescription] = useState("");
   const [addingCredits, setAddingCredits] = useState(false);
+
+  // Grant Subscription State
+  const {
+    isOpen: isSubOpen,
+    onOpen: onSubOpen,
+    onOpenChange: onSubOpenChange,
+    onClose: onSubClose,
+  } = useDisclosure();
+  const [subMonths, setSubMonths] = useState("1");
+  const [grantingSub, setGrantingSub] = useState(false);
 
   useEffect(() => {
     if (user && user.roles.includes("admin")) {
@@ -275,6 +287,39 @@ export default function AdminPage() {
     }
   };
 
+  const handleOpenSubModal = (userToEdit: UserWithCredits) => {
+    setSelectedUser(userToEdit);
+    setSubMonths("1");
+    onSubOpen();
+  };
+
+  const handleGrantSubscription = async () => {
+    if (!selectedUser || !subMonths) return;
+    setGrantingSub(true);
+    try {
+      await api.post("/api/admin/subscriptions/grant", {
+        userId: selectedUser.id,
+        months: parseInt(subMonths),
+      });
+      await fetchUsers();
+      onSubClose();
+      addToast({
+        title: "Success",
+        description: `Granted ${subMonths} month(s) of Moodio Pro to ${selectedUser.email}`,
+        color: "success",
+      });
+    } catch (error) {
+      console.error("Failed to grant subscription:", error);
+      addToast({
+        title: "Error",
+        description: "Failed to grant subscription",
+        color: "danger",
+      });
+    } finally {
+      setGrantingSub(false);
+    }
+  };
+
   const handleSaveUser = async () => {
     if (!selectedUser) return;
     setSavingUser(true);
@@ -381,6 +426,7 @@ export default function AdminPage() {
                 <TableColumn>ROLES</TableColumn>
                 <TableColumn>GROUPS</TableColumn>
                 <TableColumn>CREDITS</TableColumn>
+                <TableColumn>SUBSCRIPTION</TableColumn>
                 <TableColumn>PROVIDER</TableColumn>
                 <TableColumn>JOINED</TableColumn>
                 <TableColumn>ACTIONS</TableColumn>
@@ -456,6 +502,32 @@ export default function AdminPage() {
                         </span>
                       </div>
                     </TableCell>
+                    <TableCell>
+                      {item.isProSubscriber ? (
+                        <div className="flex flex-col gap-0.5">
+                          <Chip
+                            size="sm"
+                            variant="flat"
+                            color="success"
+                            startContent={<Crown size={12} />}
+                          >
+                            Pro
+                          </Chip>
+                          {item.subscriptionEnd && (
+                            <span className="text-xs text-default-400">
+                              until{" "}
+                              {new Date(
+                                item.subscriptionEnd
+                              ).toLocaleDateString()}
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <Chip size="sm" variant="flat" color="default">
+                          Free
+                        </Chip>
+                      )}
+                    </TableCell>
                     <TableCell className="capitalize">
                       {item.authProvider}
                     </TableCell>
@@ -495,6 +567,15 @@ export default function AdminPage() {
                           onPress={() => handleOpenCreditsModal(item)}
                         >
                           {t("addCredits")}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="flat"
+                          color="secondary"
+                          startContent={<Crown size={14} />}
+                          onPress={() => handleOpenSubModal(item)}
+                        >
+                          Grant Pro
                         </Button>
                       </div>
                     </TableCell>
@@ -770,6 +851,76 @@ export default function AdminPage() {
                   startContent={<Bean size={16} />}
                 >
                   {t("addCredits")}
+                </Button>
+              </ModalFooter>
+            </>
+          )}
+        </ModalContent>
+      </Modal>
+
+      {/* Grant Subscription Modal */}
+      <Modal isOpen={isSubOpen} onOpenChange={onSubOpenChange}>
+        <ModalContent>
+          {(onClose) => (
+            <>
+              <ModalHeader>Grant Moodio Pro</ModalHeader>
+              <ModalBody>
+                {selectedUser && (
+                  <div className="mb-4 p-3 bg-default-100 rounded-lg">
+                    <p className="text-sm text-default-500">User</p>
+                    <p className="font-medium">
+                      {selectedUser.firstName && selectedUser.lastName
+                        ? `${selectedUser.firstName} ${selectedUser.lastName}`
+                        : selectedUser.firstName || selectedUser.email}
+                    </p>
+                    <div className="flex items-center gap-1 mt-2">
+                      {selectedUser.isProSubscriber ? (
+                        <Chip size="sm" variant="flat" color="success" startContent={<Crown size={12} />}>
+                          Currently Pro
+                          {selectedUser.subscriptionEnd &&
+                            ` until ${new Date(selectedUser.subscriptionEnd).toLocaleDateString()}`}
+                        </Chip>
+                      ) : (
+                        <Chip size="sm" variant="flat" color="default">
+                          Not subscribed
+                        </Chip>
+                      )}
+                    </div>
+                    {selectedUser.isProSubscriber && (
+                      <p className="text-xs text-default-400 mt-2">
+                        Granting additional months will extend from the current
+                        end date.
+                      </p>
+                    )}
+                  </div>
+                )}
+                <Select
+                  label="Duration"
+                  placeholder="Select months"
+                  selectedKeys={new Set([subMonths])}
+                  onSelectionChange={(keys) => {
+                    const val = Array.from(keys)[0] as string;
+                    if (val) setSubMonths(val);
+                  }}
+                >
+                  <SelectItem key="1">1 month</SelectItem>
+                  <SelectItem key="3">3 months</SelectItem>
+                  <SelectItem key="6">6 months</SelectItem>
+                  <SelectItem key="12">12 months (1 year)</SelectItem>
+                  <SelectItem key="24">24 months (2 years)</SelectItem>
+                </Select>
+              </ModalBody>
+              <ModalFooter>
+                <Button variant="light" onPress={onClose}>
+                  Cancel
+                </Button>
+                <Button
+                  color="secondary"
+                  onPress={handleGrantSubscription}
+                  isLoading={grantingSub}
+                  startContent={<Crown size={16} />}
+                >
+                  Grant {subMonths} month{parseInt(subMonths) > 1 ? "s" : ""}
                 </Button>
               </ModalFooter>
             </>

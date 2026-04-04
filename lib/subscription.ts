@@ -2,7 +2,7 @@ import { db } from "@/lib/db";
 import { subscriptions } from "@/lib/db/schema";
 import { eq, and, gt, inArray } from "drizzle-orm";
 
-const ACTIVE_STATUSES = ["active", "trialing"] as const;
+const ACTIVE_STATUSES = ["active", "trialing", "admin_granted"] as const;
 
 /**
  * Check whether a user has an active (or trialing) subscription whose
