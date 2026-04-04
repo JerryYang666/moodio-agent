@@ -87,7 +87,7 @@ func main() {
 			"firstName":  claims.FirstName,
 			"email":      claims.Email,
 			"permission": permission,
-			"roomId":     desktopId,
+			"roomId":     "desktop:" + desktopId,
 		})
 		if err != nil {
 			logf(regionLocal, "WebSocket upgrade error: %v", err)
@@ -104,6 +104,44 @@ func main() {
 
 	m.HandleDisconnect(func(s *melody.Session) {
 		rooms.HandleDisconnect(s)
+	})
+
+	http.HandleFunc("/ws/production-table/{tableId}", func(w http.ResponseWriter, r *http.Request) {
+		claims, err := auth.ValidateFromCookie(r)
+		if err != nil {
+			logf(regionLocal, "[auth] rejected production-table connection: %v", err)
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		tableId := r.PathValue("tableId")
+		if tableId == "" {
+			http.Error(w, "missing tableId", http.StatusBadRequest)
+			return
+		}
+
+		permission, err := checkProductionTablePermission(permissionAPIBase, tableId, claims.UserID, r)
+		if err != nil || permission == "" {
+			logf(regionLocal, "[auth] permission denied for user=%s production-table=%s: %v", claims.UserID, tableId, err)
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
+
+		sessionId := generateSessionId()
+		logf(regionLocal, "[connect] user=%s (%s) -> production-table=%s session=%s permission=%s",
+			claims.FirstName, claims.UserID[:8], tableId[:8], sessionId, permission)
+
+		err = m.HandleRequestWithKeys(w, r, map[string]any{
+			"sessionId":  sessionId,
+			"userId":     claims.UserID,
+			"firstName":  claims.FirstName,
+			"email":      claims.Email,
+			"permission": permission,
+			"roomId":     "production-table:" + tableId,
+		})
+		if err != nil {
+			logf(regionLocal, "WebSocket upgrade error: %v", err)
+		}
 	})
 
 	pingMelody := melody.New()

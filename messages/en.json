@@ -66,7 +66,8 @@
     "logout": "Logout",
     "teams": "Teams",
     "listView": "List View",
-    "gridView": "Grid View"
+    "gridView": "Grid View",
+    "productionTable": "Production"
   },
   "auth": {
     "signInTitle": "Sign in to access your account",
@@ -1397,5 +1398,21 @@
     "idempotency_error": "This payment was already submitted. Please refresh and try again.",
     "api_error": "The payment service encountered an error. Please try again later.",
     "unknown": "An unexpected error occurred. Please try again or contact support."
+  },
+  "productionTable": {
+    "title": "Production Table",
+    "create": "Create Table",
+    "columns": "Columns",
+    "rows": "Rows",
+    "addColumn": "Add Column",
+    "addRow": "Add Row",
+    "textCell": "Text",
+    "mediaCell": "Media",
+    "reorder": "Reorder",
+    "shareTable": "Share Table",
+    "columnAccess": "Column Access",
+    "rowAccess": "Row Access",
+    "editAccess": "Edit Access",
+    "cellLocked": "Editing by {name}"
   }
 }
