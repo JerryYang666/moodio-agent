@@ -1259,8 +1259,8 @@ const veo31FirstLastFrame: VideoModelConfig = {
       name: "last_frame_url",
       label: "Last Frame",
       type: "string",
-      required: true,
-      description: "URL of the last frame of the video",
+      required: false,
+      description: "URL of the last frame of the video (optional)",
     },
     {
       name: "aspect_ratio",
