@@ -1167,8 +1167,8 @@ const veo31: VideoModelConfig = {
       label: "Aspect Ratio",
       type: "enum",
       required: false,
-      default: "auto",
-      options: ["auto", "16:9", "9:16"],
+      default: "16:9",
+      options: ["16:9", "9:16"],
       description: "Aspect ratio of the generated video",
     },
     {
@@ -1267,8 +1267,8 @@ const veo31FirstLastFrame: VideoModelConfig = {
       label: "Aspect Ratio",
       type: "enum",
       required: false,
-      default: "auto",
-      options: ["auto", "16:9", "9:16"],
+      default: "16:9",
+      options: ["16:9", "9:16"],
       description: "Aspect ratio of the generated video",
     },
     {
