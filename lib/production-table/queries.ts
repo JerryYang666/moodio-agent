@@ -7,6 +7,7 @@ import {
   productionTableShares,
   productionTableColumnShares,
   productionTableRowShares,
+  users,
 } from "@/lib/db/schema";
 import { eq, and, desc, asc, inArray } from "drizzle-orm";
 import { PERMISSION_OWNER } from "@/lib/permissions";
@@ -306,16 +307,46 @@ export async function upsertCell(
 export async function listShares(tableId: string) {
   const [tableShares, colShares, rowShares] = await Promise.all([
     db
-      .select()
+      .select({
+        id: productionTableShares.id,
+        tableId: productionTableShares.tableId,
+        sharedWithUserId: productionTableShares.sharedWithUserId,
+        permission: productionTableShares.permission,
+        sharedAt: productionTableShares.sharedAt,
+        email: users.email,
+        firstName: users.firstName,
+        lastName: users.lastName,
+      })
       .from(productionTableShares)
+      .innerJoin(users, eq(productionTableShares.sharedWithUserId, users.id))
       .where(eq(productionTableShares.tableId, tableId)),
     db
-      .select()
+      .select({
+        id: productionTableColumnShares.id,
+        tableId: productionTableColumnShares.tableId,
+        columnId: productionTableColumnShares.columnId,
+        sharedWithUserId: productionTableColumnShares.sharedWithUserId,
+        sharedAt: productionTableColumnShares.sharedAt,
+        email: users.email,
+        firstName: users.firstName,
+        lastName: users.lastName,
+      })
       .from(productionTableColumnShares)
+      .innerJoin(users, eq(productionTableColumnShares.sharedWithUserId, users.id))
       .where(eq(productionTableColumnShares.tableId, tableId)),
     db
-      .select()
+      .select({
+        id: productionTableRowShares.id,
+        tableId: productionTableRowShares.tableId,
+        rowId: productionTableRowShares.rowId,
+        sharedWithUserId: productionTableRowShares.sharedWithUserId,
+        sharedAt: productionTableRowShares.sharedAt,
+        email: users.email,
+        firstName: users.firstName,
+        lastName: users.lastName,
+      })
       .from(productionTableRowShares)
+      .innerJoin(users, eq(productionTableRowShares.sharedWithUserId, users.id))
       .where(eq(productionTableRowShares.tableId, tableId)),
   ]);
   return { tableShares, columnShares: colShares, rowShares };

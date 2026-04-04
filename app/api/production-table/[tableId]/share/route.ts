@@ -4,7 +4,6 @@ import { verifyAccessToken } from "@/lib/auth/jwt";
 import { getTablePermission } from "@/lib/production-table/permissions";
 import { listShares, addTableShare } from "@/lib/production-table/queries";
 import { isOwner, isValidSharePermission } from "@/lib/permissions";
-import type { TableSharePayload } from "@/lib/production-table/types";
 
 type Params = { tableId: string };
 
@@ -65,18 +64,38 @@ export async function POST(
       );
     }
 
-    const body = (await req.json()) as TableSharePayload;
-    const { sharedWithUserId, permission } = body;
+    const body = await req.json();
+    const { sharedWithUserId, sharedWithUserIds, permission } = body;
 
-    if (!sharedWithUserId || !permission) {
+    if (!permission) {
       return NextResponse.json(
-        { error: "sharedWithUserId and permission are required" },
+        { error: "permission is required" },
         { status: 400 }
       );
     }
     if (!isValidSharePermission(permission)) {
       return NextResponse.json(
         { error: "permission must be 'viewer' or 'collaborator'" },
+        { status: 400 }
+      );
+    }
+
+    // Bulk share
+    if (Array.isArray(sharedWithUserIds) && sharedWithUserIds.length > 0) {
+      const results = await Promise.all(
+        sharedWithUserIds.map((uid: string) =>
+          addTableShare(tableId, uid, permission).catch(() => null)
+        )
+      );
+      return NextResponse.json({
+        shares: results.filter(Boolean),
+        bulk: true,
+      });
+    }
+
+    if (!sharedWithUserId) {
+      return NextResponse.json(
+        { error: "sharedWithUserId or sharedWithUserIds is required" },
         { status: 400 }
       );
     }

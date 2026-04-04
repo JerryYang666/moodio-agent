@@ -4,7 +4,6 @@ import { verifyAccessToken } from "@/lib/auth/jwt";
 import { getTablePermission } from "@/lib/production-table/permissions";
 import { addRowShares, removeRowShare } from "@/lib/production-table/queries";
 import { isOwner } from "@/lib/permissions";
-import type { RowSharePayload } from "@/lib/production-table/types";
 
 type Params = { tableId: string };
 
@@ -31,12 +30,29 @@ export async function POST(
       );
     }
 
-    const body = (await req.json()) as RowSharePayload;
-    const { rowIds, sharedWithUserId } = body;
+    const body = await req.json();
+    const { rowIds, sharedWithUserId, sharedWithUserIds } = body;
 
-    if (!Array.isArray(rowIds) || rowIds.length === 0 || !sharedWithUserId) {
+    if (!Array.isArray(rowIds) || rowIds.length === 0) {
       return NextResponse.json(
-        { error: "rowIds and sharedWithUserId are required" },
+        { error: "rowIds is required" },
+        { status: 400 }
+      );
+    }
+
+    // Bulk: share rows with multiple users at once
+    if (Array.isArray(sharedWithUserIds) && sharedWithUserIds.length > 0) {
+      await Promise.all(
+        sharedWithUserIds.map((uid: string) =>
+          addRowShares(tableId, rowIds, uid)
+        )
+      );
+      return NextResponse.json({ success: true, bulk: true });
+    }
+
+    if (!sharedWithUserId) {
+      return NextResponse.json(
+        { error: "sharedWithUserId or sharedWithUserIds is required" },
         { status: 400 }
       );
     }

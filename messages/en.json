@@ -1417,6 +1417,8 @@
     "permission": "Permission",
     "offline": "Offline",
     "connected": "Live sync active",
-    "cellLocked": "Editing by {name}"
+    "cellLocked": "Editing by {name}",
+    "grantEditAccessColumns": "Grant edit access for {count} {count, plural, one {column} other {columns}}",
+    "grantEditAccessRows": "Grant edit access for {count} {count, plural, one {row} other {rows}}"
   }
 }

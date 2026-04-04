@@ -506,6 +506,7 @@ export default function ProductionTableDetailPage({
         isOpen={shareModal.isOpen}
         onClose={shareModal.onClose}
         tableId={tableId}
+        ownerId={table.userId}
         columns={table.columns}
         rows={table.rows}
         isOwner={isTableOwner}

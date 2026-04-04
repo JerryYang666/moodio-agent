@@ -99,18 +99,21 @@ export interface UpsertCellPayload {
 }
 
 export interface TableSharePayload {
-  sharedWithUserId: string;
+  sharedWithUserId?: string;
+  sharedWithUserIds?: string[];
   permission: "viewer" | "collaborator";
 }
 
 export interface ColumnSharePayload {
   columnIds: string[];
-  sharedWithUserId: string;
+  sharedWithUserId?: string;
+  sharedWithUserIds?: string[];
 }
 
 export interface RowSharePayload {
   rowIds: string[];
-  sharedWithUserId: string;
+  sharedWithUserId?: string;
+  sharedWithUserIds?: string[];
 }
 
 // ---------------------------------------------------------------------------

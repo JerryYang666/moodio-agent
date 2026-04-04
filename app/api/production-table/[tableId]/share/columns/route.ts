@@ -7,7 +7,6 @@ import {
   removeColumnShare,
 } from "@/lib/production-table/queries";
 import { isOwner } from "@/lib/permissions";
-import type { ColumnSharePayload } from "@/lib/production-table/types";
 
 type Params = { tableId: string };
 
@@ -34,16 +33,29 @@ export async function POST(
       );
     }
 
-    const body = (await req.json()) as ColumnSharePayload;
-    const { columnIds, sharedWithUserId } = body;
+    const body = await req.json();
+    const { columnIds, sharedWithUserId, sharedWithUserIds } = body;
 
-    if (
-      !Array.isArray(columnIds) ||
-      columnIds.length === 0 ||
-      !sharedWithUserId
-    ) {
+    if (!Array.isArray(columnIds) || columnIds.length === 0) {
       return NextResponse.json(
-        { error: "columnIds and sharedWithUserId are required" },
+        { error: "columnIds is required" },
+        { status: 400 }
+      );
+    }
+
+    // Bulk: share columns with multiple users at once
+    if (Array.isArray(sharedWithUserIds) && sharedWithUserIds.length > 0) {
+      await Promise.all(
+        sharedWithUserIds.map((uid: string) =>
+          addColumnShares(tableId, columnIds, uid)
+        )
+      );
+      return NextResponse.json({ success: true, bulk: true });
+    }
+
+    if (!sharedWithUserId) {
+      return NextResponse.json(
+        { error: "sharedWithUserId or sharedWithUserIds is required" },
         { status: 400 }
       );
     }
