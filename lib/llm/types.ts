@@ -83,6 +83,8 @@ export type MessageContentPart =
       videoId?: string;
       videoUrl?: string;
       signedVideoUrl?: string;
+      provider?: string;
+      providerRequestId?: string;
       error?: string;
       createdAt: string;
       completedAt?: string;

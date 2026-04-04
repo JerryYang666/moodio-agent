@@ -630,7 +630,19 @@
     "filterToday": "今天",
     "filterLast7Days": "最近7天",
     "filterLast30Days": "最近30天",
-    "filterDuration": "时长"
+    "filterDuration": "时长",
+    "upscaleVideo": "升级视频分辨率",
+    "upscaleVideoDesc": "获取此 Veo 3.1 视频的更高分辨率版本。1080p 已包含；4K 需额外消耗积分。",
+    "get1080pWithCost": "获取 1080p（{cost} 积分）",
+    "get4kWithCost": "获取 4K（{cost} 积分）",
+    "open1080p": "打开 1080p",
+    "open4k": "打开 4K",
+    "upscaleReady": "视频已就绪",
+    "upscaleReadyDesc": "{resolution} 视频已就绪，已在新标签页中打开。",
+    "upscaleProcessing": "处理中",
+    "upscaleProcessingDesc": "视频正在升级中，请稍后再试。",
+    "upscaleError": "升级失败",
+    "upscaleInsufficientCredits": "积分不足，无法进行此升级。"
   },
   "menu": {
     "mode": "模式",

@@ -630,7 +630,19 @@
     "filterToday": "今日",
     "filterLast7Days": "過去7日間",
     "filterLast30Days": "過去30日間",
-    "filterDuration": "再生時間"
+    "filterDuration": "再生時間",
+    "upscaleVideo": "動画をアップスケール",
+    "upscaleVideoDesc": "この Veo 3.1 動画の高解像度版を取得します。1080p は含まれています。4K には追加クレジットが必要です。",
+    "get1080pWithCost": "1080p を取得（{cost} クレジット）",
+    "get4kWithCost": "4K を取得（{cost} クレジット）",
+    "open1080p": "1080p を開く",
+    "open4k": "4K を開く",
+    "upscaleReady": "動画の準備完了",
+    "upscaleReadyDesc": "{resolution} 動画の準備ができました。新しいタブで開きました。",
+    "upscaleProcessing": "処理中",
+    "upscaleProcessingDesc": "動画をアップスケール中です。しばらくしてから再度お試しください。",
+    "upscaleError": "アップスケール失敗",
+    "upscaleInsufficientCredits": "クレジットが不足しているため、アップスケールできません。"
   },
   "menu": {
     "mode": "モード",

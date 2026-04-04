@@ -630,7 +630,19 @@
     "filterToday": "今天",
     "filterLast7Days": "最近7天",
     "filterLast30Days": "最近30天",
-    "filterDuration": "時長"
+    "filterDuration": "時長",
+    "upscaleVideo": "升級影片解析度",
+    "upscaleVideoDesc": "取得此 Veo 3.1 影片的更高解析度版本。1080p 已包含；4K 需額外消耗點數。",
+    "get1080pWithCost": "取得 1080p（{cost} 點數）",
+    "get4kWithCost": "取得 4K（{cost} 點數）",
+    "open1080p": "開啟 1080p",
+    "open4k": "開啟 4K",
+    "upscaleReady": "影片已就緒",
+    "upscaleReadyDesc": "{resolution} 影片已就緒，已在新分頁中開啟。",
+    "upscaleProcessing": "處理中",
+    "upscaleProcessingDesc": "影片正在升級中，請稍後再試。",
+    "upscaleError": "升級失敗",
+    "upscaleInsufficientCredits": "點數不足，無法進行此升級。"
   },
   "menu": {
     "mode": "模式",

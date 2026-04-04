@@ -6,6 +6,7 @@ import { videoGenerations } from "@/lib/db/schema";
 import { eq, desc } from "drizzle-orm";
 import { getImageUrl, getVideoUrl, getSignedVideoUrl } from "@/lib/storage/s3";
 import { checkAndRecoverStaleGenerations } from "@/lib/video/recovery";
+import { resolveUpscaledVideos } from "@/lib/video/upscale-utils";
 import { waitUntil } from "@vercel/functions";
 
 /**
@@ -69,6 +70,8 @@ export async function GET(request: NextRequest) {
     const generationsWithUrls = filteredGenerations.map((g) => ({
       id: g.id,
       modelId: g.modelId,
+      provider: g.provider,
+      providerRequestId: g.providerRequestId,
       status: g.status,
       sourceImageId: g.sourceImageId,
       sourceImageUrl: getImageUrl(g.sourceImageId),
@@ -76,7 +79,6 @@ export async function GET(request: NextRequest) {
       endImageUrl: g.endImageId ? getImageUrl(g.endImageId) : null,
       videoId: g.videoId,
       videoUrl: g.videoId ? getVideoUrl(g.videoId) : null,
-      // Signed URL for frame capture (works with crossOrigin="anonymous" + CORS)
       signedVideoUrl: g.videoId ? getSignedVideoUrl(g.videoId) : null,
       thumbnailImageId: g.thumbnailImageId,
       thumbnailUrl: g.thumbnailImageId
@@ -87,6 +89,7 @@ export async function GET(request: NextRequest) {
       seed: g.seed,
       createdAt: g.createdAt,
       completedAt: g.completedAt,
+      upscaled: resolveUpscaledVideos(g.params as Record<string, any>),
     }));
 
     return NextResponse.json({

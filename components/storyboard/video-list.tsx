@@ -55,6 +55,8 @@ import VideoDetailModal from "@/components/video/video-detail-modal";
 interface VideoGeneration {
   id: string;
   modelId: string;
+  provider: string | null;
+  providerRequestId: string | null;
   status: "pending" | "processing" | "completed" | "failed";
   sourceImageId: string;
   sourceImageUrl: string;
@@ -62,7 +64,7 @@ interface VideoGeneration {
   endImageUrl: string | null;
   videoId: string | null;
   videoUrl: string | null;
-  signedVideoUrl: string | null; // Signed URL for frame capture (CORS-compatible)
+  signedVideoUrl: string | null;
   thumbnailImageId: string | null;
   thumbnailUrl: string | null;
   params: Record<string, any>;
@@ -1022,6 +1024,8 @@ export default function VideoList({ refreshTrigger, onRestore }: VideoListProps)
             ? {
                 id: selectedVideo.id,
                 modelId: selectedVideo.modelId,
+                provider: selectedVideo.provider,
+                providerRequestId: selectedVideo.providerRequestId,
                 status: selectedVideo.status,
                 sourceImageUrl: selectedVideo.sourceImageUrl,
                 videoId: selectedVideo.videoId,

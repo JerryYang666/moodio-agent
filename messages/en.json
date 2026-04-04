@@ -778,7 +778,19 @@
     "filterToday": "Today",
     "filterLast7Days": "Last 7 Days",
     "filterLast30Days": "Last 30 Days",
-    "filterDuration": "Duration"
+    "filterDuration": "Duration",
+    "upscaleVideo": "Upscale Video",
+    "upscaleVideoDesc": "Get a higher resolution version of this Veo 3.1 video. 1080p is included; 4K costs additional credits.",
+    "get1080pWithCost": "Get 1080p ({cost} credits)",
+    "get4kWithCost": "Get 4K ({cost} credits)",
+    "open1080p": "Open 1080p",
+    "open4k": "Open 4K",
+    "upscaleReady": "Video Ready",
+    "upscaleReadyDesc": "{resolution} video is ready and opened in a new tab.",
+    "upscaleProcessing": "Processing",
+    "upscaleProcessingDesc": "The video is being upscaled. Please try again in a moment.",
+    "upscaleError": "Upscale Failed",
+    "upscaleInsufficientCredits": "You don't have enough credits for this upscale."
   },
   "menu": {
     "mode": "Mode",

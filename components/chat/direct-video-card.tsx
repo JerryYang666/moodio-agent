@@ -115,6 +115,8 @@ export default function DirectVideoCard({
               thumbnailUrl: gen?.thumbnailUrl || part.thumbnailUrl,
               seed: gen?.seed,
               completedAt: gen?.completedAt,
+              provider: gen?.provider,
+              providerRequestId: gen?.providerRequestId,
             });
           })
           .catch(() => {
@@ -171,6 +173,8 @@ export default function DirectVideoCard({
     ? {
         id: part.generationId,
         modelId: part.config.modelId,
+        provider: part.provider ?? null,
+        providerRequestId: part.providerRequestId ?? null,
         status: effectiveStatus,
         sourceImageUrl: part.config.sourceImageUrl ?? "",
         videoId: part.videoId ?? null,

@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { videoGenerations } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getImageUrl, getVideoUrl, getSignedVideoUrl } from "@/lib/storage/s3";
+import { resolveUpscaledVideos } from "@/lib/video/upscale-utils";
 
 /**
  * GET /api/video/generations/[id]
@@ -52,6 +53,8 @@ export async function GET(
     const generationWithUrls = {
       id: generation.id,
       modelId: generation.modelId,
+      provider: generation.provider,
+      providerRequestId: generation.providerRequestId,
       status: generation.status,
       sourceImageId: generation.sourceImageId,
       sourceImageUrl: getImageUrl(generation.sourceImageId),
@@ -75,6 +78,7 @@ export async function GET(
       seed: generation.seed,
       createdAt: generation.createdAt,
       completedAt: generation.completedAt,
+      upscaled: resolveUpscaledVideos(generation.params as Record<string, any>),
     };
 
     return NextResponse.json({ generation: generationWithUrls });

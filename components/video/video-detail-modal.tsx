@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useTranslations } from "next-intl";
 import { hasWriteAccess } from "@/lib/permissions";
 import { Button } from "@heroui/button";
@@ -28,6 +28,7 @@ import {
   RotateCcw,
   FolderPlus,
   Plus,
+  ArrowUpCircle,
 } from "lucide-react";
 import VideoStatusChip from "@/components/video/video-status-chip";
 import VideoPlayer from "@/components/video/video-player";
@@ -35,9 +36,22 @@ import { getVideoModel } from "@/lib/video/models";
 import { getUserFriendlyErrorKey } from "@/lib/video/error-classify";
 import { useCollections } from "@/hooks/use-collections";
 
+export interface UpscaledVideoEntry {
+  videoId: string;
+  videoUrl: string;
+  signedVideoUrl: string;
+}
+
+export interface UpscaledVideos {
+  "1080p": UpscaledVideoEntry | null;
+  "4k": UpscaledVideoEntry | null;
+}
+
 export interface VideoDetailData {
   id: string;
   modelId: string;
+  provider: string | null;
+  providerRequestId: string | null;
   status: "pending" | "processing" | "completed" | "failed";
   sourceImageUrl: string;
   videoId: string | null;
@@ -50,6 +64,7 @@ export interface VideoDetailData {
   seed: number | null;
   createdAt: string;
   completedAt: string | null;
+  upscaled?: UpscaledVideos | null;
 }
 
 export interface VideoRestoreData {
@@ -90,6 +105,30 @@ export default function VideoDetailModal({
 
   const [newCollectionName, setNewCollectionName] = useState("");
   const [isCreating, setIsCreating] = useState(false);
+  const [upscaleLoading, setUpscaleLoading] = useState<"1080p" | "4k" | null>(null);
+  const [localUpscaled, setLocalUpscaled] = useState<Record<string, UpscaledVideoEntry>>({});
+
+  useEffect(() => {
+    if (!isOpen || !video || video.status !== "completed") return;
+    if (video.upscaled) return;
+
+    const VEO_IDS = new Set(["veo-3.1", "veo-3.1-first-last-frame"]);
+    if (video.provider !== "kie" || !VEO_IDS.has(video.modelId)) return;
+
+    fetch(`/api/video/generations/${video.id}`)
+      .then((r) => r.json())
+      .then((data) => {
+        const u = data.generation?.upscaled;
+        if (!u) return;
+        const merged: Record<string, UpscaledVideoEntry> = {};
+        if (u["1080p"]) merged["1080p"] = u["1080p"];
+        if (u["4k"]) merged["4k"] = u["4k"];
+        if (Object.keys(merged).length > 0) {
+          setLocalUpscaled((prev) => ({ ...merged, ...prev }));
+        }
+      })
+      .catch(() => {});
+  }, [isOpen, video]);
 
   const {
     isOpen: isCreateOpen,
@@ -186,6 +225,73 @@ export default function VideoDetailModal({
 
   const getModelLabel = (modelId: string) =>
     getVideoModel(modelId)?.name ?? modelId;
+
+  const VEO_MODEL_IDS = new Set(["veo-3.1", "veo-3.1-first-last-frame"]);
+  const isVeoKie =
+    video?.status === "completed" &&
+    video.provider === "kie" &&
+    VEO_MODEL_IDS.has(video.modelId);
+
+  const handleUpscale = useCallback(
+    async (resolution: "1080p" | "4k") => {
+      if (!video) return;
+      setUpscaleLoading(resolution);
+      try {
+        const res = await fetch(`/api/video/generations/${video.id}/upscale`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ resolution }),
+        });
+        const data = await res.json();
+        if (res.status === 402) {
+          addToast({
+            title: t("upscaleError"),
+            description: t("upscaleInsufficientCredits"),
+            color: "danger",
+          });
+          return;
+        }
+        if (!res.ok) {
+          addToast({
+            title: t("upscaleError"),
+            description: data.error || "Request failed",
+            color: "danger",
+          });
+          return;
+        }
+        if (data.status === "ready" && data.videoUrl) {
+          setLocalUpscaled((prev) => ({
+            ...prev,
+            [resolution]: {
+              videoId: data.videoId,
+              videoUrl: data.videoUrl,
+              signedVideoUrl: data.signedVideoUrl,
+            },
+          }));
+          addToast({
+            title: t("upscaleReady"),
+            description: t("upscaleReadyDesc", { resolution: resolution.toUpperCase() }),
+            color: "success",
+          });
+        } else {
+          addToast({
+            title: t("upscaleProcessing"),
+            description: data.message || t("upscaleProcessingDesc"),
+            color: "warning",
+          });
+        }
+      } catch {
+        addToast({
+          title: t("upscaleError"),
+          description: "Network error",
+          color: "danger",
+        });
+      } finally {
+        setUpscaleLoading(null);
+      }
+    },
+    [video, t]
+  );
 
   return (
     <>
@@ -284,6 +390,76 @@ export default function VideoDetailModal({
                           ))}
                       </div>
                     </div>
+
+                    {isVeoKie && (
+                      <div className="bg-default-100 p-3 sm:p-4 rounded-lg">
+                        <h4 className="font-medium mb-1 sm:mb-2 text-sm sm:text-base">
+                          {t("upscaleVideo")}
+                        </h4>
+                        <p className="text-xs text-default-500 mb-3">
+                          {t("upscaleVideoDesc")}
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {(() => {
+                            const saved1080p = localUpscaled["1080p"] || video.upscaled?.["1080p"];
+                            const saved4k = localUpscaled["4k"] || video.upscaled?.["4k"];
+                            return (
+                              <>
+                                {saved1080p ? (
+                                  <Button
+                                    variant="flat"
+                                    color="success"
+                                    size="sm"
+                                    className="sm:size-md"
+                                    startContent={<Download size={14} className="sm:w-4 sm:h-4" />}
+                                    onPress={() => window.open(saved1080p.videoUrl, "_blank")}
+                                  >
+                                    {t("open1080p")}
+                                  </Button>
+                                ) : (
+                                  <Button
+                                    variant="flat"
+                                    size="sm"
+                                    className="sm:size-md"
+                                    startContent={<ArrowUpCircle size={14} className="sm:w-4 sm:h-4" />}
+                                    isLoading={upscaleLoading === "1080p"}
+                                    isDisabled={upscaleLoading !== null}
+                                    onPress={() => handleUpscale("1080p")}
+                                  >
+                                    {t("get1080pWithCost", { cost: 5 })}
+                                  </Button>
+                                )}
+                                {saved4k ? (
+                                  <Button
+                                    variant="flat"
+                                    color="success"
+                                    size="sm"
+                                    className="sm:size-md"
+                                    startContent={<Download size={14} className="sm:w-4 sm:h-4" />}
+                                    onPress={() => window.open(saved4k.videoUrl, "_blank")}
+                                  >
+                                    {t("open4k")}
+                                  </Button>
+                                ) : (
+                                  <Button
+                                    variant="flat"
+                                    color="secondary"
+                                    size="sm"
+                                    className="sm:size-md"
+                                    startContent={<ArrowUpCircle size={14} className="sm:w-4 sm:h-4" />}
+                                    isLoading={upscaleLoading === "4k"}
+                                    isDisabled={upscaleLoading !== null}
+                                    onPress={() => handleUpscale("4k")}
+                                  >
+                                    {t("get4kWithCost", { cost: 100 })}
+                                  </Button>
+                                )}
+                              </>
+                            );
+                          })()}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </ModalBody>
