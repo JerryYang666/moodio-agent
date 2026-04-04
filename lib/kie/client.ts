@@ -121,18 +121,26 @@ export async function uploadToKie(
 const KIE_BASE_IMAGE_EXTS = new Set([".jpg", ".jpeg", ".png"]);
 const KIE_EXTENDED_IMAGE_EXTS = new Set([".jpg", ".jpeg", ".png", ".webp"]);
 
+export type KieFormatProfile = "default" | "extended" | "seedance2";
+
+const KIE_FORMAT_PROFILES: Record<KieFormatProfile, Set<string>> = {
+  default: KIE_BASE_IMAGE_EXTS,
+  extended: KIE_EXTENDED_IMAGE_EXTS,
+  seedance2: new Set([".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tiff", ".gif"]),
+};
+
 /**
  * Ensure an image URL is in a format KIE accepts.
- * Base set (video pipeline): jpeg/png only.
- * Extended set (image pipeline): jpeg/png/webp.
+ * Uses named format profiles to determine supported extensions.
  * Unsupported formats are converted to JPEG via sharp.
  */
 export async function ensureKieSupportedFormat(
   url: string,
-  { allowWebp = false }: { allowWebp?: boolean } = {}
+  { allowWebp = false, formatProfile }: { allowWebp?: boolean; formatProfile?: KieFormatProfile } = {}
 ): Promise<string> {
   const ext = await inferExtension(url);
-  const supported = allowWebp ? KIE_EXTENDED_IMAGE_EXTS : KIE_BASE_IMAGE_EXTS;
+  const profile = formatProfile ?? (allowWebp ? "extended" : "default");
+  const supported = KIE_FORMAT_PROFILES[profile];
   if (supported.has(ext)) return url;
 
   console.log(
@@ -154,9 +162,9 @@ export async function ensureKieSupportedFormat(
 export async function reuploadForKie(
   url: string,
   uploadPath = "moodio/inputs",
-  { allowWebp = false }: { allowWebp?: boolean } = {}
+  { allowWebp = false, formatProfile }: { allowWebp?: boolean; formatProfile?: KieFormatProfile } = {}
 ): Promise<string> {
-  const converted = await ensureKieSupportedFormat(url, { allowWebp });
+  const converted = await ensureKieSupportedFormat(url, { allowWebp, formatProfile });
   return uploadToKie(converted, uploadPath);
 }
 
@@ -166,10 +174,10 @@ export async function reuploadForKie(
 export async function reuploadArrayForKie(
   urls: string[],
   uploadPath = "moodio/inputs",
-  { allowWebp = false }: { allowWebp?: boolean } = {}
+  { allowWebp = false, formatProfile }: { allowWebp?: boolean; formatProfile?: KieFormatProfile } = {}
 ): Promise<string[]> {
   const converted = await Promise.all(
-    urls.map((u) => ensureKieSupportedFormat(u, { allowWebp }))
+    urls.map((u) => ensureKieSupportedFormat(u, { allowWebp, formatProfile }))
   );
   return Promise.all(converted.map((u) => uploadToKie(u, uploadPath)));
 }

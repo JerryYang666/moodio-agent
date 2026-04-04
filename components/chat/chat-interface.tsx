@@ -16,7 +16,7 @@ import {
   NotificationPermissionModalRef,
 } from "@/components/notification-permission-modal";
 import { Message, MessageContentPart, isGeneratedImagePart } from "@/lib/llm/types";
-import { getVideoModel, type KlingElement } from "@/lib/video/models";
+import { getVideoModel, type KlingElement, type MediaReference } from "@/lib/video/models";
 import ImageDetailModal, { ImageInfo } from "./image-detail-modal";
 import ImageDrawingModal from "./image-drawing-modal";
 import ChatMessage from "./chat-message";
@@ -293,11 +293,12 @@ export default function ChatInterface({
   const [isAssetPickerOpen, setIsAssetPickerOpen] = useState(false);
   const toggleAssetPicker = useCallback(() => setIsAssetPickerOpen((v) => !v), []);
   // Track which picker mode is active: "pending" for regular images, "persistent" for persistent assets, "assetParam" for type:"asset" params
-  const [assetPickerMode, setAssetPickerMode] = useState<"pending" | "persistent" | "assetParam" | "elementImages">("pending");
+  const [assetPickerMode, setAssetPickerMode] = useState<"pending" | "persistent" | "assetParam" | "elementImages" | "mediaRefImage" | "mediaRefVideo">("pending");
   const [activeAssetParamName, setActiveAssetParamName] = useState<string | null>(null);
   const [activeElementIndex, setActiveElementIndex] = useState<number | null>(null);
   const [activeElementMaxImages, setActiveElementMaxImages] = useState(4);
   const [elementImageUrls, setElementImageUrls] = useState<Record<string, string>>({});
+  const [mediaRefUrls, setMediaRefUrls] = useState<Record<string, string>>({});
   const [assetParamValues, setAssetParamValues] = useState<Record<string, AssetParamValue | null>>({});
   const [precisionEditing, setPrecisionEditing] = useState(false);
   
@@ -1508,6 +1509,26 @@ export default function ChatInterface({
     [elementImageUrls]
   );
 
+  const openMediaRefImagePicker = useCallback(() => {
+    setAssetPickerMode("mediaRefImage");
+    setIsAssetPickerOpen(true);
+  }, []);
+
+  const openMediaRefVideoPicker = useCallback(() => {
+    setAssetPickerMode("mediaRefVideo");
+    setIsAssetPickerOpen(true);
+  }, []);
+
+  const resolveMediaRefImageUrl = useCallback(
+    (id: string) => mediaRefUrls[id],
+    [mediaRefUrls]
+  );
+
+  const resolveMediaRefVideoUrl = useCallback(
+    (id: string) => mediaRefUrls[id],
+    [mediaRefUrls]
+  );
+
   // Clear an asset param value
   const clearAssetParam = useCallback((paramName: string) => {
     setAssetParamValues((prev) => ({ ...prev, [paramName]: null }));
@@ -1601,6 +1622,36 @@ export default function ChatInterface({
           }));
         }
         setActiveAssetParamName(null);
+      } else if (assetPickerMode === "mediaRefImage") {
+        for (const file of files) {
+          const result = await uploadImage(file);
+          if (result.success) {
+            const ref: MediaReference = { type: "image", id: result.data.imageId };
+            setMenuState((prev) => ({
+              ...prev,
+              videoParams: {
+                ...prev.videoParams,
+                media_references: [...((prev.videoParams?.media_references as MediaReference[]) || []), ref],
+              },
+            }));
+            setMediaRefUrls((prev) => ({ ...prev, [result.data.imageId]: result.data.imageUrl }));
+          }
+        }
+      } else if (assetPickerMode === "mediaRefVideo") {
+        for (const file of files) {
+          const result = await uploadVideo(file);
+          if (result.success) {
+            const ref: MediaReference = { type: "video", id: result.data.videoId };
+            setMenuState((prev) => ({
+              ...prev,
+              videoParams: {
+                ...prev.videoParams,
+                media_references: [...((prev.videoParams?.media_references as MediaReference[]) || []), ref],
+              },
+            }));
+            setMediaRefUrls((prev) => ({ ...prev, [result.data.videoId]: result.data.videoUrl }));
+          }
+        }
       } else if (assetPickerMode === "persistent") {
         for (const file of files) {
           await uploadAndAddPersistentReferenceImage(file);
@@ -1609,7 +1660,7 @@ export default function ChatInterface({
         await handleFilesUpload(files);
       }
     },
-    [assetPickerMode, activeAssetParamName, activeElementIndex, menuState.videoParams?.kling_elements, handleFilesUpload, uploadAndAddPersistentReferenceImage, uploadImage]
+    [assetPickerMode, activeAssetParamName, activeElementIndex, menuState.videoParams?.kling_elements, menuState.videoParams?.media_references, handleFilesUpload, uploadAndAddPersistentReferenceImage, uploadImage, uploadVideo]
   );
 
   // Listen for asset selection events from the hover sidebar
@@ -1772,6 +1823,26 @@ export default function ChatInterface({
         const displayUrl = asset.videoUrl || asset.imageUrl;
         setAssetParamValues((prev) => ({ ...prev, [activeAssetParamName]: { imageId: asset.imageId, displayUrl } }));
         setActiveAssetParamName(null);
+      } else if (assetPickerMode === "mediaRefImage") {
+        const ref: MediaReference = { type: "image", id: asset.imageId };
+        setMenuState((prev) => ({
+          ...prev,
+          videoParams: {
+            ...prev.videoParams,
+            media_references: [...((prev.videoParams?.media_references as MediaReference[]) || []), ref],
+          },
+        }));
+        setMediaRefUrls((prev) => ({ ...prev, [asset.imageId]: asset.imageUrl }));
+      } else if (assetPickerMode === "mediaRefVideo") {
+        const ref: MediaReference = { type: "video", id: asset.assetId || asset.imageId };
+        setMenuState((prev) => ({
+          ...prev,
+          videoParams: {
+            ...prev.videoParams,
+            media_references: [...((prev.videoParams?.media_references as MediaReference[]) || []), ref],
+          },
+        }));
+        setMediaRefUrls((prev) => ({ ...prev, [asset.assetId || asset.imageId]: asset.videoUrl || asset.imageUrl }));
       } else if (assetPickerMode === "persistent") {
         addPersistentReferenceImage({
           imageId: asset.imageId,
@@ -1798,7 +1869,7 @@ export default function ChatInterface({
         });
       }
     },
-    [addAssetImage, addPersistentReferenceImage, assetPickerMode, activeAssetParamName, activeElementIndex, menuState.videoParams?.kling_elements, pendingVideos, t]
+    [addAssetImage, addPersistentReferenceImage, assetPickerMode, activeAssetParamName, activeElementIndex, menuState.videoParams?.kling_elements, menuState.videoParams?.media_references, pendingVideos, t]
   );
 
   const pendingImagesRef = useRef(pendingImages);
@@ -1829,6 +1900,34 @@ export default function ChatInterface({
           return next;
         });
         setActiveElementIndex(null);
+      } else if (assetPickerMode === "mediaRefImage") {
+        const newRefs: MediaReference[] = assets.map((a) => ({ type: "image", id: a.imageId }));
+        setMenuState((prev) => ({
+          ...prev,
+          videoParams: {
+            ...prev.videoParams,
+            media_references: [...((prev.videoParams?.media_references as MediaReference[]) || []), ...newRefs],
+          },
+        }));
+        setMediaRefUrls((prev) => {
+          const next = { ...prev };
+          for (const a of assets) next[a.imageId] = a.imageUrl;
+          return next;
+        });
+      } else if (assetPickerMode === "mediaRefVideo") {
+        const newRefs: MediaReference[] = assets.map((a) => ({ type: "video", id: a.assetId || a.imageId }));
+        setMenuState((prev) => ({
+          ...prev,
+          videoParams: {
+            ...prev.videoParams,
+            media_references: [...((prev.videoParams?.media_references as MediaReference[]) || []), ...newRefs],
+          },
+        }));
+        setMediaRefUrls((prev) => {
+          const next = { ...prev };
+          for (const a of assets) next[a.assetId || a.imageId] = a.videoUrl || a.imageUrl;
+          return next;
+        });
       } else if (assetPickerMode === "persistent") {
         for (const asset of assets) {
           if (persistentAssets.referenceImages.length >= MAX_PERSISTENT_REFERENCE_IMAGES) break;
@@ -1860,7 +1959,7 @@ export default function ChatInterface({
         }
       }
     },
-    [addAssetImage, addPersistentReferenceImage, assetPickerMode, activeElementIndex, menuState.videoParams?.kling_elements, persistentAssets, t]
+    [addAssetImage, addPersistentReferenceImage, assetPickerMode, activeElementIndex, menuState.videoParams?.kling_elements, menuState.videoParams?.media_references, persistentAssets, t]
   );
 
   // Handler to open drawing modal for an image
@@ -3886,11 +3985,16 @@ export default function ChatInterface({
         videoModelParams={videoModelParams}
         onPickElementImages={openElementImagePicker}
         resolveElementImageUrl={resolveElementImageUrl}
+        onPickMediaRefImage={openMediaRefImagePicker}
+        onPickMediaRefVideo={openMediaRefVideoPicker}
+        resolveMediaRefImageUrl={resolveMediaRefImageUrl}
+        resolveMediaRefVideoUrl={resolveMediaRefVideoUrl}
         onHeightChange={handleChatInputHeightChange}
         assetParamSlots={assetParamSlots}
         assetParamValues={assetParamValues}
         onOpenAssetParamPicker={openAssetParamPicker}
         onClearAssetParam={clearAssetParam}
+        isAssetPickerOpen={isAssetPickerOpen}
       />
 
       <AssetPickerModal
@@ -3905,6 +4009,10 @@ export default function ChatInterface({
             ? activeElementMaxImages
             : assetPickerMode === "assetParam"
             ? 1
+            : assetPickerMode === "mediaRefImage"
+            ? 9
+            : assetPickerMode === "mediaRefVideo"
+            ? 3
             : assetPickerMode === "persistent"
             ? MAX_PERSISTENT_REFERENCE_IMAGES - persistentAssets.referenceImages.length
             : MAX_PENDING_IMAGES - pendingImagesRef.current.length
@@ -3912,6 +4020,10 @@ export default function ChatInterface({
         acceptTypes={
           assetPickerMode === "elementImages"
             ? ["image"]
+            : assetPickerMode === "mediaRefImage"
+            ? ["image"]
+            : assetPickerMode === "mediaRefVideo"
+            ? ["video"]
             : assetPickerMode === "persistent"
             ? ["image"]
             : assetPickerMode === "assetParam" && activeAssetParamName

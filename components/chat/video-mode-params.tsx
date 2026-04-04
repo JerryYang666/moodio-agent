@@ -161,6 +161,7 @@ export default function VideoModeParams({
         p.name !== selectedModel.imageParams?.sourceImage &&
         p.name !== selectedModel.imageParams?.endImage &&
         p.type !== "asset" &&
+        p.type !== "media_references" &&
         p.status !== "hidden" &&
         p.status !== "disabled"
     );

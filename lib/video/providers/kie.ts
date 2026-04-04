@@ -4,7 +4,10 @@ import {
   kieAuthHeaders,
   reuploadForKie,
   reuploadArrayForKie,
+  uploadToKie,
+  type KieFormatProfile,
 } from "@/lib/kie/client";
+import type { MediaReference } from "@/lib/video/models";
 
 const IMAGE_URL_KEYS = new Set([
   "image_url",
@@ -14,18 +17,31 @@ const IMAGE_URL_KEYS = new Set([
   "end_image_url",
   "first_frame_url",
   "last_frame_url",
+  "reference_image_urls",
+]);
+
+const VIDEO_URL_KEYS = new Set([
+  "reference_video_urls",
 ]);
 
 function isImageUrlParam(key: string): boolean {
   return IMAGE_URL_KEYS.has(key);
 }
 
-async function reuploadSingle(value: string): Promise<string> {
-  return reuploadForKie(value, "moodio/video-inputs");
+function isVideoUrlParam(key: string): boolean {
+  return VIDEO_URL_KEYS.has(key);
 }
 
-async function reuploadArray(value: string[]): Promise<string[]> {
-  return reuploadArrayForKie(value, "moodio/video-inputs");
+async function reuploadSingle(value: string, formatProfile?: KieFormatProfile): Promise<string> {
+  return reuploadForKie(value, "moodio/video-inputs", { formatProfile });
+}
+
+async function reuploadArray(value: string[], formatProfile?: KieFormatProfile): Promise<string[]> {
+  return reuploadArrayForKie(value, "moodio/video-inputs", { formatProfile });
+}
+
+async function reuploadVideoArray(urls: string[]): Promise<string[]> {
+  return Promise.all(urls.map((u) => uploadToKie(u, "moodio/video-inputs")));
 }
 
 async function reuploadElementArray(urls: string[]): Promise<string[]> {
@@ -63,12 +79,25 @@ interface KieTaskDetailResponse {
  *  3. Re-upload image URLs nested inside kling_elements[].element_input_urls.
  */
 async function prepareInputParams(
-  params: Record<string, any>
+  params: Record<string, any>,
+  { formatProfile }: { formatProfile?: KieFormatProfile } = {}
 ): Promise<Record<string, any>> {
+  const normalized: Record<string, any> = { ...params };
+  if (Array.isArray(normalized.media_references)) {
+    const refs = normalized.media_references as MediaReference[];
+    normalized.reference_image_urls = refs
+      .filter((r) => r.type === "image")
+      .map((r) => r.id);
+    normalized.reference_video_urls = refs
+      .filter((r) => r.type === "video")
+      .map((r) => r.id);
+    delete normalized.media_references;
+  }
+
   const prepared: Record<string, any> = {};
   const uploadTasks: Promise<void>[] = [];
 
-  for (const [key, value] of Object.entries(params)) {
+  for (const [key, value] of Object.entries(normalized)) {
     if (key.endsWith("_urls") && typeof value === "string") {
       prepared[key] = [value];
     } else {
@@ -77,20 +106,34 @@ async function prepareInputParams(
   }
 
   for (const [key, value] of Object.entries(prepared)) {
-    if (!isImageUrlParam(key)) continue;
-
-    if (Array.isArray(value)) {
-      uploadTasks.push(
-        reuploadArray(value as string[]).then((urls) => {
-          prepared[key] = urls;
-        })
-      );
-    } else if (typeof value === "string" && value.startsWith("http")) {
-      uploadTasks.push(
-        reuploadSingle(value).then((url) => {
-          prepared[key] = url;
-        })
-      );
+    if (isImageUrlParam(key)) {
+      if (Array.isArray(value)) {
+        uploadTasks.push(
+          reuploadArray(value as string[], formatProfile).then((urls) => {
+            prepared[key] = urls;
+          })
+        );
+      } else if (typeof value === "string" && value.startsWith("http")) {
+        uploadTasks.push(
+          reuploadSingle(value, formatProfile).then((url) => {
+            prepared[key] = url;
+          })
+        );
+      }
+    } else if (isVideoUrlParam(key)) {
+      if (Array.isArray(value)) {
+        uploadTasks.push(
+          reuploadVideoArray(value as string[]).then((urls) => {
+            prepared[key] = urls;
+          })
+        );
+      } else if (typeof value === "string" && value.startsWith("http")) {
+        uploadTasks.push(
+          uploadToKie(value, "moodio/video-inputs").then((url) => {
+            prepared[key] = url;
+          })
+        );
+      }
     }
   }
 
@@ -152,6 +195,10 @@ function isKlingModel(providerModelId: string): boolean {
   return providerModelId.startsWith("kling-");
 }
 
+function isSeedance2Model(providerModelId: string): boolean {
+  return providerModelId === "bytedance/seedance-2";
+}
+
 export class KieVideoProvider implements VideoProviderClient {
   async submitGeneration(
     providerModelId: string,
@@ -170,7 +217,8 @@ export class KieVideoProvider implements VideoProviderClient {
       return this.submitVeoGeneration(providerModelId, transformed, webhookUrl);
     }
 
-    const input = await prepareInputParams(transformed);
+    const formatProfile: KieFormatProfile | undefined = isSeedance2Model(providerModelId) ? "seedance2" : undefined;
+    const input = await prepareInputParams(transformed, { formatProfile });
 
     const requestBody = {
       model: providerModelId,

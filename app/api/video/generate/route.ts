@@ -65,10 +65,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate required source image (only for image-to-video models)
+    // Validate required source image (only for image-to-video models with required source image)
     const isTextToVideo = !model.imageParams;
+    const sourceImageParam = model.imageParams
+      ? model.params.find((p) => p.name === model.imageParams!.sourceImage)
+      : undefined;
+    const sourceImageRequired = !isTextToVideo && sourceImageParam?.required !== false;
 
-    if (!isTextToVideo && !sourceImageId) {
+    if (sourceImageRequired && !sourceImageId) {
       return NextResponse.json(
         { error: "sourceImageId is required for this model" },
         { status: 400 }
@@ -111,7 +115,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const effectiveSourceImageId = isTextToVideo
+    const effectiveSourceImageId = (isTextToVideo || !sourceImageId)
       ? TEXT_TO_VIDEO_PLACEHOLDER_IMAGE_ID
       : sourceImageId;
 

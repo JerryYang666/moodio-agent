@@ -66,9 +66,9 @@ export function KlingElementEditor({
   const addImageId = useCallback(
     (elementIndex: number, imageId: string) => {
       const el = elements[elementIndex];
-      if (!el || el.element_input_ids.length >= MAX_IMAGES) return;
+      if (!el || (el.element_input_ids ?? []).length >= MAX_IMAGES) return;
       updateElement(elementIndex, {
-        element_input_ids: [...el.element_input_ids, imageId],
+        element_input_ids: [...(el.element_input_ids ?? []), imageId],
       });
     },
     [elements, updateElement]
@@ -79,7 +79,7 @@ export function KlingElementEditor({
       const el = elements[elementIndex];
       if (!el) return;
       updateElement(elementIndex, {
-        element_input_ids: el.element_input_ids.filter(
+        element_input_ids: (el.element_input_ids ?? []).filter(
           (_, i) => i !== imageIndex
         ),
       });
@@ -121,7 +121,7 @@ export function KlingElementEditor({
       <div className="space-y-2">
         {elements.map((el, index) => {
           const isExpanded = expandedIndex === index;
-          const imageCount = el.element_input_ids.length;
+          const imageCount = (el.element_input_ids ?? []).length;
           const isValid =
             el.name.length > "element_".length &&
             imageCount >= MIN_IMAGES &&
@@ -225,7 +225,7 @@ export function KlingElementEditor({
                       </p>
                     )}
                     <div className="flex flex-wrap gap-1.5">
-                      {el.element_input_ids.map((imageId, imgIdx) => {
+                      {(el.element_input_ids ?? []).map((imageId, imgIdx) => {
                         const displayUrl = resolveImageUrl?.(imageId);
                         return (
                           <div

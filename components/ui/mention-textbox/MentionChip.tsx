@@ -22,12 +22,15 @@ export function MentionChip({
         className
       )}
     >
-      {item.thumbnail && (
+      {item.thumbnail && item.metadata?.refType !== "video" && (
         <img
           src={item.thumbnail}
           alt=""
           className="w-4 h-4 rounded-sm object-cover shrink-0"
         />
+      )}
+      {item.metadata?.refType === "video" && (
+        <span className="w-4 h-4 rounded-sm shrink-0 bg-default-200 flex items-center justify-center text-[8px] text-default-500">▶</span>
       )}
       <span className="truncate max-w-[80px]">{item.label}</span>
       {removable && onRemove && (

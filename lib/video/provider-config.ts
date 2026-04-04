@@ -26,6 +26,8 @@ const ACTIVE_PROVIDERS: Partial<Record<string, VideoProvider>> = {
   "sora-2-text-to-video": "kie",
   "sora-2-pro-text-to-video": "kie",
   "kling-2.6-text-to-video": "kie",
+  "seedance-2.0": "kie",
+  "seedance-2.0-reference": "kie",
 };
 
 /**

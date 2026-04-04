@@ -28,7 +28,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import MenuConfiguration, { MenuState } from "./menu-configuration";
 import { MultiShotEditor } from "./multi-shot-editor";
 import { KlingElementEditor } from "./kling-element-editor";
-import type { MultiPromptShot, KlingElement } from "@/lib/video/models";
+import { SeedanceReferenceEditor } from "./seedance-reference-editor";
+import type { MultiPromptShot, KlingElement, MediaReference } from "@/lib/video/models";
 import { PendingImage, MAX_PENDING_IMAGES } from "./pending-image-types";
 import { PendingVideo, MAX_PENDING_VIDEOS } from "./pending-video-types";
 import clsx from "clsx";
@@ -135,6 +136,16 @@ interface ChatInputProps {
   onOpenAssetParamPicker?: (paramName: string) => void;
   /** Handler to clear an asset param value */
   onClearAssetParam?: (paramName: string) => void;
+  /** Whether the asset picker modal is currently open */
+  isAssetPickerOpen?: boolean;
+  /** Opens the asset picker for media reference images */
+  onPickMediaRefImage?: () => void;
+  /** Opens the asset picker for media reference videos */
+  onPickMediaRefVideo?: () => void;
+  /** Resolve a media reference image ID to a display URL */
+  resolveMediaRefImageUrl?: (id: string) => string | undefined;
+  /** Resolve a media reference video ID to a display/thumbnail URL */
+  resolveMediaRefVideoUrl?: (id: string) => string | undefined;
 }
 
 /** Ref handle for ChatInput to allow getting editor content */
@@ -192,6 +203,11 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
   assetParamValues = {},
   onOpenAssetParamPicker,
   onClearAssetParam,
+  isAssetPickerOpen = false,
+  onPickMediaRefImage,
+  onPickMediaRefVideo,
+  resolveMediaRefImageUrl,
+  resolveMediaRefVideoUrl,
 }, ref) {
   const t = useTranslations();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -237,6 +253,11 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
     [videoModelParams]
   );
 
+  const supportsMediaReferences = useMemo(
+    () => videoModelParams.some((p) => p.type === "media_references"),
+    [videoModelParams]
+  );
+
   const mentionItems: MentionItem[] = useMemo(() => {
     const imageItems = pendingImages
       .filter((img) => !img.isUploading && !img.isCompressing)
@@ -248,6 +269,24 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
         metadata: { source: img.source },
       }));
 
+    if (supportsMediaReferences && menuState.mode === "video") {
+      const refs = (menuState.videoParams?.media_references as MediaReference[]) || [];
+      let imgCount = 0, vidCount = 0;
+      const refItems: MentionItem[] = refs.map((ref) => {
+        const name = ref.type === "image" ? `image${++imgCount}` : `video${++vidCount}`;
+        return {
+          id: name,
+          type: "reference",
+          label: name,
+          thumbnail: ref.type === "image"
+            ? resolveMediaRefImageUrl?.(ref.id)
+            : resolveMediaRefVideoUrl?.(ref.id),
+          metadata: { refType: ref.type, refId: ref.id },
+        };
+      });
+      return [...imageItems, ...refItems];
+    }
+
     if (!supportsElements || menuState.mode !== "video") return imageItems;
 
     const imageUrlMap = new Map(pendingImages.map((img) => [img.imageId, img.url]));
@@ -258,7 +297,7 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
         id: el.name,
         type: "element",
         label: el.name,
-        thumbnail: (el.element_input_ids[0] && (resolveElementImageUrl?.(el.element_input_ids[0]) || imageUrlMap.get(el.element_input_ids[0]))) || undefined,
+        thumbnail: (el.element_input_ids?.[0] && (resolveElementImageUrl?.(el.element_input_ids[0]) || imageUrlMap.get(el.element_input_ids[0]))) || undefined,
         metadata: {
           description: el.description,
           element_input_ids: el.element_input_ids,
@@ -266,7 +305,7 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
       }));
 
     return [...imageItems, ...elementItems];
-  }, [pendingImages, t, supportsElements, menuState.mode, menuState.videoParams?.kling_elements, resolveElementImageUrl]);
+  }, [pendingImages, t, supportsElements, supportsMediaReferences, menuState.mode, menuState.videoParams?.kling_elements, menuState.videoParams?.media_references, resolveElementImageUrl, resolveMediaRefImageUrl, resolveMediaRefVideoUrl]);
 
   // Resolve element image IDs to display URLs using the parent's resolver or pending images
   const resolveElementImageUrlLocal = useCallback(
@@ -511,6 +550,11 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
           return;
         }
 
+        // Don't collapse if the asset picker modal is open
+        if (isAssetPickerOpen) {
+          return;
+        }
+
         // Don't collapse if there's text in the input or pending images
         if (input.trim().length > 0 || pendingImages.length > 0) {
           return;
@@ -524,7 +568,7 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
-  }, [isRecording, isTranscribing, input, pendingImages.length]);
+  }, [isRecording, isTranscribing, input, pendingImages.length, isAssetPickerOpen]);
 
   // Auto-expand if there are attachments, recording, or video mode
   useEffect(() => {
@@ -1498,6 +1542,39 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
                     onPickImages={onPickElementImages}
                     resolveImageUrl={resolveElementImageUrlLocal}
                     compact
+                  />
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Seedance Reference Editor (above menu bar in video mode) */}
+          <AnimatePresence>
+            {isExpanded && menuState.mode === "video" &&
+              videoModelParams.some((p) => p.type === "media_references") && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="overflow-hidden"
+              >
+                <div className="px-2 py-1.5 border-t border-divider">
+                  <SeedanceReferenceEditor
+                    references={(menuState.videoParams?.media_references as MediaReference[]) || []}
+                    onChange={(refs) =>
+                      onMenuStateChange({
+                        ...menuState,
+                        videoParams: {
+                          ...menuState.videoParams,
+                          media_references: refs,
+                        },
+                      })
+                    }
+                    onPickImage={onPickMediaRefImage}
+                    onPickVideo={onPickMediaRefVideo}
+                    resolveImageUrl={resolveMediaRefImageUrl}
+                    resolveVideoUrl={resolveMediaRefVideoUrl}
                   />
                 </div>
               </motion.div>

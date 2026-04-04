@@ -15,7 +15,8 @@ export type VideoModelParamType =
   | "string_array"
   | "asset"
   | "multi_prompt"
-  | "kling_elements";
+  | "kling_elements"
+  | "media_references";
 
 export interface MultiPromptShot {
   prompt: string;
@@ -26,6 +27,11 @@ export interface KlingElement {
   name: string;
   description: string;
   element_input_ids: string[];
+}
+
+export interface MediaReference {
+  type: "image" | "video";
+  id: string;
 }
 
 export type AssetAcceptType = "image" | "video";
@@ -193,6 +199,168 @@ const seedanceV15Pro: VideoModelConfig = {
       required: false,
       default: true,
       description: "Whether to generate audio for the video",
+    },
+  ],
+};
+
+/**
+ * Seedance 2.0 - First/Last Frame Image to Video
+ * ByteDance's next-gen video generation with optional first and last frame control
+ */
+const seedance20: VideoModelConfig = {
+  id: "seedance-2.0",
+  name: "Seedance 2.0",
+  description:
+    "ByteDance's next-gen video generation with first/last frame control, text-to-video support, and native audio",
+  imageParams: {
+    sourceImage: "first_frame_url",
+    endImage: "last_frame_url",
+  },
+  providers: [
+    { provider: "kie", providerModelId: "bytedance/seedance-2" },
+  ],
+  params: [
+    {
+      name: "prompt",
+      label: "Prompt",
+      type: "string",
+      required: true,
+      description: "Text prompt for video generation (3-2500 characters)",
+    },
+    {
+      name: "first_frame_url",
+      label: "First Frame",
+      type: "string",
+      required: false,
+      description: "URL of the first frame image (optional — omit for text-to-video)",
+    },
+    {
+      name: "last_frame_url",
+      label: "Last Frame",
+      type: "string",
+      required: false,
+      description: "URL of the last frame image (optional)",
+    },
+    {
+      name: "duration",
+      label: "Duration (seconds)",
+      type: "enum",
+      required: false,
+      default: "8",
+      options: ["4", "6", "8", "10", "12", "15"],
+      description: "Duration of the generated video in seconds",
+    },
+    {
+      name: "aspect_ratio",
+      label: "Aspect Ratio",
+      type: "enum",
+      required: false,
+      default: "16:9",
+      options: ["1:1", "4:3", "3:4", "16:9", "9:16", "21:9", "adaptive"],
+      description: "Video aspect ratio (adaptive matches input image)",
+    },
+    {
+      name: "resolution",
+      label: "Resolution",
+      type: "enum",
+      required: false,
+      default: "720p",
+      options: ["480p", "720p"],
+      description: "Video resolution — 480p for faster generation, 720p for higher quality",
+    },
+    {
+      name: "generate_audio",
+      label: "Generate Audio",
+      type: "boolean",
+      required: false,
+      default: true,
+      description: "Whether to generate audio for the video",
+    },
+    {
+      name: "web_search",
+      label: "Web Search",
+      type: "boolean",
+      required: false,
+      default: false,
+      description: "Use online search to enhance generation",
+      status: "hidden",
+    },
+  ],
+};
+
+/**
+ * Seedance 2.0 Reference - Multimodal Reference to Video
+ * Reference images and videos to guide generation, mentionable via @image1 / @video1
+ */
+const seedance20Reference: VideoModelConfig = {
+  id: "seedance-2.0-reference",
+  name: "Seedance 2.0 Reference",
+  description:
+    "Multimodal reference-to-video: attach images and videos as named references (@image1, @video1) to guide generation",
+  providers: [
+    { provider: "kie", providerModelId: "bytedance/seedance-2" },
+  ],
+  params: [
+    {
+      name: "prompt",
+      label: "Prompt",
+      type: "string",
+      required: true,
+      description:
+        "Text prompt for video generation. Use @image1, @video1, etc. to reference attached media (3-2500 characters)",
+    },
+    {
+      name: "media_references",
+      label: "Media References",
+      type: "media_references",
+      required: false,
+      maxItems: 12,
+      description:
+        "Attach reference images (max 9) and videos (max 3). Each gets auto-named image1/video1 etc. and can be mentioned in the prompt with @image1 / @video1.",
+    },
+    {
+      name: "duration",
+      label: "Duration (seconds)",
+      type: "enum",
+      required: false,
+      default: "8",
+      options: ["4", "6", "8", "10", "12", "15"],
+      description: "Duration of the generated video in seconds",
+    },
+    {
+      name: "aspect_ratio",
+      label: "Aspect Ratio",
+      type: "enum",
+      required: false,
+      default: "16:9",
+      options: ["1:1", "4:3", "3:4", "16:9", "9:16", "21:9", "adaptive"],
+      description: "Video aspect ratio",
+    },
+    {
+      name: "resolution",
+      label: "Resolution",
+      type: "enum",
+      required: false,
+      default: "720p",
+      options: ["480p", "720p"],
+      description: "Video resolution — 480p for faster generation, 720p for higher quality",
+    },
+    {
+      name: "generate_audio",
+      label: "Generate Audio",
+      type: "boolean",
+      required: false,
+      default: true,
+      description: "Whether to generate audio for the video",
+    },
+    {
+      name: "web_search",
+      label: "Web Search",
+      type: "boolean",
+      required: false,
+      default: false,
+      description: "Use online search to enhance generation",
+      status: "hidden",
     },
   ],
 };
@@ -1291,6 +1459,8 @@ const kling26TextToVideo: VideoModelConfig = {
  */
 export const VIDEO_MODELS: VideoModelConfig[] = [
   seedanceV15Pro,
+  seedance20,
+  seedance20Reference,
   hailuo23FastPro,
   hailuo23Pro,
   hailuo02Pro,
@@ -1637,6 +1807,39 @@ export function validateAndMergeParams(
           }
         }
         break;
+
+      case "media_references":
+        if (!Array.isArray(userValue)) {
+          throw new Error(
+            `Parameter ${param.name} must be an array of media reference objects`
+          );
+        }
+        if (
+          param.maxItems !== undefined &&
+          userValue.length > param.maxItems
+        ) {
+          throw new Error(
+            `Parameter ${param.name} allows maximum ${param.maxItems} references`
+          );
+        }
+        for (const ref of userValue) {
+          if (typeof ref !== "object" || ref === null) {
+            throw new Error(
+              `Each reference in ${param.name} must be an object with type and id`
+            );
+          }
+          if (ref.type !== "image" && ref.type !== "video") {
+            throw new Error(
+              `Each reference in ${param.name} must have type "image" or "video"`
+            );
+          }
+          if (typeof ref.id !== "string" || !ref.id) {
+            throw new Error(
+              `Each reference in ${param.name} must have a non-empty id`
+            );
+          }
+        }
+        break;
     }
 
     // Override default with user value
@@ -1725,6 +1928,8 @@ function describeModelParams(model: VideoModelConfig): string {
       desc += `array of shots, each: {prompt: string (max 500 chars, use @element_name to reference elements), duration: number (1-12 seconds)}. Max 5 shots. Only used when multi_shots is true`;
     } else if (param.type === "kling_elements") {
       desc += `array of element references, each: {name: string (referenced in prompt as @name), description: string, element_input_ids: string[] (2-4 Image IDs from the conversation — pass the Image ID e.g. "abc123", NOT a URL)}. Max 3 elements`;
+    } else if (param.type === "media_references") {
+      desc += `array of media references, each: {type: "image"|"video", id: string (asset ID from uploads)}. Max 9 images, 3 videos. Referenced in prompt as @image1, @video1, etc.`;
     }
 
     if (param.default !== undefined) {

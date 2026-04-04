@@ -9,6 +9,7 @@ import { PersistentAssets } from "@/lib/chat/persistent-assets-types";
 import {
   uploadImage,
   getSignedImageUrl,
+  getSignedVideoUrl,
   generateImageId,
   downloadImage,
 } from "@/lib/storage/s3";
@@ -770,8 +771,13 @@ export async function POST(
 
       const sourceImageId = imageIds[0];
       const isTextToVideo = !model.imageParams;
+      const sourceImageParam = model.imageParams
+        ? model.params.find((p) => p.name === model.imageParams!.sourceImage)
+        : undefined;
+      const sourceImageRequired =
+        !isTextToVideo && sourceImageParam?.required !== false;
 
-      if (!isTextToVideo && !sourceImageId) {
+      if (sourceImageRequired && !sourceImageId) {
         return NextResponse.json(
           { error: "Source image is required for this model" },
           { status: 400 }
@@ -819,7 +825,22 @@ export async function POST(
         );
       }
 
-      const effectiveSourceImageId = isTextToVideo
+      // Resolve media_references IDs to signed URLs for the provider API
+      if (Array.isArray(fullParams.media_references)) {
+        fullParams.media_references = fullParams.media_references.map(
+          (ref: { type: "image" | "video"; id: string }) => ({
+            type: ref.type,
+            id:
+              typeof ref.id === "string" && ref.id.startsWith("http")
+                ? ref.id
+                : ref.type === "video"
+                  ? getSignedVideoUrl(ref.id)
+                  : getSignedImageUrl(ref.id),
+          })
+        );
+      }
+
+      const effectiveSourceImageId = (isTextToVideo || !sourceImageId)
         ? TEXT_TO_VIDEO_PLACEHOLDER_IMAGE_ID
         : sourceImageId;
 

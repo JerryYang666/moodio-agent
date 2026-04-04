@@ -141,7 +141,7 @@ export default function VideoConfigCard({
   }, [modelConfig]);
 
   const gridParams = useMemo(
-    () => visibleParams.filter((p) => p.type !== "string" && p.type !== "asset" && p.type !== "multi_prompt" && p.type !== "kling_elements"),
+    () => visibleParams.filter((p) => p.type !== "string" && p.type !== "asset" && p.type !== "multi_prompt" && p.type !== "kling_elements" && p.type !== "media_references"),
     [visibleParams]
   );
   const textParams = useMemo(

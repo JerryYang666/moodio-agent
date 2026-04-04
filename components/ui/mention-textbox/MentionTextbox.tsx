@@ -117,6 +117,8 @@ export const MentionTextbox = forwardRef<MentionTextboxRef, MentionTextboxProps>
             const item = stateRef.current.mentionItems.find((i) => i.id === node.attrs.id);
             const thumbnail = item?.thumbnail;
             const isElement = item?.type === "element";
+            const isVideoRef = item?.metadata?.refType === "video";
+            const isReference = item?.type === "reference";
             
             if (isElement) {
               return [
@@ -128,6 +130,24 @@ export const MentionTextbox = forwardRef<MentionTextboxRef, MentionTextboxProps>
                   "data-mention-type": "element",
                 },
                 ["span", { class: "mention-chip-element-icon" }, "✦"],
+                ["span", { class: "mention-chip-label" }, `@${node.attrs.label}`],
+              ];
+            }
+
+            if (isReference) {
+              return [
+                "span",
+                { 
+                  class: isVideoRef ? "mention-chip mention-chip-reference" : "mention-chip",
+                  "data-mention-id": node.attrs.id,
+                  "data-mention-label": node.attrs.label,
+                  "data-mention-type": "reference",
+                },
+                ...(thumbnail && !isVideoRef
+                  ? [["img", { src: thumbnail, alt: "", class: "mention-chip-thumbnail" }] as any]
+                  : isVideoRef
+                  ? [["span", { class: "mention-chip-ref-icon" }, "▶"] as any]
+                  : []),
                 ["span", { class: "mention-chip-label" }, `@${node.attrs.label}`],
               ];
             }
@@ -434,7 +454,10 @@ export const MentionTextbox = forwardRef<MentionTextboxRef, MentionTextboxProps>
             "[&_.mention-chip-thumbnail]:mr-1",
             "[&_.mention-chip-element]:bg-secondary-100 [&_.mention-chip-element]:border-secondary-200",
             "[&_.mention-chip-element]:text-secondary-700",
-            "[&_.mention-chip-element-icon]:mr-0.5 [&_.mention-chip-element-icon]:text-secondary-500"
+            "[&_.mention-chip-element-icon]:mr-0.5 [&_.mention-chip-element-icon]:text-secondary-500",
+            "[&_.mention-chip-reference]:bg-primary-50 [&_.mention-chip-reference]:border-primary-200",
+            "[&_.mention-chip-reference]:text-primary-700",
+            "[&_.mention-chip-ref-icon]:mr-0.5 [&_.mention-chip-ref-icon]:text-primary-400 [&_.mention-chip-ref-icon]:text-[10px]"
           )}
         />
 
