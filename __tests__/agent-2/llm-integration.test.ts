@@ -61,6 +61,7 @@ vi.mock("@/lib/image/models", () => ({
 
 vi.mock("@/lib/pricing", () => ({
   calculateCost: vi.fn().mockResolvedValue(0),
+  parseImageSizeToNumber: vi.fn().mockReturnValue(2),
 }));
 
 vi.mock("@/lib/credits", () => ({
