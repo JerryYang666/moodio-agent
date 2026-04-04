@@ -761,6 +761,7 @@ const ALLOWED_DOWNLOAD_HOSTS = [
   "fal.ai",
   "rest.alpha.fal.ai",
   "tempfile.aiquickdraw.com",
+  "file.aiquickdraw.com",
   "tempfile.redpandaai.co",
   "kieai.redpandaai.co",
 ];
