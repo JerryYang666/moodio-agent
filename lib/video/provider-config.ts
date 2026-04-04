@@ -28,6 +28,8 @@ const ACTIVE_PROVIDERS: Partial<Record<string, VideoProvider>> = {
   "kling-2.6-text-to-video": "kie",
   "seedance-2.0": "kie",
   "seedance-2.0-reference": "kie",
+  "seedance-2.0-fast": "kie",
+  "seedance-2.0-fast-reference": "kie",
 };
 
 /**

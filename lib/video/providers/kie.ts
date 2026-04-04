@@ -196,7 +196,7 @@ function isKlingModel(providerModelId: string): boolean {
 }
 
 function isSeedance2Model(providerModelId: string): boolean {
-  return providerModelId === "bytedance/seedance-2";
+  return providerModelId === "bytedance/seedance-2" || providerModelId === "bytedance/seedance-2-fast";
 }
 
 export class KieVideoProvider implements VideoProviderClient {

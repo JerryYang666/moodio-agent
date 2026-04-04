@@ -366,6 +366,168 @@ const seedance20Reference: VideoModelConfig = {
 };
 
 /**
+ * Seedance 2.0 Fast - First/Last Frame Image to Video
+ * Same as Seedance 2.0 but with faster generation (higher cost)
+ */
+const seedance20Fast: VideoModelConfig = {
+  id: "seedance-2.0-fast",
+  name: "Seedance 2.0 Fast",
+  description:
+    "ByteDance's next-gen video generation (fast) with first/last frame control, text-to-video support, and native audio",
+  imageParams: {
+    sourceImage: "first_frame_url",
+    endImage: "last_frame_url",
+  },
+  providers: [
+    { provider: "kie", providerModelId: "bytedance/seedance-2-fast" },
+  ],
+  params: [
+    {
+      name: "prompt",
+      label: "Prompt",
+      type: "string",
+      required: true,
+      description: "Text prompt for video generation (3-2500 characters)",
+    },
+    {
+      name: "first_frame_url",
+      label: "First Frame",
+      type: "string",
+      required: false,
+      description: "URL of the first frame image (optional — omit for text-to-video)",
+    },
+    {
+      name: "last_frame_url",
+      label: "Last Frame",
+      type: "string",
+      required: false,
+      description: "URL of the last frame image (optional)",
+    },
+    {
+      name: "duration",
+      label: "Duration (seconds)",
+      type: "enum",
+      required: false,
+      default: "8",
+      options: ["4", "6", "8", "10", "12", "15"],
+      description: "Duration of the generated video in seconds",
+    },
+    {
+      name: "aspect_ratio",
+      label: "Aspect Ratio",
+      type: "enum",
+      required: false,
+      default: "16:9",
+      options: ["1:1", "4:3", "3:4", "16:9", "9:16", "21:9", "adaptive"],
+      description: "Video aspect ratio (adaptive matches input image)",
+    },
+    {
+      name: "resolution",
+      label: "Resolution",
+      type: "enum",
+      required: false,
+      default: "720p",
+      options: ["480p", "720p"],
+      description: "Video resolution — 480p for faster generation, 720p for higher quality",
+    },
+    {
+      name: "generate_audio",
+      label: "Generate Audio",
+      type: "boolean",
+      required: false,
+      default: true,
+      description: "Whether to generate audio for the video",
+    },
+    {
+      name: "web_search",
+      label: "Web Search",
+      type: "boolean",
+      required: false,
+      default: false,
+      description: "Use online search to enhance generation",
+      status: "hidden",
+    },
+  ],
+};
+
+/**
+ * Seedance 2.0 Fast Reference - Multimodal Reference to Video
+ * Same as Seedance 2.0 Reference but with faster generation (higher cost)
+ */
+const seedance20FastReference: VideoModelConfig = {
+  id: "seedance-2.0-fast-reference",
+  name: "Seedance 2.0 Fast Reference",
+  description:
+    "Fast multimodal reference-to-video: attach images and videos as named references (@image1, @video1) to guide generation",
+  providers: [
+    { provider: "kie", providerModelId: "bytedance/seedance-2-fast" },
+  ],
+  params: [
+    {
+      name: "prompt",
+      label: "Prompt",
+      type: "string",
+      required: true,
+      description:
+        "Text prompt for video generation. Use @image1, @video1, etc. to reference attached media (3-2500 characters)",
+    },
+    {
+      name: "media_references",
+      label: "Media References",
+      type: "media_references",
+      required: false,
+      maxItems: 12,
+      description:
+        "Attach reference images (max 9) and videos (max 3). Each gets auto-named image1/video1 etc. and can be mentioned in the prompt with @image1 / @video1.",
+    },
+    {
+      name: "duration",
+      label: "Duration (seconds)",
+      type: "enum",
+      required: false,
+      default: "8",
+      options: ["4", "6", "8", "10", "12", "15"],
+      description: "Duration of the generated video in seconds",
+    },
+    {
+      name: "aspect_ratio",
+      label: "Aspect Ratio",
+      type: "enum",
+      required: false,
+      default: "16:9",
+      options: ["1:1", "4:3", "3:4", "16:9", "9:16", "21:9", "adaptive"],
+      description: "Video aspect ratio",
+    },
+    {
+      name: "resolution",
+      label: "Resolution",
+      type: "enum",
+      required: false,
+      default: "720p",
+      options: ["480p", "720p"],
+      description: "Video resolution — 480p for faster generation, 720p for higher quality",
+    },
+    {
+      name: "generate_audio",
+      label: "Generate Audio",
+      type: "boolean",
+      required: false,
+      default: true,
+      description: "Whether to generate audio for the video",
+    },
+    {
+      name: "web_search",
+      label: "Web Search",
+      type: "boolean",
+      required: false,
+      default: false,
+      description: "Use online search to enhance generation",
+      status: "hidden",
+    },
+  ],
+};
+
+/**
  * MiniMax Hailuo 2.3 Fast Pro - Image to Video
  * Advanced fast image-to-video generation model with 1080p resolution
  */
@@ -1461,6 +1623,8 @@ export const VIDEO_MODELS: VideoModelConfig[] = [
   seedanceV15Pro,
   seedance20,
   seedance20Reference,
+  seedance20Fast,
+  seedance20FastReference,
   hailuo23FastPro,
   hailuo23Pro,
   hailuo02Pro,
