@@ -36,6 +36,7 @@ import { useTimeline } from "@/hooks/use-timeline";
 import { useShareModal } from "@/hooks/use-share-modal";
 import ShareModal from "@/components/share-modal";
 import { hasWriteAccess } from "@/lib/permissions";
+import { useResearchTelemetry } from "@/hooks/use-research-telemetry";
 
 const DEFAULT_CAMERA: CameraState = { x: 0, y: 0, zoom: 1 };
 const VIEWPORT_SAVE_DEBOUNCE = 2000;
@@ -61,6 +62,7 @@ export default function DesktopDetailPage({
   const t = useTranslations("desktop");
   const tCommon = useTranslations("common");
   const { user } = useAuth();
+  const { track: trackResearch } = useResearchTelemetry();
   const {
     detail,
     loading,
@@ -286,6 +288,20 @@ export default function DesktopDetailPage({
                 sendEvent("video_generation_polling", { generationId: genId });
               }
             }
+
+            // Research telemetry: canvas_item_added
+            const assetMeta = asset.metadata as Record<string, any>;
+            trackResearch({
+              chatId: assetMeta?.chatId ?? undefined,
+              eventType: "canvas_item_added",
+              imageId: assetMeta?.imageId ?? undefined,
+              metadata: {
+                assetType: asset.assetType,
+                desktopId,
+                videoId: assetMeta?.videoId ?? undefined,
+                source: assetMeta?.chatId ? "chat" : "direct",
+              },
+            });
           }
         }
       }
@@ -337,7 +353,7 @@ export default function DesktopDetailPage({
       window.removeEventListener("desktop-table-generating", handleTableGenerating as EventListener);
       window.removeEventListener("desktop-asset-updated", handleAssetUpdated as EventListener);
     };
-  }, [desktopId, fetchDetail, sendEvent, applyRemoteEvent]);
+  }, [desktopId, fetchDetail, sendEvent, applyRemoteEvent, trackResearch]);
 
   useEffect(() => {
     const expandChat = () => {
@@ -420,12 +436,27 @@ export default function DesktopDetailPage({
 
   const handleAssetDelete = useCallback(
     (assetId: string) => {
+      const asset = detail?.assets.find((a) => a.id === assetId);
+      const meta = asset?.metadata as Record<string, any> | undefined;
+
+      trackResearch({
+        eventType: "canvas_item_removed",
+        imageId: meta?.imageId ?? undefined,
+        metadata: {
+          assetId,
+          assetType: asset?.assetType,
+          videoId: meta?.videoId ?? undefined,
+          desktopId,
+          turnIndex: null,
+        },
+      });
+
       sendEvent("asset_removed", { assetId });
       removeAsset(assetId).catch((e) =>
         console.error("Failed to delete asset:", e)
       );
     },
-    [removeAsset, sendEvent]
+    [removeAsset, sendEvent, detail?.assets, trackResearch, desktopId]
   );
 
   const handleAssetBatchMove = useCallback(
@@ -441,13 +472,28 @@ export default function DesktopDetailPage({
   const handleAssetBatchDelete = useCallback(
     (assetIds: string[]) => {
       for (const id of assetIds) {
+        const asset = detail?.assets.find((a) => a.id === id);
+        const meta = asset?.metadata as Record<string, any> | undefined;
+
+        trackResearch({
+          eventType: "canvas_item_removed",
+          imageId: meta?.imageId ?? undefined,
+          metadata: {
+            assetId: id,
+            assetType: asset?.assetType,
+            videoId: meta?.videoId ?? undefined,
+            desktopId,
+            turnIndex: null,
+          },
+        });
+
         sendEvent("asset_removed", { assetId: id });
         removeAsset(id).catch((e) =>
           console.error("Failed to delete asset:", e)
         );
       }
     },
-    [removeAsset, sendEvent]
+    [removeAsset, sendEvent, detail?.assets, trackResearch, desktopId]
   );
 
   const handleExternalImageDrop = useCallback(
@@ -790,6 +836,27 @@ export default function DesktopDetailPage({
     clearTimeline,
   } = useTimeline(desktopId);
 
+  const handleTimelineClipRemove = useCallback(
+    (clipId: string) => {
+      const clip = timelineClips.find((c) => c.id === clipId);
+      const asset = clip ? detail?.assets.find((a) => a.id === clip.assetId) : undefined;
+      const meta = asset?.metadata as Record<string, any> | undefined;
+
+      trackResearch({
+        eventType: "timeline_clip_removed",
+        imageId: meta?.imageId ?? undefined,
+        metadata: {
+          clipId,
+          assetId: clip?.assetId,
+          videoId: meta?.videoId ?? undefined,
+        },
+      });
+
+      removeTimelineClip(clipId);
+    },
+    [timelineClips, detail?.assets, trackResearch, removeTimelineClip]
+  );
+
   const handleZIndexChange = useCallback(
     (assetId: string, delta: number) => {
       const asset = detail?.assets.find((a) => a.id === assetId);
@@ -811,8 +878,10 @@ export default function DesktopDetailPage({
           ? Number(asset.generationData.params.duration)
           : 0);
 
+      const clipId = `clip-${asset.id}-${Date.now()}`;
+
       addTimelineClip({
-        id: `clip-${asset.id}-${Date.now()}`,
+        id: clipId,
         assetId: asset.id,
         title: meta.title || t("untitledVideo"),
         thumbnailUrl: asset.imageUrl || null,
@@ -821,6 +890,18 @@ export default function DesktopDetailPage({
       });
       // Dispatch event so TimelinePanel auto-expands
       window.dispatchEvent(new CustomEvent("timeline-clip-added"));
+
+      trackResearch({
+        eventType: "timeline_clip_added",
+        imageId: meta.imageId ?? undefined,
+        metadata: {
+          videoId: meta.videoId ?? undefined,
+          clipId,
+          desktopId,
+          duration,
+        },
+      });
+
       addToast({
         title: t("addedToTimeline"),
         description: meta.title || t("videoClipAdded"),
@@ -1099,11 +1180,22 @@ export default function DesktopDetailPage({
         clips={timelineClips}
         isExpanded={isTimelineExpanded}
         onToggleExpanded={toggleTimelineExpanded}
-        onRemoveClip={removeTimelineClip}
+        onRemoveClip={handleTimelineClipRemove}
         onReorderClips={reorderTimelineClips}
         onClearTimeline={clearTimeline}
         onUpdateClip={updateTimelineClip}
         desktopId={desktopId}
+        onExportTrack={(data) => {
+          trackResearch({
+            eventType: "video_export_started",
+            metadata: {
+              desktopId,
+              clipCount: data.clipCount,
+              clips: data.clips,
+              outputFormat: data.outputFormat,
+            },
+          });
+        }}
       />
       </div>
 

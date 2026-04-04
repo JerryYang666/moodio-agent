@@ -15,6 +15,7 @@ import { addToast } from "@heroui/toast";
 import { useTranslations } from "next-intl";
 import { getViewportVisibleCenterPosition, findNonOverlappingPosition, getGridPlacementPositions, aspectRatioDimensions, type AssetRect } from "@/lib/desktop/types";
 import { hasWriteAccess, type Permission } from "@/lib/permissions";
+import { trackResearchEvent } from "@/lib/research-telemetry-client";
 
 interface SendToDesktopModalProps {
   isOpen: boolean;
@@ -108,11 +109,28 @@ async function sendAssetsToDesktop(
   const data = await res.json();
 
   if (useViewportPlacement) {
+    // On the desktop page — event listener there handles telemetry
     window.dispatchEvent(
       new CustomEvent("desktop-asset-added", {
         detail: { assets: data.assets, desktopId: targetDesktopId },
       })
     );
+  } else {
+    // NOT on the desktop page — track directly since there's no desktop-asset-added listener
+    for (const asset of positionedAssets) {
+      const meta = asset.metadata as Record<string, any>;
+      trackResearchEvent({
+        chatId: meta?.chatId ?? undefined,
+        eventType: "canvas_item_added",
+        imageId: meta?.imageId ?? undefined,
+        metadata: {
+          assetType: asset.assetType,
+          desktopId: targetDesktopId,
+          videoId: meta?.videoId ?? undefined,
+          source: meta?.chatId ? "chat" : "other",
+        },
+      });
+    }
   }
 
   addToast({

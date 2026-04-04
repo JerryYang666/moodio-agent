@@ -407,7 +407,7 @@ function VideoDetailContent({
                         storageKey: videoDetail.storage_key,
                         videoUrl: getContentUrl(videoDetail.storage_key),
                       });
-                      dispatchSuggestionBubble(bubble.action);
+                      dispatchSuggestionBubble(bubble.action, bubble.label, bubble.icon);
                     }
                   } : undefined}
                 >

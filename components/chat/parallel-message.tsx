@@ -26,8 +26,8 @@ interface ParallelMessageProps {
     partIndex: number,
     variantId?: string
   ) => void;
-  onAgentTitleClick: (part: any) => void;
-  onAgentExpandClick?: (part: any) => void;
+  onAgentTitleClick: (part: any, messageIndex?: number) => void;
+  onAgentExpandClick?: (part: any, messageIndex?: number) => void;
   onForkChat?: (messageIndex: number) => void;
   /** Force compact/mobile view regardless of viewport width */
   compactMode?: boolean;
@@ -77,6 +77,14 @@ interface ParallelMessageProps {
   ) => Promise<void> | void;
   /** Show spinner in place of timestamp while assistant is streaming */
   isTimestampLoading?: boolean;
+  /** Callback when user long-hovers on an agent image (1.5s+) */
+  onImageHoverTrack?: (data: {
+    imageId: string;
+    turnIndex: number;
+    imagePosition: number;
+    variantId?: string;
+    durationMs: number;
+  }) => void;
 }
 
 export default function ParallelMessage({
@@ -102,6 +110,7 @@ export default function ParallelMessage({
   onPartUpdate,
   onVideoSuggestPartUpdate,
   isTimestampLoading = false,
+  onImageHoverTrack,
 }: ParallelMessageProps) {
   const t = useTranslations();
   const [currentVariantIndex, setCurrentVariantIndex] = useState(0);
@@ -206,6 +215,7 @@ export default function ParallelMessage({
           onPartUpdate={onPartUpdate}
           onVideoSuggestPartUpdate={onVideoSuggestPartUpdate}
           isTimestampLoading={isTimestampLoading}
+          onImageHoverTrack={onImageHoverTrack}
           timestampAction={
             onGenerateVariant && !isSending ? (
               <Button
@@ -265,6 +275,7 @@ export default function ParallelMessage({
                 onSendAsVideoMessage={onSendAsVideoMessage}
                 onPartUpdate={onPartUpdate}
           onVideoSuggestPartUpdate={onVideoSuggestPartUpdate}
+                onImageHoverTrack={onImageHoverTrack}
               />
             </div>
           ))}
@@ -355,6 +366,7 @@ export default function ParallelMessage({
               onSendAsVideoMessage={onSendAsVideoMessage}
               onPartUpdate={onPartUpdate}
           onVideoSuggestPartUpdate={onVideoSuggestPartUpdate}
+              onImageHoverTrack={onImageHoverTrack}
             />
           </div>
         </div>

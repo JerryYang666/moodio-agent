@@ -33,6 +33,8 @@ import {
 import { submitVideoGeneration } from "@/lib/video/video-client";
 import { videoGenerations } from "@/lib/db/schema";
 import { siteConfig } from "@/config/site";
+import { isFeatureFlagEnabled } from "@/lib/feature-flags/server";
+import { recordResearchEvent } from "@/lib/research-telemetry";
 
 const MAX_IMAGES_PER_MESSAGE = siteConfig.imageLimits.maxImagesPerMessage;
 const MAX_SUGGESTIONS_HARD_CAP = siteConfig.imageLimits.maxSuggestionsHardCap;
@@ -532,6 +534,29 @@ export async function POST(
         resolveCompletion = resolve;
       });
 
+      // Research telemetry: reference_image_added (direct image mode)
+      if (imageIds.length > 0) {
+        void (async () => {
+          try {
+            if (await isFeatureFlagEnabled(payload.userId, "res_telemetry")) {
+              void recordResearchEvent({
+                userId: payload.userId,
+                chatId,
+                eventType: "reference_image_added",
+                turnIndex: history.length,
+                metadata: {
+                  referenceImageIds: imageIds,
+                  outputType: "image",
+                  generationMethod: "img2img",
+                },
+              }).catch((e) => console.error("[ResearchTelemetry] reference_image_added failed:", e));
+            }
+          } catch (e) {
+            console.error("[ResearchTelemetry] reference_image_added flag check failed:", e);
+          }
+        })();
+      }
+
       const directStream = new ReadableStream<Uint8Array>({
         start(controller) {
           const send = (data: any) => {
@@ -871,6 +896,33 @@ export async function POST(
                 })
                 .returning();
 
+              // Research telemetry: reference_image_added (direct video mode)
+              if (effectiveSourceImageId && effectiveSourceImageId !== TEXT_TO_VIDEO_PLACEHOLDER_IMAGE_ID) {
+                void (async () => {
+                  try {
+                    if (await isFeatureFlagEnabled(payload.userId, "res_telemetry")) {
+                      const refIds = [effectiveSourceImageId];
+                      if (endImageId) refIds.push(endImageId);
+                      void recordResearchEvent({
+                        userId: payload.userId,
+                        chatId,
+                        eventType: "reference_image_added",
+                        imageId: effectiveSourceImageId,
+                        turnIndex: history.length,
+                        metadata: {
+                          referenceImageIds: refIds,
+                          outputType: "video",
+                          outputId: generation.id,
+                          generationMethod: "img2vid",
+                        },
+                      }).catch((e) => console.error("[ResearchTelemetry] reference_image_added failed:", e));
+                    }
+                  } catch (e) {
+                    console.error("[ResearchTelemetry] reference_image_added flag check failed:", e);
+                  }
+                })();
+              }
+
               // Send initial part with generationId
               const pendingPart: MessageContentPart = {
                 type: "direct_video",
@@ -1037,6 +1089,33 @@ export async function POST(
         account.accountType,
         account.performedBy,
       );
+
+    // Research telemetry: reference_image_added (agent mode)
+    const allRefImageIds = [
+      ...(persistentAssets.referenceImages?.map((r) => r.imageId) || []),
+      ...imageIds,
+    ];
+    if (allRefImageIds.length > 0) {
+      void (async () => {
+        try {
+          if (await isFeatureFlagEnabled(payload.userId, "res_telemetry")) {
+            void recordResearchEvent({
+              userId: payload.userId,
+              chatId,
+              eventType: "reference_image_added",
+              turnIndex: history.length,
+              metadata: {
+                referenceImageIds: allRefImageIds,
+                outputType: "image",
+                generationMethod: "variation",
+              },
+            }).catch((e) => console.error("[ResearchTelemetry] reference_image_added failed:", e));
+          }
+        } catch (e) {
+          console.error("[ResearchTelemetry] reference_image_added flag check failed:", e);
+        }
+      })();
+    }
 
     // Handle background completion (saving history)
     waitUntil(
