@@ -30,7 +30,8 @@
     "send": "보내기",
     "optional": "선택 사항",
     "move": "이동",
-    "copy": "복사"
+    "copy": "복사",
+    "tabsOpen": "{count}개 탭 열림"
   },
   "share": {
     "searchUser": "사용자 검색",
@@ -1413,6 +1414,9 @@
     "columnAccess": "열 접근 권한",
     "rowAccess": "행 접근 권한",
     "editAccess": "편집 권한",
+    "permission": "권한",
+    "offline": "오프라인",
+    "connected": "실시간 동기화 활성",
     "cellLocked": "{name} 편집 중"
   }
 }

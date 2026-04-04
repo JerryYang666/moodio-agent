@@ -105,6 +105,7 @@ export const MediaCell = memo(function MediaCell({
             isIconOnly
             size="sm"
             variant="flat"
+            aria-label="Add media"
             className="w-10 h-10"
             onPress={() => setPickerOpen(true)}
           >

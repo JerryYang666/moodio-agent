@@ -96,6 +96,7 @@ export const HeaderRow = memo(function HeaderRow({
               isIconOnly
               size="sm"
               variant="light"
+              aria-label="Delete column"
               className="ml-1 opacity-0 group-hover:opacity-100 shrink-0"
               onPress={() => onDeleteColumn(col.id)}
             >

@@ -202,41 +202,43 @@ export default function ProductionTableListPage() {
                     </Chip>
                   )}
                   {table.isOwner && (
-                    <Dropdown>
-                      <DropdownTrigger>
-                        <Button
-                          isIconOnly
-                          size="sm"
-                          variant="light"
+                    <div onClick={(e) => e.stopPropagation()}>
+                      <Dropdown>
+                        <DropdownTrigger>
+                          <div
+                            role="button"
+                            tabIndex={0}
+                            className="inline-flex items-center justify-center w-8 h-8 rounded-lg hover:bg-default-100 transition-colors"
+                          >
+                            <MoreVertical size={16} />
+                          </div>
+                        </DropdownTrigger>
+                        <DropdownMenu
+                          onAction={(key) => {
+                            if (key === "rename") {
+                              setRenameTarget(table);
+                              setRenameName(table.name);
+                              renameModal.onOpen();
+                            } else if (key === "delete") {
+                              setDeleteTarget(table);
+                              deleteModal.onOpen();
+                            }
+                          }}
                         >
-                          <MoreVertical size={16} />
-                        </Button>
-                      </DropdownTrigger>
-                      <DropdownMenu
-                        onAction={(key) => {
-                          if (key === "rename") {
-                            setRenameTarget(table);
-                            setRenameName(table.name);
-                            renameModal.onOpen();
-                          } else if (key === "delete") {
-                            setDeleteTarget(table);
-                            deleteModal.onOpen();
-                          }
-                        }}
-                      >
-                        <DropdownItem key="rename" startContent={<Pencil size={14} />}>
-                          Rename
-                        </DropdownItem>
-                        <DropdownItem
-                          key="delete"
-                          className="text-danger"
-                          color="danger"
-                          startContent={<Trash2 size={14} />}
-                        >
-                          Delete
-                        </DropdownItem>
-                      </DropdownMenu>
-                    </Dropdown>
+                          <DropdownItem key="rename" startContent={<Pencil size={14} />}>
+                            Rename
+                          </DropdownItem>
+                          <DropdownItem
+                            key="delete"
+                            className="text-danger"
+                            color="danger"
+                            startContent={<Trash2 size={14} />}
+                          >
+                            Delete
+                          </DropdownItem>
+                        </DropdownMenu>
+                      </Dropdown>
+                    </div>
                   )}
                 </div>
               </CardBody>
