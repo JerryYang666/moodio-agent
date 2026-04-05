@@ -829,6 +829,7 @@ export const productionTableColumns = pgTable("production_table_columns", {
   name: varchar("name", { length: 255 }).notNull(),
   cellType: varchar("cell_type", { length: 20 }).notNull().default("text"), // "text" | "media"
   sortOrder: integer("sort_order").notNull().default(0),
+  width: integer("width").notNull().default(192),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -842,6 +843,7 @@ export const productionTableRows = pgTable("production_table_rows", {
     .notNull()
     .references(() => productionTables.id, { onDelete: "cascade" }),
   sortOrder: integer("sort_order").notNull().default(0),
+  height: integer("height").notNull().default(48),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

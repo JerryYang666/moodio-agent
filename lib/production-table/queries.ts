@@ -19,7 +19,7 @@ import type {
   CellType,
 } from "./types";
 import { getTablePermission, getEditableGrants } from "./permissions";
-import { getImageUrl } from "@/lib/storage/s3";
+import { getImageUrl, getVideoUrl } from "@/lib/storage/s3";
 
 // ---------------------------------------------------------------------------
 // Table CRUD
@@ -193,6 +193,16 @@ export async function renameColumn(columnId: string, name: string) {
   return column;
 }
 
+export async function resizeColumn(columnId: string, width: number) {
+  const clamped = Math.max(80, Math.min(800, Math.round(width)));
+  const [column] = await db
+    .update(productionTableColumns)
+    .set({ width: clamped })
+    .where(eq(productionTableColumns.id, columnId))
+    .returning();
+  return column;
+}
+
 export async function deleteColumn(columnId: string, tableId: string) {
   await db
     .delete(productionTableColumns)
@@ -245,6 +255,16 @@ export async function deleteRow(rowId: string, tableId: string) {
     .delete(productionTableRows)
     .where(eq(productionTableRows.id, rowId));
   await touchTable(tableId);
+}
+
+export async function resizeRow(rowId: string, height: number) {
+  const clamped = Math.max(32, Math.min(400, Math.round(height)));
+  const [row] = await db
+    .update(productionTableRows)
+    .set({ height: clamped })
+    .where(eq(productionTableRows.id, rowId))
+    .returning();
+  return row;
 }
 
 export async function reorderRows(tableId: string, rowIds: string[]) {
@@ -300,6 +320,105 @@ export async function upsertCell(
     })
     .returning();
 
+  await touchTable(tableId);
+  return cell;
+}
+
+// ---------------------------------------------------------------------------
+// Granular media-cell mutations (conflict-free add/remove by assetId)
+// ---------------------------------------------------------------------------
+
+export async function addMediaAsset(
+  tableId: string,
+  columnId: string,
+  rowId: string,
+  asset: MediaAssetRef,
+  updatedBy: string
+) {
+  const cleanAsset: MediaAssetRef = {
+    assetId: asset.assetId,
+    imageId: asset.imageId,
+    assetType: asset.assetType,
+    ...(asset.thumbnailImageId ? { thumbnailImageId: asset.thumbnailImageId } : {}),
+  };
+
+  const existing = await db
+    .select()
+    .from(productionTableCells)
+    .where(
+      and(
+        eq(productionTableCells.columnId, columnId),
+        eq(productionTableCells.rowId, rowId)
+      )
+    )
+    .limit(1);
+
+  if (existing.length > 0) {
+    const current = (existing[0].mediaAssets as MediaAssetRef[] | null) ?? [];
+    const updated = [...current, cleanAsset];
+    const [cell] = await db
+      .update(productionTableCells)
+      .set({ mediaAssets: updated, updatedBy, updatedAt: new Date() })
+      .where(
+        and(
+          eq(productionTableCells.columnId, columnId),
+          eq(productionTableCells.rowId, rowId)
+        )
+      )
+      .returning();
+    await touchTable(tableId);
+    return cell;
+  }
+
+  const [cell] = await db
+    .insert(productionTableCells)
+    .values({
+      tableId,
+      columnId,
+      rowId,
+      textContent: null,
+      mediaAssets: [cleanAsset],
+      updatedBy,
+      updatedAt: new Date(),
+    })
+    .returning();
+  await touchTable(tableId);
+  return cell;
+}
+
+export async function removeMediaAsset(
+  tableId: string,
+  columnId: string,
+  rowId: string,
+  assetId: string,
+  updatedBy: string
+) {
+  const existing = await db
+    .select()
+    .from(productionTableCells)
+    .where(
+      and(
+        eq(productionTableCells.columnId, columnId),
+        eq(productionTableCells.rowId, rowId)
+      )
+    )
+    .limit(1);
+
+  if (existing.length === 0) return null;
+
+  const current = (existing[0].mediaAssets as MediaAssetRef[] | null) ?? [];
+  const updated = current.filter((a) => a.assetId !== assetId);
+
+  const [cell] = await db
+    .update(productionTableCells)
+    .set({ mediaAssets: updated, updatedBy, updatedAt: new Date() })
+    .where(
+      and(
+        eq(productionTableCells.columnId, columnId),
+        eq(productionTableCells.rowId, rowId)
+      )
+    )
+    .returning();
   await touchTable(tableId);
   return cell;
 }
@@ -366,6 +485,26 @@ export async function addTableShare(
     .values({ tableId, sharedWithUserId, permission })
     .returning();
   return share;
+}
+
+/**
+ * Ensure a user has at least viewer-level table access.
+ * Called automatically when granting column/row access so the user can
+ * actually open the table page.  No-ops if they already have any share
+ * or are the table owner.
+ */
+export async function ensureTableViewerAccess(
+  tableId: string,
+  userId: string
+) {
+  const { getTablePermission } = await import("./permissions");
+  const existing = await getTablePermission(tableId, userId);
+  if (existing) return;
+
+  await db
+    .insert(productionTableShares)
+    .values({ tableId, sharedWithUserId: userId, permission: "viewer" })
+    .onConflictDoNothing();
 }
 
 export async function removeTableShare(tableId: string, userId: string) {
@@ -458,6 +597,7 @@ function enrichMediaAssets(
   return assets.map((a) => ({
     ...a,
     imageUrl: a.imageId ? getImageUrl(a.imageId) : undefined,
+    videoUrl: a.assetType === "video" && a.assetId ? getVideoUrl(a.assetId) : undefined,
   }));
 }
 

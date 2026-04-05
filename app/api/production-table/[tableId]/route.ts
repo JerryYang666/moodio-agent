@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAccessToken } from "@/lib/auth/cookies";
 import { verifyAccessToken } from "@/lib/auth/jwt";
-import { getTablePermission } from "@/lib/production-table/permissions";
+import { getTablePermission, getEditableGrants } from "@/lib/production-table/permissions";
 import {
   getEnrichedTable,
   renameTable,
@@ -35,7 +35,9 @@ export async function GET(
       );
     }
 
-    return NextResponse.json({ table });
+    const editableGrants = await getEditableGrants(tableId, payload.userId);
+
+    return NextResponse.json({ table, editableGrants });
   } catch (error) {
     console.error("Error fetching production table:", error);
     return NextResponse.json(

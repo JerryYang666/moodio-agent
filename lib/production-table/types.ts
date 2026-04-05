@@ -37,6 +37,7 @@ export interface MediaAssetRef {
 /** Enriched at read-time with derived URLs for the frontend. */
 export interface EnrichedMediaAssetRef extends MediaAssetRef {
   imageUrl?: string;
+  videoUrl?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -134,15 +135,28 @@ export interface CellLock {
   expiresAt: number;
 }
 
+export interface RemoteCellCursor {
+  sessionId: string;
+  userId: string;
+  userName?: string;
+  x: number;
+  y: number;
+}
+
 export type ProductionTableWSEvent =
   | { type: "pt_cell_selected"; tableId: string; rowId: string; columnId: string; userId: string; userName?: string }
   | { type: "pt_cell_deselected"; tableId: string; rowId: string; columnId: string; userId: string }
   | { type: "pt_cell_updated"; tableId: string; rowId: string; columnId: string; textContent?: string | null; mediaAssets?: EnrichedMediaAssetRef[] | null }
+  | { type: "pt_media_asset_added"; tableId: string; rowId: string; columnId: string; asset: EnrichedMediaAssetRef }
+  | { type: "pt_media_asset_removed"; tableId: string; rowId: string; columnId: string; assetId: string }
   | { type: "pt_column_added"; tableId: string; column: ProductionTableColumn }
   | { type: "pt_column_removed"; tableId: string; columnId: string }
   | { type: "pt_column_renamed"; tableId: string; columnId: string; name: string }
+  | { type: "pt_column_resized"; tableId: string; columnId: string; width: number }
   | { type: "pt_columns_reordered"; tableId: string; columnIds: string[] }
   | { type: "pt_row_added"; tableId: string; row: ProductionTableRow }
   | { type: "pt_row_removed"; tableId: string; rowId: string }
+  | { type: "pt_row_resized"; tableId: string; rowId: string; height: number }
   | { type: "pt_rows_reordered"; tableId: string; rowIds: string[] }
-  | { type: "pt_cursor_move"; rowId: string; columnId: string; userId: string };
+  | { type: "pt_cursor_move"; tableId: string; x: number; y: number; userId: string; userName?: string }
+  | { type: "pt_cursor_leave"; tableId: string; userId: string };

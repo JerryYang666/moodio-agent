@@ -1419,6 +1419,8 @@
     "connected": "Live sync active",
     "cellLocked": "Editing by {name}",
     "grantEditAccessColumns": "Grant edit access for {count} {count, plural, one {column} other {columns}}",
-    "grantEditAccessRows": "Grant edit access for {count} {count, plural, one {row} other {rows}}"
+    "grantEditAccessRows": "Grant edit access for {count} {count, plural, one {row} other {rows}}",
+    "deleteColumn": "Delete Column",
+    "deleteRow": "Delete Row"
   }
 }

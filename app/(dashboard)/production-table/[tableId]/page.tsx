@@ -52,6 +52,10 @@ export default function ProductionTableDetailPage({
       if (!res.ok) throw new Error();
       const data = await res.json();
       setTable(data.table);
+      if (data.editableGrants) {
+        setEditableColumnIds(new Set(data.editableGrants.columnIds ?? []));
+        setEditableRowIds(new Set(data.editableGrants.rowIds ?? []));
+      }
     } catch {
       addToast({ title: "Failed to load table", color: "danger" });
     } finally {
@@ -66,8 +70,6 @@ export default function ProductionTableDetailPage({
   // Handle remote WS events
   const onRemoteEvent = useCallback(
     (event: RemoteEvent) => {
-      if (!table) return;
-
       switch (event.type) {
         case "pt_cell_updated": {
           const { rowId, columnId, textContent, mediaAssets } = event.payload;
@@ -86,6 +88,47 @@ export default function ProductionTableDetailPage({
               }),
               textContent: textContent ?? newMap[key]?.textContent ?? null,
               mediaAssets: mediaAssets ?? newMap[key]?.mediaAssets ?? null,
+            } as EnrichedCell;
+            return { ...prev, cellMap: newMap };
+          });
+          break;
+        }
+        case "pt_media_asset_added": {
+          const { rowId, columnId, asset } = event.payload;
+          const key = `${columnId}:${rowId}`;
+          setTable((prev) => {
+            if (!prev) return prev;
+            const newMap = { ...prev.cellMap };
+            const existing = newMap[key];
+            const currentAssets = (existing?.mediaAssets as EnrichedMediaAssetRef[]) ?? [];
+            newMap[key] = {
+              ...(existing ?? {
+                id: "",
+                tableId,
+                columnId,
+                rowId,
+                textContent: null,
+                updatedAt: new Date(),
+                updatedBy: event.userId,
+              }),
+              mediaAssets: [...currentAssets, asset],
+            } as EnrichedCell;
+            return { ...prev, cellMap: newMap };
+          });
+          break;
+        }
+        case "pt_media_asset_removed": {
+          const { rowId, columnId, assetId } = event.payload;
+          const key = `${columnId}:${rowId}`;
+          setTable((prev) => {
+            if (!prev) return prev;
+            const newMap = { ...prev.cellMap };
+            const existing = newMap[key];
+            if (!existing) return prev;
+            const currentAssets = (existing.mediaAssets as EnrichedMediaAssetRef[]) ?? [];
+            newMap[key] = {
+              ...existing,
+              mediaAssets: currentAssets.filter((a: EnrichedMediaAssetRef) => a.assetId !== assetId),
             } as EnrichedCell;
             return { ...prev, cellMap: newMap };
           });
@@ -124,6 +167,20 @@ export default function ProductionTableDetailPage({
           );
           break;
         }
+        case "pt_column_resized": {
+          const { columnId, width } = event.payload;
+          setTable((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  columns: prev.columns.map((c) =>
+                    c.id === columnId ? { ...c, width: width as number } : c
+                  ),
+                }
+              : prev
+          );
+          break;
+        }
         case "pt_columns_reordered": {
           const { columnIds } = event.payload;
           setTable((prev) => {
@@ -152,6 +209,20 @@ export default function ProductionTableDetailPage({
           );
           break;
         }
+        case "pt_row_resized": {
+          const { rowId, height } = event.payload;
+          setTable((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  rows: prev.rows.map((r) =>
+                    r.id === rowId ? { ...r, height: height as number } : r
+                  ),
+                }
+              : prev
+          );
+          break;
+        }
         case "pt_rows_reordered": {
           const { rowIds } = event.payload;
           setTable((prev) => {
@@ -166,7 +237,7 @@ export default function ProductionTableDetailPage({
         }
       }
     },
-    [table, tableId]
+    [tableId]
   );
 
   const {
@@ -174,6 +245,7 @@ export default function ProductionTableDetailPage({
     sendEvent,
     connectedUsers,
     cellLocks,
+    remoteCursors,
   } = useProductionTableWS({
     tableId,
     enabled: !!table,
@@ -285,6 +357,85 @@ export default function ProductionTableDetailPage({
     [tableId, currentUserId, sendEvent]
   );
 
+  const handleMediaAssetAdd = useCallback(
+    async (columnId: string, rowId: string, asset: EnrichedMediaAssetRef) => {
+      const key = `${columnId}:${rowId}`;
+      setTable((prev) => {
+        if (!prev) return prev;
+        const newMap = { ...prev.cellMap };
+        const existing = newMap[key];
+        const currentAssets = (existing?.mediaAssets as EnrichedMediaAssetRef[]) ?? [];
+        newMap[key] = {
+          ...(existing ?? {
+            id: "",
+            tableId,
+            columnId,
+            rowId,
+            textContent: null,
+            updatedAt: new Date(),
+            updatedBy: currentUserId ?? null,
+          }),
+          mediaAssets: [...currentAssets, asset],
+        } as EnrichedCell;
+        return { ...prev, cellMap: newMap };
+      });
+
+      sendEvent("pt_media_asset_added", {
+        tableId,
+        rowId,
+        columnId,
+        asset,
+      });
+
+      try {
+        await fetch(`/api/production-table/${tableId}/cells/add-asset`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ columnId, rowId, asset }),
+        });
+      } catch {
+        addToast({ title: "Failed to add media", color: "danger" });
+      }
+    },
+    [tableId, currentUserId, sendEvent]
+  );
+
+  const handleMediaAssetRemove = useCallback(
+    async (columnId: string, rowId: string, assetId: string) => {
+      const key = `${columnId}:${rowId}`;
+      setTable((prev) => {
+        if (!prev) return prev;
+        const newMap = { ...prev.cellMap };
+        const existing = newMap[key];
+        if (!existing) return prev;
+        const currentAssets = (existing.mediaAssets as EnrichedMediaAssetRef[]) ?? [];
+        newMap[key] = {
+          ...existing,
+          mediaAssets: currentAssets.filter((a) => a.assetId !== assetId),
+        } as EnrichedCell;
+        return { ...prev, cellMap: newMap };
+      });
+
+      sendEvent("pt_media_asset_removed", {
+        tableId,
+        rowId,
+        columnId,
+        assetId,
+      });
+
+      try {
+        await fetch(`/api/production-table/${tableId}/cells/remove-asset`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ columnId, rowId, assetId }),
+        });
+      } catch {
+        addToast({ title: "Failed to remove media", color: "danger" });
+      }
+    },
+    [tableId, sendEvent]
+  );
+
   const handleRenameColumn = useCallback(
     async (columnId: string, name: string) => {
       setTable((prev) =>
@@ -332,6 +483,86 @@ export default function ProductionTableDetailPage({
         );
       } catch {
         addToast({ title: "Failed to delete column", color: "danger" });
+      }
+    },
+    [tableId, sendEvent]
+  );
+
+  const handleDeleteRow = useCallback(
+    async (rowId: string) => {
+      setTable((prev) =>
+        prev
+          ? { ...prev, rows: prev.rows.filter((r) => r.id !== rowId) }
+          : prev
+      );
+      sendEvent("pt_row_removed", { tableId, rowId });
+      try {
+        await fetch(
+          `/api/production-table/${tableId}/rows/${rowId}`,
+          { method: "DELETE" }
+        );
+      } catch {
+        addToast({ title: "Failed to delete row", color: "danger" });
+      }
+    },
+    [tableId, sendEvent]
+  );
+
+  // Column resize
+  const handleResizeColumn = useCallback(
+    async (columnId: string, width: number) => {
+      setTable((prev) =>
+        prev
+          ? {
+              ...prev,
+              columns: prev.columns.map((c) =>
+                c.id === columnId ? { ...c, width } : c
+              ),
+            }
+          : prev
+      );
+      sendEvent("pt_column_resized", { tableId, columnId, width });
+      try {
+        await fetch(
+          `/api/production-table/${tableId}/columns/${columnId}`,
+          {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ width }),
+          }
+        );
+      } catch {
+        addToast({ title: "Failed to resize column", color: "danger" });
+      }
+    },
+    [tableId, sendEvent]
+  );
+
+  // Row resize
+  const handleResizeRow = useCallback(
+    async (rowId: string, height: number) => {
+      setTable((prev) =>
+        prev
+          ? {
+              ...prev,
+              rows: prev.rows.map((r) =>
+                r.id === rowId ? { ...r, height } : r
+              ),
+            }
+          : prev
+      );
+      sendEvent("pt_row_resized", { tableId, rowId, height });
+      try {
+        await fetch(
+          `/api/production-table/${tableId}/rows/${rowId}`,
+          {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ height }),
+          }
+        );
+      } catch {
+        addToast({ title: "Failed to resize row", color: "danger" });
       }
     },
     [tableId, sendEvent]
@@ -431,16 +662,23 @@ export default function ProductionTableDetailPage({
         rows={table.rows}
         cellMap={table.cellMap}
         cellLocks={cellLocks}
+        remoteCursors={remoteCursors}
         currentUserId={currentUserId}
         canEditCell={canEditCell}
         canEditStructure={canEditStructure}
+        editableColumnIds={editableColumnIds}
+        editableRowIds={editableRowIds}
         sendEvent={sendEvent}
         onCellCommit={handleCellCommit}
+        onMediaAssetAdd={handleMediaAssetAdd}
+        onMediaAssetRemove={handleMediaAssetRemove}
         onRenameColumn={handleRenameColumn}
         onDeleteColumn={handleDeleteColumn}
-        onDeleteRow={() => {}}
+        onDeleteRow={handleDeleteRow}
         onReorderColumns={handleReorderColumns}
         onReorderRows={handleReorderRows}
+        onResizeColumn={handleResizeColumn}
+        onResizeRow={handleResizeRow}
         onAddColumn={handleAddColumn}
         onAddRow={handleAddRow}
       />
