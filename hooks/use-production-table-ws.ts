@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import type { CellLock, ProductionTableWSEvent } from "@/lib/production-table/types";
+import type { CellLock, RemoteCellCursor, ProductionTableWSEvent } from "@/lib/production-table/types";
 
 export type ConnectionState =
   | "connecting"
@@ -16,6 +16,8 @@ export interface RemoteSession {
   firstName: string;
   email: string;
   permission: string;
+  cursorX?: number;
+  cursorY?: number;
 }
 
 export interface RemoteEvent {
@@ -220,6 +222,38 @@ export function useProductionTableWS({
           return;
         }
 
+        // Cursor position tracking
+        if (data.type === "pt_cursor_move") {
+          const { x, y } = data.payload as { x: number; y: number };
+          setSessions((prev) => {
+            const existing = prev.get(data.sessionId);
+            if (!existing) return prev;
+            const next = new Map(prev);
+            next.set(data.sessionId, {
+              ...existing,
+              cursorX: x,
+              cursorY: y,
+            });
+            return next;
+          });
+          return;
+        }
+
+        if (data.type === "pt_cursor_leave") {
+          setSessions((prev) => {
+            const existing = prev.get(data.sessionId);
+            if (!existing) return prev;
+            const next = new Map(prev);
+            next.set(data.sessionId, {
+              ...existing,
+              cursorX: undefined,
+              cursorY: undefined,
+            });
+            return next;
+          });
+          return;
+        }
+
         onRemoteEventRef.current?.(data);
       } catch {
         // ignore malformed messages
@@ -306,6 +340,23 @@ export function useProductionTableWS({
     }));
   }, [sessions]);
 
+  const remoteCursors = useMemo((): RemoteCellCursor[] => {
+    const cursors: RemoteCellCursor[] = [];
+    for (const s of Array.from(sessions.values())) {
+      if (s.sessionId === mySessionId) continue;
+      if (s.cursorX != null && s.cursorY != null) {
+        cursors.push({
+          sessionId: s.sessionId,
+          userId: s.userId,
+          userName: s.firstName,
+          x: s.cursorX,
+          y: s.cursorY,
+        });
+      }
+    }
+    return cursors;
+  }, [sessions, mySessionId]);
+
   return {
     connectionState,
     mySessionId,
@@ -313,5 +364,6 @@ export function useProductionTableWS({
     connectedUsers,
     sessions,
     cellLocks,
+    remoteCursors,
   };
 }

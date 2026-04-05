@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAccessToken } from "@/lib/auth/cookies";
 import { verifyAccessToken } from "@/lib/auth/jwt";
 import { getTablePermission } from "@/lib/production-table/permissions";
-import { addRowShares, removeRowShare } from "@/lib/production-table/queries";
+import { addRowShares, removeRowShare, ensureTableViewerAccess } from "@/lib/production-table/queries";
 import { isOwner } from "@/lib/permissions";
 
 type Params = { tableId: string };
@@ -43,9 +43,10 @@ export async function POST(
     // Bulk: share rows with multiple users at once
     if (Array.isArray(sharedWithUserIds) && sharedWithUserIds.length > 0) {
       await Promise.all(
-        sharedWithUserIds.map((uid: string) =>
-          addRowShares(tableId, rowIds, uid)
-        )
+        sharedWithUserIds.map(async (uid: string) => {
+          await ensureTableViewerAccess(tableId, uid);
+          await addRowShares(tableId, rowIds, uid);
+        })
       );
       return NextResponse.json({ success: true, bulk: true });
     }
@@ -57,6 +58,7 @@ export async function POST(
       );
     }
 
+    await ensureTableViewerAccess(tableId, sharedWithUserId);
     await addRowShares(tableId, rowIds, sharedWithUserId);
     return NextResponse.json({ success: true });
   } catch (error) {

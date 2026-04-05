@@ -1,14 +1,16 @@
 "use client";
 
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { Plus } from "lucide-react";
+import { MousePointer2, Plus, Trash2 } from "lucide-react";
 import type {
   ProductionTableColumn,
   ProductionTableRow,
   EnrichedCell,
   CellLock,
   EnrichedMediaAssetRef,
+  RemoteCellCursor,
 } from "@/lib/production-table/types";
 import type { CellType } from "@/lib/production-table/types";
 import { TextCell } from "./TextCell";
@@ -16,18 +18,32 @@ import { MediaCell } from "./MediaCell";
 import { RowHandle } from "./RowHandle";
 import { HeaderRow } from "./HeaderRow";
 
-const ROW_HEIGHT = 48;
+const DEFAULT_ROW_HEIGHT = 48;
+const DEFAULT_COL_WIDTH = 192;
+const CURSOR_THROTTLE_MS = 40;
 
 type DropSide = "before" | "after";
+
+function userIdToColor(userId: string): string {
+  let hash = 0;
+  for (let i = 0; i < userId.length; i++) {
+    hash = userId.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const hue = Math.abs(hash) % 360;
+  return `hsl(${hue}, 70%, 50%)`;
+}
 
 interface ProductionTableGridProps {
   columns: ProductionTableColumn[];
   rows: ProductionTableRow[];
   cellMap: Record<string, EnrichedCell>;
   cellLocks: Map<string, CellLock>;
+  remoteCursors: RemoteCellCursor[];
   currentUserId: string | undefined;
   canEditCell: (rowId: string, columnId: string) => boolean;
   canEditStructure: boolean;
+  editableColumnIds: Set<string>;
+  editableRowIds: Set<string>;
   sendEvent?: (type: string, payload: Record<string, unknown>) => void;
   onCellCommit: (
     columnId: string,
@@ -35,11 +51,15 @@ interface ProductionTableGridProps {
     textContent?: string | null,
     mediaAssets?: EnrichedMediaAssetRef[] | null
   ) => void;
+  onMediaAssetAdd: (columnId: string, rowId: string, asset: EnrichedMediaAssetRef) => void;
+  onMediaAssetRemove: (columnId: string, rowId: string, assetId: string) => void;
   onRenameColumn: (columnId: string, name: string) => void;
   onDeleteColumn: (columnId: string) => void;
   onDeleteRow: (rowId: string) => void;
   onReorderColumns: (fromIndex: number, toIndex: number) => void;
   onReorderRows: (fromIndex: number, toIndex: number) => void;
+  onResizeColumn: (columnId: string, width: number) => void;
+  onResizeRow: (rowId: string, height: number) => void;
   onAddColumn?: (cellType: CellType) => void;
   onAddRow?: () => void;
 }
@@ -49,16 +69,23 @@ export function ProductionTableGrid({
   rows,
   cellMap,
   cellLocks,
+  remoteCursors,
   currentUserId,
   canEditCell: canEditCellFn,
   canEditStructure,
+  editableColumnIds,
+  editableRowIds,
   sendEvent,
   onCellCommit,
+  onMediaAssetAdd,
+  onMediaAssetRemove,
   onRenameColumn,
   onDeleteColumn,
   onDeleteRow,
   onReorderColumns,
   onReorderRows,
+  onResizeColumn,
+  onResizeRow,
   onAddColumn,
   onAddRow,
 }: ProductionTableGridProps) {
@@ -185,16 +212,65 @@ export function ProductionTableGrid({
     setRowDropTarget(null);
   }, [rowDragIndex, rowDropTarget, onReorderRows]);
 
-  // ---- Virtualizer (disabled during row drag for stable layout) ----
+  // ---- Virtualizer ----
   const isRowDragging = rowDragIndex !== null;
+
+  // ---- Row context menu (rendered outside the transformed virtualizer) ----
+  const t = useTranslations("productionTable");
+  const [rowContextMenu, setRowContextMenu] = useState<{
+    rowId: string;
+    x: number;
+    y: number;
+  } | null>(null);
+
+  const handleRowContextMenu = useCallback(
+    (rowId: string, x: number, y: number) => {
+      if (!canEditStructure) return;
+      setRowContextMenu({ rowId, x, y });
+    },
+    [canEditStructure]
+  );
+
+  const closeRowContextMenu = useCallback(() => setRowContextMenu(null), []);
+
+  // ---- Cursor broadcasting (XY-based, like desktop canvas) ----
+  const lastCursorSend = useRef(0);
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  const handleGridMouseMove = useCallback(
+    (e: React.MouseEvent) => {
+      if (!sendEvent || !contentRef.current) return;
+      const now = Date.now();
+      if (now - lastCursorSend.current < CURSOR_THROTTLE_MS) return;
+      lastCursorSend.current = now;
+
+      const rect = contentRef.current.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      sendEvent("pt_cursor_move", { x, y });
+    },
+    [sendEvent]
+  );
+
+  const handleGridMouseLeave = useCallback(() => {
+    if (!sendEvent) return;
+    sendEvent("pt_cursor_leave", {});
+  }, [sendEvent]);
 
   const rowVirtualizer = useVirtualizer({
     count: rows.length,
     getScrollElement: () => scrollElement,
-    estimateSize: () => ROW_HEIGHT,
+    estimateSize: (i) => rows[i]?.height ?? DEFAULT_ROW_HEIGHT,
     overscan: isRowDragging ? rows.length : 5,
     enabled: !!scrollElement,
+    getItemKey: (i) => rows[i]?.id ?? i,
   });
+
+  // When row heights change, invalidate the virtualizer's cached measurements
+  const rowHeightKey = rows.map((r) => r.height ?? DEFAULT_ROW_HEIGHT).join(",");
+  React.useEffect(() => {
+    rowVirtualizer.measure();
+  }, [rowHeightKey, rowVirtualizer]);
 
   // ---- Cell renderer ----
   const renderCell = useCallback(
@@ -214,9 +290,8 @@ export function ProductionTableGrid({
             canEdit={editable}
             lock={lock}
             currentUserId={currentUserId}
-            onCommit={(assets) =>
-              onCellCommit(col.id, row.id, null, assets)
-            }
+            onAddAsset={(asset) => onMediaAssetAdd(col.id, row.id, asset)}
+            onRemoveAsset={(assetId) => onMediaAssetRemove(col.id, row.id, assetId)}
           />
         );
       }
@@ -235,16 +310,17 @@ export function ProductionTableGrid({
         />
       );
     },
-    [cellMap, cellLocks, canEditCellFn, currentUserId, sendEvent, onCellCommit]
+    [cellMap, cellLocks, canEditCellFn, currentUserId, sendEvent, onCellCommit, onMediaAssetAdd, onMediaAssetRemove]
   );
 
-  const COL_WIDTH = 192;
   const totalWidth = useMemo(
-    () => 48 + columns.length * COL_WIDTH,
-    [columns.length]
+    () =>
+      48 +
+      columns.reduce((sum, c) => sum + (c.width || DEFAULT_COL_WIDTH), 0),
+    [columns]
   );
 
-  // Shared column gap renderer used in both header and body rows
+  // Shared column gap renderer
   const renderColGap = useCallback(
     (slotIndex: number) => (
       <div
@@ -261,15 +337,18 @@ export function ProductionTableGrid({
   );
 
   return (
-    <div ref={setScrollElement} className="flex-1 overflow-auto">
-      <div style={{ minWidth: totalWidth }}>
+  <>
+    <div ref={setScrollElement} className="flex-1 overflow-auto" onMouseLeave={handleGridMouseLeave} onMouseMove={handleGridMouseMove}>
+      <div ref={contentRef} style={{ minWidth: totalWidth, position: "relative" }}>
         <HeaderRow
           columns={columns}
           canEdit={canEditStructure}
+          editableColumnIds={editableColumnIds}
           colDragIndex={colDragIndex}
           colDropSlot={colDropSlot}
           onRenameColumn={onRenameColumn}
           onDeleteColumn={onDeleteColumn}
+          onResizeColumn={onResizeColumn}
           onColDragStart={handleColDragStart}
           onColDragOver={handleColDragOver}
           onColDragEnd={handleColDragEnd}
@@ -287,10 +366,10 @@ export function ProductionTableGrid({
             const row = rows[virtualRow.index];
             const idx = virtualRow.index;
             const isDraggedRow = rowDragIndex === idx;
+            const rowHeight = row.height ?? DEFAULT_ROW_HEIGHT;
 
             return (
               <React.Fragment key={row.id}>
-                {/* Row drop indicator BEFORE this row */}
                 {rowDropSlot === idx && (
                   <div
                     className="absolute left-0 w-full flex items-center justify-center transition-all duration-200 ease-out"
@@ -321,18 +400,23 @@ export function ProductionTableGrid({
                   <RowHandle
                     rowIndex={idx}
                     rowId={row.id}
+                    height={rowHeight}
                     canReorder={canEditStructure}
+                    isEditable={editableRowIds.has(row.id)}
                     onDragStart={handleRowDragStart}
                     onDragOver={handleRowDragOver}
                     onDragEnd={handleRowDragEnd}
+                    onResizeRow={onResizeRow}
+                    onRowContextMenu={handleRowContextMenu}
                   />
                   {columns.map((col, colIdx) => (
                     <React.Fragment key={col.id}>
                       {renderColGap(colIdx)}
                       <div
-                        className={`w-48 shrink-0 border-r border-default-200 ${
+                        className={`shrink-0 border-r border-default-200 relative ${
                           colDragIndex === colIdx ? "opacity-30" : ""
                         }`}
+                        style={{ width: col.width || DEFAULT_COL_WIDTH }}
                       >
                         {renderCell(row, col)}
                       </div>
@@ -341,7 +425,6 @@ export function ProductionTableGrid({
                     </React.Fragment>
                   ))}
                 </div>
-                {/* Row drop indicator AFTER last row */}
                 {idx === rows.length - 1 && rowDropSlot === rows.length && (
                   <div
                     className="absolute left-0 w-full flex items-center justify-center transition-all duration-200 ease-out"
@@ -358,7 +441,6 @@ export function ProductionTableGrid({
             );
           })}
         </div>
-        {/* Inline add-row button below the last row */}
         {canEditStructure && onAddRow && (
           <div className="flex border-b border-dashed border-default-200">
             <div className="w-12 shrink-0" />
@@ -371,7 +453,57 @@ export function ProductionTableGrid({
             </button>
           </div>
         )}
+
+        {/* Remote cursors */}
+        {remoteCursors.map((cursor) => {
+          const color = userIdToColor(cursor.userId);
+          return (
+            <div
+              key={cursor.sessionId}
+              className="absolute pointer-events-none z-50 transition-all duration-75"
+              style={{ left: cursor.x, top: cursor.y, transform: "translate(-1px, -1px)" }}
+            >
+              <MousePointer2 size={18} fill={color} color={color} strokeWidth={1.5} />
+              <span
+                className="absolute left-4 top-3 px-1.5 py-0.5 text-[10px] text-white rounded whitespace-nowrap"
+                style={{ backgroundColor: color }}
+              >
+                {cursor.userName || "?"}
+              </span>
+            </div>
+          );
+        })}
       </div>
     </div>
+
+    {/* Row context menu — rendered outside the virtualized/transformed container */}
+    {rowContextMenu && (
+      <>
+        <div
+          className="fixed inset-0 z-50"
+          onClick={closeRowContextMenu}
+          onContextMenu={(e) => {
+            e.preventDefault();
+            closeRowContextMenu();
+          }}
+        />
+        <div
+          className="fixed z-50 min-w-[160px] py-1 rounded-lg shadow-lg border border-default-200 bg-content1"
+          style={{ left: rowContextMenu.x, top: rowContextMenu.y }}
+        >
+          <button
+            className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-danger hover:bg-danger/10 transition-colors"
+            onClick={() => {
+              onDeleteRow(rowContextMenu.rowId);
+              closeRowContextMenu();
+            }}
+          >
+            <Trash2 size={14} />
+            {t("deleteRow")}
+          </button>
+        </div>
+      </>
+    )}
+  </>
   );
 }

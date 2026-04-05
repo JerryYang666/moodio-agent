@@ -5,6 +5,15 @@ import type { CellLock } from "@/lib/production-table/types";
 
 const SELECTION_HEARTBEAT_MS = 1000;
 
+function userIdToColor(userId: string): string {
+  let hash = 0;
+  for (let i = 0; i < userId.length; i++) {
+    hash = userId.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const hue = Math.abs(hash) % 360;
+  return `hsl(${hue}, 70%, 50%)`;
+}
+
 interface TextCellProps {
   rowId: string;
   columnId: string;
@@ -29,23 +38,29 @@ export const TextCell = memo(function TextCell({
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const sendEventRef = useRef(sendEvent);
+  sendEventRef.current = sendEvent;
 
   const isLockedByOther =
     lock && lock.userId !== currentUserId && lock.expiresAt > Date.now();
+  const lockColor = isLockedByOther && lock ? userIdToColor(lock.userId) : undefined;
 
+  // Sync prop into draft only when NOT editing (desktop TextAsset pattern)
   useEffect(() => {
-    setDraft(value);
-  }, [value]);
+    if (!editing) {
+      setDraft(value);
+    }
+  }, [value, editing]);
 
-  // Re-broadcast cell_selected every second while editing
+  // Heartbeat: re-broadcast cell_selected every second while editing
   useEffect(() => {
-    if (!editing || !sendEvent) return;
-    sendEvent("pt_cell_selected", { rowId, columnId });
+    if (!editing) return;
+    sendEventRef.current?.("pt_cell_selected", { rowId, columnId });
     const interval = setInterval(() => {
-      sendEvent("pt_cell_selected", { rowId, columnId });
+      sendEventRef.current?.("pt_cell_selected", { rowId, columnId });
     }, SELECTION_HEARTBEAT_MS);
     return () => clearInterval(interval);
-  }, [editing, sendEvent, rowId, columnId]);
+  }, [editing, rowId, columnId]);
 
   const startEditing = useCallback(() => {
     if (!canEdit || isLockedByOther) return;
@@ -55,37 +70,37 @@ export const TextCell = memo(function TextCell({
 
   const commitEdit = useCallback(() => {
     setEditing(false);
-    sendEvent?.("pt_cell_deselected", { rowId, columnId });
+    sendEventRef.current?.("pt_cell_deselected", { rowId, columnId });
     if (draft !== value) {
       onCommit(draft);
     }
-  }, [draft, value, onCommit, sendEvent, rowId, columnId]);
+  }, [draft, value, onCommit, rowId, columnId]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.key === "Escape") {
         setDraft(value);
         setEditing(false);
-        sendEvent?.("pt_cell_deselected", { rowId, columnId });
+        sendEventRef.current?.("pt_cell_deselected", { rowId, columnId });
       } else if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
         commitEdit();
       }
     },
-    [value, commitEdit, sendEvent, rowId, columnId]
+    [value, commitEdit, rowId, columnId]
   );
 
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLTextAreaElement>) => {
       const newValue = e.target.value;
       setDraft(newValue);
-      sendEvent?.("pt_cell_updated", {
+      sendEventRef.current?.("pt_cell_updated", {
         rowId,
         columnId,
         textContent: newValue,
       });
     },
-    [sendEvent, rowId, columnId]
+    [rowId, columnId]
   );
 
   useEffect(() => {
@@ -113,12 +128,16 @@ export const TextCell = memo(function TextCell({
         canEdit && !isLockedByOther
           ? "hover:bg-default-100 cursor-text"
           : ""
-      } ${isLockedByOther ? "bg-warning-50" : ""}`}
+      }`}
+      style={lockColor ? { boxShadow: `inset 0 0 0 2px ${lockColor}` } : undefined}
       onDoubleClick={startEditing}
     >
       {value || <span className="text-default-300">&nbsp;</span>}
       {isLockedByOther && lock && (
-        <div className="absolute top-0 right-0 px-1 text-[10px] bg-warning-200 text-warning-800 rounded-bl">
+        <div
+          className="absolute -top-5 left-0 px-1.5 py-0.5 text-[10px] text-white rounded-t whitespace-nowrap pointer-events-none z-10"
+          style={{ backgroundColor: lockColor }}
+        >
           {lock.userName}
         </div>
       )}

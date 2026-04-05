@@ -17,7 +17,7 @@ import { Tab, Tabs } from "@heroui/tabs";
 import { Divider } from "@heroui/divider";
 import { Spinner } from "@heroui/spinner";
 import { addToast } from "@heroui/toast";
-import { Trash2, X } from "lucide-react";
+import { X } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useTeams } from "@/hooks/use-team";
 import TeamMemberPicker from "@/components/team-member-picker";
@@ -139,6 +139,18 @@ export function ProductionTableShareModal({
     sharedAt: new Date(s.sharedAt),
     email: s.email,
   }));
+
+  // For column/row tabs, only exclude users who are already collaborator/owner
+  // (viewers should still be selectable for granular grants)
+  const granularSharesAsShareEntries: ShareEntry[] = (shares?.tableShares ?? [])
+    .filter((s) => s.permission !== PERMISSION_VIEWER)
+    .map((s) => ({
+      id: s.id,
+      sharedWithUserId: s.sharedWithUserId,
+      permission: s.permission as SharePermission,
+      sharedAt: new Date(s.sharedAt),
+      email: s.email,
+    }));
 
   const fetchShares = useCallback(async () => {
     setLoading(true);
@@ -425,7 +437,7 @@ export function ProductionTableShareModal({
           <TeamMemberPicker
             ownerId={ownerId}
             currentUserId={currentUserId}
-            shares={tableSharesAsShareEntries}
+            shares={selectedTab === "table" ? tableSharesAsShareEntries : granularSharesAsShareEntries}
             selectedUserIds={selectedUserIds}
             onToggleUser={toggleUser}
             onToggleTeam={toggleTeam}
@@ -499,7 +511,10 @@ export function ProductionTableShareModal({
               </div>
               {ownerId === searchedUser.id ? (
                 <Chip color="warning" variant="flat" size="sm">{tShare("owner")}</Chip>
-              ) : shares?.tableShares.some((s) => s.sharedWithUserId === searchedUser!.id) ? (
+              ) : (selectedTab === "table"
+                ? shares?.tableShares.some((s) => s.sharedWithUserId === searchedUser!.id)
+                : shares?.tableShares.some((s) => s.sharedWithUserId === searchedUser!.id && s.permission !== PERMISSION_VIEWER)
+              ) ? (
                 <Chip color="primary" variant="flat" size="sm">{tShare("alreadyShared")}</Chip>
               ) : (
                 <Chip color="success" variant="flat" size="sm">{tShare("available")}</Chip>
@@ -664,36 +679,45 @@ export function ProductionTableShareModal({
                     <div className="mt-4">
                       <h3 className="text-sm font-semibold mb-3">{t("columnAccess")}</h3>
                       <div className="space-y-2">
-                        {shares!.columnShares.map((s) => {
-                          const col = columns.find((c) => c.id === s.columnId);
-                          return (
-                            <div key={s.id} className="flex items-center justify-between p-3 bg-default-100 rounded-lg">
-                              <div className="flex items-center gap-2">
+                        {(() => {
+                          const byUser = new Map<string, { share: (typeof shares)extends null ? never : NonNullable<typeof shares>["columnShares"][number]; columnIds: string[] }>();
+                          for (const s of shares!.columnShares) {
+                            const existing = byUser.get(s.sharedWithUserId);
+                            if (existing) {
+                              existing.columnIds.push(s.columnId);
+                            } else {
+                              byUser.set(s.sharedWithUserId, { share: s, columnIds: [s.columnId] });
+                            }
+                          }
+                          return Array.from(byUser.values()).map(({ share: s, columnIds }) => (
+                            <div key={s.sharedWithUserId} className="p-3 bg-default-100 rounded-lg space-y-2">
+                              <div className="flex items-center justify-between">
                                 <div>
                                   <p className="font-medium text-sm">
                                     {displayName(s.email, s.firstName, s.lastName)}
                                   </p>
                                   <p className="text-xs text-default-500">{s.email}</p>
                                 </div>
-                                <Chip size="sm" variant="flat" color="secondary">
-                                  {col?.name ?? s.columnId}
-                                </Chip>
                               </div>
-                              {isOwner && (
-                                <Button
-                                  isIconOnly
-                                  size="sm"
-                                  variant="light"
-                                  color="danger"
-                                  aria-label="Remove column share"
-                                  onPress={() => handleRemoveColumnShare(s.columnId, s.sharedWithUserId)}
-                                >
-                                  <Trash2 size={14} />
-                                </Button>
-                              )}
+                              <div className="flex flex-wrap gap-1">
+                                {columnIds.map((colId) => {
+                                  const col = columns.find((c) => c.id === colId);
+                                  return (
+                                    <Chip
+                                      key={colId}
+                                      size="sm"
+                                      variant="flat"
+                                      color="secondary"
+                                      onClose={isOwner ? () => handleRemoveColumnShare(colId, s.sharedWithUserId) : undefined}
+                                    >
+                                      {col?.name ?? colId}
+                                    </Chip>
+                                  );
+                                })}
+                              </div>
                             </div>
-                          );
-                        })}
+                          ));
+                        })()}
                       </div>
                     </div>
                   )}
@@ -723,36 +747,45 @@ export function ProductionTableShareModal({
                     <div className="mt-4">
                       <h3 className="text-sm font-semibold mb-3">{t("rowAccess")}</h3>
                       <div className="space-y-2">
-                        {shares!.rowShares.map((s) => {
-                          const rowIdx = rows.findIndex((r) => r.id === s.rowId);
-                          return (
-                            <div key={s.id} className="flex items-center justify-between p-3 bg-default-100 rounded-lg">
-                              <div className="flex items-center gap-2">
+                        {(() => {
+                          const byUser = new Map<string, { share: (typeof shares)extends null ? never : NonNullable<typeof shares>["rowShares"][number]; rowIds: string[] }>();
+                          for (const s of shares!.rowShares) {
+                            const existing = byUser.get(s.sharedWithUserId);
+                            if (existing) {
+                              existing.rowIds.push(s.rowId);
+                            } else {
+                              byUser.set(s.sharedWithUserId, { share: s, rowIds: [s.rowId] });
+                            }
+                          }
+                          return Array.from(byUser.values()).map(({ share: s, rowIds }) => (
+                            <div key={s.sharedWithUserId} className="p-3 bg-default-100 rounded-lg space-y-2">
+                              <div className="flex items-center justify-between">
                                 <div>
                                   <p className="font-medium text-sm">
                                     {displayName(s.email, s.firstName, s.lastName)}
                                   </p>
                                   <p className="text-xs text-default-500">{s.email}</p>
                                 </div>
-                                <Chip size="sm" variant="flat" color="secondary">
-                                  Row {rowIdx >= 0 ? rowIdx + 1 : "?"}
-                                </Chip>
                               </div>
-                              {isOwner && (
-                                <Button
-                                  isIconOnly
-                                  size="sm"
-                                  variant="light"
-                                  color="danger"
-                                  aria-label="Remove row share"
-                                  onPress={() => handleRemoveRowShare(s.rowId, s.sharedWithUserId)}
-                                >
-                                  <Trash2 size={14} />
-                                </Button>
-                              )}
+                              <div className="flex flex-wrap gap-1">
+                                {rowIds.map((rowId) => {
+                                  const rowIdx = rows.findIndex((r) => r.id === rowId);
+                                  return (
+                                    <Chip
+                                      key={rowId}
+                                      size="sm"
+                                      variant="flat"
+                                      color="secondary"
+                                      onClose={isOwner ? () => handleRemoveRowShare(rowId, s.sharedWithUserId) : undefined}
+                                    >
+                                      Row {rowIdx >= 0 ? rowIdx + 1 : "?"}
+                                    </Chip>
+                                  );
+                                })}
+                              </div>
                             </div>
-                          );
-                        })}
+                          ));
+                        })()}
                       </div>
                     </div>
                   )}

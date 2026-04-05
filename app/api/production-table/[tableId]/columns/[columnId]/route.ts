@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAccessToken } from "@/lib/auth/cookies";
 import { verifyAccessToken } from "@/lib/auth/jwt";
 import { getTablePermission } from "@/lib/production-table/permissions";
-import { renameColumn, deleteColumn } from "@/lib/production-table/queries";
+import { renameColumn, deleteColumn, resizeColumn } from "@/lib/production-table/queries";
 import { hasWriteAccess } from "@/lib/permissions";
 
 type Params = { tableId: string; columnId: string };
@@ -28,7 +28,12 @@ export async function PATCH(
     }
 
     const body = await req.json();
-    const { name } = body as { name?: unknown };
+    const { name, width } = body as { name?: unknown; width?: unknown };
+
+    if (typeof width === "number") {
+      const column = await resizeColumn(columnId, width);
+      return NextResponse.json({ column });
+    }
 
     if (!name || typeof name !== "string" || !name.trim()) {
       return NextResponse.json(
@@ -40,9 +45,9 @@ export async function PATCH(
     const column = await renameColumn(columnId, name.trim());
     return NextResponse.json({ column });
   } catch (error) {
-    console.error("Error renaming column:", error);
+    console.error("Error updating column:", error);
     return NextResponse.json(
-      { error: "Failed to rename column" },
+      { error: "Failed to update column" },
       { status: 500 }
     );
   }

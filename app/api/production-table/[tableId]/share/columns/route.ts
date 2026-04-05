@@ -5,6 +5,7 @@ import { getTablePermission } from "@/lib/production-table/permissions";
 import {
   addColumnShares,
   removeColumnShare,
+  ensureTableViewerAccess,
 } from "@/lib/production-table/queries";
 import { isOwner } from "@/lib/permissions";
 
@@ -46,9 +47,10 @@ export async function POST(
     // Bulk: share columns with multiple users at once
     if (Array.isArray(sharedWithUserIds) && sharedWithUserIds.length > 0) {
       await Promise.all(
-        sharedWithUserIds.map((uid: string) =>
-          addColumnShares(tableId, columnIds, uid)
-        )
+        sharedWithUserIds.map(async (uid: string) => {
+          await ensureTableViewerAccess(tableId, uid);
+          await addColumnShares(tableId, columnIds, uid);
+        })
       );
       return NextResponse.json({ success: true, bulk: true });
     }
@@ -60,6 +62,7 @@ export async function POST(
       );
     }
 
+    await ensureTableViewerAccess(tableId, sharedWithUserId);
     await addColumnShares(tableId, columnIds, sharedWithUserId);
     return NextResponse.json({ success: true });
   } catch (error) {
