@@ -1,11 +1,10 @@
 "use client";
 
-import { use, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { use, useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@heroui/button";
 import { Spinner } from "@heroui/spinner";
 import { addToast } from "@heroui/toast";
-import { ArrowLeft } from "lucide-react";
 import { useDisclosure } from "@heroui/modal";
 import { useAuth } from "@/hooks/use-auth";
 import {
@@ -22,7 +21,7 @@ import type {
   ProductionTableRow,
   EnrichedCell,
   CellType,
-  MediaAssetRef,
+  EnrichedMediaAssetRef,
 } from "@/lib/production-table/types";
 
 export default function ProductionTableDetailPage({
@@ -45,9 +44,6 @@ export default function ProductionTableDetailPage({
   const [editableRowIds, setEditableRowIds] = useState<Set<string>>(new Set());
 
   const shareModal = useDisclosure();
-
-  const draggedColumnRef = useRef<string | null>(null);
-  const draggedRowRef = useRef<string | null>(null);
 
   // Fetch table data
   const fetchTable = useCallback(async () => {
@@ -246,7 +242,7 @@ export default function ProductionTableDetailPage({
       columnId: string,
       rowId: string,
       textContent?: string | null,
-      mediaAssets?: MediaAssetRef[] | null
+      mediaAssets?: EnrichedMediaAssetRef[] | null
     ) => {
       // Optimistic update
       const key = `${columnId}:${rowId}`;
@@ -341,34 +337,13 @@ export default function ProductionTableDetailPage({
     [tableId, sendEvent]
   );
 
-  // Drag-and-drop column reordering
-  const handleColumnDragStart = useCallback(
-    (e: React.DragEvent, columnId: string) => {
-      draggedColumnRef.current = columnId;
-      e.dataTransfer.effectAllowed = "move";
-    },
-    []
-  );
-
-  const handleColumnDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = "move";
-  }, []);
-
-  const handleColumnDrop = useCallback(
-    async (e: React.DragEvent, targetColumnId: string) => {
-      e.preventDefault();
-      const draggedId = draggedColumnRef.current;
-      if (!draggedId || draggedId === targetColumnId || !table) return;
-      draggedColumnRef.current = null;
-
+  // Column reorder (called by grid after drag-and-drop completes)
+  const handleReorderColumns = useCallback(
+    async (fromIndex: number, toIndex: number) => {
+      if (!table) return;
       const cols = [...table.columns];
-      const fromIdx = cols.findIndex((c) => c.id === draggedId);
-      const toIdx = cols.findIndex((c) => c.id === targetColumnId);
-      if (fromIdx === -1 || toIdx === -1) return;
-
-      const [moved] = cols.splice(fromIdx, 1);
-      cols.splice(toIdx, 0, moved);
+      const [moved] = cols.splice(fromIndex, 1);
+      cols.splice(toIndex, 0, moved);
 
       setTable((prev) => (prev ? { ...prev, columns: cols } : prev));
 
@@ -391,34 +366,13 @@ export default function ProductionTableDetailPage({
     [table, tableId, sendEvent]
   );
 
-  // Drag-and-drop row reordering
-  const handleRowDragStart = useCallback(
-    (e: React.DragEvent, rowId: string) => {
-      draggedRowRef.current = rowId;
-      e.dataTransfer.effectAllowed = "move";
-    },
-    []
-  );
-
-  const handleRowDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = "move";
-  }, []);
-
-  const handleRowDrop = useCallback(
-    async (e: React.DragEvent, targetRowId: string) => {
-      e.preventDefault();
-      const draggedId = draggedRowRef.current;
-      if (!draggedId || draggedId === targetRowId || !table) return;
-      draggedRowRef.current = null;
-
+  // Row reorder (called by grid after drag-and-drop completes)
+  const handleReorderRows = useCallback(
+    async (fromIndex: number, toIndex: number) => {
+      if (!table) return;
       const rowsCopy = [...table.rows];
-      const fromIdx = rowsCopy.findIndex((r) => r.id === draggedId);
-      const toIdx = rowsCopy.findIndex((r) => r.id === targetRowId);
-      if (fromIdx === -1 || toIdx === -1) return;
-
-      const [moved] = rowsCopy.splice(fromIdx, 1);
-      rowsCopy.splice(toIdx, 0, moved);
+      const [moved] = rowsCopy.splice(fromIndex, 1);
+      rowsCopy.splice(toIndex, 0, moved);
 
       setTable((prev) => (prev ? { ...prev, rows: rowsCopy } : prev));
 
@@ -462,22 +416,12 @@ export default function ProductionTableDetailPage({
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex items-center gap-2 px-4 py-2 border-b border-default-200">
-        <Button
-          isIconOnly
-          size="sm"
-          variant="light"
-          aria-label="Back"
-          onPress={() => router.push("/production-table")}
-        >
-          <ArrowLeft size={16} />
-        </Button>
-      </div>
       <ProductionTableToolbar
         tableName={table.name}
         connectionState={connectionState}
         connectedUsers={connectedUsers}
         canEdit={canEditStructure}
+        onBack={() => router.push("/production-table")}
         onAddColumn={handleAddColumn}
         onAddRow={handleAddRow}
         onShare={shareModal.onOpen}
@@ -495,12 +439,10 @@ export default function ProductionTableDetailPage({
         onRenameColumn={handleRenameColumn}
         onDeleteColumn={handleDeleteColumn}
         onDeleteRow={() => {}}
-        onColumnDragStart={handleColumnDragStart}
-        onColumnDragOver={handleColumnDragOver}
-        onColumnDrop={handleColumnDrop}
-        onRowDragStart={handleRowDragStart}
-        onRowDragOver={handleRowDragOver}
-        onRowDrop={handleRowDrop}
+        onReorderColumns={handleReorderColumns}
+        onReorderRows={handleReorderRows}
+        onAddColumn={handleAddColumn}
+        onAddRow={handleAddRow}
       />
       <ProductionTableShareModal
         isOpen={shareModal.isOpen}

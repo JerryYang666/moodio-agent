@@ -7,9 +7,9 @@ interface RowHandleProps {
   rowIndex: number;
   rowId: string;
   canReorder: boolean;
-  onDragStart: (e: React.DragEvent, rowId: string) => void;
-  onDragOver: (e: React.DragEvent) => void;
-  onDrop: (e: React.DragEvent, targetRowId: string) => void;
+  onDragStart: (index: number, e: React.DragEvent) => void;
+  onDragOver: (index: number, e: React.DragEvent) => void;
+  onDragEnd: () => void;
 }
 
 export const RowHandle = memo(function RowHandle({
@@ -18,7 +18,7 @@ export const RowHandle = memo(function RowHandle({
   canReorder,
   onDragStart,
   onDragOver,
-  onDrop,
+  onDragEnd,
 }: RowHandleProps) {
   return (
     <div
@@ -26,9 +26,9 @@ export const RowHandle = memo(function RowHandle({
         canReorder ? "cursor-grab active:cursor-grabbing" : ""
       }`}
       draggable={canReorder}
-      onDragStart={(e) => canReorder && onDragStart(e, rowId)}
-      onDragOver={(e) => canReorder && onDragOver(e)}
-      onDrop={(e) => canReorder && onDrop(e, rowId)}
+      onDragStart={(e) => canReorder && onDragStart(rowIndex, e)}
+      onDragOver={(e) => canReorder && onDragOver(rowIndex, e)}
+      onDragEnd={onDragEnd}
     >
       {canReorder && <GripVertical size={12} className="mr-0.5 text-default-300" />}
       {rowIndex + 1}
