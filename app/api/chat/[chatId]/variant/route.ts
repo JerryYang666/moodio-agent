@@ -8,6 +8,7 @@ import { getChatHistory, saveChatHistory } from "@/lib/storage/s3";
 import { Message, MessageContentPart } from "@/lib/llm/types";
 import { agent2 } from "@/lib/agents/agent-2";
 import { waitUntil } from "@vercel/functions";
+import { getActiveAccount } from "@/lib/credits";
 
 /**
  * Extract text content from a message for differentiation context
@@ -78,6 +79,8 @@ export async function POST(
     if (!payload) {
       return NextResponse.json({ error: "Invalid token" }, { status: 401 });
     }
+
+    const account = await getActiveAccount(payload.userId, payload);
 
     // Parse request body
     const json = await request.json();
@@ -210,6 +213,9 @@ export async function POST(
         userMessage.metadata?.imageQuantity, // maxImageQuantity
         undefined, // expertise
         persistentAssets.textChunk, // persistentTextChunk
+        account.accountId,
+        account.accountType,
+        account.performedBy,
       );
 
     // Handle background completion (saving the new variant to history)
