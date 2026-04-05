@@ -15,9 +15,11 @@ import type {
   EnrichedProductionTable,
   EnrichedCell,
   MediaAssetRef,
+  EnrichedMediaAssetRef,
   CellType,
 } from "./types";
 import { getTablePermission, getEditableGrants } from "./permissions";
+import { getImageUrl } from "@/lib/storage/s3";
 
 // ---------------------------------------------------------------------------
 // Table CRUD
@@ -139,7 +141,7 @@ export async function getEnrichedTable(
       columnId: c.columnId,
       rowId: c.rowId,
       textContent: c.textContent,
-      mediaAssets: c.mediaAssets as MediaAssetRef[] | null,
+      mediaAssets: enrichMediaAssets(c.mediaAssets as MediaAssetRef[] | null),
       updatedAt: c.updatedAt,
       updatedBy: c.updatedBy,
     };
@@ -274,6 +276,8 @@ export async function upsertCell(
   mediaAssets: MediaAssetRef[] | null | undefined,
   updatedBy: string
 ) {
+  const cleanAssets = stripMediaUrls(mediaAssets ?? null);
+
   const [cell] = await db
     .insert(productionTableCells)
     .values({
@@ -281,7 +285,7 @@ export async function upsertCell(
       columnId,
       rowId,
       textContent: textContent ?? null,
-      mediaAssets: mediaAssets ?? null,
+      mediaAssets: cleanAssets,
       updatedBy,
       updatedAt: new Date(),
     })
@@ -289,7 +293,7 @@ export async function upsertCell(
       target: [productionTableCells.columnId, productionTableCells.rowId],
       set: {
         textContent: textContent ?? null,
-        mediaAssets: mediaAssets ?? null,
+        mediaAssets: cleanAssets,
         updatedBy,
         updatedAt: new Date(),
       },
@@ -430,6 +434,32 @@ export async function removeRowShare(rowId: string, userId: string) {
 }
 
 export { getEditableGrants };
+
+// ---------------------------------------------------------------------------
+// Media asset URL strip / enrich helpers
+// ---------------------------------------------------------------------------
+
+function stripMediaUrls(
+  assets: MediaAssetRef[] | null
+): MediaAssetRef[] | null {
+  if (!assets) return null;
+  return assets.map(({ assetId, imageId, assetType, thumbnailImageId }) => ({
+    assetId,
+    imageId,
+    assetType,
+    ...(thumbnailImageId ? { thumbnailImageId } : {}),
+  }));
+}
+
+function enrichMediaAssets(
+  assets: MediaAssetRef[] | null
+): EnrichedMediaAssetRef[] | null {
+  if (!assets) return null;
+  return assets.map((a) => ({
+    ...a,
+    imageUrl: a.imageId ? getImageUrl(a.imageId) : undefined,
+  }));
+}
 
 // ---------------------------------------------------------------------------
 // Internal helper

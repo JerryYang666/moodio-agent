@@ -26,11 +26,16 @@ export type {
 
 export type CellType = "text" | "media";
 
+/** Stored in the DB — only IDs, never URLs. */
 export interface MediaAssetRef {
   assetId: string;
   imageId: string;
   assetType: string;
   thumbnailImageId?: string;
+}
+
+/** Enriched at read-time with derived URLs for the frontend. */
+export interface EnrichedMediaAssetRef extends MediaAssetRef {
   imageUrl?: string;
 }
 
@@ -44,7 +49,7 @@ export interface EnrichedCell {
   columnId: string;
   rowId: string;
   textContent: string | null;
-  mediaAssets: MediaAssetRef[] | null;
+  mediaAssets: EnrichedMediaAssetRef[] | null;
   updatedAt: Date;
   updatedBy: string | null;
 }
@@ -132,7 +137,7 @@ export interface CellLock {
 export type ProductionTableWSEvent =
   | { type: "pt_cell_selected"; tableId: string; rowId: string; columnId: string; userId: string; userName?: string }
   | { type: "pt_cell_deselected"; tableId: string; rowId: string; columnId: string; userId: string }
-  | { type: "pt_cell_updated"; tableId: string; rowId: string; columnId: string; textContent?: string | null; mediaAssets?: MediaAssetRef[] | null }
+  | { type: "pt_cell_updated"; tableId: string; rowId: string; columnId: string; textContent?: string | null; mediaAssets?: EnrichedMediaAssetRef[] | null }
   | { type: "pt_column_added"; tableId: string; column: ProductionTableColumn }
   | { type: "pt_column_removed"; tableId: string; columnId: string }
   | { type: "pt_column_renamed"; tableId: string; columnId: string; name: string }

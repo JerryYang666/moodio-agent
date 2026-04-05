@@ -5,7 +5,7 @@ import dynamic from "next/dynamic";
 import { Button } from "@heroui/button";
 import { Image } from "@heroui/image";
 import { Plus, X } from "lucide-react";
-import type { MediaAssetRef, CellLock } from "@/lib/production-table/types";
+import type { EnrichedMediaAssetRef, CellLock } from "@/lib/production-table/types";
 import type { AssetSummary } from "@/components/chat/asset-picker-modal";
 
 const AssetPickerModal = dynamic(
@@ -16,11 +16,11 @@ const AssetPickerModal = dynamic(
 interface MediaCellProps {
   rowId: string;
   columnId: string;
-  assets: MediaAssetRef[];
+  assets: EnrichedMediaAssetRef[];
   canEdit: boolean;
   lock: CellLock | undefined;
   currentUserId: string | undefined;
-  onCommit: (assets: MediaAssetRef[]) => void;
+  onCommit: (assets: EnrichedMediaAssetRef[]) => void;
 }
 
 export const MediaCell = memo(function MediaCell({
@@ -38,7 +38,7 @@ export const MediaCell = memo(function MediaCell({
 
   const handleSingleSelect = useCallback(
     (asset: AssetSummary) => {
-      const ref: MediaAssetRef = {
+      const ref: EnrichedMediaAssetRef = {
         assetId: asset.assetId ?? asset.id,
         imageId: asset.imageId,
         assetType: asset.assetType ?? "image",
@@ -52,7 +52,7 @@ export const MediaCell = memo(function MediaCell({
 
   const handleMultiSelect = useCallback(
     (selected: AssetSummary[]) => {
-      const newRefs: MediaAssetRef[] = selected.map((a) => ({
+      const newRefs: EnrichedMediaAssetRef[] = selected.map((a) => ({
         assetId: a.assetId ?? a.id,
         imageId: a.imageId,
         assetType: a.assetType ?? "image",

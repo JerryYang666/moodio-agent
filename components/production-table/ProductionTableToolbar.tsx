@@ -3,7 +3,7 @@
 import React, { memo } from "react";
 import { useTranslations } from "next-intl";
 import { Button } from "@heroui/button";
-import { Columns, Rows3, Share2, Wifi, WifiOff } from "lucide-react";
+import { ArrowLeft, Columns, Rows3, Share2, Wifi, WifiOff } from "lucide-react";
 import {
   Dropdown,
   DropdownTrigger,
@@ -19,6 +19,7 @@ interface ProductionTableToolbarProps {
   connectionState: ConnectionState;
   connectedUsers: PresenceUser[];
   canEdit: boolean;
+  onBack: () => void;
   onAddColumn: (cellType: CellType) => void;
   onAddRow: () => void;
   onShare: () => void;
@@ -29,6 +30,7 @@ export const ProductionTableToolbar = memo(function ProductionTableToolbar({
   connectionState,
   connectedUsers,
   canEdit,
+  onBack,
   onAddColumn,
   onAddRow,
   onShare,
@@ -39,6 +41,15 @@ export const ProductionTableToolbar = memo(function ProductionTableToolbar({
   return (
     <div className="flex items-center justify-between px-4 py-2 border-b border-default-200 bg-background">
       <div className="flex items-center gap-3">
+        <Button
+          isIconOnly
+          size="sm"
+          variant="light"
+          aria-label="Back"
+          onPress={onBack}
+        >
+          <ArrowLeft size={16} />
+        </Button>
         <h2 className="text-lg font-semibold truncate max-w-[300px]">
           {tableName}
         </h2>
