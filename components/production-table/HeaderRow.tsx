@@ -2,7 +2,7 @@
 
 import React, { memo, useState, useRef, useCallback } from "react";
 import { useTranslations } from "next-intl";
-import { GripVertical, Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import {
   Dropdown,
   DropdownTrigger,
@@ -11,6 +11,8 @@ import {
 } from "@heroui/dropdown";
 import type { ProductionTableColumn } from "@/lib/production-table/types";
 import type { CellType } from "@/lib/production-table/types";
+import type { SelectMode } from "@/hooks/use-grid-selection";
+import { selectModeFromEvent } from "@/hooks/use-grid-selection";
 
 interface HeaderRowProps {
   columns: ProductionTableColumn[];
@@ -18,6 +20,11 @@ interface HeaderRowProps {
   editableColumnIds: Set<string>;
   colDragIndex: number | null;
   colDropSlot: number | null;
+  selectedColumns: Set<string>;
+  onSelectColumn: (id: string, mode: SelectMode) => void;
+  onColPaintStart: (index: number) => void;
+  onColPaintMove: (index: number) => void;
+  onColPaintEnd: () => void;
   onRenameColumn: (columnId: string, name: string) => void;
   onDeleteColumn: (columnId: string) => void;
   onResizeColumn: (columnId: string, width: number) => void;
@@ -33,7 +40,11 @@ export const HeaderRow = memo(function HeaderRow({
   canEdit,
   editableColumnIds,
   colDragIndex,
-  colDropSlot,
+  selectedColumns,
+  onSelectColumn,
+  onColPaintStart,
+  onColPaintMove,
+  onColPaintEnd,
   onRenameColumn,
   onDeleteColumn,
   onResizeColumn,
@@ -48,14 +59,12 @@ export const HeaderRow = memo(function HeaderRow({
   const [editValue, setEditValue] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Right-click context menu
   const [contextMenu, setContextMenu] = useState<{
     columnId: string;
     x: number;
     y: number;
   } | null>(null);
 
-  // Column resize drag state
   const resizeRef = useRef<{
     columnId: string;
     startX: number;
@@ -63,6 +72,7 @@ export const HeaderRow = memo(function HeaderRow({
   } | null>(null);
   const [resizingId, setResizingId] = useState<string | null>(null);
   const [resizeDelta, setResizeDelta] = useState(0);
+  const didPaintRef = useRef(false);
 
   const startRename = useCallback(
     (col: ProductionTableColumn) => {
@@ -132,10 +142,53 @@ export const HeaderRow = memo(function HeaderRow({
     [onResizeColumn]
   );
 
+  const handleColMouseDown = useCallback(
+    (e: React.MouseEvent, colId: string, colIndex: number) => {
+      if (!canEdit || resizingId !== null) return;
+      if (e.button !== 0) return;
+
+      if (selectedColumns.has(colId)) return;
+
+      didPaintRef.current = false;
+      onColPaintStart(colIndex);
+
+      const handleMove = () => {
+        didPaintRef.current = true;
+      };
+      const handleUp = () => {
+        window.removeEventListener("mousemove", handleMove);
+        window.removeEventListener("mouseup", handleUp);
+        onColPaintEnd();
+        if (!didPaintRef.current) {
+          onSelectColumn(colId, selectModeFromEvent(e));
+        }
+      };
+      window.addEventListener("mousemove", handleMove);
+      window.addEventListener("mouseup", handleUp);
+    },
+    [canEdit, resizingId, selectedColumns, onColPaintStart, onColPaintEnd, onSelectColumn]
+  );
+
+  const handleColMouseEnter = useCallback(
+    (colIndex: number) => {
+      onColPaintMove(colIndex);
+    },
+    [onColPaintMove]
+  );
+
+  const handleColClick = useCallback(
+    (e: React.MouseEvent, colId: string) => {
+      if (!canEdit || resizingId !== null) return;
+      if (selectedColumns.has(colId) && !didPaintRef.current) {
+        onSelectColumn(colId, selectModeFromEvent(e));
+      }
+    },
+    [canEdit, resizingId, selectedColumns, onSelectColumn]
+  );
+
   return (
     <>
       <div className="flex sticky top-0 z-10 bg-default-100 border-b-2 border-default-300">
-        {/* Row number header */}
         <div className="w-12 shrink-0 border-r border-default-200 flex items-center justify-center text-xs font-semibold text-default-500">
           #
         </div>
@@ -144,29 +197,33 @@ export const HeaderRow = memo(function HeaderRow({
             resizingId === col.id
               ? Math.max(80, Math.min(800, col.width + resizeDelta))
               : col.width;
+          const isSelected = selectedColumns.has(col.id);
+          const canDrag = canEdit && resizingId === null && isSelected;
 
           return (
             <React.Fragment key={col.id}>
               {renderColGap(i)}
               <div
+                data-col-header
                 className={`shrink-0 border-r border-default-200 flex items-center px-2 py-1.5 group transition-opacity duration-200 relative ${
                   colDragIndex === i ? "opacity-30" : ""
-                } ${!canEdit && editableColumnIds.has(col.id) ? "bg-primary-50" : ""}`}
+                } ${
+                  isSelected
+                    ? "bg-primary-100 border-b-2 border-b-primary"
+                    : !canEdit && editableColumnIds.has(col.id)
+                      ? "bg-primary-50"
+                      : ""
+                } ${canEdit ? "cursor-pointer" : ""}`}
                 style={{ width: liveWidth }}
-                draggable={canEdit && resizingId === null}
-                onDragStart={(e) =>
-                  canEdit && resizingId === null && onColDragStart(i, e)
-                }
+                draggable={canDrag}
+                onDragStart={(e) => canDrag && onColDragStart(i, e)}
                 onDragOver={(e) => canEdit && onColDragOver(i, e)}
                 onDragEnd={onColDragEnd}
                 onContextMenu={(e) => handleContextMenu(e, col.id)}
+                onMouseDown={(e) => handleColMouseDown(e, col.id, i)}
+                onMouseEnter={() => handleColMouseEnter(i)}
+                onClick={(e) => handleColClick(e, col.id)}
               >
-                {canEdit && (
-                  <GripVertical
-                    size={12}
-                    className="mr-1 text-default-300 cursor-grab active:cursor-grabbing shrink-0"
-                  />
-                )}
                 {editingId === col.id ? (
                   <input
                     ref={inputRef}
@@ -178,6 +235,7 @@ export const HeaderRow = memo(function HeaderRow({
                       if (e.key === "Enter") commitRename();
                       if (e.key === "Escape") setEditingId(null);
                     }}
+                    onMouseDown={(e) => e.stopPropagation()}
                   />
                 ) : (
                   <span
@@ -189,13 +247,13 @@ export const HeaderRow = memo(function HeaderRow({
                     {col.name}
                   </span>
                 )}
-                {/* Resize handle */}
                 {(canEdit || editableColumnIds.has(col.id)) && (
                   <div
                     className="absolute top-0 right-0 w-1.5 h-full cursor-col-resize hover:bg-primary/30 active:bg-primary/50 z-10"
                     onPointerDown={(e) => handleResizePointerDown(e, col)}
                     onPointerMove={handleResizePointerMove}
                     onPointerUp={handleResizePointerUp}
+                    onMouseDown={(e) => e.stopPropagation()}
                   />
                 )}
               </div>
@@ -203,7 +261,6 @@ export const HeaderRow = memo(function HeaderRow({
             </React.Fragment>
           );
         })}
-        {/* Inline add-column button */}
         {canEdit && onAddColumn && (
           <div className="shrink-0 flex items-center justify-center w-10 border-r border-default-200">
             <Dropdown>
@@ -224,7 +281,6 @@ export const HeaderRow = memo(function HeaderRow({
         )}
       </div>
 
-      {/* Column context menu (portal to body via fixed positioning) */}
       {contextMenu && (
         <>
           <div

@@ -508,6 +508,36 @@ export default function ProductionTableDetailPage({
     [tableId, sendEvent]
   );
 
+  const handleBulkDeleteRows = useCallback(
+    async (rowIds: string[]) => {
+      setTable((prev) =>
+        prev
+          ? { ...prev, rows: prev.rows.filter((r) => !rowIds.includes(r.id)) }
+          : prev
+      );
+      for (const rowId of rowIds) {
+        sendEvent("pt_row_removed", { tableId, rowId });
+        fetch(`/api/production-table/${tableId}/rows/${rowId}`, { method: "DELETE" }).catch(() => {});
+      }
+    },
+    [tableId, sendEvent]
+  );
+
+  const handleBulkDeleteColumns = useCallback(
+    async (columnIds: string[]) => {
+      setTable((prev) =>
+        prev
+          ? { ...prev, columns: prev.columns.filter((c) => !columnIds.includes(c.id)) }
+          : prev
+      );
+      for (const columnId of columnIds) {
+        sendEvent("pt_column_removed", { tableId, columnId });
+        fetch(`/api/production-table/${tableId}/columns/${columnId}`, { method: "DELETE" }).catch(() => {});
+      }
+    },
+    [tableId, sendEvent]
+  );
+
   // Column resize
   const handleResizeColumn = useCallback(
     async (columnId: string, width: number) => {
@@ -563,6 +593,56 @@ export default function ProductionTableDetailPage({
         );
       } catch {
         addToast({ title: "Failed to resize row", color: "danger" });
+      }
+    },
+    [tableId, sendEvent]
+  );
+
+  const handleBulkResizeRows = useCallback(
+    async (rowIds: string[], height: number) => {
+      const idSet = new Set(rowIds);
+      setTable((prev) =>
+        prev
+          ? {
+              ...prev,
+              rows: prev.rows.map((r) =>
+                idSet.has(r.id) ? { ...r, height } : r
+              ),
+            }
+          : prev
+      );
+      for (const rowId of rowIds) {
+        sendEvent("pt_row_resized", { tableId, rowId, height });
+        fetch(`/api/production-table/${tableId}/rows/${rowId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ height }),
+        }).catch(() => {});
+      }
+    },
+    [tableId, sendEvent]
+  );
+
+  const handleBulkResizeColumns = useCallback(
+    async (columnIds: string[], width: number) => {
+      const idSet = new Set(columnIds);
+      setTable((prev) =>
+        prev
+          ? {
+              ...prev,
+              columns: prev.columns.map((c) =>
+                idSet.has(c.id) ? { ...c, width } : c
+              ),
+            }
+          : prev
+      );
+      for (const columnId of columnIds) {
+        sendEvent("pt_column_resized", { tableId, columnId, width });
+        fetch(`/api/production-table/${tableId}/columns/${columnId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ width }),
+        }).catch(() => {});
       }
     },
     [tableId, sendEvent]
@@ -626,6 +706,46 @@ export default function ProductionTableDetailPage({
     [table, tableId, sendEvent]
   );
 
+  const handleBulkReorderRows = useCallback(
+    async (newRowIds: string[]) => {
+      if (!table) return;
+      const rowMap = new Map(table.rows.map((r) => [r.id, r]));
+      const reordered = newRowIds.map((id) => rowMap.get(id)).filter(Boolean) as ProductionTableRow[];
+      setTable((prev) => (prev ? { ...prev, rows: reordered } : prev));
+      sendEvent("pt_rows_reordered", { tableId, rowIds: newRowIds });
+      try {
+        await fetch(`/api/production-table/${tableId}/rows/reorder`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ rowIds: newRowIds }),
+        });
+      } catch {
+        addToast({ title: "Failed to reorder rows", color: "danger" });
+      }
+    },
+    [table, tableId, sendEvent]
+  );
+
+  const handleBulkReorderColumns = useCallback(
+    async (newColumnIds: string[]) => {
+      if (!table) return;
+      const colMap = new Map(table.columns.map((c) => [c.id, c]));
+      const reordered = newColumnIds.map((id) => colMap.get(id)).filter(Boolean) as ProductionTableColumn[];
+      setTable((prev) => (prev ? { ...prev, columns: reordered } : prev));
+      sendEvent("pt_columns_reordered", { tableId, columnIds: newColumnIds });
+      try {
+        await fetch(`/api/production-table/${tableId}/columns/reorder`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ columnIds: newColumnIds }),
+        });
+      } catch {
+        addToast({ title: "Failed to reorder columns", color: "danger" });
+      }
+    },
+    [table, tableId, sendEvent]
+  );
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -675,10 +795,16 @@ export default function ProductionTableDetailPage({
         onRenameColumn={handleRenameColumn}
         onDeleteColumn={handleDeleteColumn}
         onDeleteRow={handleDeleteRow}
+        onBulkDeleteRows={handleBulkDeleteRows}
+        onBulkDeleteColumns={handleBulkDeleteColumns}
         onReorderColumns={handleReorderColumns}
         onReorderRows={handleReorderRows}
+        onBulkReorderRows={handleBulkReorderRows}
+        onBulkReorderColumns={handleBulkReorderColumns}
         onResizeColumn={handleResizeColumn}
         onResizeRow={handleResizeRow}
+        onBulkResizeRows={handleBulkResizeRows}
+        onBulkResizeColumns={handleBulkResizeColumns}
         onAddColumn={handleAddColumn}
         onAddRow={handleAddRow}
       />
