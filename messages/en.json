@@ -1421,6 +1421,54 @@
     "grantEditAccessColumns": "Grant edit access for {count} {count, plural, one {column} other {columns}}",
     "grantEditAccessRows": "Grant edit access for {count} {count, plural, one {row} other {rows}}",
     "deleteColumn": "Delete Column",
-    "deleteRow": "Delete Row"
+    "deleteRow": "Delete Row",
+    "wizard": {
+      "step1Title": "Name Your Table",
+      "step2Title": "Select Columns",
+      "step3Title": "Add Rows",
+      "tableName": "Table Name",
+      "selectColumnsDesc": "Choose which columns to include. All are selected by default.",
+      "next": "Next",
+      "back": "Back",
+      "createTable": "Create Table",
+      "col": {
+        "shotNumber": "Shot Number",
+        "visualContent": "Visual Content",
+        "shotSize": "Shot Size",
+        "cameraMovement": "Camera Movement",
+        "cameraAngle": "Camera Angle",
+        "dialogue": "Dialogue",
+        "characterRef": "Character Reference",
+        "sceneRef": "Scene Reference",
+        "keyframeRef": "Keyframe Reference",
+        "videoPrompt": "Video Prompt",
+        "generatedVideoRef": "Generated Video Reference"
+      },
+      "colDesc": {
+        "shotNumber": "Auto-numbered or manually entered",
+        "visualContent": "Scene / shot description",
+        "shotSize": "e.g. Wide, Medium, Close-up",
+        "cameraMovement": "e.g. Static, Push, Pull, Pan, Dolly, Track",
+        "cameraAngle": "e.g. Eye-level, High angle, Low angle, Bird's eye",
+        "dialogue": "Corresponding dialogue / narration",
+        "characterRef": "Character reference images, multi-upload with flag review",
+        "sceneRef": "Scene reference images, multi-upload with flag review",
+        "keyframeRef": "Keyframe reference images, can generate via AI",
+        "videoPrompt": "Text prompt for AI video generation",
+        "generatedVideoRef": "Generated video clips"
+      },
+      "aiFromScript": "AI from Script",
+      "aiFromScriptDesc": "Upload a script file and let AI pre-fill all text columns for you.",
+      "startFromScratch": "Start from Scratch",
+      "startFromScratchDesc": "Create an empty table with the number of rows you specify.",
+      "uploadScript": "Upload Script",
+      "uploadScriptFormats": "PDF, DOCX, or TXT, up to 5 MB",
+      "rowCount": "Number of Rows",
+      "generating": "Generating with AI...",
+      "parsing": "Parsing document...",
+      "scriptUploaded": "Script uploaded",
+      "failedToParse": "Failed to parse document",
+      "failedToCreate": "Failed to create table"
+    }
   }
 }

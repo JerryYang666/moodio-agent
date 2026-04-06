@@ -285,6 +285,63 @@ export async function reorderRows(tableId: string, rowIds: string[]) {
 }
 
 // ---------------------------------------------------------------------------
+// Bulk-insert helpers (used by the table creation wizard)
+// ---------------------------------------------------------------------------
+
+export async function bulkAddColumns(
+  tableId: string,
+  columns: Array<{ name: string; cellType: CellType }>
+) {
+  if (columns.length === 0) return [];
+  const values = columns.map((col, i) => ({
+    tableId,
+    name: col.name,
+    cellType: col.cellType,
+    sortOrder: i,
+  }));
+  const inserted = await db
+    .insert(productionTableColumns)
+    .values(values)
+    .returning();
+  await touchTable(tableId);
+  return inserted;
+}
+
+export async function bulkAddRows(tableId: string, count: number) {
+  if (count <= 0) return [];
+  const values = Array.from({ length: count }, (_, i) => ({
+    tableId,
+    sortOrder: i,
+  }));
+  const inserted = await db
+    .insert(productionTableRows)
+    .values(values)
+    .returning();
+  await touchTable(tableId);
+  return inserted;
+}
+
+export async function bulkInsertCells(
+  tableId: string,
+  cells: Array<{ columnId: string; rowId: string; textContent: string }>,
+  updatedBy: string
+) {
+  if (cells.length === 0) return;
+  const now = new Date();
+  const values = cells.map((c) => ({
+    tableId,
+    columnId: c.columnId,
+    rowId: c.rowId,
+    textContent: c.textContent,
+    mediaAssets: null,
+    updatedBy,
+    updatedAt: now,
+  }));
+  await db.insert(productionTableCells).values(values);
+  await touchTable(tableId);
+}
+
+// ---------------------------------------------------------------------------
 // Cell upsert (sparse)
 // ---------------------------------------------------------------------------
 
