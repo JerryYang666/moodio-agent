@@ -30,6 +30,7 @@ import {
   DropdownMenu,
   DropdownItem,
 } from "@heroui/dropdown";
+import CreateTableWizard from "@/components/production-table/CreateTableWizard";
 
 interface TableItem {
   id: string;
@@ -47,8 +48,6 @@ export default function ProductionTableListPage() {
   const t = useTranslations("productionTable");
   const [tables, setTables] = useState<TableItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [newTableName, setNewTableName] = useState("");
-  const [creating, setCreating] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<TableItem | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [renameTarget, setRenameTarget] = useState<TableItem | null>(null);
@@ -76,27 +75,13 @@ export default function ProductionTableListPage() {
     fetchTables();
   }, [fetchTables]);
 
-  const handleCreate = async () => {
-    if (!newTableName.trim()) return;
-    setCreating(true);
-    try {
-      const res = await fetch("/api/production-table", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: newTableName.trim() }),
-      });
-      if (!res.ok) throw new Error("Failed to create table");
-      const data = await res.json();
-      setTables((prev) => [data.table, ...prev]);
-      createModal.onClose();
-      setNewTableName("");
+  const handleCreated = useCallback(
+    (tableId: string) => {
       addToast({ title: t("create") + " ✓", color: "success" });
-    } catch {
-      addToast({ title: "Failed to create table", color: "danger" });
-    } finally {
-      setCreating(false);
-    }
-  };
+      router.push(`/production-table/${tableId}`);
+    },
+    [t, router]
+  );
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
@@ -247,34 +232,12 @@ export default function ProductionTableListPage() {
         </div>
       )}
 
-      {/* Create Modal */}
-      <Modal isOpen={createModal.isOpen} onOpenChange={createModal.onOpenChange}>
-        <ModalContent>
-          <ModalHeader>{t("create")}</ModalHeader>
-          <ModalBody>
-            <Input
-              autoFocus
-              label={t("title")}
-              value={newTableName}
-              onValueChange={setNewTableName}
-              onKeyDown={(e) => e.key === "Enter" && handleCreate()}
-            />
-          </ModalBody>
-          <ModalFooter>
-            <Button variant="flat" onPress={createModal.onClose}>
-              Cancel
-            </Button>
-            <Button
-              color="primary"
-              isLoading={creating}
-              isDisabled={!newTableName.trim()}
-              onPress={handleCreate}
-            >
-              {t("create")}
-            </Button>
-          </ModalFooter>
-        </ModalContent>
-      </Modal>
+      {/* Create Table Wizard */}
+      <CreateTableWizard
+        isOpen={createModal.isOpen}
+        onOpenChange={createModal.onOpenChange}
+        onCreated={handleCreated}
+      />
 
       {/* Delete Modal */}
       <Modal isOpen={deleteModal.isOpen} onOpenChange={deleteModal.onOpenChange}>

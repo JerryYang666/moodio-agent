@@ -124,7 +124,7 @@ export const TextCell = memo(function TextCell({
 
   return (
     <div
-      className={`w-full h-full min-h-[32px] p-1.5 text-sm truncate cursor-default relative ${
+      className={`w-full h-full min-h-[32px] p-1.5 text-sm wrap-break-word overflow-hidden cursor-default relative ${
         canEdit && !isLockedByOther
           ? "hover:bg-default-100 cursor-text"
           : ""

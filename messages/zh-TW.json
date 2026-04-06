@@ -1421,6 +1421,54 @@
     "grantEditAccessColumns": "授予 {count} 欄的編輯權限",
     "grantEditAccessRows": "授予 {count} 列的編輯權限",
     "deleteColumn": "刪除欄",
-    "deleteRow": "刪除列"
+    "deleteRow": "刪除列",
+    "wizard": {
+      "step1Title": "命名你的大表",
+      "step2Title": "選擇欄位",
+      "step3Title": "新增列",
+      "tableName": "大表名稱",
+      "selectColumnsDesc": "選擇要包含的欄位，預設全部選取。",
+      "next": "下一步",
+      "back": "上一步",
+      "createTable": "建立大表",
+      "col": {
+        "shotNumber": "鏡號",
+        "visualContent": "畫面內容",
+        "shotSize": "景別",
+        "cameraMovement": "運動",
+        "cameraAngle": "攝影機角度",
+        "dialogue": "台詞",
+        "characterRef": "人物參考",
+        "sceneRef": "場景參考",
+        "keyframeRef": "關鍵幀參考",
+        "videoPrompt": "影片 Prompt",
+        "generatedVideoRef": "生成影片參考"
+      },
+      "colDesc": {
+        "shotNumber": "自動編號或手動填寫",
+        "visualContent": "場景/畫面描述",
+        "shotSize": "如：全景、中景、特寫等",
+        "cameraMovement": "如：固定、推、拉、搖、移、跟",
+        "cameraAngle": "如：平拍、俯拍、仰拍、鳥瞰",
+        "dialogue": "對應台詞/旁白",
+        "characterRef": "人物參考圖片，支援多選上傳，Flag 標識審核狀態",
+        "sceneRef": "場景參考圖片，支援多選上傳，Flag 標識審核狀態",
+        "keyframeRef": "關鍵幀參考圖片，可透過 AI 生成",
+        "videoPrompt": "AI 生成影片的文字描述",
+        "generatedVideoRef": "生成的影片片段"
+      },
+      "aiFromScript": "AI 從劇本生成",
+      "aiFromScriptDesc": "上傳劇本檔案，讓 AI 為你自動填充所有文字欄位。",
+      "startFromScratch": "從零開始",
+      "startFromScratchDesc": "建立一個空白大表，指定初始列數。",
+      "uploadScript": "上傳劇本",
+      "uploadScriptFormats": "PDF、DOCX 或 TXT，最大 5 MB",
+      "rowCount": "列數",
+      "generating": "AI 生成中...",
+      "parsing": "正在解析文件...",
+      "scriptUploaded": "劇本已上傳",
+      "failedToParse": "文件解析失敗",
+      "failedToCreate": "建立大表失敗"
+    }
   }
 }

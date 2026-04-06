@@ -1421,6 +1421,54 @@
     "grantEditAccessColumns": "{count}列の編集アクセスを付与",
     "grantEditAccessRows": "{count}行の編集アクセスを付与",
     "deleteColumn": "列を削除",
-    "deleteRow": "行を削除"
+    "deleteRow": "行を削除",
+    "wizard": {
+      "step1Title": "シートに名前を付ける",
+      "step2Title": "列を選択",
+      "step3Title": "行を追加",
+      "tableName": "シート名",
+      "selectColumnsDesc": "含める列を選択してください。デフォルトですべて選択されています。",
+      "next": "次へ",
+      "back": "戻る",
+      "createTable": "シートを作成",
+      "col": {
+        "shotNumber": "ショット番号",
+        "visualContent": "画面内容",
+        "shotSize": "画角",
+        "cameraMovement": "カメラワーク",
+        "cameraAngle": "カメラアングル",
+        "dialogue": "台詞",
+        "characterRef": "キャラクター参考",
+        "sceneRef": "シーン参考",
+        "keyframeRef": "キーフレーム参考",
+        "videoPrompt": "動画プロンプト",
+        "generatedVideoRef": "生成動画参考"
+      },
+      "colDesc": {
+        "shotNumber": "自動採番または手動入力",
+        "visualContent": "シーン・画面の説明",
+        "shotSize": "例：ロング、ミディアム、クローズアップ",
+        "cameraMovement": "例：固定、プッシュ、プル、パン、ドリー、トラッキング",
+        "cameraAngle": "例：アイレベル、ハイアングル、ローアングル、バードアイ",
+        "dialogue": "対応する台詞・ナレーション",
+        "characterRef": "キャラクター参考画像、複数アップロード対応、フラグレビュー",
+        "sceneRef": "シーン参考画像、複数アップロード対応、フラグレビュー",
+        "keyframeRef": "キーフレーム参考画像、AI生成可能",
+        "videoPrompt": "AI動画生成用テキスト",
+        "generatedVideoRef": "生成された動画クリップ"
+      },
+      "aiFromScript": "AIで脚本から生成",
+      "aiFromScriptDesc": "脚本ファイルをアップロードすると、AIがすべてのテキスト列を自動入力します。",
+      "startFromScratch": "ゼロから始める",
+      "startFromScratchDesc": "指定した行数で空のシートを作成します。",
+      "uploadScript": "脚本をアップロード",
+      "uploadScriptFormats": "PDF、DOCXまたはTXT、最大5 MB",
+      "rowCount": "行数",
+      "generating": "AIで生成中...",
+      "parsing": "ドキュメントを解析中...",
+      "scriptUploaded": "脚本がアップロードされました",
+      "failedToParse": "ドキュメントの解析に失敗しました",
+      "failedToCreate": "シートの作成に失敗しました"
+    }
   }
 }

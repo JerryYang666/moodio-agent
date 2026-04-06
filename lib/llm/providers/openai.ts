@@ -49,7 +49,7 @@ export class OpenAIProvider implements LLMProvider {
     options?: ChatOptions
   ): Promise<string> {
     const model = options?.model || this.defaultModel;
-    const maxTokens = options?.maxTokens || 3000;
+    const maxTokens = options?.maxTokens || 12800;
     const temperature = options?.temperature || 1;
 
     const response = await this.client.chat.completions.create({
@@ -57,6 +57,9 @@ export class OpenAIProvider implements LLMProvider {
       messages: messages as OpenAI.Chat.Completions.ChatCompletionMessageParam[],
       max_completion_tokens: maxTokens,
       temperature,
+      ...(options?.responseFormat && {
+        response_format: options.responseFormat,
+      }),
     });
 
     return response.choices[0]?.message?.content || "";

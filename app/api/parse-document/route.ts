@@ -6,6 +6,7 @@ const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
 const ALLOWED_TYPES = new Set([
   "application/pdf",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "text/plain",
 ]);
 
 export async function POST(request: NextRequest) {
@@ -36,7 +37,9 @@ export async function POST(request: NextRequest) {
     const buffer = Buffer.from(await file.arrayBuffer());
     let text = "";
 
-    if (file.type === "application/pdf") {
+    if (file.type === "text/plain") {
+      text = new TextDecoder("utf-8").decode(buffer);
+    } else if (file.type === "application/pdf") {
       const PDFParser = (await import("pdf2json")).default;
       const pdfParser = new PDFParser(null, true);
       text = await new Promise<string>((resolve, reject) => {
