@@ -17,6 +17,8 @@ import { TextCell } from "./TextCell";
 import { MediaCell } from "./MediaCell";
 import { RowHandle } from "./RowHandle";
 import { HeaderRow } from "./HeaderRow";
+import { useGridSelection } from "@/hooks/use-grid-selection";
+import type { SelectMode } from "@/hooks/use-grid-selection";
 
 const DEFAULT_ROW_HEIGHT = 48;
 const DEFAULT_COL_WIDTH = 192;
@@ -56,10 +58,16 @@ interface ProductionTableGridProps {
   onRenameColumn: (columnId: string, name: string) => void;
   onDeleteColumn: (columnId: string) => void;
   onDeleteRow: (rowId: string) => void;
+  onBulkDeleteRows?: (rowIds: string[]) => void;
+  onBulkDeleteColumns?: (columnIds: string[]) => void;
   onReorderColumns: (fromIndex: number, toIndex: number) => void;
   onReorderRows: (fromIndex: number, toIndex: number) => void;
+  onBulkReorderRows?: (newRowIds: string[]) => void;
+  onBulkReorderColumns?: (newColumnIds: string[]) => void;
   onResizeColumn: (columnId: string, width: number) => void;
   onResizeRow: (rowId: string, height: number) => void;
+  onBulkResizeRows?: (rowIds: string[], height: number) => void;
+  onBulkResizeColumns?: (columnIds: string[], width: number) => void;
   onAddColumn?: (cellType: CellType) => void;
   onAddRow?: () => void;
 }
@@ -82,14 +90,35 @@ export function ProductionTableGrid({
   onRenameColumn,
   onDeleteColumn,
   onDeleteRow,
+  onBulkDeleteRows,
+  onBulkDeleteColumns,
   onReorderColumns,
   onReorderRows,
+  onBulkReorderRows,
+  onBulkReorderColumns,
   onResizeColumn,
   onResizeRow,
+  onBulkResizeRows,
+  onBulkResizeColumns,
   onAddColumn,
   onAddRow,
 }: ProductionTableGridProps) {
   const [scrollElement, setScrollElement] = useState<HTMLDivElement | null>(null);
+
+  const rowIds = useMemo(() => rows.map((r) => r.id), [rows]);
+  const columnIds = useMemo(() => columns.map((c) => c.id), [columns]);
+
+  const {
+    selectedRows,
+    selectedColumns,
+    selectRow,
+    selectColumn,
+    clearSelection,
+    startPaint,
+    movePaint,
+    endPaint,
+    isPainting,
+  } = useGridSelection({ rowIds, columnIds });
 
   // ---- Column drag state ----
   const [colDragIndex, setColDragIndex] = useState<number | null>(null);
@@ -137,18 +166,42 @@ export function ProductionTableGrid({
 
   const handleColDragEnd = useCallback(() => {
     if (colDragIndex !== null && colDropTarget !== null) {
-      const toIndex =
+      const toSlot =
         colDropTarget.side === "before"
           ? colDropTarget.index
           : colDropTarget.index + 1;
-      const adjusted = toIndex > colDragIndex ? toIndex - 1 : toIndex;
-      if (adjusted !== colDragIndex) {
-        onReorderColumns(colDragIndex, adjusted);
+
+      if (selectedColumns.size > 1 && onBulkReorderColumns) {
+        const selectedIndices = columns
+          .map((c, i) => (selectedColumns.has(c.id) ? i : -1))
+          .filter((i) => i >= 0);
+        const selectedCols = selectedIndices.map((i) => columns[i]);
+        const remaining = columns.filter((c) => !selectedColumns.has(c.id));
+
+        let insertAt = toSlot;
+        let removedBefore = 0;
+        for (const si of selectedIndices) {
+          if (si < toSlot) removedBefore++;
+        }
+        insertAt -= removedBefore;
+        insertAt = Math.max(0, Math.min(remaining.length, insertAt));
+
+        const newOrder = [
+          ...remaining.slice(0, insertAt),
+          ...selectedCols,
+          ...remaining.slice(insertAt),
+        ];
+        onBulkReorderColumns(newOrder.map((c) => c.id));
+      } else {
+        const adjusted = toSlot > colDragIndex ? toSlot - 1 : toSlot;
+        if (adjusted !== colDragIndex) {
+          onReorderColumns(colDragIndex, adjusted);
+        }
       }
     }
     setColDragIndex(null);
     setColDropTarget(null);
-  }, [colDragIndex, colDropTarget, onReorderColumns]);
+  }, [colDragIndex, colDropTarget, selectedColumns, columns, onBulkReorderColumns, onReorderColumns]);
 
   // ---- Row drag state ----
   const [rowDragIndex, setRowDragIndex] = useState<number | null>(null);
@@ -199,23 +252,47 @@ export function ProductionTableGrid({
 
   const handleRowDragEnd = useCallback(() => {
     if (rowDragIndex !== null && rowDropTarget !== null) {
-      const toIndex =
+      const toSlot =
         rowDropTarget.side === "before"
           ? rowDropTarget.index
           : rowDropTarget.index + 1;
-      const adjusted = toIndex > rowDragIndex ? toIndex - 1 : toIndex;
-      if (adjusted !== rowDragIndex) {
-        onReorderRows(rowDragIndex, adjusted);
+
+      if (selectedRows.size > 1 && onBulkReorderRows) {
+        const selectedIndices = rows
+          .map((r, i) => (selectedRows.has(r.id) ? i : -1))
+          .filter((i) => i >= 0);
+        const selectedRowItems = selectedIndices.map((i) => rows[i]);
+        const remaining = rows.filter((r) => !selectedRows.has(r.id));
+
+        let insertAt = toSlot;
+        let removedBefore = 0;
+        for (const si of selectedIndices) {
+          if (si < toSlot) removedBefore++;
+        }
+        insertAt -= removedBefore;
+        insertAt = Math.max(0, Math.min(remaining.length, insertAt));
+
+        const newOrder = [
+          ...remaining.slice(0, insertAt),
+          ...selectedRowItems,
+          ...remaining.slice(insertAt),
+        ];
+        onBulkReorderRows(newOrder.map((r) => r.id));
+      } else {
+        const adjusted = toSlot > rowDragIndex ? toSlot - 1 : toSlot;
+        if (adjusted !== rowDragIndex) {
+          onReorderRows(rowDragIndex, adjusted);
+        }
       }
     }
     setRowDragIndex(null);
     setRowDropTarget(null);
-  }, [rowDragIndex, rowDropTarget, onReorderRows]);
+  }, [rowDragIndex, rowDropTarget, selectedRows, rows, onBulkReorderRows, onReorderRows]);
 
   // ---- Virtualizer ----
   const isRowDragging = rowDragIndex !== null;
 
-  // ---- Row context menu (rendered outside the transformed virtualizer) ----
+  // ---- Row context menu ----
   const t = useTranslations("productionTable");
   const [rowContextMenu, setRowContextMenu] = useState<{
     rowId: string;
@@ -233,7 +310,7 @@ export function ProductionTableGrid({
 
   const closeRowContextMenu = useCallback(() => setRowContextMenu(null), []);
 
-  // ---- Cursor broadcasting (XY-based, like desktop canvas) ----
+  // ---- Cursor broadcasting ----
   const lastCursorSend = useRef(0);
   const contentRef = useRef<HTMLDivElement>(null);
 
@@ -257,6 +334,109 @@ export function ProductionTableGrid({
     sendEvent("pt_cursor_leave", {});
   }, [sendEvent]);
 
+  // ---- Selection handlers ----
+  const handleSelectRow = useCallback(
+    (rowId: string, mode: SelectMode) => {
+      selectRow(rowId, mode);
+    },
+    [selectRow]
+  );
+
+  const handleSelectColumn = useCallback(
+    (colId: string, mode: SelectMode) => {
+      selectColumn(colId, mode);
+    },
+    [selectColumn]
+  );
+
+  const handleRowPaintStart = useCallback(
+    (index: number) => {
+      startPaint("row", index);
+    },
+    [startPaint]
+  );
+
+  const handleRowPaintMove = useCallback(
+    (index: number) => {
+      if (isPainting()) movePaint(index);
+    },
+    [isPainting, movePaint]
+  );
+
+  const handleColPaintStart = useCallback(
+    (index: number) => {
+      startPaint("col", index);
+    },
+    [startPaint]
+  );
+
+  const handleColPaintMove = useCallback(
+    (index: number) => {
+      if (isPainting()) movePaint(index);
+    },
+    [isPainting, movePaint]
+  );
+
+  // ---- Keyboard handler ----
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === "Escape") {
+        clearSelection();
+        return;
+      }
+
+      if (e.key === "Delete" || e.key === "Backspace") {
+        if (selectedRows.size > 0 && canEditStructure) {
+          e.preventDefault();
+          const ids = Array.from(selectedRows);
+          clearSelection();
+          if (onBulkDeleteRows) {
+            onBulkDeleteRows(ids);
+          } else {
+            ids.forEach((id) => onDeleteRow(id));
+          }
+          return;
+        }
+        if (selectedColumns.size > 0 && canEditStructure) {
+          e.preventDefault();
+          const ids = Array.from(selectedColumns);
+          clearSelection();
+          if (onBulkDeleteColumns) {
+            onBulkDeleteColumns(ids);
+          } else {
+            ids.forEach((id) => onDeleteColumn(id));
+          }
+          return;
+        }
+      }
+    },
+    [selectedRows, selectedColumns, canEditStructure, clearSelection, onBulkDeleteRows, onBulkDeleteColumns, onDeleteRow, onDeleteColumn]
+  );
+
+  // ---- Bulk resize wrappers ----
+  const handleResizeRow = useCallback(
+    (rowId: string, height: number) => {
+      if (selectedRows.size > 1 && selectedRows.has(rowId) && onBulkResizeRows) {
+        onBulkResizeRows(Array.from(selectedRows), height);
+      } else {
+        onResizeRow(rowId, height);
+      }
+    },
+    [selectedRows, onBulkResizeRows, onResizeRow]
+  );
+
+  const handleResizeColumn = useCallback(
+    (columnId: string, width: number) => {
+      if (selectedColumns.size > 1 && selectedColumns.has(columnId) && onBulkResizeColumns) {
+        onBulkResizeColumns(Array.from(selectedColumns), width);
+      } else {
+        onResizeColumn(columnId, width);
+      }
+    },
+    [selectedColumns, onBulkResizeColumns, onResizeColumn]
+  );
+
+  // ---- Virtualizer ----
   const rowVirtualizer = useVirtualizer({
     count: rows.length,
     getScrollElement: () => scrollElement,
@@ -266,7 +446,6 @@ export function ProductionTableGrid({
     getItemKey: (i) => rows[i]?.id ?? i,
   });
 
-  // When row heights change, invalidate the virtualizer's cached measurements
   const rowHeightKey = rows.map((r) => r.height ?? DEFAULT_ROW_HEIGHT).join(",");
   React.useEffect(() => {
     rowVirtualizer.measure();
@@ -320,7 +499,6 @@ export function ProductionTableGrid({
     [columns]
   );
 
-  // Shared column gap renderer
   const renderColGap = useCallback(
     (slotIndex: number) => (
       <div
@@ -336,9 +514,48 @@ export function ProductionTableGrid({
     [colDropSlot]
   );
 
+  // Track when a paint-select just ended so the subsequent click event doesn't clear the selection
+  const justPaintedRef = useRef(false);
+
+  const handlePaintEnd = useCallback(() => {
+    if (isPainting()) {
+      justPaintedRef.current = true;
+    }
+    endPaint();
+  }, [isPainting, endPaint]);
+
+  const handleGridClick = useCallback(
+    (e: React.MouseEvent) => {
+      if (justPaintedRef.current) {
+        justPaintedRef.current = false;
+        return;
+      }
+      const target = e.target as HTMLElement;
+      if (
+        target.closest("[data-row-handle]") ||
+        target.closest("[data-col-header]")
+      ) {
+        return;
+      }
+      if (selectedRows.size > 0 || selectedColumns.size > 0) {
+        clearSelection();
+      }
+    },
+    [selectedRows, selectedColumns, clearSelection]
+  );
+
   return (
   <>
-    <div ref={setScrollElement} className="flex-1 overflow-auto" onMouseLeave={handleGridMouseLeave} onMouseMove={handleGridMouseMove}>
+    {/* tabIndex allows keyboard events */}
+    <div
+      ref={setScrollElement}
+      className="flex-1 overflow-auto outline-none"
+      onMouseLeave={handleGridMouseLeave}
+      onMouseMove={handleGridMouseMove}
+      onKeyDown={handleKeyDown}
+      onClick={handleGridClick}
+      tabIndex={0}
+    >
       <div ref={contentRef} style={{ minWidth: totalWidth, position: "relative" }}>
         <HeaderRow
           columns={columns}
@@ -346,9 +563,14 @@ export function ProductionTableGrid({
           editableColumnIds={editableColumnIds}
           colDragIndex={colDragIndex}
           colDropSlot={colDropSlot}
+          selectedColumns={selectedColumns}
+          onSelectColumn={handleSelectColumn}
+          onColPaintStart={handleColPaintStart}
+          onColPaintMove={handleColPaintMove}
+          onColPaintEnd={handlePaintEnd}
           onRenameColumn={onRenameColumn}
           onDeleteColumn={onDeleteColumn}
-          onResizeColumn={onResizeColumn}
+          onResizeColumn={handleResizeColumn}
           onColDragStart={handleColDragStart}
           onColDragOver={handleColDragOver}
           onColDragEnd={handleColDragEnd}
@@ -365,7 +587,9 @@ export function ProductionTableGrid({
           {rowVirtualizer.getVirtualItems().map((virtualRow) => {
             const row = rows[virtualRow.index];
             const idx = virtualRow.index;
-            const isDraggedRow = rowDragIndex === idx;
+            const isDraggedRow = selectedRows.size > 1
+              ? selectedRows.has(row.id) && rowDragIndex !== null
+              : rowDragIndex === idx;
             const rowHeight = row.height ?? DEFAULT_ROW_HEIGHT;
 
             return (
@@ -403,10 +627,15 @@ export function ProductionTableGrid({
                     height={rowHeight}
                     canReorder={canEditStructure}
                     isEditable={editableRowIds.has(row.id)}
+                    isSelected={selectedRows.has(row.id)}
+                    onSelect={handleSelectRow}
+                    onPaintStart={handleRowPaintStart}
+                    onPaintMove={handleRowPaintMove}
+                    onPaintEnd={handlePaintEnd}
                     onDragStart={handleRowDragStart}
                     onDragOver={handleRowDragOver}
                     onDragEnd={handleRowDragEnd}
-                    onResizeRow={onResizeRow}
+                    onResizeRow={handleResizeRow}
                     onRowContextMenu={handleRowContextMenu}
                   />
                   {columns.map((col, colIdx) => (
@@ -476,7 +705,7 @@ export function ProductionTableGrid({
       </div>
     </div>
 
-    {/* Row context menu — rendered outside the virtualized/transformed container */}
+    {/* Row context menu */}
     {rowContextMenu && (
       <>
         <div
@@ -494,12 +723,22 @@ export function ProductionTableGrid({
           <button
             className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-danger hover:bg-danger/10 transition-colors"
             onClick={() => {
-              onDeleteRow(rowContextMenu.rowId);
+              const idsToDelete = selectedRows.has(rowContextMenu.rowId) && selectedRows.size > 1
+                ? Array.from(selectedRows)
+                : [rowContextMenu.rowId];
+              clearSelection();
+              if (idsToDelete.length > 1 && onBulkDeleteRows) {
+                onBulkDeleteRows(idsToDelete);
+              } else {
+                idsToDelete.forEach((id) => onDeleteRow(id));
+              }
               closeRowContextMenu();
             }}
           >
             <Trash2 size={14} />
-            {t("deleteRow")}
+            {selectedRows.has(rowContextMenu.rowId) && selectedRows.size > 1
+              ? `${t("deleteRow")} (${selectedRows.size})`
+              : t("deleteRow")}
           </button>
         </div>
       </>

@@ -1,7 +1,8 @@
 "use client";
 
 import React, { memo, useRef, useState, useCallback } from "react";
-import { GripVertical } from "lucide-react";
+import type { SelectMode } from "@/hooks/use-grid-selection";
+import { selectModeFromEvent } from "@/hooks/use-grid-selection";
 
 interface RowHandleProps {
   rowIndex: number;
@@ -9,6 +10,11 @@ interface RowHandleProps {
   height: number;
   canReorder: boolean;
   isEditable: boolean;
+  isSelected: boolean;
+  onSelect: (rowId: string, mode: SelectMode) => void;
+  onPaintStart: (index: number) => void;
+  onPaintMove: (index: number) => void;
+  onPaintEnd: () => void;
   onDragStart: (index: number, e: React.DragEvent) => void;
   onDragOver: (index: number, e: React.DragEvent) => void;
   onDragEnd: () => void;
@@ -22,6 +28,11 @@ export const RowHandle = memo(function RowHandle({
   height,
   canReorder,
   isEditable,
+  isSelected,
+  onSelect,
+  onPaintStart,
+  onPaintMove,
+  onPaintEnd,
   onDragStart,
   onDragOver,
   onDragEnd,
@@ -33,6 +44,7 @@ export const RowHandle = memo(function RowHandle({
   );
   const [resizing, setResizing] = useState(false);
   const [resizeDelta, setResizeDelta] = useState(0);
+  const didPaintRef = useRef(false);
 
   const handleContextMenu = useCallback(
     (e: React.MouseEvent) => {
@@ -77,27 +89,75 @@ export const RowHandle = memo(function RowHandle({
     [rowId, onResizeRow]
   );
 
+  const handleMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      if (!canReorder || resizing) return;
+      if (e.button !== 0) return;
+
+      if (isSelected) return;
+
+      didPaintRef.current = false;
+      onPaintStart(rowIndex);
+
+      const handleMove = () => {
+        didPaintRef.current = true;
+      };
+      const handleUp = () => {
+        window.removeEventListener("mousemove", handleMove);
+        window.removeEventListener("mouseup", handleUp);
+        onPaintEnd();
+        if (!didPaintRef.current) {
+          onSelect(rowId, selectModeFromEvent(e));
+        }
+      };
+      window.addEventListener("mousemove", handleMove);
+      window.addEventListener("mouseup", handleUp);
+    },
+    [canReorder, resizing, isSelected, rowIndex, rowId, onPaintStart, onPaintEnd, onSelect]
+  );
+
+  const handleMouseEnter = useCallback(() => {
+    onPaintMove(rowIndex);
+  }, [onPaintMove, rowIndex]);
+
+  const handleClick = useCallback(
+    (e: React.MouseEvent) => {
+      if (!canReorder || resizing) return;
+      if (isSelected && !didPaintRef.current) {
+        onSelect(rowId, selectModeFromEvent(e));
+      }
+    },
+    [canReorder, resizing, isSelected, rowId, onSelect]
+  );
+
   const liveHeight = resizing
     ? Math.max(32, Math.min(400, height + resizeDelta))
     : height;
 
+  const canDrag = canReorder && !resizing && isSelected;
+
   return (
     <div
+      data-row-handle
       className={`relative flex items-center justify-center w-12 text-xs text-default-400 select-none border-r border-default-200 ${
-        !canReorder && isEditable ? "bg-primary-50" : "bg-default-50"
+        isSelected
+          ? "bg-primary-100 border-l-2 border-l-primary"
+          : !canReorder && isEditable
+            ? "bg-primary-50"
+            : "bg-default-50"
       } ${
-        canReorder && !resizing ? "cursor-grab active:cursor-grabbing" : ""
+        canDrag ? "cursor-grab active:cursor-grabbing" : canReorder ? "cursor-pointer" : ""
       }`}
       style={{ height: liveHeight }}
-      draggable={canReorder && !resizing}
-      onDragStart={(e) => canReorder && !resizing && onDragStart(rowIndex, e)}
+      draggable={canDrag}
+      onDragStart={(e) => canDrag && onDragStart(rowIndex, e)}
       onDragOver={(e) => canReorder && onDragOver(rowIndex, e)}
       onDragEnd={onDragEnd}
       onContextMenu={handleContextMenu}
+      onMouseDown={handleMouseDown}
+      onMouseEnter={handleMouseEnter}
+      onClick={handleClick}
     >
-      {canReorder && (
-        <GripVertical size={12} className="mr-0.5 text-default-300" />
-      )}
       {rowIndex + 1}
       {(canReorder || isEditable) && (
         <div
