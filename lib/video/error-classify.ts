@@ -11,7 +11,6 @@ export type VideoErrorType =
   | "generic_failure";
 
 const CONTENT_VIOLATION_PATTERNS = [
-  /\b422\b/,
   /content.?moderat/i,
   /safety.?filter/i,
   /nsfw/i,
