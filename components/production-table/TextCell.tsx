@@ -19,6 +19,7 @@ interface TextCellProps {
   columnId: string;
   value: string;
   canEdit: boolean;
+  isSelected?: boolean;
   lock: CellLock | undefined;
   currentUserId: string | undefined;
   sendEvent?: (type: string, payload: Record<string, unknown>) => void;
@@ -30,6 +31,7 @@ export const TextCell = memo(function TextCell({
   columnId,
   value,
   canEdit,
+  isSelected,
   lock,
   currentUserId,
   sendEvent,
@@ -125,9 +127,11 @@ export const TextCell = memo(function TextCell({
   return (
     <div
       className={`w-full h-full min-h-[32px] p-1.5 text-sm wrap-break-word overflow-hidden cursor-default relative ${
-        canEdit && !isLockedByOther
-          ? "hover:bg-default-100 cursor-text"
-          : ""
+        isSelected
+          ? "bg-primary/10 hover:bg-primary/15 cursor-text"
+          : canEdit && !isLockedByOther
+            ? "hover:bg-default-100 cursor-text"
+            : ""
       }`}
       style={lockColor ? { boxShadow: `inset 0 0 0 2px ${lockColor}` } : undefined}
       onDoubleClick={startEditing}

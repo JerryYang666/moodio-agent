@@ -75,6 +75,19 @@ export default function ProductionTableDetailPage({
     localStorage.setItem(siteConfig.chatPanelWidth, String(width));
   }, []);
 
+  // Auto-expand chat panel when cells are sent to chat
+  useEffect(() => {
+    const expandChat = () => {
+      if (isChatPanelCollapsed) {
+        handleChatPanelCollapseChange(false);
+      }
+    };
+    window.addEventListener("moodio-batch-to-chat", expandChat);
+    return () => {
+      window.removeEventListener("moodio-batch-to-chat", expandChat);
+    };
+  }, [isChatPanelCollapsed, handleChatPanelCollapseChange]);
+
   // Fetch table data
   const fetchTable = useCallback(async () => {
     try {

@@ -1422,6 +1422,9 @@
     "grantEditAccessRows": "{count}行の編集アクセスを付与",
     "deleteColumn": "列を削除",
     "deleteRow": "行を削除",
+    "sendToChat": "チャットに送信",
+    "cellSelected": "セル選択中",
+    "cellsSelected": "セル選択中",
     "wizard": {
       "step1Title": "シートに名前を付ける",
       "step2Title": "列を選択",

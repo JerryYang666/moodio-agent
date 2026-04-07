@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useCallback, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { MousePointer2, Plus, Trash2 } from "lucide-react";
+import { MousePointer2, Plus, Trash2, SendHorizontal } from "lucide-react";
 import type {
   ProductionTableColumn,
   ProductionTableRow,
@@ -104,6 +104,7 @@ export function ProductionTableGrid({
   onAddRow,
 }: ProductionTableGridProps) {
   const [scrollElement, setScrollElement] = useState<HTMLDivElement | null>(null);
+  const [isCellPainting, setIsCellPainting] = useState(false);
 
   const rowIds = useMemo(() => rows.map((r) => r.id), [rows]);
   const columnIds = useMemo(() => columns.map((c) => c.id), [columns]);
@@ -111,11 +112,16 @@ export function ProductionTableGrid({
   const {
     selectedRows,
     selectedColumns,
+    selectedCells,
     selectRow,
     selectColumn,
+    selectCell,
+    isCellSelected,
     clearSelection,
     startPaint,
+    startCellPaint,
     movePaint,
+    moveCellPaint,
     endPaint,
     isPainting,
   } = useGridSelection({ rowIds, columnIds });
@@ -314,8 +320,64 @@ export function ProductionTableGrid({
   const lastCursorSend = useRef(0);
   const contentRef = useRef<HTMLDivElement>(null);
 
+  // ---- Auto-scroll during paint-select ----
+  const EDGE_ZONE = 40;
+  const MAX_SCROLL_SPEED = 18;
+  const autoScrollRef = useRef<number | null>(null);
+  const mouseClientPos = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+
+  const stopAutoScroll = useCallback(() => {
+    if (autoScrollRef.current !== null) {
+      cancelAnimationFrame(autoScrollRef.current);
+      autoScrollRef.current = null;
+    }
+  }, []);
+
+  const tickAutoScroll = useCallback(() => {
+    if (!scrollElement) return;
+    const rect = scrollElement.getBoundingClientRect();
+    const { x, y } = mouseClientPos.current;
+    let dx = 0;
+    let dy = 0;
+
+    if (y < rect.top + EDGE_ZONE) {
+      dy = -MAX_SCROLL_SPEED * Math.max(0, 1 - (y - rect.top) / EDGE_ZONE);
+    } else if (y > rect.bottom - EDGE_ZONE) {
+      dy = MAX_SCROLL_SPEED * Math.max(0, 1 - (rect.bottom - y) / EDGE_ZONE);
+    }
+    if (x < rect.left + EDGE_ZONE) {
+      dx = -MAX_SCROLL_SPEED * Math.max(0, 1 - (x - rect.left) / EDGE_ZONE);
+    } else if (x > rect.right - EDGE_ZONE) {
+      dx = MAX_SCROLL_SPEED * Math.max(0, 1 - (rect.right - x) / EDGE_ZONE);
+    }
+
+    if (dx !== 0 || dy !== 0) {
+      scrollElement.scrollBy(dx, dy);
+      const el = document.elementFromPoint(x, y);
+      const wrapper = el?.closest("[data-cell-wrapper]") as HTMLElement | null;
+      if (wrapper) {
+        const rid = wrapper.getAttribute("data-row-id");
+        const cid = wrapper.getAttribute("data-col-id");
+        if (rid && cid) {
+          moveCellPaint(rid, cid);
+        }
+      }
+    }
+    autoScrollRef.current = requestAnimationFrame(tickAutoScroll);
+  }, [scrollElement, moveCellPaint]);
+
+  useEffect(() => {
+    return () => stopAutoScroll();
+  }, [stopAutoScroll]);
+
   const handleGridMouseMove = useCallback(
     (e: React.MouseEvent) => {
+      // Track position for auto-scroll during paint-select
+      mouseClientPos.current = { x: e.clientX, y: e.clientY };
+      if (isPainting() && autoScrollRef.current === null) {
+        autoScrollRef.current = requestAnimationFrame(tickAutoScroll);
+      }
+
       if (!sendEvent || !contentRef.current) return;
       const now = Date.now();
       if (now - lastCursorSend.current < CURSOR_THROTTLE_MS) return;
@@ -326,7 +388,7 @@ export function ProductionTableGrid({
       const y = e.clientY - rect.top;
       sendEvent("pt_cursor_move", { x, y });
     },
-    [sendEvent]
+    [sendEvent, isPainting, tickAutoScroll]
   );
 
   const handleGridMouseLeave = useCallback(() => {
@@ -458,6 +520,7 @@ export function ProductionTableGrid({
       const cell = cellMap[key];
       const lock = cellLocks.get(key);
       const editable = canEditCellFn(row.id, col.id);
+      const selected = isCellSelected(row.id, col.id);
 
       if (col.cellType === "media") {
         return (
@@ -467,6 +530,7 @@ export function ProductionTableGrid({
             columnId={col.id}
             assets={(cell?.mediaAssets as EnrichedMediaAssetRef[]) ?? []}
             canEdit={editable}
+            isSelected={selected}
             lock={lock}
             currentUserId={currentUserId}
             onAddAsset={(asset) => onMediaAssetAdd(col.id, row.id, asset)}
@@ -482,6 +546,7 @@ export function ProductionTableGrid({
           columnId={col.id}
           value={cell?.textContent ?? ""}
           canEdit={editable}
+          isSelected={selected}
           lock={lock}
           currentUserId={currentUserId}
           sendEvent={sendEvent}
@@ -489,7 +554,7 @@ export function ProductionTableGrid({
         />
       );
     },
-    [cellMap, cellLocks, canEditCellFn, currentUserId, sendEvent, onCellCommit, onMediaAssetAdd, onMediaAssetRemove]
+    [cellMap, cellLocks, canEditCellFn, isCellSelected, currentUserId, sendEvent, onCellCommit, onMediaAssetAdd, onMediaAssetRemove]
   );
 
   const totalWidth = useMemo(
@@ -522,7 +587,38 @@ export function ProductionTableGrid({
       justPaintedRef.current = true;
     }
     endPaint();
-  }, [isPainting, endPaint]);
+    setIsCellPainting(false);
+    stopAutoScroll();
+  }, [isPainting, endPaint, stopAutoScroll]);
+
+  // Window-level listeners for paint-select outside the grid
+  useEffect(() => {
+    if (!isCellPainting) return;
+
+    const onWindowMouseMove = (e: MouseEvent) => {
+      mouseClientPos.current = { x: e.clientX, y: e.clientY };
+      if (autoScrollRef.current === null) {
+        autoScrollRef.current = requestAnimationFrame(tickAutoScroll);
+      }
+      const el = document.elementFromPoint(e.clientX, e.clientY);
+      const wrapper = el?.closest("[data-cell-wrapper]") as HTMLElement | null;
+      if (wrapper) {
+        const rid = wrapper.getAttribute("data-row-id");
+        const cid = wrapper.getAttribute("data-col-id");
+        if (rid && cid) moveCellPaint(rid, cid);
+      }
+    };
+    const onWindowMouseUp = () => {
+      handlePaintEnd();
+    };
+
+    window.addEventListener("mousemove", onWindowMouseMove);
+    window.addEventListener("mouseup", onWindowMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", onWindowMouseMove);
+      window.removeEventListener("mouseup", onWindowMouseUp);
+    };
+  }, [isCellPainting, tickAutoScroll, moveCellPaint, handlePaintEnd]);
 
   const handleGridClick = useCallback(
     (e: React.MouseEvent) => {
@@ -533,16 +629,88 @@ export function ProductionTableGrid({
       const target = e.target as HTMLElement;
       if (
         target.closest("[data-row-handle]") ||
-        target.closest("[data-col-header]")
+        target.closest("[data-col-header]") ||
+        target.closest("[data-cell-wrapper]")
       ) {
         return;
       }
-      if (selectedRows.size > 0 || selectedColumns.size > 0) {
+      if (selectedRows.size > 0 || selectedColumns.size > 0 || selectedCells.size > 0) {
         clearSelection();
       }
     },
-    [selectedRows, selectedColumns, clearSelection]
+    [selectedRows, selectedColumns, selectedCells, clearSelection]
   );
+
+  // ---- Cell click/paint handlers ----
+  const handleCellMouseDown = useCallback(
+    (rowId: string, columnId: string, e: React.MouseEvent) => {
+      if (e.detail >= 2 || e.button !== 0) return;
+      const mode: SelectMode = e.metaKey || e.ctrlKey ? "toggle" : e.shiftKey ? "range" : "replace";
+      if (mode === "replace") {
+        startCellPaint(rowId, columnId);
+        setIsCellPainting(true);
+      } else {
+        selectCell(rowId, columnId, mode);
+      }
+    },
+    [selectCell, startCellPaint]
+  );
+
+  const handleCellMouseEnter = useCallback(
+    (rowId: string, columnId: string) => {
+      moveCellPaint(rowId, columnId);
+    },
+    [moveCellPaint]
+  );
+
+  // ---- Send selected cells to chat ----
+  const handleSendToChat = useCallback(() => {
+    if (selectedCells.size === 0) return;
+
+    const colNameMap = new Map(columns.map((c) => [c.id, c.name]));
+    const rowIndexMap = new Map(rows.map((r, i) => [r.id, i + 1]));
+
+    const images: Array<{ assetId: string; imageId: string; url: string; title?: string }> = [];
+    const textParts: string[] = [];
+
+    for (const key of Array.from(selectedCells)) {
+      const cell = cellMap[key];
+      if (!cell) continue;
+
+      const [colId, rowId] = key.split(":");
+      const colName = colNameMap.get(colId) ?? colId;
+      const rowNum = rowIndexMap.get(rowId) ?? "?";
+      const label = `[Row ${rowNum} / ${colName}]`;
+
+      if (cell.textContent) {
+        textParts.push(`${label} ${cell.textContent}`);
+      }
+      const assets = cell.mediaAssets as EnrichedMediaAssetRef[] | null;
+      if (assets && assets.length > 0) {
+        for (const a of assets) {
+          if (a.imageUrl && a.imageId) {
+            images.push({
+              assetId: a.assetId,
+              imageId: a.imageId,
+              url: a.imageUrl,
+              title: `Row ${rowNum} / ${colName}`,
+            });
+          }
+        }
+      }
+    }
+
+    const text = textParts.filter(Boolean).join("\n");
+    window.dispatchEvent(
+      new CustomEvent("moodio-batch-to-chat", {
+        detail: {
+          images: images.length > 0 ? images : undefined,
+          text: text || undefined,
+        },
+      })
+    );
+    clearSelection();
+  }, [selectedCells, cellMap, columns, rows, clearSelection]);
 
   return (
   <>
@@ -552,6 +720,7 @@ export function ProductionTableGrid({
       className="flex-1 overflow-auto outline-none"
       onMouseLeave={handleGridMouseLeave}
       onMouseMove={handleGridMouseMove}
+      onMouseUp={handlePaintEnd}
       onKeyDown={handleKeyDown}
       onClick={handleGridClick}
       tabIndex={0}
@@ -642,10 +811,15 @@ export function ProductionTableGrid({
                     <React.Fragment key={col.id}>
                       {renderColGap(colIdx)}
                       <div
-                        className={`shrink-0 border-r border-default-200 relative ${
+                        data-cell-wrapper
+                        data-row-id={row.id}
+                        data-col-id={col.id}
+                        className={`shrink-0 border-r border-default-200 relative select-none ${
                           colDragIndex === colIdx ? "opacity-30" : ""
-                        }`}
+                        } ${isCellSelected(row.id, col.id) ? "ring-2 ring-inset ring-primary" : ""}`}
                         style={{ width: col.width || DEFAULT_COL_WIDTH }}
+                        onMouseDown={(e) => handleCellMouseDown(row.id, col.id, e)}
+                        onMouseEnter={() => handleCellMouseEnter(row.id, col.id)}
                       >
                         {renderCell(row, col)}
                       </div>
@@ -742,6 +916,22 @@ export function ProductionTableGrid({
           </button>
         </div>
       </>
+    )}
+
+    {/* Floating Send to Chat bar for cell selection */}
+    {selectedCells.size > 0 && (
+      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-4 py-2.5 rounded-full shadow-lg border border-default-200 bg-content1/95 backdrop-blur-sm">
+        <span className="text-sm text-default-600">
+          {selectedCells.size} {selectedCells.size === 1 ? t("cellSelected") : t("cellsSelected")}
+        </span>
+        <button
+          className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-primary hover:bg-primary/10 rounded-lg transition-colors"
+          onClick={handleSendToChat}
+        >
+          <SendHorizontal size={14} />
+          {t("sendToChat")}
+        </button>
+      </div>
     )}
   </>
   );

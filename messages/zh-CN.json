@@ -1422,6 +1422,9 @@
     "grantEditAccessRows": "授予 {count} 行的编辑权限",
     "deleteColumn": "删除列",
     "deleteRow": "删除行",
+    "sendToChat": "发送到聊天",
+    "cellSelected": "个单元格已选中",
+    "cellsSelected": "个单元格已选中",
     "wizard": {
       "step1Title": "命名你的大表",
       "step2Title": "选择列",

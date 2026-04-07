@@ -1422,6 +1422,9 @@
     "grantEditAccessRows": "{count}개 행에 대한 편집 권한 부여",
     "deleteColumn": "열 삭제",
     "deleteRow": "행 삭제",
+    "sendToChat": "채팅으로 보내기",
+    "cellSelected": "셀 선택됨",
+    "cellsSelected": "셀 선택됨",
     "wizard": {
       "step1Title": "시트 이름 지정",
       "step2Title": "열 선택",

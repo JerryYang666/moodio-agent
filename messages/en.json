@@ -1422,6 +1422,9 @@
     "grantEditAccessRows": "Grant edit access for {count} {count, plural, one {row} other {rows}}",
     "deleteColumn": "Delete Column",
     "deleteRow": "Delete Row",
+    "sendToChat": "Send to Chat",
+    "cellSelected": "cell selected",
+    "cellsSelected": "cells selected",
     "wizard": {
       "step1Title": "Name Your Table",
       "step2Title": "Select Columns",

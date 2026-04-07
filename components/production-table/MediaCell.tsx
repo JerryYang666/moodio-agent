@@ -28,6 +28,7 @@ interface MediaCellProps {
   columnId: string;
   assets: EnrichedMediaAssetRef[];
   canEdit: boolean;
+  isSelected?: boolean;
   lock: CellLock | undefined;
   currentUserId: string | undefined;
   onAddAsset: (asset: EnrichedMediaAssetRef) => void;
@@ -39,6 +40,7 @@ export const MediaCell = memo(function MediaCell({
   columnId,
   assets,
   canEdit,
+  isSelected,
   lock,
   currentUserId,
   onAddAsset,
@@ -90,7 +92,9 @@ export const MediaCell = memo(function MediaCell({
 
   return (
     <div
-      className={`w-full h-full min-h-[32px] p-1 relative`}
+      className={`w-full h-full min-h-[32px] p-1 relative ${
+        isSelected ? "bg-primary/10 hover:bg-primary/15" : ""
+      }`}
       style={lockColor ? { boxShadow: `inset 0 0 0 2px ${lockColor}` } : undefined}
     >
       <div className="flex flex-wrap gap-1">
