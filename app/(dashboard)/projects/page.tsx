@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Card, CardBody, CardFooter } from "@heroui/card";
 import { Button } from "@heroui/button";
@@ -45,10 +45,21 @@ type SharedProject = Project & {
   sharedAt?: Date;
 };
 
+const TAB_KEYS = ["projects", "collections", "video-generations"] as const;
+type ProjectsTabKey = (typeof TAB_KEYS)[number];
+
+function parseTabParam(tab: string | null): ProjectsTabKey {
+  if (tab && TAB_KEYS.includes(tab as ProjectsTabKey)) {
+    return tab as ProjectsTabKey;
+  }
+  return "projects";
+}
+
 export default function ProjectsPage() {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const t = useTranslations();
-  const [activeTab, setActiveTab] = useState<string>("projects");
   const { isOpen, onOpen, onOpenChange } = useDisclosure();
   const {
     isOpen: isRenameOpen,
@@ -71,6 +82,20 @@ export default function ProjectsPage() {
     () => collections.filter((c) => !c.isOwner),
     [collections]
   );
+
+  const activeTab = parseTabParam(searchParams.get("tab"));
+
+  const handleTabChange = (key: string) => {
+    const nextTab = parseTabParam(key);
+    const params = new URLSearchParams(searchParams.toString());
+    if (nextTab === "projects") {
+      params.delete("tab");
+    } else {
+      params.set("tab", nextTab);
+    }
+    const queryString = params.toString();
+    router.replace(queryString ? `${pathname}?${queryString}` : pathname);
+  };
 
   const loading = projectsLoading || collectionsLoading || sharedFoldersLoading;
 
@@ -150,7 +175,7 @@ export default function ProjectsPage() {
     <div className="container mx-auto px-4 py-8 max-w-7xl">
       <Tabs
         selectedKey={activeTab}
-        onSelectionChange={(key) => setActiveTab(key as string)}
+        onSelectionChange={(key) => handleTabChange(String(key))}
         variant="solid"
         classNames={{
           tabList: "gap-2",

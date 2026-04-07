@@ -9,7 +9,7 @@ import {
   useContext,
 } from "react";
 import { useAuth } from "@/hooks/use-auth";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { addToast } from "@heroui/toast";
 import { useTranslations } from "next-intl";
 import { getUserFriendlyErrorKey } from "@/lib/video/error-classify";
@@ -51,10 +51,13 @@ export function useVideo() {
 }
 
 const POLL_INTERVAL = 5000; // 5 seconds
+const VIDEO_GENERATIONS_TAB_ROUTE = "/projects?tab=video-generations";
 
 export function VideoProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const activeProjectsTab = searchParams.get("tab");
   const router = useRouter();
   const t = useTranslations("video");
 
@@ -153,10 +156,15 @@ export function VideoProvider({ children }: { children: React.ReactNode }) {
               }
 
               // Determine if we should send browser/toast notification
-              const isStoryboardOpen = pathname === "/storyboard";
+              const isVideoGenerationsTabOpen =
+                pathname === "/projects" &&
+                activeProjectsTab === "video-generations";
+              const isLegacyStoryboardOpen = pathname === "/storyboard";
+              const isVideoGenerationViewOpen =
+                isVideoGenerationsTabOpen || isLegacyStoryboardOpen;
               const isHidden = document.hidden;
 
-              if (isHidden || !isStoryboardOpen) {
+              if (isHidden || !isVideoGenerationViewOpen) {
                 const isSuccess = generation.status === "completed";
 
                 try {
@@ -174,7 +182,7 @@ export function VideoProvider({ children }: { children: React.ReactNode }) {
 
                     notification.onclick = () => {
                       window.focus();
-                      router.push("/storyboard");
+                      router.push(VIDEO_GENERATIONS_TAB_ROUTE);
                       notification.close();
                     };
                   }
@@ -182,7 +190,7 @@ export function VideoProvider({ children }: { children: React.ReactNode }) {
                   console.error("Error showing notification:", e);
                 }
 
-                if (!isHidden && !isStoryboardOpen) {
+                if (!isHidden && !isVideoGenerationViewOpen) {
                   addToast({
                     title: isSuccess ? "Video Ready" : "Video Failed",
                     description: isSuccess
@@ -191,7 +199,7 @@ export function VideoProvider({ children }: { children: React.ReactNode }) {
                     color: isSuccess ? "success" : "danger",
                     endContent: (
                       <button
-                        onClick={() => router.push("/storyboard")}
+                        onClick={() => router.push(VIDEO_GENERATIONS_TAB_ROUTE)}
                         className="text-xs font-medium underline hover:opacity-80 text-current px-2 py-1 rounded"
                       >
                         View
@@ -216,7 +224,7 @@ export function VideoProvider({ children }: { children: React.ReactNode }) {
     }, POLL_INTERVAL);
 
     return () => clearInterval(pollInterval);
-  }, [user, pathname, router]);
+  }, [user, pathname, activeProjectsTab, router, t]);
 
   return (
     <VideoContext.Provider
