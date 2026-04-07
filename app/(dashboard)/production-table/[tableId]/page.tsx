@@ -14,6 +14,8 @@ import {
 import { ProductionTableGrid } from "@/components/production-table/ProductionTableGrid";
 import { ProductionTableToolbar } from "@/components/production-table/ProductionTableToolbar";
 import { ProductionTableShareModal } from "@/components/production-table/ProductionTableShareModal";
+import ChatSidePanel from "@/components/chat/chat-side-panel";
+import { siteConfig } from "@/config/site";
 import { hasWriteAccess, isOwner as isOwnerCheck } from "@/lib/permissions";
 import type {
   EnrichedProductionTable,
@@ -23,6 +25,9 @@ import type {
   CellType,
   EnrichedMediaAssetRef,
 } from "@/lib/production-table/types";
+
+const DEFAULT_CHAT_PANEL_WIDTH = 380;
+const COLLAPSED_CHAT_WIDTH = 48;
 
 export default function ProductionTableDetailPage({
   params,
@@ -44,6 +49,31 @@ export default function ProductionTableDetailPage({
   const [editableRowIds, setEditableRowIds] = useState<Set<string>>(new Set());
 
   const shareModal = useDisclosure();
+
+  // Chat side panel state (mirrors desktop page pattern)
+  const [isChatPanelCollapsed, setIsChatPanelCollapsed] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem(siteConfig.chatPanelCollapsed) === "true";
+  });
+  const [chatPanelWidth, setChatPanelWidth] = useState(() => {
+    if (typeof window === "undefined") return DEFAULT_CHAT_PANEL_WIDTH;
+    const stored = localStorage.getItem(siteConfig.chatPanelWidth);
+    return stored ? parseInt(stored, 10) : DEFAULT_CHAT_PANEL_WIDTH;
+  });
+
+  const chatPanelActualWidth = isChatPanelCollapsed
+    ? COLLAPSED_CHAT_WIDTH
+    : chatPanelWidth;
+
+  const handleChatPanelCollapseChange = useCallback((collapsed: boolean) => {
+    setIsChatPanelCollapsed(collapsed);
+    localStorage.setItem(siteConfig.chatPanelCollapsed, String(collapsed));
+  }, []);
+
+  const handleChatPanelWidthChange = useCallback((width: number) => {
+    setChatPanelWidth(width);
+    localStorage.setItem(siteConfig.chatPanelWidth, String(width));
+  }, []);
 
   // Fetch table data
   const fetchTable = useCallback(async () => {
@@ -766,57 +796,73 @@ export default function ProductionTableDetailPage({
   }
 
   return (
-    <div className="flex flex-col h-full">
-      <ProductionTableToolbar
-        tableName={table.name}
-        connectionState={connectionState}
-        connectedUsers={connectedUsers}
-        canEdit={canEditStructure}
-        onBack={() => router.push("/production-table")}
-        onAddColumn={handleAddColumn}
-        onAddRow={handleAddRow}
-        onShare={shareModal.onOpen}
-      />
-      <ProductionTableGrid
-        columns={table.columns}
-        rows={table.rows}
-        cellMap={table.cellMap}
-        cellLocks={cellLocks}
-        remoteCursors={remoteCursors}
-        currentUserId={currentUserId}
-        canEditCell={canEditCell}
-        canEditStructure={canEditStructure}
-        editableColumnIds={editableColumnIds}
-        editableRowIds={editableRowIds}
-        sendEvent={sendEvent}
-        onCellCommit={handleCellCommit}
-        onMediaAssetAdd={handleMediaAssetAdd}
-        onMediaAssetRemove={handleMediaAssetRemove}
-        onRenameColumn={handleRenameColumn}
-        onDeleteColumn={handleDeleteColumn}
-        onDeleteRow={handleDeleteRow}
-        onBulkDeleteRows={handleBulkDeleteRows}
-        onBulkDeleteColumns={handleBulkDeleteColumns}
-        onReorderColumns={handleReorderColumns}
-        onReorderRows={handleReorderRows}
-        onBulkReorderRows={handleBulkReorderRows}
-        onBulkReorderColumns={handleBulkReorderColumns}
-        onResizeColumn={handleResizeColumn}
-        onResizeRow={handleResizeRow}
-        onBulkResizeRows={handleBulkResizeRows}
-        onBulkResizeColumns={handleBulkResizeColumns}
-        onAddColumn={handleAddColumn}
-        onAddRow={handleAddRow}
-      />
-      <ProductionTableShareModal
-        isOpen={shareModal.isOpen}
-        onClose={shareModal.onClose}
-        tableId={tableId}
-        ownerId={table.userId}
-        columns={table.columns}
-        rows={table.rows}
-        isOwner={isTableOwner}
-      />
+    <div className="flex h-full w-full overflow-hidden">
+      <div className="relative flex-1 min-w-0 h-full flex flex-col">
+        <ProductionTableToolbar
+          tableName={table.name}
+          connectionState={connectionState}
+          connectedUsers={connectedUsers}
+          canEdit={canEditStructure}
+          onBack={() => router.push("/production-table")}
+          onAddColumn={handleAddColumn}
+          onAddRow={handleAddRow}
+          onShare={shareModal.onOpen}
+        />
+        <ProductionTableGrid
+          columns={table.columns}
+          rows={table.rows}
+          cellMap={table.cellMap}
+          cellLocks={cellLocks}
+          remoteCursors={remoteCursors}
+          currentUserId={currentUserId}
+          canEditCell={canEditCell}
+          canEditStructure={canEditStructure}
+          editableColumnIds={editableColumnIds}
+          editableRowIds={editableRowIds}
+          sendEvent={sendEvent}
+          onCellCommit={handleCellCommit}
+          onMediaAssetAdd={handleMediaAssetAdd}
+          onMediaAssetRemove={handleMediaAssetRemove}
+          onRenameColumn={handleRenameColumn}
+          onDeleteColumn={handleDeleteColumn}
+          onDeleteRow={handleDeleteRow}
+          onBulkDeleteRows={handleBulkDeleteRows}
+          onBulkDeleteColumns={handleBulkDeleteColumns}
+          onReorderColumns={handleReorderColumns}
+          onReorderRows={handleReorderRows}
+          onBulkReorderRows={handleBulkReorderRows}
+          onBulkReorderColumns={handleBulkReorderColumns}
+          onResizeColumn={handleResizeColumn}
+          onResizeRow={handleResizeRow}
+          onBulkResizeRows={handleBulkResizeRows}
+          onBulkResizeColumns={handleBulkResizeColumns}
+          onAddColumn={handleAddColumn}
+          onAddRow={handleAddRow}
+        />
+        <ProductionTableShareModal
+          isOpen={shareModal.isOpen}
+          onClose={shareModal.onClose}
+          tableId={tableId}
+          ownerId={table.userId}
+          columns={table.columns}
+          rows={table.rows}
+          isOwner={isTableOwner}
+        />
+      </div>
+
+      <div
+        className="hidden lg:block shrink-0 min-h-0 z-60"
+        style={{
+          width: chatPanelActualWidth,
+          transition: isChatPanelCollapsed ? "width 0.3s ease-in-out" : undefined,
+        }}
+      >
+        <ChatSidePanel
+          defaultExpanded={!isChatPanelCollapsed}
+          onCollapseChange={handleChatPanelCollapseChange}
+          onWidthChange={handleChatPanelWidthChange}
+        />
+      </div>
     </div>
   );
 }
