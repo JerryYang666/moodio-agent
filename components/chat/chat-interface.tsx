@@ -17,6 +17,7 @@ import {
 } from "@/components/notification-permission-modal";
 import { Message, MessageContentPart, isGeneratedImagePart } from "@/lib/llm/types";
 import { getVideoModel, type KlingElement, type MediaReference } from "@/lib/video/models";
+import { getUserFriendlyErrorKey } from "@/lib/video/error-classify";
 import ImageDetailModal, { ImageInfo } from "./image-detail-modal";
 import ImageDrawingModal from "./image-drawing-modal";
 import ChatMessage from "./chat-message";
@@ -2558,7 +2559,12 @@ export default function ChatInterface({
       });
 
       if (!res.ok || !res.body) {
-        throw new Error("Failed to send message");
+        let errorMessage = "Failed to send message";
+        try {
+          const errorData = await res.json();
+          if (errorData?.error) errorMessage = errorData.error;
+        } catch {}
+        throw new Error(errorMessage);
       }
 
       const reader = res.body.getReader();
@@ -2970,7 +2976,7 @@ export default function ChatInterface({
       lastPendingImagesRef.current = [];
       lastUserInputRef.current = "";
       lastEditorContentRef.current = null;
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error sending message", error);
       if (streamingChatId) {
         deleteStreamingChatState(streamingChatId);
@@ -2985,6 +2991,11 @@ export default function ChatInterface({
           prev.filter((msg) => !(msg.role === "user" && msg === userMessage))
         );
       }
+      const errorKey = getUserFriendlyErrorKey(error?.message);
+      addToast({
+        title: t(`video.${errorKey}`),
+        color: "danger",
+      });
     } finally {
       if (streamingChatId) {
         deleteStreamingChatState(streamingChatId);
@@ -3285,7 +3296,12 @@ export default function ChatInterface({
         });
 
         if (!res.ok || !res.body) {
-          throw new Error("Failed to send message");
+          let errorMessage = "Failed to send message";
+          try {
+            const errorData = await res.json();
+            if (errorData?.error) errorMessage = errorData.error;
+          } catch {}
+          throw new Error(errorMessage);
         }
 
         const reader = res.body.getReader();
@@ -3361,8 +3377,9 @@ export default function ChatInterface({
       } catch (e: any) {
         console.error("Failed to send video from agent:", e);
         if (streamingChatId) deleteStreamingChatState(streamingChatId);
+        const errorKey = getUserFriendlyErrorKey(e?.message);
         addToast({
-          title: t("chat.sendFailed"),
+          title: t(`video.${errorKey}`),
           color: "danger",
         });
       } finally {
