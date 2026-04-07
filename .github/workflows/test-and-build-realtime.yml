@@ -11,11 +11,14 @@ on:
       - "realtime/**"
 
 permissions:
+  actions: read
   contents: read
 
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}/realtime
+  TEST_DURATION_REGRESSION_PCT: "20"
+  REALTIME_WORKFLOW_FILE: test-and-build-realtime.yml
 
 jobs:
   test:
@@ -61,6 +64,113 @@ jobs:
             echo "- Full suite duration: **not captured**" >> "$GITHUB_STEP_SUMMARY"
           fi
           echo "- Workflow run: [View run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Compare test duration vs latest successful main
+        if: always() && steps.go-tests.outputs.duration_seconds != ''
+        id: compare-duration
+        uses: actions/github-script@v8
+        env:
+          CURRENT_DURATION_SECONDS: ${{ steps.go-tests.outputs.duration_seconds }}
+          THRESHOLD_PCT: ${{ env.TEST_DURATION_REGRESSION_PCT }}
+          WORKFLOW_FILE: ${{ env.REALTIME_WORKFLOW_FILE }}
+        with:
+          script: |
+            const current = Number(process.env.CURRENT_DURATION_SECONDS || "0");
+            const threshold = Number(process.env.THRESHOLD_PCT || "20");
+            const workflowFile = process.env.WORKFLOW_FILE;
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+
+            core.setOutput("comparison_available", "false");
+            core.setOutput("baseline_seconds", "");
+            core.setOutput("pct_change", "");
+            core.setOutput("is_regression", "false");
+
+            if (!current || Number.isNaN(current)) {
+              core.warning("Current test duration is unavailable; skipping baseline comparison.");
+              return;
+            }
+
+            const runsResp = await github.rest.actions.listWorkflowRuns({
+              owner,
+              repo,
+              workflow_id: workflowFile,
+              branch: "main",
+              status: "success",
+              per_page: 30,
+            });
+
+            const candidateRuns = (runsResp.data.workflow_runs || []).filter(
+              run => run.id !== context.runId
+            );
+
+            let baselineSeconds = null;
+            let baselineRunId = null;
+
+            for (const run of candidateRuns) {
+              const jobsResp = await github.rest.actions.listJobsForWorkflowRun({
+                owner,
+                repo,
+                run_id: run.id,
+                per_page: 100,
+              });
+
+              for (const job of jobsResp.data.jobs || []) {
+                const timedStep = (job.steps || []).find(
+                  step =>
+                    step.name === "Run Go test suite (timed)" &&
+                    step.conclusion === "success" &&
+                    step.started_at &&
+                    step.completed_at
+                );
+
+                if (!timedStep) continue;
+
+                const started = new Date(timedStep.started_at).getTime();
+                const completed = new Date(timedStep.completed_at).getTime();
+                const seconds = Math.max(0, Math.round((completed - started) / 1000));
+                if (seconds > 0) {
+                  baselineSeconds = seconds;
+                  baselineRunId = run.id;
+                  break;
+                }
+              }
+
+              if (baselineSeconds !== null) break;
+            }
+
+            if (baselineSeconds === null) {
+              core.warning("No baseline test timing found from successful main runs.");
+              await core.summary
+                .addHeading("Realtime test duration baseline")
+                .addRaw("- Baseline comparison: **not available yet** (need one prior successful main run with timed step)\n")
+                .write();
+              return;
+            }
+
+            const pctChange = ((current - baselineSeconds) / baselineSeconds) * 100;
+            const isRegression = pctChange > threshold;
+
+            core.setOutput("comparison_available", "true");
+            core.setOutput("baseline_seconds", String(baselineSeconds));
+            core.setOutput("pct_change", pctChange.toFixed(1));
+            core.setOutput("is_regression", String(isRegression));
+
+            const sign = pctChange >= 0 ? "+" : "";
+            const baselineLink = `https://github.com/${owner}/${repo}/actions/runs/${baselineRunId}`;
+
+            await core.summary
+              .addHeading("Realtime test duration comparison")
+              .addRaw(`- Current: **${current}s**\n`)
+              .addRaw(`- Baseline (latest successful main): **${baselineSeconds}s** ([run](${baselineLink}))\n`)
+              .addRaw(`- Delta: **${sign}${pctChange.toFixed(1)}%** (threshold: ${threshold}%)\n`)
+              .write();
+
+            if (isRegression) {
+              core.warning(
+                `Realtime test suite duration regressed by ${pctChange.toFixed(1)}% (current=${current}s, baseline=${baselineSeconds}s, threshold=${threshold}%).`
+              );
+            }
 
   build-and-push:
     name: Build & push container
