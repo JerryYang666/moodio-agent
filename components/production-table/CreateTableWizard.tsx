@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { useTranslations } from "next-intl";
 import {
   Modal,
@@ -24,6 +24,7 @@ import {
   Table2,
   Check,
   FileText,
+  TriangleAlert,
 } from "lucide-react";
 import type { CellType } from "@/lib/production-table/types";
 
@@ -45,6 +46,20 @@ const PRESET_COLUMNS: PresetColumn[] = [
   { key: "videoPrompt", cellType: "text" },
   { key: "generatedVideoRef", cellType: "media" },
 ];
+
+const AI_STEP_KEYS = [
+  "aiStep1",
+  "aiStep2",
+  "aiStep3",
+  "aiStep4",
+  "aiStep5",
+  "aiStep6",
+  "aiStep7",
+  "aiStep8",
+  "aiStep9",
+] as const;
+
+const STEP_INTERVAL_MS = 4000;
 
 interface CreateTableWizardProps {
   isOpen: boolean;
@@ -73,6 +88,32 @@ export default function CreateTableWizard({
   const [creatingMode, setCreatingMode] = useState<"ai" | "scratch" | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // AI loading animation state
+  const [aiStepIndex, setAiStepIndex] = useState(0);
+
+  useEffect(() => {
+    if (creatingMode !== "ai") {
+      setAiStepIndex(0);
+      return;
+    }
+    const interval = setInterval(() => {
+      setAiStepIndex((prev) =>
+        prev < AI_STEP_KEYS.length - 1 ? prev + 1 : prev
+      );
+    }, STEP_INTERVAL_MS);
+    return () => clearInterval(interval);
+  }, [creatingMode]);
+
+  // Warn user before leaving during AI generation
+  useEffect(() => {
+    if (creatingMode !== "ai") return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [creatingMode]);
+
   const resetState = useCallback(() => {
     setStep(1);
     setTableName("");
@@ -86,10 +127,11 @@ export default function CreateTableWizard({
 
   const handleOpenChange = useCallback(
     (open: boolean) => {
+      if (!open && creatingMode !== null) return;
       if (!open) resetState();
       onOpenChange(open);
     },
-    [onOpenChange, resetState]
+    [onOpenChange, resetState, creatingMode]
   );
 
   const toggleColumn = useCallback((key: string) => {
@@ -177,11 +219,11 @@ export default function CreateTableWizard({
 
         if (!res.ok) throw new Error("Failed to create table");
         const data = await res.json();
+        setCreatingMode(null);
         handleOpenChange(false);
         onCreated(data.table.id);
       } catch {
         addToast({ title: t("wizard.failedToCreate"), color: "danger" });
-      } finally {
         setCreatingMode(null);
       }
     },
@@ -274,7 +316,95 @@ export default function CreateTableWizard({
     </>
   );
 
-  const renderStep3 = () => (
+  const renderAiLoadingOverlay = () => {
+    const progress = Math.min(
+      95,
+      ((aiStepIndex + 1) / AI_STEP_KEYS.length) * 90 + 5
+    );
+
+    return (
+      <>
+        <ModalBody>
+          <div className="flex flex-col items-center justify-center gap-6 py-10">
+            {/* Animated sparkle icon */}
+            <div className="relative flex items-center justify-center">
+              <div className="absolute w-20 h-20 rounded-full bg-primary/10 animate-ping" />
+              <div className="relative w-16 h-16 rounded-full bg-linear-to-br from-primary/20 to-secondary/20 flex items-center justify-center">
+                <Sparkles
+                  size={28}
+                  className="text-primary animate-pulse"
+                />
+              </div>
+            </div>
+
+            {/* Status text with crossfade */}
+            <div className="text-center min-h-[56px] flex flex-col items-center gap-2">
+              <p
+                key={aiStepIndex}
+                className="text-lg font-semibold animate-fade-in-up"
+              >
+                {t(`wizard.${AI_STEP_KEYS[aiStepIndex]}`)}
+              </p>
+            </div>
+
+            {/* Progress bar */}
+            <div className="w-full max-w-xs">
+              <div className="h-1.5 w-full rounded-full bg-default-200 overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-linear-to-r from-primary to-secondary transition-all duration-1000 ease-out"
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+            </div>
+
+            {/* Completed steps */}
+            <div className="flex flex-col gap-1.5 w-full max-w-xs">
+              {AI_STEP_KEYS.map((key, i) => {
+                if (i > aiStepIndex) return null;
+                const isCurrent = i === aiStepIndex;
+                return (
+                  <div
+                    key={key}
+                    className={`flex items-center gap-2 text-xs transition-opacity duration-300 ${
+                      isCurrent ? "opacity-100" : "opacity-40"
+                    }`}
+                  >
+                    {isCurrent ? (
+                      <Spinner size="sm" classNames={{ wrapper: "w-3.5 h-3.5" }} />
+                    ) : (
+                      <Check size={14} className="text-success shrink-0" />
+                    )}
+                    <span className={isCurrent ? "font-medium" : ""}>
+                      {t(`wizard.${key}`)}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Do not leave warning */}
+            <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-warning-50 dark:bg-warning-50/10 border border-warning-200 dark:border-warning-200/20">
+              <TriangleAlert
+                size={16}
+                className="text-warning shrink-0"
+              />
+              <p className="text-xs text-warning-700 dark:text-warning-400">
+                {t("wizard.doNotLeave")}
+              </p>
+            </div>
+          </div>
+        </ModalBody>
+        <ModalFooter />
+      </>
+    );
+  };
+
+  const renderStep3 = () => {
+    if (creatingMode === "ai") {
+      return renderAiLoadingOverlay();
+    }
+
+    return (
     <>
       <ModalBody>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -355,11 +485,10 @@ export default function CreateTableWizard({
                 color="primary"
                 className="w-full mt-auto"
                 isDisabled={!scriptText || creatingMode !== null}
-                isLoading={creatingMode === "ai"}
-                startContent={creatingMode !== "ai" ? <Sparkles size={16} /> : undefined}
+                startContent={<Sparkles size={16} />}
                 onPress={() => handleCreate("ai")}
               >
-                {creatingMode === "ai" ? t("wizard.generating") : t("wizard.createTable")}
+                {t("wizard.createTable")}
               </Button>
             </CardBody>
           </Card>
@@ -416,7 +545,8 @@ export default function CreateTableWizard({
         </Button>
       </ModalFooter>
     </>
-  );
+    );
+  };
 
   const stepTitles: Record<1 | 2 | 3, string> = {
     1: t("wizard.step1Title"),
@@ -430,7 +560,8 @@ export default function CreateTableWizard({
       onOpenChange={handleOpenChange}
       size={step === 3 ? "3xl" : "lg"}
       scrollBehavior="inside"
-      isDismissable={false}
+      isDismissable={creatingMode === null}
+      hideCloseButton={creatingMode !== null}
     >
       <ModalContent>
         <ModalHeader className="flex-col gap-3">

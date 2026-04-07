@@ -1422,6 +1422,12 @@
     "grantEditAccessRows": "{count}行の編集アクセスを付与",
     "deleteColumn": "列を削除",
     "deleteRow": "行を削除",
+    "insertRowAbove": "上に行を挿入",
+    "insertRowBelow": "下に行を挿入",
+    "insertTextColumnLeft": "左にテキスト列を挿入",
+    "insertMediaColumnLeft": "左にメディア列を挿入",
+    "insertTextColumnRight": "右にテキスト列を挿入",
+    "insertMediaColumnRight": "右にメディア列を挿入",
     "sendToChat": "チャットに送信",
     "cellSelected": "セル選択中",
     "cellsSelected": "セル選択中",
@@ -1471,7 +1477,17 @@
       "parsing": "ドキュメントを解析中...",
       "scriptUploaded": "脚本がアップロードされました",
       "failedToParse": "ドキュメントの解析に失敗しました",
-      "failedToCreate": "シートの作成に失敗しました"
+      "failedToCreate": "シートの作成に失敗しました",
+      "doNotLeave": "このページから離れないでください — AIが作業中です！",
+      "aiStep1": "ドキュメントをスキャン中...",
+      "aiStep2": "シーンを読み込み中...",
+      "aiStep3": "ショット分解を解析中...",
+      "aiStep4": "カメラワークを分析中...",
+      "aiStep5": "台詞とショットを紐付け中...",
+      "aiStep6": "画面の説明を作成中...",
+      "aiStep7": "ショットリストを整理中...",
+      "aiStep8": "細部を仕上げ中...",
+      "aiStep9": "もう少しです、お待ちください..."
     }
   }
 }

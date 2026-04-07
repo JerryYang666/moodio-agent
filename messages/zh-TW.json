@@ -1422,6 +1422,12 @@
     "grantEditAccessRows": "授予 {count} 列的編輯權限",
     "deleteColumn": "刪除欄",
     "deleteRow": "刪除列",
+    "insertRowAbove": "在上方插入列",
+    "insertRowBelow": "在下方插入列",
+    "insertTextColumnLeft": "在左側插入文字欄",
+    "insertMediaColumnLeft": "在左側插入媒體欄",
+    "insertTextColumnRight": "在右側插入文字欄",
+    "insertMediaColumnRight": "在右側插入媒體欄",
     "sendToChat": "傳送至聊天",
     "cellSelected": "個儲存格已選取",
     "cellsSelected": "個儲存格已選取",
@@ -1471,7 +1477,17 @@
       "parsing": "正在解析文件...",
       "scriptUploaded": "劇本已上傳",
       "failedToParse": "文件解析失敗",
-      "failedToCreate": "建立大表失敗"
+      "failedToCreate": "建立大表失敗",
+      "doNotLeave": "請不要離開此頁面 — AI 正在施展魔法！",
+      "aiStep1": "正在掃描你的文件...",
+      "aiStep2": "正在通讀場景...",
+      "aiStep3": "正在識別鏡頭分解...",
+      "aiStep4": "正在分析運鏡方式...",
+      "aiStep5": "正在匹配台詞與鏡頭...",
+      "aiStep6": "正在撰寫畫面描述...",
+      "aiStep7": "正在整理鏡頭列表...",
+      "aiStep8": "正在打磨細節...",
+      "aiStep9": "馬上就好，請稍候..."
     }
   }
 }

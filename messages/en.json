@@ -1422,6 +1422,12 @@
     "grantEditAccessRows": "Grant edit access for {count} {count, plural, one {row} other {rows}}",
     "deleteColumn": "Delete Column",
     "deleteRow": "Delete Row",
+    "insertRowAbove": "Insert Row Above",
+    "insertRowBelow": "Insert Row Below",
+    "insertTextColumnLeft": "Insert Text Column Left",
+    "insertMediaColumnLeft": "Insert Media Column Left",
+    "insertTextColumnRight": "Insert Text Column Right",
+    "insertMediaColumnRight": "Insert Media Column Right",
     "sendToChat": "Send to Chat",
     "cellSelected": "cell selected",
     "cellsSelected": "cells selected",
@@ -1471,7 +1477,17 @@
       "parsing": "Parsing document...",
       "scriptUploaded": "Script uploaded",
       "failedToParse": "Failed to parse document",
-      "failedToCreate": "Failed to create table"
+      "failedToCreate": "Failed to create table",
+      "doNotLeave": "Please don't leave this page — the magic is happening!",
+      "aiStep1": "Scanning your document...",
+      "aiStep2": "Reading through the scenes...",
+      "aiStep3": "Identifying shot breakdowns...",
+      "aiStep4": "Analyzing camera movements...",
+      "aiStep5": "Matching dialogue to shots...",
+      "aiStep6": "Crafting visual descriptions...",
+      "aiStep7": "Organizing the shot list...",
+      "aiStep8": "Polishing the details...",
+      "aiStep9": "Almost there, hang tight..."
     }
   }
 }

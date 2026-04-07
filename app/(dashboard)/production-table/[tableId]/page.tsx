@@ -352,6 +352,80 @@ export default function ProductionTableDetailPage({
     }
   }, [tableId, sendEvent]);
 
+  const handleInsertRow = useCallback(
+    async (anchorRowId: string, position: "above" | "below") => {
+      if (!table) return;
+      try {
+        const res = await fetch(`/api/production-table/${tableId}/rows`, {
+          method: "POST",
+        });
+        if (!res.ok) throw new Error();
+        const data = await res.json();
+        const newRow = data.row as ProductionTableRow;
+
+        const anchorIndex = table.rows.findIndex((r) => r.id === anchorRowId);
+        const insertAt = position === "above" ? anchorIndex : anchorIndex + 1;
+        const newRows = [...table.rows];
+        newRows.splice(insertAt, 0, newRow);
+
+        setTable((prev) => (prev ? { ...prev, rows: newRows } : prev));
+        sendEvent("pt_row_added", { tableId, row: newRow });
+
+        const newIds = newRows.map((r) => r.id);
+        sendEvent("pt_rows_reordered", { tableId, rowIds: newIds });
+        await fetch(`/api/production-table/${tableId}/rows/reorder`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ rowIds: newIds }),
+        });
+      } catch {
+        addToast({ title: "Failed to insert row", color: "danger" });
+      }
+    },
+    [table, tableId, sendEvent]
+  );
+
+  const handleInsertColumn = useCallback(
+    async (anchorColumnId: string, position: "left" | "right", cellType: CellType) => {
+      if (!table) return;
+      try {
+        const res = await fetch(
+          `/api/production-table/${tableId}/columns`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              name: `Column ${(table.columns.length ?? 0) + 1}`,
+              cellType,
+            }),
+          }
+        );
+        if (!res.ok) throw new Error();
+        const data = await res.json();
+        const newCol = data.column as ProductionTableColumn;
+
+        const anchorIndex = table.columns.findIndex((c) => c.id === anchorColumnId);
+        const insertAt = position === "left" ? anchorIndex : anchorIndex + 1;
+        const newCols = [...table.columns];
+        newCols.splice(insertAt, 0, newCol);
+
+        setTable((prev) => (prev ? { ...prev, columns: newCols } : prev));
+        sendEvent("pt_column_added", { tableId, column: newCol });
+
+        const newIds = newCols.map((c) => c.id);
+        sendEvent("pt_columns_reordered", { tableId, columnIds: newIds });
+        await fetch(`/api/production-table/${tableId}/columns/reorder`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ columnIds: newIds }),
+        });
+      } catch {
+        addToast({ title: "Failed to insert column", color: "danger" });
+      }
+    },
+    [table, tableId, sendEvent]
+  );
+
   const handleCellCommit = useCallback(
     async (
       columnId: string,
@@ -851,6 +925,8 @@ export default function ProductionTableDetailPage({
           onBulkResizeColumns={handleBulkResizeColumns}
           onAddColumn={handleAddColumn}
           onAddRow={handleAddRow}
+          onInsertRow={handleInsertRow}
+          onInsertColumn={handleInsertColumn}
         />
         <ProductionTableShareModal
           isOpen={shareModal.isOpen}

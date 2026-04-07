@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { MousePointer2, Plus, Trash2, SendHorizontal } from "lucide-react";
+import { MousePointer2, Plus, Trash2, SendHorizontal, ArrowUp, ArrowDown } from "lucide-react";
 import type {
   ProductionTableColumn,
   ProductionTableRow,
@@ -71,6 +71,8 @@ interface ProductionTableGridProps {
   onBulkResizeColumns?: (columnIds: string[], width: number) => void;
   onAddColumn?: (cellType: CellType) => void;
   onAddRow?: () => void;
+  onInsertRow?: (anchorRowId: string, position: "above" | "below") => void;
+  onInsertColumn?: (anchorColumnId: string, position: "left" | "right", cellType: CellType) => void;
 }
 
 export function ProductionTableGrid({
@@ -103,6 +105,8 @@ export function ProductionTableGrid({
   onBulkResizeColumns,
   onAddColumn,
   onAddRow,
+  onInsertRow,
+  onInsertColumn,
 }: ProductionTableGridProps) {
   const [scrollElement, setScrollElement] = useState<HTMLDivElement | null>(null);
   const [isCellPainting, setIsCellPainting] = useState(false);
@@ -820,6 +824,7 @@ export function ProductionTableGrid({
           onColDragOver={handleColDragOver}
           onColDragEnd={handleColDragEnd}
           onAddColumn={onAddColumn}
+          onInsertColumn={onInsertColumn}
           renderColGap={renderColGap}
         />
         <div
@@ -970,6 +975,31 @@ export function ProductionTableGrid({
           className="fixed z-50 min-w-[160px] py-1 rounded-lg shadow-lg border border-default-200 bg-content1"
           style={{ left: rowContextMenu.x, top: rowContextMenu.y }}
         >
+          {onInsertRow && (
+            <>
+              <button
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-default-100 transition-colors"
+                onClick={() => {
+                  onInsertRow(rowContextMenu.rowId, "above");
+                  closeRowContextMenu();
+                }}
+              >
+                <ArrowUp size={14} />
+                {t("insertRowAbove")}
+              </button>
+              <button
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-default-100 transition-colors"
+                onClick={() => {
+                  onInsertRow(rowContextMenu.rowId, "below");
+                  closeRowContextMenu();
+                }}
+              >
+                <ArrowDown size={14} />
+                {t("insertRowBelow")}
+              </button>
+              <div className="my-1 border-t border-default-200" />
+            </>
+          )}
           <button
             className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-danger hover:bg-danger/10 transition-colors"
             onClick={() => {

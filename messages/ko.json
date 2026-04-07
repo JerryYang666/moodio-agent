@@ -1422,6 +1422,12 @@
     "grantEditAccessRows": "{count}개 행에 대한 편집 권한 부여",
     "deleteColumn": "열 삭제",
     "deleteRow": "행 삭제",
+    "insertRowAbove": "위에 행 삽입",
+    "insertRowBelow": "아래에 행 삽입",
+    "insertTextColumnLeft": "왼쪽에 텍스트 열 삽입",
+    "insertMediaColumnLeft": "왼쪽에 미디어 열 삽입",
+    "insertTextColumnRight": "오른쪽에 텍스트 열 삽입",
+    "insertMediaColumnRight": "오른쪽에 미디어 열 삽입",
     "sendToChat": "채팅으로 보내기",
     "cellSelected": "셀 선택됨",
     "cellsSelected": "셀 선택됨",
@@ -1471,7 +1477,17 @@
       "parsing": "문서 분석 중...",
       "scriptUploaded": "대본이 업로드되었습니다",
       "failedToParse": "문서 분석에 실패했습니다",
-      "failedToCreate": "시트 만들기에 실패했습니다"
+      "failedToCreate": "시트 만들기에 실패했습니다",
+      "doNotLeave": "이 페이지를 떠나지 마세요 — AI가 작업 중입니다!",
+      "aiStep1": "문서를 스캔하는 중...",
+      "aiStep2": "장면을 읽는 중...",
+      "aiStep3": "샷 분석을 진행하는 중...",
+      "aiStep4": "카메라 움직임을 분석하는 중...",
+      "aiStep5": "대사와 샷을 매칭하는 중...",
+      "aiStep6": "화면 설명을 작성하는 중...",
+      "aiStep7": "샷 리스트를 정리하는 중...",
+      "aiStep8": "세부사항을 다듬는 중...",
+      "aiStep9": "거의 다 됐어요, 잠시만요..."
     }
   }
 }

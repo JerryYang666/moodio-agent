@@ -1422,6 +1422,12 @@
     "grantEditAccessRows": "授予 {count} 行的编辑权限",
     "deleteColumn": "删除列",
     "deleteRow": "删除行",
+    "insertRowAbove": "在上方插入行",
+    "insertRowBelow": "在下方插入行",
+    "insertTextColumnLeft": "在左侧插入文本列",
+    "insertMediaColumnLeft": "在左侧插入媒体列",
+    "insertTextColumnRight": "在右侧插入文本列",
+    "insertMediaColumnRight": "在右侧插入媒体列",
     "sendToChat": "发送到聊天",
     "cellSelected": "个单元格已选中",
     "cellsSelected": "个单元格已选中",
@@ -1471,7 +1477,17 @@
       "parsing": "正在解析文档...",
       "scriptUploaded": "剧本已上传",
       "failedToParse": "文档解析失败",
-      "failedToCreate": "创建大表失败"
+      "failedToCreate": "创建大表失败",
+      "doNotLeave": "请不要离开此页面 — AI 正在施展魔法！",
+      "aiStep1": "正在扫描你的文档...",
+      "aiStep2": "正在通读场景...",
+      "aiStep3": "正在识别镜头分解...",
+      "aiStep4": "正在分析运镜方式...",
+      "aiStep5": "正在匹配台词与镜头...",
+      "aiStep6": "正在撰写画面描述...",
+      "aiStep7": "正在整理镜头列表...",
+      "aiStep8": "正在打磨细节...",
+      "aiStep9": "马上就好，请稍候..."
     }
   }
 }

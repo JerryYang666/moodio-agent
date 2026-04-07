@@ -2,7 +2,7 @@
 
 import React, { memo, useState, useRef, useCallback } from "react";
 import { useTranslations } from "next-intl";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, ArrowLeft, ArrowRight, Type, Image } from "lucide-react";
 import {
   Dropdown,
   DropdownTrigger,
@@ -32,6 +32,7 @@ interface HeaderRowProps {
   onColDragOver: (index: number, e: React.DragEvent) => void;
   onColDragEnd: () => void;
   onAddColumn?: (cellType: CellType) => void;
+  onInsertColumn?: (anchorColumnId: string, position: "left" | "right", cellType: CellType) => void;
   renderColGap: (slotIndex: number) => React.ReactNode;
 }
 
@@ -52,6 +53,7 @@ export const HeaderRow = memo(function HeaderRow({
   onColDragOver,
   onColDragEnd,
   onAddColumn,
+  onInsertColumn,
   renderColGap,
 }: HeaderRowProps) {
   const t = useTranslations("productionTable");
@@ -295,6 +297,55 @@ export const HeaderRow = memo(function HeaderRow({
             className="fixed z-50 min-w-[160px] py-1 rounded-lg shadow-lg border border-default-200 bg-content1"
             style={{ left: contextMenu.x, top: contextMenu.y }}
           >
+            {onInsertColumn && (
+              <>
+                <button
+                  className="w-full flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-default-100 transition-colors"
+                  onClick={() => {
+                    onInsertColumn(contextMenu.columnId, "left", "text");
+                    closeContextMenu();
+                  }}
+                >
+                  <ArrowLeft size={14} />
+                  <Type size={14} />
+                  {t("insertTextColumnLeft")}
+                </button>
+                <button
+                  className="w-full flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-default-100 transition-colors"
+                  onClick={() => {
+                    onInsertColumn(contextMenu.columnId, "left", "media");
+                    closeContextMenu();
+                  }}
+                >
+                  <ArrowLeft size={14} />
+                  <Image size={14} />
+                  {t("insertMediaColumnLeft")}
+                </button>
+                <button
+                  className="w-full flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-default-100 transition-colors"
+                  onClick={() => {
+                    onInsertColumn(contextMenu.columnId, "right", "text");
+                    closeContextMenu();
+                  }}
+                >
+                  <ArrowRight size={14} />
+                  <Type size={14} />
+                  {t("insertTextColumnRight")}
+                </button>
+                <button
+                  className="w-full flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-default-100 transition-colors"
+                  onClick={() => {
+                    onInsertColumn(contextMenu.columnId, "right", "media");
+                    closeContextMenu();
+                  }}
+                >
+                  <ArrowRight size={14} />
+                  <Image size={14} />
+                  {t("insertMediaColumnRight")}
+                </button>
+                <div className="my-1 border-t border-default-200" />
+              </>
+            )}
             <button
               className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-danger hover:bg-danger/10 transition-colors"
               onClick={() => {
