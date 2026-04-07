@@ -55,6 +55,7 @@ export interface VideoModelParam {
   min?: number; // For number types
   max?: number; // For number types
   maxItems?: number; // For array types - maximum number of items allowed
+  maxLength?: number; // For string types - maximum character length
   status?: VideoModelParamStatus; // Defaults to "active" if not specified
   acceptTypes?: AssetAcceptType[]; // For "asset" type - which asset types the picker allows
 }
@@ -69,6 +70,7 @@ export interface ParamOverride {
   options?: Array<string | number>;
   min?: number;
   max?: number;
+  maxLength?: number;
   default?: string | number | boolean | string[];
   status?: VideoModelParamStatus;
 }
@@ -122,6 +124,7 @@ const seedanceV15Pro: VideoModelConfig = {
       type: "string",
       required: true,
       description: "The text prompt used to generate the video",
+      maxLength: 2500,
     },
     {
       name: "image_url",
@@ -231,6 +234,7 @@ const seedance20: VideoModelConfig = {
       type: "string",
       required: true,
       description: "Text prompt for video generation (3-2500 characters)",
+      maxLength: 2500,
     },
     {
       name: "first_frame_url",
@@ -314,6 +318,7 @@ const seedance20Reference: VideoModelConfig = {
       required: true,
       description:
         "Text prompt for video generation. Use @image1, @video1, etc. to reference attached media (3-2500 characters)",
+      maxLength: 2500,
     },
     {
       name: "media_references",
@@ -399,6 +404,7 @@ const seedance20Fast: VideoModelConfig = {
       type: "string",
       required: true,
       description: "Text prompt for video generation (3-2500 characters)",
+      maxLength: 2500,
     },
     {
       name: "first_frame_url",
@@ -482,6 +488,7 @@ const seedance20FastReference: VideoModelConfig = {
       required: true,
       description:
         "Text prompt for video generation. Use @image1, @video1, etc. to reference attached media (3-2500 characters)",
+      maxLength: 2500,
     },
     {
       name: "media_references",
@@ -562,6 +569,7 @@ const hailuo23FastPro: VideoModelConfig = {
       type: "string",
       required: true,
       description: "Text prompt for video generation",
+      maxLength: 2500,
     },
     {
       name: "prompt_optimizer",
@@ -604,6 +612,7 @@ const hailuo23Pro: VideoModelConfig = {
       type: "string",
       required: true,
       description: "Text prompt for video generation",
+      maxLength: 2500,
     },
     {
       name: "prompt_optimizer",
@@ -647,6 +656,7 @@ const hailuo02Pro: VideoModelConfig = {
       type: "string",
       required: true,
       description: "Text prompt for video generation",
+      maxLength: 2500,
     },
     {
       name: "image_url",
@@ -707,6 +717,7 @@ const wanV26ImageToVideo: VideoModelConfig = {
       required: true,
       description:
         "The text prompt describing the desired video motion. Max 800 characters.",
+      maxLength: 800,
     },
     {
       name: "image_url",
@@ -805,6 +816,7 @@ const klingV26Pro: VideoModelConfig = {
       required: true,
       description:
         "The text prompt used to generate the video. Supports speech in quotes for audio generation.",
+      maxLength: 2500,
     },
     {
       name: "start_image_url",
@@ -885,6 +897,7 @@ const klingO1Pro: VideoModelConfig = {
       required: true,
       description:
         "Use @Image1 to reference the start frame, @Image2 to reference the end frame.",
+      maxLength: 2500,
     },
     {
       name: "start_image_url",
@@ -938,6 +951,7 @@ const klingO3Pro: VideoModelConfig = {
       required: false,
       description:
         "Text prompt for video generation describing the desired motion and style",
+      maxLength: 2500,
     },
     {
       name: "image_url",
@@ -1030,6 +1044,7 @@ const klingV3Pro: VideoModelConfig = {
       required: false,
       description:
         "Text prompt for video generation. Supports speech in quotes for audio generation. Use @element_name to reference elements.",
+      maxLength: 2500,
     },
     {
       name: "start_image_url",
@@ -1164,6 +1179,7 @@ const veo31: VideoModelConfig = {
       type: "string",
       required: true,
       description: "The text prompt describing the video to generate",
+      maxLength: 2500,
     },
     {
       name: "image_url",
@@ -1259,6 +1275,7 @@ const veo31FirstLastFrame: VideoModelConfig = {
       type: "string",
       required: true,
       description: "The text prompt describing the video you want to generate",
+      maxLength: 2500,
     },
     {
       name: "first_frame_url",
@@ -1371,6 +1388,7 @@ const sora2Pro: VideoModelConfig = {
       type: "string",
       required: true,
       description: "The text prompt describing the video to generate",
+      maxLength: 2500,
     },
     {
       name: "image_url",
@@ -1459,6 +1477,7 @@ const sora2Standard: VideoModelConfig = {
       type: "string",
       required: true,
       description: "The text prompt describing the video to generate",
+      maxLength: 2500,
     },
     {
       name: "image_url",
@@ -1507,6 +1526,7 @@ const sora2TextToVideo: VideoModelConfig = {
       type: "string",
       required: true,
       description: "The text prompt describing the video to generate",
+      maxLength: 2500,
     },
     {
       name: "aspect_ratio",
@@ -1548,6 +1568,7 @@ const sora2ProTextToVideo: VideoModelConfig = {
       type: "string",
       required: true,
       description: "The text prompt describing the video to generate",
+      maxLength: 2500,
     },
     {
       name: "aspect_ratio",
@@ -1598,6 +1619,7 @@ const kling26TextToVideo: VideoModelConfig = {
       type: "string",
       required: true,
       description: "The text prompt describing the video to generate",
+      maxLength: 2500,
     },
     {
       name: "sound",
@@ -1811,6 +1833,11 @@ export function validateAndMergeParams(
       case "string":
         if (typeof userValue !== "string") {
           throw new Error(`Parameter ${param.name} must be a string`);
+        }
+        if (param.maxLength !== undefined && userValue.length > param.maxLength) {
+          throw new Error(
+            `Parameter ${param.name} must not exceed ${param.maxLength} characters (currently ${userValue.length})`
+          );
         }
         break;
 
@@ -2053,6 +2080,7 @@ export function getModelConfigForApi(modelId: string) {
         min: p.min,
         max: p.max,
         maxItems: p.maxItems,
+        maxLength: p.maxLength,
         acceptTypes: p.acceptTypes,
       })),
   };

@@ -899,13 +899,14 @@ export async function POST(
 
           (async () => {
             let generatedPart: MessageContentPart;
+            let generation: { id: string } | undefined;
 
             try {
               // Check balance before doing any work
               await assertSufficientCredits(account.accountId, cost, account.accountType);
 
               // Create generation record (no credit deduction yet)
-              const [generation] = await db
+              [generation] = await db
                 .insert(videoGenerations)
                 .values({
                   userId: payload.userId,
@@ -985,7 +986,7 @@ export async function POST(
                   "video_generation",
                   `Generated video with model ${model.name} (chat)`,
                   account.performedBy,
-                  { type: "video_generation", id: generation.id },
+                  { type: "video_generation", id: generation!.id },
                   account.accountType,
                   tx
                 );
@@ -998,7 +999,7 @@ export async function POST(
                     providerModelId,
                     status: "processing",
                   })
-                  .where(eq(videoGenerations.id, generation.id));
+                  .where(eq(videoGenerations.id, generation!.id));
               });
 
               await recordEvent(
@@ -1021,6 +1022,22 @@ export async function POST(
               generatedPart = pendingPart;
             } catch (err: any) {
               console.error("Direct video generation error:", err);
+
+              // Mark the DB record as failed so it doesn't stay "pending" forever
+              if (generation?.id) {
+                try {
+                  await db
+                    .update(videoGenerations)
+                    .set({
+                      status: "failed",
+                      error: err.message || "Failed to submit to provider",
+                      completedAt: new Date(),
+                    })
+                    .where(eq(videoGenerations.id, generation!.id));
+                } catch (dbErr) {
+                  console.error("Failed to mark generation as failed in DB:", dbErr);
+                }
+              }
 
               const isInsufficientCredits =
                 err.message === "INSUFFICIENT_CREDITS" ||

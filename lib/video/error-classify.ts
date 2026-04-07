@@ -8,6 +8,7 @@
 
 export type VideoErrorType =
   | "prompt_violation"
+  | "prompt_too_long"
   | "generic_failure";
 
 const CONTENT_VIOLATION_PATTERNS = [
@@ -28,11 +29,24 @@ const CONTENT_VIOLATION_PATTERNS = [
   /合规/,
 ];
 
+const PROMPT_TOO_LONG_PATTERNS = [
+  /must not exceed.*characters/i,
+  /length of.*prompt.*must not exceed/i,
+  /prompt.*too long/i,
+  /prompt.*exceed.*\d+/i,
+];
+
 /**
  * Classify a raw error string into a user-friendly error type.
  */
 export function classifyVideoError(rawError: string | null | undefined): VideoErrorType {
   if (!rawError) return "generic_failure";
+
+  for (const pattern of PROMPT_TOO_LONG_PATTERNS) {
+    if (pattern.test(rawError)) {
+      return "prompt_too_long";
+    }
+  }
 
   for (const pattern of CONTENT_VIOLATION_PATTERNS) {
     if (pattern.test(rawError)) {
@@ -50,6 +64,8 @@ export function getErrorMessageKey(errorType: VideoErrorType): string {
   switch (errorType) {
     case "prompt_violation":
       return "errorPromptViolation";
+    case "prompt_too_long":
+      return "errorPromptTooLong";
     case "generic_failure":
     default:
       return "errorGenericFailure";

@@ -33,6 +33,7 @@ interface VideoModelParam {
   min?: number;
   max?: number;
   maxItems?: number;
+  maxLength?: number;
   acceptTypes?: ("image" | "video")[];
 }
 
@@ -464,6 +465,12 @@ export default function VideoGenerationPanel({
 
     if (!params.prompt?.trim()) {
       setError(t("enterPromptError"));
+      return;
+    }
+
+    const promptParam = selectedModel?.params.find((p) => p.name === "prompt");
+    if (promptParam?.maxLength && params.prompt && params.prompt.length > promptParam.maxLength) {
+      setError(t("promptTooLong", { max: promptParam.maxLength, current: params.prompt.length }));
       return;
     }
 
@@ -964,17 +971,26 @@ export default function VideoGenerationPanel({
 
               // String type - use Textarea for prompt
               if (param.name === "prompt") {
+                const promptLength = String(value).length;
+                const isOverLimit = param.maxLength !== undefined && promptLength > param.maxLength;
                 return (
-                  <Textarea
-                    key={param.name}
-                    label={param.label}
-                    value={String(value)}
-                    onValueChange={(v) => handleParamChange(param.name, v)}
-                    description={param.description}
-                    isRequired={param.required}
-                    minRows={3}
-                    placeholder={t("promptPlaceholder")}
-                  />
+                  <div key={param.name} className="space-y-1">
+                    <Textarea
+                      label={param.label}
+                      value={String(value)}
+                      onValueChange={(v) => handleParamChange(param.name, v)}
+                      description={param.description}
+                      isRequired={param.required}
+                      minRows={3}
+                      placeholder={t("promptPlaceholder")}
+                      isInvalid={isOverLimit}
+                    />
+                    {param.maxLength !== undefined && (
+                      <p className={`text-xs text-right ${isOverLimit ? "text-danger" : "text-default-400"}`}>
+                        {promptLength} / {param.maxLength}
+                      </p>
+                    )}
+                  </div>
                 );
               }
 
