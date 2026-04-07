@@ -218,6 +218,11 @@ const seedance20: VideoModelConfig = {
   },
   providers: [
     { provider: "kie", providerModelId: "bytedance/seedance-2" },
+    {
+      provider: "fal",
+      providerModelId: "bytedance/seedance-2.0",
+      paramMapping: { first_frame_url: "image_url", last_frame_url: "end_image_url" },
+    },
   ],
   params: [
     {
@@ -299,6 +304,7 @@ const seedance20Reference: VideoModelConfig = {
     "Multimodal reference-to-video: attach images and videos as named references (@image1, @video1) to guide generation",
   providers: [
     { provider: "kie", providerModelId: "bytedance/seedance-2" },
+    { provider: "fal", providerModelId: "bytedance/seedance-2.0" },
   ],
   params: [
     {
@@ -380,6 +386,11 @@ const seedance20Fast: VideoModelConfig = {
   },
   providers: [
     { provider: "kie", providerModelId: "bytedance/seedance-2-fast" },
+    {
+      provider: "fal",
+      providerModelId: "bytedance/seedance-2.0/fast",
+      paramMapping: { first_frame_url: "image_url", last_frame_url: "end_image_url" },
+    },
   ],
   params: [
     {
@@ -461,6 +472,7 @@ const seedance20FastReference: VideoModelConfig = {
     "Fast multimodal reference-to-video: attach images and videos as named references (@image1, @video1) to guide generation",
   providers: [
     { provider: "kie", providerModelId: "bytedance/seedance-2-fast" },
+    { provider: "fal", providerModelId: "bytedance/seedance-2.0/fast" },
   ],
   params: [
     {

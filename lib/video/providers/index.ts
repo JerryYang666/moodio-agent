@@ -15,7 +15,7 @@ export interface VideoProviderClient {
     providerModelId: string,
     params: Record<string, any>,
     webhookUrl: string
-  ): Promise<{ requestId: string }>;
+  ): Promise<{ requestId: string; providerModelId?: string }>;
 
   getStatus(
     providerModelId: string,

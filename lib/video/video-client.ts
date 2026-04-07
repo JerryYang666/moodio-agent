@@ -69,7 +69,7 @@ export async function submitVideoGeneration(
   return {
     requestId: result.requestId,
     provider: variant.provider,
-    providerModelId: variant.providerModelId,
+    providerModelId: result.providerModelId ?? variant.providerModelId,
   };
 }
 
