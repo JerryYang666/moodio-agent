@@ -74,7 +74,15 @@ export async function POST(request: NextRequest) {
   }
 
   if (status === "ERROR") {
-    const errorMsg = error || payload_error || "Unknown error from Fal";
+    const detailMsg = Array.isArray(resultPayload?.detail)
+      ? resultPayload.detail
+          .map((d: { msg?: string; type?: string }) =>
+            [d.type, d.msg].filter(Boolean).join(": ")
+          )
+          .join("; ")
+      : undefined;
+    const errorMsg =
+      detailMsg || error || payload_error || "Unknown error from Fal";
     await handleGenerationFailure(
       generation.id,
       generation.userId,

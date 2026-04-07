@@ -28,9 +28,18 @@ export interface FalWebhookPayload {
   request_id: string;
   gateway_request_id: string;
   status: "OK" | "ERROR";
-  payload?: VideoGenerationResult | null;
+  payload?: (VideoGenerationResult & { detail?: FalErrorDetail[] }) | null;
   error?: string;
   payload_error?: string;
+}
+
+export interface FalErrorDetail {
+  msg?: string;
+  type?: string;
+  loc?: string[];
+  input?: Record<string, unknown>;
+  ctx?: Record<string, unknown>;
+  url?: string;
 }
 
 export { type VideoGenerationResult as SeedanceVideoResult };
