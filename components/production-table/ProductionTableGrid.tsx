@@ -19,6 +19,7 @@ import { RowHandle } from "./RowHandle";
 import { HeaderRow } from "./HeaderRow";
 import { useGridSelection } from "@/hooks/use-grid-selection";
 import type { SelectMode } from "@/hooks/use-grid-selection";
+import { AI_IMAGE_DRAG_MIME, AI_VIDEO_DRAG_MIME, AI_VIDEO_SUGGEST_DRAG_MIME } from "@/components/chat/asset-dnd";
 
 const DEFAULT_ROW_HEIGHT = 48;
 const DEFAULT_COL_WIDTH = 192;
@@ -369,6 +370,78 @@ export function ProductionTableGrid({
   useEffect(() => {
     return () => stopAutoScroll();
   }, [stopAutoScroll]);
+
+  // ---- Auto-scroll during external DnD (drag from chat) ----
+  const dndScrollRef = useRef<number | null>(null);
+  const dndMousePos = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+
+  const stopDndScroll = useCallback(() => {
+    if (dndScrollRef.current !== null) {
+      cancelAnimationFrame(dndScrollRef.current);
+      dndScrollRef.current = null;
+    }
+  }, []);
+
+  const tickDndScroll = useCallback(() => {
+    if (!scrollElement) return;
+    const rect = scrollElement.getBoundingClientRect();
+    const { x, y } = dndMousePos.current;
+    let dx = 0;
+    let dy = 0;
+
+    if (y < rect.top + EDGE_ZONE) {
+      dy = -MAX_SCROLL_SPEED * Math.max(0, 1 - (y - rect.top) / EDGE_ZONE);
+    } else if (y > rect.bottom - EDGE_ZONE) {
+      dy = MAX_SCROLL_SPEED * Math.max(0, 1 - (rect.bottom - y) / EDGE_ZONE);
+    }
+    if (x < rect.left + EDGE_ZONE) {
+      dx = -MAX_SCROLL_SPEED * Math.max(0, 1 - (x - rect.left) / EDGE_ZONE);
+    } else if (x > rect.right - EDGE_ZONE) {
+      dx = MAX_SCROLL_SPEED * Math.max(0, 1 - (rect.right - x) / EDGE_ZONE);
+    }
+
+    if (dx !== 0 || dy !== 0) {
+      scrollElement.scrollBy(dx, dy);
+    }
+    dndScrollRef.current = requestAnimationFrame(tickDndScroll);
+  }, [scrollElement]);
+
+  const isAssetDrag = useCallback((types: DOMStringList | readonly string[]) => {
+    const t = Array.from(types);
+    return (
+      t.includes(AI_IMAGE_DRAG_MIME) ||
+      t.includes(AI_VIDEO_DRAG_MIME) ||
+      t.includes(AI_VIDEO_SUGGEST_DRAG_MIME)
+    );
+  }, []);
+
+  const handleGridDragOver = useCallback(
+    (e: React.DragEvent) => {
+      if (!isAssetDrag(e.dataTransfer.types)) return;
+      e.preventDefault();
+      dndMousePos.current = { x: e.clientX, y: e.clientY };
+      if (dndScrollRef.current === null) {
+        dndScrollRef.current = requestAnimationFrame(tickDndScroll);
+      }
+    },
+    [isAssetDrag, tickDndScroll]
+  );
+
+  const handleGridDragLeave = useCallback(
+    (e: React.DragEvent) => {
+      if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+      stopDndScroll();
+    },
+    [stopDndScroll]
+  );
+
+  const handleGridDrop = useCallback(() => {
+    stopDndScroll();
+  }, [stopDndScroll]);
+
+  useEffect(() => {
+    return () => stopDndScroll();
+  }, [stopDndScroll]);
 
   const handleGridMouseMove = useCallback(
     (e: React.MouseEvent) => {
@@ -723,6 +796,9 @@ export function ProductionTableGrid({
       onMouseUp={handlePaintEnd}
       onKeyDown={handleKeyDown}
       onClick={handleGridClick}
+      onDragOver={handleGridDragOver}
+      onDragLeave={handleGridDragLeave}
+      onDrop={handleGridDrop}
       tabIndex={0}
     >
       <div ref={contentRef} style={{ minWidth: totalWidth, position: "relative" }}>

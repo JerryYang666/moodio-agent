@@ -37,6 +37,7 @@ import { useVideo } from "@/components/video-provider";
 import { useCollections } from "@/hooks/use-collections";
 import { getVideoModel } from "@/lib/video/models";
 import type { MessageContentPart } from "@/lib/llm/types";
+import { AI_VIDEO_DRAG_MIME } from "@/components/chat/asset-dnd";
 
 type DirectVideoPart = Extract<MessageContentPart, { type: "direct_video" }>;
 
@@ -245,9 +246,30 @@ export default function DirectVideoCard({
     };
   }, [part.generationId, part.config.sourceImageId, part.videoId]);
 
+  const handleDragStart = useCallback((e: React.DragEvent) => {
+    if (effectiveStatus !== "completed" || !part.videoId || !part.thumbnailImageId) return;
+    const payload = {
+      videoId: part.videoId,
+      thumbnailImageId: part.thumbnailImageId,
+      thumbnailUrl: part.thumbnailUrl || part.config.sourceImageUrl || "",
+      videoUrl: part.videoUrl || "",
+      prompt: part.config.prompt || "",
+    };
+    try {
+      e.dataTransfer.setData(AI_VIDEO_DRAG_MIME, JSON.stringify(payload));
+      e.dataTransfer.effectAllowed = "copy";
+    } catch (err) {
+      console.error("Failed to start video drag", err);
+    }
+  }, [effectiveStatus, part.videoId, part.thumbnailImageId, part.thumbnailUrl, part.config.sourceImageUrl, part.videoUrl, part.config.prompt]);
+
   return (
     <>
-      <div className="relative group max-w-sm">
+      <div
+        className="relative group max-w-sm"
+        draggable={effectiveStatus === "completed" && !!part.videoId && !!part.thumbnailImageId}
+        onDragStart={handleDragStart}
+      >
         <button
           onClick={() =>
             (effectiveStatus === "completed" || effectiveStatus === "failed") &&

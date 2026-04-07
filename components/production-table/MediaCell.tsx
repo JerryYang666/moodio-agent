@@ -8,6 +8,7 @@ import { Modal, ModalContent } from "@heroui/modal";
 import { Plus, X, ChevronLeft, ChevronRight } from "lucide-react";
 import type { EnrichedMediaAssetRef, CellLock } from "@/lib/production-table/types";
 import type { AssetSummary } from "@/components/chat/asset-picker-modal";
+import { AI_IMAGE_DRAG_MIME, AI_VIDEO_DRAG_MIME, AI_VIDEO_SUGGEST_DRAG_MIME } from "@/components/chat/asset-dnd";
 
 const AssetPickerModal = dynamic(
   () => import("@/components/chat/asset-picker-modal"),
@@ -48,9 +49,100 @@ export const MediaCell = memo(function MediaCell({
 }: MediaCellProps) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
   const isLockedByOther =
     lock && lock.userId !== currentUserId && lock.expiresAt > Date.now();
   const lockColor = isLockedByOther && lock ? userIdToColor(lock.userId) : undefined;
+
+  const handleDragOver = useCallback(
+    (e: React.DragEvent) => {
+      if (!canEdit || isLockedByOther) return;
+      const types = e.dataTransfer.types;
+      if (
+        types.includes(AI_IMAGE_DRAG_MIME) ||
+        types.includes(AI_VIDEO_DRAG_MIME) ||
+        types.includes(AI_VIDEO_SUGGEST_DRAG_MIME)
+      ) {
+        e.preventDefault();
+        e.stopPropagation();
+        e.dataTransfer.dropEffect = "copy";
+        setIsDragOver(true);
+      }
+    },
+    [canEdit, isLockedByOther]
+  );
+
+  const handleDragLeave = useCallback(() => {
+    setIsDragOver(false);
+  }, []);
+
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      setIsDragOver(false);
+      if (!canEdit || isLockedByOther) return;
+
+      const types = e.dataTransfer.types;
+      const hasAssetDrag =
+        types.includes(AI_IMAGE_DRAG_MIME) ||
+        types.includes(AI_VIDEO_DRAG_MIME) ||
+        types.includes(AI_VIDEO_SUGGEST_DRAG_MIME);
+      if (!hasAssetDrag) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+
+      const imageData = e.dataTransfer.getData(AI_IMAGE_DRAG_MIME);
+      const videoData = e.dataTransfer.getData(AI_VIDEO_DRAG_MIME);
+      const videoSuggestData = e.dataTransfer.getData(AI_VIDEO_SUGGEST_DRAG_MIME);
+
+      if (imageData) {
+        try {
+          const parsed = JSON.parse(imageData);
+          if (!parsed.imageId) return;
+          const ref: EnrichedMediaAssetRef = {
+            assetId: parsed.imageId,
+            imageId: parsed.imageId,
+            assetType: "image",
+            imageUrl: parsed.url || undefined,
+          };
+          onAddAsset(ref);
+        } catch { /* ignore malformed data */ }
+        return;
+      }
+
+      if (videoSuggestData) {
+        try {
+          const parsed = JSON.parse(videoSuggestData);
+          if (!parsed.imageId) return;
+          const ref: EnrichedMediaAssetRef = {
+            assetId: parsed.imageId,
+            imageId: parsed.imageId,
+            assetType: "image",
+            imageUrl: parsed.url || undefined,
+          };
+          onAddAsset(ref);
+        } catch { /* ignore malformed data */ }
+        return;
+      }
+
+      if (videoData) {
+        try {
+          const parsed = JSON.parse(videoData);
+          if (!parsed.videoId || !parsed.thumbnailImageId) return;
+          const ref: EnrichedMediaAssetRef = {
+            assetId: parsed.videoId,
+            imageId: parsed.thumbnailImageId,
+            assetType: "video",
+            imageUrl: parsed.thumbnailUrl || undefined,
+            videoUrl: parsed.videoUrl || undefined,
+          };
+          onAddAsset(ref);
+        } catch { /* ignore malformed data */ }
+        return;
+      }
+    },
+    [canEdit, isLockedByOther, onAddAsset]
+  );
 
   const handleSingleSelect = useCallback(
     (asset: AssetSummary) => {
@@ -92,10 +184,17 @@ export const MediaCell = memo(function MediaCell({
 
   return (
     <div
-      className={`w-full h-full min-h-[32px] p-1 relative ${
-        isSelected ? "bg-primary/10 hover:bg-primary/15" : ""
+      className={`w-full h-full min-h-[32px] p-1 relative transition-colors ${
+        isDragOver
+          ? "bg-primary/20 ring-2 ring-inset ring-primary"
+          : isSelected
+            ? "bg-primary/10 hover:bg-primary/15"
+            : ""
       }`}
       style={lockColor ? { boxShadow: `inset 0 0 0 2px ${lockColor}` } : undefined}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
     >
       <div className="flex flex-wrap gap-1">
         {assets.map((asset, idx) => (

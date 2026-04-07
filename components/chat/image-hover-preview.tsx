@@ -134,6 +134,15 @@ export default function ImageHoverPreview({
     setShowPreview(false);
   }, [onHoverTrack]);
 
+  const handleDragStart = useCallback(() => {
+    isHoveringRef.current = false;
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = null;
+    }
+    setShowPreview(false);
+  }, []);
+
   // Cleanup timeout on unmount
   useEffect(() => {
     return () => {
@@ -202,6 +211,7 @@ export default function ImageHoverPreview({
       ref={containerRef}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
+      onDragStart={handleDragStart}
       className={className}
     >
       {children}
