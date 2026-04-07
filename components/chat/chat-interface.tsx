@@ -2436,6 +2436,7 @@ export default function ChatInterface({
     sessionTurnCountRef.current += 1;
 
     let streamingChatId = "";
+    let didStartChatMonitoring = false;
 
     try {
       // Check for notification permission when user sends a message
@@ -2457,11 +2458,6 @@ export default function ChatInterface({
         }
         // Notify parent of new chat creation
         onChatCreated?.(currentChatId);
-      }
-
-      // Start monitoring for background completion (in case user leaves)
-      if (currentChatId) {
-        monitorChat(currentChatId, messages.length + 1);
       }
 
       streamingChatId = currentChatId!;
@@ -2565,6 +2561,12 @@ export default function ChatInterface({
           if (errorData?.error) errorMessage = errorData.error;
         } catch {}
         throw new Error(errorMessage);
+      }
+
+      // Start monitoring only after the request is accepted and streaming starts.
+      if (currentChatId) {
+        monitorChat(currentChatId, optimisticMessages.length);
+        didStartChatMonitoring = true;
       }
 
       const reader = res.body.getReader();
@@ -2978,8 +2980,8 @@ export default function ChatInterface({
       lastEditorContentRef.current = null;
     } catch (error: any) {
       console.error("Error sending message", error);
-      if (streamingChatId) {
-        deleteStreamingChatState(streamingChatId);
+      if (didStartChatMonitoring && streamingChatId) {
+        cancelMonitorChat(streamingChatId);
       }
       if (!streamingChatId || chatIdRef.current === streamingChatId) {
         setInput(lastUserInputRef.current);
@@ -3376,7 +3378,6 @@ export default function ChatInterface({
         }
       } catch (e: any) {
         console.error("Failed to send video from agent:", e);
-        if (streamingChatId) deleteStreamingChatState(streamingChatId);
         const errorKey = getUserFriendlyErrorKey(e?.message);
         addToast({
           title: t(`video.${errorKey}`),
