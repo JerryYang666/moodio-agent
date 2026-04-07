@@ -261,7 +261,8 @@ export const MediaCell = memo(function MediaCell({
         size="4xl"
         hideCloseButton
         classNames={{
-          backdrop: "bg-black/80",
+          wrapper: "z-[70]",
+          backdrop: "bg-black/80 z-[70]",
           base: "bg-transparent shadow-none max-h-[90vh]",
           body: "p-0",
         }}

@@ -819,6 +819,7 @@ export function ProductionTableGrid({
           onColPaintEnd={handlePaintEnd}
           onRenameColumn={onRenameColumn}
           onDeleteColumn={onDeleteColumn}
+          onBulkDeleteColumns={onBulkDeleteColumns}
           onResizeColumn={handleResizeColumn}
           onColDragStart={handleColDragStart}
           onColDragOver={handleColDragOver}

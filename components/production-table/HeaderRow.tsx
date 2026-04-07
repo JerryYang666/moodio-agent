@@ -27,6 +27,7 @@ interface HeaderRowProps {
   onColPaintEnd: () => void;
   onRenameColumn: (columnId: string, name: string) => void;
   onDeleteColumn: (columnId: string) => void;
+  onBulkDeleteColumns?: (columnIds: string[]) => void;
   onResizeColumn: (columnId: string, width: number) => void;
   onColDragStart: (index: number, e: React.DragEvent) => void;
   onColDragOver: (index: number, e: React.DragEvent) => void;
@@ -48,6 +49,7 @@ export const HeaderRow = memo(function HeaderRow({
   onColPaintEnd,
   onRenameColumn,
   onDeleteColumn,
+  onBulkDeleteColumns,
   onResizeColumn,
   onColDragStart,
   onColDragOver,
@@ -349,12 +351,21 @@ export const HeaderRow = memo(function HeaderRow({
             <button
               className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-danger hover:bg-danger/10 transition-colors"
               onClick={() => {
-                onDeleteColumn(contextMenu.columnId);
+                const idsToDelete = selectedColumns.has(contextMenu.columnId) && selectedColumns.size > 1
+                  ? Array.from(selectedColumns)
+                  : [contextMenu.columnId];
+                if (idsToDelete.length > 1 && onBulkDeleteColumns) {
+                  onBulkDeleteColumns(idsToDelete);
+                } else {
+                  idsToDelete.forEach((id) => onDeleteColumn(id));
+                }
                 closeContextMenu();
               }}
             >
               <Trash2 size={14} />
-              {t("deleteColumn")}
+              {selectedColumns.has(contextMenu.columnId) && selectedColumns.size > 1
+                ? `${t("deleteColumn")} (${selectedColumns.size})`
+                : t("deleteColumn")}
             </button>
           </div>
         </>
