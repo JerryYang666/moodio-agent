@@ -79,7 +79,7 @@ func main() {
 
 		sessionId := generateSessionId()
 		logf(regionLocal, "[connect] user=%s (%s) -> desktop=%s session=%s permission=%s",
-			claims.FirstName, claims.UserID[:8], desktopId[:8], sessionId, permission)
+			displayName(claims.FirstName, claims.Email), claims.UserID[:8], desktopId[:8], sessionId, permission)
 
 		err = m.HandleRequestWithKeys(w, r, map[string]any{
 			"sessionId":  sessionId,
@@ -129,7 +129,7 @@ func main() {
 
 		sessionId := generateSessionId()
 		logf(regionLocal, "[connect] user=%s (%s) -> production-table=%s session=%s permission=%s",
-			claims.FirstName, claims.UserID[:8], tableId[:8], sessionId, permission)
+			displayName(claims.FirstName, claims.Email), claims.UserID[:8], tableId[:8], sessionId, permission)
 
 		err = m.HandleRequestWithKeys(w, r, map[string]any{
 			"sessionId":  sessionId,

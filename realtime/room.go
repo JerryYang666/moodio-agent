@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"strings"
 	"sync"
 	"time"
 
@@ -142,7 +143,7 @@ func (rm *RoomManager) HandleConnect(s *melody.Session) {
 
 	sessions := rm.getSessionsInRoom(keys.RoomID, keys.SessionID)
 
-	logf(regionLocal, "[room] %s joined room=%s (%d other sessions present)", keys.FirstName, keys.RoomID[:8], len(sessions))
+	logf(regionLocal, "[room] %s joined room=%s (%d other sessions present)", displayName(keys.FirstName, keys.Email), keys.RoomID[:8], len(sessions))
 
 	joined := RoomJoinedEvent{
 		Type:      "room_joined",
@@ -177,7 +178,7 @@ func (rm *RoomManager) HandleMessage(s *melody.Session, msg []byte) {
 
 	if isStateEvent(incoming.Type) {
 		logf(regionLocal, "[event] %s %s in room=%s by %s",
-			incoming.Type, truncatePayloadForLog(incoming.Payload), keys.RoomID[:8], keys.FirstName)
+			incoming.Type, truncatePayloadForLog(incoming.Payload), keys.RoomID[:8], displayName(keys.FirstName, keys.Email))
 	}
 
 	stamped := stampIdentity(keys, &incoming)
@@ -196,7 +197,7 @@ func (rm *RoomManager) HandleDisconnect(s *melody.Session) {
 	rm.removeFromRoom(keys.RoomID, s)
 
 	remaining := rm.getSessionsInRoom(keys.RoomID, keys.SessionID)
-	logf(regionLocal, "[room] %s left room=%s (%d sessions remaining)", keys.FirstName, keys.RoomID[:8], len(remaining))
+	logf(regionLocal, "[room] %s left room=%s (%d sessions remaining)", displayName(keys.FirstName, keys.Email), keys.RoomID[:8], len(remaining))
 
 	sessionEvent := buildSessionEvent("session_left", s)
 	rm.broadcastToRoom(keys.RoomID, s, sessionEvent)
@@ -386,6 +387,7 @@ func (rm *RoomManager) handleFederatedMessage(roomId string, sourceRegion string
 	var event struct {
 		Type      string `json:"type"`
 		FirstName string `json:"firstName"`
+		Email     string `json:"email"`
 	}
 	if err := json.Unmarshal(msg, &event); err == nil {
 		if event.Type == "presence_sync_request" {
@@ -405,7 +407,7 @@ func (rm *RoomManager) handleFederatedMessage(roomId string, sourceRegion string
 					rm.remoteMu.Unlock()
 				}
 			}
-			logf(sourceRegion, "[room] %s joined room=%s", event.FirstName, roomId[:8])
+			logf(sourceRegion, "[room] %s joined room=%s", displayName(event.FirstName, event.Email), roomId[:8])
 		case "session_left":
 			var full OutgoingEvent
 			if err := json.Unmarshal(msg, &full); err == nil {
@@ -413,7 +415,7 @@ func (rm *RoomManager) handleFederatedMessage(roomId string, sourceRegion string
 				rm.remoteSessions[roomId] = removeRemoteSession(rm.remoteSessions[roomId], full.SessionID)
 				rm.remoteMu.Unlock()
 			}
-			logf(sourceRegion, "[room] %s left room=%s", event.FirstName, roomId[:8])
+			logf(sourceRegion, "[room] %s left room=%s", displayName(event.FirstName, event.Email), roomId[:8])
 		}
 
 		if isStateEvent(event.Type) {
@@ -422,7 +424,7 @@ func (rm *RoomManager) handleFederatedMessage(roomId string, sourceRegion string
 			}
 			json.Unmarshal(msg, &raw)
 			logf(sourceRegion, "[event] %s %s in room=%s by %s",
-				event.Type, truncatePayloadForLog(raw.Payload), roomId[:8], event.FirstName)
+				event.Type, truncatePayloadForLog(raw.Payload), roomId[:8], displayName(event.FirstName, event.Email))
 		}
 	}
 
@@ -445,4 +447,14 @@ func removeRemoteSession(sessions []SessionInfo, sessionId string) []SessionInfo
 		}
 	}
 	return sessions
+}
+
+func displayName(firstName string, email string) string {
+	if firstName = strings.TrimSpace(firstName); firstName != "" {
+		return firstName
+	}
+	if email = strings.TrimSpace(email); email != "" {
+		return email
+	}
+	return "unknown-user"
 }

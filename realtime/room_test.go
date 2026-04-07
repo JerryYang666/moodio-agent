@@ -700,6 +700,47 @@ func percentile(sorted []time.Duration, pct float64) time.Duration {
 	return sorted[idx]
 }
 
+const pressureLevelsEnvKey = "MOODIO_PRESSURE_LEVELS"
+
+func enabledPressureLevels() map[string]bool {
+	defaultLevels := map[string]bool{
+		"light":  true,
+		"medium": true,
+	}
+
+	raw := strings.TrimSpace(os.Getenv(pressureLevelsEnvKey))
+	if raw == "" {
+		return defaultLevels
+	}
+
+	if strings.EqualFold(raw, "all") {
+		return map[string]bool{
+			"light":   true,
+			"medium":  true,
+			"heavy":   true,
+			"extreme": true,
+		}
+	}
+
+	known := map[string]struct{}{
+		"light":   {},
+		"medium":  {},
+		"heavy":   {},
+		"extreme": {},
+	}
+	enabled := make(map[string]bool)
+	for _, part := range strings.Split(raw, ",") {
+		level := strings.ToLower(strings.TrimSpace(part))
+		if _, ok := known[level]; ok {
+			enabled[level] = true
+		}
+	}
+	if len(enabled) == 0 {
+		return defaultLevels
+	}
+	return enabled
+}
+
 func TestLatencyUnderPressure(t *testing.T) {
 	log.SetOutput(io.Discard)
 	defer log.SetOutput(os.Stderr)
@@ -721,9 +762,15 @@ func TestLatencyUnderPressure(t *testing.T) {
 	)
 
 	t.Logf("GOMAXPROCS=%d  NumCPU=%d", runtime.GOMAXPROCS(0), runtime.NumCPU())
+	enabledLevels := enabledPressureLevels()
+	t.Logf("pressure levels enabled: %v (set %s=all or comma list to override)", enabledLevels, pressureLevelsEnvKey)
 
 	for _, level := range levels {
 		t.Run(level.label, func(t *testing.T) {
+			if !enabledLevels[level.label] {
+				t.Skipf("skipped by default; set %s=%s (or all) to run this level", pressureLevelsEnvKey, level.label)
+			}
+
 			m := melody.New()
 			m.Config.MaxMessageSize = 4096
 			rooms := NewRoomManager(m)
