@@ -130,3 +130,41 @@ func checkPermission(apiBase, desktopId, userId string, originalReq *http.Reques
 
 	return result.Permission, nil
 }
+
+// checkProductionTablePermission calls the Next.js API to verify the user's permission on a production table.
+func checkProductionTablePermission(apiBase, tableId, userId string, originalReq *http.Request) (string, error) {
+	url := fmt.Sprintf("%s/api/production-table/%s/permission?userId=%s", apiBase, tableId, userId)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return "", err
+	}
+
+	for _, c := range originalReq.Cookies() {
+		req.AddCookie(c)
+	}
+
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("permission check failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("permission denied (status %d)", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+
+	var result struct {
+		Permission string `json:"permission"`
+	}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return "", err
+	}
+
+	return result.Permission, nil
+}

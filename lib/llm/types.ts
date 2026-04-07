@@ -199,4 +199,5 @@ export interface ChatOptions {
   maxTokens?: number;
   temperature?: number;
   stream?: boolean;
+  responseFormat?: { type: "json_object" };
 }

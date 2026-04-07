@@ -22,6 +22,7 @@ import {
   Monitor,
   Check,
   CreditCard,
+  Table2,
 } from "lucide-react";
 import { Avatar } from "@heroui/avatar";
 import { Tooltip } from "@heroui/tooltip";
@@ -54,6 +55,7 @@ export const PrimarySidebar = () => {
   const tCredits = useTranslations("credits");
   const tLanguage = useTranslations("language");
   const showDesktop = useFeatureFlag<boolean>("user_desktop") ?? false;
+  const showProductionTable = useFeatureFlag<boolean>("user_prod_tbl") ?? false;
 
   const STORAGE_KEY = "moodio:sidebar-collapsed";
   const [collapsed, setCollapsed] = useState(() => {
@@ -98,6 +100,16 @@ export const PrimarySidebar = () => {
             href: "/desktop",
             icon: <Monitor size={20} />,
             isActive: (path: string) => path.startsWith("/desktop"),
+          },
+        ]
+      : []),
+    ...(showProductionTable
+      ? [
+          {
+            label: t("productionTable"),
+            href: "/production-table",
+            icon: <Table2 size={20} />,
+            isActive: (path: string) => path.startsWith("/production-table"),
           },
         ]
       : []),
