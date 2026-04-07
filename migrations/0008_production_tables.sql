@@ -18,6 +18,7 @@ CREATE TABLE production_table_columns (
   name VARCHAR(255) NOT NULL,
   cell_type VARCHAR(20) NOT NULL DEFAULT 'text',
   sort_order INTEGER NOT NULL DEFAULT 0,
+  width INTEGER NOT NULL DEFAULT 192,
   created_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
@@ -26,6 +27,7 @@ CREATE TABLE production_table_rows (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   table_id UUID NOT NULL REFERENCES production_tables(id) ON DELETE CASCADE,
   sort_order INTEGER NOT NULL DEFAULT 0,
+  height INTEGER NOT NULL DEFAULT 48,
   created_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
