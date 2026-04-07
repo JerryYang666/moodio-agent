@@ -9,7 +9,7 @@ import {
   productionTableRowShares,
   users,
 } from "@/lib/db/schema";
-import { eq, and, desc, asc, inArray } from "drizzle-orm";
+import { eq, and, desc, asc, inArray, sql } from "drizzle-orm";
 import { PERMISSION_OWNER } from "@/lib/permissions";
 import type {
   EnrichedProductionTable,
@@ -399,34 +399,11 @@ export async function addMediaAsset(
     ...(asset.thumbnailImageId ? { thumbnailImageId: asset.thumbnailImageId } : {}),
   };
 
-  const existing = await db
-    .select()
-    .from(productionTableCells)
-    .where(
-      and(
-        eq(productionTableCells.columnId, columnId),
-        eq(productionTableCells.rowId, rowId)
-      )
-    )
-    .limit(1);
+  const assetJson = JSON.stringify(cleanAsset);
 
-  if (existing.length > 0) {
-    const current = (existing[0].mediaAssets as MediaAssetRef[] | null) ?? [];
-    const updated = [...current, cleanAsset];
-    const [cell] = await db
-      .update(productionTableCells)
-      .set({ mediaAssets: updated, updatedBy, updatedAt: new Date() })
-      .where(
-        and(
-          eq(productionTableCells.columnId, columnId),
-          eq(productionTableCells.rowId, rowId)
-        )
-      )
-      .returning();
-    await touchTable(tableId);
-    return cell;
-  }
-
+  // Atomic upsert: appends the new asset to the existing JSONB array in a
+  // single statement, avoiding the read-modify-write race condition that
+  // occurs when two users add assets to the same cell concurrently.
   const [cell] = await db
     .insert(productionTableCells)
     .values({
@@ -438,7 +415,16 @@ export async function addMediaAsset(
       updatedBy,
       updatedAt: new Date(),
     })
+    .onConflictDoUpdate({
+      target: [productionTableCells.columnId, productionTableCells.rowId],
+      set: {
+        mediaAssets: sql`COALESCE(${productionTableCells.mediaAssets}, '[]'::jsonb) || ${assetJson}::jsonb`,
+        updatedBy,
+        updatedAt: new Date(),
+      },
+    })
     .returning();
+
   await touchTable(tableId);
   return cell;
 }
@@ -450,25 +436,20 @@ export async function removeMediaAsset(
   assetId: string,
   updatedBy: string
 ) {
-  const existing = await db
-    .select()
-    .from(productionTableCells)
-    .where(
-      and(
-        eq(productionTableCells.columnId, columnId),
-        eq(productionTableCells.rowId, rowId)
-      )
-    )
-    .limit(1);
-
-  if (existing.length === 0) return null;
-
-  const current = (existing[0].mediaAssets as MediaAssetRef[] | null) ?? [];
-  const updated = current.filter((a) => a.assetId !== assetId);
-
-  const [cell] = await db
+  // Atomic removal: filters out the asset by assetId directly in SQL,
+  // avoiding the read-modify-write race condition that occurs when two
+  // users modify the same cell's media assets concurrently.
+  const result = await db
     .update(productionTableCells)
-    .set({ mediaAssets: updated, updatedBy, updatedAt: new Date() })
+    .set({
+      mediaAssets: sql`(
+        SELECT COALESCE(jsonb_agg(elem), '[]'::jsonb)
+        FROM jsonb_array_elements(COALESCE(${productionTableCells.mediaAssets}, '[]'::jsonb)) AS elem
+        WHERE elem->>'assetId' != ${assetId}
+      )`,
+      updatedBy,
+      updatedAt: new Date(),
+    })
     .where(
       and(
         eq(productionTableCells.columnId, columnId),
@@ -476,8 +457,11 @@ export async function removeMediaAsset(
       )
     )
     .returning();
+
+  if (result.length === 0) return null;
+
   await touchTable(tableId);
-  return cell;
+  return result[0];
 }
 
 // ---------------------------------------------------------------------------
