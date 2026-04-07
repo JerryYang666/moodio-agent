@@ -369,4 +369,4 @@ No latency decay as session count grows. Because broadcasts only touch the targe
 | [google/uuid](https://github.com/google/uuid) | v1.6.0 | Session ID generation |
 | [nats-io/nats.go](https://github.com/nats-io/nats.go) | v1.49.0 | Cross-region federation pub/sub |
 
-Max message size: **4096 bytes** (desktop, production table), **512 bytes** (ping)..
+Max message size: **4096 bytes** (desktop, production table), **512 bytes** (ping).

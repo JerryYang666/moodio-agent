@@ -68,6 +68,7 @@ jobs:
       - name: Compare test duration vs latest successful main
         if: always() && steps.go-tests.outputs.duration_seconds != ''
         id: compare-duration
+        continue-on-error: true
         uses: actions/github-script@v8
         env:
           CURRENT_DURATION_SECONDS: ${{ steps.go-tests.outputs.duration_seconds }}
@@ -85,6 +86,7 @@ jobs:
             core.setOutput("baseline_seconds", "");
             core.setOutput("pct_change", "");
             core.setOutput("is_regression", "false");
+            core.setOutput("baseline_run_url", "");
 
             if (!current || Number.isNaN(current)) {
               core.warning("Current test duration is unavailable; skipping baseline comparison.");
@@ -141,36 +143,40 @@ jobs:
 
             if (baselineSeconds === null) {
               core.warning("No baseline test timing found from successful main runs.");
-              await core.summary
-                .addHeading("Realtime test duration baseline")
-                .addRaw("- Baseline comparison: **not available yet** (need one prior successful main run with timed step)\n")
-                .write();
               return;
             }
 
             const pctChange = ((current - baselineSeconds) / baselineSeconds) * 100;
             const isRegression = pctChange > threshold;
+            const sign = pctChange >= 0 ? "+" : "";
+            const pctChangeSigned = `${sign}${pctChange.toFixed(1)}`;
+            const baselineRunUrl = `https://github.com/${owner}/${repo}/actions/runs/${baselineRunId}`;
 
             core.setOutput("comparison_available", "true");
             core.setOutput("baseline_seconds", String(baselineSeconds));
-            core.setOutput("pct_change", pctChange.toFixed(1));
+            core.setOutput("pct_change", pctChangeSigned);
             core.setOutput("is_regression", String(isRegression));
-
-            const sign = pctChange >= 0 ? "+" : "";
-            const baselineLink = `https://github.com/${owner}/${repo}/actions/runs/${baselineRunId}`;
-
-            await core.summary
-              .addHeading("Realtime test duration comparison")
-              .addRaw(`- Current: **${current}s**\n`)
-              .addRaw(`- Baseline (latest successful main): **${baselineSeconds}s** ([run](${baselineLink}))\n`)
-              .addRaw(`- Delta: **${sign}${pctChange.toFixed(1)}%** (threshold: ${threshold}%)\n`)
-              .write();
+            core.setOutput("baseline_run_url", baselineRunUrl);
 
             if (isRegression) {
               core.warning(
                 `Realtime test suite duration regressed by ${pctChange.toFixed(1)}% (current=${current}s, baseline=${baselineSeconds}s, threshold=${threshold}%).`
               );
             }
+
+      - name: Report duration comparison
+        if: always() && steps.go-tests.outputs.duration_seconds != ''
+        run: |
+          echo "## Realtime test duration comparison" >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "${{ steps.compare-duration.outputs.comparison_available }}" != "true" ]; then
+            echo "- Baseline comparison: **not available yet** (need one prior successful main run with timed step)" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          echo "- Current: **${{ steps.go-tests.outputs.duration_seconds }}s**" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Baseline (latest successful main): **${{ steps.compare-duration.outputs.baseline_seconds }}s** ([run](${{ steps.compare-duration.outputs.baseline_run_url }}))" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Delta: **${{ steps.compare-duration.outputs.pct_change }}%** (threshold: ${{ env.TEST_DURATION_REGRESSION_PCT }}%)" >> "$GITHUB_STEP_SUMMARY"
 
   build-and-push:
     name: Build & push container
