@@ -601,7 +601,7 @@ export function ProductionTableShareModal({
   );
 
   return (
-    <Modal isOpen={isOpen} onOpenChange={(open) => !open && onClose()} size="2xl" scrollBehavior="inside">
+    <Modal isOpen={isOpen} onOpenChange={(open) => !open && onClose()} size="2xl" scrollBehavior="inside" classNames={{ wrapper: "z-[70]", backdrop: "z-[70]" }}>
       <ModalContent>
         <ModalHeader>{t("shareTable")}</ModalHeader>
         <ModalBody>
