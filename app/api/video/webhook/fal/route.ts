@@ -33,6 +33,8 @@ export async function POST(request: NextRequest) {
     console.warn("[Webhook/Fal] Skipping signature verification in development");
   }
 
+  console.log("[Webhook/Fal] Received payload:", bodyBuffer.toString("utf-8"));
+
   let payload: FalWebhookPayload;
   try {
     payload = JSON.parse(bodyBuffer.toString("utf-8"));
