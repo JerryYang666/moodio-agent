@@ -9,7 +9,7 @@ export const searchTool: ToolDefinition = {
 
 Where:
 - "text": A natural language text search query describing what to look for (can be empty string if only using filters)
-- "filters": An array of taxonomy value IDs from the tree (can be empty array if only using text search)
+- "filters": An array of taxonomy value IDs from the tree (can be empty array if only using text search). Maximum of 2 taxonomy label IDs allowed.
 
 The search will be executed directly — no user confirmation is needed.
 
