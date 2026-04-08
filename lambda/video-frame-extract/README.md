@@ -33,4 +33,4 @@ python main.py '{"bucket": "my-bucket", "video_key": "videos/test.mp4", "output_
 
 ## Deployment
 
-The Docker image is built and pushed to ECR via the `build-video-frame-extract` GitHub Actions workflow on pushes to `lambda/video-frame-extract/**`.
+The Docker image is built and pushed to ECR via the `build-video-frame-extract` GitHub Actions workflow on pushes to `lambda/video-frame-extract/**`..
