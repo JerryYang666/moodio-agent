@@ -89,23 +89,23 @@ export const PrimarySidebar = () => {
     },
     ...(showDesktop
       ? [
-          {
-            label: t("canvas"),
-            href: "/desktop",
-            icon: <Monitor size={20} />,
-            isActive: (path: string) => path.startsWith("/desktop"),
-          },
-        ]
+        {
+          label: t("canvas"),
+          href: "/desktop",
+          icon: <Monitor size={20} />,
+          isActive: (path: string) => path.startsWith("/desktop"),
+        },
+      ]
       : []),
     ...(showProductionTable
       ? [
-          {
-            label: t("productionTable"),
-            href: "/production-table",
-            icon: <Table2 size={20} />,
-            isActive: (path: string) => path.startsWith("/production-table"),
-          },
-        ]
+        {
+          label: t("productionTable"),
+          href: "/production-table",
+          icon: <Table2 size={20} />,
+          isActive: (path: string) => path.startsWith("/production-table"),
+        },
+      ]
       : []),
     {
       label: t("video"),
@@ -269,173 +269,174 @@ export const PrimarySidebar = () => {
           </Tooltip>
         )}
 
-      {/* Credits Display with Account Switcher */}
-      {user && credits !== null && (
-        <Popover placement="right" showArrow>
-          <PopoverTrigger>
-            <button
-              className={clsx(
-                "flex flex-col items-center gap-1 px-2 py-1.5 mt-1 rounded-xl transition-all duration-300 relative z-0 outline-none",
-                pathname === "/credits"
-                  ? "text-primary"
-                  : "text-default-500 hover:bg-default-100 hover:text-default-900"
-              )}
-              onClick={refreshBalance}
-            >
-              <div className="relative">
-                <Bean size={18} />
-                {activeAccountType === "team" && (
-                  <div className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-secondary rounded-full" />
-                )}
-              </div>
-              <span className="text-xs font-medium">{credits}</span>
-              {pathname === "/credits" && (
-                <motion.div
-                  layoutId="active-indicator"
-                  className="absolute inset-0 bg-primary/10 rounded-xl -z-10 shadow-sm"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                />
-              )}
-            </button>
-          </PopoverTrigger>
-          <PopoverContent className="w-56 p-2">
-            <div className="flex flex-col gap-1">
-              <p className="text-xs text-default-400 px-3 py-1">{tCredits("billingHint")}</p>
+        {/* Credits Display with Account Switcher */}
+        {user && credits !== null && (
+          <Popover placement="right" showArrow>
+            <PopoverTrigger>
               <button
                 className={clsx(
-                  "flex items-center gap-2 px-3 py-2 rounded-lg text-sm w-full text-left transition-colors",
-                  activeAccountType === "personal"
-                    ? "bg-primary/10 text-primary font-medium"
-                    : "hover:bg-default-100"
+                  "flex flex-col items-center gap-1 px-2 py-1.5 mt-1 rounded-xl transition-all duration-300 relative z-0 outline-none",
+                  pathname === "/credits"
+                    ? "text-primary"
+                    : "text-default-500 hover:bg-default-100 hover:text-default-900"
                 )}
-                onClick={() => {
-                  dispatch(resetToPersonalLocal());
-                  setActiveAccountApi({ accountType: "personal", accountId: null });
-                }}
+                onClick={refreshBalance}
               >
-                <Bean size={14} />
-                <span className="flex-1">{tCredits("personal")}</span>
-                {activeAccountType === "personal" && <Check size={14} className="text-primary" />}
+                <div className="relative">
+                  <Bean size={18} />
+                  {activeAccountType === "team" && (
+                    <div className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-secondary rounded-full" />
+                  )}
+                </div>
+                <span className="text-xs font-medium">{credits}</span>
+                {pathname === "/credits" && (
+                  <motion.div
+                    layoutId="active-indicator"
+                    className="absolute inset-0 bg-primary/10 rounded-xl -z-10 shadow-sm"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                  />
+                )}
               </button>
-              {teams.map((team) => (
+            </PopoverTrigger>
+            <PopoverContent className="w-56 p-2">
+              <div className="flex flex-col gap-1">
+                <p className="text-xs text-default-400 px-3 py-1">{tCredits("billingHint")}</p>
                 <button
-                  key={team.teamId}
                   className={clsx(
                     "flex items-center gap-2 px-3 py-2 rounded-lg text-sm w-full text-left transition-colors",
-                    activeAccountType === "team" && activeTeamName === team.teamName
+                    activeAccountType === "personal"
                       ? "bg-primary/10 text-primary font-medium"
                       : "hover:bg-default-100"
                   )}
                   onClick={() => {
-                    dispatch(
-                      setActiveAccountLocal({
-                        accountType: "team",
-                        accountId: team.teamId,
-                        teamName: team.teamName,
-                      })
-                    );
-                    setActiveAccountApi({ accountType: "team", accountId: team.teamId });
+                    dispatch(resetToPersonalLocal());
+                    setActiveAccountApi({ accountType: "personal", accountId: null });
                   }}
                 >
-                  <UsersIcon size={14} />
-                  <span className="flex-1 truncate">{team.teamName}</span>
-                  {activeAccountType === "team" && activeTeamName === team.teamName && <Check size={14} className="text-primary" />}
+                  <Bean size={14} />
+                  <span className="flex-1">{tCredits("personal")}</span>
+                  {activeAccountType === "personal" && <Check size={14} className="text-primary" />}
                 </button>
-              ))}
-              <div className="h-px bg-divider my-1" />
-              <NextLink
-                href="/credits"
-                className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm hover:bg-default-100 text-default-500"
-              >
-                {tCredits("viewAll")}
-              </NextLink>
-            </div>
-          </PopoverContent>
-        </Popover>
-      )}
-
-      {/* User Profile */}
-      <div className="pt-2 pb-2 px-2 w-full flex flex-col items-center gap-3">
-        <Tooltip content={tLanguage("switchLanguage")} placement="right" closeDelay={0}>
-          <div>
-            <LanguageSwitch />
-          </div>
-        </Tooltip>
-        <ThemeSwitch />
-
-        {user && (
-          <Popover placement="right">
-            <PopoverTrigger>
-              <button className="outline-none flex justify-center w-full">
-                <Avatar
-                  src={undefined}
-                  name={
-                    user.firstName?.charAt(0) ||
-                    user.email.charAt(0).toUpperCase()
-                  }
-                  isBordered
-                  color="primary"
-                  size="sm"
-                  className="cursor-pointer hover:scale-110 transition-transform"
-                />
-              </button>
-            </PopoverTrigger>
-            <PopoverContent className="w-60 p-2">
-              <div className="px-2 py-1">
-                <p className="font-bold text-small truncate">
-                  {user.firstName && user.lastName
-                    ? `${user.firstName} ${user.lastName}`
-                    : user.firstName || user.email}
-                </p>
-                <p className="text-tiny text-default-500 truncate">{user.email}</p>
-              </div>
-              <div className="h-px bg-divider my-2" />
-              <div className="flex flex-col gap-2">
-                <NextLink href="/profile" className="w-full">
-                  <Button
-                    size="sm"
-                    variant="flat"
-                    className="w-full justify-start"
-                    startContent={<UserIcon size={16} />}
+                {teams.map((team) => (
+                  <button
+                    key={team.teamId}
+                    className={clsx(
+                      "flex items-center gap-2 px-3 py-2 rounded-lg text-sm w-full text-left transition-colors",
+                      activeAccountType === "team" && activeTeamName === team.teamName
+                        ? "bg-primary/10 text-primary font-medium"
+                        : "hover:bg-default-100"
+                    )}
+                    onClick={() => {
+                      dispatch(
+                        setActiveAccountLocal({
+                          accountType: "team",
+                          accountId: team.teamId,
+                          teamName: team.teamName,
+                        })
+                      );
+                      setActiveAccountApi({ accountType: "team", accountId: team.teamId });
+                    }}
                   >
-                    {t("profile")}
-                  </Button>
-                </NextLink>
-                <NextLink href="/payments" className="w-full">
-                  <Button
-                    size="sm"
-                    variant="flat"
-                    className="w-full justify-start"
-                    startContent={<CreditCard size={16} />}
-                  >
-                    {t("payments")}
-                  </Button>
-                </NextLink>
-                <Button
-                  size="sm"
-                  variant="flat"
-                  color="danger"
-                  startContent={<LogOut size={16} />}
-                  onPress={logout}
-                  className="w-full justify-start"
+                    <UsersIcon size={14} />
+                    <span className="flex-1 truncate">{team.teamName}</span>
+                    {activeAccountType === "team" && activeTeamName === team.teamName && <Check size={14} className="text-primary" />}
+                  </button>
+                ))}
+                <div className="h-px bg-divider my-1" />
+                <NextLink
+                  href="/credits"
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm hover:bg-default-100 text-default-500"
                 >
-                  {t("logout")}
-                </Button>
+                  {tCredits("viewAll")}
+                </NextLink>
               </div>
             </PopoverContent>
           </Popover>
         )}
-      </div>
 
-      {/* Collapse Toggle */}
-      <button
-        onClick={() => setCollapsed((prev) => !prev)}
-        className="mt-2 p-1.5 rounded-lg text-default-400 hover:text-default-700 hover:bg-default-100 transition-colors"
-      >
-        {collapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
-      </button>
+        {/* User Profile */}
+        <div className="pt-0 pb-2 px-2 w-full flex flex-col items-center gap-0">
+          <Tooltip content={tLanguage("switchLanguage")} placement="right" closeDelay={0}>
+            <div>
+              <LanguageSwitch />
+            </div>
+          </Tooltip>
+          <div className="mb-2">
+            <ThemeSwitch />
+          </div>
+          {user && (
+            <Popover placement="right">
+              <PopoverTrigger>
+                <button className="outline-none flex justify-center w-full">
+                  <Avatar
+                    src={undefined}
+                    name={
+                      user.firstName?.charAt(0) ||
+                      user.email.charAt(0).toUpperCase()
+                    }
+                    isBordered
+                    color="primary"
+                    size="sm"
+                    className="cursor-pointer hover:scale-110 transition-transform"
+                  />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-60 p-2">
+                <div className="px-2 py-1">
+                  <p className="font-bold text-small truncate">
+                    {user.firstName && user.lastName
+                      ? `${user.firstName} ${user.lastName}`
+                      : user.firstName || user.email}
+                  </p>
+                  <p className="text-tiny text-default-500 truncate">{user.email}</p>
+                </div>
+                <div className="h-px bg-divider my-2" />
+                <div className="flex flex-col gap-2">
+                  <NextLink href="/profile" className="w-full">
+                    <Button
+                      size="sm"
+                      variant="flat"
+                      className="w-full justify-start"
+                      startContent={<UserIcon size={16} />}
+                    >
+                      {t("profile")}
+                    </Button>
+                  </NextLink>
+                  <NextLink href="/payments" className="w-full">
+                    <Button
+                      size="sm"
+                      variant="flat"
+                      className="w-full justify-start"
+                      startContent={<CreditCard size={16} />}
+                    >
+                      {t("payments")}
+                    </Button>
+                  </NextLink>
+                  <Button
+                    size="sm"
+                    variant="flat"
+                    color="danger"
+                    startContent={<LogOut size={16} />}
+                    onPress={logout}
+                    className="w-full justify-start"
+                  >
+                    {t("logout")}
+                  </Button>
+                </div>
+              </PopoverContent>
+            </Popover>
+          )}
+        </div>
+
+        {/* Collapse Toggle */}
+        <button
+          onClick={() => setCollapsed((prev) => !prev)}
+          className="mt-2 p-1.5 rounded-lg text-default-400 hover:text-default-700 hover:bg-default-100 transition-colors"
+        >
+          {collapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
+        </button>
       </div>
     </motion.aside>
   );
