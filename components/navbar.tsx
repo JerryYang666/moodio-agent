@@ -113,12 +113,6 @@ export const Navbar = () => {
       href: "/chat",
     },
     {
-      id: "video",
-      label: t("nav.video"),
-      icon: <Video size={20} />,
-      href: "/storyboard",
-    },
-    {
       id: "assets",
       label: t("nav.assets"),
       icon: <Folder size={20} />,
@@ -144,6 +138,12 @@ export const Navbar = () => {
           },
         ]
       : []),
+    {
+      id: "video",
+      label: t("nav.video"),
+      icon: <Video size={20} />,
+      href: "/storyboard",
+    },
   ];
 
   return (

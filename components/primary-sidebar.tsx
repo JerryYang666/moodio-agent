@@ -81,12 +81,6 @@ export const PrimarySidebar = () => {
       isActive: (path: string) => path.startsWith("/chat"),
     },
     {
-      label: t("video"),
-      href: "/storyboard",
-      icon: <Video size={20} />,
-      isActive: (path: string) => path.startsWith("/storyboard"),
-    },
-    {
       label: t("assets"),
       href: "/projects",
       icon: <Folder size={20} />,
@@ -113,6 +107,12 @@ export const PrimarySidebar = () => {
           },
         ]
       : []),
+    {
+      label: t("video"),
+      href: "/storyboard",
+      icon: <Video size={20} />,
+      isActive: (path: string) => path.startsWith("/storyboard"),
+    },
   ];
 
   return (
