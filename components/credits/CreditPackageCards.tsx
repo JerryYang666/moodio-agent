@@ -43,7 +43,7 @@ export default function CreditPackageCards({ accountType, accountId, teamName }:
     api
       .get("/api/stripe/packages?type=credits")
       .then((data) => setPackages(data.creditPackages ?? []))
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => setLoading(false));
   }, []);
 
@@ -136,9 +136,14 @@ export default function CreditPackageCards({ accountType, accountId, teamName }:
                   </span>
                 </div>
                 <p className="text-sm font-medium">{pkg.name}</p>
-                <p className="text-xl font-bold">
-                  ${(pkg.priceCents / 100).toFixed(2)}
-                </p>
+                <div className="flex flex-col items-center gap-0.5">
+                  <span className="text-sm text-default-400 line-through">
+                    ${(pkg.credits / 100).toFixed(2)}
+                  </span>
+                  <p className="text-xl font-bold">
+                    ${(pkg.priceCents / 100).toFixed(2)}
+                  </p>
+                </div>
                 <Button
                   color="primary"
                   variant="flat"
