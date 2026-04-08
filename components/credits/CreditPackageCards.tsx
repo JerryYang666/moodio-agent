@@ -137,9 +137,11 @@ export default function CreditPackageCards({ accountType, accountId, teamName }:
                 </div>
                 <p className="text-sm font-medium">{pkg.name}</p>
                 <div className="flex flex-col items-center gap-0.5">
-                  <span className="text-sm text-default-400 line-through">
-                    ${(pkg.credits / 100).toFixed(2)}
-                  </span>
+                  {pkg.credits !== pkg.priceCents && (
+                    <span className="text-sm text-default-400 line-through">
+                      ${(pkg.credits / 100).toFixed(2)}
+                    </span>
+                  )}
                   <p className="text-xl font-bold">
                     ${(pkg.priceCents / 100).toFixed(2)}
                   </p>
