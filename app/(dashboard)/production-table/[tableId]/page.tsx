@@ -23,6 +23,7 @@ import type {
   ProductionTableRow,
   EnrichedCell,
   CellType,
+  CellComment,
   EnrichedMediaAssetRef,
 } from "@/lib/production-table/types";
 
@@ -172,6 +173,29 @@ export default function ProductionTableDetailPage({
             newMap[key] = {
               ...existing,
               mediaAssets: currentAssets.filter((a: EnrichedMediaAssetRef) => a.assetId !== assetId),
+            } as EnrichedCell;
+            return { ...prev, cellMap: newMap };
+          });
+          break;
+        }
+        case "pt_cell_comment_updated": {
+          const { rowId, columnId, comment } = event.payload;
+          const key = `${columnId}:${rowId}`;
+          setTable((prev) => {
+            if (!prev) return prev;
+            const newMap = { ...prev.cellMap };
+            newMap[key] = {
+              ...(newMap[key] ?? {
+                id: "",
+                tableId,
+                columnId,
+                rowId,
+                textContent: null,
+                mediaAssets: null,
+                updatedAt: new Date(),
+                updatedBy: event.userId,
+              }),
+              comment: comment ?? null,
             } as EnrichedCell;
             return { ...prev, cellMap: newMap };
           });
@@ -553,6 +577,57 @@ export default function ProductionTableDetailPage({
     [tableId, sendEvent]
   );
 
+  const handleCommentSave = useCallback(
+    async (columnId: string, rowId: string, text: string | null) => {
+      const stamped: CellComment | null = text
+        ? {
+            text,
+            authorId: currentUserId ?? "",
+            authorName: user?.firstName || user?.email || "",
+            updatedAt: new Date().toISOString(),
+          }
+        : null;
+
+      const key = `${columnId}:${rowId}`;
+      setTable((prev) => {
+        if (!prev) return prev;
+        const newMap = { ...prev.cellMap };
+        newMap[key] = {
+          ...(newMap[key] ?? {
+            id: "",
+            tableId,
+            columnId,
+            rowId,
+            textContent: null,
+            mediaAssets: null,
+            updatedAt: new Date(),
+            updatedBy: currentUserId ?? null,
+          }),
+          comment: stamped,
+        } as EnrichedCell;
+        return { ...prev, cellMap: newMap };
+      });
+
+      sendEvent("pt_cell_comment_updated", {
+        tableId,
+        rowId,
+        columnId,
+        comment: stamped,
+      });
+
+      try {
+        await fetch(`/api/production-table/${tableId}/cells/comment`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ columnId, rowId, comment: stamped }),
+        });
+      } catch {
+        addToast({ title: "Failed to save comment", color: "danger" });
+      }
+    },
+    [tableId, currentUserId, user, sendEvent]
+  );
+
   const handleRenameColumn = useCallback(
     async (columnId: string, name: string) => {
       setTable((prev) =>
@@ -910,6 +985,7 @@ export default function ProductionTableDetailPage({
           onCellCommit={handleCellCommit}
           onMediaAssetAdd={handleMediaAssetAdd}
           onMediaAssetRemove={handleMediaAssetRemove}
+          onCommentSave={handleCommentSave}
           onRenameColumn={handleRenameColumn}
           onDeleteColumn={handleDeleteColumn}
           onDeleteRow={handleDeleteRow}

@@ -3,12 +3,13 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { MousePointer2, Plus, Trash2, SendHorizontal, ArrowUp, ArrowDown } from "lucide-react";
+import { MousePointer2, Plus, Trash2, SendHorizontal, ArrowUp, ArrowDown, MessageSquare } from "lucide-react";
 import type {
   ProductionTableColumn,
   ProductionTableRow,
   EnrichedCell,
   CellLock,
+  CellComment,
   EnrichedMediaAssetRef,
   RemoteCellCursor,
 } from "@/lib/production-table/types";
@@ -17,6 +18,8 @@ import { TextCell } from "./TextCell";
 import { MediaCell } from "./MediaCell";
 import { RowHandle } from "./RowHandle";
 import { HeaderRow } from "./HeaderRow";
+import { CellCommentIndicator } from "./CellCommentIndicator";
+import { CellCommentPopover } from "./CellCommentPopover";
 import { useGridSelection } from "@/hooks/use-grid-selection";
 import type { SelectMode } from "@/hooks/use-grid-selection";
 import { AI_IMAGE_DRAG_MIME, AI_VIDEO_DRAG_MIME, AI_VIDEO_SUGGEST_DRAG_MIME } from "@/components/chat/asset-dnd";
@@ -56,6 +59,7 @@ interface ProductionTableGridProps {
   ) => void;
   onMediaAssetAdd: (columnId: string, rowId: string, asset: EnrichedMediaAssetRef) => void;
   onMediaAssetRemove: (columnId: string, rowId: string, assetId: string) => void;
+  onCommentSave?: (columnId: string, rowId: string, text: string | null) => void;
   onRenameColumn: (columnId: string, name: string) => void;
   onDeleteColumn: (columnId: string) => void;
   onDeleteRow: (rowId: string) => void;
@@ -90,6 +94,7 @@ export function ProductionTableGrid({
   onCellCommit,
   onMediaAssetAdd,
   onMediaAssetRemove,
+  onCommentSave,
   onRenameColumn,
   onDeleteColumn,
   onDeleteRow,
@@ -320,6 +325,52 @@ export function ProductionTableGrid({
   );
 
   const closeRowContextMenu = useCallback(() => setRowContextMenu(null), []);
+
+  // ---- Cell context menu (right-click) ----
+  const [cellContextMenu, setCellContextMenu] = useState<{
+    rowId: string;
+    columnId: string;
+    x: number;
+    y: number;
+  } | null>(null);
+
+  const handleCellContextMenu = useCallback(
+    (rowId: string, columnId: string, e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setCellContextMenu({ rowId, columnId, x: e.clientX, y: e.clientY });
+    },
+    []
+  );
+
+  const closeCellContextMenu = useCallback(() => setCellContextMenu(null), []);
+
+  // ---- Comment popover ----
+  const [commentPopover, setCommentPopover] = useState<{
+    rowId: string;
+    columnId: string;
+    x: number;
+    y: number;
+  } | null>(null);
+
+  const openCommentPopover = useCallback(
+    (rowId: string, columnId: string, x: number, y: number) => {
+      closeCellContextMenu();
+      setCommentPopover({ rowId, columnId, x, y });
+    },
+    [closeCellContextMenu]
+  );
+
+  const closeCommentPopover = useCallback(() => setCommentPopover(null), []);
+
+  const handleCommentSave = useCallback(
+    (text: string | null) => {
+      if (!commentPopover || !onCommentSave) return;
+      onCommentSave(commentPopover.columnId, commentPopover.rowId, text);
+      closeCommentPopover();
+    },
+    [commentPopover, onCommentSave, closeCommentPopover]
+  );
 
   // ---- Cursor broadcasting ----
   const lastCursorSend = useRef(0);
@@ -902,8 +953,14 @@ export function ProductionTableGrid({
                         style={{ width: col.width || DEFAULT_COL_WIDTH }}
                         onMouseDown={(e) => handleCellMouseDown(row.id, col.id, e)}
                         onMouseEnter={() => handleCellMouseEnter(row.id, col.id)}
+                        onContextMenu={(e) => handleCellContextMenu(row.id, col.id, e)}
                       >
                         {renderCell(row, col)}
+                        {cellMap[`${col.id}:${row.id}`]?.comment && (
+                          <CellCommentIndicator
+                            comment={cellMap[`${col.id}:${row.id}`].comment!}
+                          />
+                        )}
                       </div>
                       {colIdx === columns.length - 1 &&
                         renderColGap(columns.length)}
@@ -1023,6 +1080,52 @@ export function ProductionTableGrid({
           </button>
         </div>
       </>
+    )}
+
+    {/* Cell context menu (right-click) */}
+    {cellContextMenu && (
+      <>
+        <div
+          className="fixed inset-0 z-50"
+          onClick={closeCellContextMenu}
+          onContextMenu={(e) => {
+            e.preventDefault();
+            closeCellContextMenu();
+          }}
+        />
+        <div
+          className="fixed z-50 min-w-[160px] py-1 rounded-lg shadow-lg border border-default-200 bg-content1"
+          style={{ left: cellContextMenu.x, top: cellContextMenu.y }}
+        >
+          <button
+            className="w-full flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-default-100 transition-colors"
+            onClick={() => {
+              openCommentPopover(
+                cellContextMenu.rowId,
+                cellContextMenu.columnId,
+                cellContextMenu.x,
+                cellContextMenu.y
+              );
+            }}
+          >
+            <MessageSquare size={14} />
+            {cellMap[`${cellContextMenu.columnId}:${cellContextMenu.rowId}`]?.comment
+              ? t("editComment")
+              : t("addComment")}
+          </button>
+        </div>
+      </>
+    )}
+
+    {/* Comment edit popover */}
+    {commentPopover && onCommentSave && (
+      <CellCommentPopover
+        x={commentPopover.x}
+        y={commentPopover.y}
+        comment={cellMap[`${commentPopover.columnId}:${commentPopover.rowId}`]?.comment ?? null}
+        onSave={handleCommentSave}
+        onClose={closeCommentPopover}
+      />
     )}
 
     {/* Floating Send to Chat bar for cell selection */}

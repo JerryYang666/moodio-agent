@@ -1431,6 +1431,12 @@
     "insertTextColumnRight": "在右侧插入文本列",
     "insertMediaColumnRight": "在右侧插入媒体列",
     "sendToChat": "发送到聊天",
+    "addComment": "添加备注",
+    "editComment": "编辑备注",
+    "deleteComment": "删除",
+    "saveComment": "保存",
+    "cancelComment": "取消",
+    "commentPlaceholder": "添加备注...",
     "cellSelected": "个单元格已选中",
     "cellsSelected": "个单元格已选中",
     "wizard": {

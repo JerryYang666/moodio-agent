@@ -315,6 +315,7 @@ func isMutationEvent(eventType string) bool {
 		"cell_selected", "cell_deselected", "cell_updated", "table_generating",
 		"asset_z_changed",
 		"pt_cell_selected", "pt_cell_deselected", "pt_cell_updated",
+		"pt_cell_comment_updated",
 		"pt_media_asset_added", "pt_media_asset_removed",
 		"pt_column_added", "pt_column_removed", "pt_column_renamed", "pt_column_resized", "pt_columns_reordered",
 		"pt_row_added", "pt_row_removed", "pt_row_resized", "pt_rows_reordered":

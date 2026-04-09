@@ -874,6 +874,7 @@ export const productionTableCells = pgTable(
         thumbnailImageId?: string;
       }>
     >(),
+    comment: jsonb("comment").$type<{ text: string } | null>(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
     updatedBy: uuid("updated_by").references(() => users.id, {
       onDelete: "set null",

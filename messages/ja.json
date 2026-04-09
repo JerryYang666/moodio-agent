@@ -1431,6 +1431,12 @@
     "insertTextColumnRight": "右にテキスト列を挿入",
     "insertMediaColumnRight": "右にメディア列を挿入",
     "sendToChat": "チャットに送信",
+    "addComment": "コメントを追加",
+    "editComment": "コメントを編集",
+    "deleteComment": "削除",
+    "saveComment": "保存",
+    "cancelComment": "キャンセル",
+    "commentPlaceholder": "コメントを追加...",
     "cellSelected": "セル選択中",
     "cellsSelected": "セル選択中",
     "wizard": {

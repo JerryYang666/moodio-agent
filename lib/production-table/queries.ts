@@ -17,6 +17,7 @@ import type {
   MediaAssetRef,
   EnrichedMediaAssetRef,
   CellType,
+  CellComment,
 } from "./types";
 import { getTablePermission, getEditableGrants } from "./permissions";
 import { getImageUrl, getVideoUrl } from "@/lib/storage/s3";
@@ -142,6 +143,7 @@ export async function getEnrichedTable(
       rowId: c.rowId,
       textContent: c.textContent,
       mediaAssets: enrichMediaAssets(c.mediaAssets as MediaAssetRef[] | null),
+      comment: (c.comment as CellComment | null) ?? null,
       updatedAt: c.updatedAt,
       updatedBy: c.updatedBy,
     };
@@ -371,6 +373,43 @@ export async function upsertCell(
       set: {
         textContent: textContent ?? null,
         mediaAssets: cleanAssets,
+        updatedBy,
+        updatedAt: new Date(),
+      },
+    })
+    .returning();
+
+  await touchTable(tableId);
+  return cell;
+}
+
+// ---------------------------------------------------------------------------
+// Cell comment upsert
+// ---------------------------------------------------------------------------
+
+export async function upsertCellComment(
+  tableId: string,
+  columnId: string,
+  rowId: string,
+  comment: CellComment | null,
+  updatedBy: string
+) {
+  const [cell] = await db
+    .insert(productionTableCells)
+    .values({
+      tableId,
+      columnId,
+      rowId,
+      textContent: null,
+      mediaAssets: null,
+      comment,
+      updatedBy,
+      updatedAt: new Date(),
+    })
+    .onConflictDoUpdate({
+      target: [productionTableCells.columnId, productionTableCells.rowId],
+      set: {
+        comment,
         updatedBy,
         updatedAt: new Date(),
       },

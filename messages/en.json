@@ -1431,6 +1431,12 @@
     "insertTextColumnRight": "Insert Text Column Right",
     "insertMediaColumnRight": "Insert Media Column Right",
     "sendToChat": "Send to Chat",
+    "addComment": "Add Comment",
+    "editComment": "Edit Comment",
+    "deleteComment": "Delete",
+    "saveComment": "Save",
+    "cancelComment": "Cancel",
+    "commentPlaceholder": "Add a comment...",
     "cellSelected": "cell selected",
     "cellsSelected": "cells selected",
     "wizard": {

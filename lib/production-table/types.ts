@@ -26,6 +26,14 @@ export type {
 
 export type CellType = "text" | "media";
 
+/** Extensible comment payload stored as JSONB on production_table_cells. */
+export interface CellComment {
+  text: string;
+  authorId: string;
+  authorName: string;
+  updatedAt: string;
+}
+
 /** Stored in the DB — only IDs, never URLs. */
 export interface MediaAssetRef {
   assetId: string;
@@ -51,6 +59,7 @@ export interface EnrichedCell {
   rowId: string;
   textContent: string | null;
   mediaAssets: EnrichedMediaAssetRef[] | null;
+  comment: CellComment | null;
   updatedAt: Date;
   updatedBy: string | null;
 }
@@ -158,5 +167,6 @@ export type ProductionTableWSEvent =
   | { type: "pt_row_removed"; tableId: string; rowId: string }
   | { type: "pt_row_resized"; tableId: string; rowId: string; height: number }
   | { type: "pt_rows_reordered"; tableId: string; rowIds: string[] }
+  | { type: "pt_cell_comment_updated"; tableId: string; rowId: string; columnId: string; comment: CellComment | null }
   | { type: "pt_cursor_move"; tableId: string; x: number; y: number; userId: string; userName?: string }
   | { type: "pt_cursor_leave"; tableId: string; userId: string };

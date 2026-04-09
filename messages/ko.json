@@ -1431,6 +1431,12 @@
     "insertTextColumnRight": "오른쪽에 텍스트 열 삽입",
     "insertMediaColumnRight": "오른쪽에 미디어 열 삽입",
     "sendToChat": "채팅으로 보내기",
+    "addComment": "댓글 추가",
+    "editComment": "댓글 편집",
+    "deleteComment": "삭제",
+    "saveComment": "저장",
+    "cancelComment": "취소",
+    "commentPlaceholder": "댓글 추가...",
     "cellSelected": "셀 선택됨",
     "cellsSelected": "셀 선택됨",
     "wizard": {
