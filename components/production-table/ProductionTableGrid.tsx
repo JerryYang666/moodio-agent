@@ -575,7 +575,7 @@ export function ProductionTableGrid({
         return;
       }
 
-      if (e.key === "Delete" || e.key === "Backspace") {
+      if (e.key === "Delete") {
         if (selectedRows.size > 0 && canEditStructure) {
           e.preventDefault();
           const ids = Array.from(selectedRows);
