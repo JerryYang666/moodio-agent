@@ -1459,6 +1459,11 @@
     "cellsSelected": "cells selected",
     "tableNotFoundOrAccessDenied": "Table not found or access denied.",
     "backToTables": "Back to tables",
+    "batchAddRows": "Add Rows",
+    "batchAddColumns": "Add Columns",
+    "numberOfRows": "Number of rows",
+    "numberOfColumns": "Number of columns",
+    "add": "Add",
     "errors": {
       "maxRowsReached": "Maximum {count} rows allowed",
       "maxColumnsReached": "Maximum {count} columns allowed",

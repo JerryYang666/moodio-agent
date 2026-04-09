@@ -361,40 +361,52 @@ export default function ProductionTableDetailPage({
 
   // Actions
   const handleAddColumn = useCallback(
-    async (cellType: CellType) => {
+    async (cellType: CellType, count: number = 1) => {
       if (!canAddColumns) {
         addToast({ title: columnLimitError, color: "danger" });
         return;
       }
-      try {
-        const res = await fetch(
-          `/api/production-table/${tableId}/columns`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ name: `Column ${(table?.columns.length ?? 0) + 1}`, cellType }),
+      const currentCount = table?.columns.length ?? 0;
+      const actualCount = Math.min(
+        Math.max(1, count),
+        MAX_PRODUCTION_TABLE_COLUMNS - currentCount
+      );
+      if (actualCount <= 0) {
+        addToast({ title: columnLimitError, color: "danger" });
+        return;
+      }
+      for (let i = 0; i < actualCount; i++) {
+        try {
+          const res = await fetch(
+            `/api/production-table/${tableId}/columns`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ name: `Column ${currentCount + i + 1}`, cellType }),
+            }
+          );
+          const data = (await res
+            .json()
+            .catch(() => null)) as {
+            column?: ProductionTableColumn;
+            errorCode?: string;
+          } | null;
+          if (!res.ok || !data?.column) {
+            throw new Error(data?.errorCode || "UNKNOWN_ERROR");
           }
-        );
-        const data = (await res
-          .json()
-          .catch(() => null)) as {
-          column?: ProductionTableColumn;
-          errorCode?: string;
-        } | null;
-        if (!res.ok || !data?.column) {
-          throw new Error(data?.errorCode || "UNKNOWN_ERROR");
+          const newColumn = data.column;
+          setTable((prev) =>
+            prev ? { ...prev, columns: [...prev.columns, newColumn] } : prev
+          );
+          sendEvent("pt_column_added", { tableId, column: newColumn });
+        } catch (error) {
+          const message = resolveApiErrorMessage(
+            error,
+            t("errors.failedToAddColumn")
+          );
+          addToast({ title: message, color: "danger" });
+          break;
         }
-        const newColumn = data.column;
-        setTable((prev) =>
-          prev ? { ...prev, columns: [...prev.columns, newColumn] } : prev
-        );
-        sendEvent("pt_column_added", { tableId, column: newColumn });
-      } catch (error) {
-        const message = resolveApiErrorMessage(
-          error,
-          t("errors.failedToAddColumn")
-        );
-        addToast({ title: message, color: "danger" });
       }
     },
     [
@@ -408,37 +420,50 @@ export default function ProductionTableDetailPage({
     ]
   );
 
-  const handleAddRow = useCallback(async () => {
+  const handleAddRow = useCallback(async (count: number = 1) => {
     if (!canAddRows) {
       addToast({ title: rowLimitError, color: "danger" });
       return;
     }
-    try {
-      const res = await fetch(`/api/production-table/${tableId}/rows`, {
-        method: "POST",
-      });
-      const data = (await res
-        .json()
-        .catch(() => null)) as {
-        row?: ProductionTableRow;
-        errorCode?: string;
-      } | null;
-      if (!res.ok || !data?.row) {
-        throw new Error(data?.errorCode || "UNKNOWN_ERROR");
+    const currentCount = table?.rows.length ?? 0;
+    const actualCount = Math.min(
+      Math.max(1, count),
+      MAX_PRODUCTION_TABLE_ROWS - currentCount
+    );
+    if (actualCount <= 0) {
+      addToast({ title: rowLimitError, color: "danger" });
+      return;
+    }
+    for (let i = 0; i < actualCount; i++) {
+      try {
+        const res = await fetch(`/api/production-table/${tableId}/rows`, {
+          method: "POST",
+        });
+        const data = (await res
+          .json()
+          .catch(() => null)) as {
+          row?: ProductionTableRow;
+          errorCode?: string;
+        } | null;
+        if (!res.ok || !data?.row) {
+          throw new Error(data?.errorCode || "UNKNOWN_ERROR");
+        }
+        const newRow = data.row;
+        setTable((prev) =>
+          prev ? { ...prev, rows: [...prev.rows, newRow] } : prev
+        );
+        sendEvent("pt_row_added", { tableId, row: newRow });
+      } catch (error) {
+        const message = resolveApiErrorMessage(error, t("errors.failedToAddRow"));
+        addToast({ title: message, color: "danger" });
+        break;
       }
-      const newRow = data.row;
-      setTable((prev) =>
-        prev ? { ...prev, rows: [...prev.rows, newRow] } : prev
-      );
-      sendEvent("pt_row_added", { tableId, row: newRow });
-    } catch (error) {
-      const message = resolveApiErrorMessage(error, t("errors.failedToAddRow"));
-      addToast({ title: message, color: "danger" });
     }
   }, [
     canAddRows,
     rowLimitError,
     tableId,
+    table?.rows.length,
     sendEvent,
     resolveApiErrorMessage,
     t,
@@ -1081,6 +1106,8 @@ export default function ProductionTableDetailPage({
           canEdit={canEditStructure}
           canAddColumns={canAddColumns}
           canAddRows={canAddRows}
+          currentRowCount={table.rows.length}
+          currentColumnCount={table.columns.length}
           onBack={() => router.push("/production-table")}
           onAddColumn={handleAddColumn}
           onAddRow={handleAddRow}
