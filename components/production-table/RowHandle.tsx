@@ -139,7 +139,7 @@ export const RowHandle = memo(function RowHandle({
   return (
     <div
       data-row-handle
-      className={`relative flex items-center justify-center w-12 text-xs text-default-400 select-none border-r border-default-200 ${
+      className={`left-0 z-5 shrink-0 relative flex items-center justify-center w-12 text-xs text-default-400 select-none border-r border-default-200 ${
         isSelected
           ? "bg-primary-100 border-l-2 border-l-primary"
           : !canReorder && isEditable
