@@ -193,7 +193,7 @@ export const HeaderRow = memo(function HeaderRow({
   return (
     <>
       <div className="flex sticky top-0 z-10 bg-default-100 border-b-2 border-default-300">
-        <div className="w-12 shrink-0 border-r border-default-200 flex items-center justify-center text-xs font-semibold text-default-500">
+        <div className="sticky left-0 z-20 w-8 shrink-0 border-r border-default-200 bg-default-100 flex items-center justify-center text-xs font-semibold text-default-500">
           #
         </div>
         {columns.map((col, i) => {

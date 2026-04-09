@@ -663,7 +663,7 @@ export function ProductionTableGrid({
 
   const totalWidth = useMemo(
     () =>
-      48 +
+      32 +
       columns.reduce((sum, c) => sum + (c.width || DEFAULT_COL_WIDTH), 0),
     [columns]
   );
@@ -961,7 +961,7 @@ export function ProductionTableGrid({
         </div>
         {canEditStructure && onAddRow && (
           <div className="flex border-b border-dashed border-default-200">
-            <div className="w-12 shrink-0" />
+            <div className="w-8 shrink-0" />
             <button
               className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-default-400 hover:text-primary hover:bg-default-100 transition-colors rounded-md my-0.5"
               onClick={onAddRow}
