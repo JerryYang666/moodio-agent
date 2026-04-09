@@ -52,6 +52,24 @@
     "membersSelected": "{count}人のメンバーを選択中",
     "noTeams": "まだチームに参加していません"
   },
+  "publicShare": {
+    "tabTitle": "公開共有",
+    "teamShareTab": "チーム共有",
+    "enablePublicShare": "リンクを知っている人は誰でもすべてのアセットを閲覧できます",
+    "disablePublicShare": "外部共有用の公開リンクを生成する",
+    "publicShareEnabled": "公開共有が有効です",
+    "publicShareDisabled": "公開共有が無効です",
+    "shareLink": "共有リンク",
+    "copyLink": "リンクをコピー",
+    "linkCopied": "リンクをコピーしました！",
+    "warning": "このリンクを知っている人は、後から追加したアセットを含め、この{resourceType}のすべてのアセットを閲覧できます。Moodioアカウントは不要です。",
+    "joinMoodio": "Moodioに参加する",
+    "sharedCollection": "共有コレクション",
+    "sharedFolder": "共有フォルダ",
+    "sharedBy": "{name}が共有",
+    "linkNotFound": "この共有リンクは無効か、無効にされています。",
+    "noAssets": "この{resourceType}にはまだアセットがありません。"
+  },
   "nav": {
     "inspiration": "インスピレーション",
     "generation": "生成",

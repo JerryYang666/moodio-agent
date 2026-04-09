@@ -1438,6 +1438,8 @@ export default function FolderPage({
           email: s.email,
         }))}
         share={shareModal}
+        publicShareConfig={{ resourceType: "folder", resourceId: folderId }}
+        hasWriteAccess={canWrite}
       />
     </div>
   );

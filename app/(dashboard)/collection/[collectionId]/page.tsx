@@ -1274,6 +1274,8 @@ export default function CollectionPage({
         ownerId={collection.userId}
         shares={shares}
         share={shareModal}
+        publicShareConfig={{ resourceType: "collection", resourceId: collectionId }}
+        hasWriteAccess={canAddImages}
       />
 
       {/* Remove Image Confirmation Modal */}

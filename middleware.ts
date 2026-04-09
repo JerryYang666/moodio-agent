@@ -40,6 +40,10 @@ function isPublicPath(pathname: string): boolean {
     return true;
   }
 
+  if (pathname.startsWith("/share/")) {
+    return true;
+  }
+
   return false;
 }
 
@@ -193,6 +197,11 @@ export async function middleware(request: NextRequest) {
     }
     
     // If refresh failed or no refresh token, allow to proceed to login page
+    return NextResponse.next();
+  }
+
+  // 2b. Allow GET requests to public share API (unauthenticated access)
+  if (pathname.startsWith("/api/public-share/") && request.method === "GET") {
     return NextResponse.next();
   }
 

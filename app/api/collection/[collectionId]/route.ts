@@ -6,6 +6,7 @@ import {
   collectionShares,
   collectionTags,
   folders,
+  publicShareLinks,
   type CollectionShare,
   users
 } from "@/lib/db/schema";
@@ -330,6 +331,14 @@ export async function DELETE(
         { status: 403 }
       );
     }
+
+    // Clean up public share link (no FK cascade since resourceId is polymorphic)
+    await db.delete(publicShareLinks).where(
+      and(
+        eq(publicShareLinks.resourceType, "collection"),
+        eq(publicShareLinks.resourceId, collectionId)
+      )
+    );
 
     // Delete collection (cascade will handle images and shares)
     await db.delete(collections).where(eq(collections.id, collectionId));

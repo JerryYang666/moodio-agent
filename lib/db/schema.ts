@@ -969,3 +969,33 @@ export type NewProductionTableColumnShare = typeof productionTableColumnShares.$
 
 export type ProductionTableRowShare = typeof productionTableRowShares.$inferSelect;
 export type NewProductionTableRowShare = typeof productionTableRowShares.$inferInsert;
+
+// ---------------------------------------------------------------------------
+// Public Share Links
+// ---------------------------------------------------------------------------
+
+/**
+ * Public Share Links table
+ * Stores one-per-resource public share tokens for collections and folders.
+ * External (unauthenticated) users can view assets via these tokens.
+ */
+export const publicShareLinks = pgTable(
+  "public_share_links",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    token: varchar("token", { length: 64 }).notNull().unique(),
+    resourceType: varchar("resource_type", { length: 20 }).notNull(), // 'collection' | 'folder'
+    resourceId: uuid("resource_id").notNull(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    isActive: boolean("is_active").notNull().default(true),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    uniqueResource: unique().on(table.resourceType, table.resourceId),
+  })
+);
+
+export type PublicShareLink = typeof publicShareLinks.$inferSelect;
+export type NewPublicShareLink = typeof publicShareLinks.$inferInsert;

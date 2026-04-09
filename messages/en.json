@@ -52,6 +52,24 @@
     "membersSelected": "{count} member(s) selected",
     "noTeams": "You are not in any team yet"
   },
+  "publicShare": {
+    "tabTitle": "Public Share",
+    "teamShareTab": "Team Share",
+    "enablePublicShare": "Anyone with the link can view all assets",
+    "disablePublicShare": "Generate a public link to share externally",
+    "publicShareEnabled": "Public sharing is enabled",
+    "publicShareDisabled": "Public sharing is disabled",
+    "shareLink": "Share Link",
+    "copyLink": "Copy Link",
+    "linkCopied": "Link copied!",
+    "warning": "Anyone with this link can see all assets in this {resourceType}, including any assets you add later. They do not need a Moodio account.",
+    "joinMoodio": "Join Moodio Today",
+    "sharedCollection": "Shared Collection",
+    "sharedFolder": "Shared Folder",
+    "sharedBy": "Shared by {name}",
+    "linkNotFound": "This share link is invalid or has been disabled.",
+    "noAssets": "This {resourceType} has no assets yet."
+  },
   "nav": {
     "inspiration": "Inspiration",
     "generation": "Generation",

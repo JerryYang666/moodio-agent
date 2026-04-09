@@ -52,6 +52,24 @@
     "membersSelected": "{count}명의 멤버 선택됨",
     "noTeams": "아직 팀에 가입하지 않았습니다"
   },
+  "publicShare": {
+    "tabTitle": "공개 공유",
+    "teamShareTab": "팀 공유",
+    "enablePublicShare": "링크가 있는 모든 사람이 모든 에셋을 볼 수 있습니다",
+    "disablePublicShare": "외부 공유용 공개 링크를 생성합니다",
+    "publicShareEnabled": "공개 공유가 활성화되었습니다",
+    "publicShareDisabled": "공개 공유가 비활성화되었습니다",
+    "shareLink": "공유 링크",
+    "copyLink": "링크 복사",
+    "linkCopied": "링크가 복사되었습니다!",
+    "warning": "이 링크가 있는 모든 사람은 나중에 추가하는 에셋을 포함하여 이 {resourceType}의 모든 에셋을 볼 수 있습니다. Moodio 계정이 필요하지 않습니다.",
+    "joinMoodio": "지금 Moodio 가입하기",
+    "sharedCollection": "공유된 컬렉션",
+    "sharedFolder": "공유된 폴더",
+    "sharedBy": "{name}님이 공유함",
+    "linkNotFound": "이 공유 링크가 유효하지 않거나 비활성화되었습니다.",
+    "noAssets": "이 {resourceType}에는 아직 에셋이 없습니다."
+  },
   "nav": {
     "inspiration": "영감",
     "generation": "생성",

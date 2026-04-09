@@ -52,6 +52,24 @@
     "membersSelected": "已选择 {count} 位成员",
     "noTeams": "你还没有加入任何团队"
   },
+  "publicShare": {
+    "tabTitle": "公开分享",
+    "teamShareTab": "团队分享",
+    "enablePublicShare": "任何拥有链接的人都可以查看所有素材",
+    "disablePublicShare": "生成公开链接以对外分享",
+    "publicShareEnabled": "公开分享已开启",
+    "publicShareDisabled": "公开分享已关闭",
+    "shareLink": "分享链接",
+    "copyLink": "复制链接",
+    "linkCopied": "链接已复制！",
+    "warning": "任何拥有此链接的人都可以查看此{resourceType}中的所有素材，包括您之后添加的素材，即使没有 Moodio 账号。",
+    "joinMoodio": "立即加入 Moodio",
+    "sharedCollection": "已分享的合集",
+    "sharedFolder": "已分享的文件夹",
+    "sharedBy": "由 {name} 分享",
+    "linkNotFound": "此分享链接无效或已被禁用。",
+    "noAssets": "此{resourceType}暂无素材。"
+  },
   "nav": {
     "inspiration": "灵感",
     "generation": "生成",

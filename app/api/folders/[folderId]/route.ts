@@ -6,6 +6,7 @@ import {
   collectionImages,
   collections,
   users,
+  publicShareLinks,
 } from "@/lib/db/schema";
 import { getAccessToken } from "@/lib/auth/cookies";
 import { verifyAccessToken } from "@/lib/auth/jwt";
@@ -243,6 +244,14 @@ export async function DELETE(
         { status: 403 }
       );
     }
+
+    // Clean up public share link (no FK cascade since resourceId is polymorphic)
+    await db.delete(publicShareLinks).where(
+      and(
+        eq(publicShareLinks.resourceType, "folder"),
+        eq(publicShareLinks.resourceId, folderId)
+      )
+    );
 
     await db.delete(folders).where(eq(folders.id, folderId));
 
