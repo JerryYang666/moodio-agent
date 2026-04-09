@@ -58,6 +58,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         {
           error: `Maximum ${MAX_PRODUCTION_TABLE_COLUMNS} columns allowed`,
+          errorCode: "PT_MAX_COLUMNS_REACHED",
         },
         { status: 400 }
       );

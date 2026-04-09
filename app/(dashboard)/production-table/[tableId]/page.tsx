@@ -2,6 +2,7 @@
 
 import { use, useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { Button } from "@heroui/button";
 import { Spinner } from "@heroui/spinner";
 import { addToast } from "@heroui/toast";
@@ -39,6 +40,7 @@ export default function ProductionTableDetailPage({
 }) {
   const { tableId } = use(params);
   const router = useRouter();
+  const t = useTranslations("productionTable");
   const { user } = useAuth();
   const currentUserId = user?.id;
 
@@ -103,11 +105,11 @@ export default function ProductionTableDetailPage({
         setEditableRowIds(new Set(data.editableGrants.rowIds ?? []));
       }
     } catch {
-      addToast({ title: "Failed to load table", color: "danger" });
+      addToast({ title: t("errors.failedToLoadTable"), color: "danger" });
     } finally {
       setLoading(false);
     }
-  }, [tableId]);
+  }, [tableId, t]);
 
   useEffect(() => {
     fetchTable();
@@ -329,8 +331,23 @@ export default function ProductionTableDetailPage({
   const canAddRows = (table?.rows.length ?? 0) < MAX_PRODUCTION_TABLE_ROWS;
   const canAddColumns =
     (table?.columns.length ?? 0) < MAX_PRODUCTION_TABLE_COLUMNS;
-  const rowLimitError = `Maximum ${MAX_PRODUCTION_TABLE_ROWS} rows allowed`;
-  const columnLimitError = `Maximum ${MAX_PRODUCTION_TABLE_COLUMNS} columns allowed`;
+  const rowLimitError = t("errors.maxRowsReached", {
+    count: MAX_PRODUCTION_TABLE_ROWS,
+  });
+  const columnLimitError = t("errors.maxColumnsReached", {
+    count: MAX_PRODUCTION_TABLE_COLUMNS,
+  });
+
+  const resolveApiErrorMessage = useCallback(
+    (error: unknown, fallback: string) => {
+      if (error instanceof Error) {
+        if (error.message === "PT_MAX_ROWS_REACHED") return rowLimitError;
+        if (error.message === "PT_MAX_COLUMNS_REACHED") return columnLimitError;
+      }
+      return fallback;
+    },
+    [rowLimitError, columnLimitError]
+  );
 
   const canEditCell = useCallback(
     (rowId: string, columnId: string) => {
@@ -360,9 +377,12 @@ export default function ProductionTableDetailPage({
         );
         const data = (await res
           .json()
-          .catch(() => null)) as { column?: ProductionTableColumn; error?: string } | null;
+          .catch(() => null)) as {
+          column?: ProductionTableColumn;
+          errorCode?: string;
+        } | null;
         if (!res.ok || !data?.column) {
-          throw new Error(data?.error || "Failed to add column");
+          throw new Error(data?.errorCode || "UNKNOWN_ERROR");
         }
         const newColumn = data.column;
         setTable((prev) =>
@@ -370,14 +390,22 @@ export default function ProductionTableDetailPage({
         );
         sendEvent("pt_column_added", { tableId, column: newColumn });
       } catch (error) {
-        const message =
-          error instanceof Error && error.message
-            ? error.message
-            : "Failed to add column";
+        const message = resolveApiErrorMessage(
+          error,
+          t("errors.failedToAddColumn")
+        );
         addToast({ title: message, color: "danger" });
       }
     },
-    [canAddColumns, columnLimitError, tableId, table?.columns.length, sendEvent]
+    [
+      canAddColumns,
+      columnLimitError,
+      tableId,
+      table?.columns.length,
+      sendEvent,
+      resolveApiErrorMessage,
+      t,
+    ]
   );
 
   const handleAddRow = useCallback(async () => {
@@ -391,9 +419,12 @@ export default function ProductionTableDetailPage({
       });
       const data = (await res
         .json()
-        .catch(() => null)) as { row?: ProductionTableRow; error?: string } | null;
+        .catch(() => null)) as {
+        row?: ProductionTableRow;
+        errorCode?: string;
+      } | null;
       if (!res.ok || !data?.row) {
-        throw new Error(data?.error || "Failed to add row");
+        throw new Error(data?.errorCode || "UNKNOWN_ERROR");
       }
       const newRow = data.row;
       setTable((prev) =>
@@ -401,13 +432,17 @@ export default function ProductionTableDetailPage({
       );
       sendEvent("pt_row_added", { tableId, row: newRow });
     } catch (error) {
-      const message =
-        error instanceof Error && error.message
-          ? error.message
-          : "Failed to add row";
+      const message = resolveApiErrorMessage(error, t("errors.failedToAddRow"));
       addToast({ title: message, color: "danger" });
     }
-  }, [canAddRows, rowLimitError, tableId, sendEvent]);
+  }, [
+    canAddRows,
+    rowLimitError,
+    tableId,
+    sendEvent,
+    resolveApiErrorMessage,
+    t,
+  ]);
 
   const handleInsertRow = useCallback(
     async (anchorRowId: string, position: "above" | "below") => {
@@ -422,9 +457,12 @@ export default function ProductionTableDetailPage({
         });
         const data = (await res
           .json()
-          .catch(() => null)) as { row?: ProductionTableRow; error?: string } | null;
+          .catch(() => null)) as {
+          row?: ProductionTableRow;
+          errorCode?: string;
+        } | null;
         if (!res.ok || !data?.row) {
-          throw new Error(data?.error || "Failed to insert row");
+          throw new Error(data?.errorCode || "UNKNOWN_ERROR");
         }
         const newRow = data.row as ProductionTableRow;
 
@@ -444,14 +482,22 @@ export default function ProductionTableDetailPage({
           body: JSON.stringify({ rowIds: newIds }),
         });
       } catch (error) {
-        const message =
-          error instanceof Error && error.message
-            ? error.message
-            : "Failed to insert row";
+        const message = resolveApiErrorMessage(
+          error,
+          t("errors.failedToInsertRow")
+        );
         addToast({ title: message, color: "danger" });
       }
     },
-    [table, canAddRows, rowLimitError, tableId, sendEvent]
+    [
+      table,
+      canAddRows,
+      rowLimitError,
+      tableId,
+      sendEvent,
+      resolveApiErrorMessage,
+      t,
+    ]
   );
 
   const handleInsertColumn = useCallback(
@@ -475,9 +521,12 @@ export default function ProductionTableDetailPage({
         );
         const data = (await res
           .json()
-          .catch(() => null)) as { column?: ProductionTableColumn; error?: string } | null;
+          .catch(() => null)) as {
+          column?: ProductionTableColumn;
+          errorCode?: string;
+        } | null;
         if (!res.ok || !data?.column) {
-          throw new Error(data?.error || "Failed to insert column");
+          throw new Error(data?.errorCode || "UNKNOWN_ERROR");
         }
         const newCol = data.column as ProductionTableColumn;
 
@@ -497,14 +546,22 @@ export default function ProductionTableDetailPage({
           body: JSON.stringify({ columnIds: newIds }),
         });
       } catch (error) {
-        const message =
-          error instanceof Error && error.message
-            ? error.message
-            : "Failed to insert column";
+        const message = resolveApiErrorMessage(
+          error,
+          t("errors.failedToInsertColumn")
+        );
         addToast({ title: message, color: "danger" });
       }
     },
-    [table, canAddColumns, columnLimitError, tableId, sendEvent]
+    [
+      table,
+      canAddColumns,
+      columnLimitError,
+      tableId,
+      sendEvent,
+      resolveApiErrorMessage,
+      t,
+    ]
   );
 
   const handleCellCommit = useCallback(
@@ -549,10 +606,10 @@ export default function ProductionTableDetailPage({
           body: JSON.stringify({ columnId, rowId, textContent, mediaAssets }),
         });
       } catch {
-        addToast({ title: "Failed to save cell", color: "danger" });
+        addToast({ title: t("errors.failedToSaveCell"), color: "danger" });
       }
     },
-    [tableId, currentUserId, sendEvent]
+    [tableId, currentUserId, sendEvent, t]
   );
 
   const handleMediaAssetAdd = useCallback(
@@ -592,10 +649,10 @@ export default function ProductionTableDetailPage({
           body: JSON.stringify({ columnId, rowId, asset }),
         });
       } catch {
-        addToast({ title: "Failed to add media", color: "danger" });
+        addToast({ title: t("errors.failedToAddMedia"), color: "danger" });
       }
     },
-    [tableId, currentUserId, sendEvent]
+    [tableId, currentUserId, sendEvent, t]
   );
 
   const handleMediaAssetRemove = useCallback(
@@ -628,10 +685,10 @@ export default function ProductionTableDetailPage({
           body: JSON.stringify({ columnId, rowId, assetId }),
         });
       } catch {
-        addToast({ title: "Failed to remove media", color: "danger" });
+        addToast({ title: t("errors.failedToRemoveMedia"), color: "danger" });
       }
     },
-    [tableId, sendEvent]
+    [tableId, sendEvent, t]
   );
 
   const handleCommentSave = useCallback(
@@ -679,10 +736,10 @@ export default function ProductionTableDetailPage({
           body: JSON.stringify({ columnId, rowId, comment: stamped }),
         });
       } catch {
-        addToast({ title: "Failed to save comment", color: "danger" });
+        addToast({ title: t("errors.failedToSaveComment"), color: "danger" });
       }
     },
-    [tableId, currentUserId, user, sendEvent]
+    [tableId, currentUserId, user, sendEvent, t]
   );
 
   const handleRenameColumn = useCallback(
@@ -708,10 +765,10 @@ export default function ProductionTableDetailPage({
           }
         );
       } catch {
-        addToast({ title: "Failed to rename column", color: "danger" });
+        addToast({ title: t("errors.failedToRenameColumn"), color: "danger" });
       }
     },
-    [tableId, sendEvent]
+    [tableId, sendEvent, t]
   );
 
   const handleDeleteColumn = useCallback(
@@ -731,10 +788,10 @@ export default function ProductionTableDetailPage({
           { method: "DELETE" }
         );
       } catch {
-        addToast({ title: "Failed to delete column", color: "danger" });
+        addToast({ title: t("errors.failedToDeleteColumn"), color: "danger" });
       }
     },
-    [tableId, sendEvent]
+    [tableId, sendEvent, t]
   );
 
   const handleDeleteRow = useCallback(
@@ -751,10 +808,10 @@ export default function ProductionTableDetailPage({
           { method: "DELETE" }
         );
       } catch {
-        addToast({ title: "Failed to delete row", color: "danger" });
+        addToast({ title: t("errors.failedToDeleteRow"), color: "danger" });
       }
     },
-    [tableId, sendEvent]
+    [tableId, sendEvent, t]
   );
 
   const handleBulkDeleteRows = useCallback(
@@ -811,10 +868,10 @@ export default function ProductionTableDetailPage({
           }
         );
       } catch {
-        addToast({ title: "Failed to resize column", color: "danger" });
+        addToast({ title: t("errors.failedToResizeColumn"), color: "danger" });
       }
     },
-    [tableId, sendEvent]
+    [tableId, sendEvent, t]
   );
 
   // Row resize
@@ -841,10 +898,10 @@ export default function ProductionTableDetailPage({
           }
         );
       } catch {
-        addToast({ title: "Failed to resize row", color: "danger" });
+        addToast({ title: t("errors.failedToResizeRow"), color: "danger" });
       }
     },
-    [tableId, sendEvent]
+    [tableId, sendEvent, t]
   );
 
   const handleBulkResizeRows = useCallback(
@@ -920,10 +977,10 @@ export default function ProductionTableDetailPage({
           }
         );
       } catch {
-        addToast({ title: "Failed to reorder columns", color: "danger" });
+        addToast({ title: t("errors.failedToReorderColumns"), color: "danger" });
       }
     },
-    [table, tableId, sendEvent]
+    [table, tableId, sendEvent, t]
   );
 
   // Row reorder (called by grid after drag-and-drop completes)
@@ -949,10 +1006,10 @@ export default function ProductionTableDetailPage({
           }
         );
       } catch {
-        addToast({ title: "Failed to reorder rows", color: "danger" });
+        addToast({ title: t("errors.failedToReorderRows"), color: "danger" });
       }
     },
-    [table, tableId, sendEvent]
+    [table, tableId, sendEvent, t]
   );
 
   const handleBulkReorderRows = useCallback(
@@ -969,10 +1026,10 @@ export default function ProductionTableDetailPage({
           body: JSON.stringify({ rowIds: newRowIds }),
         });
       } catch {
-        addToast({ title: "Failed to reorder rows", color: "danger" });
+        addToast({ title: t("errors.failedToReorderRows"), color: "danger" });
       }
     },
-    [table, tableId, sendEvent]
+    [table, tableId, sendEvent, t]
   );
 
   const handleBulkReorderColumns = useCallback(
@@ -989,10 +1046,10 @@ export default function ProductionTableDetailPage({
           body: JSON.stringify({ columnIds: newColumnIds }),
         });
       } catch {
-        addToast({ title: "Failed to reorder columns", color: "danger" });
+        addToast({ title: t("errors.failedToReorderColumns"), color: "danger" });
       }
     },
-    [table, tableId, sendEvent]
+    [table, tableId, sendEvent, t]
   );
 
   if (loading) {
@@ -1006,9 +1063,9 @@ export default function ProductionTableDetailPage({
   if (!table) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-4">
-        <p className="text-default-500">Table not found or access denied.</p>
+        <p className="text-default-500">{t("tableNotFoundOrAccessDenied")}</p>
         <Button variant="flat" onPress={() => router.push("/production-table")}>
-          Back to tables
+          {t("backToTables")}
         </Button>
       </div>
     );

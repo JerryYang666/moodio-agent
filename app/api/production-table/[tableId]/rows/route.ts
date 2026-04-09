@@ -31,7 +31,10 @@ export async function POST(
     const rowCount = await countTableRows(tableId);
     if (rowCount >= MAX_PRODUCTION_TABLE_ROWS) {
       return NextResponse.json(
-        { error: `Maximum ${MAX_PRODUCTION_TABLE_ROWS} rows allowed` },
+        {
+          error: `Maximum ${MAX_PRODUCTION_TABLE_ROWS} rows allowed`,
+          errorCode: "PT_MAX_ROWS_REACHED",
+        },
         { status: 400 }
       );
     }

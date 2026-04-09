@@ -36,7 +36,10 @@ export async function POST(
     const columnCount = await countTableColumns(tableId);
     if (columnCount >= MAX_PRODUCTION_TABLE_COLUMNS) {
       return NextResponse.json(
-        { error: `Maximum ${MAX_PRODUCTION_TABLE_COLUMNS} columns allowed` },
+        {
+          error: `Maximum ${MAX_PRODUCTION_TABLE_COLUMNS} columns allowed`,
+          errorCode: "PT_MAX_COLUMNS_REACHED",
+        },
         { status: 400 }
       );
     }
