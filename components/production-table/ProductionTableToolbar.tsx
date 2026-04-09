@@ -19,6 +19,8 @@ interface ProductionTableToolbarProps {
   connectionState: ConnectionState;
   connectedUsers: PresenceUser[];
   canEdit: boolean;
+  canAddColumns?: boolean;
+  canAddRows?: boolean;
   onBack: () => void;
   onAddColumn: (cellType: CellType) => void;
   onAddRow: () => void;
@@ -30,6 +32,8 @@ export const ProductionTableToolbar = memo(function ProductionTableToolbar({
   connectionState,
   connectedUsers,
   canEdit,
+  canAddColumns = true,
+  canAddRows = true,
   onBack,
   onAddColumn,
   onAddRow,
@@ -73,6 +77,7 @@ export const ProductionTableToolbar = memo(function ProductionTableToolbar({
                   size="sm"
                   variant="flat"
                   startContent={<Columns size={14} />}
+                  isDisabled={!canAddColumns}
                 >
                   {t("addColumn")}
                 </Button>
@@ -89,6 +94,7 @@ export const ProductionTableToolbar = memo(function ProductionTableToolbar({
               variant="flat"
               startContent={<Rows3 size={14} />}
               onPress={onAddRow}
+              isDisabled={!canAddRows}
             >
               {t("addRow")}
             </Button>

@@ -17,6 +17,7 @@ import { selectModeFromEvent } from "@/hooks/use-grid-selection";
 interface HeaderRowProps {
   columns: ProductionTableColumn[];
   canEdit: boolean;
+  canAddColumns?: boolean;
   editableColumnIds: Set<string>;
   colDragIndex: number | null;
   colDropSlot: number | null;
@@ -40,6 +41,7 @@ interface HeaderRowProps {
 export const HeaderRow = memo(function HeaderRow({
   columns,
   canEdit,
+  canAddColumns = true,
   editableColumnIds,
   colDragIndex,
   selectedColumns,
@@ -265,7 +267,7 @@ export const HeaderRow = memo(function HeaderRow({
             </React.Fragment>
           );
         })}
-        {canEdit && onAddColumn && (
+        {canEdit && onAddColumn && canAddColumns && (
           <div className="shrink-0 flex items-center justify-center w-10 border-r border-default-200">
             <Dropdown>
               <DropdownTrigger>
@@ -299,7 +301,7 @@ export const HeaderRow = memo(function HeaderRow({
             className="fixed z-50 min-w-[160px] py-1 rounded-lg shadow-lg border border-default-200 bg-content1"
             style={{ left: contextMenu.x, top: contextMenu.y }}
           >
-            {onInsertColumn && (
+            {onInsertColumn && canAddColumns && (
               <>
                 <button
                   className="w-full flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-default-100 transition-colors"

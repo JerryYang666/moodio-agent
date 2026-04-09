@@ -77,6 +77,8 @@ interface ProductionTableGridProps {
   onAddRow?: () => void;
   onInsertRow?: (anchorRowId: string, position: "above" | "below") => void;
   onInsertColumn?: (anchorColumnId: string, position: "left" | "right", cellType: CellType) => void;
+  canAddColumns?: boolean;
+  canAddRows?: boolean;
 }
 
 export function ProductionTableGrid({
@@ -112,6 +114,8 @@ export function ProductionTableGrid({
   onAddRow,
   onInsertRow,
   onInsertColumn,
+  canAddColumns = true,
+  canAddRows = true,
 }: ProductionTableGridProps) {
   const [scrollElement, setScrollElement] = useState<HTMLDivElement | null>(null);
   const [isCellPainting, setIsCellPainting] = useState(false);
@@ -836,6 +840,7 @@ export function ProductionTableGrid({
         <HeaderRow
           columns={columns}
           canEdit={canEditStructure}
+          canAddColumns={canAddColumns}
           editableColumnIds={editableColumnIds}
           colDragIndex={colDragIndex}
           colDropSlot={colDropSlot}
@@ -959,7 +964,7 @@ export function ProductionTableGrid({
             );
           })}
         </div>
-        {canEditStructure && onAddRow && (
+        {canEditStructure && onAddRow && canAddRows && (
           <div className="flex border-b border-dashed border-default-200">
             <div className="w-8 shrink-0" />
             <button
@@ -1009,7 +1014,7 @@ export function ProductionTableGrid({
           className="fixed z-50 min-w-[160px] py-1 rounded-lg shadow-lg border border-default-200 bg-content1"
           style={{ left: rowContextMenu.x, top: rowContextMenu.y }}
         >
-          {onInsertRow && (
+          {onInsertRow && canAddRows && (
             <>
               <button
                 className="w-full flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-default-100 transition-colors"

@@ -9,10 +9,13 @@ import {
   bulkInsertCells,
 } from "@/lib/production-table/queries";
 import { generateRowsFromScript } from "@/lib/production-table/ai-generate";
-import type { CellType } from "@/lib/production-table/types";
+import {
+  MAX_PRODUCTION_TABLE_COLUMNS,
+  MAX_PRODUCTION_TABLE_ROWS,
+  type CellType,
+} from "@/lib/production-table/types";
 
 const VALID_CELL_TYPES: CellType[] = ["text", "media"];
-const MAX_ROW_COUNT = 200;
 const MAX_SCRIPT_LENGTH = 50_000;
 
 interface InitializeBody {
@@ -48,6 +51,14 @@ export async function POST(req: NextRequest) {
     if (!Array.isArray(columns) || columns.length === 0) {
       return NextResponse.json(
         { error: "At least one column is required" },
+        { status: 400 }
+      );
+    }
+    if (columns.length > MAX_PRODUCTION_TABLE_COLUMNS) {
+      return NextResponse.json(
+        {
+          error: `Maximum ${MAX_PRODUCTION_TABLE_COLUMNS} columns allowed`,
+        },
         { status: 400 }
       );
     }
@@ -89,7 +100,7 @@ export async function POST(req: NextRequest) {
     if (mode === "scratch") {
       const count = Math.min(
         Math.max(1, typeof rowCount === "number" ? rowCount : 10),
-        MAX_ROW_COUNT
+        MAX_PRODUCTION_TABLE_ROWS
       );
       await bulkAddRows(table.id, count);
 
@@ -116,7 +127,8 @@ export async function POST(req: NextRequest) {
       scriptText: trimmedScript,
     });
 
-    const insertedRows = await bulkAddRows(table.id, generatedRows.length);
+    const limitedRows = generatedRows.slice(0, MAX_PRODUCTION_TABLE_ROWS);
+    const insertedRows = await bulkAddRows(table.id, limitedRows.length);
 
     const colNameToId = new Map(
       insertedColumns.map((c) => [c.name, c.id])
@@ -128,8 +140,8 @@ export async function POST(req: NextRequest) {
       textContent: string;
     }> = [];
 
-    for (let i = 0; i < generatedRows.length; i++) {
-      const row = generatedRows[i];
+    for (let i = 0; i < limitedRows.length; i++) {
+      const row = limitedRows[i];
       const rowId = insertedRows[i].id;
       for (const colName of textColumnNames) {
         const colId = colNameToId.get(colName);

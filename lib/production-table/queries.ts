@@ -213,6 +213,14 @@ export async function deleteColumn(columnId: string, tableId: string) {
   await touchTable(tableId);
 }
 
+export async function countTableColumns(tableId: string) {
+  const [result] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(productionTableColumns)
+    .where(eq(productionTableColumns.tableId, tableId));
+  return result?.count ?? 0;
+}
+
 export async function reorderColumns(tableId: string, columnIds: string[]) {
   await db.transaction(async (tx) => {
     for (let i = 0; i < columnIds.length; i++) {
@@ -258,6 +266,14 @@ export async function deleteRow(rowId: string, tableId: string) {
     .delete(productionTableRows)
     .where(eq(productionTableRows.id, rowId));
   await touchTable(tableId);
+}
+
+export async function countTableRows(tableId: string) {
+  const [result] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(productionTableRows)
+    .where(eq(productionTableRows.tableId, tableId));
+  return result?.count ?? 0;
 }
 
 export async function resizeRow(rowId: string, height: number) {

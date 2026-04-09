@@ -17,14 +17,16 @@ import { ProductionTableShareModal } from "@/components/production-table/Product
 import ChatSidePanel from "@/components/chat/chat-side-panel";
 import { siteConfig } from "@/config/site";
 import { hasWriteAccess, isOwner as isOwnerCheck } from "@/lib/permissions";
-import type {
-  EnrichedProductionTable,
-  ProductionTableColumn,
-  ProductionTableRow,
-  EnrichedCell,
-  CellType,
-  CellComment,
-  EnrichedMediaAssetRef,
+import {
+  MAX_PRODUCTION_TABLE_COLUMNS,
+  MAX_PRODUCTION_TABLE_ROWS,
+  type EnrichedProductionTable,
+  type ProductionTableColumn,
+  type ProductionTableRow,
+  type EnrichedCell,
+  type CellType,
+  type CellComment,
+  type EnrichedMediaAssetRef,
 } from "@/lib/production-table/types";
 
 const DEFAULT_CHAT_PANEL_WIDTH = 380;
@@ -324,6 +326,11 @@ export default function ProductionTableDetailPage({
   const tablePermission = table?.permission ?? null;
   const canEditStructure = hasWriteAccess(tablePermission);
   const isTableOwner = isOwnerCheck(tablePermission);
+  const canAddRows = (table?.rows.length ?? 0) < MAX_PRODUCTION_TABLE_ROWS;
+  const canAddColumns =
+    (table?.columns.length ?? 0) < MAX_PRODUCTION_TABLE_COLUMNS;
+  const rowLimitError = `Maximum ${MAX_PRODUCTION_TABLE_ROWS} rows allowed`;
+  const columnLimitError = `Maximum ${MAX_PRODUCTION_TABLE_COLUMNS} columns allowed`;
 
   const canEditCell = useCallback(
     (rowId: string, columnId: string) => {
@@ -338,6 +345,10 @@ export default function ProductionTableDetailPage({
   // Actions
   const handleAddColumn = useCallback(
     async (cellType: CellType) => {
+      if (!canAddColumns) {
+        addToast({ title: columnLimitError, color: "danger" });
+        return;
+      }
       try {
         const res = await fetch(
           `/api/production-table/${tableId}/columns`,
@@ -347,44 +358,74 @@ export default function ProductionTableDetailPage({
             body: JSON.stringify({ name: `Column ${(table?.columns.length ?? 0) + 1}`, cellType }),
           }
         );
-        if (!res.ok) throw new Error();
-        const data = await res.json();
+        const data = (await res
+          .json()
+          .catch(() => null)) as { column?: ProductionTableColumn; error?: string } | null;
+        if (!res.ok || !data?.column) {
+          throw new Error(data?.error || "Failed to add column");
+        }
+        const newColumn = data.column;
         setTable((prev) =>
-          prev ? { ...prev, columns: [...prev.columns, data.column] } : prev
+          prev ? { ...prev, columns: [...prev.columns, newColumn] } : prev
         );
-        sendEvent("pt_column_added", { tableId, column: data.column });
-      } catch {
-        addToast({ title: "Failed to add column", color: "danger" });
+        sendEvent("pt_column_added", { tableId, column: newColumn });
+      } catch (error) {
+        const message =
+          error instanceof Error && error.message
+            ? error.message
+            : "Failed to add column";
+        addToast({ title: message, color: "danger" });
       }
     },
-    [tableId, table?.columns.length, sendEvent]
+    [canAddColumns, columnLimitError, tableId, table?.columns.length, sendEvent]
   );
 
   const handleAddRow = useCallback(async () => {
+    if (!canAddRows) {
+      addToast({ title: rowLimitError, color: "danger" });
+      return;
+    }
     try {
       const res = await fetch(`/api/production-table/${tableId}/rows`, {
         method: "POST",
       });
-      if (!res.ok) throw new Error();
-      const data = await res.json();
+      const data = (await res
+        .json()
+        .catch(() => null)) as { row?: ProductionTableRow; error?: string } | null;
+      if (!res.ok || !data?.row) {
+        throw new Error(data?.error || "Failed to add row");
+      }
+      const newRow = data.row;
       setTable((prev) =>
-        prev ? { ...prev, rows: [...prev.rows, data.row] } : prev
+        prev ? { ...prev, rows: [...prev.rows, newRow] } : prev
       );
-      sendEvent("pt_row_added", { tableId, row: data.row });
-    } catch {
-      addToast({ title: "Failed to add row", color: "danger" });
+      sendEvent("pt_row_added", { tableId, row: newRow });
+    } catch (error) {
+      const message =
+        error instanceof Error && error.message
+          ? error.message
+          : "Failed to add row";
+      addToast({ title: message, color: "danger" });
     }
-  }, [tableId, sendEvent]);
+  }, [canAddRows, rowLimitError, tableId, sendEvent]);
 
   const handleInsertRow = useCallback(
     async (anchorRowId: string, position: "above" | "below") => {
       if (!table) return;
+      if (!canAddRows) {
+        addToast({ title: rowLimitError, color: "danger" });
+        return;
+      }
       try {
         const res = await fetch(`/api/production-table/${tableId}/rows`, {
           method: "POST",
         });
-        if (!res.ok) throw new Error();
-        const data = await res.json();
+        const data = (await res
+          .json()
+          .catch(() => null)) as { row?: ProductionTableRow; error?: string } | null;
+        if (!res.ok || !data?.row) {
+          throw new Error(data?.error || "Failed to insert row");
+        }
         const newRow = data.row as ProductionTableRow;
 
         const anchorIndex = table.rows.findIndex((r) => r.id === anchorRowId);
@@ -402,16 +443,24 @@ export default function ProductionTableDetailPage({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ rowIds: newIds }),
         });
-      } catch {
-        addToast({ title: "Failed to insert row", color: "danger" });
+      } catch (error) {
+        const message =
+          error instanceof Error && error.message
+            ? error.message
+            : "Failed to insert row";
+        addToast({ title: message, color: "danger" });
       }
     },
-    [table, tableId, sendEvent]
+    [table, canAddRows, rowLimitError, tableId, sendEvent]
   );
 
   const handleInsertColumn = useCallback(
     async (anchorColumnId: string, position: "left" | "right", cellType: CellType) => {
       if (!table) return;
+      if (!canAddColumns) {
+        addToast({ title: columnLimitError, color: "danger" });
+        return;
+      }
       try {
         const res = await fetch(
           `/api/production-table/${tableId}/columns`,
@@ -424,8 +473,12 @@ export default function ProductionTableDetailPage({
             }),
           }
         );
-        if (!res.ok) throw new Error();
-        const data = await res.json();
+        const data = (await res
+          .json()
+          .catch(() => null)) as { column?: ProductionTableColumn; error?: string } | null;
+        if (!res.ok || !data?.column) {
+          throw new Error(data?.error || "Failed to insert column");
+        }
         const newCol = data.column as ProductionTableColumn;
 
         const anchorIndex = table.columns.findIndex((c) => c.id === anchorColumnId);
@@ -443,11 +496,15 @@ export default function ProductionTableDetailPage({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ columnIds: newIds }),
         });
-      } catch {
-        addToast({ title: "Failed to insert column", color: "danger" });
+      } catch (error) {
+        const message =
+          error instanceof Error && error.message
+            ? error.message
+            : "Failed to insert column";
+        addToast({ title: message, color: "danger" });
       }
     },
-    [table, tableId, sendEvent]
+    [table, canAddColumns, columnLimitError, tableId, sendEvent]
   );
 
   const handleCellCommit = useCallback(
@@ -965,6 +1022,8 @@ export default function ProductionTableDetailPage({
           connectionState={connectionState}
           connectedUsers={connectedUsers}
           canEdit={canEditStructure}
+          canAddColumns={canAddColumns}
+          canAddRows={canAddRows}
           onBack={() => router.push("/production-table")}
           onAddColumn={handleAddColumn}
           onAddRow={handleAddRow}
@@ -1003,6 +1062,8 @@ export default function ProductionTableDetailPage({
           onAddRow={handleAddRow}
           onInsertRow={handleInsertRow}
           onInsertColumn={handleInsertColumn}
+          canAddColumns={canAddColumns}
+          canAddRows={canAddRows}
         />
         <ProductionTableShareModal
           isOpen={shareModal.isOpen}

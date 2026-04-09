@@ -2,9 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAccessToken } from "@/lib/auth/cookies";
 import { verifyAccessToken } from "@/lib/auth/jwt";
 import { getTablePermission } from "@/lib/production-table/permissions";
-import { addColumn } from "@/lib/production-table/queries";
+import { addColumn, countTableColumns } from "@/lib/production-table/queries";
 import { hasWriteAccess } from "@/lib/permissions";
-import type { CellType } from "@/lib/production-table/types";
+import {
+  MAX_PRODUCTION_TABLE_COLUMNS,
+  type CellType,
+} from "@/lib/production-table/types";
 
 type Params = { tableId: string };
 
@@ -28,6 +31,14 @@ export async function POST(
     const permission = await getTablePermission(tableId, payload.userId);
     if (!hasWriteAccess(permission)) {
       return NextResponse.json({ error: "Permission denied" }, { status: 403 });
+    }
+
+    const columnCount = await countTableColumns(tableId);
+    if (columnCount >= MAX_PRODUCTION_TABLE_COLUMNS) {
+      return NextResponse.json(
+        { error: `Maximum ${MAX_PRODUCTION_TABLE_COLUMNS} columns allowed` },
+        { status: 400 }
+      );
     }
 
     const body = await req.json();

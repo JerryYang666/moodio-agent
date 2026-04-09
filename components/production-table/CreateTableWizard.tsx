@@ -26,7 +26,7 @@ import {
   FileText,
   TriangleAlert,
 } from "lucide-react";
-import type { CellType } from "@/lib/production-table/types";
+import { MAX_PRODUCTION_TABLE_ROWS, type CellType } from "@/lib/production-table/types";
 
 interface PresetColumn {
   key: string;
@@ -208,7 +208,7 @@ export default function CreateTableWizard({
         if (mode === "ai") {
           body.scriptText = scriptText;
         } else {
-          body.rowCount = rowCount;
+          body.rowCount = Math.min(rowCount, MAX_PRODUCTION_TABLE_ROWS);
         }
 
         const res = await fetch("/api/production-table/initialize", {
@@ -512,11 +512,13 @@ export default function CreateTableWizard({
                 type="number"
                 label={t("wizard.rowCount")}
                 min={1}
-                max={200}
+                max={MAX_PRODUCTION_TABLE_ROWS}
                 value={String(rowCount)}
                 onValueChange={(v) => {
                   const n = parseInt(v, 10);
-                  if (!isNaN(n) && n > 0 && n <= 200) setRowCount(n);
+                  if (!isNaN(n) && n > 0 && n <= MAX_PRODUCTION_TABLE_ROWS) {
+                    setRowCount(n);
+                  }
                 }}
               />
 

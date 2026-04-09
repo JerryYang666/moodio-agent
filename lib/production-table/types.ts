@@ -26,6 +26,9 @@ export type {
 
 export type CellType = "text" | "media";
 
+export const MAX_PRODUCTION_TABLE_ROWS = 99;
+export const MAX_PRODUCTION_TABLE_COLUMNS = 99;
+
 /** Extensible comment payload stored as JSONB on production_table_cells. */
 export interface CellComment {
   text: string;
