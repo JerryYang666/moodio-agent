@@ -575,32 +575,8 @@ export function ProductionTableGrid({
         return;
       }
 
-      if (e.key === "Delete") {
-        if (selectedRows.size > 0 && canEditStructure) {
-          e.preventDefault();
-          const ids = Array.from(selectedRows);
-          clearSelection();
-          if (onBulkDeleteRows) {
-            onBulkDeleteRows(ids);
-          } else {
-            ids.forEach((id) => onDeleteRow(id));
-          }
-          return;
-        }
-        if (selectedColumns.size > 0 && canEditStructure) {
-          e.preventDefault();
-          const ids = Array.from(selectedColumns);
-          clearSelection();
-          if (onBulkDeleteColumns) {
-            onBulkDeleteColumns(ids);
-          } else {
-            ids.forEach((id) => onDeleteColumn(id));
-          }
-          return;
-        }
-      }
     },
-    [selectedRows, selectedColumns, canEditStructure, clearSelection, onBulkDeleteRows, onBulkDeleteColumns, onDeleteRow, onDeleteColumn]
+    [clearSelection]
   );
 
   // ---- Bulk resize wrappers ----
