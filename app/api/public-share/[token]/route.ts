@@ -35,7 +35,6 @@ interface AssetRow {
   imageId: string;
   assetId: string;
   assetType: string;
-  generationDetails: unknown;
 }
 
 function buildAssetUrls(asset: AssetRow) {
@@ -60,15 +59,6 @@ function buildAssetUrls(asset: AssetRow) {
   };
 }
 
-function extractDimensions(details: unknown): { width: number; height: number } {
-  if (details && typeof details === "object") {
-    const d = details as Record<string, unknown>;
-    const w = typeof d.width === "number" ? d.width : 512;
-    const h = typeof d.height === "number" ? d.height : 512;
-    return { width: w, height: h };
-  }
-  return { width: 512, height: 512 };
-}
 
 /**
  * Recursively collect all folder IDs under a collection.
@@ -187,7 +177,6 @@ export async function GET(
           imageId: collectionImages.imageId,
           assetId: collectionImages.assetId,
           assetType: collectionImages.assetType,
-          generationDetails: collectionImages.generationDetails,
         })
         .from(collectionImages)
         .where(eq(collectionImages.collectionId, shareLink.resourceId))
@@ -206,7 +195,6 @@ export async function GET(
           imageId: collectionImages.imageId,
           assetId: collectionImages.assetId,
           assetType: collectionImages.assetType,
-          generationDetails: collectionImages.generationDetails,
         })
         .from(collectionImages)
         .where(
@@ -222,14 +210,11 @@ export async function GET(
 
     const assets = rawAssets.map((asset) => {
       const urls = buildAssetUrls(asset);
-      const dims = extractDimensions(asset.generationDetails);
       return {
         id: asset.id,
         imageUrl: urls.imageUrl,
         videoUrl: urls.videoUrl,
         assetType: asset.assetType,
-        width: dims.width,
-        height: dims.height,
       };
     });
 
