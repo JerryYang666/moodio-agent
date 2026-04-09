@@ -1459,6 +1459,11 @@
     "cellsSelected": "个单元格已选中",
     "tableNotFoundOrAccessDenied": "未找到大表或无访问权限。",
     "backToTables": "返回大表列表",
+    "batchAddRows": "添加行",
+    "batchAddColumns": "添加列",
+    "numberOfRows": "行数",
+    "numberOfColumns": "列数",
+    "add": "添加",
     "errors": {
       "maxRowsReached": "最多允许 {count} 行",
       "maxColumnsReached": "最多允许 {count} 列",

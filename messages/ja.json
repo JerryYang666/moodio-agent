@@ -1459,6 +1459,11 @@
     "cellsSelected": "セル選択中",
     "tableNotFoundOrAccessDenied": "シートが見つからないか、アクセス権限がありません。",
     "backToTables": "シート一覧に戻る",
+    "batchAddRows": "行を追加",
+    "batchAddColumns": "列を追加",
+    "numberOfRows": "行数",
+    "numberOfColumns": "列数",
+    "add": "追加",
     "errors": {
       "maxRowsReached": "行は最大{count}件までです",
       "maxColumnsReached": "列は最大{count}件までです",

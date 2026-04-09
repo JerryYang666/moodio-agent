@@ -1459,6 +1459,11 @@
     "cellsSelected": "셀 선택됨",
     "tableNotFoundOrAccessDenied": "시트를 찾을 수 없거나 접근 권한이 없습니다.",
     "backToTables": "시트 목록으로 돌아가기",
+    "batchAddRows": "행 추가",
+    "batchAddColumns": "열 추가",
+    "numberOfRows": "행 수",
+    "numberOfColumns": "열 수",
+    "add": "추가",
     "errors": {
       "maxRowsReached": "행은 최대 {count}개까지 가능합니다",
       "maxColumnsReached": "열은 최대 {count}개까지 가능합니다",

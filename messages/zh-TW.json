@@ -1459,6 +1459,11 @@
     "cellsSelected": "個儲存格已選取",
     "tableNotFoundOrAccessDenied": "找不到大表或沒有存取權限。",
     "backToTables": "返回大表列表",
+    "batchAddRows": "新增列",
+    "batchAddColumns": "新增欄",
+    "numberOfRows": "列數",
+    "numberOfColumns": "欄數",
+    "add": "新增",
     "errors": {
       "maxRowsReached": "最多允許 {count} 列",
       "maxColumnsReached": "最多允許 {count} 欄",
