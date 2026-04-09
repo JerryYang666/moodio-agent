@@ -28,7 +28,7 @@ export type AssetSummary = {
   assetId?: string;
   imageUrl: string;
   videoUrl?: string;
-  assetType?: "image" | "video";
+  assetType?: "image" | "video" | "public_image" | "public_video";
   chatId: string | null;
   generationDetails: {
     title: string;
@@ -519,7 +519,8 @@ export default function AssetPickerModal({
     if (acceptTypes && acceptTypes.length > 0) {
       result = result.filter((a) => {
         const type = a.assetType || "image";
-        return acceptTypes.includes(type);
+        const baseType = type.replace("public_", "") as "image" | "video";
+        return acceptTypes.includes(baseType);
       });
     }
     const q = query.trim().toLowerCase();

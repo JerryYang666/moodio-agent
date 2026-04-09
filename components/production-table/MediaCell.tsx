@@ -151,6 +151,7 @@ export const MediaCell = memo(function MediaCell({
         imageId: asset.imageId,
         assetType: asset.assetType ?? "image",
         imageUrl: asset.imageUrl,
+        videoUrl: asset.videoUrl,
       };
       onAddAsset(ref);
       setPickerOpen(false);
@@ -166,6 +167,7 @@ export const MediaCell = memo(function MediaCell({
           imageId: a.imageId,
           assetType: a.assetType ?? "image",
           imageUrl: a.imageUrl,
+          videoUrl: a.videoUrl,
         });
       }
       setPickerOpen(false);
@@ -199,7 +201,7 @@ export const MediaCell = memo(function MediaCell({
       <div className="flex flex-wrap gap-1">
         {assets.map((asset, idx) => (
           <div key={`${asset.assetId}-${idx}`} className="relative group">
-            {asset.imageUrl && (
+            {asset.imageUrl ? (
               <Image
                 alt=""
                 className="object-cover rounded cursor-pointer"
@@ -208,7 +210,14 @@ export const MediaCell = memo(function MediaCell({
                 src={asset.imageUrl}
                 onClick={() => setPreviewIndex(idx)}
               />
-            )}
+            ) : asset.videoUrl ? (
+              <video
+                className="object-cover rounded cursor-pointer w-10 h-10"
+                src={asset.videoUrl}
+                muted
+                onClick={() => setPreviewIndex(idx)}
+              />
+            ) : null}
             {canEdit && !isLockedByOther && (
               <button
                 className="absolute -top-1 -right-1 z-10 w-4 h-4 bg-danger text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
@@ -313,7 +322,7 @@ export const MediaCell = memo(function MediaCell({
                   className="flex items-center justify-center max-h-[85vh]"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  {previewAsset.assetType === "video" && previewAsset.videoUrl ? (
+                  {(previewAsset.assetType === "video" || previewAsset.assetType === "public_video") && previewAsset.videoUrl ? (
                     <video
                       src={previewAsset.videoUrl}
                       controls

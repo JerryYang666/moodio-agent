@@ -21,6 +21,7 @@ import type {
 } from "./types";
 import { getTablePermission, getEditableGrants } from "./permissions";
 import { getImageUrl, getVideoUrl } from "@/lib/storage/s3";
+import { getContentUrl } from "@/lib/config/video.config";
 
 // ---------------------------------------------------------------------------
 // Table CRUD
@@ -674,11 +675,27 @@ function enrichMediaAssets(
   assets: MediaAssetRef[] | null
 ): EnrichedMediaAssetRef[] | null {
   if (!assets) return null;
-  return assets.map((a) => ({
-    ...a,
-    imageUrl: a.imageId ? getImageUrl(a.imageId) : undefined,
-    videoUrl: a.assetType === "video" && a.assetId ? getVideoUrl(a.assetId) : undefined,
-  }));
+  return assets.map((a) => {
+    if (a.assetType === "public_image") {
+      return {
+        ...a,
+        imageUrl: getContentUrl(a.assetId),
+        videoUrl: undefined,
+      };
+    }
+    if (a.assetType === "public_video") {
+      return {
+        ...a,
+        imageUrl: undefined,
+        videoUrl: getContentUrl(a.assetId),
+      };
+    }
+    return {
+      ...a,
+      imageUrl: a.imageId ? getImageUrl(a.imageId) : undefined,
+      videoUrl: a.assetType === "video" && a.assetId ? getVideoUrl(a.assetId) : undefined,
+    };
+  });
 }
 
 // ---------------------------------------------------------------------------
