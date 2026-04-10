@@ -1069,7 +1069,11 @@
     "maxRecordingDuration": "最大{seconds}秒の録画",
     "filterByRating": "星",
     "selectedCount": "{count}件選択中",
-    "confirmSelection": "選択を確定"
+    "confirmSelection": "選択を確定",
+    "folders": "フォルダ",
+    "allAssets": "すべてのアセット",
+    "rootOnly": "ルート（フォルダなし）",
+    "noFolders": "フォルダなし"
   },
   "assetsSidebar": {
     "title": "アセット",
@@ -1089,7 +1093,9 @@
     "assetAlt": "アセット",
     "untitled": "無題",
     "addedToCollection": "コレクションに追加しました",
-    "addToCollectionFailed": "コレクションへの追加に失敗しました"
+    "addToCollectionFailed": "コレクションへの追加に失敗しました",
+    "folders": "フォルダ",
+    "backToParent": "戻る"
   },
   "imageDetail": {
     "title": "画像の詳細",

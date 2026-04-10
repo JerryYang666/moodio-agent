@@ -1069,7 +1069,11 @@
     "maxRecordingDuration": "最長錄製 {seconds} 秒",
     "filterByRating": "星級",
     "selectedCount": "已選擇 {count} 項",
-    "confirmSelection": "確認選擇"
+    "confirmSelection": "確認選擇",
+    "folders": "資料夾",
+    "allAssets": "所有素材",
+    "rootOnly": "根目錄（無資料夾）",
+    "noFolders": "沒有資料夾"
   },
   "assetsSidebar": {
     "title": "素材",
@@ -1089,7 +1093,9 @@
     "assetAlt": "素材",
     "untitled": "未命名",
     "addedToCollection": "已新增至集合",
-    "addToCollectionFailed": "新增至集合失敗"
+    "addToCollectionFailed": "新增至集合失敗",
+    "folders": "資料夾",
+    "backToParent": "返回"
   },
   "imageDetail": {
     "title": "圖片詳細資訊",

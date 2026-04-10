@@ -1069,7 +1069,11 @@
     "maxRecordingDuration": "최대 {seconds}초 녹화",
     "filterByRating": "별점",
     "selectedCount": "{count}개 선택됨",
-    "confirmSelection": "선택 확인"
+    "confirmSelection": "선택 확인",
+    "folders": "폴더",
+    "allAssets": "모든 애셋",
+    "rootOnly": "루트 (폴더 없음)",
+    "noFolders": "폴더 없음"
   },
   "assetsSidebar": {
     "title": "애셋",
@@ -1089,7 +1093,9 @@
     "assetAlt": "애셋",
     "untitled": "제목 없음",
     "addedToCollection": "컬렉션에 추가되었습니다",
-    "addToCollectionFailed": "컬렉션에 추가하는 데 실패했습니다"
+    "addToCollectionFailed": "컬렉션에 추가하는 데 실패했습니다",
+    "folders": "폴더",
+    "backToParent": "뒤로"
   },
   "imageDetail": {
     "title": "이미지 상세 정보",

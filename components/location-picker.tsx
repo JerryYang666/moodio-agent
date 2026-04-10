@@ -13,7 +13,8 @@ import { Spinner } from "@heroui/spinner";
 import { ChevronRight, ChevronDown, Folder, Library } from "lucide-react";
 import { useCollections } from "@/hooks/use-collections";
 import { hasWriteAccess } from "@/lib/permissions";
-import { nextApi, type FolderTreeItem } from "@/lib/redux/services/next-api";
+import { nextApi } from "@/lib/redux/services/next-api";
+import { buildTree, type TreeNode } from "@/lib/tree-utils";
 
 export type LocationTarget =
   | { type: "collection"; collectionId: string }
@@ -29,34 +30,6 @@ interface LocationPickerProps {
   excludeCollectionId?: string;
   excludeFolderId?: string;
   onConfirm: (target: LocationTarget) => void;
-}
-
-interface TreeNode {
-  id: string;
-  name: string;
-  parentId: string | null;
-  depth: number;
-  children: TreeNode[];
-}
-
-function buildTree(items: FolderTreeItem[]): TreeNode[] {
-  const map = new Map<string, TreeNode>();
-  const roots: TreeNode[] = [];
-
-  for (const item of items) {
-    map.set(item.id, { ...item, children: [] });
-  }
-
-  for (const item of items) {
-    const node = map.get(item.id)!;
-    if (item.parentId && map.has(item.parentId)) {
-      map.get(item.parentId)!.children.push(node);
-    } else {
-      roots.push(node);
-    }
-  }
-
-  return roots;
 }
 
 function FolderTreeNode({
@@ -81,18 +54,16 @@ function FolderTreeNode({
     <div>
       <button
         type="button"
-        disabled={isExcluded}
         className={`w-full flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-sm transition-colors ${
           isExcluded
-            ? "opacity-40 cursor-not-allowed"
+            ? "opacity-60 cursor-pointer"
             : isSelected
               ? "bg-primary/15 text-primary font-medium"
               : "hover:bg-default-100 cursor-pointer"
         }`}
         style={{ paddingLeft: `${(level + 1) * 20 + 8}px` }}
         onClick={() => {
-          if (isExcluded) return;
-          onSelect(`folder:${node.id}`);
+          if (!isExcluded) onSelect(`folder:${node.id}`);
           if (hasChildren) setExpanded((v) => !v);
         }}
       >

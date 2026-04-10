@@ -19,6 +19,8 @@ import { Tab, Tabs } from "@heroui/tabs";
 import { Search, Expand, Camera, Star, X, Check, Video } from "lucide-react";
 import { siteConfig } from "@/config/site";
 import { useGetCollectionsQuery } from "@/lib/redux/services/next-api";
+import AssetPickerFolderTree from "./asset-picker-folder-tree";
+import AssetPickerBreadcrumbs from "./asset-picker-breadcrumbs";
 
 export type AssetSummary = {
   id: string;
@@ -346,6 +348,8 @@ export default function AssetPickerModal({
   const [loadingMoreAssets, setLoadingMoreAssets] = useState(false);
   const [projectId, setProjectId] = useState<string>("recent");
   const [collectionId, setCollectionId] = useState<string>("all");
+  const [folderId, setFolderId] = useState<string | null>(null);
+  const [folderRoot, setFolderRoot] = useState(false);
   const [query, setQuery] = useState("");
   const [tabKey, setTabKey] = useState<"library" | "upload" | "camera">("library");
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -394,6 +398,8 @@ export default function AssetPickerModal({
       setSelectedIds(new Set());
       lastClickedIndexRef.current = null;
       setFilterRating(null);
+      setFolderId(null);
+      setFolderRoot(false);
       setHasMoreAssets(false);
       setNextAssetsOffset(0);
       setLoadingMoreAssets(false);
@@ -464,6 +470,11 @@ export default function AssetPickerModal({
         params.set("offset", String(offset));
         if (collectionId !== "all") {
           params.set("collectionId", collectionId);
+          if (folderId) {
+            params.set("folderId", folderId);
+          } else if (folderRoot) {
+            params.set("folderRoot", "true");
+          }
         } else if (projectId !== "recent") {
           params.set("projectId", projectId);
         }
@@ -497,7 +508,7 @@ export default function AssetPickerModal({
         }
       }
     },
-    [collectionId, projectId]
+    [collectionId, projectId, folderId, folderRoot]
   );
 
   useEffect(() => {
@@ -507,7 +518,7 @@ export default function AssetPickerModal({
     setNextAssetsOffset(0);
     setLoadingMoreAssets(false);
     void loadAssetsPage({ offset: 0, append: false });
-  }, [isOpen, projectId, collectionId, loadAssetsPage]);
+  }, [isOpen, projectId, collectionId, folderId, folderRoot, loadAssetsPage]);
 
   const handleLoadMoreAssets = useCallback(() => {
     if (loading || loadingMoreAssets || !hasMoreAssets) return;
@@ -1034,7 +1045,7 @@ export default function AssetPickerModal({
                   </div>
                 ) : (
                   /* ── Library Tab ── */
-                  <div className="flex flex-col gap-4 min-h-0">
+                  <div className="flex flex-col gap-3 min-h-0">
                     <div className="flex flex-col md:flex-row gap-3 shrink-0">
                       <Select
                         label={t("assetPicker.projectLabel")}
@@ -1043,6 +1054,8 @@ export default function AssetPickerModal({
                           const next = e.target.value;
                           setProjectId(next);
                           setCollectionId("all");
+                          setFolderId(null);
+                          setFolderRoot(false);
                         }}
                         className="md:w-1/2"
                       >
@@ -1063,7 +1076,11 @@ export default function AssetPickerModal({
                       <Select
                         label={t("assetPicker.collectionLabel")}
                         selectedKeys={[collectionId]}
-                        onChange={(e) => setCollectionId(e.target.value)}
+                        onChange={(e) => {
+                          setCollectionId(e.target.value);
+                          setFolderId(null);
+                          setFolderRoot(false);
+                        }}
                         className="md:w-1/2"
                       >
                         <SelectItem key="all">{t("assetPicker.all")}</SelectItem>
@@ -1079,77 +1096,109 @@ export default function AssetPickerModal({
                       </Select>
                     </div>
 
-                    {/* Search + Star filter row */}
-                    <div className="flex flex-wrap items-center gap-3 shrink-0">
-                      <Input
-                        startContent={
-                          <Search size={16} className="text-default-400" />
-                        }
-                        placeholder={t("assetPicker.searchByTitle")}
-                        value={query}
-                        onValueChange={setQuery}
-                        className="flex-1 min-w-[180px]"
-                      />
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-xs text-default-500 mr-0.5">
-                          {t("assetPicker.filterByRating")}:
-                        </span>
-                        {[1, 2, 3, 4, 5].map((star) => (
-                          <button
-                            key={star}
-                            type="button"
-                            className="p-0.5 leading-none cursor-pointer"
-                            onClick={() =>
-                              setFilterRating(filterRating === star ? null : star)
-                            }
-                          >
-                            <Star
-                              size={16}
-                              className={
-                                filterRating !== null && star <= filterRating
-                                  ? "text-yellow-400 fill-yellow-400"
-                                  : "text-default-300"
+                    <div className="flex flex-row gap-0 min-h-0 flex-1">
+                      {collectionId !== "all" && (
+                        <div className="hidden md:block">
+                          <AssetPickerFolderTree
+                            collectionId={collectionId}
+                            selectedFolderId={folderId}
+                            isCollectionRoot={folderRoot}
+                            onSelectFolder={(id, isRoot) => {
+                              setFolderId(id);
+                              setFolderRoot(isRoot);
+                            }}
+                          />
+                        </div>
+                      )}
+
+                      <div className="flex flex-col gap-3 min-h-0 flex-1 min-w-0">
+                        {folderId && (
+                          <div className="shrink-0 px-1">
+                            <AssetPickerBreadcrumbs
+                              collectionName={
+                                visibleCollections.find((c) => c.id === collectionId)?.name ?? null
                               }
+                              folderId={folderId}
+                              onNavigate={(id) => {
+                                setFolderId(id);
+                                setFolderRoot(false);
+                              }}
                             />
-                          </button>
-                        ))}
-                        {filterRating !== null && (
-                          <Button
-                            size="sm"
-                            variant="light"
-                            isIconOnly
-                            onPress={() => setFilterRating(null)}
-                            className="min-w-6 w-6 h-6"
-                          >
-                            <X size={14} />
-                          </Button>
+                          </div>
+                        )}
+
+                        <div className="flex flex-wrap items-center gap-3 shrink-0">
+                          <Input
+                            startContent={
+                              <Search size={16} className="text-default-400" />
+                            }
+                            placeholder={t("assetPicker.searchByTitle")}
+                            value={query}
+                            onValueChange={setQuery}
+                            className="flex-1 min-w-[180px]"
+                          />
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-xs text-default-500 mr-0.5">
+                              {t("assetPicker.filterByRating")}:
+                            </span>
+                            {[1, 2, 3, 4, 5].map((star) => (
+                              <button
+                                key={star}
+                                type="button"
+                                className="p-0.5 leading-none cursor-pointer"
+                                onClick={() =>
+                                  setFilterRating(filterRating === star ? null : star)
+                                }
+                              >
+                                <Star
+                                  size={16}
+                                  className={
+                                    filterRating !== null && star <= filterRating
+                                      ? "text-yellow-400 fill-yellow-400"
+                                      : "text-default-300"
+                                  }
+                                />
+                              </button>
+                            ))}
+                            {filterRating !== null && (
+                              <Button
+                                size="sm"
+                                variant="light"
+                                isIconOnly
+                                onPress={() => setFilterRating(null)}
+                                className="min-w-6 w-6 h-6"
+                              >
+                                <X size={14} />
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+
+                        {loading ? (
+                          <div className="flex items-center justify-center py-10">
+                            <Spinner />
+                          </div>
+                        ) : filteredAssets.length === 0 ? (
+                          <div className="text-center py-10 text-default-500">
+                            {t("assetPicker.noAssetsFound")}
+                          </div>
+                        ) : (
+                          <VirtualAssetGrid
+                            assets={filteredAssets}
+                            selectedIds={selectedIds}
+                            multiSelect={multiSelect}
+                            hasMore={hasMoreAssets}
+                            isLoadingMore={loadingMoreAssets}
+                            onLoadMore={handleLoadMoreAssets}
+                            onClick={handleAssetClick}
+                            onExpand={setPreviewAsset}
+                            untitledLabel={t("assetPicker.untitled")}
+                            viewFullLabel={t("assetPicker.viewFull")}
+                            assetAltLabel={t("assetPicker.assetAlt")}
+                          />
                         )}
                       </div>
                     </div>
-
-                    {loading ? (
-                      <div className="flex items-center justify-center py-10">
-                        <Spinner />
-                      </div>
-                    ) : filteredAssets.length === 0 ? (
-                      <div className="text-center py-10 text-default-500">
-                        {t("assetPicker.noAssetsFound")}
-                      </div>
-                    ) : (
-                      <VirtualAssetGrid
-                        assets={filteredAssets}
-                        selectedIds={selectedIds}
-                        multiSelect={multiSelect}
-                        hasMore={hasMoreAssets}
-                        isLoadingMore={loadingMoreAssets}
-                        onLoadMore={handleLoadMoreAssets}
-                        onClick={handleAssetClick}
-                        onExpand={setPreviewAsset}
-                        untitledLabel={t("assetPicker.untitled")}
-                        viewFullLabel={t("assetPicker.viewFull")}
-                        assetAltLabel={t("assetPicker.assetAlt")}
-                      />
-                    )}
                   </div>
                 )}
               </ModalBody>

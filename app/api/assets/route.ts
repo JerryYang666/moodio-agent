@@ -67,6 +67,8 @@ export async function GET(req: NextRequest) {
     const url = new URL(req.url);
     const projectId = url.searchParams.get("projectId") || undefined;
     const collectionId = url.searchParams.get("collectionId") || undefined;
+    const folderId = url.searchParams.get("folderId") || undefined;
+    const folderRoot = url.searchParams.get("folderRoot") === "true";
     const limit = parseLimit(url.searchParams.get("limit"), 60);
     const offset = parseOffset(url.searchParams.get("offset"));
 
@@ -98,10 +100,17 @@ export async function GET(req: NextRequest) {
         }
       }
 
+      const conditions = [eq(collectionImages.collectionId, collectionId)];
+      if (folderId) {
+        conditions.push(eq(collectionImages.folderId, folderId));
+      } else if (folderRoot) {
+        conditions.push(isNull(collectionImages.folderId));
+      }
+
       const rows = await db
         .select()
         .from(collectionImages)
-        .where(eq(collectionImages.collectionId, collectionId))
+        .where(and(...conditions))
         .orderBy(desc(collectionImages.addedAt), desc(collectionImages.id))
         .offset(offset)
         .limit(limit + 1);

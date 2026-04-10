@@ -1217,7 +1217,11 @@
     "maxRecordingDuration": "Max {seconds}s recording",
     "filterByRating": "Stars",
     "selectedCount": "{count} selected",
-    "confirmSelection": "Confirm Selection"
+    "confirmSelection": "Confirm Selection",
+    "folders": "Folders",
+    "allAssets": "All assets",
+    "rootOnly": "Root (no folder)",
+    "noFolders": "No folders"
   },
   "assetsSidebar": {
     "title": "Assets",
@@ -1237,7 +1241,9 @@
     "assetAlt": "Asset",
     "untitled": "Untitled",
     "addedToCollection": "Added to collection",
-    "addToCollectionFailed": "Failed to add to collection"
+    "addToCollectionFailed": "Failed to add to collection",
+    "folders": "Folders",
+    "backToParent": "Back"
   },
   "imageDetail": {
     "title": "Image Details",

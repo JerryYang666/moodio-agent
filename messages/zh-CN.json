@@ -1069,7 +1069,11 @@
     "maxRecordingDuration": "最长录制 {seconds} 秒",
     "filterByRating": "星级",
     "selectedCount": "已选择 {count} 项",
-    "confirmSelection": "确认选择"
+    "confirmSelection": "确认选择",
+    "folders": "文件夹",
+    "allAssets": "所有素材",
+    "rootOnly": "根目录（无文件夹）",
+    "noFolders": "暂无文件夹"
   },
   "assetsSidebar": {
     "title": "素材",
@@ -1089,7 +1093,9 @@
     "assetAlt": "素材",
     "untitled": "未命名",
     "addedToCollection": "已添加到集合",
-    "addToCollectionFailed": "添加到集合失败"
+    "addToCollectionFailed": "添加到集合失败",
+    "folders": "文件夹",
+    "backToParent": "返回"
   },
   "imageDetail": {
     "title": "图片详情",

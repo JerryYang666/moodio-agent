@@ -7,7 +7,7 @@ import { Button } from "@heroui/button";
 import { Spinner } from "@heroui/spinner";
 import { Chip } from "@heroui/chip";
 import { Image } from "@heroui/image";
-import { Folder, Clock, Images, ChevronLeft, Pin, PinOff, X, Play } from "lucide-react";
+import { Folder, Clock, Images, ChevronLeft, ChevronRight, Pin, PinOff, X, Play, ArrowLeft } from "lucide-react";
 import clsx from "clsx";
 import { addToast } from "@heroui/toast";
 import { ASSET_DRAG_MIME, AI_IMAGE_DRAG_MIME } from "./asset-dnd";
@@ -80,7 +80,10 @@ export default function AssetsHoverSidebar() {
     | { kind: "recent" }
     | { kind: "project"; id: string }
     | { kind: "collection"; id: string }
+    | { kind: "folder"; collectionId: string; folderId: string }
   >({ kind: "recent" });
+  const [childFolders, setChildFolders] = useState<Array<{ id: string; name: string }>>([]);
+  const [foldersLoading, setFoldersLoading] = useState(false);
 
   const ownedCollectionsByProject = useMemo(() => {
     const map = new Map<string, Collection[]>();
@@ -125,6 +128,10 @@ export default function AssetsHoverSidebar() {
       params.set("limit", "60");
       if (scope.kind === "project") params.set("projectId", scope.id);
       if (scope.kind === "collection") params.set("collectionId", scope.id);
+      if (scope.kind === "folder") {
+        params.set("collectionId", scope.collectionId);
+        params.set("folderId", scope.folderId);
+      }
       const res = await fetch(`/api/assets?${params.toString()}`);
       if (!res.ok) return;
       const data = await res.json();
@@ -134,6 +141,32 @@ export default function AssetsHoverSidebar() {
     } finally {
       setLoading(false);
     }
+  }, [scope]);
+
+  // Load child folders when in collection or folder scope
+  useEffect(() => {
+    if (scope.kind !== "collection" && scope.kind !== "folder") {
+      setChildFolders([]);
+      return;
+    }
+    const collectionId = scope.kind === "collection" ? scope.id : scope.collectionId;
+    const parentId = scope.kind === "folder" ? scope.folderId : undefined;
+    const loadFolders = async () => {
+      setFoldersLoading(true);
+      try {
+        const params = new URLSearchParams();
+        if (parentId) params.set("parentId", parentId);
+        const res = await fetch(`/api/collection/${collectionId}/folders?${params.toString()}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        setChildFolders(data.folders || []);
+      } catch (e) {
+        console.error("Failed to load folders", e);
+      } finally {
+        setFoldersLoading(false);
+      }
+    };
+    loadFolders();
   }, [scope]);
 
   // Load assets when scope changes
@@ -478,11 +511,47 @@ export default function AssetsHoverSidebar() {
               </div>
 
               <div className="flex-1 overflow-y-auto p-3">
+                {scope.kind === "folder" && (
+                  <button
+                    className="w-full flex items-center gap-1.5 px-2 py-1.5 rounded-md text-xs text-default-600 hover:bg-default-100 mb-2 cursor-pointer"
+                    onClick={() => {
+                      setScope({ kind: "collection", id: scope.collectionId });
+                    }}
+                  >
+                    <ArrowLeft size={12} />
+                    <span>{t("assetsSidebar.backToParent")}</span>
+                  </button>
+                )}
+
+                {childFolders.length > 0 && (
+                  <div className="mb-3">
+                    <div className="text-[10px] font-medium text-default-400 uppercase tracking-wider mb-1">
+                      {t("assetsSidebar.folders")}
+                    </div>
+                    <div className="flex flex-col gap-0.5">
+                      {childFolders.map((f) => (
+                        <button
+                          key={f.id}
+                          className="w-full flex items-center gap-1.5 px-2 py-1.5 rounded-md text-xs hover:bg-default-100 text-default-700 cursor-pointer"
+                          onClick={() => {
+                            const collId = scope.kind === "collection" ? scope.id : scope.kind === "folder" ? scope.collectionId : "";
+                            setScope({ kind: "folder", collectionId: collId, folderId: f.id });
+                          }}
+                        >
+                          <Folder size={12} className="shrink-0 text-default-500" />
+                          <span className="truncate">{f.name}</span>
+                          <ChevronRight size={10} className="ml-auto shrink-0 text-default-400" />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {loading ? (
                   <div className="flex items-center justify-center h-full">
                     <Spinner />
                   </div>
-                ) : assets.length === 0 ? (
+                ) : assets.length === 0 && childFolders.length === 0 ? (
                   <div className="text-center py-10 text-default-500 text-sm">
                     {t("assetsSidebar.noAssets")}
                   </div>
