@@ -643,7 +643,7 @@ export default function FolderPage({
       try {
         await Promise.all(
           files.map(async (file) => {
-            const result = await uploadAudioFile(file);
+            const result = await uploadAudioFile(file, { skipCollection: true });
             if (!result.success) {
               addToast({ title: t("uploadFailed"), color: "danger" });
               return;

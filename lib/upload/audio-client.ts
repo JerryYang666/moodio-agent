@@ -35,7 +35,11 @@ export function validateAudioFile(file: File): AudioUploadError | null {
   return null;
 }
 
-export async function uploadAudio(file: File): Promise<AudioUploadOutcome> {
+export interface AudioUploadOptions {
+  skipCollection?: boolean;
+}
+
+export async function uploadAudio(file: File, options?: AudioUploadOptions): Promise<AudioUploadOutcome> {
   const validationError = validateAudioFile(file);
   if (validationError) {
     return { success: false, error: validationError };
@@ -89,6 +93,7 @@ export async function uploadAudio(file: File): Promise<AudioUploadOutcome> {
       body: JSON.stringify({
         audioId,
         filename: file.name,
+        skipCollection: options?.skipCollection,
       }),
     });
 

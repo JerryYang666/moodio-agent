@@ -812,6 +812,9 @@ export default function DesktopDetailPage({
           return;
         }
       }
+      if (asset.assetType === "audio" && asset.audioUrl) {
+        setPlayingAssetId((prev) => (prev === asset.id ? null : asset.id));
+      }
     },
     []
   );
@@ -972,7 +975,7 @@ export default function DesktopDetailPage({
         let asset: { assetType: string; metadata: Record<string, unknown>; posX: number; posY: number; width?: number; height?: number };
 
         if (isAudio) {
-          const result = await uploadAudio(file);
+          const result = await uploadAudio(file, { skipCollection: true });
           if (!result.success) {
             addToast({ title: t("uploadFailed"), description: result.error.message, color: "danger" });
             continue;
