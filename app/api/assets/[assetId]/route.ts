@@ -4,7 +4,7 @@ import { collectionImages, collectionShares, collections, projects } from "@/lib
 import { getAccessToken } from "@/lib/auth/cookies";
 import { verifyAccessToken } from "@/lib/auth/jwt";
 import { and, eq } from "drizzle-orm";
-import { getImageUrl } from "@/lib/storage/s3";
+import { getImageUrl, getAudioUrl } from "@/lib/storage/s3";
 import { getContentUrl } from "@/lib/config/video.config";
 
 /**
@@ -81,15 +81,13 @@ export async function GET(
       );
     }
 
-    return NextResponse.json({
-      asset: {
-        ...asset,
-        imageUrl:
-          asset.assetType === "public_image"
-            ? getContentUrl(asset.assetId)
-            : getImageUrl(asset.imageId),
-      },
-    });
+    const enriched = asset.assetType === "audio"
+      ? { ...asset, imageUrl: "", audioUrl: getAudioUrl(asset.assetId) }
+      : asset.assetType === "public_image"
+        ? { ...asset, imageUrl: getContentUrl(asset.assetId) }
+        : { ...asset, imageUrl: getImageUrl(asset.imageId) };
+
+    return NextResponse.json({ asset: enriched });
   } catch (error) {
     console.error("Error fetching asset:", error);
     return NextResponse.json(

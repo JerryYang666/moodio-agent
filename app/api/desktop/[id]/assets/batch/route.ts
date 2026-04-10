@@ -6,7 +6,7 @@ import { verifyAccessToken } from "@/lib/auth/jwt";
 import { eq, and } from "drizzle-orm";
 import { getDesktopPermission } from "@/lib/desktop/permissions";
 import { hasWriteAccess } from "@/lib/permissions";
-import { getImageUrl, getVideoUrl } from "@/lib/storage/s3";
+import { getImageUrl, getVideoUrl, getAudioUrl } from "@/lib/storage/s3";
 import { getContentUrl } from "@/lib/config/video.config";
 
 function enrichAsset(asset: typeof desktopAssets.$inferSelect) {
@@ -14,6 +14,7 @@ function enrichAsset(asset: typeof desktopAssets.$inferSelect) {
   const storageKey = typeof meta.storageKey === "string" ? meta.storageKey : null;
   const imageId = typeof meta.imageId === "string" ? meta.imageId : null;
   const videoId = typeof meta.videoId === "string" ? meta.videoId : null;
+  const audioId = typeof meta.audioId === "string" ? meta.audioId : null;
   if (asset.assetType === "public_video") {
     return {
       ...asset,
@@ -26,6 +27,13 @@ function enrichAsset(asset: typeof desktopAssets.$inferSelect) {
       ...asset,
       imageUrl: storageKey ? getContentUrl(storageKey) : null,
       videoUrl: null,
+    };
+  }
+  if (asset.assetType === "audio") {
+    return {
+      ...asset,
+      imageUrl: null,
+      audioUrl: audioId ? getAudioUrl(audioId) : null,
     };
   }
   return {
