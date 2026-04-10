@@ -17,6 +17,7 @@ import { Input } from "@heroui/input";
 import { Image } from "@heroui/image";
 import { Tab, Tabs } from "@heroui/tabs";
 import { Search, Expand, Camera, Star, X, Check, Video, Music } from "lucide-react";
+import AudioPlayer from "@/components/audio-player";
 import { siteConfig } from "@/config/site";
 import { useGetCollectionsQuery } from "@/lib/redux/services/next-api";
 import AssetPickerFolderTree from "./asset-picker-folder-tree";
@@ -1286,13 +1287,12 @@ export default function AssetPickerModal({
                       className="max-w-full max-h-[70vh] object-contain"
                     />
                   ) : previewAsset.assetType === "audio" && previewAsset.audioUrl ? (
-                    <div className="flex flex-col items-center justify-center gap-6 py-12">
-                      <Music size={64} className="text-violet-400" />
-                      <audio
+                    <div className="w-full max-w-md mx-auto">
+                      <AudioPlayer
                         src={previewAsset.audioUrl}
-                        controls
+                        title={previewAsset.generationDetails?.title}
+                        variant="full"
                         autoPlay
-                        className="w-full max-w-md"
                       />
                     </div>
                   ) : (

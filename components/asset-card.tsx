@@ -23,6 +23,7 @@ import {
   Check,
   Star,
 } from "lucide-react";
+import AudioPlayer from "@/components/audio-player";
 import type { AssetItem } from "@/lib/types/asset";
 
 export interface AssetCardLabels {
@@ -85,10 +86,16 @@ export default function AssetCard({
       <CardBody className="p-0 overflow-hidden aspect-square relative rounded-lg">
         {asset.assetType === "audio" ? (
           <div
-            className={`w-full h-full cursor-pointer flex items-center justify-center bg-gradient-to-br from-violet-500/20 to-purple-600/20 ${isSelectionMode && isSelected ? "opacity-80" : ""}`}
+            className={`w-full h-full cursor-pointer bg-linear-to-br from-violet-500/20 to-purple-600/20 ${isSelectionMode && isSelected ? "opacity-80" : ""}`}
             onClick={() => onClick(asset)}
           >
-            <Music size={48} className="text-violet-400" />
+            {asset.audioUrl ? (
+              <AudioPlayer src={asset.audioUrl} variant="compact" />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center">
+                <Music size={48} className="text-violet-400" />
+              </div>
+            )}
           </div>
         ) : asset.assetType === "public_video" && asset.videoUrl ? (
           <div
