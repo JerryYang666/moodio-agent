@@ -3,7 +3,8 @@
 import { useTranslations } from "next-intl";
 import type { AudioAssetMeta } from "@/lib/desktop/types";
 import type { EnrichedDesktopAsset } from "./types";
-import { Music, Maximize2 } from "lucide-react";
+import { Maximize2 } from "lucide-react";
+import AudioPlayer from "@/components/audio-player";
 
 interface AudioAssetProps {
   asset: EnrichedDesktopAsset;
@@ -21,21 +22,19 @@ export default function AudioAsset({
   const audioUrl = asset.audioUrl;
 
   return (
-    <div className="w-full h-full bg-gradient-to-br from-violet-500/20 to-purple-600/20 flex flex-col items-center justify-center gap-3 p-4">
-      <Music size={32} className="text-violet-400" />
+    <div
+      className="w-full h-full bg-linear-to-br from-violet-500/20 to-purple-600/20 relative"
+      onClick={(e) => e.stopPropagation()}
+      onPointerDown={(e) => e.stopPropagation()}
+    >
       {audioUrl ? (
-        <audio
-          src={audioUrl}
-          controls
-          preload="metadata"
-          className="w-full max-w-[250px]"
-          onClick={(e) => e.stopPropagation()}
-          onPointerDown={(e) => e.stopPropagation()}
-        />
+        <AudioPlayer src={audioUrl} variant="compact" />
       ) : (
-        <span className="text-xs text-default-400">
-          {meta.title || "Audio"}
-        </span>
+        <div className="w-full h-full flex items-center justify-center">
+          <span className="text-xs text-default-400">
+            {meta.title || "Audio"}
+          </span>
+        </div>
       )}
 
       {onFocusAsset && (

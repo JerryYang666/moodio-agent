@@ -2,7 +2,8 @@
 
 import React, { useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, ChevronLeft, ChevronRight, Music } from "lucide-react";
+import { X, ChevronLeft, ChevronRight } from "lucide-react";
+import AudioPlayer from "@/components/audio-player";
 import type { PublicAsset } from "./PublicGallery";
 
 interface PublicLightboxProps {
@@ -119,15 +120,12 @@ export function PublicLightbox({
             className="relative z-10 max-w-[90vw] max-h-[85vh]"
             onClick={(e) => e.stopPropagation()}
           >
-            {isAudioAsset ? (
-              <div className="flex flex-col items-center justify-center gap-6 p-12">
-                <Music size={64} className="text-violet-400" />
-                <audio
-                  key={asset.audioUrl || asset.id}
+            {isAudioAsset && asset.audioUrl ? (
+              <div className="w-full max-w-md p-4">
+                <AudioPlayer
                   src={asset.audioUrl}
-                  controls
+                  variant="full"
                   autoPlay
-                  className="w-full max-w-md"
                 />
               </div>
             ) : isVideo ? (

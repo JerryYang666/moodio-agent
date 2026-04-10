@@ -6,6 +6,7 @@ import { Button } from "@heroui/button";
 import { Image } from "@heroui/image";
 import { Modal, ModalContent } from "@heroui/modal";
 import { Plus, X, ChevronLeft, ChevronRight, Download, Music } from "lucide-react";
+import AudioPlayer from "@/components/audio-player";
 import type { EnrichedMediaAssetRef, CellLock } from "@/lib/production-table/types";
 import type { AssetSummary } from "@/components/chat/asset-picker-modal";
 import { AI_IMAGE_DRAG_MIME, AI_VIDEO_DRAG_MIME, AI_VIDEO_SUGGEST_DRAG_MIME, AI_AUDIO_DRAG_MIME } from "@/components/chat/asset-dnd";
@@ -408,9 +409,13 @@ export const MediaCell = memo(function MediaCell({
                   onClick={(e) => e.stopPropagation()}
                 >
                   {previewAsset.assetType === "audio" && previewAsset.audioUrl ? (
-                    <div className="flex flex-col items-center gap-4 p-8">
-                      <Music size={48} className="text-violet-400" />
-                      <audio src={previewAsset.audioUrl} controls autoPlay className="w-full max-w-md" />
+                    <div className="w-full max-w-md p-4">
+                      <AudioPlayer
+                        src={previewAsset.audioUrl}
+                        variant="full"
+                        autoPlay
+                        onDownload={handleDownload}
+                      />
                     </div>
                   ) : (previewAsset.assetType === "video" || previewAsset.assetType === "public_video") && previewAsset.videoUrl ? (
                     <video
