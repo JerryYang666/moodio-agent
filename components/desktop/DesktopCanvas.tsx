@@ -1616,7 +1616,7 @@ function AssetCardContent({
       );
     }
     case "audio":
-      return <AudioAsset asset={asset} onFocusAsset={onFocusAsset} zoom={zoom} />;
+      return <AudioAsset asset={asset} playing={playing} onPlayToggle={onPlayToggle} onFocusAsset={onFocusAsset} zoom={zoom} />;
     case "table": {
       const assetPrefix = `${asset.id}:`;
       const assetCellLocks = new Map<string, { userId: string; sessionId: string; firstName: string }>();

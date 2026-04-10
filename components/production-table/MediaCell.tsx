@@ -409,7 +409,10 @@ export const MediaCell = memo(function MediaCell({
                   onClick={(e) => e.stopPropagation()}
                 >
                   {previewAsset.assetType === "audio" && previewAsset.audioUrl ? (
-                    <div className="w-full max-w-md p-4">
+                    <div
+                      className="w-full max-w-md p-4"
+                      onContextMenu={(e) => e.preventDefault()}
+                    >
                       <AudioPlayer
                         src={previewAsset.audioUrl}
                         variant="full"

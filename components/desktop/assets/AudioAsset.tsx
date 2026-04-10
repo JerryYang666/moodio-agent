@@ -1,39 +1,68 @@
 "use client";
 
+import { useRef, useEffect } from "react";
 import { useTranslations } from "next-intl";
 import type { AudioAssetMeta } from "@/lib/desktop/types";
 import type { EnrichedDesktopAsset } from "./types";
-import { Maximize2 } from "lucide-react";
-import AudioPlayer from "@/components/audio-player";
+import { Play, Pause, Music, Maximize2 } from "lucide-react";
 
 interface AudioAssetProps {
   asset: EnrichedDesktopAsset;
+  playing?: boolean;
+  onPlayToggle?: () => void;
   onFocusAsset?: (asset: EnrichedDesktopAsset) => void;
   zoom: number;
 }
 
 export default function AudioAsset({
   asset,
+  playing,
+  onPlayToggle,
   onFocusAsset,
   zoom,
 }: AudioAssetProps) {
   const t = useTranslations("desktop");
   const meta = asset.metadata as unknown as AudioAssetMeta;
   const audioUrl = asset.audioUrl;
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    if (!audioUrl) return;
+    if (!audioRef.current) {
+      audioRef.current = new Audio(audioUrl);
+      audioRef.current.addEventListener("ended", () => onPlayToggle?.());
+    }
+    if (playing) {
+      audioRef.current.play().catch(() => {});
+    } else {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+    }
+  }, [playing, audioUrl, onPlayToggle]);
+
+  useEffect(() => {
+    return () => {
+      audioRef.current?.pause();
+      audioRef.current = null;
+    };
+  }, []);
 
   return (
-    <div
-      className="w-full h-full bg-linear-to-br from-violet-500/20 to-purple-600/20 relative"
-      onClick={(e) => e.stopPropagation()}
-      onPointerDown={(e) => e.stopPropagation()}
-    >
-      {audioUrl ? (
-        <AudioPlayer src={audioUrl} variant="compact" />
-      ) : (
-        <div className="w-full h-full flex items-center justify-center">
-          <span className="text-xs text-default-400">
-            {meta.title || "Audio"}
-          </span>
+    <div className="w-full h-full bg-linear-to-br from-violet-500/20 to-purple-600/20 flex flex-col items-center justify-center gap-2 relative">
+      <Music size={32} className="text-violet-400" />
+      <span className="text-xs text-default-500 truncate max-w-[90%] px-2">
+        {meta.title || "Audio"}
+      </span>
+
+      {audioUrl && (
+        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-[1]">
+          <div className="w-10 h-10 rounded-full bg-black/60 flex items-center justify-center backdrop-blur-sm">
+            {playing ? (
+              <Pause size={18} className="text-white" />
+            ) : (
+              <Play size={18} className="text-white ml-0.5" fill="white" />
+            )}
+          </div>
         </div>
       )}
 
