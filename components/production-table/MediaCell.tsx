@@ -190,23 +190,26 @@ export const MediaCell = memo(function MediaCell({
       (previewAsset.assetType === "video" ||
         previewAsset.assetType === "public_video") &&
       !!previewAsset.videoUrl;
-    const url = isVideo ? previewAsset.videoUrl : previewAsset.imageUrl;
-    if (!url) return;
+    // Route through our backend proxy endpoints. Direct fetch() against
+    // CloudFront signed-cookie URLs fails because fetch() does not send
+    // cross-origin cookies by default, so CloudFront rejects the request
+    // with "Missing Key-Pair-Id query parameter or cookie value".
+    const prefix = isVideo ? "video" : "image";
+    const filename = `${prefix}-${previewAsset.assetId}`;
+    const downloadUrl = isVideo
+      ? `/api/video/${encodeURIComponent(previewAsset.assetId)}/download?filename=${encodeURIComponent(filename)}`
+      : `/api/image/${encodeURIComponent(previewAsset.imageId)}/download?filename=${encodeURIComponent(filename)}`;
+
     try {
-      const response = await fetch(url);
+      const response = await fetch(downloadUrl);
       if (!response.ok) throw new Error(`Download failed: ${response.status}`);
       const blob = await response.blob();
       const objectUrl = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = objectUrl;
-      const extension = isVideo
-        ? "mp4"
-        : (() => {
-            const match = url.match(/\.([a-zA-Z0-9]+)(?:\?|$)/);
-            return match ? match[1] : "png";
-          })();
-      const prefix = isVideo ? "video" : "image";
-      a.download = `${prefix}-${previewAsset.assetId}.${extension}`;
+      // Let the Content-Disposition header from the backend set the
+      // filename; pass an empty string so the browser honors it.
+      a.download = "";
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(objectUrl);
@@ -313,6 +316,16 @@ export const MediaCell = memo(function MediaCell({
             <div
               className="relative flex items-center justify-center"
               onClick={() => setPreviewIndex(null)}
+              // HeroUI's Modal is a React child of this MediaCell, so React
+              // synthetic events still bubble through the React tree up to
+              // the table cell's handlers even though the modal is portaled
+              // out of the cell in the DOM. Stop propagation here so clicks
+              // and right-clicks inside the lightbox don't select cells or
+              // open the production table's cell context menu. We don't
+              // preventDefault on contextmenu so users can still use the
+              // browser's native right-click menu to save/copy the media.
+              onContextMenu={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
             >
               {/* Download button */}
               <button
