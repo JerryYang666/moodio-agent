@@ -56,6 +56,15 @@ export type PublicImageAssetMeta = {
   height?: number;
 };
 
+export type AudioAssetMeta = {
+  audioId: string;
+  chatId?: string;
+  messageTimestamp?: number;
+  title?: string;
+  status?: string;
+  duration?: number;
+};
+
 export type TextAssetMeta = {
   content: string;
   fontSize?: number;
@@ -111,9 +120,10 @@ export type DesktopAssetMetadata =
   | { assetType: "text"; metadata: TextAssetMeta }
   | { assetType: "link"; metadata: LinkAssetMeta }
   | { assetType: "table"; metadata: TableAssetMeta }
-  | { assetType: "video_suggest"; metadata: VideoSuggestAssetMeta };
+  | { assetType: "video_suggest"; metadata: VideoSuggestAssetMeta }
+  | { assetType: "audio"; metadata: AudioAssetMeta };
 
-const SUPPORTED_ASSET_TYPES = ["image", "video", "public_video", "public_image", "text", "link", "table", "video_suggest"] as const;
+const SUPPORTED_ASSET_TYPES = ["image", "video", "public_video", "public_image", "text", "link", "table", "video_suggest", "audio"] as const;
 export type SupportedAssetType = (typeof SUPPORTED_ASSET_TYPES)[number];
 
 export function validateAssetMetadata(
@@ -190,6 +200,11 @@ export function validateAssetMetadata(
       }
       if (typeof m.title !== "string") {
         return { valid: false, error: "video_suggest metadata requires a title string" };
+      }
+      break;
+    case "audio":
+      if (typeof m.audioId !== "string" || !m.audioId) {
+        return { valid: false, error: "audio metadata requires a non-empty audioId string" };
       }
       break;
   }

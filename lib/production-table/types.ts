@@ -49,6 +49,7 @@ export interface MediaAssetRef {
 export interface EnrichedMediaAssetRef extends MediaAssetRef {
   imageUrl?: string;
   videoUrl?: string;
+  audioUrl?: string;
 }
 
 // ---------------------------------------------------------------------------

@@ -7,7 +7,7 @@ import { eq, desc, inArray } from "drizzle-orm";
 import { getDesktopPermission } from "@/lib/desktop/permissions";
 import { hasWriteAccess } from "@/lib/permissions";
 import { validateAssetMetadata } from "@/lib/desktop/types";
-import { getImageUrl, getVideoUrl } from "@/lib/storage/s3";
+import { getImageUrl, getVideoUrl, getAudioUrl } from "@/lib/storage/s3";
 import { getContentUrl } from "@/lib/config/video.config";
 
 /**
@@ -106,6 +106,17 @@ export async function GET(
           ...asset,
           imageUrl: storageKey ? getContentUrl(storageKey) : null,
           videoUrl: null,
+          generationData: null,
+        };
+      }
+
+      if (asset.assetType === "audio") {
+        const audioId = typeof meta.audioId === "string" ? meta.audioId : null;
+        return {
+          ...asset,
+          imageUrl: null,
+          videoUrl: null,
+          audioUrl: audioId ? getAudioUrl(audioId) : null,
           generationData: null,
         };
       }
@@ -215,6 +226,16 @@ export async function POST(
           ...asset,
           imageUrl: storageKey ? getContentUrl(storageKey) : null,
           videoUrl: null,
+        };
+      }
+
+      if (asset.assetType === "audio") {
+        const audioId = typeof meta.audioId === "string" ? meta.audioId : null;
+        return {
+          ...asset,
+          imageUrl: null,
+          videoUrl: null,
+          audioUrl: audioId ? getAudioUrl(audioId) : null,
         };
       }
 

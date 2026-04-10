@@ -9,7 +9,7 @@ import {
 import { getAccessToken } from "@/lib/auth/cookies";
 import { verifyAccessToken } from "@/lib/auth/jwt";
 import { and, desc, eq, inArray, isNull, or } from "drizzle-orm";
-import { getImageUrl, getVideoUrl } from "@/lib/storage/s3";
+import { getImageUrl, getVideoUrl, getAudioUrl } from "@/lib/storage/s3";
 import { getContentUrl } from "@/lib/config/video.config";
 import { ensureDefaultProject } from "@/lib/db/projects";
 
@@ -19,6 +19,10 @@ function enrichAssetUrls(asset: { assetType: string; imageId: string; assetId: s
   }
   if (asset.assetType === "public_video") {
     return { imageUrl: "", videoUrl: getContentUrl(asset.assetId) };
+  }
+
+  if (asset.assetType === "audio") {
+    return { imageUrl: "", audioUrl: getAudioUrl(asset.assetId) };
   }
 
   const imageUrl = getImageUrl(asset.imageId);

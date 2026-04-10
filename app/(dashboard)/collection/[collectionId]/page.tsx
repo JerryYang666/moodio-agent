@@ -39,9 +39,11 @@ import AssetCard from "@/components/asset-card";
 import AssetSearchFilter from "@/components/asset-search-filter";
 import BulkSelectionBar from "@/components/bulk-selection-bar";
 import VideoDetailModal from "@/components/video-detail-modal";
+import AudioDetailModal from "@/components/audio-detail-modal";
 import { buildDesktopSendPayload } from "@/lib/utils/desktop-payload";
 import { siteConfig } from "@/config/site";
 import { uploadImage, validateFile, getMaxFileSizeMB, shouldCompressFile, getCompressThresholdMB } from "@/lib/upload/client";
+import { uploadAudio as uploadAudioFile, validateAudioFile } from "@/lib/upload/audio-client";
 import { useShareModal } from "@/hooks/use-share-modal";
 import ShareModal from "@/components/share-modal";
 import type { AssetItem } from "@/lib/types/asset";
@@ -142,6 +144,11 @@ export default function CollectionPage({
     onOpenChange: onVideoDetailOpenChange,
   } = useDisclosure();
   const {
+    isOpen: isAudioDetailOpen,
+    onOpen: onAudioDetailOpen,
+    onOpenChange: onAudioDetailOpenChange,
+  } = useDisclosure();
+  const {
     isOpen: isRenameItemOpen,
     onOpen: onRenameItemOpen,
     onOpenChange: onRenameItemOpenChange,
@@ -168,6 +175,7 @@ export default function CollectionPage({
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [assetToRemove, setAssetToRemove] = useState<AssetItem | null>(null);
   const [selectedVideo, setSelectedVideo] = useState<AssetItem | null>(null);
+  const [selectedAudio, setSelectedAudio] = useState<AssetItem | null>(null);
 
   // Rename item state
   const [itemToRename, setItemToRename] = useState<AssetItem | null>(null);
@@ -625,6 +633,11 @@ export default function CollectionPage({
       toggleSelection(asset.id);
       return;
     }
+    if (asset.assetType === "audio") {
+      setSelectedAudio(asset);
+      onAudioDetailOpen();
+      return;
+    }
     if (asset.assetType === "video" || asset.assetType === "public_video") {
       setSelectedVideo(asset);
       onVideoDetailOpen();
@@ -726,6 +739,27 @@ export default function CollectionPage({
     }
   };
 
+  const handleAudioDownload = async (asset: AssetItem) => {
+    if (!asset.audioUrl) return;
+    try {
+      const filename = `audio-${asset.assetId}`;
+      const downloadUrl = `/api/audio/${encodeURIComponent(asset.assetId)}/download?filename=${encodeURIComponent(filename)}`;
+      const response = await fetch(downloadUrl);
+      if (!response.ok) throw new Error("Download failed");
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "";
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (e) {
+      console.error("Audio download error:", e);
+    }
+  };
+
   const handleImageNavigate = useCallback(
     (index: number) => {
       if (index >= 0 && index < allImages.length) {
@@ -822,6 +856,65 @@ export default function CollectionPage({
     [collectionId, t]
   );
 
+  const uploadAudioFilesToCollection = useCallback(
+    async (files: File[]) => {
+      for (const file of files) {
+        const err = validateAudioFile(file);
+        if (err) {
+          addToast({ title: err.message, color: "danger" });
+          return;
+        }
+      }
+
+      setIsUploading(true);
+      let successCount = 0;
+
+      try {
+        await Promise.all(
+          files.map(async (file) => {
+            const result = await uploadAudioFile(file);
+            if (!result.success) {
+              addToast({ title: t("uploadFailed"), color: "danger" });
+              return;
+            }
+
+            const res = await fetch(`/api/collection/${collectionId}/images`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                imageId: "audio-file-placeholder",
+                assetId: result.data.audioId,
+                assetType: "audio",
+                generationDetails: {
+                  title: file.name.replace(/\.[^/.]+$/, ""),
+                  prompt: "",
+                  status: "generated",
+                },
+              }),
+            });
+
+            if (res.ok) {
+              successCount++;
+            } else {
+              addToast({ title: t("uploadFailed"), color: "danger" });
+            }
+          })
+        );
+
+        if (successCount > 0) {
+          addToast({
+            title: t("imagesUploaded", { count: successCount }),
+            color: "success",
+          });
+          fetchCollectionData();
+        }
+      } finally {
+        setIsUploading(false);
+      }
+    },
+    [collectionId, t]
+  );
+
   // Handle dropped files on the page
   const handleFileDrop = useCallback(
     (e: React.DragEvent) => {
@@ -832,12 +925,16 @@ export default function CollectionPage({
 
       if (!e.dataTransfer.files.length) return;
 
-      const allowedTypes = siteConfig.upload.allowedImageTypes;
-      const validFiles: File[] = [];
+      const allowedImageTypes = siteConfig.upload.allowedImageTypes;
+      const allowedAudioTypes = siteConfig.upload.allowedAudioTypes;
+      const validImageFiles: File[] = [];
+      const validAudioFiles: File[] = [];
       let hasInvalid = false;
       for (const file of Array.from(e.dataTransfer.files)) {
-        if (allowedTypes.includes(file.type)) {
-          validFiles.push(file);
+        if (allowedImageTypes.includes(file.type)) {
+          validImageFiles.push(file);
+        } else if (allowedAudioTypes.includes(file.type)) {
+          validAudioFiles.push(file);
         } else {
           hasInvalid = true;
         }
@@ -845,8 +942,11 @@ export default function CollectionPage({
       if (hasInvalid) {
         addToast({ title: t("invalidImageType"), color: "warning" });
       }
-      if (validFiles.length > 0) {
-        uploadFilesToCollection(validFiles);
+      if (validImageFiles.length > 0) {
+        uploadFilesToCollection(validImageFiles);
+      }
+      if (validAudioFiles.length > 0) {
+        uploadAudioFilesToCollection(validAudioFiles);
       }
     },
     [uploadFilesToCollection, t]
@@ -1322,6 +1422,20 @@ export default function CollectionPage({
         labels={{
           videoDetails: t("videoDetails"),
           untitledVideo: t("untitledVideo"),
+          download: tCommon("download"),
+          close: tCommon("close"),
+        }}
+      />
+
+      {/* Audio Detail Modal */}
+      <AudioDetailModal
+        isOpen={isAudioDetailOpen}
+        onOpenChange={onAudioDetailOpenChange}
+        asset={selectedAudio}
+        onDownload={handleAudioDownload}
+        labels={{
+          audioDetails: t("audioDetails"),
+          untitledAudio: t("untitledAudio"),
           download: tCommon("download"),
           close: tCommon("close"),
         }}

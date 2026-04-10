@@ -481,7 +481,10 @@ export default function AssetPickerModal({
         const res = await fetch(`/api/assets?${params.toString()}`);
         if (!res.ok) return;
         const data = (await res.json()) as AssetsPageResponse;
-        const incoming = data.assets || [];
+        // Filter out audio assets — audio is not supported in chat contexts
+        const incoming = (data.assets || []).filter(
+          (a) => (a.assetType as string) !== "audio"
+        );
 
         setAssets((prev) => {
           if (!append) return incoming;

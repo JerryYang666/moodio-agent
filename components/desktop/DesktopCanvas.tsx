@@ -7,7 +7,7 @@ import type { CameraState } from "@/hooks/use-desktop";
 import type { RemoteCursor } from "@/hooks/use-desktop-ws";
 import type { EnrichedDesktopAsset } from "./assets";
 import { aspectRatioDimensions } from "@/lib/desktop/types";
-import { ImageAsset, VideoAsset, TextAsset, LinkAsset, VideoSuggestAsset } from "./assets";
+import { ImageAsset, VideoAsset, TextAsset, LinkAsset, VideoSuggestAsset, AudioAsset } from "./assets";
 import PublicVideoAsset from "./assets/PublicVideoAsset";
 import TableAsset from "./assets/TableAsset";
 import { hasWriteAccess, type Permission } from "@/lib/permissions";
@@ -1615,6 +1615,8 @@ function AssetCardContent({
         />
       );
     }
+    case "audio":
+      return <AudioAsset asset={asset} onFocusAsset={onFocusAsset} zoom={zoom} />;
     case "table": {
       const assetPrefix = `${asset.id}:`;
       const assetCellLocks = new Map<string, { userId: string; sessionId: string; firstName: string }>();

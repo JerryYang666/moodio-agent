@@ -5,10 +5,10 @@ import dynamic from "next/dynamic";
 import { Button } from "@heroui/button";
 import { Image } from "@heroui/image";
 import { Modal, ModalContent } from "@heroui/modal";
-import { Plus, X, ChevronLeft, ChevronRight, Download } from "lucide-react";
+import { Plus, X, ChevronLeft, ChevronRight, Download, Music } from "lucide-react";
 import type { EnrichedMediaAssetRef, CellLock } from "@/lib/production-table/types";
 import type { AssetSummary } from "@/components/chat/asset-picker-modal";
-import { AI_IMAGE_DRAG_MIME, AI_VIDEO_DRAG_MIME, AI_VIDEO_SUGGEST_DRAG_MIME } from "@/components/chat/asset-dnd";
+import { AI_IMAGE_DRAG_MIME, AI_VIDEO_DRAG_MIME, AI_VIDEO_SUGGEST_DRAG_MIME, AI_AUDIO_DRAG_MIME } from "@/components/chat/asset-dnd";
 
 const AssetPickerModal = dynamic(
   () => import("@/components/chat/asset-picker-modal"),
@@ -61,7 +61,8 @@ export const MediaCell = memo(function MediaCell({
       if (
         types.includes(AI_IMAGE_DRAG_MIME) ||
         types.includes(AI_VIDEO_DRAG_MIME) ||
-        types.includes(AI_VIDEO_SUGGEST_DRAG_MIME)
+        types.includes(AI_VIDEO_SUGGEST_DRAG_MIME) ||
+        types.includes(AI_AUDIO_DRAG_MIME)
       ) {
         e.preventDefault();
         e.stopPropagation();
@@ -85,7 +86,8 @@ export const MediaCell = memo(function MediaCell({
       const hasAssetDrag =
         types.includes(AI_IMAGE_DRAG_MIME) ||
         types.includes(AI_VIDEO_DRAG_MIME) ||
-        types.includes(AI_VIDEO_SUGGEST_DRAG_MIME);
+        types.includes(AI_VIDEO_SUGGEST_DRAG_MIME) ||
+        types.includes(AI_AUDIO_DRAG_MIME);
       if (!hasAssetDrag) return;
 
       e.preventDefault();
@@ -94,6 +96,7 @@ export const MediaCell = memo(function MediaCell({
       const imageData = e.dataTransfer.getData(AI_IMAGE_DRAG_MIME);
       const videoData = e.dataTransfer.getData(AI_VIDEO_DRAG_MIME);
       const videoSuggestData = e.dataTransfer.getData(AI_VIDEO_SUGGEST_DRAG_MIME);
+      const audioData = e.dataTransfer.getData(AI_AUDIO_DRAG_MIME);
 
       if (imageData) {
         try {
@@ -135,6 +138,21 @@ export const MediaCell = memo(function MediaCell({
             assetType: "video",
             imageUrl: parsed.thumbnailUrl || undefined,
             videoUrl: parsed.videoUrl || undefined,
+          };
+          onAddAsset(ref);
+        } catch { /* ignore malformed data */ }
+        return;
+      }
+
+      if (audioData) {
+        try {
+          const parsed = JSON.parse(audioData);
+          if (!parsed.audioId) return;
+          const ref: EnrichedMediaAssetRef = {
+            assetId: parsed.audioId,
+            imageId: "audio-file-placeholder",
+            assetType: "audio",
+            audioUrl: parsed.audioUrl || undefined,
           };
           onAddAsset(ref);
         } catch { /* ignore malformed data */ }
@@ -190,15 +208,14 @@ export const MediaCell = memo(function MediaCell({
       (previewAsset.assetType === "video" ||
         previewAsset.assetType === "public_video") &&
       !!previewAsset.videoUrl;
-    // Route through our backend proxy endpoints. Direct fetch() against
-    // CloudFront signed-cookie URLs fails because fetch() does not send
-    // cross-origin cookies by default, so CloudFront rejects the request
-    // with "Missing Key-Pair-Id query parameter or cookie value".
-    const prefix = isVideo ? "video" : "image";
+    const isAudioAsset = previewAsset.assetType === "audio" && !!previewAsset.audioUrl;
+    const prefix = isAudioAsset ? "audio" : isVideo ? "video" : "image";
     const filename = `${prefix}-${previewAsset.assetId}`;
-    const downloadUrl = isVideo
-      ? `/api/video/${encodeURIComponent(previewAsset.assetId)}/download?filename=${encodeURIComponent(filename)}`
-      : `/api/image/${encodeURIComponent(previewAsset.imageId)}/download?filename=${encodeURIComponent(filename)}`;
+    const downloadUrl = isAudioAsset
+      ? `/api/audio/${encodeURIComponent(previewAsset.assetId)}/download?filename=${encodeURIComponent(filename)}`
+      : isVideo
+        ? `/api/video/${encodeURIComponent(previewAsset.assetId)}/download?filename=${encodeURIComponent(filename)}`
+        : `/api/image/${encodeURIComponent(previewAsset.imageId)}/download?filename=${encodeURIComponent(filename)}`;
 
     try {
       const response = await fetch(downloadUrl);
@@ -236,7 +253,14 @@ export const MediaCell = memo(function MediaCell({
       <div className="flex flex-wrap gap-1">
         {assets.map((asset, idx) => (
           <div key={`${asset.assetId}-${idx}`} className="relative group">
-            {asset.imageUrl ? (
+            {asset.assetType === "audio" ? (
+              <div
+                className="w-10 h-10 rounded bg-violet-500/20 flex items-center justify-center cursor-pointer"
+                onClick={() => setPreviewIndex(idx)}
+              >
+                <Music size={16} className="text-violet-400" />
+              </div>
+            ) : asset.imageUrl ? (
               <Image
                 alt=""
                 className="object-cover rounded cursor-pointer"
@@ -380,7 +404,12 @@ export const MediaCell = memo(function MediaCell({
                   className="flex items-center justify-center max-h-[85vh]"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  {(previewAsset.assetType === "video" || previewAsset.assetType === "public_video") && previewAsset.videoUrl ? (
+                  {previewAsset.assetType === "audio" && previewAsset.audioUrl ? (
+                    <div className="flex flex-col items-center gap-4 p-8">
+                      <Music size={48} className="text-violet-400" />
+                      <audio src={previewAsset.audioUrl} controls autoPlay className="w-full max-w-md" />
+                    </div>
+                  ) : (previewAsset.assetType === "video" || previewAsset.assetType === "public_video") && previewAsset.videoUrl ? (
                     <video
                       src={previewAsset.videoUrl}
                       controls

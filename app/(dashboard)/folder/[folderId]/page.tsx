@@ -45,6 +45,8 @@ import AssetCard from "@/components/asset-card";
 import AssetSearchFilter from "@/components/asset-search-filter";
 import BulkSelectionBar from "@/components/bulk-selection-bar";
 import VideoDetailModal from "@/components/video-detail-modal";
+import AudioDetailModal from "@/components/audio-detail-modal";
+import { uploadAudio as uploadAudioFile, validateAudioFile } from "@/lib/upload/audio-client";
 import { buildDesktopSendPayload } from "@/lib/utils/desktop-payload";
 import { siteConfig } from "@/config/site";
 import { uploadImage, validateFile, getMaxFileSizeMB, shouldCompressFile, getCompressThresholdMB } from "@/lib/upload/client";
@@ -223,6 +225,14 @@ export default function FolderPage({
   } = useDisclosure();
   const [selectedVideo, setSelectedVideo] = useState<AssetItem | null>(null);
 
+  // Audio detail
+  const {
+    isOpen: isAudioDetailOpen,
+    onOpen: onAudioDetailOpen,
+    onOpenChange: onAudioDetailOpenChange,
+  } = useDisclosure();
+  const [selectedAudio, setSelectedAudio] = useState<AssetItem | null>(null);
+
   // Rename item
   const {
     isOpen: isRenameItemOpen,
@@ -373,6 +383,11 @@ export default function FolderPage({
       toggleSelection(asset.id);
       return;
     }
+    if (asset.assetType === "audio") {
+      setSelectedAudio(asset);
+      onAudioDetailOpen();
+      return;
+    }
     if (asset.assetType === "video" || asset.assetType === "public_video") {
       setSelectedVideo(asset);
       onVideoDetailOpen();
@@ -514,6 +529,27 @@ export default function FolderPage({
     }
   };
 
+  const handleAudioDownload = async (asset: AssetItem) => {
+    if (!asset.audioUrl) return;
+    try {
+      const filename = `audio-${asset.assetId}`;
+      const downloadUrl = `/api/audio/${encodeURIComponent(asset.assetId)}/download?filename=${encodeURIComponent(filename)}`;
+      const response = await fetch(downloadUrl);
+      if (!response.ok) throw new Error("Download failed");
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "";
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (e) {
+      console.error("Audio download error:", e);
+    }
+  };
+
   // Upload
   const uploadFilesToFolder = useCallback(
     async (files: File[]) => {
@@ -593,6 +629,54 @@ export default function FolderPage({
     [folderId, t, fetchFolderData]
   );
 
+  const uploadAudioFilesToFolder = useCallback(
+    async (files: File[]) => {
+      for (const file of files) {
+        const err = validateAudioFile(file);
+        if (err) {
+          addToast({ title: err.message, color: "danger" });
+          return;
+        }
+      }
+      setIsUploading(true);
+      let successCount = 0;
+      try {
+        await Promise.all(
+          files.map(async (file) => {
+            const result = await uploadAudioFile(file);
+            if (!result.success) {
+              addToast({ title: t("uploadFailed"), color: "danger" });
+              return;
+            }
+            const res = await fetch(`/api/folders/${folderId}/images`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                imageId: "audio-file-placeholder",
+                assetId: result.data.audioId,
+                assetType: "audio",
+                generationDetails: {
+                  title: file.name.replace(/\.[^/.]+$/, ""),
+                  prompt: "",
+                  status: "generated",
+                },
+              }),
+            });
+            if (res.ok) successCount++;
+            else addToast({ title: t("uploadFailed"), color: "danger" });
+          })
+        );
+        if (successCount > 0) {
+          addToast({ title: t("imagesUploaded", { count: successCount }), color: "success" });
+          fetchFolderData();
+        }
+      } finally {
+        setIsUploading(false);
+      }
+    },
+    [folderId, t]
+  );
+
   const handleFileDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
@@ -601,11 +685,15 @@ export default function FolderPage({
       dragCounterRef.current = 0;
       if (!e.dataTransfer.files.length) return;
       const allowedTypes = siteConfig.upload.allowedImageTypes;
-      const validFiles: File[] = [];
+      const allowedAudioTypes = siteConfig.upload.allowedAudioTypes;
+      const validImageFiles: File[] = [];
+      const validAudioFiles: File[] = [];
       let hasInvalid = false;
       for (const file of Array.from(e.dataTransfer.files)) {
         if (allowedTypes.includes(file.type)) {
-          validFiles.push(file);
+          validImageFiles.push(file);
+        } else if (allowedAudioTypes.includes(file.type)) {
+          validAudioFiles.push(file);
         } else {
           hasInvalid = true;
         }
@@ -613,11 +701,14 @@ export default function FolderPage({
       if (hasInvalid) {
         addToast({ title: t("invalidImageType"), color: "warning" });
       }
-      if (validFiles.length > 0) {
-        uploadFilesToFolder(validFiles);
+      if (validImageFiles.length > 0) {
+        uploadFilesToFolder(validImageFiles);
+      }
+      if (validAudioFiles.length > 0) {
+        uploadAudioFilesToFolder(validAudioFiles);
       }
     },
-    [uploadFilesToFolder, t]
+    [uploadFilesToFolder, uploadAudioFilesToFolder, t]
   );
 
   useEffect(() => {
@@ -1373,6 +1464,20 @@ export default function FolderPage({
         labels={{
           videoDetails: tCollections("videoDetails"),
           untitledVideo: tCollections("untitledVideo"),
+          download: tCommon("download"),
+          close: tCommon("close"),
+        }}
+      />
+
+      {/* Audio Detail Modal */}
+      <AudioDetailModal
+        isOpen={isAudioDetailOpen}
+        onOpenChange={onAudioDetailOpenChange}
+        asset={selectedAudio}
+        onDownload={handleAudioDownload}
+        labels={{
+          audioDetails: t("audioDetails"),
+          untitledAudio: t("untitledAudio"),
           download: tCommon("download"),
           close: tCommon("close"),
         }}

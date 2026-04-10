@@ -25,7 +25,7 @@ export interface CollectionImage {
   collectionId: string | null;
   imageId: string;
   assetId: string;
-  assetType: "image" | "video" | "public_video" | "public_image";
+  assetType: "image" | "video" | "public_video" | "public_image" | "audio";
   chatId: string | null;
   generationDetails: {
     title: string;
@@ -79,6 +79,11 @@ interface CollectionsContextValue {
     storageKey: string,
     contentUuid: string,
     title: string
+  ) => Promise<boolean>;
+  addAudioToCollection: (
+    collectionId: string,
+    audioId: string,
+    generationDetails: any
   ) => Promise<boolean>;
   removeItemFromCollection: (
     collectionId: string,
@@ -374,6 +379,47 @@ export function CollectionsProvider({
     [invalidateCollections]
   );
 
+  const addAudioToCollection = useCallback(
+    async (
+      collectionId: string,
+      audioId: string,
+      generationDetails: any
+    ) => {
+      try {
+        const res = await fetch(`/api/collection/${collectionId}/images`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            imageId: "audio-file-placeholder",
+            assetId: audioId,
+            assetType: "audio",
+            chatId: null,
+            generationDetails,
+          }),
+        });
+
+        if (!res.ok) {
+          const data = await res.json();
+          throw new Error(data.error || "Failed to add audio to collection");
+        }
+
+        invalidateCollections();
+
+        window.dispatchEvent(
+          new CustomEvent(ASSETS_UPDATED_EVENT, {
+            detail: { collectionId },
+          })
+        );
+
+        return true;
+      } catch (err) {
+        console.error("Error adding audio to collection:", err);
+        return false;
+      }
+    },
+    [invalidateCollections]
+  );
+
   const removeItemFromCollection = useCallback(
     async (collectionId: string, itemId: string) => {
       try {
@@ -455,6 +501,7 @@ export function CollectionsProvider({
     addVideoToCollection,
     addPublicVideoToCollection,
     addPublicImageToCollection,
+    addAudioToCollection,
     removeItemFromCollection,
     shareCollection,
     removeShare,

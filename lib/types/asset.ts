@@ -4,9 +4,10 @@ export interface AssetItem {
   folderId?: string | null;
   imageId: string;
   assetId: string;
-  assetType: "image" | "video" | "public_video" | "public_image";
+  assetType: "image" | "video" | "public_video" | "public_image" | "audio";
   imageUrl: string;
   videoUrl?: string;
+  audioUrl?: string;
   chatId: string | null;
   generationDetails: {
     title: string;

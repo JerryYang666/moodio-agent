@@ -12,6 +12,7 @@ import { ArrowLeft, Share2, Pencil, Wifi, WifiOff } from "lucide-react";
 import AssetPickerModal, { type AssetSummary } from "@/components/chat/asset-picker-modal";
 import { uploadImage } from "@/lib/upload/client";
 import { uploadVideo } from "@/lib/upload/video-client";
+import { uploadAudio } from "@/lib/upload/audio-client";
 import DesktopCanvas from "@/components/desktop/DesktopCanvas";
 import type { EnrichedDesktopAsset } from "@/components/desktop/assets";
 import DesktopToolbar, { type CanvasMode } from "@/components/desktop/DesktopToolbar";
@@ -961,10 +962,29 @@ export default function DesktopDetailPage({
       const pos = addAssetPositionRef.current;
       for (const file of files) {
         const isVideo = siteConfig.upload.allowedVideoTypes.includes(file.type);
+        const isAudio = siteConfig.upload.allowedAudioTypes.includes(file.type);
 
-        let asset: { assetType: string; metadata: Record<string, unknown>; posX: number; posY: number };
+        let asset: { assetType: string; metadata: Record<string, unknown>; posX: number; posY: number; width?: number; height?: number };
 
-        if (isVideo) {
+        if (isAudio) {
+          const result = await uploadAudio(file);
+          if (!result.success) {
+            addToast({ title: t("uploadFailed"), description: result.error.message, color: "danger" });
+            continue;
+          }
+          asset = {
+            assetType: "audio",
+            metadata: {
+              audioId: result.data.audioId,
+              title: file.name,
+              status: "completed",
+            },
+            posX: pos.x,
+            posY: pos.y,
+            width: 300,
+            height: 200,
+          };
+        } else if (isVideo) {
           const result = await uploadVideo(file);
           if (!result.success) {
             addToast({ title: t("uploadFailed"), description: result.error.message, color: "danger" });

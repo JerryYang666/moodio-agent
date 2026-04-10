@@ -3,6 +3,7 @@ import type { DesktopAsset } from "@/lib/db/schema";
 export interface EnrichedDesktopAsset extends DesktopAsset {
   imageUrl?: string | null;
   videoUrl?: string | null;
+  audioUrl?: string | null;
   generationData?: {
     generationId: string;
     status: string;

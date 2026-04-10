@@ -2,7 +2,7 @@
 
 import React, { useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, ChevronLeft, ChevronRight } from "lucide-react";
+import { X, ChevronLeft, ChevronRight, Music } from "lucide-react";
 import type { PublicAsset } from "./PublicGallery";
 
 interface PublicLightboxProps {
@@ -53,6 +53,7 @@ export function PublicLightbox({
   if (!asset) return null;
 
   const isVideo = asset.assetType === "video" || asset.assetType === "public_video";
+  const isAudioAsset = asset.assetType === "audio";
   const src = isVideo ? (asset.videoUrl || asset.imageUrl) : asset.imageUrl;
 
   return (
@@ -118,7 +119,18 @@ export function PublicLightbox({
             className="relative z-10 max-w-[90vw] max-h-[85vh]"
             onClick={(e) => e.stopPropagation()}
           >
-            {isVideo ? (
+            {isAudioAsset ? (
+              <div className="flex flex-col items-center justify-center gap-6 p-12">
+                <Music size={64} className="text-violet-400" />
+                <audio
+                  key={asset.audioUrl || asset.id}
+                  src={asset.audioUrl}
+                  controls
+                  autoPlay
+                  className="w-full max-w-md"
+                />
+              </div>
+            ) : isVideo ? (
               <video
                 key={src}
                 src={src}

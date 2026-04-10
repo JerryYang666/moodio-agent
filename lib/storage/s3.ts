@@ -753,6 +753,147 @@ export function getSignedVideoUrl(
   });
 }
 
+// ============================================================================
+// Audio Storage Functions
+// ============================================================================
+
+export function generateAudioId(): string {
+  return randomUUID();
+}
+
+export async function uploadAudio(
+  file: Buffer | Blob,
+  contentType: string,
+  preGeneratedId?: string
+): Promise<string> {
+  const audioId = preGeneratedId || randomUUID();
+  const key = `audios/${audioId}`;
+
+  let body;
+  if (file instanceof Blob) {
+    body = Buffer.from(await file.arrayBuffer());
+  } else {
+    body = file;
+  }
+
+  await s3Client.send(
+    new PutObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: key,
+      Body: body,
+      ContentType: contentType,
+    })
+  );
+
+  return audioId;
+}
+
+export async function getPresignedAudioUploadUrl(
+  audioId: string,
+  contentType: string,
+  contentLength: number,
+  expiresIn: number = 300
+): Promise<string> {
+  const key = `audios/${audioId}`;
+
+  const command = new PutObjectCommand({
+    Bucket: BUCKET_NAME,
+    Key: key,
+    ContentType: contentType,
+    ContentLength: contentLength,
+  });
+
+  return await getS3SignedUrl(s3Client, command, { expiresIn });
+}
+
+export async function checkAudioExists(
+  audioId: string
+): Promise<{ exists: boolean; contentType?: string; contentLength?: number }> {
+  const key = `audios/${audioId}`;
+
+  try {
+    const response = await s3Client.send(
+      new HeadObjectCommand({
+        Bucket: BUCKET_NAME,
+        Key: key,
+      })
+    );
+
+    return {
+      exists: true,
+      contentType: response.ContentType,
+      contentLength: response.ContentLength,
+    };
+  } catch (error: any) {
+    if (error.name === "NotFound" || error.$metadata?.httpStatusCode === 404) {
+      return { exists: false };
+    }
+    throw error;
+  }
+}
+
+export async function downloadAudio(audioId: string): Promise<Buffer | null> {
+  const key = `audios/${audioId}`;
+  try {
+    const response = await s3Client.send(
+      new GetObjectCommand({
+        Bucket: BUCKET_NAME,
+        Key: key,
+      })
+    );
+
+    if (!response.Body) return null;
+    const byteArray = await response.Body.transformToByteArray();
+    return Buffer.from(byteArray);
+  } catch (error) {
+    console.error("Error downloading audio:", error);
+    return null;
+  }
+}
+
+export function getAudioUrl(audioId: string): string {
+  if (!CLOUDFRONT_DOMAIN) {
+    console.warn(
+      "[CloudFront] Missing CloudFront configuration, falling back to unsigned URL"
+    );
+    return `https://${CLOUDFRONT_DOMAIN || "s3-fallback"}/audios/${audioId}`;
+  }
+
+  if (IS_DEV) {
+    return getSignedAudioUrl(audioId);
+  }
+
+  return `https://${CLOUDFRONT_DOMAIN}/audios/${audioId}`;
+}
+
+export function getSignedAudioUrl(
+  audioId: string,
+  expirationSeconds?: number
+): string {
+  if (
+    !CLOUDFRONT_DOMAIN ||
+    !CLOUDFRONT_KEY_PAIR_ID ||
+    !CLOUDFRONT_PRIVATE_KEY
+  ) {
+    console.warn(
+      "[CloudFront] Missing CloudFront signing configuration, falling back to unsigned URL"
+    );
+    return getAudioUrl(audioId);
+  }
+
+  const url = `https://${CLOUDFRONT_DOMAIN}/audios/${audioId}`;
+  const expiration =
+    expirationSeconds || siteConfig.cloudfront.signedUrlExpirationSeconds;
+  const dateLessThan = new Date(Date.now() + expiration * 1000);
+
+  return getSignedUrl({
+    url,
+    keyPairId: CLOUDFRONT_KEY_PAIR_ID,
+    dateLessThan: dateLessThan.toISOString(),
+    privateKey: CLOUDFRONT_PRIVATE_KEY,
+  });
+}
+
 // Allowed hostnames for external downloads (e.g. Fal AI media URLs)
 const ALLOWED_DOWNLOAD_HOSTS = [
   "fal.media",

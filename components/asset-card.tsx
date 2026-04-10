@@ -19,6 +19,7 @@ import {
   MessageSquare,
   Trash2,
   Play,
+  Music,
   Check,
   Star,
 } from "lucide-react";
@@ -82,7 +83,14 @@ export default function AssetCard({
       className={`group relative ${isSelectionMode && isSelected ? "ring-2 ring-primary ring-offset-2 ring-offset-background" : ""}`}
     >
       <CardBody className="p-0 overflow-hidden aspect-square relative rounded-lg">
-        {asset.assetType === "public_video" && asset.videoUrl ? (
+        {asset.assetType === "audio" ? (
+          <div
+            className={`w-full h-full cursor-pointer flex items-center justify-center bg-gradient-to-br from-violet-500/20 to-purple-600/20 ${isSelectionMode && isSelected ? "opacity-80" : ""}`}
+            onClick={() => onClick(asset)}
+          >
+            <Music size={48} className="text-violet-400" />
+          </div>
+        ) : asset.assetType === "public_video" && asset.videoUrl ? (
           <div
             className={`w-full h-full cursor-pointer ${isSelectionMode && isSelected ? "opacity-80" : ""}`}
             onClick={() => onClick(asset)}
@@ -122,6 +130,18 @@ export default function AssetCard({
               className={`w-6 h-6 rounded-md flex items-center justify-center transition-colors ${isSelected ? "bg-primary text-white" : "bg-background/80 backdrop-blur-sm border border-default-300"}`}
             >
               {isSelected && <Check size={14} />}
+            </div>
+          </div>
+        )}
+
+        {/* Audio badge */}
+        {asset.assetType === "audio" && (
+          <div
+            className={`absolute ${isSelectionMode ? "top-2 left-10" : "top-2 left-2"} z-10`}
+          >
+            <div className="bg-violet-600/70 text-white rounded-full p-1.5 flex items-center gap-1">
+              <Music size={12} />
+              <span className="text-[10px] font-medium pr-1">Audio</span>
             </div>
           </div>
         )}

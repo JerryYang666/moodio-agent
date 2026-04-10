@@ -20,7 +20,7 @@ import type {
   CellComment,
 } from "./types";
 import { getTablePermission, getEditableGrants } from "./permissions";
-import { getImageUrl, getVideoUrl } from "@/lib/storage/s3";
+import { getImageUrl, getVideoUrl, getAudioUrl } from "@/lib/storage/s3";
 import { getContentUrl } from "@/lib/config/video.config";
 
 // ---------------------------------------------------------------------------
@@ -704,6 +704,14 @@ function enrichMediaAssets(
         ...a,
         imageUrl: undefined,
         videoUrl: getContentUrl(a.assetId),
+      };
+    }
+    if (a.assetType === "audio") {
+      return {
+        ...a,
+        imageUrl: undefined,
+        videoUrl: undefined,
+        audioUrl: a.assetId ? getAudioUrl(a.assetId) : undefined,
       };
     }
     return {

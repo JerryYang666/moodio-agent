@@ -9,6 +9,7 @@ export type ResearchEventType =
   | "video_generation_started"
   | "video_downloaded"
   | "video_saved_to_collection"
+  | "audio_saved_to_collection"
   | "reference_image_added"
   | "chat_forked"
   | "session_end"

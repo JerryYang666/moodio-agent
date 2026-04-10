@@ -10,7 +10,7 @@ import {
 import { getAccessToken } from "@/lib/auth/cookies";
 import { verifyAccessToken } from "@/lib/auth/jwt";
 import { eq, and, desc, or } from "drizzle-orm";
-import { getSignedImageUrl, getSignedVideoUrl } from "@/lib/storage/s3";
+import { getSignedImageUrl, getSignedVideoUrl, getSignedAudioUrl } from "@/lib/storage/s3";
 import {
   getContentUrl,
   getVideoUrl as getPublicVideoUrl,
@@ -48,6 +48,13 @@ function buildAssetUrls(asset: AssetRow) {
     return {
       imageUrl: getContentUrl(asset.assetId),
       videoUrl: undefined,
+    };
+  }
+  if (asset.assetType === "audio") {
+    return {
+      imageUrl: "",
+      videoUrl: undefined,
+      audioUrl: getSignedAudioUrl(asset.assetId, SIGNED_URL_EXPIRY),
     };
   }
   return {

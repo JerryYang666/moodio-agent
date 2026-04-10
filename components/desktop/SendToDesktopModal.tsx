@@ -21,7 +21,7 @@ interface SendToDesktopModalProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
   assets: Array<{
-    assetType: "image" | "video" | "public_video" | "public_image" | "text" | "table";
+    assetType: "image" | "video" | "public_video" | "public_image" | "text" | "table" | "audio";
     metadata: Record<string, unknown>;
   }>;
   /** When provided, skip desktop selection and send directly to this desktop */
@@ -44,6 +44,7 @@ function getAssetSize(a: SendToDesktopModalProps["assets"][number]): { w: number
     : null;
   if (a.assetType === "image" || a.assetType === "public_image") return arDims ?? { w: 300, h: 300 };
   if (a.assetType === "video" || a.assetType === "public_video") return arDims ?? { w: 300, h: 300 };
+  if (a.assetType === "audio") return { w: 300, h: 200 };
   if (a.assetType === "text") return { w: 300, h: 200 };
   if (a.assetType === "table") {
     const rows = Array.isArray((a.metadata as any)?.rows) ? (a.metadata as any).rows.length : 0;

@@ -109,6 +109,13 @@ export async function POST(
       );
     }
 
+    if (resolvedAssetType === "audio" && !assetId) {
+      return NextResponse.json(
+        { error: "assetId (audio ID) is required for audio" },
+        { status: 400 }
+      );
+    }
+
     // Check if asset already exists in collection (check by assetId to avoid duplicates)
     const [existingAsset] = await db
       .select()
@@ -122,7 +129,11 @@ export async function POST(
       .limit(1);
 
     if (existingAsset) {
-      const label = resolvedAssetType === "video" || resolvedAssetType === "public_video" ? "Video" : "Image";
+      const label = resolvedAssetType === "video" || resolvedAssetType === "public_video"
+        ? "Video"
+        : resolvedAssetType === "audio"
+          ? "Audio"
+          : "Image";
       return NextResponse.json(
         { error: `${label} already exists in this collection` },
         { status: 400 }
@@ -183,6 +194,17 @@ export async function POST(
             storageKey: resolvedAssetId,
             collectionId,
             source: "browse",
+          },
+        });
+      } else if (resolvedAssetType === "audio") {
+        recordResearchEvent({
+          userId,
+          chatId: chatId || undefined,
+          eventType: "audio_saved_to_collection",
+          imageId,
+          metadata: {
+            audioId: resolvedAssetId,
+            collectionId,
           },
         });
       } else {

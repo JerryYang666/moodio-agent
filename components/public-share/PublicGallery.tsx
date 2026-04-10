@@ -12,6 +12,7 @@ export interface PublicAsset {
   id: string;
   imageUrl: string;
   videoUrl?: string;
+  audioUrl?: string;
   assetType: string;
 }
 
@@ -29,6 +30,10 @@ function isVideo(assetType: string): boolean {
   return assetType === "video" || assetType === "public_video";
 }
 
+function isAudio(assetType: string): boolean {
+  return assetType === "audio";
+}
+
 /**
  * Probes the natural dimensions of images and videos since collection_images
  * doesn't store width/height in the database. Falls back to 4:3 if probing fails.
@@ -44,6 +49,11 @@ function useAssetDimensions(assets: PublicAsset[]) {
 
     const probe = (asset: PublicAsset) =>
       new Promise<void>((resolve) => {
+        if (isAudio(asset.assetType)) {
+          newDims.set(asset.id, { width: 400, height: 200 });
+          resolve();
+          return;
+        }
         if (isVideo(asset.assetType)) {
           const video = document.createElement("video");
           video.preload = "metadata";
@@ -105,10 +115,13 @@ export function PublicGallery({ assets, onAssetClick }: PublicGalleryProps) {
         const detected = detectedDims.get(asset.id);
         const w = detected?.width ?? DEFAULT_W;
         const h = detected?.height ?? DEFAULT_H;
-        return {
-          src: isVideo(asset.assetType)
+        const src = isAudio(asset.assetType)
+          ? ""
+          : isVideo(asset.assetType)
             ? (asset.videoUrl || asset.imageUrl)
-            : asset.imageUrl,
+            : asset.imageUrl;
+        return {
+          src,
           width: w,
           height: h,
           alt: "",
