@@ -426,6 +426,7 @@
     "noAssetsInCollection": "このコレクションにはまだアセットがありません",
     "imageCount": "{count}枚の画像",
     "videoCount": "{count}本の動画",
+    "audioCount": "{count}件のオーディオ",
     "renameCollection": "コレクション名を変更",
     "deleteCollection": "コレクションを削除",
     "deleteCollectionConfirm": "このコレクションを削除してもよろしいですか？この操作は取り消せません。",

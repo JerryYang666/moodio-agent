@@ -1019,9 +1019,10 @@ export default function CollectionPage({
   const canEdit = isOwner(collection.permission);
   const canAddImages = hasWriteAccess(collection.permission);
 
-  // Count images and videos separately
+  // Count images, videos, and audio separately
   const imageCount = images.filter((a) => a.assetType === "image" || a.assetType === "public_image").length;
   const videoCount = images.filter((a) => a.assetType === "video" || a.assetType === "public_video").length;
+  const audioCount = images.filter((a) => a.assetType === "audio").length;
 
   const getAssetCountText = () => {
     const parts = [];
@@ -1030,6 +1031,9 @@ export default function CollectionPage({
     }
     if (videoCount > 0) {
       parts.push(t("videoCount", { count: videoCount }));
+    }
+    if (audioCount > 0) {
+      parts.push(t("audioCount", { count: audioCount }));
     }
     if (parts.length === 0) {
       return t("noAssets");
@@ -1573,8 +1577,15 @@ export default function CollectionPage({
         isOpen={isUploadPickerOpen}
         onOpenChange={toggleUploadPicker}
         onSelect={noop}
-        onUpload={uploadFilesToCollection}
+        onUpload={(files) => {
+          const audioTypes = siteConfig.upload.allowedAudioTypes;
+          const imageFiles = files.filter((f) => !audioTypes.includes(f.type));
+          const audioFiles = files.filter((f) => audioTypes.includes(f.type));
+          if (imageFiles.length > 0) uploadFilesToCollection(imageFiles);
+          if (audioFiles.length > 0) uploadAudioFilesToCollection(audioFiles);
+        }}
         hideLibraryTab
+        acceptTypes={["image", "video", "audio"]}
       />
     </div>
   );

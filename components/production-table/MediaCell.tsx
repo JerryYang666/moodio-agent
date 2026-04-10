@@ -170,6 +170,7 @@ export const MediaCell = memo(function MediaCell({
         assetType: asset.assetType ?? "image",
         imageUrl: asset.imageUrl,
         videoUrl: asset.videoUrl,
+        audioUrl: asset.audioUrl,
       };
       onAddAsset(ref);
       setPickerOpen(false);
@@ -186,6 +187,7 @@ export const MediaCell = memo(function MediaCell({
           assetType: a.assetType ?? "image",
           imageUrl: a.imageUrl,
           videoUrl: a.videoUrl,
+          audioUrl: a.audioUrl,
         });
       }
       setPickerOpen(false);
@@ -319,6 +321,7 @@ export const MediaCell = memo(function MediaCell({
           onSelectMultiple={handleMultiSelect}
           onUpload={() => {}}
           multiSelect
+          acceptTypes={["image", "video", "audio"]}
         />
       )}
 

@@ -917,30 +917,35 @@ export default function DesktopDetailPage({
     async (asset: AssetSummary) => {
       const pos = addAssetPositionRef.current;
       const isVideo = asset.assetType === "video";
+      const isAudio = asset.assetType === "audio";
       try {
         const metadata: Record<string, unknown> = {
           imageId: asset.imageId,
           chatId: asset.chatId ?? undefined,
-          title: asset.generationDetails?.title || (isVideo ? "Video" : "Image"),
+          title: asset.generationDetails?.title || (isAudio ? "Audio" : isVideo ? "Video" : "Image"),
           prompt: asset.generationDetails?.prompt || "",
           status: asset.generationDetails?.status || "generated",
         };
         if (isVideo && asset.assetId) {
           metadata.videoId = asset.assetId;
         }
+        if (isAudio && asset.assetId) {
+          metadata.audioId = asset.assetId;
+        }
+        const assetPayload: Record<string, unknown> = {
+          assetType: isAudio ? "audio" : isVideo ? "video" : "image",
+          metadata,
+          posX: pos.x,
+          posY: pos.y,
+        };
+        if (isAudio) {
+          assetPayload.width = 300;
+          assetPayload.height = 200;
+        }
         const res = await fetch(`/api/desktop/${desktopId}/assets`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            assets: [
-              {
-                assetType: isVideo ? "video" : "image",
-                metadata,
-                posX: pos.x,
-                posY: pos.y,
-              },
-            ],
-          }),
+          body: JSON.stringify({ assets: [assetPayload] }),
         });
         if (!res.ok) throw new Error("Failed to add asset to desktop");
         const data = await res.json();
@@ -1212,6 +1217,7 @@ export default function DesktopDetailPage({
         onOpenChange={toggleAssetPicker}
         onSelect={handleAssetPickerSelect}
         onUpload={handleAssetPickerUpload}
+        acceptTypes={["image", "video", "audio"]}
       />
     </div>
   );

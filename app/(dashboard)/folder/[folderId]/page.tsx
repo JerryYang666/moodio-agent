@@ -1251,9 +1251,14 @@ export default function FolderPage({
         onSelect={() => {}}
         onUpload={(files) => {
           setIsUploadPickerOpen(false);
-          uploadFilesToFolder(files);
+          const audioTypes = siteConfig.upload.allowedAudioTypes;
+          const imageFiles = files.filter((f) => !audioTypes.includes(f.type));
+          const audioFiles = files.filter((f) => audioTypes.includes(f.type));
+          if (imageFiles.length > 0) uploadFilesToFolder(imageFiles);
+          if (audioFiles.length > 0) uploadAudioFilesToFolder(audioFiles);
         }}
         hideLibraryTab
+        acceptTypes={["image", "video", "audio"]}
       />
 
       {/* Remove Asset Confirmation */}

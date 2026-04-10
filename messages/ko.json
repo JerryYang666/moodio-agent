@@ -426,6 +426,7 @@
     "noAssetsInCollection": "이 컬렉션에는 아직 애셋이 없습니다",
     "imageCount": "{count}개의 이미지",
     "videoCount": "{count}개의 비디오",
+    "audioCount": "{count}개의 오디오",
     "renameCollection": "컬렉션 이름 변경",
     "deleteCollection": "컬렉션 삭제",
     "deleteCollectionConfirm": "이 컬렉션을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.",

@@ -426,6 +426,7 @@
     "noAssetsInCollection": "此集合暂无素材",
     "imageCount": "{count} 张图片",
     "videoCount": "{count} 个视频",
+    "audioCount": "{count} 段音频",
     "renameCollection": "重命名集合",
     "deleteCollection": "删除集合",
     "deleteCollectionConfirm": "确定要删除此集合吗？此操作无法撤销。",

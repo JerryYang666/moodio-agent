@@ -16,7 +16,7 @@ import { Select, SelectItem } from "@heroui/select";
 import { Input } from "@heroui/input";
 import { Image } from "@heroui/image";
 import { Tab, Tabs } from "@heroui/tabs";
-import { Search, Expand, Camera, Star, X, Check, Video } from "lucide-react";
+import { Search, Expand, Camera, Star, X, Check, Video, Music } from "lucide-react";
 import { siteConfig } from "@/config/site";
 import { useGetCollectionsQuery } from "@/lib/redux/services/next-api";
 import AssetPickerFolderTree from "./asset-picker-folder-tree";
@@ -30,7 +30,8 @@ export type AssetSummary = {
   assetId?: string;
   imageUrl: string;
   videoUrl?: string;
-  assetType?: "image" | "video" | "public_image" | "public_video";
+  audioUrl?: string;
+  assetType?: "image" | "video" | "public_image" | "public_video" | "audio";
   chatId: string | null;
   generationDetails: {
     title: string;
@@ -84,16 +85,31 @@ const AssetGridItem = React.memo(function AssetGridItem({
           className="w-full h-full"
           onClick={(e) => onClick(asset, index, e)}
         >
-          <Image
-            src={asset.imageUrl}
-            alt={asset.generationDetails?.title || assetAltLabel}
-            radius="none"
-            classNames={{
-              wrapper: "w-full h-full !max-w-full",
-              img: `w-full h-full object-cover ${multiSelect && isSelected ? "opacity-80" : ""}`,
-            }}
-          />
+          {asset.assetType === "audio" ? (
+            <div className={`w-full h-full flex items-center justify-center bg-linear-to-br from-violet-500/20 to-purple-600/20 ${multiSelect && isSelected ? "opacity-80" : ""}`}>
+              <Music size={32} className="text-violet-400" />
+            </div>
+          ) : (
+            <Image
+              src={asset.imageUrl}
+              alt={asset.generationDetails?.title || assetAltLabel}
+              radius="none"
+              classNames={{
+                wrapper: "w-full h-full !max-w-full",
+                img: `w-full h-full object-cover ${multiSelect && isSelected ? "opacity-80" : ""}`,
+              }}
+            />
+          )}
         </button>
+
+        {/* Audio badge */}
+        {asset.assetType === "audio" && (
+          <div className="absolute bottom-8 right-1.5 z-10">
+            <span className="text-[9px] font-semibold bg-violet-600/90 text-white px-1.5 py-0.5 rounded flex items-center gap-0.5">
+              <Music size={8} />
+            </span>
+          </div>
+        )}
 
         {/* Video badge */}
         {asset.assetType === "video" && (
@@ -336,7 +352,7 @@ export default function AssetPickerModal({
   /** Max number of images that can be selected (multiSelect mode) */
   maxSelectCount?: number;
   /** When provided, only show assets of these types (and restrict upload accordingly) */
-  acceptTypes?: ("image" | "video")[];
+  acceptTypes?: ("image" | "video" | "audio")[];
 }) {
   const t = useTranslations();
   const [loading, setLoading] = useState(false);
@@ -481,9 +497,9 @@ export default function AssetPickerModal({
         const res = await fetch(`/api/assets?${params.toString()}`);
         if (!res.ok) return;
         const data = (await res.json()) as AssetsPageResponse;
-        // Filter out audio assets — audio is not supported in chat contexts
+        // Only include audio assets when explicitly requested via acceptTypes
         const incoming = (data.assets || []).filter(
-          (a) => (a.assetType as string) !== "audio"
+          (a) => (a.assetType as string) !== "audio" || acceptTypes?.includes("audio")
         );
 
         setAssets((prev) => {
@@ -979,6 +995,7 @@ export default function AssetPickerModal({
                         const types: string[] = [];
                         if (acceptTypes.includes("image")) types.push(...siteConfig.upload.allowedImageTypes);
                         if (acceptTypes.includes("video")) types.push(...siteConfig.upload.allowedVideoTypes);
+                        if (acceptTypes.includes("audio")) types.push(...siteConfig.upload.allowedAudioTypes);
                         return types.join(", ");
                       })()}
                       multiple
@@ -993,6 +1010,7 @@ export default function AssetPickerModal({
                           const t: string[] = [];
                           if (acceptTypes.includes("image")) t.push(...siteConfig.upload.allowedImageTypes);
                           if (acceptTypes.includes("video")) t.push(...siteConfig.upload.allowedVideoTypes);
+                          if (acceptTypes.includes("audio")) t.push(...siteConfig.upload.allowedAudioTypes);
                           return t;
                         })();
                         const validFiles: File[] = [];
@@ -1267,6 +1285,16 @@ export default function AssetPickerModal({
                       playsInline
                       className="max-w-full max-h-[70vh] object-contain"
                     />
+                  ) : previewAsset.assetType === "audio" && previewAsset.audioUrl ? (
+                    <div className="flex flex-col items-center justify-center gap-6 py-12">
+                      <Music size={64} className="text-violet-400" />
+                      <audio
+                        src={previewAsset.audioUrl}
+                        controls
+                        autoPlay
+                        className="w-full max-w-md"
+                      />
+                    </div>
                   ) : (
                     <Image
                       src={previewAsset.imageUrl}

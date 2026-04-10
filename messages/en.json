@@ -426,6 +426,7 @@
     "noAssetsInCollection": "No assets in this collection yet",
     "imageCount": "{count, plural, one {# image} other {# images}}",
     "videoCount": "{count, plural, one {# video} other {# videos}}",
+    "audioCount": "{count, plural, one {# audio} other {# audios}}",
     "renameCollection": "Rename Collection",
     "deleteCollection": "Delete Collection",
     "deleteCollectionConfirm": "Are you sure you want to delete this collection? This action cannot be undone.",
