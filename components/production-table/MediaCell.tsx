@@ -5,7 +5,7 @@ import dynamic from "next/dynamic";
 import { Button } from "@heroui/button";
 import { Image } from "@heroui/image";
 import { Modal, ModalContent } from "@heroui/modal";
-import { Plus, X, ChevronLeft, ChevronRight } from "lucide-react";
+import { Plus, X, ChevronLeft, ChevronRight, Download } from "lucide-react";
 import type { EnrichedMediaAssetRef, CellLock } from "@/lib/production-table/types";
 import type { AssetSummary } from "@/components/chat/asset-picker-modal";
 import { AI_IMAGE_DRAG_MIME, AI_VIDEO_DRAG_MIME, AI_VIDEO_SUGGEST_DRAG_MIME } from "@/components/chat/asset-dnd";
@@ -184,6 +184,38 @@ export const MediaCell = memo(function MediaCell({
 
   const previewAsset = previewIndex !== null ? assets[previewIndex] : null;
 
+  const handleDownload = useCallback(async () => {
+    if (!previewAsset) return;
+    const isVideo =
+      (previewAsset.assetType === "video" ||
+        previewAsset.assetType === "public_video") &&
+      !!previewAsset.videoUrl;
+    const url = isVideo ? previewAsset.videoUrl : previewAsset.imageUrl;
+    if (!url) return;
+    try {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`Download failed: ${response.status}`);
+      const blob = await response.blob();
+      const objectUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = objectUrl;
+      const extension = isVideo
+        ? "mp4"
+        : (() => {
+            const match = url.match(/\.([a-zA-Z0-9]+)(?:\?|$)/);
+            return match ? match[1] : "png";
+          })();
+      const prefix = isVideo ? "video" : "image";
+      a.download = `${prefix}-${previewAsset.assetId}.${extension}`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(objectUrl);
+      document.body.removeChild(a);
+    } catch (e) {
+      console.error("Download error:", e);
+    }
+  }, [previewAsset]);
+
   return (
     <div
       className={`w-full h-full min-h-[32px] p-1 relative transition-colors ${
@@ -282,9 +314,22 @@ export const MediaCell = memo(function MediaCell({
               className="relative flex items-center justify-center"
               onClick={() => setPreviewIndex(null)}
             >
+              {/* Download button */}
+              <button
+                className="absolute top-2 right-12 z-20 w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center hover:bg-black/70 transition-colors"
+                aria-label="Download"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDownload();
+                }}
+              >
+                <Download size={16} />
+              </button>
+
               {/* Close button */}
               <button
                 className="absolute top-2 right-2 z-20 w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center hover:bg-black/70 transition-colors"
+                aria-label="Close"
                 onClick={() => setPreviewIndex(null)}
               >
                 <X size={18} />
