@@ -23,6 +23,8 @@ import { CellCommentPopover } from "./CellCommentPopover";
 import { useGridSelection } from "@/hooks/use-grid-selection";
 import type { SelectMode } from "@/hooks/use-grid-selection";
 import { AI_IMAGE_DRAG_MIME, AI_VIDEO_DRAG_MIME, AI_VIDEO_SUGGEST_DRAG_MIME } from "@/components/chat/asset-dnd";
+import { uploadImage } from "@/lib/upload/client";
+import { siteConfig } from "@/config/site";
 
 const DEFAULT_ROW_HEIGHT = 48;
 const DEFAULT_COL_WIDTH = 192;
@@ -583,6 +585,49 @@ export function ProductionTableGrid({
     [clearSelection]
   );
 
+  // ---- Paste handler (image → media cell) ----
+  const handlePaste = useCallback(
+    (e: React.ClipboardEvent) => {
+      if (selectedCells.size !== 1) return;
+
+      const cellKey = Array.from(selectedCells)[0];
+      const [columnId, rowId] = cellKey.split(":");
+      const col = columns.find((c) => c.id === columnId);
+      if (!col || col.cellType !== "media") return;
+      if (!canEditCellFn(rowId, columnId)) return;
+
+      const items = e.clipboardData?.items;
+      if (!items) return;
+
+      const allowedTypes = siteConfig.upload.allowedImageTypes;
+      const files: File[] = [];
+      for (const item of Array.from(items)) {
+        if (item.kind === "file" && allowedTypes.includes(item.type)) {
+          const file = item.getAsFile();
+          if (file) files.push(file);
+        }
+      }
+      if (files.length === 0) return;
+
+      e.preventDefault();
+
+      for (const file of files) {
+        uploadImage(file).then((outcome) => {
+          if (outcome.success) {
+            const { imageId, imageUrl } = outcome.data;
+            onMediaAssetAdd(columnId, rowId, {
+              assetId: imageId,
+              imageId,
+              assetType: "image",
+              imageUrl,
+            });
+          }
+        });
+      }
+    },
+    [selectedCells, columns, canEditCellFn, onMediaAssetAdd]
+  );
+
   // ---- Bulk resize wrappers ----
   const handleResizeRow = useCallback(
     (rowId: string, height: number) => {
@@ -847,6 +892,7 @@ export function ProductionTableGrid({
       onMouseMove={handleGridMouseMove}
       onMouseUp={handlePaintEnd}
       onKeyDown={handleKeyDown}
+      onPaste={handlePaste}
       onClick={handleGridClick}
       onDragOver={handleGridDragOver}
       onDragLeave={handleGridDragLeave}
