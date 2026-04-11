@@ -10,6 +10,7 @@ import {
   uploadImage,
   getSignedImageUrl,
   getSignedVideoUrl,
+  getSignedAudioUrl,
   generateImageId,
   downloadImage,
 } from "@/lib/storage/s3";
@@ -342,6 +343,23 @@ export async function POST(
         videoUrl: typeof entry.videoUrl === "string" ? entry.videoUrl : "",
       }));
 
+    // Parse audio sources
+    type AudioSourceEntry = {
+      audioId: string;
+      source: "upload" | "library";
+      title?: string;
+    };
+    const rawAudioSources = Array.isArray(json.audioSources) ? json.audioSources : [];
+    const audioSources: AudioSourceEntry[] = rawAudioSources
+      .filter((entry: any) => typeof entry?.audioId === "string")
+      .map((entry: any) => ({
+        audioId: entry.audioId as string,
+        source: (["upload", "library"].includes(entry.source)
+          ? entry.source
+          : "upload") as AudioSourceEntry["source"],
+        title: typeof entry.title === "string" ? entry.title : undefined,
+      }));
+
     // Parse expertise selection
     const VALID_EXPERTISE = ["film", "ugcAd", "game", "musicVideo", "shortDrama", "animation"] as const;
     type Expertise = typeof VALID_EXPERTISE[number];
@@ -441,7 +459,7 @@ export async function POST(
       videoParams: mode === "video" ? videoParams : undefined,
     };
 
-    if (imageIds.length > 0 || videoSources.length > 0) {
+    if (imageIds.length > 0 || videoSources.length > 0 || audioSources.length > 0) {
       const sourceById = new Map<string, ImageSourceEntry>(
         imageSources.map((entry) => [entry.imageId, entry])
       );
@@ -464,6 +482,14 @@ export async function POST(
           videoId: vid.videoId,
           source: vid.source,
           videoUrl: vid.videoUrl,
+        });
+      }
+      for (const aud of audioSources) {
+        parts.push({
+          type: "audio",
+          audioId: aud.audioId,
+          source: aud.source,
+          title: aud.title,
         });
       }
       userMessage = {
@@ -853,14 +879,16 @@ export async function POST(
       // Resolve media_references IDs to signed URLs for the provider API
       if (Array.isArray(fullParams.media_references)) {
         fullParams.media_references = fullParams.media_references.map(
-          (ref: { type: "image" | "video"; id: string }) => ({
+          (ref: { type: "image" | "video" | "audio"; id: string }) => ({
             type: ref.type,
             id:
               typeof ref.id === "string" && ref.id.startsWith("http")
                 ? ref.id
                 : ref.type === "video"
                   ? getSignedVideoUrl(ref.id)
-                  : getSignedImageUrl(ref.id),
+                  : ref.type === "audio"
+                    ? getSignedAudioUrl(ref.id)
+                    : getSignedImageUrl(ref.id),
           })
         );
       }

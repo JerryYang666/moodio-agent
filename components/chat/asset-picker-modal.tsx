@@ -550,7 +550,7 @@ export default function AssetPickerModal({
     if (acceptTypes && acceptTypes.length > 0) {
       result = result.filter((a) => {
         const type = a.assetType || "image";
-        const baseType = type.replace("public_", "") as "image" | "video";
+        const baseType = type.replace("public_", "") as "image" | "video" | "audio";
         return acceptTypes.includes(baseType);
       });
     }

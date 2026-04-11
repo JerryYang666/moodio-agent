@@ -60,6 +60,7 @@ interface VideoConfigCardProps {
   part: AgentVideoPart;
   sourceImages: Array<{ imageId: string; imageUrl: string; title?: string }>;
   sourceVideos?: Array<{ videoId: string; videoUrl: string }>;
+  sourceAudios?: Array<{ audioId: string; audioUrl: string }>;
   desktopId?: string;
   chatId?: string;
   onStatusChange?: (
@@ -82,6 +83,7 @@ export default function VideoConfigCard({
   part,
   sourceImages,
   sourceVideos,
+  sourceAudios,
   desktopId,
   chatId,
   onStatusChange,
@@ -195,6 +197,14 @@ export default function VideoConfigCard({
       return match?.videoUrl;
     },
     [sourceVideos]
+  );
+
+  const resolveAudioUrl = useCallback(
+    (audioId: string) => {
+      const match = sourceAudios?.find((a) => a.audioId === audioId);
+      return match?.audioUrl;
+    },
+    [sourceAudios]
   );
 
   const costParamsKey = useMemo(() => {
@@ -757,6 +767,7 @@ export default function VideoConfigCard({
             disabled={!isEditable}
             resolveImageUrl={resolveImageUrl}
             resolveVideoUrl={resolveVideoUrl}
+            resolveAudioUrl={resolveAudioUrl}
           />
         )}
 

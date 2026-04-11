@@ -24,12 +24,20 @@ const VIDEO_URL_KEYS = new Set([
   "reference_video_urls",
 ]);
 
+const AUDIO_URL_KEYS = new Set([
+  "reference_audio_urls",
+]);
+
 function isImageUrlParam(key: string): boolean {
   return IMAGE_URL_KEYS.has(key);
 }
 
 function isVideoUrlParam(key: string): boolean {
   return VIDEO_URL_KEYS.has(key);
+}
+
+function isAudioUrlParam(key: string): boolean {
+  return AUDIO_URL_KEYS.has(key);
 }
 
 async function reuploadSingle(value: string, formatProfile?: KieFormatProfile): Promise<string> {
@@ -91,6 +99,9 @@ async function prepareInputParams(
     normalized.reference_video_urls = refs
       .filter((r) => r.type === "video")
       .map((r) => r.id);
+    normalized.reference_audio_urls = refs
+      .filter((r) => r.type === "audio")
+      .map((r) => r.id);
     delete normalized.media_references;
   }
 
@@ -130,6 +141,24 @@ async function prepareInputParams(
       } else if (typeof value === "string" && value.startsWith("http")) {
         uploadTasks.push(
           uploadToKie(value, "moodio/video-inputs").then((url) => {
+            prepared[key] = url;
+          })
+        );
+      }
+    } else if (isAudioUrlParam(key)) {
+      if (Array.isArray(value)) {
+        uploadTasks.push(
+          Promise.all(
+            (value as string[])
+              .filter((u) => typeof u === "string" && u.startsWith("http"))
+              .map((u) => uploadToKie(u, "moodio/audio-inputs"))
+          ).then((urls) => {
+            prepared[key] = urls;
+          })
+        );
+      } else if (typeof value === "string" && value.startsWith("http")) {
+        uploadTasks.push(
+          uploadToKie(value, "moodio/audio-inputs").then((url) => {
             prepared[key] = url;
           })
         );

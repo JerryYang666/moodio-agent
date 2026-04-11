@@ -50,6 +50,12 @@ import {
   hasUploadingVideos,
 } from "./pending-video-types";
 import {
+  PendingAudio,
+  MAX_PENDING_AUDIOS,
+  canAddAudio,
+  hasUploadingAudios,
+} from "./pending-audio-types";
+import {
   uploadImage,
   validateFile,
   getMaxFileSizeMB,
@@ -60,6 +66,10 @@ import {
   uploadVideo,
   validateVideoFile,
 } from "@/lib/upload/video-client";
+import {
+  uploadAudio,
+  validateAudioFile,
+} from "@/lib/upload/audio-client";
 import {
   saveChatDraft,
   loadChatDraft,
@@ -291,10 +301,12 @@ export default function ChatInterface({
   const [suggestedImages, setSuggestedImages] = useState<PendingImage[]>([]);
   // Pending videos array (max 1 video, combined limit with images is 10)
   const [pendingVideos, setPendingVideos] = useState<PendingVideo[]>([]);
+  // Pending audios array (max 1 audio)
+  const [pendingAudios, setPendingAudios] = useState<PendingAudio[]>([]);
   const [isAssetPickerOpen, setIsAssetPickerOpen] = useState(false);
   const toggleAssetPicker = useCallback(() => setIsAssetPickerOpen((v) => !v), []);
   // Track which picker mode is active: "pending" for regular images, "persistent" for persistent assets, "assetParam" for type:"asset" params
-  const [assetPickerMode, setAssetPickerMode] = useState<"pending" | "persistent" | "assetParam" | "elementImages" | "mediaRefImage" | "mediaRefVideo">("pending");
+  const [assetPickerMode, setAssetPickerMode] = useState<"pending" | "persistent" | "assetParam" | "elementImages" | "mediaRefImage" | "mediaRefVideo" | "mediaRefAudio">("pending");
   const [activeAssetParamName, setActiveAssetParamName] = useState<string | null>(null);
   const [activeElementIndex, setActiveElementIndex] = useState<number | null>(null);
   const [activeElementMaxImages, setActiveElementMaxImages] = useState(4);
@@ -1179,6 +1191,89 @@ export default function ChatInterface({
     []
   );
 
+  // Upload and add audio files
+  const uploadAndAddAudios = useCallback(
+    async (files: File[]) => {
+      for (const file of files) {
+        const validationError = validateAudioFile(file);
+        if (validationError) {
+          addToast({
+            title: validationError.code === "FILE_TOO_LARGE"
+              ? t("chat.fileSizeTooLarge", { maxSize: siteConfig.upload.maxFileSizeMB })
+              : t("chat.uploadFailed"),
+            color: "danger",
+          });
+          return;
+        }
+      }
+
+      if (pendingAudios.length + files.length > MAX_PENDING_AUDIOS) {
+        addToast({
+          title: t("chat.maxAudiosReached", { max: MAX_PENDING_AUDIOS }),
+          color: "warning",
+        });
+        return;
+      }
+
+      const entries = files.map((file) => {
+        const tempId = `uploading-audio-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const localPreviewUrl = URL.createObjectURL(file);
+        const placeholder: PendingAudio = {
+          audioId: tempId,
+          url: localPreviewUrl,
+          source: "upload",
+          title: file.name,
+          isUploading: true,
+          localPreviewUrl,
+        };
+        return { file, tempId, localPreviewUrl, placeholder };
+      });
+
+      setPendingAudios((prev) => [...prev, ...entries.map((e) => e.placeholder)]);
+
+      await Promise.all(
+        entries.map(async ({ file, tempId, localPreviewUrl }) => {
+          const result = await uploadAudio(file, { skipCollection: true });
+
+          if (result.success) {
+            setPendingAudios((prev) =>
+              prev.map((a) =>
+                a.audioId === tempId
+                  ? {
+                    ...a,
+                    audioId: result.data.audioId,
+                    url: result.data.audioUrl,
+                    isUploading: false,
+                    localPreviewUrl: undefined,
+                  }
+                  : a
+              )
+            );
+            URL.revokeObjectURL(localPreviewUrl);
+          } else {
+            console.error("Audio upload failed:", result.error);
+            setPendingAudios((prev) => prev.filter((a) => a.audioId !== tempId));
+            URL.revokeObjectURL(localPreviewUrl);
+            addToast({ title: t("chat.uploadFailed"), color: "danger" });
+          }
+        })
+      );
+    },
+    [pendingAudios, t]
+  );
+
+  // Remove a pending audio
+  const removePendingAudio = useCallback(
+    (audioId: string) => {
+      setPendingAudios((prev) => {
+        const aud = prev.find((a) => a.audioId === audioId);
+        if (aud?.localPreviewUrl) URL.revokeObjectURL(aud.localPreviewUrl);
+        return prev.filter((a) => a.audioId !== audioId);
+      });
+    },
+    []
+  );
+
   // Add a retrieval video from the browse page
   const addRetrievalVideo = useCallback(
     (contentId: number, storageKey: string, url: string) => {
@@ -1542,12 +1637,22 @@ export default function ChatInterface({
     setIsAssetPickerOpen(true);
   }, []);
 
+  const openMediaRefAudioPicker = useCallback(() => {
+    setAssetPickerMode("mediaRefAudio");
+    setIsAssetPickerOpen(true);
+  }, []);
+
   const resolveMediaRefImageUrl = useCallback(
     (id: string) => mediaRefUrls[id],
     [mediaRefUrls]
   );
 
   const resolveMediaRefVideoUrl = useCallback(
+    (id: string) => mediaRefUrls[id],
+    [mediaRefUrls]
+  );
+
+  const resolveMediaRefAudioUrl = useCallback(
     (id: string) => mediaRefUrls[id],
     [mediaRefUrls]
   );
@@ -1590,20 +1695,25 @@ export default function ChatInterface({
   );
 
   // Get the appropriate upload handler based on asset picker mode
-  // Unified file upload handler that routes video vs image files
+  // Unified file upload handler that routes video, audio, and image files
   const handleFilesUpload = useCallback(
     async (files: File[]) => {
       const videoTypes = siteConfig.upload.allowedVideoTypes;
+      const audioTypes = siteConfig.upload.allowedAudioTypes;
       const videoFiles = files.filter((f) => videoTypes.includes(f.type));
-      const imageFiles = files.filter((f) => !videoTypes.includes(f.type));
+      const audioFiles = files.filter((f) => audioTypes.includes(f.type));
+      const imageFiles = files.filter((f) => !videoTypes.includes(f.type) && !audioTypes.includes(f.type));
       if (videoFiles.length > 0) {
         await uploadAndAddVideos(videoFiles);
+      }
+      if (audioFiles.length > 0) {
+        await uploadAndAddAudios(audioFiles);
       }
       if (imageFiles.length > 0) {
         await uploadAndAddImages(imageFiles);
       }
     },
-    [uploadAndAddImages, uploadAndAddVideos]
+    [uploadAndAddImages, uploadAndAddVideos, uploadAndAddAudios]
   );
 
   const handleAssetUpload = useCallback(
@@ -1673,6 +1783,21 @@ export default function ChatInterface({
               },
             }));
             setMediaRefUrls((prev) => ({ ...prev, [result.data.videoId]: result.data.videoUrl }));
+          }
+        }
+      } else if (assetPickerMode === "mediaRefAudio") {
+        for (const file of files) {
+          const result = await uploadAudio(file, { skipCollection: true });
+          if (result.success) {
+            const ref: MediaReference = { type: "audio", id: result.data.audioId };
+            setMenuState((prev) => ({
+              ...prev,
+              videoParams: {
+                ...prev.videoParams,
+                media_references: [...((prev.videoParams?.media_references as MediaReference[]) || []), ref],
+              },
+            }));
+            setMediaRefUrls((prev) => ({ ...prev, [result.data.audioId]: result.data.audioUrl }));
           }
         }
       } else if (assetPickerMode === "persistent") {
@@ -1794,6 +1919,21 @@ export default function ChatInterface({
 
   const handleAssetDrop = useCallback(
     async (payload: any) => {
+      // Audio assets: route to pending audios, never to addAssetImage
+      if (payload?.assetType === "audio" && payload?.assetId) {
+        if (!canAddAudio(pendingAudios)) {
+          addToast({ title: t("chat.maxAudiosReached", { max: MAX_PENDING_AUDIOS }), color: "warning" });
+          return;
+        }
+        setPendingAudios((prev) => [...prev, {
+          audioId: payload.assetId,
+          url: payload.audioUrl || payload.url || "",
+          source: "library",
+          title: payload.title || t("chat.selectedAsset"),
+        }]);
+        return;
+      }
+
       if (payload?.assetId && payload?.url && payload?.imageId) {
         addAssetImage({
           assetId: payload.assetId,
@@ -1810,6 +1950,19 @@ export default function ChatInterface({
           if (!res.ok) return;
           const data = await res.json();
           const a = data.asset;
+          if (a?.assetType === "audio") {
+            if (!canAddAudio(pendingAudios)) {
+              addToast({ title: t("chat.maxAudiosReached", { max: MAX_PENDING_AUDIOS }), color: "warning" });
+              return;
+            }
+            setPendingAudios((prev) => [...prev, {
+              audioId: a.assetId || a.id,
+              url: a.audioUrl || "",
+              source: "library",
+              title: a.generationDetails?.title || t("chat.selectedAsset"),
+            }]);
+            return;
+          }
           if (!a?.id || !a?.imageUrl || !a?.imageId) return;
           addAssetImage({
             assetId: a.id,
@@ -1822,7 +1975,7 @@ export default function ChatInterface({
         }
       }
     },
-    [addAssetImage, t]
+    [addAssetImage, pendingAudios, t]
   );
 
   const handleAssetPicked = useCallback(
@@ -1866,6 +2019,16 @@ export default function ChatInterface({
           },
         }));
         setMediaRefUrls((prev) => ({ ...prev, [asset.assetId || asset.imageId]: asset.videoUrl || asset.imageUrl }));
+      } else if (assetPickerMode === "mediaRefAudio") {
+        const ref: MediaReference = { type: "audio", id: asset.assetId || asset.imageId };
+        setMenuState((prev) => ({
+          ...prev,
+          videoParams: {
+            ...prev.videoParams,
+            media_references: [...((prev.videoParams?.media_references as MediaReference[]) || []), ref],
+          },
+        }));
+        setMediaRefUrls((prev) => ({ ...prev, [asset.assetId || asset.imageId]: (asset as any).audioUrl || asset.imageUrl }));
       } else if (assetPickerMode === "persistent") {
         addPersistentReferenceImage({
           imageId: asset.imageId,
@@ -1883,6 +2046,17 @@ export default function ChatInterface({
           source: "library",
           title: asset.generationDetails?.title || t("chat.selectedAsset"),
         }]);
+      } else if (asset.assetType === "audio") {
+        if (!canAddAudio(pendingAudios)) {
+          addToast({ title: t("chat.maxAudiosReached", { max: MAX_PENDING_AUDIOS }), color: "warning" });
+          return;
+        }
+        setPendingAudios((prev) => [...prev, {
+          audioId: asset.assetId || asset.imageId,
+          url: asset.audioUrl || "",
+          source: "library",
+          title: asset.generationDetails?.title || t("chat.selectedAsset"),
+        }]);
       } else {
         addAssetImage({
           assetId: asset.id,
@@ -1892,7 +2066,7 @@ export default function ChatInterface({
         });
       }
     },
-    [addAssetImage, addPersistentReferenceImage, assetPickerMode, activeAssetParamName, activeElementIndex, menuState.videoParams?.kling_elements, menuState.videoParams?.media_references, pendingVideos, t]
+    [addAssetImage, addPersistentReferenceImage, assetPickerMode, activeAssetParamName, activeElementIndex, menuState.videoParams?.kling_elements, menuState.videoParams?.media_references, pendingAudios, pendingVideos, t]
   );
 
   const pendingImagesRef = useRef(pendingImages);
@@ -1951,6 +2125,20 @@ export default function ChatInterface({
           for (const a of assets) next[a.assetId || a.imageId] = a.videoUrl || a.imageUrl;
           return next;
         });
+      } else if (assetPickerMode === "mediaRefAudio") {
+        const newRefs: MediaReference[] = assets.map((a) => ({ type: "audio", id: a.assetId || a.imageId }));
+        setMenuState((prev) => ({
+          ...prev,
+          videoParams: {
+            ...prev.videoParams,
+            media_references: [...((prev.videoParams?.media_references as MediaReference[]) || []), ...newRefs],
+          },
+        }));
+        setMediaRefUrls((prev) => {
+          const next = { ...prev };
+          for (const a of assets) next[a.assetId || a.imageId] = (a as any).audioUrl || a.imageUrl;
+          return next;
+        });
       } else if (assetPickerMode === "persistent") {
         for (const asset of assets) {
           if (persistentAssets.referenceImages.length >= MAX_PERSISTENT_REFERENCE_IMAGES) break;
@@ -1962,7 +2150,15 @@ export default function ChatInterface({
         }
       } else {
         for (const asset of assets) {
-          if (asset.assetType === "video") {
+          if (asset.assetType === "audio") {
+            if (!canAddAudio(pendingAudios)) continue;
+            setPendingAudios((prev) => [...prev, {
+              audioId: asset.assetId || asset.imageId,
+              url: asset.audioUrl || "",
+              source: "library" as const,
+              title: asset.generationDetails?.title || t("chat.selectedAsset"),
+            }]);
+          } else if (asset.assetType === "video") {
             if (!canAddVideo(pendingVideosRef.current)) continue;
             setPendingVideos((prev) => [...prev, {
               videoId: asset.assetId || asset.imageId,
@@ -1982,7 +2178,7 @@ export default function ChatInterface({
         }
       }
     },
-    [addAssetImage, addPersistentReferenceImage, assetPickerMode, activeElementIndex, menuState.videoParams?.kling_elements, menuState.videoParams?.media_references, persistentAssets, t]
+    [addAssetImage, addPersistentReferenceImage, assetPickerMode, activeElementIndex, menuState.videoParams?.kling_elements, menuState.videoParams?.media_references, pendingAudios, persistentAssets, t]
   );
 
   // Handler to open drawing modal for an image
@@ -2282,7 +2478,7 @@ export default function ChatInterface({
     setSuggestedImages([]);
 
     // Block send if uploading images or videos
-    if (hasUploadingImages(pendingImages) || hasUploadingVideos(pendingVideos)) {
+    if (hasUploadingImages(pendingImages) || hasUploadingVideos(pendingVideos) || hasUploadingAudios(pendingAudios)) {
       addToast({
         title: t("chat.waitForUpload"),
         color: "warning",
@@ -2338,10 +2534,11 @@ export default function ChatInterface({
     // Capture current pending images and videos before clearing
     const currentPendingImages = [...pendingImages];
     const currentPendingVideos = [...pendingVideos];
+    const currentPendingAudios = [...pendingAudios];
 
-    // Build optimistic message content with image/video metadata for display and pre-select
+    // Build optimistic message content with image/video/audio metadata for display and pre-select
     const optimisticContent: Message["content"] =
-      currentPendingImages.length > 0 || currentPendingVideos.length > 0
+      currentPendingImages.length > 0 || currentPendingVideos.length > 0 || currentPendingAudios.length > 0
         ? (() => {
           const parts: MessageContentPart[] = [];
           if (currentInput) {
@@ -2362,6 +2559,15 @@ export default function ChatInterface({
               videoId: vid.videoId,
               source: vid.source as "retrieval" | "upload" | "library" | "ai_generated",
               videoUrl: vid.url,
+            });
+          }
+          for (const aud of currentPendingAudios) {
+            parts.push({
+              type: "audio",
+              audioId: aud.audioId,
+              audioUrl: aud.url,
+              source: aud.source,
+              title: aud.title,
             });
           }
           return parts;
@@ -2424,6 +2630,7 @@ export default function ChatInterface({
     setInput("");
     setPendingImages([]);
     setPendingVideos([]);
+    setPendingAudios([]);
     setAssetParamValues({});
     setPrecisionEditing(false);
     
@@ -2495,6 +2702,12 @@ export default function ChatInterface({
           videoId: vid.videoId,
           source: vid.source,
           videoUrl: vid.url,
+        })),
+        // Include audio sources
+        audioSources: currentPendingAudios.map((aud) => ({
+          audioId: aud.audioId,
+          source: aud.source,
+          title: aud.title,
         })),
       };
 
@@ -4028,6 +4241,8 @@ export default function ChatInterface({
         onDismissSuggestedImages={dismissSuggestedImages}
         pendingVideos={pendingVideos}
         onRemovePendingVideo={removePendingVideo}
+        pendingAudios={pendingAudios}
+        onRemovePendingAudio={removePendingAudio}
         onOpenAssetPicker={openPendingImagePicker}
         onAssetDrop={handleAssetDrop}
         onFilesUpload={handleFilesUpload}
@@ -4052,8 +4267,10 @@ export default function ChatInterface({
         resolveElementImageUrl={resolveElementImageUrl}
         onPickMediaRefImage={openMediaRefImagePicker}
         onPickMediaRefVideo={openMediaRefVideoPicker}
+        onPickMediaRefAudio={openMediaRefAudioPicker}
         resolveMediaRefImageUrl={resolveMediaRefImageUrl}
         resolveMediaRefVideoUrl={resolveMediaRefVideoUrl}
+        resolveMediaRefAudioUrl={resolveMediaRefAudioUrl}
         onHeightChange={handleChatInputHeightChange}
         assetParamSlots={assetParamSlots}
         assetParamValues={assetParamValues}
@@ -4078,6 +4295,8 @@ export default function ChatInterface({
             ? 9
             : assetPickerMode === "mediaRefVideo"
             ? 3
+            : assetPickerMode === "mediaRefAudio"
+            ? 3
             : assetPickerMode === "persistent"
             ? MAX_PERSISTENT_REFERENCE_IMAGES - persistentAssets.referenceImages.length
             : MAX_PENDING_IMAGES - pendingImagesRef.current.length
@@ -4089,11 +4308,13 @@ export default function ChatInterface({
             ? ["image"]
             : assetPickerMode === "mediaRefVideo"
             ? ["video"]
+            : assetPickerMode === "mediaRefAudio"
+            ? ["audio"]
             : assetPickerMode === "persistent"
             ? ["image"]
             : assetPickerMode === "assetParam" && activeAssetParamName
             ? assetParamSlots.find((s) => s.name === activeAssetParamName)?.acceptTypes
-            : undefined
+            : ["image", "video", "audio"]
         }
       />
 

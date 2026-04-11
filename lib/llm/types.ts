@@ -113,6 +113,13 @@ export type MessageContentPart =
       videoUrl: string;
     }
   | {
+      type: "audio";
+      audioId: string;
+      audioUrl?: string;
+      source: "upload" | "library";
+      title?: string;
+    }
+  | {
       type: "tool_call";
       tool: string;
       status: "loading" | "complete" | "error";

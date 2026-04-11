@@ -76,6 +76,12 @@ export class InputParser {
                 text: `[Video | ID: ${p.videoId} | Source: ${p.source} | URL: ${p.videoUrl}]`,
               };
             }
+            if (p.type === "audio") {
+              return {
+                type: "text" as const,
+                text: `[Audio | ID: ${p.audioId} | Title: ${p.title || "Untitled"} | Source: ${p.source}]`,
+              };
+            }
             // Strip suggestions and ask_user — they are UI-only and should never be sent back to the LLM
             if (p.type === "suggestions" || p.type === "agent_ask_user") {
               return null;
@@ -172,6 +178,12 @@ export class InputParser {
               return [{
                 type: "text" as const,
                 text: `[Video | ID: ${p.videoId} | Source: ${p.source} | URL: ${p.videoUrl}]`,
+              }];
+            }
+            if (p.type === "audio") {
+              return [{
+                type: "text" as const,
+                text: `[Audio | ID: ${p.audioId} | Title: ${p.title || "Untitled"}]`,
               }];
             }
             return [p];

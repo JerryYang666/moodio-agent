@@ -271,6 +271,10 @@ function stripDerivedUrls(messages: Message[]): Message[] {
         const { videoUrl, ...rest } = part;
         return { ...rest, videoUrl: "" };
       }
+      if (part.type === "audio" && "audioUrl" in part) {
+        const { audioUrl, ...rest } = part;
+        return rest;
+      }
       return part;
     });
 
@@ -377,6 +381,12 @@ function addDerivedUrls(messages: Message[]): Message[] {
         return {
           ...part,
           videoUrl: getVideoUrl(part.videoId),
+        };
+      }
+      if (part.type === "audio" && "audioId" in part) {
+        return {
+          ...part,
+          audioUrl: getAudioUrl(part.audioId),
         };
       }
       return part;

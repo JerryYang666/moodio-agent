@@ -2,11 +2,12 @@
 
 import { useCallback } from "react";
 import { Button } from "@heroui/button";
-import { ImagePlus, Film, X, Layers } from "lucide-react";
+import { ImagePlus, Film, Music, X, Layers } from "lucide-react";
 import type { MediaReference } from "@/lib/video/models";
 
 const MAX_IMAGES = 9;
 const MAX_VIDEOS = 3;
+const MAX_AUDIOS = 3;
 
 interface SeedanceReferenceEditorProps {
   references: MediaReference[];
@@ -14,10 +15,13 @@ interface SeedanceReferenceEditorProps {
   disabled?: boolean;
   onPickImage?: () => void;
   onPickVideo?: () => void;
+  onPickAudio?: () => void;
   resolveImageUrl?: (id: string) => string | undefined;
   resolveVideoUrl?: (id: string) => string | undefined;
+  resolveAudioUrl?: (id: string) => string | undefined;
   maxImages?: number;
   maxVideos?: number;
+  maxAudios?: number;
 }
 
 function getRefName(refs: MediaReference[], index: number): string {
@@ -26,7 +30,9 @@ function getRefName(refs: MediaReference[], index: number): string {
   for (let i = 0; i <= index; i++) {
     if (refs[i].type === ref.type) count++;
   }
-  return ref.type === "image" ? `image${count}` : `video${count}`;
+  if (ref.type === "image") return `image${count}`;
+  if (ref.type === "video") return `video${count}`;
+  return `audio${count}`;
 }
 
 export function SeedanceReferenceEditor({
@@ -35,13 +41,17 @@ export function SeedanceReferenceEditor({
   disabled = false,
   onPickImage,
   onPickVideo,
+  onPickAudio,
   resolveImageUrl,
   resolveVideoUrl,
+  resolveAudioUrl,
   maxImages = MAX_IMAGES,
   maxVideos = MAX_VIDEOS,
+  maxAudios = MAX_AUDIOS,
 }: SeedanceReferenceEditorProps) {
   const imageCount = references.filter((r) => r.type === "image").length;
   const videoCount = references.filter((r) => r.type === "video").length;
+  const audioCount = references.filter((r) => r.type === "audio").length;
 
   const removeReference = useCallback(
     (index: number) => {
@@ -82,6 +92,17 @@ export function SeedanceReferenceEditor({
               Video
             </Button>
           )}
+          {!disabled && audioCount < maxAudios && (
+            <Button
+              size="sm"
+              variant="flat"
+              startContent={<Music size={14} />}
+              onPress={onPickAudio}
+              className="h-6 min-w-0 px-2 text-xs"
+            >
+              Audio
+            </Button>
+          )}
         </div>
       </div>
 
@@ -90,8 +111,8 @@ export function SeedanceReferenceEditor({
           onClick={onPickImage}
           className="w-full rounded-lg border-2 border-dashed border-default-200 p-3 text-xs text-default-400 hover:border-default-300 hover:text-default-500 transition-colors"
         >
-          Add reference images or videos to mention in your prompt with @image1
-          / @video1
+          Add reference images, videos, or audio to mention in your prompt with
+          @image1 / @video1 / @audio1
         </button>
       )}
 
@@ -102,14 +123,20 @@ export function SeedanceReferenceEditor({
             const displayUrl =
               ref.type === "image"
                 ? resolveImageUrl?.(ref.id)
-                : resolveVideoUrl?.(ref.id);
+                : ref.type === "video"
+                  ? resolveVideoUrl?.(ref.id)
+                  : resolveAudioUrl?.(ref.id);
 
             return (
               <div
                 key={`${ref.type}-${ref.id}-${index}`}
                 className="relative w-14 h-14 rounded-md overflow-hidden border border-divider group"
               >
-                {displayUrl ? (
+                {ref.type === "audio" ? (
+                  <div className="w-full h-full bg-linear-to-br from-violet-500/20 to-purple-600/20 flex items-center justify-center">
+                    <Music size={16} className="text-violet-400" />
+                  </div>
+                ) : displayUrl ? (
                   ref.type === "image" ? (
                     <img
                       src={displayUrl}

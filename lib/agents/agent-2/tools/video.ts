@@ -24,7 +24,7 @@ Rules for video creation:
 2. For text-to-video models (those marked "Type: text-to-video"): NO source image is needed. You can use these models even when there are no images in the conversation.
 3. If using an image-to-video model and there are NO images in the conversation, do NOT output a <VIDEO> tag directly. Instead, first use <IMAGE_GENERATE_SYNC> to create an image. Once you receive the imageId from the sync result, output a <VIDEO> tag with that imageId as "sourceImageId".
 4. For models with optional reference image/asset parameters (type: "asset"): you can pass an Image ID from the conversation as the value. For example, if a model has an "image_url" asset parameter, include \`"image_url": "abc123"\` where "abc123" is the imageId. The system will resolve it to the actual URL. If the user hasn't provided an image and doesn't want one, simply omit the parameter.
-5. For models with a "media_references" parameter (e.g., Seedance 2.0 Reference): pass an array of references, each with \`type\` ("image" or "video") and \`id\` (Image ID or Video ID from the conversation). Reference them in the prompt as @image1, @video1, etc. Example: \`"media_references": [{"type": "image", "id": "abc123"}, {"type": "video", "id": "def456"}]\`.
+5. For models with a "media_references" parameter (e.g., Seedance 2.0 Reference): pass an array of references, each with \`type\` ("image", "video", or "audio") and \`id\` (Image ID, Video ID, or Audio ID from the conversation). Reference them in the prompt as @image1, @video1, @audio1, etc. Example: \`"media_references": [{"type": "image", "id": "abc123"}, {"type": "video", "id": "def456"}, {"type": "audio", "id": "ghi789"}]\`.
 6. Write a detailed, descriptive prompt about the motion, camera movement, and animation.
 7. Choose parameters that best match the user's request.
 8. Only output ONE <VIDEO> tag per response.
@@ -86,7 +86,7 @@ Rules for video creation:
         .filter(
           (ref: any) =>
             ref &&
-            (ref.type === "image" || ref.type === "video") &&
+            (ref.type === "image" || ref.type === "video" || ref.type === "audio") &&
             typeof ref.id === "string" &&
             ref.id
         )

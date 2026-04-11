@@ -4,10 +4,11 @@ import { Card, CardBody } from "@heroui/card";
 import { Spinner } from "@heroui/spinner";
 import { Avatar } from "@heroui/avatar";
 import { Image } from "@heroui/image";
-import { Bot, X, Pencil, ChevronDown, ChevronRight, Brain, Maximize2, Monitor, Video } from "lucide-react";
+import { Bot, X, Pencil, ChevronDown, ChevronRight, Brain, Maximize2, Monitor, Video, Music } from "lucide-react";
 import clsx from "clsx";
 import { Message, MessageContentPart, isGeneratedImagePart } from "@/lib/llm/types";
 import ImageWithMenu from "@/components/collection/image-with-menu";
+import AudioPlayer from "@/components/audio-player";
 import { ImageInfo } from "./image-detail-modal";
 import ImageHoverPreview from "./image-hover-preview";
 import { formatTime } from "./utils";
@@ -266,6 +267,20 @@ export default function ChatMessage({
     return videos;
   }, [allMessages]);
 
+  const sourceAudiosForVideo = useMemo(() => {
+    if (!allMessages) return [];
+    const audios: Array<{ audioId: string; audioUrl: string }> = [];
+    for (const msg of allMessages) {
+      if (!Array.isArray(msg.content)) continue;
+      for (const part of msg.content) {
+        if (part.type === "audio" && (part as any).audioId && (part as any).audioUrl) {
+          audios.push({ audioId: (part as any).audioId, audioUrl: (part as any).audioUrl });
+        }
+      }
+    }
+    return audios;
+  }, [allMessages]);
+
   const handleAgentDragStart = (e: React.DragEvent, part: any) => {
     if (part.status !== "generated" || !part.imageId || !part.imageUrl) return;
     const payload = {
@@ -497,6 +512,35 @@ export default function ChatMessage({
                 </div>
               );
 
+            case "audio":
+              if (!isUser) return null;
+              return (
+                <div key={`user-audios-${gi}`} className="flex gap-2 overflow-x-auto pb-1">
+                  {group.parts.map((part: any, i) => (
+                    <div
+                      key={`aud-${gi}-${i}`}
+                      className="h-20 w-48 rounded-lg border border-divider overflow-hidden shrink-0 relative bg-secondary/5"
+                    >
+                      {part.audioUrl ? (
+                        <div className="h-full w-full flex items-center px-2">
+                          <AudioPlayer src={part.audioUrl} variant="compact" title={part.title} />
+                        </div>
+                      ) : (
+                        <div className="h-full w-full flex items-center justify-center">
+                          <Music size={20} className="text-default-400" />
+                        </div>
+                      )}
+                      <div className="absolute top-1 left-1 z-10">
+                        <span className="text-[9px] font-semibold bg-secondary/90 text-white px-1.5 py-0.5 rounded flex items-center gap-0.5">
+                          <Music size={8} />
+                          {t("chat.audioLabel")}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              );
+
             case "agent_image":
               return (
                 <div key={`agent-images-${gi}`} className="grid grid-cols-2 gap-3 mt-2">
@@ -709,6 +753,7 @@ export default function ChatMessage({
                     part={part}
                     sourceImages={sourceImagesForVideo}
                     sourceVideos={sourceVideosForVideo}
+                    sourceAudios={sourceAudiosForVideo}
                     desktopId={desktopId}
                     chatId={chatId}
                     onStatusChange={(status, generationId) => {

@@ -30,7 +30,7 @@ export interface KlingElement {
 }
 
 export interface MediaReference {
-  type: "image" | "video";
+  type: "image" | "video" | "audio";
   id: string;
 }
 
@@ -305,7 +305,7 @@ const seedance20Reference: VideoModelConfig = {
   id: "seedance-2.0-reference",
   name: "Seedance 2.0 Reference",
   description:
-    "Multimodal reference-to-video: attach images and videos as named references (@image1, @video1) to guide generation",
+    "Multimodal reference-to-video: attach images, videos, and audio as named references (@image1, @video1, @audio1) to guide generation",
   providers: [
     { provider: "kie", providerModelId: "bytedance/seedance-2" },
     { provider: "fal", providerModelId: "bytedance/seedance-2.0" },
@@ -317,7 +317,7 @@ const seedance20Reference: VideoModelConfig = {
       type: "string",
       required: true,
       description:
-        "Text prompt for video generation. Use @image1, @video1, etc. to reference attached media (3-2500 characters)",
+        "Text prompt for video generation. Use @image1, @video1, @audio1, etc. to reference attached media (3-2500 characters)",
       maxLength: 2500,
     },
     {
@@ -327,7 +327,7 @@ const seedance20Reference: VideoModelConfig = {
       required: false,
       maxItems: 12,
       description:
-        "Attach reference images (max 9) and videos (max 3). Each gets auto-named image1/video1 etc. and can be mentioned in the prompt with @image1 / @video1.",
+        "Attach reference images (max 9), videos (max 3), and audio files (max 3, MP3/WAV, combined max 15s). Each gets auto-named @image1/@video1/@audio1 etc.",
     },
     {
       name: "duration",
@@ -475,7 +475,7 @@ const seedance20FastReference: VideoModelConfig = {
   id: "seedance-2.0-fast-reference",
   name: "Seedance 2.0 Fast Reference",
   description:
-    "Fast multimodal reference-to-video: attach images and videos as named references (@image1, @video1) to guide generation",
+    "Fast multimodal reference-to-video: attach images, videos, and audio as named references (@image1, @video1, @audio1) to guide generation",
   providers: [
     { provider: "kie", providerModelId: "bytedance/seedance-2-fast" },
     { provider: "fal", providerModelId: "bytedance/seedance-2.0/fast" },
@@ -487,7 +487,7 @@ const seedance20FastReference: VideoModelConfig = {
       type: "string",
       required: true,
       description:
-        "Text prompt for video generation. Use @image1, @video1, etc. to reference attached media (3-2500 characters)",
+        "Text prompt for video generation. Use @image1, @video1, @audio1, etc. to reference attached media (3-2500 characters)",
       maxLength: 2500,
     },
     {
@@ -497,7 +497,7 @@ const seedance20FastReference: VideoModelConfig = {
       required: false,
       maxItems: 12,
       description:
-        "Attach reference images (max 9) and videos (max 3). Each gets auto-named image1/video1 etc. and can be mentioned in the prompt with @image1 / @video1.",
+        "Attach reference images (max 9), videos (max 3), and audio files (max 3, MP3/WAV, combined max 15s). Each gets auto-named @image1/@video1/@audio1 etc.",
     },
     {
       name: "duration",
@@ -2031,9 +2031,9 @@ export function validateAndMergeParams(
               `Each reference in ${param.name} must be an object with type and id`
             );
           }
-          if (ref.type !== "image" && ref.type !== "video") {
+          if (ref.type !== "image" && ref.type !== "video" && ref.type !== "audio") {
             throw new Error(
-              `Each reference in ${param.name} must have type "image" or "video"`
+              `Each reference in ${param.name} must have type "image", "video", or "audio"`
             );
           }
           if (typeof ref.id !== "string" || !ref.id) {
@@ -2133,7 +2133,7 @@ function describeModelParams(model: VideoModelConfig): string {
     } else if (param.type === "kling_elements") {
       desc += `array of element references, each: {name: string (referenced in prompt as @name), description: string, element_input_ids: string[] (2-4 Image IDs from the conversation — pass the Image ID e.g. "abc123", NOT a URL)}. Max 3 elements`;
     } else if (param.type === "media_references") {
-      desc += `array of media references, each: {type: "image"|"video", id: string (Image ID or Video ID from the conversation — pass the ID e.g. "abc123", NOT a URL)}. Max 9 images, 3 videos. Reference them in the prompt as @image1, @video1, etc. (numbered in order of appearance)`;
+      desc += `array of media references, each: {type: "image"|"video"|"audio", id: string (Image ID, Video ID, or Audio ID from the conversation — pass the ID e.g. "abc123", NOT a URL)}. Max 9 images, 3 videos, 3 audios. Reference them in the prompt as @image1, @video1, @audio1, etc. (numbered in order of appearance)`;
     }
 
     if (param.default !== undefined) {

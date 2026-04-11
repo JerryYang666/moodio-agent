@@ -23,6 +23,7 @@ import {
   ChevronDown,
   Bean,
   Video,
+  Music,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import MenuConfiguration, { MenuState } from "./menu-configuration";
@@ -32,6 +33,7 @@ import { SeedanceReferenceEditor } from "./seedance-reference-editor";
 import type { MultiPromptShot, KlingElement, MediaReference } from "@/lib/video/models";
 import { PendingImage, MAX_PENDING_IMAGES } from "./pending-image-types";
 import { PendingVideo, MAX_PENDING_VIDEOS } from "./pending-video-types";
+import { PendingAudio } from "./pending-audio-types";
 import clsx from "clsx";
 import { ASSET_DRAG_MIME } from "./asset-dnd";
 import {
@@ -83,6 +85,8 @@ interface ChatInputProps {
   onDismissSuggestedImages?: () => void;
   pendingVideos?: PendingVideo[];
   onRemovePendingVideo?: (videoId: string) => void;
+  pendingAudios?: PendingAudio[];
+  onRemovePendingAudio?: (audioId: string) => void;
   onOpenAssetPicker: () => void;
   onAssetDrop: (payload: {
     assetId: string;
@@ -142,10 +146,14 @@ interface ChatInputProps {
   onPickMediaRefImage?: () => void;
   /** Opens the asset picker for media reference videos */
   onPickMediaRefVideo?: () => void;
+  /** Opens the asset picker for media reference audio */
+  onPickMediaRefAudio?: () => void;
   /** Resolve a media reference image ID to a display URL */
   resolveMediaRefImageUrl?: (id: string) => string | undefined;
   /** Resolve a media reference video ID to a display/thumbnail URL */
   resolveMediaRefVideoUrl?: (id: string) => string | undefined;
+  /** Resolve a media reference audio ID to a display URL */
+  resolveMediaRefAudioUrl?: (id: string) => string | undefined;
 }
 
 /** Ref handle for ChatInput to allow getting editor content */
@@ -175,6 +183,8 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
   onDismissSuggestedImages,
   pendingVideos = [],
   onRemovePendingVideo,
+  pendingAudios = [],
+  onRemovePendingAudio,
   onOpenAssetPicker,
   onAssetDrop,
   onFilesUpload,
@@ -206,8 +216,10 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
   isAssetPickerOpen = false,
   onPickMediaRefImage,
   onPickMediaRefVideo,
+  onPickMediaRefAudio,
   resolveMediaRefImageUrl,
   resolveMediaRefVideoUrl,
+  resolveMediaRefAudioUrl,
 }, ref) {
   const t = useTranslations();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -271,16 +283,22 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
 
     if (supportsMediaReferences && menuState.mode === "video") {
       const refs = (menuState.videoParams?.media_references as MediaReference[]) || [];
-      let imgCount = 0, vidCount = 0;
+      let imgCount = 0, vidCount = 0, audCount = 0;
       const refItems: MentionItem[] = refs.map((ref) => {
-        const name = ref.type === "image" ? `image${++imgCount}` : `video${++vidCount}`;
+        const name = ref.type === "image"
+          ? `image${++imgCount}`
+          : ref.type === "video"
+            ? `video${++vidCount}`
+            : `audio${++audCount}`;
         return {
           id: name,
           type: "reference",
           label: name,
           thumbnail: ref.type === "image"
             ? resolveMediaRefImageUrl?.(ref.id)
-            : resolveMediaRefVideoUrl?.(ref.id),
+            : ref.type === "video"
+              ? resolveMediaRefVideoUrl?.(ref.id)
+              : resolveMediaRefAudioUrl?.(ref.id),
           metadata: { refType: ref.type, refId: ref.id },
         };
       });
@@ -305,7 +323,7 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
       }));
 
     return [...imageItems, ...elementItems];
-  }, [pendingImages, t, supportsElements, supportsMediaReferences, menuState.mode, menuState.videoParams?.kling_elements, menuState.videoParams?.media_references, resolveElementImageUrl, resolveMediaRefImageUrl, resolveMediaRefVideoUrl]);
+  }, [pendingImages, t, supportsElements, supportsMediaReferences, menuState.mode, menuState.videoParams?.kling_elements, menuState.videoParams?.media_references, resolveElementImageUrl, resolveMediaRefImageUrl, resolveMediaRefVideoUrl, resolveMediaRefAudioUrl]);
 
   // Resolve element image IDs to display URLs using the parent's resolver or pending images
   const resolveElementImageUrlLocal = useCallback(
@@ -429,6 +447,7 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
       const allowedTypes = [
         ...siteConfig.upload.allowedImageTypes,
         ...siteConfig.upload.allowedVideoTypes,
+        ...siteConfig.upload.allowedAudioTypes,
       ];
       const validFiles: File[] = [];
       let hasInvalid = false;
@@ -448,7 +467,7 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
     }
   };
 
-  // Handle paste: extract image/video data from clipboard
+  // Handle paste: extract image/video/audio data from clipboard
   const handlePaste = useCallback(
     (e: React.ClipboardEvent) => {
       const items = e.clipboardData?.items;
@@ -457,6 +476,7 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
       const allowedTypes = [
         ...siteConfig.upload.allowedImageTypes,
         ...siteConfig.upload.allowedVideoTypes,
+        ...siteConfig.upload.allowedAudioTypes,
       ];
       const files: File[] = [];
       for (const item of Array.from(items)) {
@@ -572,10 +592,10 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
 
   // Auto-expand if there are attachments, recording, or video mode
   useEffect(() => {
-    if (pendingImages.length > 0 || pendingVideos.length > 0 || isRecording || menuState.mode === "video") {
+    if (pendingImages.length > 0 || pendingVideos.length > 0 || pendingAudios.length > 0 || isRecording || menuState.mode === "video") {
       setIsExpanded(true);
     }
-  }, [pendingImages.length, pendingVideos.length, isRecording, menuState.mode]);
+  }, [pendingImages.length, pendingVideos.length, pendingAudios.length, isRecording, menuState.mode]);
 
   // Helper to get source icon for pending image
   const getSourceIcon = (source: PendingImage["source"]) => {
@@ -1338,6 +1358,61 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
             )}
           </AnimatePresence>
 
+          {/* Pending Audios Area */}
+          <AnimatePresence>
+            {isExpanded && pendingAudios.length > 0 && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="px-4 pt-2 overflow-hidden"
+              >
+                <div className="flex gap-2 flex-wrap mb-2">
+                  {pendingAudios.map((aud) => (
+                    <div key={aud.audioId} className="relative w-fit group">
+                      <div className="h-20 w-40 rounded-lg border border-divider overflow-hidden relative bg-secondary/10 flex items-center justify-center gap-2 px-3">
+                        {aud.isUploading ? (
+                          <div className="absolute inset-0 flex items-center justify-center bg-black/10">
+                            <Spinner size="sm" />
+                          </div>
+                        ) : (
+                          <>
+                            <Music size={20} className="text-secondary shrink-0" />
+                            <span className="text-xs text-default-700 line-clamp-2 leading-tight">
+                              {aud.title || "Audio"}
+                            </span>
+                          </>
+                        )}
+                        <div className="absolute top-1 left-1 z-10">
+                          <span className="text-[9px] font-semibold bg-secondary/90 text-white px-1.5 py-0.5 rounded flex items-center gap-0.5">
+                            <Music size={8} />
+                            {t("chat.audioLabel")}
+                          </span>
+                        </div>
+                      </div>
+                      {onRemovePendingAudio && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onRemovePendingAudio(aud.audioId);
+                          }}
+                          disabled={aud.isUploading}
+                          className={clsx(
+                            "absolute -top-2 -right-2 bg-default-100 rounded-full p-1 shadow-sm border border-divider z-10",
+                            aud.isUploading ? "opacity-50 cursor-not-allowed" : "hover:bg-default-200"
+                          )}
+                        >
+                          <X size={14} />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           {/* Input Row */}
           <div className={clsx("flex items-center p-2", isExpanded && "gap-2")}>
             <div
@@ -1573,8 +1648,10 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
                     }
                     onPickImage={onPickMediaRefImage}
                     onPickVideo={onPickMediaRefVideo}
+                    onPickAudio={onPickMediaRefAudio}
                     resolveImageUrl={resolveMediaRefImageUrl}
                     resolveVideoUrl={resolveMediaRefVideoUrl}
+                    resolveAudioUrl={resolveMediaRefAudioUrl}
                   />
                 </div>
               </motion.div>

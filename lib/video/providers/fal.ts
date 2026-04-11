@@ -43,12 +43,16 @@ function resolveFalEndpoint(
     const videoUrls = media_references
       .filter((r: any) => r.type === "video")
       .map((r: any) => r.id);
+    const audioUrls = media_references
+      .filter((r: any) => r.type === "audio")
+      .map((r: any) => r.id);
     return {
       endpoint: `${providerModelId}/reference-to-video`,
       input: {
         ...rest,
         ...(imageUrls.length > 0 && { image_urls: imageUrls }),
         ...(videoUrls.length > 0 && { video_urls: videoUrls }),
+        ...(audioUrls.length > 0 && { audio_urls: audioUrls }),
       },
     };
   }
