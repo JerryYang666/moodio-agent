@@ -5,7 +5,7 @@ import dynamic from "next/dynamic";
 import { Button } from "@heroui/button";
 import { Image } from "@heroui/image";
 import { Modal, ModalContent } from "@heroui/modal";
-import { Plus, X, ChevronLeft, ChevronRight, Download, Music } from "lucide-react";
+import { Plus, X, ChevronLeft, ChevronRight, Download, Music, Loader2 } from "lucide-react";
 import AudioPlayer from "@/components/audio-player";
 import type { EnrichedMediaAssetRef, CellLock } from "@/lib/production-table/types";
 import type { AssetSummary } from "@/components/chat/asset-picker-modal";
@@ -31,6 +31,7 @@ interface MediaCellProps {
   assets: EnrichedMediaAssetRef[];
   canEdit: boolean;
   isSelected?: boolean;
+  isUploading?: boolean;
   lock: CellLock | undefined;
   currentUserId: string | undefined;
   onAddAsset: (asset: EnrichedMediaAssetRef) => void;
@@ -43,6 +44,7 @@ export const MediaCell = memo(function MediaCell({
   assets,
   canEdit,
   isSelected,
+  isUploading,
   lock,
   currentUserId,
   onAddAsset,
@@ -293,6 +295,11 @@ export const MediaCell = memo(function MediaCell({
             )}
           </div>
         ))}
+        {isUploading && (
+          <div className="w-10 h-10 rounded bg-default-100 flex items-center justify-center">
+            <Loader2 size={16} className="animate-spin text-default-400" />
+          </div>
+        )}
         {canEdit && !isLockedByOther && (
           <Button
             isIconOnly

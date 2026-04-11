@@ -24,6 +24,7 @@ import { useGridSelection } from "@/hooks/use-grid-selection";
 import type { SelectMode } from "@/hooks/use-grid-selection";
 import { AI_IMAGE_DRAG_MIME, AI_VIDEO_DRAG_MIME, AI_VIDEO_SUGGEST_DRAG_MIME } from "@/components/chat/asset-dnd";
 import { uploadImage } from "@/lib/upload/client";
+import { uploadAudio } from "@/lib/upload/audio-client";
 import { siteConfig } from "@/config/site";
 
 const DEFAULT_ROW_HEIGHT = 48;
@@ -121,6 +122,7 @@ export function ProductionTableGrid({
 }: ProductionTableGridProps) {
   const [scrollElement, setScrollElement] = useState<HTMLDivElement | null>(null);
   const [isCellPainting, setIsCellPainting] = useState(false);
+  const [uploadingCells, setUploadingCells] = useState<Set<string>>(() => new Set());
 
   const rowIds = useMemo(() => rows.map((r) => r.id), [rows]);
   const columnIds = useMemo(() => columns.map((c) => c.id), [columns]);
@@ -585,7 +587,7 @@ export function ProductionTableGrid({
     [clearSelection]
   );
 
-  // ---- Paste handler (image → media cell) ----
+  // ---- Paste handler (image/audio → media cell) ----
   const handlePaste = useCallback(
     (e: React.ClipboardEvent) => {
       if (selectedCells.size !== 1) return;
@@ -599,20 +601,34 @@ export function ProductionTableGrid({
       const items = e.clipboardData?.items;
       if (!items) return;
 
-      const allowedTypes = siteConfig.upload.allowedImageTypes;
-      const files: File[] = [];
+      const allowedImageTypes = siteConfig.upload.allowedImageTypes;
+      const allowedAudioTypes = siteConfig.upload.allowedAudioTypes;
+      const imageFiles: File[] = [];
+      const audioFiles: File[] = [];
       for (const item of Array.from(items)) {
-        if (item.kind === "file" && allowedTypes.includes(item.type)) {
-          const file = item.getAsFile();
-          if (file) files.push(file);
-        }
+        if (item.kind !== "file") continue;
+        const file = item.getAsFile();
+        if (!file) continue;
+        if (allowedImageTypes.includes(item.type)) imageFiles.push(file);
+        else if (allowedAudioTypes.includes(item.type)) audioFiles.push(file);
       }
-      if (files.length === 0) return;
+      if (imageFiles.length === 0 && audioFiles.length === 0) return;
 
       e.preventDefault();
 
-      for (const file of files) {
+      const addUploading = () =>
+        setUploadingCells((prev) => new Set(prev).add(cellKey));
+      const removeUploading = () =>
+        setUploadingCells((prev) => {
+          const next = new Set(prev);
+          next.delete(cellKey);
+          return next;
+        });
+
+      for (const file of imageFiles) {
+        addUploading();
         uploadImage(file).then((outcome) => {
+          removeUploading();
           if (outcome.success) {
             const { imageId, imageUrl } = outcome.data;
             onMediaAssetAdd(columnId, rowId, {
@@ -620,6 +636,22 @@ export function ProductionTableGrid({
               imageId,
               assetType: "image",
               imageUrl,
+            });
+          }
+        });
+      }
+
+      for (const file of audioFiles) {
+        addUploading();
+        uploadAudio(file).then((outcome) => {
+          removeUploading();
+          if (outcome.success) {
+            const { audioId, audioUrl } = outcome.data;
+            onMediaAssetAdd(columnId, rowId, {
+              assetId: audioId,
+              imageId: "audio-file-placeholder",
+              assetType: "audio",
+              audioUrl,
             });
           }
         });
@@ -684,6 +716,7 @@ export function ProductionTableGrid({
             assets={(cell?.mediaAssets as EnrichedMediaAssetRef[]) ?? []}
             canEdit={editable}
             isSelected={selected}
+            isUploading={uploadingCells.has(key)}
             lock={lock}
             currentUserId={currentUserId}
             onAddAsset={(asset) => onMediaAssetAdd(col.id, row.id, asset)}
@@ -707,7 +740,7 @@ export function ProductionTableGrid({
         />
       );
     },
-    [cellMap, cellLocks, canEditCellFn, isCellSelected, currentUserId, sendEvent, onCellCommit, onMediaAssetAdd, onMediaAssetRemove]
+    [cellMap, cellLocks, canEditCellFn, isCellSelected, uploadingCells, currentUserId, sendEvent, onCellCommit, onMediaAssetAdd, onMediaAssetRemove]
   );
 
   const totalWidth = useMemo(
