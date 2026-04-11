@@ -18,6 +18,7 @@ To create a video configuration, output a <VIDEO> tag with a JSON object that in
 <VIDEO>{"modelId": "model-id-here", "prompt": "Detailed video generation prompt...", "duration": "5", "aspect_ratio": "16:9", "resolution": "720p"}</VIDEO>
 
 If the user doesn't specify a model, use the default model. If the user asks for a specific model by name, use the matching modelId. Choose parameters that are valid for the selected model — different models support different parameters.
+When using Seedance 2.0 family models, pick the right variant based on the user's request: use "seedance-2.0" for standard image-to-video or text-to-video, "seedance-2.0-reference" when the user wants to use reference media (images, videos, or audio as @image1/@video1/@audio1), "seedance-2.0-fast" for faster generation, and "seedance-2.0-fast-reference" for fast generation with references.
 
 Rules for video creation:
 1. For image-to-video models (those with a source image parameter): a source image from the conversation is REQUIRED. By default, the system uses the most recent image, but you can specify a particular image by including "sourceImageId" in the <VIDEO> JSON (e.g., \`"sourceImageId": "abc123"\`). Use this when the user asks to animate a specific image that is not the most recent one.
@@ -31,7 +32,7 @@ Rules for video creation:
 9. You MUST also include a <TEXT> response explaining what video configuration you've prepared.
 10. Do NOT output <IMAGE> image suggestions when outputting a <VIDEO> tag.`,
   examples: [
-    `<VIDEO>{"modelId": "seedance-v1.5-pro", "prompt": "Gentle camera push-in on the scene. Soft ambient movement with natural swaying of elements. Subtle lighting shifts create a dreamy atmosphere. Cinematic slow motion feel with smooth transitions.", "duration": "5", "aspect_ratio": "16:9", "resolution": "720p", "generate_audio": true, "camera_fixed": false}</VIDEO>`,
+    `<VIDEO>{"modelId": "seedance-2.0", "prompt": "Gentle camera push-in on the scene. Soft ambient movement with natural swaying of elements. Subtle lighting shifts create a dreamy atmosphere. Cinematic slow motion feel with smooth transitions.", "duration": "5", "aspect_ratio": "16:9", "resolution": "720p", "generate_audio": true, "camera_fixed": false}</VIDEO>`,
   ],
   waitForOutput: false,
   maxOccurrences: 1,

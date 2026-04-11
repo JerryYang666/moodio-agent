@@ -1679,7 +1679,7 @@ export const VIDEO_MODELS: VideoModelConfig[] = [
 /**
  * Default model ID
  */
-export const DEFAULT_VIDEO_MODEL_ID = "seedance-v1.5-pro";
+export const DEFAULT_VIDEO_MODEL_ID = "seedance-2.0";
 
 /**
  * Mapping from legacy fal model IDs to new stable display IDs.

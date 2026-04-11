@@ -45,6 +45,7 @@ import {
 import type { VideoRestoreData } from "@/components/video/video-detail-modal";
 import {
   PendingVideo,
+  PendingVideoSource,
   MAX_PENDING_VIDEOS,
   canAddVideo,
   hasUploadingVideos,
@@ -1890,6 +1891,8 @@ export default function ChatInterface({
       const ce = e as CustomEvent;
       const d = ce.detail as {
         images?: Array<{ assetId: string; imageId: string; url: string; title?: string }>;
+        videos?: Array<{ videoId: string; url: string; title?: string; source?: string }>;
+        audios?: Array<{ audioId: string; url: string; title?: string }>;
         text?: string;
       };
       if (!d) return;
@@ -1904,6 +1907,40 @@ export default function ChatInterface({
             title: img.title || "Selected asset",
             imageId: img.imageId,
           });
+        }
+      }
+
+      // Add videos to pending (respects max limit)
+      if (d.videos && d.videos.length > 0) {
+        for (const vid of d.videos) {
+          if (!vid.videoId || !vid.url) continue;
+          if (!canAddVideo(pendingVideosRef.current)) {
+            addToast({ title: t("chat.maxVideosReached", { max: MAX_PENDING_VIDEOS }), color: "warning" });
+            break;
+          }
+          setPendingVideos((prev) => [...prev, {
+            videoId: vid.videoId,
+            url: vid.url,
+            source: (vid.source as PendingVideoSource) || "library",
+            title: vid.title || "Selected video",
+          }]);
+        }
+      }
+
+      // Add audios to pending (respects max limit)
+      if (d.audios && d.audios.length > 0) {
+        for (const aud of d.audios) {
+          if (!aud.audioId || !aud.url) continue;
+          if (!canAddAudio(pendingAudiosRef.current)) {
+            addToast({ title: t("chat.maxAudiosReached", { max: MAX_PENDING_AUDIOS }), color: "warning" });
+            break;
+          }
+          setPendingAudios((prev) => [...prev, {
+            audioId: aud.audioId,
+            url: aud.url,
+            source: "library" as const,
+            title: aud.title || "Selected audio",
+          }]);
         }
       }
 
@@ -2074,6 +2111,9 @@ export default function ChatInterface({
 
   const pendingVideosRef = useRef(pendingVideos);
   pendingVideosRef.current = pendingVideos;
+
+  const pendingAudiosRef = useRef(pendingAudios);
+  pendingAudiosRef.current = pendingAudios;
 
   const handleAssetPickedMultiple = useCallback(
     async (assets: AssetSummary[]) => {

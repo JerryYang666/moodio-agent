@@ -779,6 +779,8 @@ export function ProductionTableGrid({
     const rowIndexMap = new Map(rows.map((r, i) => [r.id, i + 1]));
 
     const images: Array<{ assetId: string; imageId: string; url: string; title?: string }> = [];
+    const videos: Array<{ videoId: string; url: string; title?: string; source?: string }> = [];
+    const audios: Array<{ audioId: string; url: string; title?: string }> = [];
     const textParts: string[] = [];
 
     for (const key of Array.from(selectedCells)) {
@@ -796,7 +798,20 @@ export function ProductionTableGrid({
       const assets = cell.mediaAssets as EnrichedMediaAssetRef[] | null;
       if (assets && assets.length > 0) {
         for (const a of assets) {
-          if (a.imageUrl && a.imageId) {
+          if (a.assetType === "audio" && a.audioUrl) {
+            audios.push({
+              audioId: a.assetId,
+              url: a.audioUrl,
+              title: `Row ${rowNum} / ${colName}`,
+            });
+          } else if (a.assetType === "video" && a.videoUrl) {
+            videos.push({
+              videoId: a.assetId,
+              url: a.videoUrl,
+              title: `Row ${rowNum} / ${colName}`,
+              source: "library",
+            });
+          } else if (a.imageUrl && a.imageId) {
             images.push({
               assetId: a.assetId,
               imageId: a.imageId,
@@ -813,6 +828,8 @@ export function ProductionTableGrid({
       new CustomEvent("moodio-batch-to-chat", {
         detail: {
           images: images.length > 0 ? images : undefined,
+          videos: videos.length > 0 ? videos : undefined,
+          audios: audios.length > 0 ? audios : undefined,
           text: text || undefined,
         },
       })
