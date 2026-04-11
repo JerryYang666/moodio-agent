@@ -525,6 +525,11 @@
     "goToGeneration": "生成へ",
     "goToAssets": "アセットへ"
   },
+  "previewBrowse": {
+    "title": "Moodio",
+    "login": "ログイン",
+    "loginRequired": "続行するにはログインしてください"
+  },
   "browse": {
     "title": "ブラウズ",
     "subtitle": "コンテンツを閲覧",

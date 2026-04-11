@@ -673,6 +673,11 @@
     "goToGeneration": "Go to Generation",
     "goToAssets": "Go to Assets"
   },
+  "previewBrowse": {
+    "title": "Moodio",
+    "login": "Log in",
+    "loginRequired": "Sign in to continue"
+  },
   "browse": {
     "title": "Browse",
     "subtitle": "Browse content",

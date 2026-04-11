@@ -44,6 +44,10 @@ function isPublicPath(pathname: string): boolean {
     return true;
   }
 
+  if (pathname.startsWith("/preview-browse")) {
+    return true;
+  }
+
   return false;
 }
 
@@ -267,6 +271,8 @@ export async function middleware(request: NextRequest) {
 
   if (isApiRoute) {
     response = NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  } else if (pathname === "/") {
+    response = NextResponse.redirect(new URL("/preview-browse", request.url));
   } else {
     const loginUrl = new URL("/auth/login", request.url);
     loginUrl.searchParams.set("redirect", pathname);

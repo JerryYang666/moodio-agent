@@ -525,6 +525,11 @@
     "goToGeneration": "생성으로",
     "goToAssets": "에셋으로"
   },
+  "previewBrowse": {
+    "title": "Moodio",
+    "login": "로그인",
+    "loginRequired": "계속하려면 로그인하세요"
+  },
   "browse": {
     "title": "둘러보기",
     "subtitle": "콘텐츠 탐색",

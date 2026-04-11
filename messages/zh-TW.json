@@ -525,6 +525,11 @@
     "goToGeneration": "前往生成",
     "goToAssets": "前往資產"
   },
+  "previewBrowse": {
+    "title": "Moodio",
+    "login": "登入",
+    "loginRequired": "請登入以繼續"
+  },
   "browse": {
     "title": "瀏覽",
     "subtitle": "瀏覽內容",

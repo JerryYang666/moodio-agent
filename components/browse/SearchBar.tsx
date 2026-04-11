@@ -11,8 +11,9 @@ import { setTextSearch, setSelectedFilters } from '@/lib/redux/slices/querySlice
 interface SearchBarProps {
   placeholder?: string;
   className?: string;
-  initialDisplayValue?: string; // Override initial display (doesn't affect Redux state)
-  clearFiltersOnSearch?: boolean; // Clear selected filters when searching (for HomePage fresh start)
+  initialDisplayValue?: string;
+  clearFiltersOnSearch?: boolean;
+  onSearchOverride?: (term: string) => void;
 }
 
 const SearchBar: React.FC<SearchBarProps> = ({
@@ -20,6 +21,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
   className = "",
   initialDisplayValue,
   clearFiltersOnSearch = false,
+  onSearchOverride,
 }) => {
   const dispatch = useDispatch();
   const router = useRouter();
@@ -47,7 +49,11 @@ const SearchBar: React.FC<SearchBarProps> = ({
   };
 
   const handleSearch = () => {
-    // Clear filters if searching from homepage (fresh start)
+    if (onSearchOverride && localSearchText.trim()) {
+      onSearchOverride(localSearchText);
+      return;
+    }
+
     if (clearFiltersOnSearch) {
       dispatch(setSelectedFilters([]));
     }

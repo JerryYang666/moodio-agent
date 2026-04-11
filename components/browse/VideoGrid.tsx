@@ -38,9 +38,10 @@ interface VideoGridProps {
   hideSummary?: boolean;
   desktopId?: string;
   descriptionSlot?: React.ReactNode;
+  onPhotoClickOverride?: (photo: Photo) => void;
 }
 
-const VideoGrid: React.FC<VideoGridProps> = ({ hideSummary = false, desktopId, descriptionSlot }) => {
+const VideoGrid: React.FC<VideoGridProps> = ({ hideSummary = false, desktopId, descriptionSlot, onPhotoClickOverride }) => {
   const t = useTranslations("browse");
   const locale = useLocale();
   const dispatch = useDispatch();
@@ -142,6 +143,10 @@ const VideoGrid: React.FC<VideoGridProps> = ({ hideSummary = false, desktopId, d
 
   // Handle photo click — capture rect, start the flying clone
   const handleClickPhoto = useCallback((photo: Photo) => {
+    if (onPhotoClickOverride) {
+      onPhotoClickOverride(photo);
+      return;
+    }
     const videoEl = galleryRef.current?.querySelector(
       `[data-photo-key="${photo.key}"]`
     );
@@ -152,7 +157,7 @@ const VideoGrid: React.FC<VideoGridProps> = ({ hideSummary = false, desktopId, d
       setOriginRect(null);
     }
     setSelectedPhoto(photo);
-  }, []);
+  }, [onPhotoClickOverride]);
 
   const handleCloseDetail = useCallback(() => {
     setSelectedPhoto(null);
