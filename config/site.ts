@@ -103,6 +103,7 @@ export const siteConfig = {
     maxFileSizeMB: 30,
     compressThresholdMB: 6,
     serverCompressThresholdMB: 6,
+    uploadTimeoutMs: 120_000,
     allowedImageTypes: ["image/jpeg", "image/png", "image/gif", "image/webp"],
     allowedVideoTypes: ["video/mp4", "video/webm", "video/quicktime", "video/x-msvideo"],
     allowedAudioTypes: ["audio/mpeg", "audio/wav"],

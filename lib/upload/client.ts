@@ -135,6 +135,7 @@ export async function uploadImage(file: File, options?: UploadOptions): Promise<
         "Content-Length": file.size.toString(),
       },
       body: file,
+      signal: AbortSignal.timeout(siteConfig.upload.uploadTimeoutMs),
     });
 
     if (!uploadResponse.ok) {
@@ -185,6 +186,15 @@ export async function uploadImage(file: File, options?: UploadOptions): Promise<
       data: { imageId, imageUrl },
     };
   } catch (error) {
+    if (error instanceof DOMException && error.name === "TimeoutError") {
+      return {
+        success: false,
+        error: {
+          code: "UPLOAD_FAILED",
+          message: "Upload timed out. Please check your connection and try again.",
+        },
+      };
+    }
     console.error("Image upload failed:", error);
     return {
       success: false,
