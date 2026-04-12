@@ -37,6 +37,7 @@ import { VideoVisibilityProvider } from "@/hooks/use-video-visibility";
 import { MOCK_VIDEO_DETAIL, type VideoDetailData } from "./video-detail-data";
 import { useGetVideoDetailQuery, type ContentLabel } from "@/lib/redux/services/api";
 import { getContentUrl } from "@/lib/config/video.config";
+import { useUserSetting } from "@/lib/user-settings";
 import { useCollections } from "@/hooks/use-collections";
 import { useFeatureFlag } from "@/lib/feature-flags";
 import { hasWriteAccess } from "@/lib/permissions";
@@ -174,6 +175,7 @@ function VideoDetailContent({
   desktopId,
   onSimilarClick,
 }: VideoDetailContentProps) {
+  const cnMode = useUserSetting("cnMode");
   const detail: VideoDetailData = MOCK_VIDEO_DETAIL;
   const videoTargetRef = useRef<HTMLDivElement>(null);
   const { data: videoDetail, isLoading: isLoadingDetail } = useGetVideoDetailQuery(selectedPhoto.id);
@@ -405,7 +407,7 @@ function VideoDetailContent({
                       const bubble = factory({
                         contentId: videoDetail.id,
                         storageKey: videoDetail.storage_key,
-                        videoUrl: getContentUrl(videoDetail.storage_key),
+                        videoUrl: getContentUrl(videoDetail.storage_key, cnMode),
                       });
                       dispatchSuggestionBubble(bubble.action, bubble.label, bubble.icon);
                     }

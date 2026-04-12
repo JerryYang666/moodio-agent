@@ -16,15 +16,15 @@ import { VirtualInfiniteScroll } from "@/components/browse/VirtualInfiniteScroll
 import { VideoDetailView } from "@/components/browse/VideoDetailView";
 import { Squircle } from "@/components/Squircle";
 import { getContentUrl } from "@/lib/config/video.config";
+import { useUserSetting } from "@/lib/user-settings";
 import { useInfiniteContent } from "@/lib/redux/hooks/useInfiniteContent";
 import { VideoVisibilityProvider } from "@/hooks/use-video-visibility";
 import { Loader2 } from "lucide-react";
 import { addToast } from "@heroui/toast";
 import { normalizeMediaType } from "@/lib/media";
 
-// Simple mapping function - dimensions come from API, no async loading needed
-const videoToPhoto = (video: Video): Photo => ({
-  src: getContentUrl(video.storage_key),
+const videoToPhoto = (video: Video, cnMode: boolean = false): Photo => ({
+  src: getContentUrl(video.storage_key, cnMode),
   width: video.width,
   height: video.height,
   id: video.id,
@@ -45,6 +45,7 @@ const VideoGrid: React.FC<VideoGridProps> = ({ hideSummary = false, desktopId, d
   const t = useTranslations("browse");
   const locale = useLocale();
   const dispatch = useDispatch();
+  const cnMode = useUserSetting("cnMode");
   const queryState = useSelector((state: RootState) => state.query);
 
   // Video detail state
@@ -139,7 +140,7 @@ const VideoGrid: React.FC<VideoGridProps> = ({ hideSummary = false, desktopId, d
   }, [error, queryState.selectedFilters, dispatch]);
 
   // Direct mapping - dimensions come from API, no loading phase needed
-  const photos = videos.map(videoToPhoto);
+  const photos = videos.map((v) => videoToPhoto(v, cnMode));
 
   // Handle photo click — capture rect, start the flying clone
   const handleClickPhoto = useCallback((photo: Photo) => {

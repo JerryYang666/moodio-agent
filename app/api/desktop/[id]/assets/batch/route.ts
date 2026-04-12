@@ -8,8 +8,12 @@ import { getDesktopPermission } from "@/lib/desktop/permissions";
 import { hasWriteAccess } from "@/lib/permissions";
 import { getImageUrl, getVideoUrl, getAudioUrl } from "@/lib/storage/s3";
 import { getContentUrl } from "@/lib/config/video.config";
+import { getUserSetting } from "@/lib/user-settings/server";
 
-function enrichAsset(asset: typeof desktopAssets.$inferSelect) {
+function enrichAsset(
+  asset: typeof desktopAssets.$inferSelect,
+  cnMode: boolean = false
+) {
   const meta = asset.metadata as Record<string, unknown>;
   const storageKey = typeof meta.storageKey === "string" ? meta.storageKey : null;
   const imageId = typeof meta.imageId === "string" ? meta.imageId : null;
@@ -19,13 +23,13 @@ function enrichAsset(asset: typeof desktopAssets.$inferSelect) {
     return {
       ...asset,
       imageUrl: null,
-      videoUrl: storageKey ? getContentUrl(storageKey) : null,
+      videoUrl: storageKey ? getContentUrl(storageKey, cnMode) : null,
     };
   }
   if (asset.assetType === "public_image") {
     return {
       ...asset,
-      imageUrl: storageKey ? getContentUrl(storageKey) : null,
+      imageUrl: storageKey ? getContentUrl(storageKey, cnMode) : null,
       videoUrl: null,
     };
   }
@@ -33,13 +37,13 @@ function enrichAsset(asset: typeof desktopAssets.$inferSelect) {
     return {
       ...asset,
       imageUrl: null,
-      audioUrl: audioId ? getAudioUrl(audioId) : null,
+      audioUrl: audioId ? getAudioUrl(audioId, cnMode) : null,
     };
   }
   return {
     ...asset,
-    imageUrl: imageId ? getImageUrl(imageId) : null,
-    videoUrl: asset.assetType === "video" && videoId ? getVideoUrl(videoId) : null,
+    imageUrl: imageId ? getImageUrl(imageId, cnMode) : null,
+    videoUrl: asset.assetType === "video" && videoId ? getVideoUrl(videoId, cnMode) : null,
   };
 }
 
@@ -72,6 +76,7 @@ export async function POST(
       return NextResponse.json({ error: "Invalid token" }, { status: 401 });
     }
 
+    const cnMode = await getUserSetting(payload.userId, "cnMode");
     const { id } = await params;
     const permission = await getDesktopPermission(id, payload.userId);
     if (!hasWriteAccess(permission)) {
@@ -113,7 +118,7 @@ export async function POST(
         )
         .returning();
 
-      if (updated) results.push(enrichAsset(updated));
+      if (updated) results.push(enrichAsset(updated, cnMode));
     }
 
     return NextResponse.json({ assets: results });

@@ -14,22 +14,23 @@ import { getContentUrl } from "@/lib/config/video.config";
 import { ensureDefaultProject } from "@/lib/db/projects";
 import { getUserPermission } from "@/lib/collection-utils";
 import { getProjectPermission } from "@/lib/project-utils";
+import { getUserSetting } from "@/lib/user-settings/server";
 
-function enrichAssetUrls(asset: { assetType: string; imageId: string; assetId: string }) {
+function enrichAssetUrls(asset: { assetType: string; imageId: string; assetId: string }, cnMode: boolean = false) {
   if (asset.assetType === "public_image") {
-    return { imageUrl: getContentUrl(asset.assetId) };
+    return { imageUrl: getContentUrl(asset.assetId, cnMode) };
   }
   if (asset.assetType === "public_video") {
-    return { imageUrl: "", videoUrl: getContentUrl(asset.assetId) };
+    return { imageUrl: "", videoUrl: getContentUrl(asset.assetId, cnMode) };
   }
 
   if (asset.assetType === "audio") {
-    return { imageUrl: "", audioUrl: getAudioUrl(asset.assetId) };
+    return { imageUrl: "", audioUrl: getAudioUrl(asset.assetId, cnMode) };
   }
 
-  const imageUrl = getImageUrl(asset.imageId);
+  const imageUrl = getImageUrl(asset.imageId, cnMode);
   if (asset.assetType === "video") {
-    return { imageUrl, videoUrl: getVideoUrl(asset.assetId) };
+    return { imageUrl, videoUrl: getVideoUrl(asset.assetId, cnMode) };
   }
   return { imageUrl };
 }
@@ -70,6 +71,7 @@ export async function GET(req: NextRequest) {
     }
 
     const userId = payload.userId;
+    const cnMode = await getUserSetting(userId, "cnMode");
     const url = new URL(req.url);
     const projectId = url.searchParams.get("projectId") || undefined;
     const collectionId = url.searchParams.get("collectionId") || undefined;
@@ -108,7 +110,7 @@ export async function GET(req: NextRequest) {
 
       const assets = pageRows.map((a) => ({
         ...a,
-        ...enrichAssetUrls(a),
+        ...enrichAssetUrls(a, cnMode),
       }));
 
       return NextResponse.json({
@@ -141,7 +143,7 @@ export async function GET(req: NextRequest) {
 
       const assets = pageRows.map((a) => ({
         ...a,
-        ...enrichAssetUrls(a),
+        ...enrichAssetUrls(a, cnMode),
       }));
 
       return NextResponse.json({
@@ -200,7 +202,7 @@ export async function GET(req: NextRequest) {
     const pageRows = hasMore ? rows.slice(0, limit) : rows;
     const assets = pageRows.map((a) => ({
       ...a,
-      ...enrichAssetUrls(a),
+      ...enrichAssetUrls(a, cnMode),
     }));
 
     return NextResponse.json({
@@ -310,10 +312,11 @@ export async function POST(req: NextRequest) {
       })
       .returning();
 
+    const cnModePost = await getUserSetting(userId, "cnMode");
     return NextResponse.json({
       asset: {
         ...created,
-        imageUrl: getImageUrl(created.imageId),
+        imageUrl: getImageUrl(created.imageId, cnModePost),
       },
     });
   } catch (error) {

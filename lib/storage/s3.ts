@@ -14,6 +14,7 @@ import {
 import { randomUUID } from "crypto";
 import { siteConfig } from "@/config/site";
 import { compressImageIfNeeded } from "@/lib/image/compress";
+import { getCdnDomain } from "@/lib/cdn";
 
 const s3Client = new S3Client({
   region: process.env.AWS_REGION!,
@@ -24,7 +25,6 @@ const s3Client = new S3Client({
 });
 
 const BUCKET_NAME = process.env.AWS_S3_BUCKET_NAME!;
-const CLOUDFRONT_DOMAIN = process.env.CLOUDFRONT_DOMAIN;
 const CLOUDFRONT_KEY_PAIR_ID = process.env.CLOUDFRONT_KEY_PAIR_ID;
 // Process private key once at module load - handle escaped newlines from env var
 const CLOUDFRONT_PRIVATE_KEY = process.env.CLOUDFRONT_PRIVATE_KEY?.replace(
@@ -108,17 +108,19 @@ export async function uploadTempImage(
  */
 export function getSignedTempImageUrl(
   imageId: string,
-  expirationSeconds?: number
+  expirationSeconds?: number,
+  cnMode: boolean = false
 ): string {
+  const domain = getCdnDomain(cnMode);
   if (
-    !CLOUDFRONT_DOMAIN ||
+    !domain ||
     !CLOUDFRONT_KEY_PAIR_ID ||
     !CLOUDFRONT_PRIVATE_KEY
   ) {
-    return `https://${CLOUDFRONT_DOMAIN || "s3-fallback"}/temp-images/${imageId}`;
+    return `https://${domain || "s3-fallback"}/temp-images/${imageId}`;
   }
 
-  const url = `https://${CLOUDFRONT_DOMAIN}/temp-images/${imageId}`;
+  const url = `https://${domain}/temp-images/${imageId}`;
   const expiration =
     expirationSeconds || siteConfig.cloudfront.signedUrlExpirationSeconds;
   const dateLessThan = new Date(Date.now() + expiration * 1000);
@@ -529,21 +531,20 @@ export async function replaceImage(
  * @param imageId The image ID (stored in S3 as images/{imageId})
  * @returns CloudFront URL (signed in dev, cookie-based in production)
  */
-export function getImageUrl(imageId: string): string {
-  if (!CLOUDFRONT_DOMAIN) {
+export function getImageUrl(imageId: string, cnMode: boolean = false): string {
+  const domain = getCdnDomain(cnMode);
+  if (!domain) {
     console.warn(
       "[CloudFront] Missing CloudFront configuration, falling back to unsigned URL"
     );
-    // Fallback to direct S3 URL if CloudFront is not configured
-    return `https://${CLOUDFRONT_DOMAIN || "s3-fallback"}/images/${imageId}`;
+    return `https://${domain || "s3-fallback"}/images/${imageId}`;
   }
 
-  // In development, always use signed URLs since cookies can't be set locally
   if (IS_DEV) {
-    return getSignedImageUrl(imageId);
+    return getSignedImageUrl(imageId, undefined, cnMode);
   }
 
-  return `https://${CLOUDFRONT_DOMAIN}/images/${imageId}`;
+  return `https://${domain}/images/${imageId}`;
 }
 
 /**
@@ -556,20 +557,22 @@ export function getImageUrl(imageId: string): string {
  */
 export function getSignedImageUrl(
   imageId: string,
-  expirationSeconds?: number
+  expirationSeconds?: number,
+  cnMode: boolean = false
 ): string {
+  const domain = getCdnDomain(cnMode);
   if (
-    !CLOUDFRONT_DOMAIN ||
+    !domain ||
     !CLOUDFRONT_KEY_PAIR_ID ||
     !CLOUDFRONT_PRIVATE_KEY
   ) {
     console.warn(
       "[CloudFront] Missing CloudFront signing configuration, falling back to unsigned URL"
     );
-    return getImageUrl(imageId);
+    return getImageUrl(imageId, cnMode);
   }
 
-  const url = `https://${CLOUDFRONT_DOMAIN}/images/${imageId}`;
+  const url = `https://${domain}/images/${imageId}`;
   const expiration =
     expirationSeconds || siteConfig.cloudfront.signedUrlExpirationSeconds;
   const dateLessThan = new Date(Date.now() + expiration * 1000);
@@ -711,20 +714,20 @@ export async function downloadVideo(videoId: string): Promise<Buffer | null> {
  * @param videoId The video ID (stored in S3 as videos/{videoId})
  * @returns CloudFront URL (signed in dev, cookie-based in production)
  */
-export function getVideoUrl(videoId: string): string {
-  if (!CLOUDFRONT_DOMAIN) {
+export function getVideoUrl(videoId: string, cnMode: boolean = false): string {
+  const domain = getCdnDomain(cnMode);
+  if (!domain) {
     console.warn(
       "[CloudFront] Missing CloudFront configuration, falling back to unsigned URL"
     );
-    return `https://${CLOUDFRONT_DOMAIN || "s3-fallback"}/videos/${videoId}`;
+    return `https://${domain || "s3-fallback"}/videos/${videoId}`;
   }
 
-  // In development, always use signed URLs since cookies can't be set locally
   if (IS_DEV) {
-    return getSignedVideoUrl(videoId);
+    return getSignedVideoUrl(videoId, undefined, cnMode);
   }
 
-  return `https://${CLOUDFRONT_DOMAIN}/videos/${videoId}`;
+  return `https://${domain}/videos/${videoId}`;
 }
 
 /**
@@ -737,20 +740,22 @@ export function getVideoUrl(videoId: string): string {
  */
 export function getSignedVideoUrl(
   videoId: string,
-  expirationSeconds?: number
+  expirationSeconds?: number,
+  cnMode: boolean = false
 ): string {
+  const domain = getCdnDomain(cnMode);
   if (
-    !CLOUDFRONT_DOMAIN ||
+    !domain ||
     !CLOUDFRONT_KEY_PAIR_ID ||
     !CLOUDFRONT_PRIVATE_KEY
   ) {
     console.warn(
       "[CloudFront] Missing CloudFront signing configuration, falling back to unsigned URL"
     );
-    return getVideoUrl(videoId);
+    return getVideoUrl(videoId, cnMode);
   }
 
-  const url = `https://${CLOUDFRONT_DOMAIN}/videos/${videoId}`;
+  const url = `https://${domain}/videos/${videoId}`;
   const expiration =
     expirationSeconds || siteConfig.cloudfront.signedUrlExpirationSeconds;
   const dateLessThan = new Date(Date.now() + expiration * 1000);
@@ -861,37 +866,40 @@ export async function downloadAudio(audioId: string): Promise<Buffer | null> {
   }
 }
 
-export function getAudioUrl(audioId: string): string {
-  if (!CLOUDFRONT_DOMAIN) {
+export function getAudioUrl(audioId: string, cnMode: boolean = false): string {
+  const domain = getCdnDomain(cnMode);
+  if (!domain) {
     console.warn(
       "[CloudFront] Missing CloudFront configuration, falling back to unsigned URL"
     );
-    return `https://${CLOUDFRONT_DOMAIN || "s3-fallback"}/audios/${audioId}`;
+    return `https://${domain || "s3-fallback"}/audios/${audioId}`;
   }
 
   if (IS_DEV) {
-    return getSignedAudioUrl(audioId);
+    return getSignedAudioUrl(audioId, undefined, cnMode);
   }
 
-  return `https://${CLOUDFRONT_DOMAIN}/audios/${audioId}`;
+  return `https://${domain}/audios/${audioId}`;
 }
 
 export function getSignedAudioUrl(
   audioId: string,
-  expirationSeconds?: number
+  expirationSeconds?: number,
+  cnMode: boolean = false
 ): string {
+  const domain = getCdnDomain(cnMode);
   if (
-    !CLOUDFRONT_DOMAIN ||
+    !domain ||
     !CLOUDFRONT_KEY_PAIR_ID ||
     !CLOUDFRONT_PRIVATE_KEY
   ) {
     console.warn(
       "[CloudFront] Missing CloudFront signing configuration, falling back to unsigned URL"
     );
-    return getAudioUrl(audioId);
+    return getAudioUrl(audioId, cnMode);
   }
 
-  const url = `https://${CLOUDFRONT_DOMAIN}/audios/${audioId}`;
+  const url = `https://${domain}/audios/${audioId}`;
   const expiration =
     expirationSeconds || siteConfig.cloudfront.signedUrlExpirationSeconds;
   const dateLessThan = new Date(Date.now() + expiration * 1000);

@@ -22,6 +22,7 @@ import type {
 import { getTablePermission, getEditableGrants } from "./permissions";
 import { getImageUrl, getVideoUrl, getAudioUrl } from "@/lib/storage/s3";
 import { getContentUrl } from "@/lib/config/video.config";
+import { getUserSetting } from "@/lib/user-settings/server";
 
 // ---------------------------------------------------------------------------
 // Table CRUD
@@ -113,6 +114,8 @@ export async function getEnrichedTable(
   const permission = await getTablePermission(tableId, userId);
   if (!permission) return null;
 
+  const cnMode = await getUserSetting(userId, "cnMode");
+
   const [columns, rows, cells, shares] = await Promise.all([
     db
       .select()
@@ -143,7 +146,7 @@ export async function getEnrichedTable(
       columnId: c.columnId,
       rowId: c.rowId,
       textContent: c.textContent,
-      mediaAssets: enrichMediaAssets(c.mediaAssets as MediaAssetRef[] | null),
+      mediaAssets: enrichMediaAssets(c.mediaAssets as MediaAssetRef[] | null, cnMode),
       comment: (c.comment as CellComment | null) ?? null,
       updatedAt: c.updatedAt,
       updatedBy: c.updatedBy,
@@ -688,14 +691,15 @@ function stripMediaUrls(
 }
 
 function enrichMediaAssets(
-  assets: MediaAssetRef[] | null
+  assets: MediaAssetRef[] | null,
+  cnMode: boolean = false
 ): EnrichedMediaAssetRef[] | null {
   if (!assets) return null;
   return assets.map((a) => {
     if (a.assetType === "public_image") {
       return {
         ...a,
-        imageUrl: getContentUrl(a.assetId),
+        imageUrl: getContentUrl(a.assetId, cnMode),
         videoUrl: undefined,
       };
     }
@@ -703,7 +707,7 @@ function enrichMediaAssets(
       return {
         ...a,
         imageUrl: undefined,
-        videoUrl: getContentUrl(a.assetId),
+        videoUrl: getContentUrl(a.assetId, cnMode),
       };
     }
     if (a.assetType === "audio") {
@@ -711,13 +715,13 @@ function enrichMediaAssets(
         ...a,
         imageUrl: undefined,
         videoUrl: undefined,
-        audioUrl: a.assetId ? getAudioUrl(a.assetId) : undefined,
+        audioUrl: a.assetId ? getAudioUrl(a.assetId, cnMode) : undefined,
       };
     }
     return {
       ...a,
-      imageUrl: a.imageId ? getImageUrl(a.imageId) : undefined,
-      videoUrl: a.assetType === "video" && a.assetId ? getVideoUrl(a.assetId) : undefined,
+      imageUrl: a.imageId ? getImageUrl(a.imageId, cnMode) : undefined,
+      videoUrl: a.assetType === "video" && a.assetId ? getVideoUrl(a.assetId, cnMode) : undefined,
     };
   });
 }

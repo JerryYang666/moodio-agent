@@ -8,6 +8,7 @@ import { getImageUrl, getAudioUrl } from "@/lib/storage/s3";
 import { getContentUrl } from "@/lib/config/video.config";
 import { getUserPermission } from "@/lib/collection-utils";
 import { getProjectPermission } from "@/lib/project-utils";
+import { getUserSetting } from "@/lib/user-settings/server";
 
 /**
  * GET /api/assets/[assetId]
@@ -52,11 +53,13 @@ export async function GET(
       );
     }
 
+    const cnMode = await getUserSetting(userId, "cnMode");
+
     const enriched = asset.assetType === "audio"
-      ? { ...asset, imageUrl: "", audioUrl: getAudioUrl(asset.assetId) }
+      ? { ...asset, imageUrl: "", audioUrl: getAudioUrl(asset.assetId, cnMode) }
       : asset.assetType === "public_image"
-        ? { ...asset, imageUrl: getContentUrl(asset.assetId) }
-        : { ...asset, imageUrl: getImageUrl(asset.imageId) };
+        ? { ...asset, imageUrl: getContentUrl(asset.assetId, cnMode) }
+        : { ...asset, imageUrl: getImageUrl(asset.imageId, cnMode) };
 
     return NextResponse.json({ asset: enriched });
   } catch (error) {

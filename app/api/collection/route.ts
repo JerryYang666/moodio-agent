@@ -10,6 +10,7 @@ import { getContentUrl } from "@/lib/config/video.config";
 import { getProjectPermission, hasProjectWritePermission } from "@/lib/project-utils";
 import { PERMISSION_OWNER } from "@/lib/permissions";
 import { TAG_COLOR_MAP } from "@/lib/tag-colors";
+import { getUserSetting } from "@/lib/user-settings/server";
 
 /**
  * GET /api/collection
@@ -28,6 +29,7 @@ export async function GET(req: NextRequest) {
     }
 
     const userId = payload.userId;
+    const cnMode = await getUserSetting(userId, "cnMode");
     await ensureDefaultProject(userId);
 
     // Get collections owned by user
@@ -97,10 +99,10 @@ export async function GET(req: NextRequest) {
           continue;
         }
         if (cover.assetType === "public_image") {
-          coverMap.set(cover.collectionId, getContentUrl(cover.assetId));
+          coverMap.set(cover.collectionId, getContentUrl(cover.assetId, cnMode));
           continue;
         }
-        coverMap.set(cover.collectionId, getImageUrl(cover.imageId));
+        coverMap.set(cover.collectionId, getImageUrl(cover.imageId, cnMode));
       }
     }
 

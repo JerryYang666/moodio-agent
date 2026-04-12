@@ -15,6 +15,7 @@ import { eq, desc, inArray } from "drizzle-orm";
 import { getDesktopPermission } from "@/lib/desktop/permissions";
 import { getImageUrl, getVideoUrl } from "@/lib/storage/s3";
 import { getContentUrl, getVideoUrl as getPublicVideoUrl } from "@/lib/config/video.config";
+import { getUserSetting } from "@/lib/user-settings/server";
 
 /**
  * GET /api/desktop/[id]
@@ -35,6 +36,7 @@ export async function GET(
       return NextResponse.json({ error: "Invalid token" }, { status: 401 });
     }
 
+    const cnMode = await getUserSetting(payload.userId, "cnMode");
     const { id } = await params;
     const permission = await getDesktopPermission(id, payload.userId);
     if (!permission) {
@@ -108,7 +110,7 @@ export async function GET(
         return {
           ...asset,
           imageUrl: null,
-          videoUrl: storageKey ? getPublicVideoUrl(storageKey) : null,
+          videoUrl: storageKey ? getPublicVideoUrl(storageKey, cnMode) : null,
           generationData: null,
         };
       }
@@ -117,7 +119,7 @@ export async function GET(
         const storageKey = typeof meta.storageKey === "string" ? meta.storageKey : null;
         return {
           ...asset,
-          imageUrl: storageKey ? getContentUrl(storageKey) : null,
+          imageUrl: storageKey ? getContentUrl(storageKey, cnMode) : null,
           videoUrl: null,
           generationData: null,
         };
@@ -125,8 +127,8 @@ export async function GET(
 
       return {
         ...asset,
-        imageUrl: imageId ? getImageUrl(imageId) : null,
-        videoUrl: asset.assetType === "video" && videoId ? getVideoUrl(videoId) : null,
+        imageUrl: imageId ? getImageUrl(imageId, cnMode) : null,
+        videoUrl: asset.assetType === "video" && videoId ? getVideoUrl(videoId, cnMode) : null,
         generationData,
       };
     });

@@ -18,6 +18,7 @@ import { getContentUrl, getVideoUrl as getPublicVideoUrl } from "@/lib/config/vi
 import { getUserPermission } from "@/lib/collection-utils";
 import { PERMISSION_OWNER, isOwner, type SharePermission } from "@/lib/permissions";
 import { TAG_COLOR_MAP } from "@/lib/tag-colors";
+import { getUserSetting } from "@/lib/user-settings/server";
 
 /**
  * GET /api/collection/[collectionId]
@@ -39,6 +40,7 @@ export async function GET(
     }
 
     const userId = payload.userId;
+    const cnMode = await getUserSetting(userId, "cnMode");
     const { collectionId } = await params;
 
     // Check permission
@@ -77,13 +79,13 @@ export async function GET(
         return {
           ...asset,
           imageUrl: "",
-          videoUrl: getPublicVideoUrl(asset.assetId),
+          videoUrl: getPublicVideoUrl(asset.assetId, cnMode),
         };
       }
       if (asset.assetType === "public_image") {
         return {
           ...asset,
-          imageUrl: getContentUrl(asset.assetId),
+          imageUrl: getContentUrl(asset.assetId, cnMode),
           videoUrl: undefined,
         };
       }
@@ -91,13 +93,13 @@ export async function GET(
         return {
           ...asset,
           imageUrl: "",
-          audioUrl: getAudioUrl(asset.assetId),
+          audioUrl: getAudioUrl(asset.assetId, cnMode),
         };
       }
       return {
         ...asset,
-        imageUrl: getImageUrl(asset.imageId),
-        videoUrl: asset.assetType === "video" ? getVideoUrl(asset.assetId) : undefined,
+        imageUrl: getImageUrl(asset.imageId, cnMode),
+        videoUrl: asset.assetType === "video" ? getVideoUrl(asset.assetId, cnMode) : undefined,
       };
     });
 

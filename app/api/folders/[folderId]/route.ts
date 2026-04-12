@@ -25,6 +25,7 @@ import {
   isOwner,
   type SharePermission,
 } from "@/lib/permissions";
+import { getUserSetting } from "@/lib/user-settings/server";
 
 /**
  * GET /api/folders/[folderId]
@@ -46,6 +47,7 @@ export async function GET(
     }
 
     const userId = payload.userId;
+    const cnMode = await getUserSetting(userId, "cnMode");
     const { folderId } = await params;
 
     const permission = await getFolderPermission(folderId, userId);
@@ -94,13 +96,13 @@ export async function GET(
         return {
           ...asset,
           imageUrl: "",
-          videoUrl: getPublicVideoUrl(asset.assetId),
+          videoUrl: getPublicVideoUrl(asset.assetId, cnMode),
         };
       }
       if (asset.assetType === "public_image") {
         return {
           ...asset,
-          imageUrl: getContentUrl(asset.assetId),
+          imageUrl: getContentUrl(asset.assetId, cnMode),
           videoUrl: undefined,
         };
       }
@@ -108,15 +110,15 @@ export async function GET(
         return {
           ...asset,
           imageUrl: "",
-          audioUrl: getAudioUrl(asset.assetId),
+          audioUrl: getAudioUrl(asset.assetId, cnMode),
         };
       }
       return {
         ...asset,
-        imageUrl: getImageUrl(asset.imageId),
+        imageUrl: getImageUrl(asset.imageId, cnMode),
         videoUrl:
           asset.assetType === "video"
-            ? getVideoUrl(asset.assetId)
+            ? getVideoUrl(asset.assetId, cnMode)
             : undefined,
       };
     });

@@ -9,6 +9,7 @@ import { hasWriteAccess } from "@/lib/permissions";
 import { validateAssetMetadata } from "@/lib/desktop/types";
 import { getImageUrl, getVideoUrl, getAudioUrl } from "@/lib/storage/s3";
 import { getContentUrl } from "@/lib/config/video.config";
+import { getUserSetting } from "@/lib/user-settings/server";
 
 /**
  * GET /api/desktop/[id]/assets
@@ -29,6 +30,7 @@ export async function GET(
       return NextResponse.json({ error: "Invalid token" }, { status: 401 });
     }
 
+    const cnMode = await getUserSetting(payload.userId, "cnMode");
     const { id } = await params;
     const permission = await getDesktopPermission(id, payload.userId);
     if (!permission) {
@@ -95,7 +97,7 @@ export async function GET(
         return {
           ...asset,
           imageUrl: null,
-          videoUrl: storageKey ? getContentUrl(storageKey) : null,
+          videoUrl: storageKey ? getContentUrl(storageKey, cnMode) : null,
           generationData: null,
         };
       }
@@ -104,7 +106,7 @@ export async function GET(
         const storageKey = typeof meta.storageKey === "string" ? meta.storageKey : null;
         return {
           ...asset,
-          imageUrl: storageKey ? getContentUrl(storageKey) : null,
+          imageUrl: storageKey ? getContentUrl(storageKey, cnMode) : null,
           videoUrl: null,
           generationData: null,
         };
@@ -116,15 +118,15 @@ export async function GET(
           ...asset,
           imageUrl: null,
           videoUrl: null,
-          audioUrl: audioId ? getAudioUrl(audioId) : null,
+          audioUrl: audioId ? getAudioUrl(audioId, cnMode) : null,
           generationData: null,
         };
       }
 
       return {
         ...asset,
-        imageUrl: imageId ? getImageUrl(imageId) : null,
-        videoUrl: asset.assetType === "video" && videoId ? getVideoUrl(videoId) : null,
+        imageUrl: imageId ? getImageUrl(imageId, cnMode) : null,
+        videoUrl: asset.assetType === "video" && videoId ? getVideoUrl(videoId, cnMode) : null,
         generationData,
       };
     });
@@ -158,6 +160,7 @@ export async function POST(
       return NextResponse.json({ error: "Invalid token" }, { status: 401 });
     }
 
+    const cnMode = await getUserSetting(payload.userId, "cnMode");
     const { id } = await params;
     const permission = await getDesktopPermission(id, payload.userId);
     if (!hasWriteAccess(permission)) {
@@ -216,7 +219,7 @@ export async function POST(
         return {
           ...asset,
           imageUrl: null,
-          videoUrl: storageKey ? getContentUrl(storageKey) : null,
+          videoUrl: storageKey ? getContentUrl(storageKey, cnMode) : null,
         };
       }
 
@@ -224,7 +227,7 @@ export async function POST(
         const storageKey = typeof meta.storageKey === "string" ? meta.storageKey : null;
         return {
           ...asset,
-          imageUrl: storageKey ? getContentUrl(storageKey) : null,
+          imageUrl: storageKey ? getContentUrl(storageKey, cnMode) : null,
           videoUrl: null,
         };
       }
@@ -235,14 +238,14 @@ export async function POST(
           ...asset,
           imageUrl: null,
           videoUrl: null,
-          audioUrl: audioId ? getAudioUrl(audioId) : null,
+          audioUrl: audioId ? getAudioUrl(audioId, cnMode) : null,
         };
       }
 
       return {
         ...asset,
-        imageUrl: imgId ? getImageUrl(imgId) : null,
-        videoUrl: asset.assetType === "video" && vidId ? getVideoUrl(vidId) : null,
+        imageUrl: imgId ? getImageUrl(imgId, cnMode) : null,
+        videoUrl: asset.assetType === "video" && vidId ? getVideoUrl(vidId, cnMode) : null,
       };
     });
 

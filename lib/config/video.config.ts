@@ -1,3 +1,5 @@
+import { getCdnBaseUrl } from "@/lib/cdn";
+
 /**
  * Video content configuration
  *
@@ -6,35 +8,29 @@
 export const S3_CONTENT_PREFIX = "public-videos" as const;
 
 /**
- * Construct CloudFront URL for retrieval content.
+ * Construct CDN URL for retrieval content.
  * 
  * Supports both retrieval storage key families:
  * - public-videos/...webm
  * - public-stills/...webp
+ *
+ * @param cnMode When true, resolves to the China CDN domain.
  */
-export function getContentUrl(storageKey: string): string {
-  let cloudfrontDomain = process.env.NEXT_PUBLIC_CLOUDFRONT_URL;
+export function getContentUrl(storageKey: string, cnMode: boolean = false): string {
+  const base = getCdnBaseUrl(cnMode);
 
-  if (!cloudfrontDomain) {
-    console.error('NEXT_PUBLIC_CLOUDFRONT_URL environment variable is not set');
-    return '';
+  if (!base) {
+    console.error("CDN URL is not configured");
+    return "";
   }
 
-  // Ensure the domain has a protocol (https://)
-  if (!cloudfrontDomain.startsWith('http://') && !cloudfrontDomain.startsWith('https://')) {
-    cloudfrontDomain = `https://${cloudfrontDomain}`;
-  }
-
-  // Remove leading slash if present
-  const cleanKey = storageKey.startsWith('/') ? storageKey.slice(1) : storageKey;
-
-  // Construct full URL - storage_key already includes the bucket prefix.
-  return `${cloudfrontDomain}/${cleanKey}`;
+  const cleanKey = storageKey.startsWith("/") ? storageKey.slice(1) : storageKey;
+  return `${base}/${cleanKey}`;
 }
 
 /**
  * Backward-compatible alias for legacy call sites.
  */
-export function getVideoUrl(storageKey: string): string {
-  return getContentUrl(storageKey);
+export function getVideoUrl(storageKey: string, cnMode: boolean = false): string {
+  return getContentUrl(storageKey, cnMode);
 }
