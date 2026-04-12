@@ -32,6 +32,7 @@ export const users = pgTable("users", {
   roles: jsonb("roles").$type<string[]>().notNull().default(["new_user"]), // Array of role names
   testingGroups: jsonb("testing_groups").$type<string[]>().notNull().default([]), // Array of testing group UUIDs
   stripeCustomerId: varchar("stripe_customer_id", { length: 255 }).unique(),
+  settings: jsonb("settings").$type<import("@/lib/user-settings/types").UserSettings>().notNull().default({}),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

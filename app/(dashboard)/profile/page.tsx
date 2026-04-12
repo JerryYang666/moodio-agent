@@ -8,10 +8,12 @@ import { Button } from "@heroui/button";
 import { Card, CardBody, CardHeader } from "@heroui/card";
 import { useAuth } from "@/hooks/use-auth";
 import { startRegistration } from "@simplewebauthn/browser";
-import { Key, Lock, Eye, EyeOff } from "lucide-react";
+import { Switch } from "@heroui/switch";
+import { Key, Lock, Eye, EyeOff, Globe } from "lucide-react";
 import { addToast } from "@heroui/toast";
 import { siteConfig } from "@/config/site";
 import { LegalFooter } from "@/components/legal-footer";
+import { useUserSetting, useUpdateSettings } from "@/lib/user-settings";
 
 export default function ProfilePage() {
   const t = useTranslations();
@@ -34,6 +36,9 @@ export default function ProfilePage() {
   const [passwordError, setPasswordError] = useState("");
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  const cnMode = useUserSetting("cnMode");
+  const updateSettings = useUpdateSettings();
 
   const OTP_LENGTH = siteConfig.auth.otp.length;
 
@@ -246,6 +251,29 @@ export default function ProfilePage() {
               </Button>
             </div>
           </form>
+        </CardBody>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-0 pt-4 px-4 flex-col items-start">
+          <h2 className="text-lg font-semibold">{t("profile.accountSettings")}</h2>
+        </CardHeader>
+        <CardBody>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Globe className="w-5 h-5 text-primary" />
+              <div className="flex flex-col">
+                <span className="font-medium">{t("profile.cnMode")}</span>
+                <span className="text-xs text-default-400">
+                  {t("profile.cnModeDescription")}
+                </span>
+              </div>
+            </div>
+            <Switch
+              isSelected={cnMode}
+              onValueChange={(val) => updateSettings({ cnMode: val })}
+            />
+          </div>
         </CardBody>
       </Card>
 

@@ -299,7 +299,10 @@
     "passwordChanged": "Password changed successfully",
     "passwordSetSuccess": "Password set successfully",
     "otpSentForPassword": "Verification code sent to your email",
-    "enterOtpAndNewPassword": "Enter the verification code from your email and your new password"
+    "enterOtpAndNewPassword": "Enter the verification code from your email and your new password",
+    "accountSettings": "Account Settings",
+    "cnMode": "China Mode",
+    "cnModeDescription": "Optimize content delivery for mainland China"
   },
   "payments": {
     "title": "Payments & Subscriptions",

@@ -299,7 +299,10 @@
     "passwordChanged": "密碼變更成功",
     "passwordSetSuccess": "密碼設定成功",
     "otpSentForPassword": "驗證碼已傳送至您的電子郵件",
-    "enterOtpAndNewPassword": "請輸入電子郵件中的驗證碼和新密碼"
+    "enterOtpAndNewPassword": "請輸入電子郵件中的驗證碼和新密碼",
+    "accountSettings": "帳戶設定",
+    "cnMode": "國內模式",
+    "cnModeDescription": "優化中國大陸的內容傳遞"
   },
   "payments": {
     "title": "付款與訂閱",

@@ -299,7 +299,10 @@
     "passwordChanged": "비밀번호가 성공적으로 변경되었습니다",
     "passwordSetSuccess": "비밀번호가 성공적으로 설정되었습니다",
     "otpSentForPassword": "인증 코드가 이메일로 전송되었습니다",
-    "enterOtpAndNewPassword": "이메일로 받은 인증 코드와 새 비밀번호를 입력하세요"
+    "enterOtpAndNewPassword": "이메일로 받은 인증 코드와 새 비밀번호를 입력하세요",
+    "accountSettings": "계정 설정",
+    "cnMode": "중국 모드",
+    "cnModeDescription": "중국 본토를 위한 콘텐츠 전송 최적화"
   },
   "payments": {
     "title": "결제 및 구독",

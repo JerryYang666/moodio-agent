@@ -299,7 +299,10 @@
     "passwordChanged": "パスワードが正常に変更されました",
     "passwordSetSuccess": "パスワードが正常に設定されました",
     "otpSentForPassword": "認証コードがメールに送信されました",
-    "enterOtpAndNewPassword": "メールの認証コードと新しいパスワードを入力してください"
+    "enterOtpAndNewPassword": "メールの認証コードと新しいパスワードを入力してください",
+    "accountSettings": "アカウント設定",
+    "cnMode": "中国モード",
+    "cnModeDescription": "中国本土向けにコンテンツ配信を最適化"
   },
   "payments": {
     "title": "お支払いとサブスクリプション",

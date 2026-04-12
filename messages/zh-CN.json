@@ -299,7 +299,10 @@
     "passwordChanged": "密码修改成功",
     "passwordSetSuccess": "密码设置成功",
     "otpSentForPassword": "验证码已发送到您的邮箱",
-    "enterOtpAndNewPassword": "请输入邮箱中的验证码和新密码"
+    "enterOtpAndNewPassword": "请输入邮箱中的验证码和新密码",
+    "accountSettings": "账户设置",
+    "cnMode": "国内模式",
+    "cnModeDescription": "优化中国大陆的内容分发"
   },
   "payments": {
     "title": "支付与订阅",

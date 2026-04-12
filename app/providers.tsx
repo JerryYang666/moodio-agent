@@ -15,6 +15,7 @@ import { IOSInstallPrompt } from "@/components/ios-install-prompt";
 import { LocaleAutoDetect } from "@/components/locale-auto-detect";
 import { ReduxProvider } from "@/lib/providers/redux-provider";
 import { FeatureFlagProvider } from "@/lib/feature-flags";
+import { UserSettingsProvider } from "@/lib/user-settings";
 
 export interface ProvidersProps {
   children: React.ReactNode;
@@ -38,16 +39,18 @@ export function Providers({ children, themeProps }: ProvidersProps) {
         <NextThemesProvider {...themeProps}>
           <AuthProvider>
             <FeatureFlagProvider>
-              <ChatProvider>
-                <CollectionsProvider>
-                  <VideoProvider>
-                    <ToastProvider />
-                    <LocaleAutoDetect />
-                    <IOSInstallPrompt />
-                    {children}
-                  </VideoProvider>
-                </CollectionsProvider>
-              </ChatProvider>
+              <UserSettingsProvider>
+                <ChatProvider>
+                  <CollectionsProvider>
+                    <VideoProvider>
+                      <ToastProvider />
+                      <LocaleAutoDetect />
+                      <IOSInstallPrompt />
+                      {children}
+                    </VideoProvider>
+                  </CollectionsProvider>
+                </ChatProvider>
+              </UserSettingsProvider>
             </FeatureFlagProvider>
           </AuthProvider>
         </NextThemesProvider>

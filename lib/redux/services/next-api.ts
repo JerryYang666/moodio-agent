@@ -1,6 +1,7 @@
 import { createApi } from "@reduxjs/toolkit/query/react";
 import { createBaseQueryWithReauth } from "./base-query";
 import type { FeatureFlagsResponse } from "@/lib/feature-flags/types";
+import type { UserSettingsResponse, UserSettings } from "@/lib/user-settings/types";
 import type { Permission } from "@/lib/permissions";
 import type { PersistentAssets } from "@/lib/chat/persistent-assets-types";
 
@@ -168,13 +169,28 @@ export interface CollectionItem {
 export const nextApi = createApi({
   reducerPath: "nextApi",
   baseQuery: createBaseQueryWithReauth(""),
-  tagTypes: ["FeatureFlags", "Credits", "Collections", "PersistentAssets", "Teams", "Folders"],
+  tagTypes: ["FeatureFlags", "Credits", "Collections", "PersistentAssets", "Teams", "Folders", "UserSettings"],
 
   endpoints: (builder) => ({
     getFeatureFlags: builder.query<FeatureFlagsResponse, void>({
       query: () => "/api/users/feature-flags",
       keepUnusedDataFor: 300,
       providesTags: ["FeatureFlags"],
+    }),
+
+    getUserSettings: builder.query<UserSettingsResponse, void>({
+      query: () => "/api/users/settings",
+      keepUnusedDataFor: 3600,
+      providesTags: ["UserSettings"],
+    }),
+
+    updateUserSettings: builder.mutation<UserSettingsResponse, Partial<UserSettings>>({
+      query: (body) => ({
+        url: "/api/users/settings",
+        method: "PATCH",
+        body,
+      }),
+      invalidatesTags: ["UserSettings"],
     }),
 
     setActiveAccount: builder.mutation<void, SetActiveAccountRequest>({
@@ -467,6 +483,8 @@ export const nextApi = createApi({
 
 export const {
   useGetFeatureFlagsQuery,
+  useGetUserSettingsQuery,
+  useUpdateUserSettingsMutation,
   useSetActiveAccountMutation,
   useGetCreditsBalanceQuery,
   useGenerateVideoMutation,
