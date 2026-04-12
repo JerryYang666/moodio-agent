@@ -111,26 +111,35 @@ export function getSignedTempImageUrl(
   expirationSeconds?: number,
   cnMode: boolean = false
 ): string {
-  const domain = getCdnDomain(cnMode);
+  const originDomain = getCdnDomain(false);
   if (
-    !domain ||
+    !originDomain ||
     !CLOUDFRONT_KEY_PAIR_ID ||
     !CLOUDFRONT_PRIVATE_KEY
   ) {
-    return `https://${domain || "s3-fallback"}/temp-images/${imageId}`;
+    const fallback = getCdnDomain(cnMode) || "s3-fallback";
+    return `https://${fallback}/temp-images/${imageId}`;
   }
 
-  const url = `https://${domain}/temp-images/${imageId}`;
+  const url = `https://${originDomain}/temp-images/${imageId}`;
   const expiration =
     expirationSeconds || siteConfig.cloudfront.signedUrlExpirationSeconds;
   const dateLessThan = new Date(Date.now() + expiration * 1000);
 
-  return getSignedUrl({
+  const signed = getSignedUrl({
     url,
     keyPairId: CLOUDFRONT_KEY_PAIR_ID,
     dateLessThan: dateLessThan.toISOString(),
     privateKey: CLOUDFRONT_PRIVATE_KEY,
   });
+
+  if (cnMode) {
+    const cnDomain = getCdnDomain(true);
+    if (cnDomain && cnDomain !== originDomain) {
+      return signed.replace(originDomain, cnDomain);
+    }
+  }
+  return signed;
 }
 
 /**
@@ -561,9 +570,9 @@ export function getSignedImageUrl(
   expirationSeconds?: number,
   cnMode: boolean = false
 ): string {
-  const domain = getCdnDomain(cnMode);
+  const originDomain = getCdnDomain(false);
   if (
-    !domain ||
+    !originDomain ||
     !CLOUDFRONT_KEY_PAIR_ID ||
     !CLOUDFRONT_PRIVATE_KEY
   ) {
@@ -573,17 +582,26 @@ export function getSignedImageUrl(
     return getImageUrl(imageId, cnMode);
   }
 
-  const url = `https://${domain}/images/${imageId}`;
+  // Sign against the original CloudFront domain (CN CDN is a reverse proxy)
+  const url = `https://${originDomain}/images/${imageId}`;
   const expiration =
     expirationSeconds || siteConfig.cloudfront.signedUrlExpirationSeconds;
   const dateLessThan = new Date(Date.now() + expiration * 1000);
 
-  return getSignedUrl({
+  const signed = getSignedUrl({
     url,
     keyPairId: CLOUDFRONT_KEY_PAIR_ID,
     dateLessThan: dateLessThan.toISOString(),
     privateKey: CLOUDFRONT_PRIVATE_KEY,
   });
+
+  if (cnMode) {
+    const cnDomain = getCdnDomain(true);
+    if (cnDomain && cnDomain !== originDomain) {
+      return signed.replace(originDomain, cnDomain);
+    }
+  }
+  return signed;
 }
 
 // ============================================================================
@@ -744,9 +762,9 @@ export function getSignedVideoUrl(
   expirationSeconds?: number,
   cnMode: boolean = false
 ): string {
-  const domain = getCdnDomain(cnMode);
+  const originDomain = getCdnDomain(false);
   if (
-    !domain ||
+    !originDomain ||
     !CLOUDFRONT_KEY_PAIR_ID ||
     !CLOUDFRONT_PRIVATE_KEY
   ) {
@@ -756,17 +774,26 @@ export function getSignedVideoUrl(
     return getVideoUrl(videoId, cnMode);
   }
 
-  const url = `https://${domain}/videos/${videoId}`;
+  // Sign against the original CloudFront domain (CN CDN is a reverse proxy)
+  const url = `https://${originDomain}/videos/${videoId}`;
   const expiration =
     expirationSeconds || siteConfig.cloudfront.signedUrlExpirationSeconds;
   const dateLessThan = new Date(Date.now() + expiration * 1000);
 
-  return getSignedUrl({
+  const signed = getSignedUrl({
     url,
     keyPairId: CLOUDFRONT_KEY_PAIR_ID,
     dateLessThan: dateLessThan.toISOString(),
     privateKey: CLOUDFRONT_PRIVATE_KEY,
   });
+
+  if (cnMode) {
+    const cnDomain = getCdnDomain(true);
+    if (cnDomain && cnDomain !== originDomain) {
+      return signed.replace(originDomain, cnDomain);
+    }
+  }
+  return signed;
 }
 
 // ============================================================================
@@ -888,9 +915,9 @@ export function getSignedAudioUrl(
   expirationSeconds?: number,
   cnMode: boolean = false
 ): string {
-  const domain = getCdnDomain(cnMode);
+  const originDomain = getCdnDomain(false);
   if (
-    !domain ||
+    !originDomain ||
     !CLOUDFRONT_KEY_PAIR_ID ||
     !CLOUDFRONT_PRIVATE_KEY
   ) {
@@ -900,17 +927,26 @@ export function getSignedAudioUrl(
     return getAudioUrl(audioId, cnMode);
   }
 
-  const url = `https://${domain}/audios/${audioId}`;
+  // Sign against the original CloudFront domain (CN CDN is a reverse proxy)
+  const url = `https://${originDomain}/audios/${audioId}`;
   const expiration =
     expirationSeconds || siteConfig.cloudfront.signedUrlExpirationSeconds;
   const dateLessThan = new Date(Date.now() + expiration * 1000);
 
-  return getSignedUrl({
+  const signed = getSignedUrl({
     url,
     keyPairId: CLOUDFRONT_KEY_PAIR_ID,
     dateLessThan: dateLessThan.toISOString(),
     privateKey: CLOUDFRONT_PRIVATE_KEY,
   });
+
+  if (cnMode) {
+    const cnDomain = getCdnDomain(true);
+    if (cnDomain && cnDomain !== originDomain) {
+      return signed.replace(originDomain, cnDomain);
+    }
+  }
+  return signed;
 }
 
 // Allowed hostnames for external downloads (e.g. Fal AI media URLs)
