@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import {
   collectionImages,
-  collections,
   collectionShares,
   projects,
+  projectShares,
 } from "@/lib/db/schema";
 import { getAccessToken } from "@/lib/auth/cookies";
 import { verifyAccessToken } from "@/lib/auth/jwt";
@@ -12,6 +12,8 @@ import { and, desc, eq, inArray, isNull, or } from "drizzle-orm";
 import { getImageUrl, getVideoUrl, getAudioUrl } from "@/lib/storage/s3";
 import { getContentUrl } from "@/lib/config/video.config";
 import { ensureDefaultProject } from "@/lib/db/projects";
+import { getUserPermission } from "@/lib/collection-utils";
+import { getProjectPermission } from "@/lib/project-utils";
 
 function enrichAssetUrls(asset: { assetType: string; imageId: string; assetId: string }) {
   if (asset.assetType === "public_image") {
@@ -47,11 +49,11 @@ function parseOffset(value: string | null) {
 /**
  * GET /api/assets
  * List assets user can access.
- * - Owned: project.userId == userId
- * - Shared: asset belongs to a collection shared with user
+ * - Owned: asset belongs to a project the user owns
+ * - Shared: asset belongs to a directly shared collection or a shared project
  * Filters:
- * - projectId? (owned only)
- * - collectionId? (owned or shared)
+ * - projectId? (owned or shared)
+ * - collectionId? (owned, directly shared, or inherited via project share)
  * - limit?
  * - offset?
  */
@@ -78,30 +80,12 @@ export async function GET(req: NextRequest) {
 
     // If filtering by a specific collection, verify access first.
     if (collectionId) {
-      const [ownedCollection] = await db
-        .select({ id: collections.id })
-        .from(collections)
-        .where(and(eq(collections.id, collectionId), eq(collections.userId, userId)))
-        .limit(1);
-
-      if (!ownedCollection) {
-        const [shared] = await db
-          .select({ id: collectionShares.id })
-          .from(collectionShares)
-          .where(
-            and(
-              eq(collectionShares.collectionId, collectionId),
-              eq(collectionShares.sharedWithUserId, userId)
-            )
-          )
-          .limit(1);
-
-        if (!shared) {
-          return NextResponse.json(
-            { error: "Collection not found or access denied" },
-            { status: 404 }
-          );
-        }
+      const permission = await getUserPermission(collectionId, userId);
+      if (!permission) {
+        return NextResponse.json(
+          { error: "Collection not found or access denied" },
+          { status: 404 }
+        );
       }
 
       const conditions = [eq(collectionImages.collectionId, collectionId)];
@@ -134,15 +118,10 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    // If filtering by projectId, enforce owner-only (projects are not shareable yet).
+    // If filtering by projectId, allow owned or shared projects.
     if (projectId) {
-      const [project] = await db
-        .select({ id: projects.id })
-        .from(projects)
-        .where(and(eq(projects.id, projectId), eq(projects.userId, userId)))
-        .limit(1);
-
-      if (!project) {
+      const permission = await getProjectPermission(projectId, userId);
+      if (!permission) {
         return NextResponse.json(
           { error: "Project not found or access denied" },
           { status: 404 }
@@ -177,29 +156,38 @@ export async function GET(req: NextRequest) {
       .select({ projectId: projects.id })
       .from(projects)
       .where(eq(projects.userId, userId));
-    const ownedProjectIds = ownedProjectIdsRows.map((r) => r.projectId);
+    const sharedProjectIdsRows = await db
+      .select({ projectId: projectShares.projectId })
+      .from(projectShares)
+      .where(eq(projectShares.sharedWithUserId, userId));
+    const accessibleProjectIds = Array.from(
+      new Set([
+        ...ownedProjectIdsRows.map((r) => r.projectId),
+        ...sharedProjectIdsRows.map((r) => r.projectId),
+      ])
+    );
 
     const sharedCollectionIdsRows = await db
       .select({ collectionId: collectionShares.collectionId })
       .from(collectionShares)
       .where(eq(collectionShares.sharedWithUserId, userId));
-    const sharedCollectionIds = sharedCollectionIdsRows.map((r) => r.collectionId);
+    const directSharedCollectionIds = sharedCollectionIdsRows.map((r) => r.collectionId);
 
-    const hasOwnedAccess = ownedProjectIds.length > 0;
-    const hasSharedAccess = sharedCollectionIds.length > 0;
+    const hasProjectAccess = accessibleProjectIds.length > 0;
+    const hasDirectCollectionAccess = directSharedCollectionIds.length > 0;
 
-    if (!hasOwnedAccess && !hasSharedAccess) {
+    if (!hasProjectAccess && !hasDirectCollectionAccess) {
       return NextResponse.json({ assets: [], hasMore: false, nextOffset: null });
     }
 
-    const whereClause = hasOwnedAccess && hasSharedAccess
+    const whereClause = hasProjectAccess && hasDirectCollectionAccess
       ? or(
-          inArray(collectionImages.projectId, ownedProjectIds),
-          inArray(collectionImages.collectionId, sharedCollectionIds)
+          inArray(collectionImages.projectId, accessibleProjectIds),
+          inArray(collectionImages.collectionId, directSharedCollectionIds)
         )
-      : hasOwnedAccess
-        ? inArray(collectionImages.projectId, ownedProjectIds)
-        : inArray(collectionImages.collectionId, sharedCollectionIds);
+      : hasProjectAccess
+        ? inArray(collectionImages.projectId, accessibleProjectIds)
+        : inArray(collectionImages.collectionId, directSharedCollectionIds);
     const rows = await db
       .select()
       .from(collectionImages)

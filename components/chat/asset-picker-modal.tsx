@@ -47,6 +47,7 @@ type Project = {
   id: string;
   name: string;
   isDefault: boolean;
+  isOwner: boolean;
 };
 
 type AssetsPageResponse = {
@@ -438,7 +439,7 @@ export default function AssetPickerModal({
         const projectsRes = await fetch("/api/projects");
         if (projectsRes.ok) {
           const data = await projectsRes.json();
-          setProjects(data.projects || []);
+          setProjects([...(data.projects || []), ...(data.sharedProjects || [])]);
         }
       } catch (e) {
         console.error("Failed to load picker metadata", e);
@@ -1089,6 +1090,8 @@ export default function AssetPickerModal({
                             <SelectItem key={p.id}>
                               {p.isDefault
                                 ? `${p.name} (${t("assetPicker.defaultSuffix")})`
+                                : !p.isOwner
+                                  ? `${p.name} (${t("assetPicker.sharedSuffix")})`
                                 : p.name}
                             </SelectItem>
                           ))}

@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { collectionImages, collectionShares, collections, projects } from "@/lib/db/schema";
+import { collectionImages } from "@/lib/db/schema";
 import { getAccessToken } from "@/lib/auth/cookies";
 import { verifyAccessToken } from "@/lib/auth/jwt";
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { getImageUrl, getAudioUrl } from "@/lib/storage/s3";
 import { getContentUrl } from "@/lib/config/video.config";
+import { getUserPermission } from "@/lib/collection-utils";
+import { getProjectPermission } from "@/lib/project-utils";
 
 /**
  * GET /api/assets/[assetId]
@@ -39,40 +41,9 @@ export async function GET(
       return NextResponse.json({ error: "Asset not found" }, { status: 404 });
     }
 
-    // Owner access via project ownership
-    const [ownedProject] = await db
-      .select({ id: projects.id })
-      .from(projects)
-      .where(and(eq(projects.id, asset.projectId), eq(projects.userId, userId)))
-      .limit(1);
-
-    let canAccess = !!ownedProject;
-
-    // Shared access via collection share (collectionId must be set)
-    if (!canAccess && asset.collectionId) {
-      const [shared] = await db
-        .select({ id: collectionShares.id })
-        .from(collectionShares)
-        .where(
-          and(
-            eq(collectionShares.collectionId, asset.collectionId),
-            eq(collectionShares.sharedWithUserId, userId)
-          )
-        )
-        .limit(1);
-
-      if (shared) canAccess = true;
-    }
-
-    // Also allow if user owns the collection directly (defensive)
-    if (!canAccess && asset.collectionId) {
-      const [ownedCollection] = await db
-        .select({ id: collections.id })
-        .from(collections)
-        .where(and(eq(collections.id, asset.collectionId), eq(collections.userId, userId)))
-        .limit(1);
-      if (ownedCollection) canAccess = true;
-    }
+    const canAccess = asset.collectionId
+      ? Boolean(await getUserPermission(asset.collectionId, userId))
+      : Boolean(await getProjectPermission(asset.projectId, userId));
 
     if (!canAccess) {
       return NextResponse.json(
