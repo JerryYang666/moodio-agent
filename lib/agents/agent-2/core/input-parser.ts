@@ -169,7 +169,7 @@ export class InputParser {
                 {
                   type: "image_url" as const,
                   image_url: {
-                    url: getSignedImageUrl(p.imageId),
+                    url: getSignedImageUrl(p.imageId, undefined, ctx.cnMode),
                   },
                 },
               ];
@@ -206,7 +206,7 @@ export class InputParser {
         formattedUserMessage.content.push({
           type: "image_url",
           image_url: {
-            url: getSignedImageUrl(ref.imageId),
+            url: getSignedImageUrl(ref.imageId, undefined, ctx.cnMode),
           },
         });
       }

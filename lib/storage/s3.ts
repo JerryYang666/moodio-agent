@@ -315,7 +315,7 @@ export async function saveChatHistory(
  * Add derived URL fields to message content parts on retrieval.
  * All URLs are generated from stable IDs and never persisted.
  */
-function addDerivedUrls(messages: Message[]): Message[] {
+function addDerivedUrls(messages: Message[], cnMode: boolean = false): Message[] {
   return messages.map((message) => {
     if (typeof message.content === "string") {
       return message;
@@ -325,20 +325,20 @@ function addDerivedUrls(messages: Message[]): Message[] {
       if (part.type === "image" && "imageId" in part) {
         return {
           ...part,
-          imageUrl: getImageUrl(part.imageId),
+          imageUrl: getImageUrl(part.imageId, cnMode),
         };
       }
       if ((part.type === "agent_image" || part.type === "direct_image" || part.type === "agent_video_suggest") && part.imageId) {
         return {
           ...part,
-          imageUrl: getImageUrl(part.imageId),
+          imageUrl: getImageUrl(part.imageId, cnMode),
         };
       }
       if (part.type === "agent_video") {
         const enrichedConfig = {
           ...part.config,
           sourceImageUrl: part.config.sourceImageId
-            ? getImageUrl(part.config.sourceImageId)
+            ? getImageUrl(part.config.sourceImageId, cnMode)
             : undefined,
         };
         // Normalize legacy element_input_urls -> element_input_ids
@@ -364,16 +364,16 @@ function addDerivedUrls(messages: Message[]): Message[] {
           ...part,
           config: {
             ...part.config,
-            sourceImageUrl: getImageUrl(part.config.sourceImageId),
+            sourceImageUrl: getImageUrl(part.config.sourceImageId, cnMode),
             endImageUrl: part.config.endImageId
-              ? getImageUrl(part.config.endImageId)
+              ? getImageUrl(part.config.endImageId, cnMode)
               : undefined,
           },
           thumbnailUrl: part.thumbnailImageId
-            ? getImageUrl(part.thumbnailImageId)
+            ? getImageUrl(part.thumbnailImageId, cnMode)
             : undefined,
-          videoUrl: part.videoId ? getVideoUrl(part.videoId) : undefined,
-          signedVideoUrl: part.videoId ? getSignedVideoUrl(part.videoId) : undefined,
+          videoUrl: part.videoId ? getVideoUrl(part.videoId, cnMode) : undefined,
+          signedVideoUrl: part.videoId ? getSignedVideoUrl(part.videoId, undefined, cnMode) : undefined,
         };
       }
       if (part.type === "video" && "videoId" in part) {
@@ -382,13 +382,13 @@ function addDerivedUrls(messages: Message[]): Message[] {
         }
         return {
           ...part,
-          videoUrl: getVideoUrl(part.videoId),
+          videoUrl: getVideoUrl(part.videoId, cnMode),
         };
       }
       if (part.type === "audio" && "audioId" in part) {
         return {
           ...part,
-          audioUrl: getAudioUrl(part.audioId),
+          audioUrl: getAudioUrl(part.audioId, cnMode),
         };
       }
       return part;
@@ -402,7 +402,8 @@ function addDerivedUrls(messages: Message[]): Message[] {
 }
 
 export async function getChatHistory(
-  chatId: string
+  chatId: string,
+  cnMode: boolean = false
 ): Promise<{ messages: Message[]; persistentAssets: PersistentAssets }> {
   const key = `chats/${chatId}.json`;
 
@@ -422,7 +423,7 @@ export async function getChatHistory(
     const data = JSON.parse(str) as ChatHistory;
     // Generate fresh derived URLs on retrieval
     return {
-      messages: addDerivedUrls(data.messages),
+      messages: addDerivedUrls(data.messages, cnMode),
       persistentAssets: data.persistentAssets ?? EMPTY_PERSISTENT_ASSETS,
     };
   } catch (error: any) {

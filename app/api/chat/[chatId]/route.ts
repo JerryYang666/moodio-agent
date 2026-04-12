@@ -7,6 +7,7 @@ import { eq, and, inArray } from "drizzle-orm";
 import { getChatHistory, getImageUrl, getVideoUrl, getSignedVideoUrl, saveChatHistory } from "@/lib/storage/s3";
 import { waitUntil } from "@vercel/functions";
 import { Message, MessageContentPart } from "@/lib/llm/types";
+import { getUserSetting } from "@/lib/user-settings/server";
 
 export async function GET(
   request: NextRequest,
@@ -41,7 +42,8 @@ export async function GET(
       return NextResponse.json({ error: "Chat not found" }, { status: 404 });
     }
 
-    const { messages, persistentAssets } = await getChatHistory(chatId);
+    const cnMode = await getUserSetting(payload.userId, "cnMode");
+    const { messages, persistentAssets } = await getChatHistory(chatId, cnMode);
 
     // Collect direct_video generation IDs so we can reconcile with DB state
     const directVideoGenerationIds: string[] = [];
@@ -77,14 +79,14 @@ export async function GET(
           if ((part.type === "agent_image" || part.type === "direct_image" || part.type === "agent_video_suggest") && part.imageId && !part.imageUrl) {
             return {
               ...part,
-              imageUrl: getImageUrl(part.imageId),
+              imageUrl: getImageUrl(part.imageId, cnMode),
             };
           }
           // Add CloudFront URL for image parts (user uploaded images)
           if (part.type === "image" && part.imageId) {
             return {
               ...part,
-              imageUrl: getImageUrl(part.imageId),
+              imageUrl: getImageUrl(part.imageId, cnMode),
             };
           }
           // Reconcile direct_video parts with actual DB state
@@ -120,21 +122,21 @@ export async function GET(
                 config: {
                   ...part.config,
                   sourceImageId: gen.sourceImageId,
-                  sourceImageUrl: getImageUrl(gen.sourceImageId),
+                  sourceImageUrl: getImageUrl(gen.sourceImageId, cnMode),
                   endImageId: gen.endImageId ?? undefined,
                   endImageUrl: gen.endImageId
-                    ? getImageUrl(gen.endImageId)
+                    ? getImageUrl(gen.endImageId, cnMode)
                     : undefined,
                   prompt: dbPrompt,
                   params: mergedModelParams,
                 },
                 status: gen.status as "completed" | "failed",
                 videoId: gen.videoId ?? undefined,
-                videoUrl: gen.videoId ? getVideoUrl(gen.videoId) : undefined,
-                signedVideoUrl: gen.videoId ? getSignedVideoUrl(gen.videoId) : undefined,
+                videoUrl: gen.videoId ? getVideoUrl(gen.videoId, cnMode) : undefined,
+                signedVideoUrl: gen.videoId ? getSignedVideoUrl(gen.videoId, undefined, cnMode) : undefined,
                 thumbnailImageId: gen.thumbnailImageId ?? undefined,
                 thumbnailUrl: gen.thumbnailImageId
-                  ? getImageUrl(gen.thumbnailImageId)
+                  ? getImageUrl(gen.thumbnailImageId, cnMode)
                   : undefined,
                 seed: gen.seed ?? undefined,
                 error: gen.error ?? undefined,
@@ -150,17 +152,17 @@ export async function GET(
               ...part,
               config: {
                 ...part.config,
-                sourceImageUrl: getImageUrl(part.config.sourceImageId),
+                sourceImageUrl: getImageUrl(part.config.sourceImageId, cnMode),
                 endImageUrl: part.config.endImageId
-                  ? getImageUrl(part.config.endImageId)
+                  ? getImageUrl(part.config.endImageId, cnMode)
                   : undefined,
               },
-              videoUrl: part.videoId ? getVideoUrl(part.videoId) : part.videoUrl,
+              videoUrl: part.videoId ? getVideoUrl(part.videoId, cnMode) : part.videoUrl,
               signedVideoUrl: part.videoId
-                ? getSignedVideoUrl(part.videoId)
+                ? getSignedVideoUrl(part.videoId, undefined, cnMode)
                 : part.signedVideoUrl,
               thumbnailUrl: part.thumbnailImageId
-                ? getImageUrl(part.thumbnailImageId)
+                ? getImageUrl(part.thumbnailImageId, cnMode)
                 : part.thumbnailUrl,
             };
           }
@@ -210,20 +212,20 @@ export async function GET(
                 config: {
                   ...part.config,
                   sourceImageId: gen.sourceImageId,
-                  sourceImageUrl: getImageUrl(gen.sourceImageId),
+                  sourceImageUrl: getImageUrl(gen.sourceImageId, cnMode),
                   endImageId: gen.endImageId ?? undefined,
                   endImageUrl: gen.endImageId
-                    ? getImageUrl(gen.endImageId)
+                    ? getImageUrl(gen.endImageId, cnMode)
                     : undefined,
                   prompt: dbPrompt,
                   params: mergedModelParams,
                 },
                 status: gen.status as "completed" | "failed",
                 videoId: gen.videoId ?? undefined,
-                videoUrl: gen.videoId ? getVideoUrl(gen.videoId) : undefined,
+                videoUrl: gen.videoId ? getVideoUrl(gen.videoId, cnMode) : undefined,
                 thumbnailImageId: gen.thumbnailImageId ?? undefined,
                 thumbnailUrl: gen.thumbnailImageId
-                  ? getImageUrl(gen.thumbnailImageId)
+                  ? getImageUrl(gen.thumbnailImageId, cnMode)
                   : undefined,
                 seed: gen.seed ?? undefined,
                 error: gen.error ?? undefined,
@@ -250,7 +252,7 @@ export async function GET(
       ...persistentAssets,
       referenceImages: persistentAssets.referenceImages.map((img) => ({
         ...img,
-        imageUrl: getImageUrl(img.imageId),
+        imageUrl: getImageUrl(img.imageId, cnMode),
       })),
     };
 

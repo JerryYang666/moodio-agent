@@ -30,6 +30,9 @@ export interface RequestContext {
   effectiveAccountType: AccountType;
   effectivePerformedBy: string;
 
+  // CDN mode
+  cnMode: boolean;
+
   // User-provided images
   imageIds: string[];
   imageBase64Promises: Promise<string | undefined>[];
@@ -74,6 +77,7 @@ export interface CreateRequestContextInput {
   accountId?: string;
   accountType?: AccountType;
   performedBy?: string;
+  cnMode?: boolean;
   imageIds?: string[];
   imageBase64Promises?: Promise<string | undefined>[];
   referenceImages?: ReferenceImageEntry[];
@@ -126,6 +130,7 @@ export function createRequestContext(input: CreateRequestContextInput): RequestC
     effectiveAccountId: input.accountId || input.userId,
     effectiveAccountType: input.accountType || "personal",
     effectivePerformedBy: input.performedBy || input.userId,
+    cnMode: input.cnMode || false,
     imageIds: input.imageIds || [],
     imageBase64Promises: input.imageBase64Promises || [],
     referenceImages: input.referenceImages || [],

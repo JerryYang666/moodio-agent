@@ -11,13 +11,14 @@ import {
   MAX_PERSISTENT_REFERENCE_IMAGES,
 } from "@/lib/chat/persistent-assets-types";
 import { REFERENCE_IMAGE_TAGS, ReferenceImageTag } from "@/components/chat/reference-image-types";
+import { getUserSetting } from "@/lib/user-settings/server";
 
-function addImageUrls(assets: PersistentAssets) {
+function addImageUrls(assets: PersistentAssets, cnMode: boolean = false) {
   return {
     ...assets,
     referenceImages: assets.referenceImages.map((img) => ({
       ...img,
-      imageUrl: getImageUrl(img.imageId),
+      imageUrl: getImageUrl(img.imageId, cnMode),
     })),
   };
 }
@@ -47,10 +48,11 @@ export async function GET(
       return NextResponse.json({ error: "Chat not found" }, { status: 404 });
     }
 
-    const { persistentAssets } = await getChatHistory(chatId);
+    const cnMode = await getUserSetting(payload.userId, "cnMode");
+    const { persistentAssets } = await getChatHistory(chatId, cnMode);
 
     return NextResponse.json({
-      persistentAssets: addImageUrls(persistentAssets),
+      persistentAssets: addImageUrls(persistentAssets, cnMode),
     });
   } catch (error) {
     console.error("Error fetching persistent assets:", error);
@@ -118,8 +120,9 @@ export async function PUT(
 
     await savePersistentAssets(chatId, assets);
 
+    const cnMode = await getUserSetting(payload.userId, "cnMode");
     return NextResponse.json({
-      persistentAssets: addImageUrls(assets),
+      persistentAssets: addImageUrls(assets, cnMode),
     });
   } catch (error) {
     console.error("Error saving persistent assets:", error);

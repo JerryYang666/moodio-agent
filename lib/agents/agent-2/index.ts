@@ -232,6 +232,7 @@ export class Agent2 implements Agent {
     accountId?: string,
     accountType?: AccountType,
     performedBy?: string,
+    cnMode?: boolean,
   ): Promise<ParallelAgentResponse> {
     const startTime = requestStartTime || Date.now();
     const variantTimestamp = messageTimestamp || Date.now();
@@ -303,6 +304,7 @@ export class Agent2 implements Agent {
               accountId,
               accountType,
               performedBy,
+              cnMode,
               imageIds: allImageIds,
               imageBase64Promises,
               referenceImages: refImages,

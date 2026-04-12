@@ -9,6 +9,7 @@ import { Message, MessageContentPart } from "@/lib/llm/types";
 import { agent2 } from "@/lib/agents/agent-2";
 import { waitUntil } from "@vercel/functions";
 import { getActiveAccount } from "@/lib/credits";
+import { getUserSetting } from "@/lib/user-settings/server";
 
 /**
  * Extract text content from a message for differentiation context
@@ -81,6 +82,7 @@ export async function POST(
     }
 
     const account = await getActiveAccount(payload.userId, payload);
+    const cnMode = await getUserSetting(payload.userId, "cnMode");
 
     // Parse request body
     const json = await request.json();
@@ -111,7 +113,7 @@ export async function POST(
     }
 
     // Get existing history
-    const { messages: history, persistentAssets } = await getChatHistory(chatId);
+    const { messages: history, persistentAssets } = await getChatHistory(chatId, cnMode);
     console.log(
       "[Variant] Chat history retrieved",
       `[${Date.now() - requestStartTime}ms]`
@@ -216,6 +218,7 @@ export async function POST(
         account.accountId,
         account.accountType,
         account.performedBy,
+        cnMode,
       );
 
     // Handle background completion (saving the new variant to history)

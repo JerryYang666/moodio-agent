@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { chats } from "@/lib/db/schema";
 import { eq, desc, isNull, and } from "drizzle-orm";
 import { getImageUrl } from "@/lib/storage/s3";
+import { getUserSetting } from "@/lib/user-settings/server";
 
 // Create a new chat
 export async function POST(request: NextRequest) {
@@ -50,6 +51,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Invalid token" }, { status: 401 });
     }
 
+    const cnMode = await getUserSetting(payload.userId, "cnMode");
+
     // Only fetch non-deleted chats (deletedAt is null)
     const userChats = await db
       .select()
@@ -61,7 +64,7 @@ export async function GET(request: NextRequest) {
     const chatsWithUrls = userChats.map((chat) => ({
       ...chat,
       thumbnailImageUrl: chat.thumbnailImageId
-        ? getImageUrl(chat.thumbnailImageId)
+        ? getImageUrl(chat.thumbnailImageId, cnMode)
         : null,
     }));
 

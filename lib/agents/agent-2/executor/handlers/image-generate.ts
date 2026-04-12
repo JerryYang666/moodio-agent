@@ -284,7 +284,7 @@ export class ImageGenerateHandler implements ToolHandler {
       ? {
           type: "agent_video_suggest",
           imageId: finalImageId,
-          imageUrl: getSignedImageUrl(finalImageId),
+          imageUrl: getSignedImageUrl(finalImageId, undefined, ctx.cnMode),
           title: suggestion.title,
           aspectRatio,
           prompt: suggestion.prompt,
@@ -294,7 +294,7 @@ export class ImageGenerateHandler implements ToolHandler {
       : {
           type: "agent_image",
           imageId: finalImageId,
-          imageUrl: getSignedImageUrl(finalImageId),
+          imageUrl: getSignedImageUrl(finalImageId, undefined, ctx.cnMode),
           title: suggestion.title,
           aspectRatio,
           prompt: suggestion.prompt,

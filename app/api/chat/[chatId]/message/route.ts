@@ -14,6 +14,7 @@ import {
   generateImageId,
   downloadImage,
 } from "@/lib/storage/s3";
+import { getUserSetting } from "@/lib/user-settings/server";
 import { createLLMClient } from "@/lib/llm/client";
 import { Message, MessageContentPart, MessageMetadata, DEFAULT_LLM_MODEL, isGeneratedImagePart } from "@/lib/llm/types";
 import { agent2 } from "@/lib/agents/agent-2";
@@ -269,6 +270,7 @@ export async function POST(
     }
 
     const account = await getActiveAccount(payload.userId, payload);
+    const cnMode = await getUserSetting(payload.userId, "cnMode");
 
     const ipAddress =
       request.headers.get("x-forwarded-for") ||
@@ -438,7 +440,7 @@ export async function POST(
     }
 
     // Get existing history
-    const { messages: history, persistentAssets } = await getChatHistory(chatId);
+    const { messages: history, persistentAssets } = await getChatHistory(chatId, cnMode);
     console.log(
       "[Perf] Chat history Got",
       `[${Date.now() - requestStartTime}ms]`
@@ -734,7 +736,7 @@ export async function POST(
                   const successPart: MessageContentPart = {
                     type: "direct_image",
                     imageId: finalImageId,
-                    imageUrl: getSignedImageUrl(finalImageId),
+                    imageUrl: getSignedImageUrl(finalImageId, undefined, cnMode),
                     title: getImageTitle(i),
                     aspectRatio: aspectRatioOverride || "1:1",
                     prompt: content,
@@ -843,16 +845,16 @@ export async function POST(
         ...videoParams,
       };
       if (!isTextToVideo && sourceImageId) {
-        fullParams[model.imageParams!.sourceImage] = getSignedImageUrl(sourceImageId);
+        fullParams[model.imageParams!.sourceImage] = getSignedImageUrl(sourceImageId, undefined, cnMode);
         if (endImageId && model.imageParams!.endImage) {
-          fullParams[model.imageParams!.endImage] = getSignedImageUrl(endImageId);
+          fullParams[model.imageParams!.endImage] = getSignedImageUrl(endImageId, undefined, cnMode);
         }
       }
 
       // Sign image IDs for type: "asset" params
       for (const param of model.params) {
         if (param.type === "asset" && typeof fullParams[param.name] === "string" && fullParams[param.name]) {
-          fullParams[param.name] = getSignedImageUrl(fullParams[param.name]);
+          fullParams[param.name] = getSignedImageUrl(fullParams[param.name], undefined, cnMode);
         }
       }
 
@@ -868,9 +870,9 @@ export async function POST(
               }
               const cfMatch = idOrUrl.match(/\/images\/([^/?]+)/);
               if (cfMatch) {
-                return getSignedImageUrl(cfMatch[1]);
+                return getSignedImageUrl(cfMatch[1], undefined, cnMode);
               }
-              return getSignedImageUrl(idOrUrl);
+              return getSignedImageUrl(idOrUrl, undefined, cnMode);
             }),
           })
         );
@@ -885,10 +887,10 @@ export async function POST(
               typeof ref.id === "string" && ref.id.startsWith("http")
                 ? ref.id
                 : ref.type === "video"
-                  ? getSignedVideoUrl(ref.id)
+                  ? getSignedVideoUrl(ref.id, undefined, cnMode)
                   : ref.type === "audio"
-                    ? getSignedAudioUrl(ref.id)
-                    : getSignedImageUrl(ref.id),
+                    ? getSignedAudioUrl(ref.id, undefined, cnMode)
+                    : getSignedImageUrl(ref.id, undefined, cnMode),
           })
         );
       }
@@ -981,14 +983,14 @@ export async function POST(
                   modelName: model.name,
                   prompt: content,
                   sourceImageId: effectiveSourceImageId,
-                  sourceImageUrl: getSignedImageUrl(effectiveSourceImageId),
+                  sourceImageUrl: getSignedImageUrl(effectiveSourceImageId, undefined, cnMode),
                   endImageId: endImageId || undefined,
-                  endImageUrl: endImageId ? getSignedImageUrl(endImageId) : undefined,
+                  endImageUrl: endImageId ? getSignedImageUrl(endImageId, undefined, cnMode) : undefined,
                   params: videoParams,
                 },
                 generationId: generation.id,
                 status: "processing",
-                thumbnailUrl: getSignedImageUrl(effectiveSourceImageId),
+                thumbnailUrl: getSignedImageUrl(effectiveSourceImageId, undefined, cnMode),
                 createdAt: new Date().toISOString(),
               };
               send({ type: "part", part: pendingPart, variantId });
@@ -1078,7 +1080,7 @@ export async function POST(
                   modelName: model.name,
                   prompt: content,
                   sourceImageId: effectiveSourceImageId,
-                  sourceImageUrl: getSignedImageUrl(effectiveSourceImageId),
+                  sourceImageUrl: getSignedImageUrl(effectiveSourceImageId, undefined, cnMode),
                   params: videoParams,
                 },
                 status: "failed",
@@ -1154,6 +1156,7 @@ export async function POST(
         account.accountId,
         account.accountType,
         account.performedBy,
+        cnMode,
       );
 
     // Research telemetry: reference_image_added (agent mode)

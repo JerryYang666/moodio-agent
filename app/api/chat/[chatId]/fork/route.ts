@@ -7,6 +7,7 @@ import { eq, and } from "drizzle-orm";
 import { getChatHistory, saveChatHistory } from "@/lib/storage/s3";
 import { isFeatureFlagEnabled } from "@/lib/feature-flags/server";
 import { recordResearchEvent } from "@/lib/research-telemetry";
+import { getUserSetting } from "@/lib/user-settings/server";
 
 export async function POST(
   request: NextRequest,
@@ -45,7 +46,8 @@ export async function POST(
     }
 
     // Get original chat history
-    const { messages: history } = await getChatHistory(chatId);
+    const cnMode = await getUserSetting(payload.userId, "cnMode");
+    const { messages: history } = await getChatHistory(chatId, cnMode);
 
     // Validate index (must be a user message and not the first one logic handled by frontend, but checking bounds here)
     if (messageIndex >= history.length) {
