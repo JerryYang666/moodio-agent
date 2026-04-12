@@ -20,6 +20,8 @@ interface TextCellProps {
   value: string;
   canEdit: boolean;
   isSelected?: boolean;
+  shouldActivate?: boolean;
+  onActivated?: () => void;
   lock: CellLock | undefined;
   currentUserId: string | undefined;
   sendEvent?: (type: string, payload: Record<string, unknown>) => void;
@@ -32,6 +34,8 @@ export const TextCell = memo(function TextCell({
   value,
   canEdit,
   isSelected,
+  shouldActivate,
+  onActivated,
   lock,
   currentUserId,
   sendEvent,
@@ -110,6 +114,17 @@ export const TextCell = memo(function TextCell({
       inputRef.current?.focus();
     }
   }, [editing]);
+
+  // Enter key activation from parent grid
+  const startEditingRef = useRef(startEditing);
+  startEditingRef.current = startEditing;
+  const onActivatedRef = useRef(onActivated);
+  onActivatedRef.current = onActivated;
+  useEffect(() => {
+    if (!shouldActivate) return;
+    startEditingRef.current();
+    onActivatedRef.current?.();
+  }, [shouldActivate]);
 
   if (editing) {
     return (

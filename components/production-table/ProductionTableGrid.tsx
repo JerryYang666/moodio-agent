@@ -575,6 +575,9 @@ export function ProductionTableGrid({
     [isPainting, movePaint]
   );
 
+  // ---- Activation state: Enter key triggers edit/picker on the selected cell ----
+  const [activatingCellKey, setActivatingCellKey] = useState<string | null>(null);
+
   // ---- Keyboard handler ----
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -583,8 +586,62 @@ export function ProductionTableGrid({
         return;
       }
 
+      // Skip navigation shortcuts when a text input is focused (e.g. editing a TextCell)
+      const isEditingText =
+        e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLInputElement;
+
+      if (e.key === "Tab") {
+        e.preventDefault();
+        if (selectedCells.size !== 1) return;
+        const key = Array.from(selectedCells)[0];
+        const [columnId, rowId] = key.split(":");
+        const colIdx = columns.findIndex((c) => c.id === columnId);
+        if (colIdx === -1) return;
+        if (colIdx < columns.length - 1) {
+          selectCell(rowId, columns[colIdx + 1].id, "replace");
+        } else {
+          // Wrap to first column of the next row
+          const rowIdx = rows.findIndex((r) => r.id === rowId);
+          if (rowIdx !== -1 && rowIdx < rows.length - 1) {
+            selectCell(rows[rowIdx + 1].id, columns[0].id, "replace");
+          }
+        }
+        return;
+      }
+
+      if (e.key === "Enter" && !isEditingText) {
+        e.preventDefault();
+        if (selectedCells.size !== 1) return;
+        const key = Array.from(selectedCells)[0];
+        setActivatingCellKey(key);
+        return;
+      }
+
+      if (
+        (e.key === "ArrowRight" || e.key === "ArrowLeft" || e.key === "ArrowUp" || e.key === "ArrowDown") &&
+        !isEditingText
+      ) {
+        e.preventDefault();
+        if (selectedCells.size !== 1) return;
+        const key = Array.from(selectedCells)[0];
+        const [columnId, rowId] = key.split(":");
+        const colIdx = columns.findIndex((c) => c.id === columnId);
+        const rowIdx = rows.findIndex((r) => r.id === rowId);
+        if (colIdx === -1 || rowIdx === -1) return;
+
+        if (e.key === "ArrowRight" && colIdx < columns.length - 1) {
+          selectCell(rowId, columns[colIdx + 1].id, "replace");
+        } else if (e.key === "ArrowLeft" && colIdx > 0) {
+          selectCell(rowId, columns[colIdx - 1].id, "replace");
+        } else if (e.key === "ArrowDown" && rowIdx < rows.length - 1) {
+          selectCell(rows[rowIdx + 1].id, columnId, "replace");
+        } else if (e.key === "ArrowUp" && rowIdx > 0) {
+          selectCell(rows[rowIdx - 1].id, columnId, "replace");
+        }
+        return;
+      }
     },
-    [clearSelection]
+    [clearSelection, selectedCells, columns, rows, selectCell]
   );
 
   // ---- Paste handler (image/audio → media cell) ----
@@ -717,6 +774,8 @@ export function ProductionTableGrid({
             canEdit={editable}
             isSelected={selected}
             isUploading={uploadingCells.has(key)}
+            shouldActivate={activatingCellKey === key}
+            onActivated={() => setActivatingCellKey(null)}
             lock={lock}
             currentUserId={currentUserId}
             onAddAsset={(asset) => onMediaAssetAdd(col.id, row.id, asset)}
@@ -733,6 +792,8 @@ export function ProductionTableGrid({
           value={cell?.textContent ?? ""}
           canEdit={editable}
           isSelected={selected}
+          shouldActivate={activatingCellKey === key}
+          onActivated={() => setActivatingCellKey(null)}
           lock={lock}
           currentUserId={currentUserId}
           sendEvent={sendEvent}
@@ -740,7 +801,7 @@ export function ProductionTableGrid({
         />
       );
     },
-    [cellMap, cellLocks, canEditCellFn, isCellSelected, uploadingCells, currentUserId, sendEvent, onCellCommit, onMediaAssetAdd, onMediaAssetRemove]
+    [cellMap, cellLocks, canEditCellFn, isCellSelected, uploadingCells, activatingCellKey, currentUserId, sendEvent, onCellCommit, onMediaAssetAdd, onMediaAssetRemove]
   );
 
   const totalWidth = useMemo(

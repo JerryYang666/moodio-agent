@@ -1,6 +1,6 @@
 "use client";
 
-import React, { memo, useCallback, useState } from "react";
+import React, { memo, useCallback, useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { Button } from "@heroui/button";
 import { Image } from "@heroui/image";
@@ -32,6 +32,8 @@ interface MediaCellProps {
   canEdit: boolean;
   isSelected?: boolean;
   isUploading?: boolean;
+  shouldActivate?: boolean;
+  onActivated?: () => void;
   lock: CellLock | undefined;
   currentUserId: string | undefined;
   onAddAsset: (asset: EnrichedMediaAssetRef) => void;
@@ -45,6 +47,8 @@ export const MediaCell = memo(function MediaCell({
   canEdit,
   isSelected,
   isUploading,
+  shouldActivate,
+  onActivated,
   lock,
   currentUserId,
   onAddAsset,
@@ -56,6 +60,15 @@ export const MediaCell = memo(function MediaCell({
   const isLockedByOther =
     lock && lock.userId !== currentUserId && lock.expiresAt > Date.now();
   const lockColor = isLockedByOther && lock ? userIdToColor(lock.userId) : undefined;
+
+  // Enter key activation from parent grid — open picker (same as clicking Add)
+  const onActivatedRef = useRef(onActivated);
+  onActivatedRef.current = onActivated;
+  useEffect(() => {
+    if (!shouldActivate || !canEdit || isLockedByOther) return;
+    setPickerOpen(true);
+    onActivatedRef.current?.();
+  }, [shouldActivate, canEdit, isLockedByOther]);
 
   const handleDragOver = useCallback(
     (e: React.DragEvent) => {
