@@ -845,16 +845,16 @@ export async function POST(
         ...videoParams,
       };
       if (!isTextToVideo && sourceImageId) {
-        fullParams[model.imageParams!.sourceImage] = getSignedImageUrl(sourceImageId, undefined, cnMode);
+        fullParams[model.imageParams!.sourceImage] = getSignedImageUrl(sourceImageId);
         if (endImageId && model.imageParams!.endImage) {
-          fullParams[model.imageParams!.endImage] = getSignedImageUrl(endImageId, undefined, cnMode);
+          fullParams[model.imageParams!.endImage] = getSignedImageUrl(endImageId);
         }
       }
 
       // Sign image IDs for type: "asset" params
       for (const param of model.params) {
         if (param.type === "asset" && typeof fullParams[param.name] === "string" && fullParams[param.name]) {
-          fullParams[param.name] = getSignedImageUrl(fullParams[param.name], undefined, cnMode);
+          fullParams[param.name] = getSignedImageUrl(fullParams[param.name]);
         }
       }
 
@@ -870,9 +870,9 @@ export async function POST(
               }
               const cfMatch = idOrUrl.match(/\/images\/([^/?]+)/);
               if (cfMatch) {
-                return getSignedImageUrl(cfMatch[1], undefined, cnMode);
+                return getSignedImageUrl(cfMatch[1]);
               }
-              return getSignedImageUrl(idOrUrl, undefined, cnMode);
+              return getSignedImageUrl(idOrUrl);
             }),
           })
         );
@@ -887,10 +887,10 @@ export async function POST(
               typeof ref.id === "string" && ref.id.startsWith("http")
                 ? ref.id
                 : ref.type === "video"
-                  ? getSignedVideoUrl(ref.id, undefined, cnMode)
+                  ? getSignedVideoUrl(ref.id)
                   : ref.type === "audio"
-                    ? getSignedAudioUrl(ref.id, undefined, cnMode)
-                    : getSignedImageUrl(ref.id, undefined, cnMode),
+                    ? getSignedAudioUrl(ref.id)
+                    : getSignedImageUrl(ref.id),
           })
         );
       }
