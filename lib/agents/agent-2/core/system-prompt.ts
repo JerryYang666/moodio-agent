@@ -136,7 +136,7 @@ Cross-style principle: In all styles, the 12 principles of animation apply: squa
 export class SystemPromptConstructor {
   constructor(private registry: ToolRegistry) {}
 
-  build(options?: { systemPromptOverride?: string; maxImageQuantity?: number; expertise?: Expertise; persistentTextChunk?: string }): string {
+  build(options?: { systemPromptOverride?: string; maxImageQuantity?: number; expertise?: Expertise; persistentTextChunk?: string; languagePreference?: string }): string {
     // If admin override is provided, use it directly
     if (options?.systemPromptOverride) {
       return options.systemPromptOverride;
@@ -182,6 +182,10 @@ export class SystemPromptConstructor {
     // Append user's persistent text context
     if (options?.persistentTextChunk) {
       prompt += `\n\n## User's Persistent Context\n${options.persistentTextChunk}`;
+    }
+
+    if (options?.languagePreference) {
+      prompt += `\n\n## Language Preference\nThe user prefers to communicate in ${options.languagePreference}.`;
     }
 
     return prompt;

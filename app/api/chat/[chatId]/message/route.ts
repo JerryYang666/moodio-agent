@@ -14,7 +14,7 @@ import {
   generateImageId,
   downloadImage,
 } from "@/lib/storage/s3";
-import { getUserSetting } from "@/lib/user-settings/server";
+import { getUserSettingsMulti } from "@/lib/user-settings/server";
 import { createLLMClient } from "@/lib/llm/client";
 import { Message, MessageContentPart, MessageMetadata, DEFAULT_LLM_MODEL, isGeneratedImagePart } from "@/lib/llm/types";
 import { agent2 } from "@/lib/agents/agent-2";
@@ -270,7 +270,7 @@ export async function POST(
     }
 
     const account = await getActiveAccount(payload.userId, payload);
-    const cnMode = await getUserSetting(payload.userId, "cnMode");
+    const { cnMode, languagePreference } = await getUserSettingsMulti(payload.userId, ["cnMode", "languagePreference"]);
 
     const ipAddress =
       request.headers.get("x-forwarded-for") ||
@@ -1158,6 +1158,7 @@ export async function POST(
         account.performedBy,
         cnMode,
         chatId,
+        languagePreference || undefined,
       );
 
     // Research telemetry: reference_image_added (agent mode)

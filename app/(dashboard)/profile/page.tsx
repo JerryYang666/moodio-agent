@@ -9,11 +9,15 @@ import { Card, CardBody, CardHeader } from "@heroui/card";
 import { useAuth } from "@/hooks/use-auth";
 import { startRegistration } from "@simplewebauthn/browser";
 import { Switch } from "@heroui/switch";
-import { Key, Lock, Eye, EyeOff, Globe } from "lucide-react";
+import { Select, SelectItem } from "@heroui/select";
+import { Chip } from "@heroui/chip";
+import { Key, Lock, Eye, EyeOff, Globe, Sparkles } from "lucide-react";
 import { addToast } from "@heroui/toast";
 import { siteConfig } from "@/config/site";
 import { LegalFooter } from "@/components/legal-footer";
 import { useUserSetting, useUpdateSettings } from "@/lib/user-settings";
+import { PERSONALIZATION_QUESTIONS } from "@/lib/onboarding/personalization-questions";
+import { locales, localeNames, type Locale } from "@/i18n/config";
 
 export default function ProfilePage() {
   const t = useTranslations();
@@ -38,7 +42,32 @@ export default function ProfilePage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const cnMode = useUserSetting("cnMode");
+  const languagePreference = useUserSetting("languagePreference");
+  const creativeGoals = useUserSetting("creativeGoals");
+  const userRole = useUserSetting("userRole");
+  const experienceLevel = useUserSetting("experienceLevel");
+  const mainGoal = useUserSetting("mainGoal");
+  const communicationTone = useUserSetting("communicationTone");
+  const explanationDepth = useUserSetting("explanationDepth");
   const updateSettings = useUpdateSettings();
+
+  const AGENT_ONLY_LANGUAGES: { code: string; name: string }[] = [
+    { code: "es", name: "Español" },
+    { code: "fr", name: "Français" },
+    { code: "de", name: "Deutsch" },
+    { code: "pt", name: "Português" },
+    { code: "ru", name: "Русский" },
+    { code: "ar", name: "العربية" },
+    { code: "hi", name: "हिन्दी" },
+    { code: "th", name: "ภาษาไทย" },
+    { code: "vi", name: "Tiếng Việt" },
+    { code: "id", name: "Bahasa Indonesia" },
+  ];
+
+  const ALL_LANGUAGE_OPTIONS = [
+    ...locales.map((l) => ({ code: l, name: localeNames[l] })),
+    ...AGENT_ONLY_LANGUAGES,
+  ];
 
   const OTP_LENGTH = siteConfig.auth.otp.length;
 
@@ -274,6 +303,97 @@ export default function ProfilePage() {
               onValueChange={(val) => updateSettings({ cnMode: val })}
             />
           </div>
+        </CardBody>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-0 pt-4 px-4 flex-col items-start">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-primary" />
+            <h2 className="text-lg font-semibold">{t("profile.personalization")}</h2>
+          </div>
+          <p className="text-small text-default-500">
+            {t("profile.personalizationDescription")}
+          </p>
+        </CardHeader>
+        <CardBody className="space-y-5">
+          <div className="space-y-2">
+            <span className="text-sm font-medium">{t("profile.languagePreferenceLabel")}</span>
+            <Select
+              selectedKeys={languagePreference ? [languagePreference] : []}
+              onSelectionChange={(keys) => {
+                const selected = Array.from(keys)[0] as string;
+                updateSettings({ languagePreference: selected || null });
+              }}
+              variant="bordered"
+              size="sm"
+              placeholder={t("profile.selectLanguage")}
+            >
+              {ALL_LANGUAGE_OPTIONS.map((lang) => (
+                <SelectItem key={lang.code}>{lang.name}</SelectItem>
+              ))}
+            </Select>
+          </div>
+
+          {PERSONALIZATION_QUESTIONS.map((q) => {
+            const currentValue = (() => {
+              switch (q.id) {
+                case "creativeGoals": return creativeGoals;
+                case "userRole": return userRole;
+                case "experienceLevel": return experienceLevel;
+                case "mainGoal": return mainGoal;
+                case "communicationTone": return communicationTone;
+                case "explanationDepth": return explanationDepth;
+                default: return null;
+              }
+            })();
+
+            if (q.type === "multi") {
+              const values = (currentValue as string[]) || [];
+              return (
+                <div key={q.id} className="space-y-2">
+                  <span className="text-sm font-medium">{t(q.titleKey)}</span>
+                  <div className="flex flex-wrap gap-2">
+                    {q.options.map((opt) => (
+                      <Chip
+                        key={opt.id}
+                        variant={values.includes(opt.id) ? "solid" : "bordered"}
+                        color={values.includes(opt.id) ? "primary" : "default"}
+                        className="cursor-pointer select-none transition-all"
+                        onClick={() => {
+                          const updated = values.includes(opt.id)
+                            ? values.filter((v) => v !== opt.id)
+                            : [...values, opt.id];
+                          updateSettings({ [q.id]: updated });
+                        }}
+                      >
+                        {t(opt.labelKey)}
+                      </Chip>
+                    ))}
+                  </div>
+                </div>
+              );
+            }
+
+            return (
+              <div key={q.id} className="space-y-2">
+                <span className="text-sm font-medium">{t(q.titleKey)}</span>
+                <Select
+                  selectedKeys={(currentValue as string) ? [currentValue as string] : []}
+                  onSelectionChange={(keys) => {
+                    const selected = Array.from(keys)[0] as string;
+                    updateSettings({ [q.id]: selected || null });
+                  }}
+                  variant="bordered"
+                  size="sm"
+                >
+                  {q.options.map((opt) => (
+                    <SelectItem key={opt.id}>{t(opt.labelKey)}</SelectItem>
+                  ))}
+                </Select>
+              </div>
+            );
+          })}
         </CardBody>
       </Card>
 

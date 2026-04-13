@@ -32,3 +32,19 @@ export async function getUserSetting<K extends keyof UserSettings>(
   const settings = await getUserSettings(userId);
   return settings[key];
 }
+
+/**
+ * Get multiple setting values for a user in a single DB round trip.
+ * Returns a pick of the resolved settings object containing only the requested keys.
+ */
+export async function getUserSettingsMulti<K extends keyof UserSettings>(
+  userId: string,
+  keys: K[]
+): Promise<Pick<Required<UserSettings>, K>> {
+  const settings = await getUserSettings(userId);
+  const result = {} as Pick<Required<UserSettings>, K>;
+  for (const key of keys) {
+    result[key] = settings[key];
+  }
+  return result;
+}

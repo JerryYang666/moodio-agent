@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { firstName, lastName } = body;
+    const { firstName, lastName, birthYear, languagePreference } = body;
 
     // Update user in database
     const [updatedUser] = await db
@@ -45,6 +45,18 @@ export async function POST(request: NextRequest) {
 
     if (!updatedUser) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
+
+    // Persist birthYear and languagePreference into settings JSONB
+    if (birthYear !== undefined || languagePreference !== undefined) {
+      const currentSettings = (updatedUser.settings as Record<string, unknown>) ?? {};
+      const settingsPatch: Record<string, unknown> = {};
+      if (birthYear !== undefined) settingsPatch.birthYear = birthYear;
+      if (languagePreference !== undefined) settingsPatch.languagePreference = languagePreference;
+      await db
+        .update(users)
+        .set({ settings: { ...currentSettings, ...settingsPatch } })
+        .where(eq(users.id, payload.userId));
     }
 
     // Grant new user signup bonus credits

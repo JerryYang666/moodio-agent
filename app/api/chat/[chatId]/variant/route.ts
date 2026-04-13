@@ -9,7 +9,7 @@ import { Message, MessageContentPart } from "@/lib/llm/types";
 import { agent2 } from "@/lib/agents/agent-2";
 import { waitUntil } from "@vercel/functions";
 import { getActiveAccount } from "@/lib/credits";
-import { getUserSetting } from "@/lib/user-settings/server";
+import { getUserSettingsMulti } from "@/lib/user-settings/server";
 
 /**
  * Extract text content from a message for differentiation context
@@ -82,7 +82,7 @@ export async function POST(
     }
 
     const account = await getActiveAccount(payload.userId, payload);
-    const cnMode = await getUserSetting(payload.userId, "cnMode");
+    const { cnMode, languagePreference } = await getUserSettingsMulti(payload.userId, ["cnMode", "languagePreference"]);
 
     // Parse request body
     const json = await request.json();
@@ -219,6 +219,8 @@ export async function POST(
         account.accountType,
         account.performedBy,
         cnMode,
+        undefined, // chatId
+        languagePreference || undefined,
       );
 
     // Handle background completion (saving the new variant to history)

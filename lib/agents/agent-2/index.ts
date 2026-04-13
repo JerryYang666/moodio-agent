@@ -236,6 +236,7 @@ export class Agent2 implements Agent {
     performedBy?: string,
     cnMode?: boolean,
     chatId?: string,
+    languagePreference?: string,
   ): Promise<ParallelAgentResponse> {
     const startTime = requestStartTime || Date.now();
     const variantTimestamp = messageTimestamp || Date.now();
@@ -320,6 +321,7 @@ export class Agent2 implements Agent {
               maxImageQuantity,
               systemPromptOverride,
               expertise,
+              languagePreference,
               send,
             });
 
@@ -412,6 +414,7 @@ export class Agent2 implements Agent {
       maxImageQuantity: ctx.maxImageQuantity,
       expertise: ctx.expertise,
       persistentTextChunk: ctx.persistentTextChunk,
+      languagePreference: ctx.languagePreference,
     });
 
     // 2. Parse input

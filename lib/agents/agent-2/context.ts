@@ -52,6 +52,7 @@ export interface RequestContext {
   maxImageQuantity?: number;
   systemPromptOverride?: string;
   expertise?: Expertise;
+  languagePreference?: string;
 
   // Event emitter for streaming events to frontend
   send: (event: StreamEvent) => void;
@@ -93,6 +94,7 @@ export interface CreateRequestContextInput {
   maxImageQuantity?: number;
   systemPromptOverride?: string;
   expertise?: Expertise;
+  languagePreference?: string;
   send: (event: StreamEvent) => void;
 }
 
@@ -147,6 +149,7 @@ export function createRequestContext(input: CreateRequestContextInput): RequestC
     maxImageQuantity: input.maxImageQuantity,
     systemPromptOverride: input.systemPromptOverride,
     expertise: input.expertise,
+    languagePreference: input.languagePreference,
     send: input.send,
   };
 }
