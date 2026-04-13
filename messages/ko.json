@@ -771,6 +771,12 @@
       "description": "모든 채팅, 활동, 기록을 확인합니다.",
       "goTo": "채팅 관리로 이동"
     },
+    "feedback": {
+      "title": "사용자 피드백",
+      "subtitle": "피드백",
+      "description": "사용자의 좋아요/싫어요 피드백과 댓글을 확인합니다.",
+      "goTo": "피드백 보기"
+    },
     "events": {
       "title": "이벤트",
       "subtitle": "텔레메트리",

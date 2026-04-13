@@ -6,7 +6,7 @@ import { Card, CardBody, CardFooter, CardHeader } from "@heroui/card";
 import { Button } from "@heroui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { Spinner } from "@heroui/spinner";
-import { Users, UsersRound, MessageSquare, Settings, Activity, Video, Calculator, Bean, FlaskConical, Flag, Wifi, CreditCard } from "lucide-react";
+import { Users, UsersRound, MessageSquare, Settings, Activity, Video, Calculator, Bean, FlaskConical, Flag, Wifi, CreditCard, ThumbsUp } from "lucide-react";
 
 export default function AdminPage() {
   const { user, loading: authLoading } = useAuth();
@@ -106,6 +106,34 @@ export default function AdminPage() {
               onPress={() => router.push("/admin/chat-management")}
             >
               {t("chats.goTo")}
+            </Button>
+          </CardFooter>
+        </Card>
+
+        {/* User Feedback Card */}
+        <Card
+          className="py-4 cursor-pointer hover:scale-[1.02] transition-transform"
+          onPress={() => router.push("/admin/feedback")}
+        >
+          <CardHeader className="pb-0 pt-2 px-4 flex-row gap-2 items-center">
+            <ThumbsUp className="w-6 h-6 text-primary" />
+            <div className="flex flex-col">
+              <p className="text-tiny uppercase font-bold">
+                {t("feedback.subtitle")}
+              </p>
+              <h4 className="font-bold text-large">{t("feedback.title")}</h4>
+            </div>
+          </CardHeader>
+          <CardBody className="overflow-visible py-2">
+            <p className="text-default-500">{t("feedback.description")}</p>
+          </CardBody>
+          <CardFooter>
+            <Button
+              color="primary"
+              variant="flat"
+              onPress={() => router.push("/admin/feedback")}
+            >
+              {t("feedback.goTo")}
             </Button>
           </CardFooter>
         </Card>

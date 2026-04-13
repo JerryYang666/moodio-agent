@@ -771,6 +771,12 @@
       "description": "查看所有对话、监控活动和历史记录。",
       "goTo": "前往对话管理"
     },
+    "feedback": {
+      "title": "用户反馈",
+      "subtitle": "反馈",
+      "description": "查看用户的点赞/点踩反馈和评论。",
+      "goTo": "查看反馈"
+    },
     "events": {
       "title": "事件",
       "subtitle": "遥测",

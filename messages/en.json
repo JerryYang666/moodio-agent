@@ -919,6 +919,12 @@
       "description": "View all chats, monitor activity, and history.",
       "goTo": "Go to Chat Management"
     },
+    "feedback": {
+      "title": "User Feedback",
+      "subtitle": "Feedback",
+      "description": "View thumbs up/down feedback and comments from users.",
+      "goTo": "View Feedback"
+    },
     "events": {
       "title": "Events",
       "subtitle": "Telemetry",

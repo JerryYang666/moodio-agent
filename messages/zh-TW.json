@@ -771,6 +771,12 @@
       "description": "檢視所有對話、監控活動和歷史記錄。",
       "goTo": "前往對話管理"
     },
+    "feedback": {
+      "title": "使用者回饋",
+      "subtitle": "回饋",
+      "description": "檢視使用者的按讚/倒讚回饋和留言。",
+      "goTo": "檢視回饋"
+    },
     "events": {
       "title": "事件",
       "subtitle": "遙測",
