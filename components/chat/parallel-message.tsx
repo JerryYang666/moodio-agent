@@ -8,6 +8,7 @@ import { ChevronLeft, ChevronRight, Layers, Sparkles } from "lucide-react";
 import { useTranslations } from "next-intl";
 import clsx from "clsx";
 import { Message } from "@/lib/llm/types";
+import { chatMessageFeedbackKey } from "@/lib/feedback/utils";
 import ChatMessage from "./chat-message";
 
 interface ParallelMessageProps {
@@ -85,6 +86,14 @@ interface ParallelMessageProps {
     variantId?: string;
     durationMs: number;
   }) => void;
+  /** Feedback state for all variants, keyed by "timestamp:variantId" */
+  feedbackMap?: Record<string, { thumbs: "up" | "down"; comment?: string }>;
+  /** Callback when user gives feedback */
+  onFeedback?: (
+    messageTimestamp: number,
+    variantId: string | undefined,
+    value: { thumbs: "up" | "down"; comment?: string } | null
+  ) => void;
 }
 
 export default function ParallelMessage({
@@ -111,6 +120,8 @@ export default function ParallelMessage({
   onVideoSuggestPartUpdate,
   isTimestampLoading = false,
   onImageHoverTrack,
+  feedbackMap,
+  onFeedback,
 }: ParallelMessageProps) {
   const t = useTranslations();
   const [currentVariantIndex, setCurrentVariantIndex] = useState(0);
@@ -216,6 +227,12 @@ export default function ParallelMessage({
           onVideoSuggestPartUpdate={onVideoSuggestPartUpdate}
           isTimestampLoading={isTimestampLoading}
           onImageHoverTrack={onImageHoverTrack}
+          feedbackValue={
+            feedbackMap && variants[0].createdAt
+              ? feedbackMap[chatMessageFeedbackKey(variants[0].createdAt, variants[0].variantId)] ?? null
+              : null
+          }
+          onFeedback={onFeedback}
           timestampAction={
             onGenerateVariant && !isSending ? (
               <Button
@@ -276,6 +293,12 @@ export default function ParallelMessage({
                 onPartUpdate={onPartUpdate}
           onVideoSuggestPartUpdate={onVideoSuggestPartUpdate}
                 onImageHoverTrack={onImageHoverTrack}
+                feedbackValue={
+                  feedbackMap && variant.createdAt
+                    ? feedbackMap[chatMessageFeedbackKey(variant.createdAt, variant.variantId)] ?? null
+                    : null
+                }
+                onFeedback={onFeedback}
               />
             </div>
           ))}
@@ -367,6 +390,12 @@ export default function ParallelMessage({
               onPartUpdate={onPartUpdate}
           onVideoSuggestPartUpdate={onVideoSuggestPartUpdate}
               onImageHoverTrack={onImageHoverTrack}
+              feedbackValue={
+                feedbackMap && variants[currentVariantIndex]?.createdAt
+                  ? feedbackMap[chatMessageFeedbackKey(variants[currentVariantIndex].createdAt!, variants[currentVariantIndex].variantId)] ?? null
+                  : null
+              }
+              onFeedback={onFeedback}
             />
           </div>
         </div>

@@ -12,6 +12,7 @@ import {
   integer,
   smallint,
   index,
+  uniqueIndex,
   type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 
@@ -527,6 +528,40 @@ export const researchEvents = pgTable(
 
 export type ResearchEvent = typeof researchEvents.$inferSelect;
 export type NewResearchEvent = typeof researchEvents.$inferInsert;
+
+/**
+ * User Feedback table
+ * Generic feedback storage for any entity type (chat messages, images, videos, etc.).
+ * Uses entity_type + entity_id pattern for cross-domain reuse.
+ */
+export const userFeedback = pgTable(
+  "user_feedback",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    entityType: varchar("entity_type", { length: 50 }).notNull(),
+    entityId: varchar("entity_id", { length: 512 }).notNull(),
+    feedback: jsonb("feedback").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    userEntityIdx: uniqueIndex("user_feedback_user_entity_idx").on(
+      table.userId,
+      table.entityType,
+      table.entityId
+    ),
+    entityTypeIdx: index("user_feedback_entity_type_idx").on(
+      table.entityType,
+      table.entityId
+    ),
+  })
+);
+
+export type UserFeedback = typeof userFeedback.$inferSelect;
+export type NewUserFeedback = typeof userFeedback.$inferInsert;
 
 /**
  * Desktops table

@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAccessToken } from "@/lib/auth/cookies";
 import { verifyAccessToken } from "@/lib/auth/jwt";
 import { db } from "@/lib/db";
-import { chats, videoGenerations, teamMembers } from "@/lib/db/schema";
-import { eq, and, inArray } from "drizzle-orm";
+import { chats, videoGenerations, teamMembers, userFeedback } from "@/lib/db/schema";
+import { eq, and, inArray, like } from "drizzle-orm";
 import { getChatHistory, getImageUrl, getVideoUrl, getSignedVideoUrl, saveChatHistory } from "@/lib/storage/s3";
 import { waitUntil } from "@vercel/functions";
 import { Message, MessageContentPart } from "@/lib/llm/types";
@@ -89,6 +89,27 @@ export async function GET(
         .from(videoGenerations)
         .where(inArray(videoGenerations.id, directVideoGenerationIds));
       generationMap = new Map(generations.map((g) => [g.id, g]));
+    }
+
+    // Batch-query feedback for this chat's messages
+    const feedbackRows = await db
+      .select({
+        entityId: userFeedback.entityId,
+        feedback: userFeedback.feedback,
+      })
+      .from(userFeedback)
+      .where(
+        and(
+          eq(userFeedback.userId, payload.userId),
+          eq(userFeedback.entityType, "chat_message"),
+          like(userFeedback.entityId, `${chatId}:%`)
+        )
+      );
+
+    const feedbackMap: Record<string, any> = {};
+    for (const row of feedbackRows) {
+      const key = row.entityId.slice(chatId.length + 1);
+      feedbackMap[key] = row.feedback;
     }
 
     let s3Dirty = false;
@@ -286,6 +307,7 @@ export async function GET(
       messages: processedMessages,
       persistentAssets: processedPersistentAssets,
       isOwner,
+      feedbackMap,
     });
   } catch (error) {
     console.error("Error fetching chat:", error);

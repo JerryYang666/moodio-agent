@@ -87,6 +87,7 @@ import { getPreselectImages } from "./preselect-images-utils";
 import type { JSONContent } from "@tiptap/react";
 import { useResearchTelemetry } from "@/hooks/use-research-telemetry";
 import type { SuggestionBubble, SuggestionBubbleAction, SuggestionBubbleContext } from "./suggestion-bubble-types";
+import { chatMessageEntityId, chatMessageFeedbackKey } from "@/lib/feedback/utils";
 import { SUGGESTION_BUBBLE_EVENT } from "./suggestion-bubble-types";
 import { EMPTY_CHAT_SUGGESTIONS } from "@/config/suggestion-bubbles";
 import SuggestionBubbleGroup from "./SuggestionBubbleGroup";
@@ -285,10 +286,12 @@ export default function ChatInterface({
         setIsSending(false);
         setIsLoading(!!initialChatId && initialMessages.length === 0);
       }
+      setFeedbackMap({});
     }
   }, [initialChatId]);
   const [isSending, setIsSending] = useState(false);
   const [isReadOnly, setIsReadOnly] = useState(false);
+  const [feedbackMap, setFeedbackMap] = useState<Record<string, { thumbs: "up" | "down"; comment?: string }>>({});
   const [postMessageSuggestions, setPostMessageSuggestions] = useState<SuggestionBubble[]>([]);
   const [askUserQuestions, setAskUserQuestions] = useState<
     Array<{ id: string; question: string; options: string[] }> | null
@@ -929,6 +932,9 @@ export default function ChatInterface({
           setMessages(hydratedMessages);
           setIsSending(cached?.isSending ?? false);
           setIsReadOnly(data.isOwner === false);
+          if (data.feedbackMap) {
+            setFeedbackMap(data.feedbackMap);
+          }
           if (cached?.isSending) {
             setTimeout(() => {
               if (chatIdRef.current !== requestedChatId) return;
@@ -3910,6 +3916,53 @@ export default function ChatInterface({
     }
   };
 
+  // Handler for feedback (thumbs up/down) on any message
+  const handleFeedback = useCallback(
+    async (
+      messageTimestamp: number,
+      variantId: string | undefined,
+      value: { thumbs: "up" | "down"; comment?: string } | null
+    ) => {
+      if (!chatId) return;
+
+      const key = chatMessageFeedbackKey(messageTimestamp, variantId);
+      const entityId = chatMessageEntityId(chatId, messageTimestamp, variantId);
+
+      // Optimistic update
+      setFeedbackMap((prev) => {
+        if (value === null) {
+          const next = { ...prev };
+          delete next[key];
+          return next;
+        }
+        return { ...prev, [key]: value };
+      });
+
+      try {
+        if (value === null) {
+          await fetch("/api/feedback", {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ entityType: "chat_message", entityId }),
+          });
+        } else {
+          await fetch("/api/feedback", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              entityType: "chat_message",
+              entityId,
+              feedback: value,
+            }),
+          });
+        }
+      } catch (error) {
+        console.error("Failed to save feedback:", error);
+      }
+    },
+    [chatId]
+  );
+
   // Handler for generating an additional variant for a message group
   const handleGenerateVariant = async (messageTimestamp: number) => {
     if (!chatId || generatingVariantTimestamp !== null) return;
@@ -4200,6 +4253,8 @@ export default function ChatInterface({
                   onVideoSuggestPartUpdate={handleVideoSuggestPartUpdate}
                   isTimestampLoading={isStreamingAssistantGroup}
                   onImageHoverTrack={handleImageHoverTrack}
+                  feedbackMap={feedbackMap}
+                  onFeedback={handleFeedback}
                 />
               </div>
             );

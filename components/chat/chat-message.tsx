@@ -4,7 +4,7 @@ import { Card, CardBody } from "@heroui/card";
 import { Spinner } from "@heroui/spinner";
 import { Avatar } from "@heroui/avatar";
 import { Image } from "@heroui/image";
-import { Bot, X, Pencil, ChevronDown, ChevronRight, Brain, Maximize2, Monitor, Video, Music } from "lucide-react";
+import { Bot, X, Pencil, ChevronDown, ChevronRight, Brain, Maximize2, Monitor, Video, Music, ThumbsUp, ThumbsDown, Send } from "lucide-react";
 import clsx from "clsx";
 import { Message, MessageContentPart, isGeneratedImagePart } from "@/lib/llm/types";
 import ImageWithMenu from "@/components/collection/image-with-menu";
@@ -106,6 +106,14 @@ interface ChatMessageProps {
     variantId?: string;
     durationMs: number;
   }) => void;
+  /** Current feedback value for this message */
+  feedbackValue?: { thumbs: "up" | "down"; comment?: string } | null;
+  /** Callback when user gives feedback (thumbs up/down/remove) */
+  onFeedback?: (
+    messageTimestamp: number,
+    variantId: string | undefined,
+    value: { thumbs: "up" | "down"; comment?: string } | null
+  ) => void;
 }
 
 export default function ChatMessage({
@@ -131,10 +139,14 @@ export default function ChatMessage({
   timestampAction,
   isTimestampLoading = false,
   onImageHoverTrack,
+  feedbackValue,
+  onFeedback,
 }: ChatMessageProps) {
   const isUser = message.role === "user";
   const [isForkPopoverOpen, setIsForkPopoverOpen] = useState(false);
   const [isThinkingOpen, setIsThinkingOpen] = useState(false);
+  const [showDownComment, setShowDownComment] = useState(false);
+  const [downComment, setDownComment] = useState("");
   const { user: currentUser } = useAuth();
   const isAdmin = currentUser?.roles?.includes("admin");
   const t = useTranslations();
@@ -901,6 +913,57 @@ export default function ChatMessage({
                 {formatTime(message.createdAt)}
               </span>
             )}
+            {!isUser && !isTimestampLoading && onFeedback && message.createdAt && (
+              <div className={clsx(
+                "flex items-center gap-0.5",
+                !feedbackValue && "md:opacity-0 md:group-hover:opacity-100",
+                "transition-opacity"
+              )}>
+                <button
+                  onClick={() => {
+                    if (!message.createdAt) return;
+                    if (feedbackValue?.thumbs === "up") {
+                      onFeedback(message.createdAt, message.variantId, null);
+                    } else {
+                      setShowDownComment(false);
+                      setDownComment("");
+                      onFeedback(message.createdAt, message.variantId, { thumbs: "up" });
+                    }
+                  }}
+                  className={clsx(
+                    "p-1 rounded-full transition-colors",
+                    feedbackValue?.thumbs === "up"
+                      ? "text-success-500 bg-success-50"
+                      : "text-default-400 hover:text-default-600 hover:bg-default-100"
+                  )}
+                  aria-label="Thumbs up"
+                >
+                  <ThumbsUp size={12} fill={feedbackValue?.thumbs === "up" ? "currentColor" : "none"} />
+                </button>
+                <button
+                  onClick={() => {
+                    if (!message.createdAt) return;
+                    if (feedbackValue?.thumbs === "down") {
+                      onFeedback(message.createdAt, message.variantId, null);
+                      setShowDownComment(false);
+                      setDownComment("");
+                    } else {
+                      onFeedback(message.createdAt, message.variantId, { thumbs: "down" });
+                      setShowDownComment(true);
+                    }
+                  }}
+                  className={clsx(
+                    "p-1 rounded-full transition-colors",
+                    feedbackValue?.thumbs === "down"
+                      ? "text-danger-500 bg-danger-50"
+                      : "text-default-400 hover:text-default-600 hover:bg-default-100"
+                  )}
+                  aria-label="Thumbs down"
+                >
+                  <ThumbsDown size={12} fill={feedbackValue?.thumbs === "down" ? "currentColor" : "none"} />
+                </button>
+              </div>
+            )}
             {!isUser && timestampAction && (
               <div className="ml-auto">{timestampAction}</div>
             )}
@@ -949,6 +1012,45 @@ export default function ChatMessage({
                 </PopoverContent>
               </Popover>
             )}
+          </div>
+        )}
+        {!isUser && showDownComment && feedbackValue?.thumbs === "down" && onFeedback && message.createdAt && (
+          <div className="flex items-start gap-1.5 mt-1 max-w-sm">
+            <textarea
+              value={downComment}
+              onChange={(e) => setDownComment(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  if (!message.createdAt) return;
+                  onFeedback(message.createdAt, message.variantId, {
+                    thumbs: "down",
+                    comment: downComment.trim() || undefined,
+                  });
+                  setShowDownComment(false);
+                  setDownComment("");
+                }
+              }}
+              placeholder="What went wrong?"
+              maxLength={1000}
+              rows={1}
+              className="flex-1 text-xs bg-default-100 rounded-lg px-2 py-1.5 resize-none outline-none focus:ring-1 focus:ring-default-300 text-default-700 placeholder:text-default-400"
+            />
+            <button
+              onClick={() => {
+                if (!message.createdAt) return;
+                onFeedback(message.createdAt, message.variantId, {
+                  thumbs: "down",
+                  comment: downComment.trim() || undefined,
+                });
+                setShowDownComment(false);
+                setDownComment("");
+              }}
+              className="p-1.5 rounded-full text-default-500 hover:text-primary hover:bg-default-100 transition-colors"
+              aria-label="Submit comment"
+            >
+              <Send size={12} />
+            </button>
           </div>
         )}
       </div>
