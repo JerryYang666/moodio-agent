@@ -98,6 +98,7 @@ export class Agent2 implements Agent {
     accountId?: string,
     accountType?: AccountType,
     performedBy?: string,
+    chatId?: string,
   ): Promise<AgentResponse> {
     const startTime = requestStartTime || Date.now();
     console.log("[Perf] Agent2 processRequest start", `[${Date.now() - startTime}ms]`);
@@ -143,6 +144,7 @@ export class Agent2 implements Agent {
           userId,
           isAdmin,
           requestStartTime: startTime,
+          chatId,
           accountId,
           accountType,
           performedBy,
@@ -233,6 +235,7 @@ export class Agent2 implements Agent {
     accountType?: AccountType,
     performedBy?: string,
     cnMode?: boolean,
+    chatId?: string,
   ): Promise<ParallelAgentResponse> {
     const startTime = requestStartTime || Date.now();
     const variantTimestamp = messageTimestamp || Date.now();
@@ -301,6 +304,7 @@ export class Agent2 implements Agent {
               userId,
               isAdmin,
               requestStartTime: startTime,
+              chatId,
               accountId,
               accountType,
               performedBy,

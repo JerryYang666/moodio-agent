@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAccessToken } from "@/lib/auth/cookies";
 import { verifyAccessToken } from "@/lib/auth/jwt";
 import { db } from "@/lib/db";
-import { videoGenerations } from "@/lib/db/schema";
+import { videoGenerations, teamMembers } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getImageUrl, getVideoUrl, getSignedVideoUrl } from "@/lib/storage/s3";
 import { resolveUpscaledVideos } from "@/lib/video/upscale-utils";
@@ -10,7 +10,8 @@ import { resolveUpscaledVideos } from "@/lib/video/upscale-utils";
 /**
  * GET /api/video/generations/[id]
  * Get a single video generation by ID
- * Only returns the generation if it belongs to the current user
+ * Only returns the generation if it belongs to the current user,
+ * or if the requester is a team owner/admin and the generator is a team member (hint-based).
  */
 export async function GET(
   request: NextRequest,
@@ -30,16 +31,10 @@ export async function GET(
   const { id } = await params;
 
   try {
-    // Find generation that belongs to the user
     const [generation] = await db
       .select()
       .from(videoGenerations)
-      .where(
-        and(
-          eq(videoGenerations.id, id),
-          eq(videoGenerations.userId, payload.userId)
-        )
-      )
+      .where(eq(videoGenerations.id, id))
       .limit(1);
 
     if (!generation) {
@@ -47,6 +42,40 @@ export async function GET(
         { error: "Generation not found" },
         { status: 404 }
       );
+    }
+
+    const isOwner = generation.userId === payload.userId;
+
+    if (!isOwner) {
+      const { searchParams } = new URL(request.url);
+      const teamIdHint = searchParams.get("teamId");
+
+      let granted = false;
+      if (teamIdHint) {
+        const membership = payload.teams?.find((t) => t.id === teamIdHint);
+        if (membership && (membership.role === "owner" || membership.role === "admin")) {
+          const [genOwnerMembership] = await db
+            .select()
+            .from(teamMembers)
+            .where(
+              and(
+                eq(teamMembers.teamId, teamIdHint),
+                eq(teamMembers.userId, generation.userId)
+              )
+            )
+            .limit(1);
+          if (genOwnerMembership) {
+            granted = true;
+          }
+        }
+      }
+
+      if (!granted) {
+        return NextResponse.json(
+          { error: "Generation not found" },
+          { status: 404 }
+        );
+      }
     }
 
     // Add CloudFront URLs

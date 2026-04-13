@@ -10,12 +10,14 @@ export default function ChatPage({ params }: { params: Promise<{ chatId: string 
   const scrollToAssetId = searchParams.get("assetId") || undefined;
   const rawTimestamp = searchParams.get("messageTimestamp");
   const scrollToMessageTimestamp = rawTimestamp ? Number(rawTimestamp) : undefined;
+  const teamId = searchParams.get("teamId") || undefined;
 
   return (
     <ChatInterface
       chatId={chatId}
       scrollToAssetId={scrollToAssetId}
       scrollToMessageTimestamp={scrollToMessageTimestamp}
+      teamId={teamId}
     />
   );
 }

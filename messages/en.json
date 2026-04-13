@@ -135,6 +135,7 @@
     "deleteChat": "Delete Chat",
     "deleteConfirm": "Are you sure you want to delete this chat? This action cannot be undone.",
     "noChatsYet": "No chats yet",
+    "readOnlyChat": "You are viewing this chat in read-only mode",
     "chatRenamed": "Chat renamed",
     "chatRenamedDesc": "The chat has been renamed successfully",
     "chatDeleted": "Chat deleted",
@@ -1339,7 +1340,9 @@
     "purchaseCanceled": "Purchase was canceled.",
     "purchasingForPersonal": "Adding credits to your personal account",
     "purchasingForTeam": "Adding credits to {teamName}",
-    "teamPurchaseNotAllowed": "Only team owners and admins can purchase credits for the team"
+    "teamPurchaseNotAllowed": "Only team owners and admins can purchase credits for the team",
+    "viewChat": "View Chat",
+    "viewGeneration": "View Generation"
   },
   "teams": {
     "title": "Teams",

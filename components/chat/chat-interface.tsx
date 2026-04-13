@@ -8,7 +8,7 @@ import { Spinner } from "@heroui/spinner";
 import { useDisclosure } from "@heroui/modal";
 import { Card, CardBody } from "@heroui/card";
 import { addToast } from "@heroui/toast";
-import { Bot } from "lucide-react";
+import { Bot, EyeOff } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useChat } from "@/hooks/use-chat";
 import {
@@ -193,6 +193,8 @@ interface ChatInterfaceProps {
   scrollToAssetId?: string;
   /** Message timestamp to scroll to directly (preferred over assetId scan) */
   scrollToMessageTimestamp?: number;
+  /** Team ID hint for team-based access control */
+  teamId?: string;
 }
 
 export default function ChatInterface({
@@ -205,6 +207,7 @@ export default function ChatInterface({
   desktopId,
   scrollToAssetId,
   scrollToMessageTimestamp,
+  teamId,
 }: ChatInterfaceProps) {
   const t = useTranslations();
   const { user } = useAuth();
@@ -285,6 +288,7 @@ export default function ChatInterface({
     }
   }, [initialChatId]);
   const [isSending, setIsSending] = useState(false);
+  const [isReadOnly, setIsReadOnly] = useState(false);
   const [postMessageSuggestions, setPostMessageSuggestions] = useState<SuggestionBubble[]>([]);
   const [askUserQuestions, setAskUserQuestions] = useState<
     Array<{ id: string; question: string; options: string[] }> | null
@@ -908,7 +912,7 @@ export default function ChatInterface({
       setIsLoading(true);
       try {
         if (requestedChatId !== chatIdRef.current) return;
-        const res = await fetch(`/api/chat/${requestedChatId}`);
+        const res = await fetch(`/api/chat/${requestedChatId}${teamId ? `?teamId=${teamId}` : ""}`);
         if (res.ok) {
           const data = await res.json();
           if (chatIdRef.current !== requestedChatId) return;
@@ -924,6 +928,7 @@ export default function ChatInterface({
           }
           setMessages(hydratedMessages);
           setIsSending(cached?.isSending ?? false);
+          setIsReadOnly(data.isOwner === false);
           if (cached?.isSending) {
             setTimeout(() => {
               if (chatIdRef.current !== requestedChatId) return;
@@ -950,7 +955,7 @@ export default function ChatInterface({
     } else {
       setIsLoading(false);
     }
-  }, [chatId, user]);
+  }, [chatId, user, teamId]);
 
   // Persist active chat ID for cross-page continuity
   // Use "new" as a special marker for new chat state (no chatId yet)
@@ -4217,7 +4222,7 @@ export default function ChatInterface({
               </Card>
             </div>
           )}
-        {!isSending && postMessageSuggestions.length > 0 && (
+        {!isReadOnly && !isSending && postMessageSuggestions.length > 0 && (
           <div className="flex justify-center pt-0 pb-0">
             <SuggestionBubbleGroup
               suggestions={postMessageSuggestions}
@@ -4225,7 +4230,7 @@ export default function ChatInterface({
             />
           </div>
         )}
-        {!isSending && askUserQuestions && askUserQuestions.length > 0 && (
+        {!isReadOnly && !isSending && askUserQuestions && askUserQuestions.length > 0 && (
           <div className="flex justify-center pt-1 pb-0">
             <AskUserCard
               questions={askUserQuestions}
@@ -4236,7 +4241,7 @@ export default function ChatInterface({
         <div ref={messagesEndRef} />
       </div>
 
-      {messages.length === 0 && showCreativeSuggestions && creativeSuggestions.length > 0 && (
+      {!isReadOnly && messages.length === 0 && showCreativeSuggestions && creativeSuggestions.length > 0 && (
         <div
           className="absolute left-0 right-0 z-10 flex justify-center px-4"
           style={{ bottom: (chatInputHeight || 64) + 16 }}
@@ -4252,7 +4257,7 @@ export default function ChatInterface({
       )}
 
       {/* Persistent Assets Panel - positioned at top-left of chat (fullscreen only; in compact/sidebar mode the panel header handles this) */}
-      {chatId && !compactMode && (
+      {chatId && !compactMode && !isReadOnly && (
         <div className="absolute top-3 left-3 z-40">
           <PersistentAssetsPanel
             chatId={chatId}
@@ -4263,6 +4268,12 @@ export default function ChatInterface({
         </div>
       )}
 
+      {isReadOnly ? (
+        <div className="flex items-center justify-center gap-2 px-4 py-3 text-sm text-default-400 bg-default-50 border-t border-divider">
+          <EyeOff size={16} />
+          <span>{t("chat.readOnlyChat")}</span>
+        </div>
+      ) : (
       <ChatInput
         ref={chatInputRef}
         input={input}
@@ -4318,6 +4329,7 @@ export default function ChatInterface({
         onClearAssetParam={clearAssetParam}
         isAssetPickerOpen={isAssetPickerOpen}
       />
+      )}
 
       <AssetPickerModal
         isOpen={isAssetPickerOpen}

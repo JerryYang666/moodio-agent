@@ -258,7 +258,7 @@ export class ImageGenerateHandler implements ToolHandler {
         "image_generation",
         `Image generation (${modelId || "default"}, ${imageSize})`,
         ctx.effectivePerformedBy,
-        undefined,
+        ctx.chatId ? { type: "chat", id: ctx.chatId } : undefined,
         ctx.effectiveAccountType
       );
     }

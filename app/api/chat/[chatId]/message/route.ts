@@ -711,7 +711,7 @@ export async function POST(
                       "image_generation",
                       `Direct image generation (${imageModelId || "default"}, ${imageSizeOverride || "2k"})`,
                       account.performedBy,
-                      undefined,
+                      { type: "chat", id: chatId },
                       account.accountType,
                     );
                   }
@@ -1157,6 +1157,7 @@ export async function POST(
         account.accountType,
         account.performedBy,
         cnMode,
+        chatId,
       );
 
     // Research telemetry: reference_image_added (agent mode)

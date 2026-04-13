@@ -25,6 +25,9 @@ export interface RequestContext {
   isAdmin: boolean;
   requestStartTime: number;
 
+  // Chat context
+  chatId?: string;
+
   // Account (for credit operations)
   effectiveAccountId: string;
   effectiveAccountType: AccountType;
@@ -74,6 +77,7 @@ export interface CreateRequestContextInput {
   userId: string;
   isAdmin: boolean;
   requestStartTime?: number;
+  chatId?: string;
   accountId?: string;
   accountType?: AccountType;
   performedBy?: string;
@@ -127,6 +131,7 @@ export function createRequestContext(input: CreateRequestContextInput): RequestC
     userId: input.userId,
     isAdmin: input.isAdmin,
     requestStartTime: input.requestStartTime || Date.now(),
+    chatId: input.chatId,
     effectiveAccountId: input.accountId || input.userId,
     effectiveAccountType: input.accountType || "personal",
     effectivePerformedBy: input.performedBy || input.userId,

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAccessToken } from "@/lib/auth/cookies";
 import { verifyAccessToken } from "@/lib/auth/jwt";
 import { db } from "@/lib/db";
-import { chats, videoGenerations } from "@/lib/db/schema";
+import { chats, videoGenerations, teamMembers } from "@/lib/db/schema";
 import { eq, and, inArray } from "drizzle-orm";
 import { getChatHistory, getImageUrl, getVideoUrl, getSignedVideoUrl, saveChatHistory } from "@/lib/storage/s3";
 import { waitUntil } from "@vercel/functions";
@@ -29,17 +29,42 @@ export async function GET(
     const isAdmin = payload.roles?.includes("admin");
     let chat;
 
-    if (isAdmin) {
-      [chat] = await db.select().from(chats).where(eq(chats.id, chatId));
-    } else {
-      [chat] = await db
-        .select()
-        .from(chats)
-        .where(and(eq(chats.id, chatId), eq(chats.userId, payload.userId)));
-    }
+    [chat] = await db.select().from(chats).where(eq(chats.id, chatId));
 
     if (!chat) {
       return NextResponse.json({ error: "Chat not found" }, { status: 404 });
+    }
+
+    const isOwner = chat.userId === payload.userId;
+
+    if (!isOwner && !isAdmin) {
+      // Hint-based team access: allow team owner/admin to view a member's chat
+      const { searchParams } = new URL(request.url);
+      const teamIdHint = searchParams.get("teamId");
+
+      let granted = false;
+      if (teamIdHint) {
+        const membership = payload.teams?.find((t) => t.id === teamIdHint);
+        if (membership && (membership.role === "owner" || membership.role === "admin")) {
+          const [chatOwnerMembership] = await db
+            .select()
+            .from(teamMembers)
+            .where(
+              and(
+                eq(teamMembers.teamId, teamIdHint),
+                eq(teamMembers.userId, chat.userId)
+              )
+            )
+            .limit(1);
+          if (chatOwnerMembership) {
+            granted = true;
+          }
+        }
+      }
+
+      if (!granted) {
+        return NextResponse.json({ error: "Chat not found" }, { status: 404 });
+      }
     }
 
     const cnMode = await getUserSetting(payload.userId, "cnMode");
@@ -260,6 +285,7 @@ export async function GET(
       chat,
       messages: processedMessages,
       persistentAssets: processedPersistentAssets,
+      isOwner,
     });
   } catch (error) {
     console.error("Error fetching chat:", error);

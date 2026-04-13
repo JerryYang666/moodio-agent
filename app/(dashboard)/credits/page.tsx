@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useTranslations } from "next-intl";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { Card, CardBody, CardHeader } from "@heroui/card";
 import {
   Table,
@@ -18,19 +18,23 @@ import { Button } from "@heroui/button";
 import { addToast } from "@heroui/toast";
 import { Tabs, Tab } from "@heroui/tabs";
 import { Pagination } from "@heroui/pagination";
-import { Bean, CalendarCheck } from "lucide-react";
+import { Tooltip } from "@heroui/tooltip";
+import { Bean, CalendarCheck, MessageSquare, Eye } from "lucide-react";
 import { api } from "@/lib/api/client";
 import { useCredits } from "@/hooks/use-credits";
 import { useTeams } from "@/hooks/use-team";
 import { useAuth } from "@/hooks/use-auth";
 import { LegalFooter } from "@/components/legal-footer";
 import CreditPackageCards from "@/components/credits/CreditPackageCards";
+import VideoDetailModal, { type VideoDetailData } from "@/components/video/video-detail-modal";
 
 interface Transaction {
   id: string;
   amount: number;
   type: string;
   description: string | null;
+  relatedEntityType: string | null;
+  relatedEntityId: string | null;
   createdAt: string;
   performedByEmail?: string;
   performedByFirstName?: string;
@@ -46,6 +50,7 @@ interface CheckinStatus {
 export default function CreditsPage() {
   const t = useTranslations("credits");
   const searchParams = useSearchParams();
+  const router = useRouter();
   const { activeAccountType, activeAccountId, refreshBalance } = useCredits();
   const { teams, isOwnerOrAdmin } = useTeams();
   const { user } = useAuth();
@@ -70,6 +75,34 @@ export default function CreditsPage() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const rowsPerPage = 20;
+
+  // Video detail modal state
+  const [videoModalOpen, setVideoModalOpen] = useState(false);
+  const [videoModalData, setVideoModalData] = useState<VideoDetailData | null>(null);
+  const [videoModalLoading, setVideoModalLoading] = useState(false);
+
+  const handleViewVideoGeneration = async (generationId: string) => {
+    setVideoModalLoading(true);
+    setVideoModalOpen(true);
+    try {
+      const params = new URLSearchParams();
+      if (viewAccountType === "team" && viewAccountId) {
+        params.set("teamId", viewAccountId);
+      }
+      const data = await api.get(`/api/video/generations/${generationId}?${params.toString()}`);
+      setVideoModalData(data.generation);
+    } catch {
+      addToast({ title: "Failed to load video generation", color: "danger" });
+      setVideoModalOpen(false);
+    } finally {
+      setVideoModalLoading(false);
+    }
+  };
+
+  const handleViewChat = (chatId: string) => {
+    const teamParam = viewAccountType === "team" && viewAccountId ? `?teamId=${viewAccountId}` : "";
+    router.push(`/chat/${chatId}${teamParam}`);
+  };
 
   const fetchCredits = useCallback(async () => {
     try {
@@ -168,6 +201,8 @@ export default function CreditsPage() {
     const transactionTypes = t.raw("transactionTypes") as Record<string, string>;
     return transactionTypes[type] || type;
   };
+
+  const showActions = viewAccountType === "team" && viewAccountId && isOwnerOrAdmin(viewAccountId);
 
   if (initialLoading) {
     return (
@@ -319,6 +354,10 @@ export default function CreditsPage() {
                   : <TableColumn className="hidden"><></></TableColumn>
                 }
                 <TableColumn className="text-right">{t("amount")}</TableColumn>
+                {showActions
+                  ? <TableColumn className="w-12">{""}</TableColumn>
+                  : <TableColumn className="hidden"><></></TableColumn>
+                }
               </TableHeader>
               <TableBody
                 isLoading={fetchingPage}
@@ -361,6 +400,34 @@ export default function CreditsPage() {
                         {tx.amount.toLocaleString()}
                       </span>
                     </TableCell>
+                    {showActions
+                      ? <TableCell>
+                          {tx.type === "image_generation" && tx.relatedEntityType === "chat" && tx.relatedEntityId ? (
+                            <Tooltip content={t("viewChat")}>
+                              <Button
+                                isIconOnly
+                                size="sm"
+                                variant="light"
+                                onPress={() => handleViewChat(tx.relatedEntityId!)}
+                              >
+                                <MessageSquare size={16} />
+                              </Button>
+                            </Tooltip>
+                          ) : tx.type === "video_generation" && tx.relatedEntityType === "video_generation" && tx.relatedEntityId ? (
+                            <Tooltip content={t("viewGeneration")}>
+                              <Button
+                                isIconOnly
+                                size="sm"
+                                variant="light"
+                                onPress={() => handleViewVideoGeneration(tx.relatedEntityId!)}
+                              >
+                                <Eye size={16} />
+                              </Button>
+                            </Tooltip>
+                          ) : null}
+                        </TableCell>
+                      : <TableCell className="hidden"><></></TableCell>
+                    }
                   </TableRow>
                 ))}
               </TableBody>
@@ -370,6 +437,15 @@ export default function CreditsPage() {
       </Card>
 
       <LegalFooter className="pt-8" />
+
+      <VideoDetailModal
+        video={videoModalData}
+        isOpen={videoModalOpen}
+        onClose={() => {
+          setVideoModalOpen(false);
+          setVideoModalData(null);
+        }}
+      />
     </div>
   );
 }
