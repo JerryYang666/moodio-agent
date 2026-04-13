@@ -5,11 +5,13 @@ export const searchTool: ToolDefinition = {
   tag: "SEARCH",
   description: "Content library search with text query and taxonomy filter IDs",
   instruction: `After the system injects the taxonomy tree into the conversation, you can then formulate a search query using the <SEARCH> tag:
-<SEARCH>{"text": "descriptive text search query", "filters": [42, 55]}</SEARCH>
+<SEARCH>{"text": "very concise descriptive text search query", "filters": [42]}</SEARCH>
 
 Where:
-- "text": A natural language text search query describing what to look for (can be empty string if only using filters)
-- "filters": An array of taxonomy value IDs from the tree (can be empty array if only using text search). Maximum of 2 taxonomy label IDs allowed.
+- "text": A very concise natural language text search query describing what to look for (can be empty string if only using filters)
+- "filters": An array of taxonomy value IDs from the tree (can be empty array if only using text search). Maximum of 1 taxonomy label IDs allowed.
+
+Don't use text and filters together unless the user explicitly asks for it. Leave text an empty string if you are using filters, and leave filters an empty array if you are using text.
 
 The search will be executed directly — no user confirmation is needed.
 
