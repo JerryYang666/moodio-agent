@@ -363,39 +363,69 @@ export default function ChatInterface({
     setMenuState(saved);
   }, []);
 
-  // Hydrate missing media-ref URLs from the server (localStorage is just a cache)
+  // Normalize media_references: convert signed CDN URLs back to raw IDs + unsigned display URLs.
+  // Then hydrate any remaining missing URLs from the enrich endpoint.
   const enrichingIdsRef = useRef<Set<string>>(new Set());
   useEffect(() => {
     const refs = (menuState.videoParams?.media_references as MediaReference[]) || [];
-    const unresolved = refs.filter(
-      (r) => r.id && !mediaRefUrls[r.id] && !enrichingIdsRef.current.has(r.id)
-    );
-    if (unresolved.length === 0) return;
+    if (refs.length === 0) return;
 
-    // IDs that are already full URLs can be resolved immediately
-    const alreadyUrls: Record<string, string> = {};
-    const needsFetch: typeof unresolved = [];
-    for (const r of unresolved) {
-      if (r.id.startsWith("http")) {
-        alreadyUrls[r.id] = r.id;
-      } else {
-        needsFetch.push(r);
+    // Pass 1: normalise signed-URL IDs back to bare asset IDs
+    const urlIdMap: Record<string, { rawId: string; unsignedUrl: string }> = {};
+    let hasUrlIds = false;
+    for (const r of refs) {
+      if (r.id && r.id.startsWith("http")) {
+        try {
+          const parsed = new URL(r.id);
+          // pathname is e.g. /images/{uuid} or /videos/{uuid} or /audios/{uuid}
+          const segments = parsed.pathname.split("/").filter(Boolean);
+          if (segments.length >= 2) {
+            const rawId = segments[segments.length - 1];
+            const unsignedUrl = `${parsed.origin}/${segments.join("/")}`;
+            urlIdMap[r.id] = { rawId, unsignedUrl };
+            hasUrlIds = true;
+          }
+        } catch { /* not a valid URL — ignore */ }
       }
     }
 
-    if (Object.keys(alreadyUrls).length > 0) {
-      setMediaRefUrls((prev) => ({ ...prev, ...alreadyUrls }));
+    if (hasUrlIds) {
+      // Rewrite media_references to use raw IDs
+      setMenuState((prev) => {
+        const prevRefs = (prev.videoParams?.media_references as MediaReference[]) || [];
+        const normalised = prevRefs.map((r) => {
+          const entry = urlIdMap[r.id];
+          return entry ? { ...r, id: entry.rawId } : r;
+        });
+        return {
+          ...prev,
+          videoParams: { ...prev.videoParams, media_references: normalised },
+        };
+      });
+      // Populate display URLs keyed by the raw IDs
+      setMediaRefUrls((prev) => {
+        const next = { ...prev };
+        for (const [, { rawId, unsignedUrl }] of Object.entries(urlIdMap)) {
+          next[rawId] = unsignedUrl;
+        }
+        return next;
+      });
+      return; // effect will re-run with normalised refs
     }
 
-    if (needsFetch.length === 0) return;
+    // Pass 2: fetch URLs for any raw IDs that are still missing
+    const missing = refs.filter(
+      (r) => r.id && !mediaRefUrls[r.id] && !enrichingIdsRef.current.has(r.id)
+    );
+    if (missing.length === 0) return;
 
-    const ids = needsFetch.map((r) => r.id);
+    const ids = missing.map((r) => r.id);
     for (const id of ids) enrichingIdsRef.current.add(id);
 
     fetch("/api/media/enrich", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ refs: needsFetch.map(({ type, id }) => ({ type, id })) }),
+      body: JSON.stringify({ refs: missing.map(({ type, id }) => ({ type, id })) }),
     })
       .then((res) => (res.ok ? res.json() : null))
       .then((data: { urls: Record<string, string> } | null) => {
