@@ -2191,13 +2191,27 @@ export default function ChatInterface({
           return next;
         });
       } else if (assetPickerMode === "persistent") {
+        const existing = persistentAssets.referenceImages;
+        const existingIds = new Set(existing.map((img) => img.imageId));
+        const newImages: typeof existing = [];
         for (const asset of assets) {
-          if (persistentAssets.referenceImages.length >= MAX_PERSISTENT_REFERENCE_IMAGES) break;
-          await addPersistentReferenceImage({
+          if (existing.length + newImages.length >= MAX_PERSISTENT_REFERENCE_IMAGES) break;
+          if (existingIds.has(asset.imageId)) continue;
+          existingIds.add(asset.imageId);
+          newImages.push({
             imageId: asset.imageId,
-            url: asset.imageUrl,
+            tag: "subject" as const,
             title: asset.generationDetails?.title || t("chat.selectedAsset"),
           });
+        }
+        if (newImages.length > 0 && chatId) {
+          await updatePersistentAssets({
+            chatId,
+            referenceImages: [...existing, ...newImages],
+            textChunk: persistentAssets.textChunk,
+          });
+        } else if (newImages.length === 0 && assets.length > 0) {
+          addToast({ title: t("chat.imageAlreadyAdded"), color: "warning" });
         }
       } else {
         for (const asset of assets) {
@@ -2229,7 +2243,7 @@ export default function ChatInterface({
         }
       }
     },
-    [addAssetImage, addPersistentReferenceImage, assetPickerMode, activeElementIndex, menuState.videoParams?.kling_elements, menuState.videoParams?.media_references, pendingAudios, persistentAssets, t]
+    [addAssetImage, updatePersistentAssets, chatId, addToast, assetPickerMode, activeElementIndex, menuState.videoParams?.kling_elements, menuState.videoParams?.media_references, pendingAudios, persistentAssets, t]
   );
 
   // Handler to open drawing modal for an image
