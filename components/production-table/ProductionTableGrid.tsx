@@ -757,7 +757,7 @@ export function ProductionTableGrid({
 
   // ---- Cell renderer ----
   const renderCell = useCallback(
-    (row: ProductionTableRow, col: ProductionTableColumn) => {
+    (row: ProductionTableRow, col: ProductionTableColumn, rowIndex: number) => {
       const key = `${col.id}:${row.id}`;
       const cell = cellMap[key];
       const lock = cellLocks.get(key);
@@ -780,6 +780,7 @@ export function ProductionTableGrid({
             currentUserId={currentUserId}
             onAddAsset={(asset) => onMediaAssetAdd(col.id, row.id, asset)}
             onRemoveAsset={(assetId) => onMediaAssetRemove(col.id, row.id, assetId)}
+            assetLabel={`${col.name} - Row ${rowIndex + 1}`}
           />
         );
       }
@@ -1093,7 +1094,7 @@ export function ProductionTableGrid({
                         onMouseEnter={() => handleCellMouseEnter(row.id, col.id)}
                         onContextMenu={(e) => handleCellContextMenu(row.id, col.id, e)}
                       >
-                        {renderCell(row, col)}
+                        {renderCell(row, col, idx)}
                         {cellMap[`${col.id}:${row.id}`]?.comment && (
                           <CellCommentIndicator
                             comment={cellMap[`${col.id}:${row.id}`].comment!}

@@ -48,6 +48,8 @@ interface MediaCellProps {
   currentUserId: string | undefined;
   onAddAsset: (asset: EnrichedMediaAssetRef) => void;
   onRemoveAsset: (assetId: string) => void;
+  /** Label used as asset title when adding to a collection (e.g. "Column · Row 3") */
+  assetLabel?: string;
 }
 
 export const MediaCell = memo(function MediaCell({
@@ -63,6 +65,7 @@ export const MediaCell = memo(function MediaCell({
   currentUserId,
   onAddAsset,
   onRemoveAsset,
+  assetLabel,
 }: MediaCellProps) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
@@ -336,7 +339,7 @@ export const MediaCell = memo(function MediaCell({
 
   const addAssetToCollection = useCallback(
     async (collectionId: string, asset: EnrichedMediaAssetRef) => {
-      const details = { title: "", prompt: "", status: "generated" as const };
+      const details = { title: assetLabel || "", prompt: "", status: "generated" as const };
       if (asset.assetType === "video") {
         await addVideoToCollection(collectionId, asset.imageId, asset.assetId, details);
       } else if (asset.assetType === "audio") {
@@ -346,7 +349,7 @@ export const MediaCell = memo(function MediaCell({
       }
       closeAssetContextMenu();
     },
-    [addImageToCollection, addVideoToCollection, addAudioToCollection, closeAssetContextMenu]
+    [assetLabel, addImageToCollection, addVideoToCollection, addAudioToCollection, closeAssetContextMenu]
   );
 
   const handleCreateNewCollection = useCallback(
