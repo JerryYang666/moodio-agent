@@ -4,7 +4,7 @@ import { Card, CardBody } from "@heroui/card";
 import { Spinner } from "@heroui/spinner";
 import { Avatar } from "@heroui/avatar";
 import { Image } from "@heroui/image";
-import { Bot, X, Pencil, ChevronDown, ChevronRight, Brain, Maximize2, Monitor, Video, Music, ThumbsUp, ThumbsDown, Send } from "lucide-react";
+import { Bot, X, Pencil, ChevronDown, ChevronRight, Brain, Maximize2, Monitor, Video, Music, ThumbsUp, ThumbsDown, Send, Paperclip } from "lucide-react";
 import clsx from "clsx";
 import { Message, MessageContentPart, isGeneratedImagePart } from "@/lib/llm/types";
 import ImageWithMenu from "@/components/collection/image-with-menu";
@@ -145,6 +145,7 @@ export default function ChatMessage({
   const isUser = message.role === "user";
   const [isForkPopoverOpen, setIsForkPopoverOpen] = useState(false);
   const [isThinkingOpen, setIsThinkingOpen] = useState(false);
+  const [isMediaRefsOpen, setIsMediaRefsOpen] = useState(false);
   const [showDownComment, setShowDownComment] = useState(false);
   const [downComment, setDownComment] = useState("");
   const { user: currentUser } = useAuth();
@@ -821,6 +822,63 @@ export default function ChatMessage({
                   desktopId={desktopId}
                 />
               ));
+
+            case "media_references":
+              return group.parts.map((part: any, i) => {
+                const refs = part.references || [];
+                const imageRefs = refs.filter((r: any) => r.refType === "image");
+                const videoRefs = refs.filter((r: any) => r.refType === "video");
+                const audioRefs = refs.filter((r: any) => r.refType === "audio");
+
+                const counts: string[] = [];
+                if (imageRefs.length > 0) counts.push(`${imageRefs.length} ${imageRefs.length === 1 ? t("chat.imageLabel") : t("chat.imagesLabel")}`);
+                if (videoRefs.length > 0) counts.push(`${videoRefs.length} ${videoRefs.length === 1 ? t("chat.videoLabel") : t("chat.videosLabel")}`);
+                if (audioRefs.length > 0) counts.push(`${audioRefs.length} ${audioRefs.length === 1 ? t("chat.audioLabel") : t("chat.audiosLabel")}`);
+
+                return (
+                  <div key={`media-refs-${gi}-${i}`}>
+                    <button
+                      onClick={() => setIsMediaRefsOpen(!isMediaRefsOpen)}
+                      className="flex items-center gap-2 text-xs opacity-70 hover:opacity-100 transition-opacity w-full"
+                    >
+                      {isMediaRefsOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                      <Paperclip size={14} />
+                      <span>{t("chat.mediaReferences", { count: refs.length })} ({counts.join(", ")})</span>
+                    </button>
+                    {isMediaRefsOpen && (
+                      <div className="mt-2 flex gap-2 flex-wrap">
+                        {refs.map((ref: any, ri: number) => {
+                          const label =
+                            ref.refType === "video" ? `@video${videoRefs.indexOf(ref) + 1}` :
+                            ref.refType === "audio" ? `@audio${audioRefs.indexOf(ref) + 1}` :
+                            `@image${imageRefs.indexOf(ref) + 1}`;
+                          return (
+                            <div
+                              key={`ref-${ri}`}
+                              className="h-16 w-16 rounded-lg border border-divider overflow-hidden shrink-0 relative bg-default-100"
+                            >
+                              {ref.refType === "image" && ref.url ? (
+                                <img src={ref.url} alt={label} className="h-full w-full object-cover" />
+                              ) : ref.refType === "video" && ref.url ? (
+                                <video src={ref.url} className="h-full w-full object-cover" muted />
+                              ) : (
+                                <div className="h-full w-full flex items-center justify-center">
+                                  {ref.refType === "video" ? <Video size={16} className="opacity-40" /> :
+                                   ref.refType === "audio" ? <Music size={16} className="opacity-40" /> :
+                                   <Paperclip size={16} className="opacity-40" />}
+                                </div>
+                              )}
+                              <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-[9px] text-white text-center py-0.5">
+                                {label}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              });
 
             default:
               return null;

@@ -500,6 +500,24 @@ export async function POST(
         createdAt: Date.now(),
         metadata,
       };
+    } else if (mode === "video" && Array.isArray(videoParams?.media_references) && videoParams.media_references.length > 0) {
+      const parts: MessageContentPart[] = [];
+      if (content) {
+        parts.push({ type: "text", text: content });
+      }
+      parts.push({
+        type: "media_references",
+        references: videoParams.media_references.map((ref: any) => ({
+          refType: ref.type,
+          id: ref.id,
+        })),
+      });
+      userMessage = {
+        role: "user",
+        content: parts,
+        createdAt: Date.now(),
+        metadata,
+      };
     } else {
       userMessage = { role: "user", content, createdAt: Date.now(), metadata };
     }

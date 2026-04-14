@@ -82,8 +82,8 @@ export class InputParser {
                 text: `[Audio | ID: ${p.audioId} | Title: ${p.title || "Untitled"} | Source: ${p.source}]`,
               };
             }
-            // Strip suggestions and ask_user — they are UI-only and should never be sent back to the LLM
-            if (p.type === "suggestions" || p.type === "agent_ask_user") {
+            // Strip suggestions, ask_user, and media_references — they are UI-only and should never be sent back to the LLM
+            if (p.type === "suggestions" || p.type === "agent_ask_user" || p.type === "media_references") {
               return null;
             }
             return p;
@@ -185,6 +185,9 @@ export class InputParser {
                 type: "text" as const,
                 text: `[Audio | ID: ${p.audioId} | Title: ${p.title || "Untitled"}]`,
               }];
+            }
+            if (p.type === "media_references") {
+              return [];
             }
             return [p];
           })

@@ -400,6 +400,20 @@ function addDerivedUrls(messages: Message[], cnMode: boolean = false): Message[]
           audioUrl: getAudioUrl(part.audioId, cnMode),
         };
       }
+      if (part.type === "media_references") {
+        return {
+          ...part,
+          references: part.references.map((ref) => ({
+            ...ref,
+            url:
+              ref.refType === "video"
+                ? getVideoUrl(ref.id, cnMode)
+                : ref.refType === "audio"
+                  ? getAudioUrl(ref.id, cnMode)
+                  : getImageUrl(ref.id, cnMode),
+          })),
+        };
+      }
       return part;
     });
 

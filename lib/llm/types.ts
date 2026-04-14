@@ -139,6 +139,14 @@ export type MessageContentPart =
         question: string;
         options: string[];
       }>;
+    }
+  | {
+      type: "media_references";
+      references: Array<{
+        refType: "image" | "video" | "audio";
+        id: string;
+        url?: string;
+      }>;
     };
 
 /** Type for parts that represent generated images (agent_image, direct_image, or agent_video_suggest) */

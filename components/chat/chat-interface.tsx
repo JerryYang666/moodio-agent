@@ -2590,14 +2590,20 @@ export default function ChatInterface({
     lastEditorContentRef.current = chatInputRef.current?.getEditorJSON() || null;
     lastUserMessageTextRef.current = currentInput;
 
-    // Capture current pending images and videos before clearing
-    const currentPendingImages = [...pendingImages];
+    // Capture current pending images and videos before clearing.
+    // In video mode with text-to-video models (no imageParams), pending images
+    // are irrelevant — references come from videoParams.media_references instead.
+    const isTextToVideoMode = menuState.mode === "video" && !videoModelHasImageParams;
+    const currentPendingImages = isTextToVideoMode ? [] : [...pendingImages];
     const currentPendingVideos = [...pendingVideos];
     const currentPendingAudios = [...pendingAudios];
+    const currentMediaRefs = isTextToVideoMode
+      ? ((menuState.videoParams?.media_references as MediaReference[]) || [])
+      : [];
 
     // Build optimistic message content with image/video/audio metadata for display and pre-select
     const optimisticContent: Message["content"] =
-      currentPendingImages.length > 0 || currentPendingVideos.length > 0 || currentPendingAudios.length > 0
+      currentPendingImages.length > 0 || currentPendingVideos.length > 0 || currentPendingAudios.length > 0 || currentMediaRefs.length > 0
         ? (() => {
           const parts: MessageContentPart[] = [];
           if (currentInput) {
@@ -2627,6 +2633,16 @@ export default function ChatInterface({
               audioUrl: aud.url,
               source: aud.source,
               title: aud.title,
+            });
+          }
+          if (currentMediaRefs.length > 0) {
+            parts.push({
+              type: "media_references",
+              references: currentMediaRefs.map((ref) => ({
+                refType: ref.type,
+                id: ref.id,
+                url: mediaRefUrls[ref.id],
+              })),
             });
           }
           return parts;
@@ -2692,6 +2708,14 @@ export default function ChatInterface({
     setPendingAudios([]);
     setAssetParamValues({});
     setPrecisionEditing(false);
+    setMediaRefUrls({});
+    setMenuState((prev) => ({
+      ...prev,
+      videoParams: {
+        ...prev.videoParams,
+        media_references: [],
+      },
+    }));
     
     // Clear the draft since we're sending the message
     clearChatDraft(chatId);
