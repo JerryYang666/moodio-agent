@@ -82,7 +82,7 @@ import {
   EMPTY_PERSISTENT_ASSETS,
   MAX_PERSISTENT_REFERENCE_IMAGES,
 } from "@/lib/chat/persistent-assets-types";
-import type { PersistentAssets, PersistentReferenceImage } from "@/lib/chat/persistent-assets-types";
+import type { PersistentReferenceImage } from "@/lib/chat/persistent-assets-types";
 import { getPreselectImages } from "./preselect-images-utils";
 import type { JSONContent } from "@tiptap/react";
 import { useResearchTelemetry } from "@/hooks/use-research-telemetry";
@@ -362,6 +362,29 @@ export default function ChatInterface({
     const saved = loadMenuState();
     setMenuState(saved);
   }, []);
+
+  // Hydrate missing media-ref URLs from the server (localStorage is just a cache)
+  const enrichingRef = useRef(false);
+  useEffect(() => {
+    const refs = (menuState.videoParams?.media_references as MediaReference[]) || [];
+    const missing = refs.filter((r) => r.id && !mediaRefUrls[r.id]);
+    if (missing.length === 0 || enrichingRef.current) return;
+
+    enrichingRef.current = true;
+    fetch("/api/media/enrich", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refs: missing.map(({ type, id }) => ({ type, id })) }),
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { urls: Record<string, string> } | null) => {
+        if (data?.urls && Object.keys(data.urls).length > 0) {
+          setMediaRefUrls((prev) => ({ ...prev, ...data.urls }));
+        }
+      })
+      .catch(() => {})
+      .finally(() => { enrichingRef.current = false; });
+  }, [menuState.videoParams?.media_references, mediaRefUrls]);
 
   // Video cost estimation state
   const [videoCost, setVideoCost] = useState<number | null>(null);
