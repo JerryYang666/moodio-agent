@@ -365,9 +365,16 @@ export const nextApi = createApi({
         method: "PUT",
         body,
       }),
-      invalidatesTags: (_result, _error, { chatId }) => [
-        { type: "PersistentAssets", id: chatId },
-      ],
+      async onQueryStarted({ chatId }, { dispatch, queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          dispatch(
+            nextApi.util.updateQueryData("getPersistentAssets", chatId, () => data)
+          );
+        } catch {
+          // mutation failed — leave cache as-is, caller handles the error
+        }
+      },
     }),
 
     // Folder endpoints
