@@ -595,6 +595,10 @@
     "failedToBulkMove": "항목 이동 실패",
     "failedToBulkCopy": "항목 복사 실패",
     "failedToBulkDelete": "항목 삭제 실패",
+    "bulkDownload": "다운로드",
+    "bulkDownloaded": "다운로드 완료",
+    "bulkDownloadedDesc": "{count}개 파일이 ZIP으로 다운로드됨",
+    "failedToBulkDownload": "파일 다운로드 실패",
     "tags": "태그",
     "addTag": "태그 추가",
     "add": "추가",
@@ -1414,7 +1418,11 @@
     "bulkDeleteConfirm": "이 폴더에서 {count}개 항목을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.",
     "bulkMoved": "{count}개 항목이 이동되었습니다",
     "bulkCopied": "{count}개 항목이 복사되었습니다",
-    "bulkDeleted": "{count}개 항목이 삭제되었습니다"
+    "bulkDeleted": "{count}개 항목이 삭제되었습니다",
+    "bulkDownload": "다운로드",
+    "bulkDownloaded": "다운로드 완료",
+    "bulkDownloadedDesc": "{count}개 파일이 ZIP으로 다운로드됨",
+    "failedToBulkDownload": "파일 다운로드 실패"
   },
   "desktop": {
     "title": "데스크톱",

@@ -1,7 +1,8 @@
 "use client";
 
 import { Button } from "@heroui/button";
-import { Copy, Move, Trash2 } from "lucide-react";
+import { Copy, Download, Move, Trash2 } from "lucide-react";
+import { Spinner } from "@heroui/spinner";
 import { motion, AnimatePresence } from "framer-motion";
 
 export interface BulkSelectionBarProps {
@@ -12,6 +13,8 @@ export interface BulkSelectionBarProps {
   onCopy: () => void;
   onMove: () => void;
   onDelete: () => void;
+  onDownload?: () => void;
+  isDownloading?: boolean;
   labels: {
     selectedCount: string;
     selectAll: string;
@@ -19,6 +22,7 @@ export interface BulkSelectionBarProps {
     bulkCopyTo: string;
     bulkMoveTo: string;
     bulkDelete: string;
+    bulkDownload?: string;
   };
 }
 
@@ -30,6 +34,8 @@ export default function BulkSelectionBar({
   onCopy,
   onMove,
   onDelete,
+  onDownload,
+  isDownloading,
   labels,
 }: BulkSelectionBarProps) {
   return (
@@ -54,6 +60,17 @@ export default function BulkSelectionBar({
               {isAllSelected ? labels.deselectAll : labels.selectAll}
             </Button>
             <div className="w-px h-5 bg-divider mx-1" />
+            {onDownload && labels.bulkDownload && (
+              <Button
+                size="sm"
+                variant="flat"
+                startContent={isDownloading ? <Spinner size="sm" /> : <Download size={14} />}
+                onPress={onDownload}
+                isDisabled={isDownloading}
+              >
+                {labels.bulkDownload}
+              </Button>
+            )}
             <Button
               size="sm"
               variant="flat"

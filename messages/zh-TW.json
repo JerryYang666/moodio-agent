@@ -595,6 +595,10 @@
     "failedToBulkMove": "移動項目失敗",
     "failedToBulkCopy": "複製項目失敗",
     "failedToBulkDelete": "刪除項目失敗",
+    "bulkDownload": "下載",
+    "bulkDownloaded": "下載完成",
+    "bulkDownloadedDesc": "已將 {count} 個檔案下載為 ZIP",
+    "failedToBulkDownload": "下載檔案失敗",
     "tags": "標籤",
     "addTag": "新增標籤",
     "add": "新增",
@@ -1414,7 +1418,11 @@
     "bulkDeleteConfirm": "確定要從此資料夾中刪除 {count} 個項目嗎？此操作無法復原。",
     "bulkMoved": "已移動 {count} 個項目",
     "bulkCopied": "已複製 {count} 個項目",
-    "bulkDeleted": "已刪除 {count} 個項目"
+    "bulkDeleted": "已刪除 {count} 個項目",
+    "bulkDownload": "下載",
+    "bulkDownloaded": "下載完成",
+    "bulkDownloadedDesc": "已將 {count} 個檔案下載為 ZIP",
+    "failedToBulkDownload": "下載檔案失敗"
   },
   "desktop": {
     "title": "畫布",

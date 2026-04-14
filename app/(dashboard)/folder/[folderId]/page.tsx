@@ -52,6 +52,7 @@ import { siteConfig } from "@/config/site";
 import { uploadImage, validateFile, getMaxFileSizeMB, shouldCompressFile, getCompressThresholdMB } from "@/lib/upload/client";
 import { useTranslations } from "next-intl";
 import type { AssetItem } from "@/lib/types/asset";
+import { bulkDownloadAssets } from "@/lib/bulk-download";
 
 interface FolderInfo {
   id: string;
@@ -200,6 +201,7 @@ export default function FolderPage({
   const [isBulkMoving, setIsBulkMoving] = useState(false);
   const [isBulkCopying, setIsBulkCopying] = useState(false);
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+  const [isBulkDownloading, setIsBulkDownloading] = useState(false);
 
   const shareModal = useShareModal({
     shareApiPath: `/api/folders/${folderId}/share`,
@@ -952,6 +954,26 @@ export default function FolderPage({
     }
   };
 
+  const handleBulkDownload = async () => {
+    if (selectedIds.size === 0 || !folderData) return;
+    const selectedAssets = folderData.images.filter((a) => selectedIds.has(a.id));
+    if (selectedAssets.length === 0) return;
+    setIsBulkDownloading(true);
+    try {
+      const zipName = `${folderData.folder.name || "folder"}.zip`;
+      await bulkDownloadAssets(selectedAssets, zipName);
+      addToast({
+        title: t("bulkDownloaded"),
+        description: t("bulkDownloadedDesc", { count: selectedAssets.length }),
+        color: "success",
+      });
+    } catch {
+      addToast({ title: tCommon("error"), description: t("failedToBulkDownload"), color: "danger" });
+    } finally {
+      setIsBulkDownloading(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -1215,6 +1237,8 @@ export default function FolderPage({
         onCopy={onBulkCopyOpen}
         onMove={onBulkMoveOpen}
         onDelete={onBulkDeleteOpen}
+        onDownload={handleBulkDownload}
+        isDownloading={isBulkDownloading}
         labels={{
           selectedCount: t("selectedCount", { count: selectedIds.size }),
           selectAll: t("selectAll"),
@@ -1222,6 +1246,7 @@ export default function FolderPage({
           bulkCopyTo: t("bulkCopyTo"),
           bulkMoveTo: t("bulkMoveTo"),
           bulkDelete: t("bulkDelete"),
+          bulkDownload: t("bulkDownload"),
         }}
       />
 

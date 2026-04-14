@@ -47,6 +47,7 @@ import { uploadAudio as uploadAudioFile, validateAudioFile } from "@/lib/upload/
 import { useShareModal } from "@/hooks/use-share-modal";
 import ShareModal from "@/components/share-modal";
 import type { AssetItem } from "@/lib/types/asset";
+import { bulkDownloadAssets } from "@/lib/bulk-download";
 
 interface CollectionData {
   collection: {
@@ -222,6 +223,7 @@ export default function CollectionPage({
   const [isBulkMoving, setIsBulkMoving] = useState(false);
   const [isBulkCopying, setIsBulkCopying] = useState(false);
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+  const [isBulkDownloading, setIsBulkDownloading] = useState(false);
 
   useEffect(() => {
     fetchCollectionData();
@@ -625,6 +627,26 @@ export default function CollectionPage({
       addToast({ title: tCommon("error"), description: t("failedToBulkDelete"), color: "danger" });
     } finally {
       setIsBulkDeleting(false);
+    }
+  };
+
+  const handleBulkDownload = async () => {
+    if (selectedIds.size === 0) return;
+    const selectedAssets = images.filter((a) => selectedIds.has(a.id));
+    if (selectedAssets.length === 0) return;
+    setIsBulkDownloading(true);
+    try {
+      const zipName = `${collectionData?.collection.name || "collection"}.zip`;
+      await bulkDownloadAssets(selectedAssets, zipName);
+      addToast({
+        title: t("bulkDownloaded"),
+        description: t("bulkDownloadedDesc", { count: selectedAssets.length }),
+        color: "success",
+      });
+    } catch {
+      addToast({ title: tCommon("error"), description: t("failedToBulkDownload"), color: "danger" });
+    } finally {
+      setIsBulkDownloading(false);
     }
   };
 
@@ -1252,6 +1274,8 @@ export default function CollectionPage({
         onCopy={onBulkCopyOpen}
         onMove={onBulkMoveOpen}
         onDelete={onBulkDeleteOpen}
+        onDownload={handleBulkDownload}
+        isDownloading={isBulkDownloading}
         labels={{
           selectedCount: t("selectedCount", { count: selectedIds.size }),
           selectAll: t("selectAll"),
@@ -1259,6 +1283,7 @@ export default function CollectionPage({
           bulkCopyTo: t("bulkCopyTo"),
           bulkMoveTo: t("bulkMoveTo"),
           bulkDelete: t("bulkDelete"),
+          bulkDownload: t("bulkDownload"),
         }}
       />
 

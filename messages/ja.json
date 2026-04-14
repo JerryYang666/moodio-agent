@@ -595,6 +595,10 @@
     "failedToBulkMove": "アイテムの移動に失敗しました",
     "failedToBulkCopy": "アイテムのコピーに失敗しました",
     "failedToBulkDelete": "アイテムの削除に失敗しました",
+    "bulkDownload": "ダウンロード",
+    "bulkDownloaded": "ダウンロード完了",
+    "bulkDownloadedDesc": "{count}件のファイルをZIPでダウンロードしました",
+    "failedToBulkDownload": "ファイルのダウンロードに失敗しました",
     "tags": "タグ",
     "addTag": "タグを追加",
     "add": "追加",
@@ -1414,7 +1418,11 @@
     "bulkDeleteConfirm": "このフォルダから{count}件のアイテムを削除してもよろしいですか？この操作は元に戻せません。",
     "bulkMoved": "{count}件のアイテムを移動しました",
     "bulkCopied": "{count}件のアイテムをコピーしました",
-    "bulkDeleted": "{count}件のアイテムを削除しました"
+    "bulkDeleted": "{count}件のアイテムを削除しました",
+    "bulkDownload": "ダウンロード",
+    "bulkDownloaded": "ダウンロード完了",
+    "bulkDownloadedDesc": "{count}件のファイルをZIPでダウンロードしました",
+    "failedToBulkDownload": "ファイルのダウンロードに失敗しました"
   },
   "desktop": {
     "title": "デスクトップ",

@@ -595,6 +595,10 @@
     "failedToBulkMove": "Failed to move items",
     "failedToBulkCopy": "Failed to copy items",
     "failedToBulkDelete": "Failed to delete items",
+    "bulkDownload": "Download",
+    "bulkDownloaded": "Download complete",
+    "bulkDownloadedDesc": "{count, plural, one {# file} other {# files}} downloaded as ZIP",
+    "failedToBulkDownload": "Failed to download files",
     "tags": "Tags",
     "addTag": "Add Tag",
     "add": "Add",
@@ -667,7 +671,11 @@
     "bulkDeleteConfirm": "Are you sure you want to delete {count} item(s) from this folder? This action cannot be undone.",
     "bulkMoved": "{count} item(s) moved",
     "bulkCopied": "{count} item(s) copied",
-    "bulkDeleted": "{count} item(s) deleted"
+    "bulkDeleted": "{count} item(s) deleted",
+    "bulkDownload": "Download",
+    "bulkDownloaded": "Download complete",
+    "bulkDownloadedDesc": "{count, plural, one {# file} other {# files}} downloaded as ZIP",
+    "failedToBulkDownload": "Failed to download files"
   },
   "desktop": {
     "title": "Desktops",

@@ -595,6 +595,10 @@
     "failedToBulkMove": "移动项目失败",
     "failedToBulkCopy": "复制项目失败",
     "failedToBulkDelete": "删除项目失败",
+    "bulkDownload": "下载",
+    "bulkDownloaded": "下载完成",
+    "bulkDownloadedDesc": "已将 {count} 个文件下载为 ZIP",
+    "failedToBulkDownload": "下载文件失败",
     "tags": "标签",
     "addTag": "添加标签",
     "add": "添加",
@@ -1414,7 +1418,11 @@
     "bulkDeleteConfirm": "确定要从此文件夹中删除 {count} 个项目吗？此操作无法撤销。",
     "bulkMoved": "已移动 {count} 个项目",
     "bulkCopied": "已复制 {count} 个项目",
-    "bulkDeleted": "已删除 {count} 个项目"
+    "bulkDeleted": "已删除 {count} 个项目",
+    "bulkDownload": "下载",
+    "bulkDownloaded": "下载完成",
+    "bulkDownloadedDesc": "已将 {count} 个文件下载为 ZIP",
+    "failedToBulkDownload": "下载文件失败"
   },
   "desktop": {
     "title": "画布",
