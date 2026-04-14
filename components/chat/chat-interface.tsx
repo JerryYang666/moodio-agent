@@ -364,17 +364,38 @@ export default function ChatInterface({
   }, []);
 
   // Hydrate missing media-ref URLs from the server (localStorage is just a cache)
-  const enrichingRef = useRef(false);
+  const enrichingIdsRef = useRef<Set<string>>(new Set());
   useEffect(() => {
     const refs = (menuState.videoParams?.media_references as MediaReference[]) || [];
-    const missing = refs.filter((r) => r.id && !mediaRefUrls[r.id]);
-    if (missing.length === 0 || enrichingRef.current) return;
+    const unresolved = refs.filter(
+      (r) => r.id && !mediaRefUrls[r.id] && !enrichingIdsRef.current.has(r.id)
+    );
+    if (unresolved.length === 0) return;
 
-    enrichingRef.current = true;
+    // IDs that are already full URLs can be resolved immediately
+    const alreadyUrls: Record<string, string> = {};
+    const needsFetch: typeof unresolved = [];
+    for (const r of unresolved) {
+      if (r.id.startsWith("http")) {
+        alreadyUrls[r.id] = r.id;
+      } else {
+        needsFetch.push(r);
+      }
+    }
+
+    if (Object.keys(alreadyUrls).length > 0) {
+      setMediaRefUrls((prev) => ({ ...prev, ...alreadyUrls }));
+    }
+
+    if (needsFetch.length === 0) return;
+
+    const ids = needsFetch.map((r) => r.id);
+    for (const id of ids) enrichingIdsRef.current.add(id);
+
     fetch("/api/media/enrich", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ refs: missing.map(({ type, id }) => ({ type, id })) }),
+      body: JSON.stringify({ refs: needsFetch.map(({ type, id }) => ({ type, id })) }),
     })
       .then((res) => (res.ok ? res.json() : null))
       .then((data: { urls: Record<string, string> } | null) => {
@@ -383,7 +404,9 @@ export default function ChatInterface({
         }
       })
       .catch(() => {})
-      .finally(() => { enrichingRef.current = false; });
+      .finally(() => {
+        for (const id of ids) enrichingIdsRef.current.delete(id);
+      });
   }, [menuState.videoParams?.media_references, mediaRefUrls]);
 
   // Video cost estimation state

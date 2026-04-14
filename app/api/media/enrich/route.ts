@@ -42,6 +42,10 @@ export async function POST(request: NextRequest) {
 
     for (const ref of trimmed) {
       if (!ref.id || typeof ref.id !== "string") continue;
+      if (ref.id.startsWith("http")) {
+        urls[ref.id] = ref.id;
+        continue;
+      }
       switch (ref.type) {
         case "image":
           urls[ref.id] = getImageUrl(ref.id, cnMode);
