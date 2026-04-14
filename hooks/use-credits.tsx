@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useAuth } from "@/hooks/use-auth";
 import { useGetCreditsBalanceQuery, useGetUserTeamsQuery } from "@/lib/redux/services/next-api";
@@ -30,13 +30,11 @@ export function useCredits(): UseCreditsReturn {
   );
   const { data: teams } = useGetUserTeamsQuery(undefined, { skip: !user });
 
-  // Sync Redux slice from the balance response (single source of truth)
-  const prevAccountKey = useRef<string | null>(null);
+  // Sync Redux slice from the balance response (single source of truth).
+  // Re-runs whenever `data` or `teams` change so that teamName is filled
+  // even when teams load after the balance response.
   useEffect(() => {
     if (!data) return;
-    const key = `${data.accountType}:${data.accountId}`;
-    if (key === prevAccountKey.current) return;
-    prevAccountKey.current = key;
 
     if (data.accountType === "team" && data.accountId) {
       const team = teams?.find((t) => t.teamId === data.accountId);

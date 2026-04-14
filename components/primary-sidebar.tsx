@@ -47,7 +47,7 @@ import { siteConfig } from "@/config/site";
 export const PrimarySidebar = () => {
   const pathname = usePathname();
   const { user, logout } = useAuth();
-  const { balance: credits, activeAccountType, activeTeamName, refreshBalance } = useCredits();
+  const { balance: credits, activeAccountType, activeAccountId, activeTeamName, refreshBalance } = useCredits();
   const { teams } = useTeams();
   const dispatch = useDispatch();
   const [setActiveAccountApi] = useSetActiveAccountMutation();
@@ -324,7 +324,7 @@ export const PrimarySidebar = () => {
                     key={team.teamId}
                     className={clsx(
                       "flex items-center gap-2 px-3 py-2 rounded-lg text-sm w-full text-left transition-colors",
-                      activeAccountType === "team" && activeTeamName === team.teamName
+                      activeAccountType === "team" && activeAccountId === team.teamId
                         ? "bg-primary/10 text-primary font-medium"
                         : "hover:bg-default-100"
                     )}
@@ -341,7 +341,7 @@ export const PrimarySidebar = () => {
                   >
                     <UsersIcon size={14} />
                     <span className="flex-1 truncate">{team.teamName}</span>
-                    {activeAccountType === "team" && activeTeamName === team.teamName && <Check size={14} className="text-primary" />}
+                    {activeAccountType === "team" && activeAccountId === team.teamId && <Check size={14} className="text-primary" />}
                   </button>
                 ))}
                 <div className="h-px bg-divider my-1" />
