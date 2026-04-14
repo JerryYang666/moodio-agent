@@ -2,7 +2,7 @@
 
 import { useCallback } from "react";
 import { Button } from "@heroui/button";
-import { ImagePlus, Film, Music, X, Layers } from "lucide-react";
+import { ImagePlus, Film, Music, X, Layers, Pin } from "lucide-react";
 import type { MediaReference } from "@/lib/video/models";
 
 const MAX_IMAGES = 9;
@@ -56,6 +56,17 @@ export function SeedanceReferenceEditor({
   const removeReference = useCallback(
     (index: number) => {
       onChange(references.filter((_, i) => i !== index));
+    },
+    [references, onChange]
+  );
+
+  const togglePin = useCallback(
+    (index: number) => {
+      onChange(
+        references.map((ref, i) =>
+          i === index ? { ...ref, pinned: !ref.pinned } : ref
+        )
+      );
     },
     [references, onChange]
   );
@@ -130,7 +141,9 @@ export function SeedanceReferenceEditor({
             return (
               <div
                 key={`${ref.type}-${ref.id}-${index}`}
-                className="relative w-14 h-14 rounded-md overflow-hidden border border-divider group"
+                className={`relative w-14 h-14 rounded-md overflow-hidden border group ${
+                  ref.pinned ? "border-primary ring-1 ring-primary/50" : "border-divider"
+                }`}
               >
                 {ref.type === "audio" ? (
                   <div className="w-full h-full bg-linear-to-br from-violet-500/20 to-purple-600/20 flex items-center justify-center">
@@ -163,12 +176,25 @@ export function SeedanceReferenceEditor({
                   @{name}
                 </div>
                 {!disabled && (
-                  <button
-                    onClick={() => removeReference(index)}
-                    className="absolute top-0 right-0 p-0.5 bg-black/60 text-white rounded-bl-md opacity-0 group-hover:opacity-100 transition-opacity"
-                  >
-                    <X size={10} />
-                  </button>
+                  <>
+                    <button
+                      onClick={() => togglePin(index)}
+                      className={`absolute top-0 left-0 p-0.5 rounded-br-md transition-opacity ${
+                        ref.pinned
+                          ? "bg-primary text-white opacity-100"
+                          : "bg-black/60 text-white opacity-0 group-hover:opacity-100"
+                      }`}
+                      title={ref.pinned ? "Unpin" : "Pin"}
+                    >
+                      <Pin size={10} />
+                    </button>
+                    <button
+                      onClick={() => removeReference(index)}
+                      className="absolute top-0 right-0 p-0.5 bg-black/60 text-white rounded-bl-md opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <X size={10} />
+                    </button>
+                  </>
                 )}
               </div>
             );

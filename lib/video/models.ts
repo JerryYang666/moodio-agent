@@ -32,6 +32,7 @@ export interface KlingElement {
 export interface MediaReference {
   type: "image" | "video" | "audio";
   id: string;
+  pinned?: boolean;
 }
 
 export type AssetAcceptType = "image" | "video";

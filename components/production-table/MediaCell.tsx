@@ -4,12 +4,21 @@ import React, { memo, useCallback, useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { Button } from "@heroui/button";
 import { Image } from "@heroui/image";
-import { Modal, ModalContent } from "@heroui/modal";
-import { Plus, X, ChevronLeft, ChevronRight, Download, Music, Loader2 } from "lucide-react";
+import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, useDisclosure } from "@heroui/modal";
+import { Input } from "@heroui/input";
+import { addToast } from "@heroui/toast";
+import { Plus, X, ChevronLeft, ChevronRight, Download, Music, Loader2, FolderPlus } from "lucide-react";
+import { useTranslations } from "next-intl";
+import { hasWriteAccess } from "@/lib/permissions";
+import { useCollections } from "@/hooks/use-collections";
 import AudioPlayer from "@/components/audio-player";
 import type { EnrichedMediaAssetRef, CellLock } from "@/lib/production-table/types";
 import type { AssetSummary } from "@/components/chat/asset-picker-modal";
 import { AI_IMAGE_DRAG_MIME, AI_VIDEO_DRAG_MIME, AI_VIDEO_SUGGEST_DRAG_MIME, AI_AUDIO_DRAG_MIME } from "@/components/chat/asset-dnd";
+import { uploadImage } from "@/lib/upload/client";
+import { uploadAudio } from "@/lib/upload/audio-client";
+import { uploadVideo } from "@/lib/upload/video-client";
+import { siteConfig } from "@/config/site";
 
 const AssetPickerModal = dynamic(
   () => import("@/components/chat/asset-picker-modal"),
@@ -218,7 +227,155 @@ export const MediaCell = memo(function MediaCell({
     [onRemoveAsset]
   );
 
+  const [isFileUploading, setIsFileUploading] = useState(false);
+
+  const handleFileUpload = useCallback(
+    (files: File[]) => {
+      if (files.length === 0) return;
+      setIsFileUploading(true);
+      let remaining = files.length;
+
+      const done = () => {
+        remaining--;
+        if (remaining <= 0) setIsFileUploading(false);
+      };
+
+      const allowedImageTypes = siteConfig.upload.allowedImageTypes;
+      const allowedAudioTypes = siteConfig.upload.allowedAudioTypes;
+      const allowedVideoTypes = siteConfig.upload.allowedVideoTypes;
+
+      for (const file of files) {
+        if (allowedImageTypes.includes(file.type)) {
+          uploadImage(file).then((outcome) => {
+            if (outcome.success) {
+              onAddAsset({
+                assetId: outcome.data.imageId,
+                imageId: outcome.data.imageId,
+                assetType: "image",
+                imageUrl: outcome.data.imageUrl,
+              });
+            }
+            done();
+          });
+        } else if (allowedAudioTypes.includes(file.type)) {
+          uploadAudio(file).then((outcome) => {
+            if (outcome.success) {
+              onAddAsset({
+                assetId: outcome.data.audioId,
+                imageId: "audio-file-placeholder",
+                assetType: "audio",
+                audioUrl: outcome.data.audioUrl,
+              });
+            }
+            done();
+          });
+        } else if (allowedVideoTypes.includes(file.type)) {
+          uploadVideo(file).then((outcome) => {
+            if (outcome.success) {
+              onAddAsset({
+                assetId: outcome.data.videoId,
+                imageId: outcome.data.thumbnailImageId || outcome.data.videoId,
+                assetType: "video",
+                videoUrl: outcome.data.videoUrl,
+              });
+            }
+            done();
+          });
+        } else {
+          done();
+        }
+      }
+    },
+    [onAddAsset]
+  );
+
   const previewAsset = previewIndex !== null ? assets[previewIndex] : null;
+
+  // ── Collection menu state ──
+  const tMenu = useTranslations("imageMenu");
+  const tCollections = useTranslations("collections");
+  const tCommon = useTranslations("common");
+  const {
+    collections,
+    createCollection,
+    addImageToCollection,
+    addVideoToCollection,
+    addAudioToCollection,
+    getDefaultCollectionName,
+  } = useCollections();
+
+  const {
+    isOpen: isCreateOpen,
+    onOpen: onCreateOpen,
+    onOpenChange: onCreateOpenChange,
+  } = useDisclosure();
+  const [newCollectionName, setNewCollectionName] = useState("");
+  const [isCreating, setIsCreating] = useState(false);
+
+  const [assetContextMenu, setAssetContextMenu] = useState<{
+    asset: EnrichedMediaAssetRef;
+    x: number;
+    y: number;
+  } | null>(null);
+
+  const pendingCollectionAssetRef = useRef<EnrichedMediaAssetRef | null>(null);
+
+  const handleAssetContextMenu = useCallback(
+    (asset: EnrichedMediaAssetRef, e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setAssetContextMenu({ asset, x: e.clientX, y: e.clientY });
+    },
+    []
+  );
+
+  const closeAssetContextMenu = useCallback(() => {
+    setAssetContextMenu(null);
+  }, []);
+
+  const addAssetToCollection = useCallback(
+    async (collectionId: string, asset: EnrichedMediaAssetRef) => {
+      const details = { title: "", prompt: "", status: "generated" as const };
+      if (asset.assetType === "video") {
+        await addVideoToCollection(collectionId, asset.imageId, asset.assetId, details);
+      } else if (asset.assetType === "audio") {
+        await addAudioToCollection(collectionId, asset.assetId, details);
+      } else {
+        await addImageToCollection(collectionId, asset.imageId, null, details);
+      }
+      closeAssetContextMenu();
+    },
+    [addImageToCollection, addVideoToCollection, addAudioToCollection, closeAssetContextMenu]
+  );
+
+  const handleCreateNewCollection = useCallback(
+    (asset: EnrichedMediaAssetRef) => {
+      pendingCollectionAssetRef.current = asset;
+      setNewCollectionName(getDefaultCollectionName());
+      closeAssetContextMenu();
+      onCreateOpen();
+    },
+    [getDefaultCollectionName, onCreateOpen, closeAssetContextMenu]
+  );
+
+  const handleCreateAndAdd = useCallback(async () => {
+    if (!newCollectionName.trim() || !pendingCollectionAssetRef.current) return;
+    setIsCreating(true);
+    try {
+      const collection = await createCollection(newCollectionName.trim());
+      if (collection) {
+        await addAssetToCollection(collection.id, pendingCollectionAssetRef.current);
+        setNewCollectionName("");
+        onCreateOpenChange();
+      }
+    } catch (error: any) {
+      const msg = error?.status === 409 ? tCollections("duplicateName") : tCollections("createFailed");
+      addToast({ title: tCollections("error"), description: msg, color: "danger" });
+    } finally {
+      setIsCreating(false);
+      pendingCollectionAssetRef.current = null;
+    }
+  }, [newCollectionName, createCollection, addAssetToCollection, onCreateOpenChange, tCollections]);
 
   const handleDownload = useCallback(async () => {
     if (!previewAsset) return;
@@ -275,24 +432,28 @@ export const MediaCell = memo(function MediaCell({
               <div
                 className="w-10 h-10 rounded bg-violet-500/20 flex items-center justify-center cursor-pointer"
                 onClick={() => setPreviewIndex(idx)}
+                onContextMenu={(e) => handleAssetContextMenu(asset, e)}
               >
                 <Music size={16} className="text-violet-400" />
               </div>
             ) : asset.imageUrl ? (
-              <Image
-                alt=""
-                className="object-cover rounded cursor-pointer"
-                height={40}
-                width={40}
-                src={asset.imageUrl}
-                onClick={() => setPreviewIndex(idx)}
-              />
+              <div onContextMenu={(e) => handleAssetContextMenu(asset, e)}>
+                <Image
+                  alt=""
+                  className="object-cover rounded cursor-pointer"
+                  height={40}
+                  width={40}
+                  src={asset.imageUrl}
+                  onClick={() => setPreviewIndex(idx)}
+                />
+              </div>
             ) : asset.videoUrl ? (
               <video
                 className="object-cover rounded cursor-pointer w-10 h-10"
                 src={asset.videoUrl}
                 muted
                 onClick={() => setPreviewIndex(idx)}
+                onContextMenu={(e) => handleAssetContextMenu(asset, e)}
               />
             ) : null}
             {canEdit && !isLockedByOther && (
@@ -308,7 +469,7 @@ export const MediaCell = memo(function MediaCell({
             )}
           </div>
         ))}
-        {isUploading && (
+        {(isUploading || isFileUploading) && (
           <div className="w-10 h-10 rounded bg-default-100 flex items-center justify-center">
             <Loader2 size={16} className="animate-spin text-default-400" />
           </div>
@@ -335,15 +496,20 @@ export const MediaCell = memo(function MediaCell({
         </div>
       )}
       {pickerOpen && (
-        <AssetPickerModal
-          isOpen={pickerOpen}
-          onOpenChange={() => setPickerOpen(false)}
-          onSelect={handleSingleSelect}
-          onSelectMultiple={handleMultiSelect}
-          onUpload={() => {}}
-          multiSelect
-          acceptTypes={["image", "video", "audio"]}
-        />
+        <div
+          onContextMenu={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          <AssetPickerModal
+            isOpen={pickerOpen}
+            onOpenChange={() => setPickerOpen(false)}
+            onSelect={handleSingleSelect}
+            onSelectMultiple={handleMultiSelect}
+            onUpload={handleFileUpload}
+            multiSelect
+            acceptTypes={["image", "video", "audio"]}
+          />
+        </div>
       )}
 
       {/* Media preview lightbox */}
@@ -375,6 +541,20 @@ export const MediaCell = memo(function MediaCell({
               onContextMenu={(e) => e.stopPropagation()}
               onMouseDown={(e) => e.stopPropagation()}
             >
+              {/* Add to Collection button */}
+              <button
+                className="absolute top-2 right-22 z-20 w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center hover:bg-black/70 transition-colors"
+                aria-label={tMenu("addToCollection")}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (previewAsset) {
+                    handleAssetContextMenu(previewAsset, e);
+                  }
+                }}
+              >
+                <FolderPlus size={16} />
+              </button>
+
               {/* Download button */}
               <button
                 className="absolute top-2 right-12 z-20 w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center hover:bg-black/70 transition-colors"
@@ -464,6 +644,92 @@ export const MediaCell = memo(function MediaCell({
                 </div>
               )}
             </div>
+          )}
+        </ModalContent>
+      </Modal>
+
+      {/* Asset right-click context menu */}
+      {assetContextMenu && (
+        <>
+          <div
+            className="fixed inset-0 z-80"
+            onClick={closeAssetContextMenu}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              closeAssetContextMenu();
+            }}
+          />
+          <div
+            className="fixed z-80 min-w-[200px] py-1 rounded-lg shadow-lg border border-default-200 bg-content1 max-h-[320px] overflow-y-auto"
+            style={{ left: assetContextMenu.x, top: assetContextMenu.y }}
+            onContextMenu={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <div className="px-3 py-1.5 text-xs text-default-400 font-semibold uppercase">
+              {tMenu("addToCollection")}
+            </div>
+            <button
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-sm font-semibold hover:bg-default-100 transition-colors"
+              onClick={() => handleCreateNewCollection(assetContextMenu.asset)}
+            >
+              <Plus size={14} />
+              {tCollections("createNewCollection")}
+            </button>
+            <div className="my-1 border-t border-default-200" />
+            {collections.filter((c) => hasWriteAccess(c.permission)).length === 0 ? (
+              <div className="px-3 py-1.5 text-xs text-default-400">
+                {tCollections("noCollectionsYet")}
+              </div>
+            ) : (
+              collections
+                .filter((c) => hasWriteAccess(c.permission))
+                .map((collection) => (
+                  <button
+                    key={collection.id}
+                    className="w-full flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-default-100 transition-colors"
+                    onClick={() => addAssetToCollection(collection.id, assetContextMenu.asset)}
+                  >
+                    <FolderPlus size={14} />
+                    {collection.name}
+                  </button>
+                ))
+            )}
+          </div>
+        </>
+      )}
+
+      {/* Create Collection Modal */}
+      <Modal isOpen={isCreateOpen} onOpenChange={onCreateOpenChange} classNames={{ wrapper: "z-[130]" }}>
+        <ModalContent>
+          {(onClose) => (
+            <>
+              <ModalHeader>{tCollections("createNewCollection")}</ModalHeader>
+              <ModalBody>
+                <Input
+                  label={tCollections("collectionName")}
+                  placeholder={tCollections("enterCollectionName")}
+                  value={newCollectionName}
+                  onValueChange={setNewCollectionName}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleCreateAndAdd();
+                  }}
+                  autoFocus
+                />
+              </ModalBody>
+              <ModalFooter>
+                <Button variant="light" onPress={onClose}>
+                  {tCommon("cancel")}
+                </Button>
+                <Button
+                  color="primary"
+                  onPress={handleCreateAndAdd}
+                  isLoading={isCreating}
+                  isDisabled={!newCollectionName.trim()}
+                >
+                  {tMenu("createAndAdd")}
+                </Button>
+              </ModalFooter>
+            </>
           )}
         </ModalContent>
       </Modal>

@@ -2708,14 +2708,28 @@ export default function ChatInterface({
     setPendingAudios([]);
     setAssetParamValues({});
     setPrecisionEditing(false);
-    setMediaRefUrls({});
-    setMenuState((prev) => ({
-      ...prev,
-      videoParams: {
-        ...prev.videoParams,
-        media_references: [],
-      },
-    }));
+    setMediaRefUrls((prev) => {
+      const pinnedRefs = ((menuState.videoParams?.media_references as MediaReference[]) || []).filter(
+        (ref: MediaReference) => ref.pinned
+      );
+      if (pinnedRefs.length === 0) return {};
+      const kept: Record<string, string> = {};
+      for (const ref of pinnedRefs) {
+        if (prev[ref.id]) kept[ref.id] = prev[ref.id];
+      }
+      return kept;
+    });
+    setMenuState((prev) => {
+      const currentRefs = (prev.videoParams?.media_references as MediaReference[]) || [];
+      const pinnedRefs = currentRefs.filter((ref: MediaReference) => ref.pinned);
+      return {
+        ...prev,
+        videoParams: {
+          ...prev.videoParams,
+          media_references: pinnedRefs,
+        },
+      };
+    });
     
     // Clear the draft since we're sending the message
     clearChatDraft(chatId);
@@ -2807,6 +2821,11 @@ export default function ChatInterface({
         const mergedVideoParams = { ...menuState.videoParams };
         for (const [paramName, val] of Object.entries(assetParamValues)) {
           if (val) mergedVideoParams[paramName] = val.imageId;
+        }
+        if (Array.isArray(mergedVideoParams.media_references)) {
+          mergedVideoParams.media_references = (mergedVideoParams.media_references as MediaReference[]).map(
+            ({ type, id }) => ({ type, id })
+          );
         }
         payload.videoParams = mergedVideoParams;
       }
