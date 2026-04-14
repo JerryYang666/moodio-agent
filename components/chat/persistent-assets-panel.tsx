@@ -235,8 +235,8 @@ export function PersistentAssetsPanel({
               </Badge>
             </Button>
           </PopoverTrigger>
-      <PopoverContent className="w-[400px] max-h-[500px] overflow-y-auto p-0">
-        <div className="p-4 space-y-4">
+      <PopoverContent className="w-[400px] p-0">
+        <div className="p-4 space-y-4 max-h-[500px] overflow-y-auto">
           {/* Header */}
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold">{t("persistentAssets")}</h3>

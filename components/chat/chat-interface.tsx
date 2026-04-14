@@ -328,6 +328,7 @@ export default function ChatInterface({
     skip: !chatId,
   });
   const [updatePersistentAssets, { isLoading: isPersistentAssetsSaving }] = useUpdatePersistentAssetsMutation();
+  const [isPersistentUploading, setIsPersistentUploading] = useState(false);
   const persistentAssets = persistentAssetsData?.persistentAssets ?? {
     ...EMPTY_PERSISTENT_ASSETS,
     referenceImages: [] as Array<PersistentReferenceImage & { imageUrl?: string }>,
@@ -1694,16 +1695,21 @@ export default function ChatInterface({
         addToast({ title: t("chat.maxImagesReached", { max: MAX_PERSISTENT_REFERENCE_IMAGES }), color: "warning" });
         return;
       }
-      const result = await uploadImage(file);
-      if (result.success) {
-        await addPersistentReferenceImages([{
-          imageId: result.data.imageId,
-          url: result.data.imageUrl,
-          title: file.name,
-        }]);
-      } else {
-        console.error("Persistent reference image upload failed:", result.error);
-        addToast({ title: t("chat.uploadFailed"), color: "danger" });
+      setIsPersistentUploading(true);
+      try {
+        const result = await uploadImage(file);
+        if (result.success) {
+          await addPersistentReferenceImages([{
+            imageId: result.data.imageId,
+            url: result.data.imageUrl,
+            title: file.name,
+          }]);
+        } else {
+          console.error("Persistent reference image upload failed:", result.error);
+          addToast({ title: t("chat.uploadFailed"), color: "danger" });
+        }
+      } finally {
+        setIsPersistentUploading(false);
       }
     },
     [persistentAssets, addPersistentReferenceImages, t]
@@ -4320,7 +4326,7 @@ export default function ChatInterface({
             chatId={chatId}
             persistentAssets={persistentAssets}
             onOpenAssetPicker={openPersistentAssetPicker}
-            isSavingExternal={isPersistentAssetsSaving}
+            isSavingExternal={isPersistentAssetsSaving || isPersistentUploading}
           />
         </div>
       )}
