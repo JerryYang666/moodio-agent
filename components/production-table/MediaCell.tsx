@@ -1,6 +1,7 @@
 "use client";
 
 import React, { memo, useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import dynamic from "next/dynamic";
 import { Button } from "@heroui/button";
 import { Image } from "@heroui/image";
@@ -648,11 +649,11 @@ export const MediaCell = memo(function MediaCell({
         </ModalContent>
       </Modal>
 
-      {/* Asset right-click context menu */}
-      {assetContextMenu && (
+      {/* Asset right-click context menu — portaled to body to escape table stacking context */}
+      {assetContextMenu && createPortal(
         <>
           <div
-            className="fixed inset-0 z-80"
+            className="fixed inset-0 z-9998"
             onClick={closeAssetContextMenu}
             onContextMenu={(e) => {
               e.preventDefault();
@@ -660,7 +661,7 @@ export const MediaCell = memo(function MediaCell({
             }}
           />
           <div
-            className="fixed z-80 min-w-[200px] py-1 rounded-lg shadow-lg border border-default-200 bg-content1 max-h-[320px] overflow-y-auto"
+            className="fixed z-9999 min-w-[200px] py-1 rounded-lg shadow-lg border border-default-200 bg-content1 max-h-[320px] overflow-y-auto"
             style={{ left: assetContextMenu.x, top: assetContextMenu.y }}
             onContextMenu={(e) => e.stopPropagation()}
             onMouseDown={(e) => e.stopPropagation()}
@@ -695,11 +696,12 @@ export const MediaCell = memo(function MediaCell({
                 ))
             )}
           </div>
-        </>
+        </>,
+        document.body
       )}
 
       {/* Create Collection Modal */}
-      <Modal isOpen={isCreateOpen} onOpenChange={onCreateOpenChange} classNames={{ wrapper: "z-[130]" }}>
+      <Modal isOpen={isCreateOpen} onOpenChange={onCreateOpenChange} classNames={{ wrapper: "z-[10000]" }}>
         <ModalContent>
           {(onClose) => (
             <>
