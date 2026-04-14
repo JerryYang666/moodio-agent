@@ -1494,27 +1494,30 @@ export default function ChatInterface({
     [pendingImages, t, removePendingImage]
   );
 
-  // Add a reference image via persistent assets API
-  const addPersistentReferenceImage = useCallback(
-    async (asset: { imageId: string; url: string; title?: string }) => {
-      if (!chatId) return;
-      if (persistentAssets.referenceImages.length >= MAX_PERSISTENT_REFERENCE_IMAGES) {
-        addToast({
-          title: t("chat.maxImagesReached", { max: MAX_PERSISTENT_REFERENCE_IMAGES }),
-          color: "warning",
-        });
-        return;
+  // Add one or more reference images via persistent assets API (single mutation)
+  const addPersistentReferenceImages = useCallback(
+    async (assets: Array<{ imageId: string; url: string; title?: string }>) => {
+      if (!chatId || assets.length === 0) return;
+      const existing = persistentAssets.referenceImages;
+      const existingIds = new Set(existing.map((img) => img.imageId));
+      const newImages: typeof existing = [];
+      for (const asset of assets) {
+        if (existing.length + newImages.length >= MAX_PERSISTENT_REFERENCE_IMAGES) break;
+        if (existingIds.has(asset.imageId)) continue;
+        existingIds.add(asset.imageId);
+        newImages.push({ imageId: asset.imageId, tag: "subject" as const, title: asset.title });
       }
-      if (persistentAssets.referenceImages.some((img) => img.imageId === asset.imageId)) {
-        addToast({ title: t("chat.imageAlreadyAdded"), color: "warning" });
+      if (newImages.length === 0) {
+        if (existing.length >= MAX_PERSISTENT_REFERENCE_IMAGES) {
+          addToast({ title: t("chat.maxImagesReached", { max: MAX_PERSISTENT_REFERENCE_IMAGES }), color: "warning" });
+        } else {
+          addToast({ title: t("chat.imageAlreadyAdded"), color: "warning" });
+        }
         return;
       }
       await updatePersistentAssets({
         chatId,
-        referenceImages: [
-          ...persistentAssets.referenceImages,
-          { imageId: asset.imageId, tag: "subject" as const, title: asset.title },
-        ],
+        referenceImages: [...existing, ...newImages],
         textChunk: persistentAssets.textChunk,
       });
     },
@@ -1693,17 +1696,17 @@ export default function ChatInterface({
       }
       const result = await uploadImage(file);
       if (result.success) {
-        await addPersistentReferenceImage({
+        await addPersistentReferenceImages([{
           imageId: result.data.imageId,
           url: result.data.imageUrl,
           title: file.name,
-        });
+        }]);
       } else {
         console.error("Persistent reference image upload failed:", result.error);
         addToast({ title: t("chat.uploadFailed"), color: "danger" });
       }
     },
-    [persistentAssets, addPersistentReferenceImage, t]
+    [persistentAssets, addPersistentReferenceImages, t]
   );
 
   // Get the appropriate upload handler based on asset picker mode
@@ -2078,11 +2081,11 @@ export default function ChatInterface({
         }));
         setMediaRefUrls((prev) => ({ ...prev, [asset.assetId || asset.imageId]: (asset as any).audioUrl || asset.imageUrl }));
       } else if (assetPickerMode === "persistent") {
-        addPersistentReferenceImage({
+        addPersistentReferenceImages([{
           imageId: asset.imageId,
           url: asset.imageUrl,
           title: asset.generationDetails?.title || t("chat.selectedAsset"),
-        });
+        }]);
       } else if (asset.assetType === "video") {
         if (!canAddVideo(pendingVideos)) {
           addToast({ title: t("chat.maxVideosReached", { max: MAX_PENDING_VIDEOS }), color: "warning" });
@@ -2114,7 +2117,7 @@ export default function ChatInterface({
         });
       }
     },
-    [addAssetImage, addPersistentReferenceImage, assetPickerMode, activeAssetParamName, activeElementIndex, menuState.videoParams?.kling_elements, menuState.videoParams?.media_references, pendingAudios, pendingVideos, t]
+    [addAssetImage, addPersistentReferenceImages, assetPickerMode, activeAssetParamName, activeElementIndex, menuState.videoParams?.kling_elements, menuState.videoParams?.media_references, pendingAudios, pendingVideos, t]
   );
 
   const pendingImagesRef = useRef(pendingImages);
@@ -2191,28 +2194,13 @@ export default function ChatInterface({
           return next;
         });
       } else if (assetPickerMode === "persistent") {
-        const existing = persistentAssets.referenceImages;
-        const existingIds = new Set(existing.map((img) => img.imageId));
-        const newImages: typeof existing = [];
-        for (const asset of assets) {
-          if (existing.length + newImages.length >= MAX_PERSISTENT_REFERENCE_IMAGES) break;
-          if (existingIds.has(asset.imageId)) continue;
-          existingIds.add(asset.imageId);
-          newImages.push({
+        await addPersistentReferenceImages(
+          assets.map((asset) => ({
             imageId: asset.imageId,
-            tag: "subject" as const,
+            url: asset.imageUrl,
             title: asset.generationDetails?.title || t("chat.selectedAsset"),
-          });
-        }
-        if (newImages.length > 0 && chatId) {
-          await updatePersistentAssets({
-            chatId,
-            referenceImages: [...existing, ...newImages],
-            textChunk: persistentAssets.textChunk,
-          });
-        } else if (newImages.length === 0 && assets.length > 0) {
-          addToast({ title: t("chat.imageAlreadyAdded"), color: "warning" });
-        }
+          }))
+        );
       } else {
         for (const asset of assets) {
           if (asset.assetType === "audio") {
@@ -2243,7 +2231,7 @@ export default function ChatInterface({
         }
       }
     },
-    [addAssetImage, updatePersistentAssets, chatId, addToast, assetPickerMode, activeElementIndex, menuState.videoParams?.kling_elements, menuState.videoParams?.media_references, pendingAudios, persistentAssets, t]
+    [addAssetImage, addPersistentReferenceImages, assetPickerMode, activeElementIndex, menuState.videoParams?.kling_elements, menuState.videoParams?.media_references, pendingAudios, persistentAssets, t]
   );
 
   // Handler to open drawing modal for an image
