@@ -49,18 +49,26 @@ function deduplicateFilename(
   return `${name} (${count})`;
 }
 
-function getDownloadUrl(asset: AssetItem): string | null {
-  if (
-    (asset.assetType === "video" || asset.assetType === "public_video") &&
-    asset.videoUrl
-  ) {
-    return asset.videoUrl;
+/**
+ * Route downloads through backend API proxies to avoid CloudFront
+ * signed-cookie / CORS 403 errors on cross-origin CDN fetches.
+ */
+function getProxyDownloadUrl(asset: AssetItem): string | null {
+  const basename = encodeURIComponent(
+    normalizeDownloadBasename(asset.generationDetails?.title, asset.assetType)
+  );
+
+  if (asset.assetType === "video" || asset.assetType === "public_video") {
+    if (!asset.assetId) return null;
+    return `/api/video/${encodeURIComponent(asset.assetId)}/download?filename=${basename}`;
   }
-  if (asset.assetType === "audio" && asset.audioUrl) {
-    return asset.audioUrl;
+  if (asset.assetType === "audio") {
+    if (!asset.assetId) return null;
+    return `/api/audio/${encodeURIComponent(asset.assetId)}/download?filename=${basename}`;
   }
-  if (asset.imageUrl) {
-    return asset.imageUrl;
+  // image / public_image
+  if (asset.imageId) {
+    return `/api/image/${encodeURIComponent(asset.imageId)}/download?filename=${basename}`;
   }
   return null;
 }
@@ -81,7 +89,7 @@ export async function bulkDownloadAssets(
   async function next(): Promise<void> {
     while (idx < assets.length) {
       const asset = assets[idx++];
-      const url = getDownloadUrl(asset);
+      const url = getProxyDownloadUrl(asset);
       if (!url) {
         done++;
         onProgress?.(done, total);
@@ -121,6 +129,10 @@ export async function bulkDownloadAssets(
     () => next()
   );
   await Promise.all(workers);
+
+  if (zip.length === 0) {
+    throw new Error("No files could be downloaded");
+  }
 
   const blob = await zip.generateAsync({ type: "blob" });
 
