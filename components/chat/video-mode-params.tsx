@@ -133,6 +133,15 @@ export default function VideoModeParams({
       }
     }
 
+    // Preserve externally-managed complex params (media_references, kling_elements,
+    // multi_prompt) that live in videoParams but are not controlled by this component.
+    const PRESERVED_TYPES = new Set(["media_references", "kling_elements", "multi_prompt"]);
+    for (const param of model.params) {
+      if (PRESERVED_TYPES.has(param.type) && videoParams[param.name] !== undefined) {
+        initialParams[param.name] = videoParams[param.name];
+      }
+    }
+
     onParamsChange(initialParams);
   }, [videoModelId, models]);
 
