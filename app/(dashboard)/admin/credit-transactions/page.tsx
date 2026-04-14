@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useCallback, useState } from "react";
+import { useEffect, useMemo, useCallback, useState, useRef } from "react";
 import {
   Table,
   TableHeader,
@@ -49,9 +49,22 @@ interface AdminCreditTransaction {
   performerLastName: string | null;
 }
 
+interface TransactionResponse {
+  transactions: AdminCreditTransaction[];
+  totalCount: number;
+  page: number;
+  limit: number;
+  totals: {
+    credits: number;
+    debits: number;
+    net: number;
+  };
+}
+
 const TYPE_OPTIONS = [
   { key: "all", label: "All types" },
   { key: "admin_grant", label: "Admin Grant" },
+  { key: "purchase", label: "Purchase" },
   { key: "video_generation", label: "Video Generation" },
   { key: "image_generation", label: "Image Generation" },
   { key: "daily_checkin", label: "Daily Check-in" },
@@ -63,11 +76,12 @@ function getTypeColor(type: string) {
   switch (type) {
     case "admin_grant":
       return "primary";
+    case "purchase":
+      return "success";
     case "video_generation":
     case "image_generation":
       return "warning";
     case "refund":
-      return "success";
     case "signup_bonus":
     case "daily_checkin":
       return "secondary";
@@ -88,98 +102,81 @@ function formatAmount(amount: number) {
 
 export default function CreditTransactionsPage() {
   const { user, loading: authLoading } = useAuth();
-  const [transactions, setTransactions] = useState<AdminCreditTransaction[]>(
-    []
-  );
+  const [transactions, setTransactions] = useState<AdminCreditTransaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedTransaction, setSelectedTransaction] =
     useState<AdminCreditTransaction | null>(null);
 
-  // Filters
   const [filterValue, setFilterValue] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
-
-  // Pagination
   const [page, setPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(20);
 
-  useEffect(() => {
-    if (user && user.roles.includes("admin")) {
-      fetchTransactions();
-    }
-  }, [user]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [totals, setTotals] = useState({ credits: 0, debits: 0, net: 0 });
 
-  const fetchTransactions = async () => {
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const pages = Math.max(1, Math.ceil(totalCount / rowsPerPage));
+
+  const fetchTransactions = useCallback(async (
+    fetchPage: number,
+    fetchLimit: number,
+    fetchType: string,
+    fetchSearch: string,
+  ) => {
     setLoading(true);
     try {
-      const data = await api.get("/api/admin/credit-transactions");
+      const params = new URLSearchParams();
+      params.set("page", String(fetchPage));
+      params.set("limit", String(fetchLimit));
+      if (fetchType && fetchType !== "all") {
+        params.set("type", fetchType);
+      }
+      if (fetchSearch) {
+        params.set("search", fetchSearch);
+      }
+
+      const data: TransactionResponse = await api.get(
+        `/api/admin/credit-transactions?${params.toString()}`
+      );
       setTransactions(data.transactions ?? []);
+      setTotalCount(data.totalCount ?? 0);
+      setTotals(data.totals ?? { credits: 0, debits: 0, net: 0 });
     } catch (error) {
       console.error("Failed to fetch credit transactions:", error);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const filteredItems = useMemo(() => {
-    let filtered = [...transactions];
-
-    if (typeFilter !== "all") {
-      filtered = filtered.filter((t) => t.type === typeFilter);
+  useEffect(() => {
+    if (user && user.roles.includes("admin")) {
+      fetchTransactions(page, rowsPerPage, typeFilter, filterValue);
     }
-
-    if (filterValue) {
-      const lowerFilter = filterValue.toLowerCase();
-      filtered = filtered.filter((t) => {
-        const userName = `${t.userFirstName || ""} ${t.userLastName || ""}`.trim();
-        const description = t.description?.toLowerCase() || "";
-        const accountLabel = t.accountType === "team"
-          ? (t.teamName || "").toLowerCase()
-          : (t.userEmail || "").toLowerCase();
-        return (
-          t.id.toLowerCase().includes(lowerFilter) ||
-          accountLabel.includes(lowerFilter) ||
-          userName.toLowerCase().includes(lowerFilter) ||
-          description.includes(lowerFilter) ||
-          t.type.toLowerCase().includes(lowerFilter)
-        );
-      });
-    }
-
-    return filtered;
-  }, [transactions, filterValue, typeFilter]);
-
-  const pages = Math.ceil(filteredItems.length / rowsPerPage);
-  const items = useMemo(() => {
-    const start = (page - 1) * rowsPerPage;
-    const end = start + rowsPerPage;
-    return filteredItems.slice(start, end);
-  }, [page, filteredItems, rowsPerPage]);
-
-  // Calculate totals
-  const totals = useMemo(() => {
-    const credits = filteredItems
-      .filter((t) => t.amount > 0)
-      .reduce((sum, t) => sum + t.amount, 0);
-    const debits = filteredItems
-      .filter((t) => t.amount < 0)
-      .reduce((sum, t) => sum + Math.abs(t.amount), 0);
-    return { credits, debits, net: credits - debits };
-  }, [filteredItems]);
+  }, [user, page, rowsPerPage, typeFilter]);
 
   const onSearchChange = useCallback((value?: string) => {
-    if (value) {
-      setFilterValue(value);
-      setPage(1);
-    } else {
-      setFilterValue("");
+    const newValue = value || "";
+    setFilterValue(newValue);
+
+    if (searchDebounceRef.current) {
+      clearTimeout(searchDebounceRef.current);
     }
-  }, []);
+    searchDebounceRef.current = setTimeout(() => {
+      setPage(1);
+      fetchTransactions(1, rowsPerPage, typeFilter, newValue);
+    }, 400);
+  }, [fetchTransactions, rowsPerPage, typeFilter]);
 
   const onClearSearch = useCallback(() => {
     setFilterValue("");
+    if (searchDebounceRef.current) {
+      clearTimeout(searchDebounceRef.current);
+    }
     setPage(1);
-  }, []);
+    fetchTransactions(1, rowsPerPage, typeFilter, "");
+  }, [fetchTransactions, rowsPerPage, typeFilter]);
 
   if (authLoading) {
     return <Spinner size="lg" className="flex justify-center mt-10" />;
@@ -197,7 +194,7 @@ export default function CreditTransactionsPage() {
           <h1 className="text-2xl font-bold">Credit Transactions</h1>
         </div>
         <Button
-          onPress={fetchTransactions}
+          onPress={() => fetchTransactions(page, rowsPerPage, typeFilter, filterValue)}
           color="primary"
           variant="flat"
           size="sm"
@@ -248,8 +245,11 @@ export default function CreditTransactionsPage() {
       </div>
 
       <Card>
-        <CardHeader>
+        <CardHeader className="flex justify-between items-center">
           <h2 className="text-lg font-semibold">Transaction History</h2>
+          <span className="text-sm text-default-400">
+            {totalCount.toLocaleString()} transactions
+          </span>
         </CardHeader>
         <CardBody>
           <div className="flex flex-col gap-4">
@@ -302,7 +302,7 @@ export default function CreditTransactionsPage() {
                 if (found) setSelectedTransaction(found);
               }}
               bottomContent={
-                pages > 0 ? (
+                pages > 1 ? (
                   <div className="flex w-full justify-center">
                     <Pagination
                       isCompact
@@ -311,7 +311,7 @@ export default function CreditTransactionsPage() {
                       color="primary"
                       page={page}
                       total={pages}
-                      onChange={(page) => setPage(page)}
+                      onChange={(p) => setPage(p)}
                     />
                   </div>
                 ) : null
@@ -330,7 +330,7 @@ export default function CreditTransactionsPage() {
                 emptyContent={
                   loading ? <Spinner /> : "No transactions found"
                 }
-                items={items}
+                items={transactions}
               >
                 {(item) => {
                   const amountInfo = formatAmount(item.amount);
