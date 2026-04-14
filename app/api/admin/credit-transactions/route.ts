@@ -3,7 +3,7 @@ import { getAccessToken } from "@/lib/auth/cookies";
 import { verifyAccessToken } from "@/lib/auth/jwt";
 import { db } from "@/lib/db";
 import { creditTransactions, users, teams } from "@/lib/db/schema";
-import { desc, eq, and, or, ilike, count, sum, gt, lt, type SQL } from "drizzle-orm";
+import { desc, eq, and, or, ilike, count, sum, gt, lt, sql, type SQL } from "drizzle-orm";
 
 export async function GET(request: NextRequest) {
   try {
@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
       conditions.push(
         or(
           ilike(creditTransactions.description, pattern),
-          ilike(creditTransactions.id, pattern),
+          sql`${creditTransactions.id}::text ilike ${pattern}`,
           ilike(users.email, pattern),
           ilike(users.firstName, pattern),
           ilike(users.lastName, pattern),
