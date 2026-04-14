@@ -144,10 +144,10 @@ function mergeFetchedAndCachedMessages(
         message.role === cachedMessage.role &&
         (cachedMessage.role === "assistant"
           ? message.createdAt === cachedMessage.createdAt &&
-            message.variantId === cachedMessage.variantId
+          message.variantId === cachedMessage.variantId
           : message.createdAt !== undefined &&
-            cachedMessage.createdAt !== undefined &&
-            message.createdAt === cachedMessage.createdAt)
+          cachedMessage.createdAt !== undefined &&
+          message.createdAt === cachedMessage.createdAt)
     );
 
     if (matchIndex !== -1) {
@@ -159,11 +159,11 @@ function mergeFetchedAndCachedMessages(
     const fallbackMatchIndex =
       cachedMessage.createdAt === undefined
         ? merged.findIndex(
-            (message) =>
-              message.role === cachedMessage.role &&
-              serializeMessageContent(message.content) ===
-                serializeMessageContent(cachedMessage.content)
-          )
+          (message) =>
+            message.role === cachedMessage.role &&
+            serializeMessageContent(message.content) ===
+            serializeMessageContent(cachedMessage.content)
+        )
         : -1;
 
     if (fallbackMatchIndex !== -1) {
@@ -319,10 +319,29 @@ export default function ChatInterface({
   const [activeElementIndex, setActiveElementIndex] = useState<number | null>(null);
   const [activeElementMaxImages, setActiveElementMaxImages] = useState(4);
   const [elementImageUrls, setElementImageUrls] = useState<Record<string, string>>({});
-  const [mediaRefUrls, setMediaRefUrls] = useState<Record<string, string>>({});
+  const MEDIA_REF_URLS_STORAGE_KEY = "moodio:media-ref-urls";
+  const [mediaRefUrls, setMediaRefUrls] = useState<Record<string, string>>(() => {
+    if (typeof window === "undefined") return {};
+    try {
+      const stored = localStorage.getItem(MEDIA_REF_URLS_STORAGE_KEY);
+      return stored ? JSON.parse(stored) : {};
+    } catch {
+      return {};
+    }
+  });
   const [assetParamValues, setAssetParamValues] = useState<Record<string, AssetParamValue | null>>({});
   const [precisionEditing, setPrecisionEditing] = useState(false);
-  
+
+  useEffect(() => {
+    try {
+      if (Object.keys(mediaRefUrls).length === 0) {
+        localStorage.removeItem(MEDIA_REF_URLS_STORAGE_KEY);
+      } else {
+        localStorage.setItem(MEDIA_REF_URLS_STORAGE_KEY, JSON.stringify(mediaRefUrls));
+      }
+    } catch { /* quota exceeded — ignore */ }
+  }, [mediaRefUrls]);
+
   // Persistent assets state - loaded from server via RTK Query
   const { data: persistentAssetsData } = useGetPersistentAssetsQuery(chatId || "", {
     skip: !chatId,
@@ -380,7 +399,7 @@ export default function ChatInterface({
   // Load draft on mount or when chatId changes
   useEffect(() => {
     if (isDraftLoaded) return;
-    
+
     const draft = loadChatDraft(chatId);
     if (draft) {
       setLoadedDraft(draft);
@@ -401,14 +420,14 @@ export default function ChatInterface({
 
   // Track previous isSending state to detect when AI response completes
   const prevIsSendingRef = useRef(isSending);
-  
+
   // Pre-select images refs (useEffects are defined after applyPreselectImages)
   const hasAppliedInitialPreselect = useRef(false);
 
   // Save draft function - called on blur and visibility change
   const saveDraft = useCallback(() => {
     if (!isDraftLoaded) return;
-    
+
     const editorContent = chatInputRef.current?.getEditorJSON() || null;
     saveChatDraft(chatId, editorContent, input, pendingImages);
   }, [chatId, input, pendingImages, isDraftLoaded]);
@@ -2730,7 +2749,7 @@ export default function ChatInterface({
         },
       };
     });
-    
+
     // Clear the draft since we're sending the message
     clearChatDraft(chatId);
     // Reset draftHadImages so pre-select can work after AI response
@@ -2874,7 +2893,7 @@ export default function ChatInterface({
         try {
           const errorData = await res.json();
           if (errorData?.error) errorMessage = errorData.error;
-        } catch {}
+        } catch { }
         throw new Error(errorMessage);
       }
 
@@ -3617,7 +3636,7 @@ export default function ChatInterface({
           try {
             const errorData = await res.json();
             if (errorData?.error) errorMessage = errorData.error;
-          } catch {}
+          } catch { }
           throw new Error(errorMessage);
         }
 
@@ -3732,7 +3751,7 @@ export default function ChatInterface({
           updates,
         }),
       })
-        .then(() => {})
+        .then(() => { })
         .catch((err) => {
           console.error("Failed to persist part update:", err);
         });
@@ -3842,9 +3861,9 @@ export default function ChatInterface({
       pendingVideoRestoreRef.current = isSameModel
         ? null
         : {
-            modelId: data.modelId,
-            videoParams: restoredVideoParams,
-          };
+          modelId: data.modelId,
+          videoParams: restoredVideoParams,
+        };
 
       // Switch to video mode and set model + params
       setMenuState((prev) => ({
@@ -3883,18 +3902,18 @@ export default function ChatInterface({
       if (chatInputRef.current) {
         const content: JSONContent = restoredPrompt
           ? {
-              type: "doc",
-              content: [
-                {
-                  type: "paragraph",
-                  content: [{ type: "text", text: restoredPrompt }],
-                },
-              ],
-            }
+            type: "doc",
+            content: [
+              {
+                type: "paragraph",
+                content: [{ type: "text", text: restoredPrompt }],
+              },
+            ],
+          }
           : {
-              type: "doc",
-              content: [{ type: "paragraph" }],
-            };
+            type: "doc",
+            content: [{ type: "paragraph" }],
+          };
         chatInputRef.current.setEditorContent(content);
       }
 
@@ -4380,61 +4399,61 @@ export default function ChatInterface({
           <span>{t("chat.readOnlyChat")}</span>
         </div>
       ) : (
-      <ChatInput
-        ref={chatInputRef}
-        input={input}
-        onInputChange={setInput}
-        onSend={handleSend}
-        isSending={isSending}
-        isRecording={isRecording}
-        isTranscribing={isTranscribing}
-        recordingTime={recordingTime}
-        onStartRecording={startRecording}
-        onStopRecording={stopRecording}
-        pendingImages={pendingImages}
-        onRemovePendingImage={removePendingImage}
-        suggestedImages={suggestedImages}
-        onConfirmSuggestedImages={confirmSuggestedImages}
-        onDismissSuggestedImages={dismissSuggestedImages}
-        pendingVideos={pendingVideos}
-        onRemovePendingVideo={removePendingVideo}
-        pendingAudios={pendingAudios}
-        onRemovePendingAudio={removePendingAudio}
-        onOpenAssetPicker={openPendingImagePicker}
-        onAssetDrop={handleAssetDrop}
-        onFilesUpload={handleFilesUpload}
-        showFileUpload={true}
-        precisionEditing={precisionEditing}
-        onPrecisionEditingChange={handlePrecisionEditingChange}
-        onDrawImage={handleDrawImage}
-        menuState={menuState}
-        onMenuStateChange={handleMenuStateChange}
-        hasUploadingImages={hasUploadingImages(pendingImages)}
-        initialEditorContent={loadedDraft?.editorContent || (loadedDraft?.plainText ? loadedDraft.plainText : undefined)}
-        onBlur={saveDraft}
-        videoCost={videoCost}
-        videoCostLoading={videoCostLoading}
-        imageCost={imageTotalCost}
-        imageCostLoading={imageCostLoading}
-        imageUnitCost={imageCost}
-        videoModelSupportsEndImage={videoModelSupportsEndImage}
-        videoModelHasImageParams={videoModelHasImageParams}
-        videoModelParams={videoModelParams}
-        onPickElementImages={openElementImagePicker}
-        resolveElementImageUrl={resolveElementImageUrl}
-        onPickMediaRefImage={openMediaRefImagePicker}
-        onPickMediaRefVideo={openMediaRefVideoPicker}
-        onPickMediaRefAudio={openMediaRefAudioPicker}
-        resolveMediaRefImageUrl={resolveMediaRefImageUrl}
-        resolveMediaRefVideoUrl={resolveMediaRefVideoUrl}
-        resolveMediaRefAudioUrl={resolveMediaRefAudioUrl}
-        onHeightChange={handleChatInputHeightChange}
-        assetParamSlots={assetParamSlots}
-        assetParamValues={assetParamValues}
-        onOpenAssetParamPicker={openAssetParamPicker}
-        onClearAssetParam={clearAssetParam}
-        isAssetPickerOpen={isAssetPickerOpen}
-      />
+        <ChatInput
+          ref={chatInputRef}
+          input={input}
+          onInputChange={setInput}
+          onSend={handleSend}
+          isSending={isSending}
+          isRecording={isRecording}
+          isTranscribing={isTranscribing}
+          recordingTime={recordingTime}
+          onStartRecording={startRecording}
+          onStopRecording={stopRecording}
+          pendingImages={pendingImages}
+          onRemovePendingImage={removePendingImage}
+          suggestedImages={suggestedImages}
+          onConfirmSuggestedImages={confirmSuggestedImages}
+          onDismissSuggestedImages={dismissSuggestedImages}
+          pendingVideos={pendingVideos}
+          onRemovePendingVideo={removePendingVideo}
+          pendingAudios={pendingAudios}
+          onRemovePendingAudio={removePendingAudio}
+          onOpenAssetPicker={openPendingImagePicker}
+          onAssetDrop={handleAssetDrop}
+          onFilesUpload={handleFilesUpload}
+          showFileUpload={true}
+          precisionEditing={precisionEditing}
+          onPrecisionEditingChange={handlePrecisionEditingChange}
+          onDrawImage={handleDrawImage}
+          menuState={menuState}
+          onMenuStateChange={handleMenuStateChange}
+          hasUploadingImages={hasUploadingImages(pendingImages)}
+          initialEditorContent={loadedDraft?.editorContent || (loadedDraft?.plainText ? loadedDraft.plainText : undefined)}
+          onBlur={saveDraft}
+          videoCost={videoCost}
+          videoCostLoading={videoCostLoading}
+          imageCost={imageTotalCost}
+          imageCostLoading={imageCostLoading}
+          imageUnitCost={imageCost}
+          videoModelSupportsEndImage={videoModelSupportsEndImage}
+          videoModelHasImageParams={videoModelHasImageParams}
+          videoModelParams={videoModelParams}
+          onPickElementImages={openElementImagePicker}
+          resolveElementImageUrl={resolveElementImageUrl}
+          onPickMediaRefImage={openMediaRefImagePicker}
+          onPickMediaRefVideo={openMediaRefVideoPicker}
+          onPickMediaRefAudio={openMediaRefAudioPicker}
+          resolveMediaRefImageUrl={resolveMediaRefImageUrl}
+          resolveMediaRefVideoUrl={resolveMediaRefVideoUrl}
+          resolveMediaRefAudioUrl={resolveMediaRefAudioUrl}
+          onHeightChange={handleChatInputHeightChange}
+          assetParamSlots={assetParamSlots}
+          assetParamValues={assetParamValues}
+          onOpenAssetParamPicker={openAssetParamPicker}
+          onClearAssetParam={clearAssetParam}
+          isAssetPickerOpen={isAssetPickerOpen}
+        />
       )}
 
       <AssetPickerModal
@@ -4448,31 +4467,31 @@ export default function ChatInterface({
           assetPickerMode === "elementImages"
             ? activeElementMaxImages
             : assetPickerMode === "assetParam"
-            ? 1
-            : assetPickerMode === "mediaRefImage"
-            ? 9
-            : assetPickerMode === "mediaRefVideo"
-            ? 3
-            : assetPickerMode === "mediaRefAudio"
-            ? 3
-            : assetPickerMode === "persistent"
-            ? MAX_PERSISTENT_REFERENCE_IMAGES - persistentAssets.referenceImages.length
-            : MAX_PENDING_IMAGES - pendingImagesRef.current.length
+              ? 1
+              : assetPickerMode === "mediaRefImage"
+                ? 9
+                : assetPickerMode === "mediaRefVideo"
+                  ? 3
+                  : assetPickerMode === "mediaRefAudio"
+                    ? 3
+                    : assetPickerMode === "persistent"
+                      ? MAX_PERSISTENT_REFERENCE_IMAGES - persistentAssets.referenceImages.length
+                      : MAX_PENDING_IMAGES - pendingImagesRef.current.length
         }
         acceptTypes={
           assetPickerMode === "elementImages"
             ? ["image"]
             : assetPickerMode === "mediaRefImage"
-            ? ["image"]
-            : assetPickerMode === "mediaRefVideo"
-            ? ["video"]
-            : assetPickerMode === "mediaRefAudio"
-            ? ["audio"]
-            : assetPickerMode === "persistent"
-            ? ["image"]
-            : assetPickerMode === "assetParam" && activeAssetParamName
-            ? assetParamSlots.find((s) => s.name === activeAssetParamName)?.acceptTypes
-            : ["image", "video", "audio"]
+              ? ["image"]
+              : assetPickerMode === "mediaRefVideo"
+                ? ["video"]
+                : assetPickerMode === "mediaRefAudio"
+                  ? ["audio"]
+                  : assetPickerMode === "persistent"
+                    ? ["image"]
+                    : assetPickerMode === "assetParam" && activeAssetParamName
+                      ? assetParamSlots.find((s) => s.name === activeAssetParamName)?.acceptTypes
+                      : ["image", "video", "audio"]
         }
       />
 
