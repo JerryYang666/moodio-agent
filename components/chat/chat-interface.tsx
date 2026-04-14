@@ -2012,50 +2012,94 @@ export default function ChatInterface({
       };
       if (!d) return;
 
-      // Add all images to pending
+      const useMediaRefs = supportsMediaRefsRef.current;
+
       if (d.images && d.images.length > 0) {
-        for (const img of d.images) {
-          if (!img.imageId || !img.url) continue;
-          addAssetImage({
-            assetId: img.assetId,
-            url: img.url,
-            title: img.title || "Selected asset",
-            imageId: img.imageId,
-          });
+        if (useMediaRefs) {
+          for (const img of d.images) {
+            if (!img.imageId || !img.url) continue;
+            const ref: MediaReference = { type: "image", id: img.imageId };
+            setMenuState((prev) => ({
+              ...prev,
+              videoParams: {
+                ...prev.videoParams,
+                media_references: [...((prev.videoParams?.media_references as MediaReference[]) || []), ref],
+              },
+            }));
+            setMediaRefUrls((prev) => ({ ...prev, [img.imageId]: img.url }));
+          }
+        } else {
+          for (const img of d.images) {
+            if (!img.imageId || !img.url) continue;
+            addAssetImage({
+              assetId: img.assetId,
+              url: img.url,
+              title: img.title || "Selected asset",
+              imageId: img.imageId,
+            });
+          }
         }
       }
 
-      // Add videos to pending (respects max limit)
       if (d.videos && d.videos.length > 0) {
-        for (const vid of d.videos) {
-          if (!vid.videoId || !vid.url) continue;
-          if (!canAddVideo(pendingVideosRef.current)) {
-            addToast({ title: t("chat.maxVideosReached", { max: MAX_PENDING_VIDEOS }), color: "warning" });
-            break;
+        if (useMediaRefs) {
+          for (const vid of d.videos) {
+            if (!vid.videoId || !vid.url) continue;
+            const ref: MediaReference = { type: "video", id: vid.videoId };
+            setMenuState((prev) => ({
+              ...prev,
+              videoParams: {
+                ...prev.videoParams,
+                media_references: [...((prev.videoParams?.media_references as MediaReference[]) || []), ref],
+              },
+            }));
+            setMediaRefUrls((prev) => ({ ...prev, [vid.videoId]: vid.url }));
           }
-          setPendingVideos((prev) => [...prev, {
-            videoId: vid.videoId,
-            url: vid.url,
-            source: (vid.source as PendingVideoSource) || "library",
-            title: vid.title || "Selected video",
-          }]);
+        } else {
+          for (const vid of d.videos) {
+            if (!vid.videoId || !vid.url) continue;
+            if (!canAddVideo(pendingVideosRef.current)) {
+              addToast({ title: t("chat.maxVideosReached", { max: MAX_PENDING_VIDEOS }), color: "warning" });
+              break;
+            }
+            setPendingVideos((prev) => [...prev, {
+              videoId: vid.videoId,
+              url: vid.url,
+              source: (vid.source as PendingVideoSource) || "library",
+              title: vid.title || "Selected video",
+            }]);
+          }
         }
       }
 
-      // Add audios to pending (respects max limit)
       if (d.audios && d.audios.length > 0) {
-        for (const aud of d.audios) {
-          if (!aud.audioId || !aud.url) continue;
-          if (!canAddAudio(pendingAudiosRef.current)) {
-            addToast({ title: t("chat.maxAudiosReached", { max: MAX_PENDING_AUDIOS }), color: "warning" });
-            break;
+        if (useMediaRefs) {
+          for (const aud of d.audios) {
+            if (!aud.audioId || !aud.url) continue;
+            const ref: MediaReference = { type: "audio", id: aud.audioId };
+            setMenuState((prev) => ({
+              ...prev,
+              videoParams: {
+                ...prev.videoParams,
+                media_references: [...((prev.videoParams?.media_references as MediaReference[]) || []), ref],
+              },
+            }));
+            setMediaRefUrls((prev) => ({ ...prev, [aud.audioId]: aud.url }));
           }
-          setPendingAudios((prev) => [...prev, {
-            audioId: aud.audioId,
-            url: aud.url,
-            source: "library" as const,
-            title: aud.title || "Selected audio",
-          }]);
+        } else {
+          for (const aud of d.audios) {
+            if (!aud.audioId || !aud.url) continue;
+            if (!canAddAudio(pendingAudiosRef.current)) {
+              addToast({ title: t("chat.maxAudiosReached", { max: MAX_PENDING_AUDIOS }), color: "warning" });
+              break;
+            }
+            setPendingAudios((prev) => [...prev, {
+              audioId: aud.audioId,
+              url: aud.url,
+              source: "library" as const,
+              title: aud.title || "Selected audio",
+            }]);
+          }
         }
       }
 
@@ -2067,7 +2111,7 @@ export default function ChatInterface({
     window.addEventListener("moodio-batch-to-chat", handler as any);
     return () =>
       window.removeEventListener("moodio-batch-to-chat", handler as any);
-  }, [addAssetImage]);
+  }, [addAssetImage, t]);
 
   const handleAssetDrop = useCallback(
     async (payload: any) => {
@@ -2229,6 +2273,12 @@ export default function ChatInterface({
 
   const pendingAudiosRef = useRef(pendingAudios);
   pendingAudiosRef.current = pendingAudios;
+
+  const supportsMediaRefsRef = useRef(false);
+  supportsMediaRefsRef.current =
+    menuState.mode === "video" &&
+    !videoModelHasImageParams &&
+    videoModelParams.some((p) => p.type === "media_references");
 
   const handleAssetPickedMultiple = useCallback(
     async (assets: AssetSummary[]) => {
