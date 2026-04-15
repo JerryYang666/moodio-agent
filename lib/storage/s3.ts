@@ -974,6 +974,7 @@ const ALLOWED_DOWNLOAD_HOSTS = [
   "file.aiquickdraw.com",
   "tempfile.redpandaai.co",
   "kieai.redpandaai.co",
+  "volces.com",
 ];
 
 /**
