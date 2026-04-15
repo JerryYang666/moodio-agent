@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useCallback, useEffect, useState } from "react";
+import { use, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Button } from "@heroui/button";
@@ -29,6 +29,7 @@ import {
   type CellComment,
   type EnrichedMediaAssetRef,
 } from "@/lib/production-table/types";
+import { createProductionTableStore, type ProductionTableStore } from "@/lib/production-table/store";
 
 const DEFAULT_CHAT_PANEL_WIDTH = 380;
 const COLLAPSED_CHAT_WIDTH = 48;
@@ -46,6 +47,13 @@ export default function ProductionTableDetailPage({
 
   const [table, setTable] = useState<EnrichedProductionTable | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // Cell-level Zustand store — stable reference for the lifetime of the page
+  const storeRef = useRef<ProductionTableStore | null>(null);
+  if (!storeRef.current) {
+    storeRef.current = createProductionTableStore();
+  }
+  const store = storeRef.current;
 
   // Editable column/row IDs for granular permissions
   const [editableColumnIds, setEditableColumnIds] = useState<Set<string>>(
@@ -100,6 +108,11 @@ export default function ProductionTableDetailPage({
       if (!res.ok) throw new Error();
       const data = await res.json();
       setTable(data.table);
+      store.getState().hydrate({
+        columns: data.table.columns,
+        rows: data.table.rows,
+        cellMap: data.table.cellMap,
+      });
       if (data.editableGrants) {
         setEditableColumnIds(new Set(data.editableGrants.columnIds ?? []));
         setEditableRowIds(new Set(data.editableGrants.rowIds ?? []));
@@ -109,7 +122,7 @@ export default function ProductionTableDetailPage({
     } finally {
       setLoading(false);
     }
-  }, [tableId, t]);
+  }, [tableId, t, store]);
 
   useEffect(() => {
     fetchTable();
@@ -122,86 +135,53 @@ export default function ProductionTableDetailPage({
         case "pt_cell_updated": {
           const { rowId, columnId, textContent, mediaAssets } = event.payload;
           const key = `${columnId}:${rowId}`;
-          setTable((prev) => {
-            if (!prev) return prev;
-            const newMap = { ...prev.cellMap };
-            newMap[key] = {
-              ...(newMap[key] ?? {
-                id: "",
-                tableId,
-                columnId,
-                rowId,
-                updatedAt: new Date(),
-                updatedBy: event.userId,
-              }),
-              textContent: textContent ?? newMap[key]?.textContent ?? null,
-              mediaAssets: mediaAssets ?? newMap[key]?.mediaAssets ?? null,
-            } as EnrichedCell;
-            return { ...prev, cellMap: newMap };
-          });
+          const existing = store.getState().cellMap[key];
+          store.getState().setCell(key, {
+            ...(existing ?? {
+              id: "",
+              tableId,
+              columnId,
+              rowId,
+              updatedAt: new Date(),
+              updatedBy: event.userId,
+            }),
+            textContent: textContent ?? existing?.textContent ?? null,
+            mediaAssets: mediaAssets ?? existing?.mediaAssets ?? null,
+          } as EnrichedCell);
           break;
         }
         case "pt_media_asset_added": {
           const { rowId, columnId, asset } = event.payload;
           const key = `${columnId}:${rowId}`;
-          setTable((prev) => {
-            if (!prev) return prev;
-            const newMap = { ...prev.cellMap };
-            const existing = newMap[key];
-            const currentAssets = (existing?.mediaAssets as EnrichedMediaAssetRef[]) ?? [];
-            newMap[key] = {
-              ...(existing ?? {
-                id: "",
-                tableId,
-                columnId,
-                rowId,
-                textContent: null,
-                updatedAt: new Date(),
-                updatedBy: event.userId,
-              }),
-              mediaAssets: [...currentAssets, asset],
-            } as EnrichedCell;
-            return { ...prev, cellMap: newMap };
+          store.getState().addMediaAsset(key, asset, {
+            id: "",
+            tableId,
+            columnId,
+            rowId,
+            textContent: null,
+            updatedAt: new Date(),
+            updatedBy: event.userId,
           });
           break;
         }
         case "pt_media_asset_removed": {
           const { rowId, columnId, assetId } = event.payload;
           const key = `${columnId}:${rowId}`;
-          setTable((prev) => {
-            if (!prev) return prev;
-            const newMap = { ...prev.cellMap };
-            const existing = newMap[key];
-            if (!existing) return prev;
-            const currentAssets = (existing.mediaAssets as EnrichedMediaAssetRef[]) ?? [];
-            newMap[key] = {
-              ...existing,
-              mediaAssets: currentAssets.filter((a: EnrichedMediaAssetRef) => a.assetId !== assetId),
-            } as EnrichedCell;
-            return { ...prev, cellMap: newMap };
-          });
+          store.getState().removeMediaAsset(key, assetId);
           break;
         }
         case "pt_cell_comment_updated": {
           const { rowId, columnId, comment } = event.payload;
           const key = `${columnId}:${rowId}`;
-          setTable((prev) => {
-            if (!prev) return prev;
-            const newMap = { ...prev.cellMap };
-            newMap[key] = {
-              ...(newMap[key] ?? {
-                id: "",
-                tableId,
-                columnId,
-                rowId,
-                textContent: null,
-                mediaAssets: null,
-                updatedAt: new Date(),
-                updatedBy: event.userId,
-              }),
-              comment: comment ?? null,
-            } as EnrichedCell;
-            return { ...prev, cellMap: newMap };
+          store.getState().updateCellComment(key, comment ?? null, {
+            id: "",
+            tableId,
+            columnId,
+            rowId,
+            textContent: null,
+            mediaAssets: null,
+            updatedAt: new Date(),
+            updatedBy: event.userId,
           });
           break;
         }
@@ -210,6 +190,7 @@ export default function ProductionTableDetailPage({
           setTable((prev) =>
             prev ? { ...prev, columns: [...prev.columns, column] } : prev
           );
+          store.getState().setColumns([...store.getState().columns, column]);
           break;
         }
         case "pt_column_removed": {
@@ -222,6 +203,7 @@ export default function ProductionTableDetailPage({
                 }
               : prev
           );
+          store.getState().setColumns(store.getState().columns.filter((c) => c.id !== columnId));
           break;
         }
         case "pt_column_renamed": {
@@ -269,6 +251,7 @@ export default function ProductionTableDetailPage({
           setTable((prev) =>
             prev ? { ...prev, rows: [...prev.rows, row] } : prev
           );
+          store.getState().setRows([...store.getState().rows, row]);
           break;
         }
         case "pt_row_removed": {
@@ -278,6 +261,7 @@ export default function ProductionTableDetailPage({
               ? { ...prev, rows: prev.rows.filter((r) => r.id !== rowId) }
               : prev
           );
+          store.getState().setRows(store.getState().rows.filter((r) => r.id !== rowId));
           break;
         }
         case "pt_row_resized": {
@@ -308,7 +292,7 @@ export default function ProductionTableDetailPage({
         }
       }
     },
-    [tableId]
+    [tableId, store]
   );
 
   const {
@@ -323,6 +307,11 @@ export default function ProductionTableDetailPage({
     onRemoteEvent,
     fetchDetail: fetchTable,
   });
+
+  // Sync WS cell locks into the Zustand store so cells can self-subscribe
+  useEffect(() => {
+    store.setState({ cellLocks });
+  }, [cellLocks, store]);
 
   // Permission checks
   const tablePermission = table?.permission ?? null;
@@ -398,6 +387,7 @@ export default function ProductionTableDetailPage({
           setTable((prev) =>
             prev ? { ...prev, columns: [...prev.columns, newColumn] } : prev
           );
+          store.getState().setColumns([...store.getState().columns, newColumn]);
           sendEvent("pt_column_added", { tableId, column: newColumn });
         } catch (error) {
           const message = resolveApiErrorMessage(
@@ -452,6 +442,7 @@ export default function ProductionTableDetailPage({
         setTable((prev) =>
           prev ? { ...prev, rows: [...prev.rows, newRow] } : prev
         );
+        store.getState().setRows([...store.getState().rows, newRow]);
         sendEvent("pt_row_added", { tableId, row: newRow });
       } catch (error) {
         const message = resolveApiErrorMessage(error, t("errors.failedToAddRow"));
@@ -497,6 +488,7 @@ export default function ProductionTableDetailPage({
         newRows.splice(insertAt, 0, newRow);
 
         setTable((prev) => (prev ? { ...prev, rows: newRows } : prev));
+        store.getState().setRows(newRows);
         sendEvent("pt_row_added", { tableId, row: newRow });
 
         const newIds = newRows.map((r) => r.id);
@@ -561,6 +553,7 @@ export default function ProductionTableDetailPage({
         newCols.splice(insertAt, 0, newCol);
 
         setTable((prev) => (prev ? { ...prev, columns: newCols } : prev));
+        store.getState().setColumns(newCols);
         sendEvent("pt_column_added", { tableId, column: newCol });
 
         const newIds = newCols.map((c) => c.id);
@@ -596,25 +589,20 @@ export default function ProductionTableDetailPage({
       textContent?: string | null,
       mediaAssets?: EnrichedMediaAssetRef[] | null
     ) => {
-      // Optimistic update
       const key = `${columnId}:${rowId}`;
-      setTable((prev) => {
-        if (!prev) return prev;
-        const newMap = { ...prev.cellMap };
-        newMap[key] = {
-          ...(newMap[key] ?? {
-            id: "",
-            tableId,
-            columnId,
-            rowId,
-            updatedAt: new Date(),
-            updatedBy: currentUserId ?? null,
-          }),
-          textContent: textContent ?? newMap[key]?.textContent ?? null,
-          mediaAssets: mediaAssets ?? newMap[key]?.mediaAssets ?? null,
-        } as EnrichedCell;
-        return { ...prev, cellMap: newMap };
-      });
+      const existing = store.getState().cellMap[key];
+      store.getState().setCell(key, {
+        ...(existing ?? {
+          id: "",
+          tableId,
+          columnId,
+          rowId,
+          updatedAt: new Date(),
+          updatedBy: currentUserId ?? null,
+        }),
+        textContent: textContent ?? existing?.textContent ?? null,
+        mediaAssets: mediaAssets ?? existing?.mediaAssets ?? null,
+      } as EnrichedCell);
 
       sendEvent("pt_cell_updated", {
         tableId,
@@ -634,31 +622,21 @@ export default function ProductionTableDetailPage({
         addToast({ title: t("errors.failedToSaveCell"), color: "danger" });
       }
     },
-    [tableId, currentUserId, sendEvent, t]
+    [tableId, currentUserId, sendEvent, t, store]
   );
 
   const handleMediaAssetAdd = useCallback(
     async (columnId: string, rowId: string, asset: EnrichedMediaAssetRef) => {
       const key = `${columnId}:${rowId}`;
-      setTable((prev) => {
-        if (!prev) return prev;
-        const newMap = { ...prev.cellMap };
-        const existing = newMap[key];
-        const currentAssets = (existing?.mediaAssets as EnrichedMediaAssetRef[]) ?? [];
-        newMap[key] = {
-          ...(existing ?? {
-            id: "",
-            tableId,
-            columnId,
-            rowId,
-            textContent: null,
-            updatedAt: new Date(),
-            updatedBy: currentUserId ?? null,
-          }),
-          mediaAssets: [...currentAssets, asset],
-        } as EnrichedCell;
-        return { ...prev, cellMap: newMap };
-      });
+      store.getState().addMediaAsset(key, asset, {
+        id: "",
+        tableId,
+        columnId,
+        rowId,
+        textContent: null,
+        updatedAt: new Date(),
+        updatedBy: currentUserId ?? null,
+      } as unknown as Partial<EnrichedCell>);
 
       sendEvent("pt_media_asset_added", {
         tableId,
@@ -677,24 +655,13 @@ export default function ProductionTableDetailPage({
         addToast({ title: t("errors.failedToAddMedia"), color: "danger" });
       }
     },
-    [tableId, currentUserId, sendEvent, t]
+    [tableId, currentUserId, sendEvent, t, store]
   );
 
   const handleMediaAssetRemove = useCallback(
     async (columnId: string, rowId: string, assetId: string) => {
       const key = `${columnId}:${rowId}`;
-      setTable((prev) => {
-        if (!prev) return prev;
-        const newMap = { ...prev.cellMap };
-        const existing = newMap[key];
-        if (!existing) return prev;
-        const currentAssets = (existing.mediaAssets as EnrichedMediaAssetRef[]) ?? [];
-        newMap[key] = {
-          ...existing,
-          mediaAssets: currentAssets.filter((a) => a.assetId !== assetId),
-        } as EnrichedCell;
-        return { ...prev, cellMap: newMap };
-      });
+      store.getState().removeMediaAsset(key, assetId);
 
       sendEvent("pt_media_asset_removed", {
         tableId,
@@ -713,7 +680,7 @@ export default function ProductionTableDetailPage({
         addToast({ title: t("errors.failedToRemoveMedia"), color: "danger" });
       }
     },
-    [tableId, sendEvent, t]
+    [tableId, sendEvent, t, store]
   );
 
   const handleCommentSave = useCallback(
@@ -728,24 +695,16 @@ export default function ProductionTableDetailPage({
         : null;
 
       const key = `${columnId}:${rowId}`;
-      setTable((prev) => {
-        if (!prev) return prev;
-        const newMap = { ...prev.cellMap };
-        newMap[key] = {
-          ...(newMap[key] ?? {
-            id: "",
-            tableId,
-            columnId,
-            rowId,
-            textContent: null,
-            mediaAssets: null,
-            updatedAt: new Date(),
-            updatedBy: currentUserId ?? null,
-          }),
-          comment: stamped,
-        } as EnrichedCell;
-        return { ...prev, cellMap: newMap };
-      });
+      store.getState().updateCellComment(key, stamped, {
+        id: "",
+        tableId,
+        columnId,
+        rowId,
+        textContent: null,
+        mediaAssets: null,
+        updatedAt: new Date(),
+        updatedBy: currentUserId ?? null,
+      } as unknown as Partial<EnrichedCell>);
 
       sendEvent("pt_cell_comment_updated", {
         tableId,
@@ -764,7 +723,7 @@ export default function ProductionTableDetailPage({
         addToast({ title: t("errors.failedToSaveComment"), color: "danger" });
       }
     },
-    [tableId, currentUserId, user, sendEvent, t]
+    [tableId, currentUserId, user, sendEvent, t, store]
   );
 
   const handleRenameColumn = useCallback(
@@ -806,6 +765,7 @@ export default function ProductionTableDetailPage({
             }
           : prev
       );
+      store.getState().setColumns(store.getState().columns.filter((c) => c.id !== columnId));
       sendEvent("pt_column_removed", { tableId, columnId });
       try {
         await fetch(
@@ -826,6 +786,7 @@ export default function ProductionTableDetailPage({
           ? { ...prev, rows: prev.rows.filter((r) => r.id !== rowId) }
           : prev
       );
+      store.getState().setRows(store.getState().rows.filter((r) => r.id !== rowId));
       sendEvent("pt_row_removed", { tableId, rowId });
       try {
         await fetch(
@@ -841,32 +802,36 @@ export default function ProductionTableDetailPage({
 
   const handleBulkDeleteRows = useCallback(
     async (rowIds: string[]) => {
+      const idSet = new Set(rowIds);
       setTable((prev) =>
         prev
-          ? { ...prev, rows: prev.rows.filter((r) => !rowIds.includes(r.id)) }
+          ? { ...prev, rows: prev.rows.filter((r) => !idSet.has(r.id)) }
           : prev
       );
+      store.getState().setRows(store.getState().rows.filter((r) => !idSet.has(r.id)));
       for (const rowId of rowIds) {
         sendEvent("pt_row_removed", { tableId, rowId });
         fetch(`/api/production-table/${tableId}/rows/${rowId}`, { method: "DELETE" }).catch(() => {});
       }
     },
-    [tableId, sendEvent]
+    [tableId, sendEvent, store]
   );
 
   const handleBulkDeleteColumns = useCallback(
     async (columnIds: string[]) => {
+      const idSet = new Set(columnIds);
       setTable((prev) =>
         prev
-          ? { ...prev, columns: prev.columns.filter((c) => !columnIds.includes(c.id)) }
+          ? { ...prev, columns: prev.columns.filter((c) => !idSet.has(c.id)) }
           : prev
       );
+      store.getState().setColumns(store.getState().columns.filter((c) => !idSet.has(c.id)));
       for (const columnId of columnIds) {
         sendEvent("pt_column_removed", { tableId, columnId });
         fetch(`/api/production-table/${tableId}/columns/${columnId}`, { method: "DELETE" }).catch(() => {});
       }
     },
-    [tableId, sendEvent]
+    [tableId, sendEvent, store]
   );
 
   // Column resize
@@ -988,6 +953,7 @@ export default function ProductionTableDetailPage({
       cols.splice(toIndex, 0, moved);
 
       setTable((prev) => (prev ? { ...prev, columns: cols } : prev));
+      store.getState().setColumns(cols);
 
       const newIds = cols.map((c) => c.id);
       sendEvent("pt_columns_reordered", { tableId, columnIds: newIds });
@@ -1017,6 +983,7 @@ export default function ProductionTableDetailPage({
       rowsCopy.splice(toIndex, 0, moved);
 
       setTable((prev) => (prev ? { ...prev, rows: rowsCopy } : prev));
+      store.getState().setRows(rowsCopy);
 
       const newIds = rowsCopy.map((r) => r.id);
       sendEvent("pt_rows_reordered", { tableId, rowIds: newIds });
@@ -1043,6 +1010,7 @@ export default function ProductionTableDetailPage({
       const rowMap = new Map(table.rows.map((r) => [r.id, r]));
       const reordered = newRowIds.map((id) => rowMap.get(id)).filter(Boolean) as ProductionTableRow[];
       setTable((prev) => (prev ? { ...prev, rows: reordered } : prev));
+      store.getState().setRows(reordered);
       sendEvent("pt_rows_reordered", { tableId, rowIds: newRowIds });
       try {
         await fetch(`/api/production-table/${tableId}/rows/reorder`, {
@@ -1063,6 +1031,7 @@ export default function ProductionTableDetailPage({
       const colMap = new Map(table.columns.map((c) => [c.id, c]));
       const reordered = newColumnIds.map((id) => colMap.get(id)).filter(Boolean) as ProductionTableColumn[];
       setTable((prev) => (prev ? { ...prev, columns: reordered } : prev));
+      store.getState().setColumns(reordered);
       sendEvent("pt_columns_reordered", { tableId, columnIds: newColumnIds });
       try {
         await fetch(`/api/production-table/${tableId}/columns/reorder`, {
@@ -1116,8 +1085,7 @@ export default function ProductionTableDetailPage({
         <ProductionTableGrid
           columns={table.columns}
           rows={table.rows}
-          cellMap={table.cellMap}
-          cellLocks={cellLocks}
+          store={store}
           remoteCursors={remoteCursors}
           currentUserId={currentUserId}
           canEditCell={canEditCell}

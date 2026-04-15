@@ -7,9 +7,6 @@ import { MousePointer2, Plus, Trash2, SendHorizontal, ArrowUp, ArrowDown, Messag
 import type {
   ProductionTableColumn,
   ProductionTableRow,
-  EnrichedCell,
-  CellLock,
-  CellComment,
   EnrichedMediaAssetRef,
   RemoteCellCursor,
 } from "@/lib/production-table/types";
@@ -26,6 +23,8 @@ import { AI_IMAGE_DRAG_MIME, AI_VIDEO_DRAG_MIME, AI_VIDEO_SUGGEST_DRAG_MIME } fr
 import { uploadImage } from "@/lib/upload/client";
 import { uploadAudio } from "@/lib/upload/audio-client";
 import { siteConfig } from "@/config/site";
+import { useStore } from "zustand";
+import { useCellData, useCellLock, type ProductionTableStore } from "@/lib/production-table/store";
 
 const DEFAULT_ROW_HEIGHT = 48;
 const DEFAULT_COL_WIDTH = 192;
@@ -42,11 +41,121 @@ function userIdToColor(userId: string): string {
   return `hsl(${hue}, 70%, 50%)`;
 }
 
+/**
+ * Self-subscribing cell wrapper: each cell subscribes to its own data from
+ * the store via `useCellData`/`useCellLock`, so a change in one cell does NOT
+ * re-render any other cell.
+ */
+const GridCell = React.memo(function GridCell({
+  store,
+  rowId,
+  columnId,
+  cellType,
+  rowIndex,
+  colName,
+  canEdit,
+  isSelected,
+  isUploading,
+  shouldActivate,
+  onActivated,
+  currentUserId,
+  sendEvent,
+  onCellCommit,
+  onMediaAssetAdd,
+  onMediaAssetRemove,
+}: {
+  store: ProductionTableStore;
+  rowId: string;
+  columnId: string;
+  cellType: string;
+  rowIndex: number;
+  colName: string;
+  canEdit: boolean;
+  isSelected: boolean;
+  isUploading: boolean;
+  shouldActivate: boolean;
+  onActivated: () => void;
+  currentUserId: string | undefined;
+  sendEvent?: (type: string, payload: Record<string, unknown>) => void;
+  onCellCommit: (columnId: string, rowId: string, textContent?: string | null, mediaAssets?: EnrichedMediaAssetRef[] | null) => void;
+  onMediaAssetAdd: (columnId: string, rowId: string, asset: EnrichedMediaAssetRef) => void;
+  onMediaAssetRemove: (columnId: string, rowId: string, assetId: string) => void;
+}) {
+  const key = `${columnId}:${rowId}`;
+  const cell = useCellData(store, key);
+  const lock = useCellLock(store, key);
+
+  const handleCommit = useCallback(
+    (value: string) => onCellCommit(columnId, rowId, value, null),
+    [onCellCommit, columnId, rowId]
+  );
+
+  const handleAddAsset = useCallback(
+    (asset: EnrichedMediaAssetRef) => onMediaAssetAdd(columnId, rowId, asset),
+    [onMediaAssetAdd, columnId, rowId]
+  );
+
+  const handleRemoveAsset = useCallback(
+    (assetId: string) => onMediaAssetRemove(columnId, rowId, assetId),
+    [onMediaAssetRemove, columnId, rowId]
+  );
+
+  if (cellType === "media") {
+    return (
+      <MediaCell
+        rowId={rowId}
+        columnId={columnId}
+        assets={(cell?.mediaAssets as EnrichedMediaAssetRef[]) ?? []}
+        canEdit={canEdit}
+        isSelected={isSelected}
+        isUploading={isUploading}
+        shouldActivate={shouldActivate}
+        onActivated={onActivated}
+        lock={lock}
+        currentUserId={currentUserId}
+        onAddAsset={handleAddAsset}
+        onRemoveAsset={handleRemoveAsset}
+        assetLabel={`${colName} - Row ${rowIndex + 1}`}
+      />
+    );
+  }
+
+  return (
+    <TextCell
+      rowId={rowId}
+      columnId={columnId}
+      value={cell?.textContent ?? ""}
+      canEdit={canEdit}
+      isSelected={isSelected}
+      shouldActivate={shouldActivate}
+      onActivated={onActivated}
+      lock={lock}
+      currentUserId={currentUserId}
+      sendEvent={sendEvent}
+      onCommit={handleCommit}
+    />
+  );
+});
+
+/**
+ * Self-subscribing comment indicator: subscribes to cell comment only.
+ */
+const CellCommentIndicatorSubscribed = React.memo(function CellCommentIndicatorSubscribed({
+  store,
+  cellKey,
+}: {
+  store: ProductionTableStore;
+  cellKey: string;
+}) {
+  const cell = useCellData(store, cellKey);
+  if (!cell?.comment) return null;
+  return <CellCommentIndicator comment={cell.comment} />;
+});
+
 interface ProductionTableGridProps {
   columns: ProductionTableColumn[];
   rows: ProductionTableRow[];
-  cellMap: Record<string, EnrichedCell>;
-  cellLocks: Map<string, CellLock>;
+  store: ProductionTableStore;
   remoteCursors: RemoteCellCursor[];
   currentUserId: string | undefined;
   canEditCell: (rowId: string, columnId: string) => boolean;
@@ -87,8 +196,7 @@ interface ProductionTableGridProps {
 export function ProductionTableGrid({
   columns,
   rows,
-  cellMap,
-  cellLocks,
+  store,
   remoteCursors,
   currentUserId,
   canEditCell: canEditCellFn,
@@ -756,54 +864,8 @@ export function ProductionTableGrid({
   }, [rowHeightKey, rowVirtualizer]);
 
   // ---- Cell renderer ----
-  const renderCell = useCallback(
-    (row: ProductionTableRow, col: ProductionTableColumn, rowIndex: number) => {
-      const key = `${col.id}:${row.id}`;
-      const cell = cellMap[key];
-      const lock = cellLocks.get(key);
-      const editable = canEditCellFn(row.id, col.id);
-      const selected = isCellSelected(row.id, col.id);
-
-      if (col.cellType === "media") {
-        return (
-          <MediaCell
-            key={key}
-            rowId={row.id}
-            columnId={col.id}
-            assets={(cell?.mediaAssets as EnrichedMediaAssetRef[]) ?? []}
-            canEdit={editable}
-            isSelected={selected}
-            isUploading={uploadingCells.has(key)}
-            shouldActivate={activatingCellKey === key}
-            onActivated={() => setActivatingCellKey(null)}
-            lock={lock}
-            currentUserId={currentUserId}
-            onAddAsset={(asset) => onMediaAssetAdd(col.id, row.id, asset)}
-            onRemoveAsset={(assetId) => onMediaAssetRemove(col.id, row.id, assetId)}
-            assetLabel={`${col.name} - Row ${rowIndex + 1}`}
-          />
-        );
-      }
-
-      return (
-        <TextCell
-          key={key}
-          rowId={row.id}
-          columnId={col.id}
-          value={cell?.textContent ?? ""}
-          canEdit={editable}
-          isSelected={selected}
-          shouldActivate={activatingCellKey === key}
-          onActivated={() => setActivatingCellKey(null)}
-          lock={lock}
-          currentUserId={currentUserId}
-          sendEvent={sendEvent}
-          onCommit={(value) => onCellCommit(col.id, row.id, value, null)}
-        />
-      );
-    },
-    [cellMap, cellLocks, canEditCellFn, isCellSelected, uploadingCells, activatingCellKey, currentUserId, sendEvent, onCellCommit, onMediaAssetAdd, onMediaAssetRemove]
-  );
+  // Stable callback to clear activation — no deps on cell data
+  const clearActivating = useCallback(() => setActivatingCellKey(null), []);
 
   const totalWidth = useMemo(
     () =>
@@ -917,6 +979,7 @@ export function ProductionTableGrid({
 
     const colNameMap = new Map(columns.map((c) => [c.id, c.name]));
     const rowIndexMap = new Map(rows.map((r, i) => [r.id, i + 1]));
+    const currentCellMap = store.getState().cellMap;
 
     const images: Array<{ assetId: string; imageId: string; url: string; title?: string }> = [];
     const videos: Array<{ videoId: string; url: string; title?: string; source?: string }> = [];
@@ -924,7 +987,7 @@ export function ProductionTableGrid({
     const textParts: string[] = [];
 
     for (const key of Array.from(selectedCells)) {
-      const cell = cellMap[key];
+      const cell = currentCellMap[key];
       if (!cell) continue;
 
       const [colId, rowId] = key.split(":");
@@ -975,7 +1038,7 @@ export function ProductionTableGrid({
       })
     );
     clearSelection();
-  }, [selectedCells, cellMap, columns, rows, clearSelection]);
+  }, [selectedCells, store, columns, rows, clearSelection]);
 
   return (
   <>
@@ -1079,7 +1142,9 @@ export function ProductionTableGrid({
                     onResizeRow={handleResizeRow}
                     onRowContextMenu={handleRowContextMenu}
                   />
-                  {columns.map((col, colIdx) => (
+                  {columns.map((col, colIdx) => {
+                    const key = `${col.id}:${row.id}`;
+                    return (
                     <React.Fragment key={col.id}>
                       {renderColGap(colIdx)}
                       <div
@@ -1094,17 +1159,31 @@ export function ProductionTableGrid({
                         onMouseEnter={() => handleCellMouseEnter(row.id, col.id)}
                         onContextMenu={(e) => handleCellContextMenu(row.id, col.id, e)}
                       >
-                        {renderCell(row, col, idx)}
-                        {cellMap[`${col.id}:${row.id}`]?.comment && (
-                          <CellCommentIndicator
-                            comment={cellMap[`${col.id}:${row.id}`].comment!}
-                          />
-                        )}
+                        <GridCell
+                          store={store}
+                          rowId={row.id}
+                          columnId={col.id}
+                          cellType={col.cellType}
+                          rowIndex={idx}
+                          colName={col.name}
+                          canEdit={canEditCellFn(row.id, col.id)}
+                          isSelected={isCellSelected(row.id, col.id)}
+                          isUploading={uploadingCells.has(key)}
+                          shouldActivate={activatingCellKey === key}
+                          onActivated={clearActivating}
+                          currentUserId={currentUserId}
+                          sendEvent={sendEvent}
+                          onCellCommit={onCellCommit}
+                          onMediaAssetAdd={onMediaAssetAdd}
+                          onMediaAssetRemove={onMediaAssetRemove}
+                        />
+                        <CellCommentIndicatorSubscribed store={store} cellKey={key} />
                       </div>
                       {colIdx === columns.length - 1 &&
                         renderColGap(columns.length)}
                     </React.Fragment>
-                  ))}
+                    );
+                  })}
                 </div>
                 {idx === rows.length - 1 && rowDropSlot === rows.length && (
                   <div
@@ -1248,7 +1327,7 @@ export function ProductionTableGrid({
             }}
           >
             <MessageSquare size={14} />
-            {cellMap[`${cellContextMenu.columnId}:${cellContextMenu.rowId}`]?.comment
+            {store.getState().cellMap[`${cellContextMenu.columnId}:${cellContextMenu.rowId}`]?.comment
               ? t("editComment")
               : t("addComment")}
           </button>
@@ -1261,7 +1340,7 @@ export function ProductionTableGrid({
       <CellCommentPopover
         x={commentPopover.x}
         y={commentPopover.y}
-        comment={cellMap[`${commentPopover.columnId}:${commentPopover.rowId}`]?.comment ?? null}
+        comment={store.getState().cellMap[`${commentPopover.columnId}:${commentPopover.rowId}`]?.comment ?? null}
         onSave={handleCommentSave}
         onClose={closeCommentPopover}
       />

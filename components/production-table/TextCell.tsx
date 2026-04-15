@@ -4,6 +4,7 @@ import React, { memo, useState, useRef, useEffect, useCallback } from "react";
 import type { CellLock } from "@/lib/production-table/types";
 
 const SELECTION_HEARTBEAT_MS = 1000;
+const WS_DEBOUNCE_MS = 200;
 
 function userIdToColor(userId: string): string {
   let hash = 0;
@@ -76,6 +77,10 @@ export const TextCell = memo(function TextCell({
 
   const commitEdit = useCallback(() => {
     setEditing(false);
+    if (wsDebounceRef.current) {
+      clearTimeout(wsDebounceRef.current);
+      wsDebounceRef.current = null;
+    }
     sendEventRef.current?.("pt_cell_deselected", { rowId, columnId });
     if (draft !== value) {
       onCommit(draft);
@@ -96,18 +101,29 @@ export const TextCell = memo(function TextCell({
     [value, commitEdit, rowId, columnId]
   );
 
+  const wsDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLTextAreaElement>) => {
       const newValue = e.target.value;
       setDraft(newValue);
-      sendEventRef.current?.("pt_cell_updated", {
-        rowId,
-        columnId,
-        textContent: newValue,
-      });
+      if (wsDebounceRef.current) clearTimeout(wsDebounceRef.current);
+      wsDebounceRef.current = setTimeout(() => {
+        sendEventRef.current?.("pt_cell_updated", {
+          rowId,
+          columnId,
+          textContent: newValue,
+        });
+      }, WS_DEBOUNCE_MS);
     },
     [rowId, columnId]
   );
+
+  useEffect(() => {
+    return () => {
+      if (wsDebounceRef.current) clearTimeout(wsDebounceRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     if (editing) {
