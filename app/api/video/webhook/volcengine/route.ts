@@ -47,10 +47,19 @@ export async function POST(request: NextRequest) {
     `[Webhook/Volcengine] Received callback for task ${payload.id}, status: ${payload.status}`
   );
 
-  const generation = await findGenerationByRequestId(payload.id);
+  let generation = await findGenerationByRequestId(payload.id);
+  if (!generation) {
+    // Volcengine can fire the webhook before our submit request returns and
+    // the DB row is committed. Wait briefly and retry once.
+    console.warn(
+      `[Webhook/Volcengine] Generation not found for task ${payload.id}, retrying in 5s…`
+    );
+    await new Promise((r) => setTimeout(r, 6000));
+    generation = await findGenerationByRequestId(payload.id);
+  }
   if (!generation) {
     console.error(
-      `[Webhook/Volcengine] Generation not found for task ${payload.id}`
+      `[Webhook/Volcengine] Generation still not found for task ${payload.id} after retry`
     );
     return NextResponse.json(
       { error: "Generation not found" },
