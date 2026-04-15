@@ -155,15 +155,6 @@ export async function POST(request: NextRequest) {
       throw error;
     }
 
-    // Build webhook URL
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL;
-    if (!baseUrl) {
-      return NextResponse.json(
-        { error: "Server configuration error" },
-        { status: 500 }
-      );
-    }
-
     // Create generation record (no credit deduction yet)
     const [generation] = await db
       .insert(videoGenerations)
@@ -202,7 +193,6 @@ export async function POST(request: NextRequest) {
       const { requestId, provider, providerModelId } = await submitVideoGeneration(
         modelId,
         mergedParams,
-        baseUrl
       );
 
       // Submission succeeded — deduct credits and update record atomically

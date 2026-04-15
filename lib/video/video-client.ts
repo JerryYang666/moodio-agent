@@ -47,7 +47,11 @@ export { type VideoGenerationResult as SeedanceVideoResult };
 /**
  * Build the provider-specific webhook URL.
  */
-function getWebhookUrl(baseUrl: string, provider: VideoProvider): string {
+function getWebhookUrl(provider: VideoProvider): string {
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL;
+  if (!baseUrl) {
+    throw new Error("NEXT_PUBLIC_APP_URL is not configured");
+  }
   return `${baseUrl}/api/video/webhook/${provider}`;
 }
 
@@ -56,18 +60,16 @@ function getWebhookUrl(baseUrl: string, provider: VideoProvider): string {
  *
  * @param modelId The display model ID (e.g., "kling-v2.6-pro")
  * @param params The input parameters for the model
- * @param baseUrl The app's base URL (used to construct provider-specific webhook URL)
  * @returns The request ID and provider info for tracking
  */
 export async function submitVideoGeneration(
   modelId: string,
   params: Record<string, any>,
-  baseUrl: string
 ): Promise<SubmitVideoGenerationResult> {
   const variant = getActiveProvider(modelId);
   const client = getProviderClient(variant.provider);
   const mappedParams = applyParamMapping(params, variant.paramMapping);
-  const webhookUrl = getWebhookUrl(baseUrl, variant.provider);
+  const webhookUrl = getWebhookUrl(variant.provider);
 
   const result = await client.submitGeneration(
     variant.providerModelId,

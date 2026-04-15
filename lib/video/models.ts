@@ -61,7 +61,7 @@ export interface VideoModelParam {
   acceptTypes?: AssetAcceptType[]; // For "asset" type - which asset types the picker allows
 }
 
-export type VideoProvider = "fal" | "kie";
+export type VideoProvider = "fal" | "kie" | "volcengine";
 
 /**
  * Per-provider overrides for a single parameter.
@@ -227,6 +227,7 @@ const seedance20: VideoModelConfig = {
       providerModelId: "bytedance/seedance-2.0",
       paramMapping: { first_frame_url: "image_url", last_frame_url: "end_image_url" },
     },
+    { provider: "volcengine", providerModelId: "doubao-seedance-2-0-260128" },
   ],
   params: [
     {
@@ -310,6 +311,7 @@ const seedance20Reference: VideoModelConfig = {
   providers: [
     { provider: "kie", providerModelId: "bytedance/seedance-2" },
     { provider: "fal", providerModelId: "bytedance/seedance-2.0" },
+    { provider: "volcengine", providerModelId: "doubao-seedance-2-0-260128" },
   ],
   params: [
     {
@@ -397,6 +399,7 @@ const seedance20Fast: VideoModelConfig = {
       providerModelId: "bytedance/seedance-2.0/fast",
       paramMapping: { first_frame_url: "image_url", last_frame_url: "end_image_url" },
     },
+    { provider: "volcengine", providerModelId: "doubao-seedance-2-0-fast-260128" },
   ],
   params: [
     {
@@ -480,6 +483,7 @@ const seedance20FastReference: VideoModelConfig = {
   providers: [
     { provider: "kie", providerModelId: "bytedance/seedance-2-fast" },
     { provider: "fal", providerModelId: "bytedance/seedance-2.0/fast" },
+    { provider: "volcengine", providerModelId: "doubao-seedance-2-0-fast-260128" },
   ],
   params: [
     {

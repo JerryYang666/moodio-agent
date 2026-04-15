@@ -1013,17 +1013,10 @@ export async function POST(
               };
               send({ type: "part", part: pendingPart, variantId });
 
-              // Build webhook URL
-              const baseUrl = process.env.NEXT_PUBLIC_APP_URL;
-              if (!baseUrl) {
-                throw new Error("Server configuration error: Missing base URL");
-              }
-
               // Submit to provider queue
               const { requestId, provider, providerModelId } = await submitVideoGeneration(
                 modelId,
                 mergedParams,
-                baseUrl
               );
 
               // Submission succeeded — deduct credits and update record atomically
