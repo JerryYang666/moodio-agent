@@ -15,7 +15,7 @@ import { waitUntil } from "@vercel/functions";
 interface VolcengineCallbackPayload {
   id: string;
   model: string;
-  status: "running" | "succeeded" | "failed" | "expired";
+  status: "queued" | "running" | "succeeded" | "failed" | "expired";
   content?: {
     video_url?: string;
     last_frame_url?: string;
@@ -65,9 +65,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ received: true, status: "already_processed" });
   }
 
-  if (payload.status === "running") {
+  if (payload.status === "queued" || payload.status === "running") {
     console.log(
-      `[Webhook/Volcengine] Task ${payload.id} still running, ignoring`
+      `[Webhook/Volcengine] Task ${payload.id} still ${payload.status}, ignoring`
     );
     return NextResponse.json({ received: true, status: "in_progress" });
   }
