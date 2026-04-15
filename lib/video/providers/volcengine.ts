@@ -3,6 +3,50 @@ import type { MediaReference } from "@/lib/video/models";
 
 const ARK_API_BASE = "https://ark.cn-beijing.volces.com/api/v3";
 
+const ARK_FETCH_TIMEOUT_MS = 30_000;
+const ARK_MAX_RETRIES = 3;
+const ARK_RETRY_BASE_DELAY_MS = 2_000;
+
+/**
+ * fetch wrapper for Volcengine Ark API with extended timeout and retry.
+ * Mainland China endpoints can be flaky from overseas — retries with
+ * exponential backoff absorb transient connect timeouts.
+ */
+async function arkFetch(
+  url: string,
+  init?: RequestInit
+): Promise<Response> {
+  let lastError: Error | undefined;
+
+  for (let attempt = 0; attempt <= ARK_MAX_RETRIES; attempt++) {
+    try {
+      const res = await fetch(url, {
+        ...init,
+        signal: AbortSignal.timeout(ARK_FETCH_TIMEOUT_MS),
+      });
+      return res;
+    } catch (error: any) {
+      lastError = error;
+      const isRetryable =
+        error?.cause?.code === "UND_ERR_CONNECT_TIMEOUT" ||
+        error?.cause?.code === "ECONNRESET" ||
+        error?.cause?.code === "ETIMEDOUT" ||
+        error?.name === "TimeoutError";
+
+      if (!isRetryable || attempt === ARK_MAX_RETRIES) break;
+
+      const delay = ARK_RETRY_BASE_DELAY_MS * 2 ** attempt;
+      console.warn(
+        `[Volcengine] Request to ${url} failed (${error?.cause?.code ?? error.message}), ` +
+        `retrying in ${delay}ms (attempt ${attempt + 1}/${ARK_MAX_RETRIES})`
+      );
+      await new Promise((r) => setTimeout(r, delay));
+    }
+  }
+
+  throw lastError;
+}
+
 function getArkApiKey(): string {
   const key = process.env.ARK_API_KEY;
   if (!key) throw new Error("ARK_API_KEY environment variable is not set");
@@ -180,7 +224,7 @@ export class VolcengineVideoProvider implements VideoProviderClient {
       JSON.stringify(body, null, 2)
     );
 
-    const res = await fetch(
+    const res = await arkFetch(
       `${ARK_API_BASE}/contents/generations/tasks`,
       {
         method: "POST",
@@ -272,7 +316,7 @@ export class VolcengineVideoProvider implements VideoProviderClient {
 
   private async fetchTask(taskId: string): Promise<VolcengineTaskResponse> {
     const url = `${ARK_API_BASE}/contents/generations/tasks/${encodeURIComponent(taskId)}`;
-    const res = await fetch(url, { headers: arkAuthHeaders() });
+    const res = await arkFetch(url, { headers: arkAuthHeaders() });
 
     if (!res.ok) {
       const text = await res.text();

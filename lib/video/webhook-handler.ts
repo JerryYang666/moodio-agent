@@ -91,6 +91,7 @@ export async function processVideoResult(
         sourceImageId: effectiveSourceImageId,
         thumbnailImageId: effectiveThumbnailId,
         seed: result.seed,
+        error: null,
         completedAt: new Date(),
       })
       .where(eq(videoGenerations.id, generationId));

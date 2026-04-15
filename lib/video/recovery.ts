@@ -184,6 +184,7 @@ export async function recoverGeneration(generation: {
           sourceImageId: effectiveSourceImageId,
           thumbnailImageId: effectiveThumbnailId,
           seed: recoveryResult.result.seed,
+          error: null,
           completedAt: new Date(),
         })
         .where(eq(videoGenerations.id, generation.id));
