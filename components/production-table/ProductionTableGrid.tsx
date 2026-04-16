@@ -863,6 +863,28 @@ export function ProductionTableGrid({
     rowVirtualizer.measure();
   }, [rowHeightKey, rowVirtualizer]);
 
+  // ---- Column Virtualizer ----
+  // Horizontal virtualization. The header and body share the same `scrollElement`
+  // (see line ~1047) so they stay aligned automatically as long as both consume
+  // this virtualizer.
+  const colVirtualizer = useVirtualizer({
+    count: columns.length,
+    getScrollElement: () => scrollElement,
+    horizontal: true,
+    estimateSize: (i) => columns[i]?.width ?? DEFAULT_COL_WIDTH,
+    overscan: 3,
+    enabled: !!scrollElement,
+    getItemKey: (i) => columns[i]?.id ?? i,
+    // Account for the 32px RowHandle / header `#` gutter on the left so the
+    // virtualizer's `start` offsets line up inside the virtualized track.
+    scrollMargin: 32,
+  });
+
+  const colWidthKey = columns.map((c) => c.width ?? DEFAULT_COL_WIDTH).join(",");
+  React.useEffect(() => {
+    colVirtualizer.measure();
+  }, [colWidthKey, colVirtualizer]);
+
   // ---- Cell renderer ----
   // Stable callback to clear activation — no deps on cell data
   const clearActivating = useCallback(() => setActivatingCellKey(null), []);
@@ -874,20 +896,18 @@ export function ProductionTableGrid({
     [columns]
   );
 
-  const renderColGap = useCallback(
-    (slotIndex: number) => (
-      <div
-        className={`shrink-0 transition-all duration-200 ease-out flex items-center justify-center ${
-          colDropSlot === slotIndex ? "w-3 mx-0.5" : "w-0"
-        }`}
-      >
-        {colDropSlot === slotIndex && (
-          <div className="w-[3px] h-[32px] bg-primary rounded-full shadow-[0_0_6px_1px_hsl(var(--heroui-primary)/0.5)]" />
-        )}
-      </div>
-    ),
-    [colDropSlot]
-  );
+  // Cumulative left offset (inside the virtualized column track, i.e. not
+  // including the sticky row-handle/`#` gutter) for the current colDropSlot.
+  // Used to render a single absolute-positioned column drop indicator instead
+  // of inserting inline gaps between every column.
+  const colDropLeft = useMemo(() => {
+    if (colDropSlot === null) return null;
+    let x = 0;
+    for (let i = 0; i < colDropSlot && i < columns.length; i++) {
+      x += columns[i]?.width ?? DEFAULT_COL_WIDTH;
+    }
+    return x;
+  }, [colDropSlot, columns]);
 
   // Track when a paint-select just ended so the subsequent click event doesn't clear the selection
   const justPaintedRef = useRef(false);
@@ -1065,6 +1085,8 @@ export function ProductionTableGrid({
           editableColumnIds={editableColumnIds}
           colDragIndex={colDragIndex}
           colDropSlot={colDropSlot}
+          colDropLeft={colDropLeft}
+          colVirtualizer={colVirtualizer}
           selectedColumns={selectedColumns}
           onSelectColumn={handleSelectColumn}
           onColPaintStart={handleColPaintStart}
@@ -1079,7 +1101,6 @@ export function ProductionTableGrid({
           onColDragEnd={handleColDragEnd}
           onAddColumn={onAddColumn}
           onInsertColumn={onInsertColumn}
-          renderColGap={renderColGap}
         />
         <div
           style={{
@@ -1088,6 +1109,18 @@ export function ProductionTableGrid({
             position: "relative",
           }}
         >
+          {colDropLeft !== null && (
+            <div
+              className="absolute top-0 pointer-events-none z-20"
+              style={{
+                left: 32 + colDropLeft - 1,
+                width: 3,
+                height: "100%",
+              }}
+            >
+              <div className="w-[3px] h-full bg-primary rounded-full shadow-[0_0_6px_1px_hsl(var(--heroui-primary)/0.5)]" />
+            </div>
+          )}
           {rowVirtualizer.getVirtualItems().map((virtualRow) => {
             const row = rows[virtualRow.index];
             const idx = virtualRow.index;
@@ -1142,48 +1175,55 @@ export function ProductionTableGrid({
                     onResizeRow={handleResizeRow}
                     onRowContextMenu={handleRowContextMenu}
                   />
-                  {columns.map((col, colIdx) => {
-                    const key = `${col.id}:${row.id}`;
-                    return (
-                    <React.Fragment key={col.id}>
-                      {renderColGap(colIdx)}
-                      <div
-                        data-cell-wrapper
-                        data-row-id={row.id}
-                        data-col-id={col.id}
-                        className={`shrink-0 border-r border-default-200 relative select-none ${
-                          colDragIndex === colIdx ? "opacity-30" : ""
-                        } ${isCellSelected(row.id, col.id) ? "ring-2 ring-inset ring-primary" : ""}`}
-                        style={{ width: col.width || DEFAULT_COL_WIDTH }}
-                        onMouseDown={(e) => handleCellMouseDown(row.id, col.id, e)}
-                        onMouseEnter={() => handleCellMouseEnter(row.id, col.id)}
-                        onContextMenu={(e) => handleCellContextMenu(row.id, col.id, e)}
-                      >
-                        <GridCell
-                          store={store}
-                          rowId={row.id}
-                          columnId={col.id}
-                          cellType={col.cellType}
-                          rowIndex={idx}
-                          colName={col.name}
-                          canEdit={canEditCellFn(row.id, col.id)}
-                          isSelected={isCellSelected(row.id, col.id)}
-                          isUploading={uploadingCells.has(key)}
-                          shouldActivate={activatingCellKey === key}
-                          onActivated={clearActivating}
-                          currentUserId={currentUserId}
-                          sendEvent={sendEvent}
-                          onCellCommit={onCellCommit}
-                          onMediaAssetAdd={onMediaAssetAdd}
-                          onMediaAssetRemove={onMediaAssetRemove}
-                        />
-                        <CellCommentIndicatorSubscribed store={store} cellKey={key} />
-                      </div>
-                      {colIdx === columns.length - 1 &&
-                        renderColGap(columns.length)}
-                    </React.Fragment>
-                    );
-                  })}
+                  <div
+                    style={{
+                      position: "relative",
+                      width: colVirtualizer.getTotalSize(),
+                      height: "100%",
+                      flex: "0 0 auto",
+                    }}
+                  >
+                    {colVirtualizer.getVirtualItems().map((vc) => {
+                      const col = columns[vc.index];
+                      const colIdx = vc.index;
+                      const key = `${col.id}:${row.id}`;
+                      return (
+                        <div
+                          key={col.id}
+                          data-cell-wrapper
+                          data-row-id={row.id}
+                          data-col-id={col.id}
+                          className={`absolute top-0 border-r border-default-200 bg-background select-none ${
+                            colDragIndex === colIdx ? "opacity-30" : ""
+                          } ${isCellSelected(row.id, col.id) ? "ring-2 ring-inset ring-primary z-10" : ""}`}
+                          style={{ left: vc.start, width: vc.size, height: "100%" }}
+                          onMouseDown={(e) => handleCellMouseDown(row.id, col.id, e)}
+                          onMouseEnter={() => handleCellMouseEnter(row.id, col.id)}
+                          onContextMenu={(e) => handleCellContextMenu(row.id, col.id, e)}
+                        >
+                          <GridCell
+                            store={store}
+                            rowId={row.id}
+                            columnId={col.id}
+                            cellType={col.cellType}
+                            rowIndex={idx}
+                            colName={col.name}
+                            canEdit={canEditCellFn(row.id, col.id)}
+                            isSelected={isCellSelected(row.id, col.id)}
+                            isUploading={uploadingCells.has(key)}
+                            shouldActivate={activatingCellKey === key}
+                            onActivated={clearActivating}
+                            currentUserId={currentUserId}
+                            sendEvent={sendEvent}
+                            onCellCommit={onCellCommit}
+                            onMediaAssetAdd={onMediaAssetAdd}
+                            onMediaAssetRemove={onMediaAssetRemove}
+                          />
+                          <CellCommentIndicatorSubscribed store={store} cellKey={key} />
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
                 {idx === rows.length - 1 && rowDropSlot === rows.length && (
                   <div
