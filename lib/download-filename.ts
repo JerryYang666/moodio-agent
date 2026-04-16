@@ -116,6 +116,38 @@ function encodeRfc5987Value(value: string): string {
   );
 }
 
+const CONTENT_TYPE_TO_EXTENSION: Record<string, string> = {
+  "image/png": ".png",
+  "image/jpeg": ".jpg",
+  "image/webp": ".webp",
+  "image/gif": ".gif",
+  "video/mp4": ".mp4",
+  "video/webm": ".webm",
+  "video/quicktime": ".mov",
+  "audio/mpeg": ".mp3",
+  "audio/mp3": ".mp3",
+  "audio/wav": ".wav",
+  "audio/x-wav": ".wav",
+};
+
+const FALLBACK_EXTENSION: Record<string, string> = {
+  image: ".png",
+  video: ".mp4",
+  audio: ".mp3",
+};
+
+export function extensionFromContentType(
+  contentType: string | null | undefined,
+  fallbackType: "image" | "video" | "audio"
+): string {
+  if (contentType) {
+    const mapped =
+      CONTENT_TYPE_TO_EXTENSION[contentType.split(";")[0].trim().toLowerCase()];
+    if (mapped) return mapped;
+  }
+  return FALLBACK_EXTENSION[fallbackType];
+}
+
 export function buildAttachmentContentDisposition(filename: string): string {
   const asciiFallback = toAsciiFallbackFilename(filename, "download");
   const utf8Filename = encodeRfc5987Value(filename);

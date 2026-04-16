@@ -963,6 +963,55 @@ export function getSignedAudioUrl(
   return signed;
 }
 
+// ============================================================================
+// Generic Media Helpers (for bulk / direct download)
+// ============================================================================
+
+const MEDIA_PREFIX: Record<"image" | "video" | "audio", string> = {
+  image: "images",
+  video: "videos",
+  audio: "audios",
+};
+
+/**
+ * Lightweight HEAD request to get the ContentType stored in S3 metadata.
+ * Returns null when the object does not exist or the call fails.
+ */
+export async function getMediaContentType(
+  type: "image" | "video" | "audio",
+  id: string
+): Promise<string | null> {
+  const key = `${MEDIA_PREFIX[type]}/${id}`;
+  try {
+    const response = await s3Client.send(
+      new HeadObjectCommand({ Bucket: BUCKET_NAME, Key: key })
+    );
+    return response.ContentType || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Generate a CloudFront signed download URL for any media type.
+ * Delegates to getSignedImageUrl / getSignedVideoUrl / getSignedAudioUrl.
+ */
+export function getSignedDownloadUrl(
+  type: "image" | "video" | "audio",
+  id: string,
+  cnMode: boolean = false,
+  expirationSeconds?: number
+): string {
+  switch (type) {
+    case "image":
+      return getSignedImageUrl(id, expirationSeconds, cnMode);
+    case "video":
+      return getSignedVideoUrl(id, expirationSeconds, cnMode);
+    case "audio":
+      return getSignedAudioUrl(id, expirationSeconds, cnMode);
+  }
+}
+
 // Allowed hostnames for external downloads (e.g. Fal AI media URLs)
 const ALLOWED_DOWNLOAD_HOSTS = [
   "fal.media",
