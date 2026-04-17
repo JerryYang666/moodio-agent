@@ -3,7 +3,6 @@
 import React, { memo, useState, useRef, useCallback } from "react";
 import { useTranslations } from "next-intl";
 import { Plus, Trash2, ArrowLeft, ArrowRight, Type, Image } from "lucide-react";
-import type { Virtualizer } from "@tanstack/react-virtual";
 import {
   Dropdown,
   DropdownTrigger,
@@ -22,8 +21,6 @@ interface HeaderRowProps {
   editableColumnIds: Set<string>;
   colDragIndex: number | null;
   colDropSlot: number | null;
-  colDropLeft: number | null;
-  colVirtualizer: Virtualizer<HTMLDivElement, Element>;
   selectedColumns: Set<string>;
   onSelectColumn: (id: string, mode: SelectMode) => void;
   onColPaintStart: (index: number) => void;
@@ -38,6 +35,7 @@ interface HeaderRowProps {
   onColDragEnd: () => void;
   onAddColumn?: (cellType: CellType) => void;
   onInsertColumn?: (anchorColumnId: string, position: "left" | "right", cellType: CellType) => void;
+  renderColGap: (slotIndex: number) => React.ReactNode;
 }
 
 export const HeaderRow = memo(function HeaderRow({
@@ -46,8 +44,6 @@ export const HeaderRow = memo(function HeaderRow({
   canAddColumns = true,
   editableColumnIds,
   colDragIndex,
-  colDropLeft,
-  colVirtualizer,
   selectedColumns,
   onSelectColumn,
   onColPaintStart,
@@ -62,6 +58,7 @@ export const HeaderRow = memo(function HeaderRow({
   onColDragEnd,
   onAddColumn,
   onInsertColumn,
+  renderColGap,
 }: HeaderRowProps) {
   const t = useTranslations("productionTable");
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -197,45 +194,24 @@ export const HeaderRow = memo(function HeaderRow({
 
   return (
     <>
-      <div className="flex sticky top-0 z-10 bg-default-100 border-b-2 border-default-300 min-h-[34px]">
+      <div className="flex sticky top-0 z-10 bg-default-100 border-b-2 border-default-300">
         <div className="sticky left-0 z-20 w-8 shrink-0 border-r border-default-200 bg-default-100 flex items-center justify-center text-xs font-semibold text-default-500">
           #
         </div>
-        <div
-          style={{
-            position: "relative",
-            width: colVirtualizer.getTotalSize(),
-            height: "100%",
-            flex: "0 0 auto",
-          }}
-        >
-          {colDropLeft !== null && (
-            <div
-              className="absolute top-0 pointer-events-none z-20 flex items-center"
-              style={{
-                left: colDropLeft - 1,
-                width: 3,
-                height: "100%",
-              }}
-            >
-              <div className="w-[3px] h-[32px] bg-primary rounded-full shadow-[0_0_6px_1px_hsl(var(--heroui-primary)/0.5)]" />
-            </div>
-          )}
-          {colVirtualizer.getVirtualItems().map((vc) => {
-            const col = columns[vc.index];
-            const i = vc.index;
-            const liveWidth =
-              resizingId === col.id
-                ? Math.max(80, Math.min(800, col.width + resizeDelta))
-                : vc.size;
-            const isSelected = selectedColumns.has(col.id);
-            const canDrag = canEdit && resizingId === null && isSelected;
+        {columns.map((col, i) => {
+          const liveWidth =
+            resizingId === col.id
+              ? Math.max(80, Math.min(800, col.width + resizeDelta))
+              : col.width;
+          const isSelected = selectedColumns.has(col.id);
+          const canDrag = canEdit && resizingId === null && isSelected;
 
-            return (
+          return (
+            <React.Fragment key={col.id}>
+              {renderColGap(i)}
               <div
-                key={col.id}
                 data-col-header
-                className={`absolute top-0 border-r border-default-200 bg-default-100 flex items-center px-2 py-1.5 group transition-opacity duration-200 ${
+                className={`shrink-0 border-r border-default-200 flex items-center px-2 py-1.5 group transition-opacity duration-200 relative ${
                   colDragIndex === i ? "opacity-30" : ""
                 } ${
                   isSelected
@@ -244,7 +220,7 @@ export const HeaderRow = memo(function HeaderRow({
                       ? "bg-primary-50"
                       : ""
                 } ${canEdit ? "cursor-pointer" : ""}`}
-                style={{ left: vc.start, width: liveWidth, height: "100%" }}
+                style={{ width: liveWidth }}
                 draggable={canDrag}
                 onDragStart={(e) => canDrag && onColDragStart(i, e)}
                 onDragOver={(e) => canEdit && onColDragOver(i, e)}
@@ -287,9 +263,10 @@ export const HeaderRow = memo(function HeaderRow({
                   />
                 )}
               </div>
-            );
-          })}
-        </div>
+              {i === columns.length - 1 && renderColGap(columns.length)}
+            </React.Fragment>
+          );
+        })}
         {canEdit && onAddColumn && canAddColumns && (
           <div className="shrink-0 flex items-center justify-center w-10 border-r border-default-200">
             <Dropdown>
