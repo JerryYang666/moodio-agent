@@ -37,7 +37,7 @@ import { getViewportVisibleCenterPosition } from "@/lib/desktop/types";
 import type { MessageContentPart } from "@/lib/llm/types";
 import { getVideoModel, type VideoModelParam } from "@/lib/video/models";
 import { MultiShotEditor } from "./multi-shot-editor";
-import { KlingElementEditor } from "./kling-element-editor";
+import { KlingElementEditor, areKlingElementsValid } from "./kling-element-editor";
 import { SeedanceReferenceEditor } from "./seedance-reference-editor";
 import type { MultiPromptShot, KlingElement, MediaReference } from "@/lib/video/models";
 
@@ -165,6 +165,12 @@ export default function VideoConfigCard({
     () => visibleParams.some((p) => p.type === "kling_elements"),
     [visibleParams]
   );
+  const klingElementsInvalid = useMemo(() => {
+    if (!hasKlingElements) return false;
+    return !areKlingElementsValid(
+      (editedParams.kling_elements as KlingElement[]) || []
+    );
+  }, [hasKlingElements, editedParams.kling_elements]);
   const hasMediaReferences = useMemo(
     () => visibleParams.some((p) => p.type === "media_references"),
     [visibleParams]
@@ -830,6 +836,13 @@ export default function VideoConfigCard({
           </div>
         )}
 
+        {/* Invalid Kling elements warning */}
+        {klingElementsInvalid && status === "pending" && (
+          <div className="text-xs text-danger bg-danger-50 p-2 rounded-lg">
+            {t("chat.klingElementsInvalid")}
+          </div>
+        )}
+
         {/* Error message */}
         {error && (
           <div className="text-xs text-danger bg-danger-50 p-2 rounded-lg">
@@ -847,7 +860,7 @@ export default function VideoConfigCard({
             className="w-full"
             startContent={creating ? undefined : <Sparkles size={16} />}
             isLoading={creating}
-            isDisabled={(!isTextToVideo && !selectedSourceImage) || creating || insufficientCredits}
+            isDisabled={(!isTextToVideo && !selectedSourceImage) || creating || insufficientCredits || klingElementsInvalid}
             onPress={handleCreate}
           >
             {creating ? (

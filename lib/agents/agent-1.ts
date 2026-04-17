@@ -23,6 +23,7 @@ import {
 } from "@/lib/video/models";
 import { calculateCost, parseImageSizeToNumber } from "@/lib/pricing";
 import { deductCredits, getUserBalance, InsufficientCreditsError, AccountType } from "@/lib/credits";
+import { classifyImageError } from "@/lib/image/error-classify";
 import {
   fetchTaxonomyTree,
   serializeTaxonomyForLLM,
@@ -788,6 +789,10 @@ export class Agent1 implements Agent {
             } catch (err) {
               console.error(`Image gen error for imageId ${trackingImageId}`, err);
               const isInsufficientCredits = err instanceof InsufficientCreditsError;
+              const rawErrMsg = err instanceof Error ? err.message : String(err);
+              const reason = isInsufficientCredits
+                ? "INSUFFICIENT_CREDITS"
+                : classifyImageError(rawErrMsg);
               const errorPart: MessageContentPart = {
                 type: "agent_image",
                 imageId: trackingImageId,
@@ -795,7 +800,7 @@ export class Agent1 implements Agent {
                 aspectRatio: "1:1",
                 prompt: suggestion.prompt || "",
                 status: "error",
-                ...(isInsufficientCredits && { reason: "INSUFFICIENT_CREDITS" }),
+                reason,
               };
               ctx.send({ type: "part_update", imageId: trackingImageId, part: errorPart });
               const idx = state.finalContent.findIndex(

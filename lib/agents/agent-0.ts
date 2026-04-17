@@ -11,6 +11,7 @@ import { getSystemPrompt } from "./system-prompts";
 import { recordEvent, sanitizeOpenAIResponse } from "@/lib/telemetry";
 import { calculateCost, parseImageSizeToNumber } from "@/lib/pricing";
 import { deductCredits, getUserBalance, InsufficientCreditsError, AccountType } from "@/lib/credits";
+import { classifyImageError } from "@/lib/image/error-classify";
 
 interface Suggestion {
   title: string;
@@ -428,6 +429,10 @@ export class Agent0 implements Agent {
           console.error(e);
 
           const isInsufficientCredits = e instanceof InsufficientCreditsError;
+          const rawErrMsg = e instanceof Error ? e.message : String(e);
+          const reason = isInsufficientCredits
+            ? "INSUFFICIENT_CREDITS"
+            : classifyImageError(rawErrMsg);
 
           if (!isInsufficientCredits) {
             // Record failure event (skip for credit errors -- not a generation failure)
@@ -444,7 +449,7 @@ export class Agent0 implements Agent {
             title: suggestion.title,
             prompt: suggestion.prompt,
             status: "error",
-            ...(isInsufficientCredits && { reason: "INSUFFICIENT_CREDITS" }),
+            reason,
           };
           if (controller) {
             controller.enqueue(

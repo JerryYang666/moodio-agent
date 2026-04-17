@@ -354,7 +354,13 @@
     "uploadDocumentInvalidType": "Only PDF and DOCX files are supported",
     "uploadDocumentFailed": "Failed to extract text from document",
     "uploadDocumentSuccess": "Document text imported",
-    "uploadDocumentTruncated": "Document text was truncated to fit the character limit"
+    "uploadDocumentTruncated": "Document text was truncated to fit the character limit",
+    "klingElementsInvalid": "Please complete every element: name, description, and at least 2 reference images are required.",
+    "imageError": {
+      "contentPolicyViolation": "Image blocked: the prompt or reference image may violate content policies. Please revise and try again.",
+      "publicFigureBlocked": "Image blocked: the request was flagged for containing a prominent public figure. Please remove the public figure reference and try again.",
+      "generationFailed": "Image generation failed. Please try again."
+    }
   },
   "profile": {
     "title": "Profile Settings",

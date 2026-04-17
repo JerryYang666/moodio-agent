@@ -22,6 +22,7 @@ import {
   type AccountType,
 } from "@/lib/credits";
 import { recordEvent, sanitizeGeminiResponse } from "@/lib/telemetry";
+import { classifyImageError } from "@/lib/image/error-classify";
 
 const SUPPORTED_ASPECT_RATIOS = [
   "1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", "21:9",
@@ -66,6 +67,10 @@ export class ImageGenerateHandler implements ToolHandler {
     } catch (err) {
       console.error(`Image gen error for imageId ${trackingImageId}`, err);
       const isInsufficientCredits = err instanceof InsufficientCreditsError;
+      const rawMessage = err instanceof Error ? err.message : String(err);
+      const reason = isInsufficientCredits
+        ? "INSUFFICIENT_CREDITS"
+        : classifyImageError(rawMessage);
       const errorPart: MessageContentPart = isVideoSuggest
         ? {
             type: "agent_video_suggest",
@@ -75,7 +80,7 @@ export class ImageGenerateHandler implements ToolHandler {
             prompt: suggestion.prompt || "",
             videoIdea: suggestion.videoIdea || "",
             status: "error",
-            ...(isInsufficientCredits && { reason: "INSUFFICIENT_CREDITS" }),
+            reason,
           }
         : {
             type: "agent_image",
@@ -84,7 +89,7 @@ export class ImageGenerateHandler implements ToolHandler {
             aspectRatio: "1:1",
             prompt: suggestion.prompt || "",
             status: "error",
-            ...(isInsufficientCredits && { reason: "INSUFFICIENT_CREDITS" }),
+            reason,
           };
 
       ctx.send({ type: "part_update", imageId: trackingImageId, part: errorPart });

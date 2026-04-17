@@ -10,6 +10,26 @@ const MAX_ELEMENTS = 3;
 const MIN_IMAGES = 2;
 const MAX_IMAGES = 4;
 
+/** A Kling element is valid when name, description, and ≥ MIN_IMAGES reference images are all set. */
+export function isKlingElementValid(el: KlingElement | undefined | null): boolean {
+  if (!el) return false;
+  const imageCount = (el.element_input_ids ?? []).length;
+  return (
+    el.name.trim().length > 0 &&
+    el.description.trim().length > 0 &&
+    imageCount >= MIN_IMAGES &&
+    imageCount <= MAX_IMAGES
+  );
+}
+
+/** Validates the entire elements array — every element must be valid. Empty array is valid (elements are optional). */
+export function areKlingElementsValid(
+  elements: KlingElement[] | undefined | null
+): boolean {
+  if (!elements || elements.length === 0) return true;
+  return elements.every(isKlingElementValid);
+}
+
 interface KlingElementEditorProps {
   elements: KlingElement[];
   onChange: (elements: KlingElement[]) => void;
@@ -36,7 +56,7 @@ export function KlingElementEditor({
   const addElement = useCallback(() => {
     if (elements.length >= MAX_ELEMENTS) return;
     const newElement: KlingElement = {
-      name: "element_",
+      name: "",
       description: "",
       element_input_ids: [],
     };
@@ -114,7 +134,7 @@ export function KlingElementEditor({
           onClick={addElement}
           className="w-full rounded-lg border-2 border-dashed border-default-200 p-3 text-xs text-default-400 hover:border-default-300 hover:text-default-500 transition-colors"
         >
-          Add elements to reference in your prompt with @element_name
+          Add elements to reference in your prompt with @name
         </button>
       )}
 
@@ -122,10 +142,10 @@ export function KlingElementEditor({
         {elements.map((el, index) => {
           const isExpanded = expandedIndex === index;
           const imageCount = (el.element_input_ids ?? []).length;
-          const isValid =
-            el.name.length > "element_".length &&
-            imageCount >= MIN_IMAGES &&
-            imageCount <= MAX_IMAGES;
+          const nameInvalid = el.name.trim().length === 0;
+          const descriptionInvalid = el.description.trim().length === 0;
+          const imagesInvalid = imageCount < MIN_IMAGES;
+          const isValid = isKlingElementValid(el);
 
           return (
             <div
@@ -149,13 +169,17 @@ export function KlingElementEditor({
                 <Sparkles
                   size={14}
                   className={
-                    isValid ? "text-secondary" : "text-default-400"
+                    isValid
+                      ? "text-secondary"
+                      : "text-danger"
                   }
                 />
                 <span className="text-xs font-medium flex-1 text-left truncate">
                   {el.name ? `@${el.name}` : `Element ${index + 1}`}
                 </span>
-                <span className="text-[10px] text-default-400">
+                <span
+                  className={`text-[10px] ${imagesInvalid ? "text-danger" : "text-default-400"}`}
+                >
                   {imageCount} image{imageCount !== 1 ? "s" : ""}
                 </span>
                 {!disabled && (
@@ -177,16 +201,16 @@ export function KlingElementEditor({
                     size="sm"
                     label="Name"
                     placeholder="dog"
-                    startContent={
-                      <span className="text-xs text-default-400 whitespace-nowrap">element_</span>
-                    }
-                    value={el.name.replace(/^element_/, "")}
+                    value={el.name}
                     onValueChange={(v) =>
                       updateElement(index, {
-                        name: "element_" + v.replace(/[^a-zA-Z0-9_]/g, ""),
+                        name: v.replace(/@/g, ""),
                       })
                     }
-                    description="Used in prompt as @element_name"
+                    isRequired
+                    isInvalid={nameInvalid}
+                    errorMessage={nameInvalid ? "Name is required" : undefined}
+                    description={nameInvalid ? undefined : "Used in prompt as @name"}
                     isDisabled={disabled}
                     classNames={{ input: "text-xs", label: "text-xs" }}
                   />
@@ -198,6 +222,11 @@ export function KlingElementEditor({
                     onValueChange={(v) =>
                       updateElement(index, { description: v })
                     }
+                    isRequired
+                    isInvalid={descriptionInvalid}
+                    errorMessage={
+                      descriptionInvalid ? "Description is required" : undefined
+                    }
                     isDisabled={disabled}
                     classNames={{ input: "text-xs", label: "text-xs" }}
                   />
@@ -206,6 +235,7 @@ export function KlingElementEditor({
                     <div className="flex items-center justify-between">
                       <span className="text-[11px] text-default-500">
                         Reference Images ({imageCount}/{MAX_IMAGES})
+                        <span className="text-danger ml-0.5">*</span>
                       </span>
                       {!disabled && imageCount < MAX_IMAGES && (
                         <Button
@@ -219,8 +249,8 @@ export function KlingElementEditor({
                         </Button>
                       )}
                     </div>
-                    {imageCount < MIN_IMAGES && (
-                      <p className="text-[10px] text-warning">
+                    {imagesInvalid && (
+                      <p className="text-[10px] text-danger">
                         At least {MIN_IMAGES} images required
                       </p>
                     )}

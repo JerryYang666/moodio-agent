@@ -1990,9 +1990,9 @@ export function validateAndMergeParams(
               `Each element in ${param.name} must have a non-empty name`
             );
           }
-          if (typeof elem.description !== "string") {
+          if (typeof elem.description !== "string" || !elem.description.trim()) {
             throw new Error(
-              `Each element in ${param.name} must have a description`
+              `Each element in ${param.name} must have a non-empty description`
             );
           }
           const urls = elem.element_input_urls || elem.element_input_ids || [];

@@ -28,7 +28,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import MenuConfiguration, { MenuState } from "./menu-configuration";
 import { MultiShotEditor } from "./multi-shot-editor";
-import { KlingElementEditor } from "./kling-element-editor";
+import { KlingElementEditor, areKlingElementsValid } from "./kling-element-editor";
 import { SeedanceReferenceEditor } from "./seedance-reference-editor";
 import type { MultiPromptShot, KlingElement, MediaReference } from "@/lib/video/models";
 import { PendingImage, MAX_PENDING_IMAGES } from "./pending-image-types";
@@ -269,6 +269,12 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
     () => videoModelParams.some((p) => p.type === "media_references"),
     [videoModelParams]
   );
+
+  const klingElementsInvalid = useMemo(() => {
+    if (!supportsElements) return false;
+    const elements = (menuState.videoParams?.kling_elements as KlingElement[]) || [];
+    return !areKlingElementsValid(elements);
+  }, [supportsElements, menuState.videoParams?.kling_elements]);
 
   const mentionItems: MentionItem[] = useMemo(() => {
     const imageItems = pendingImages
@@ -1500,8 +1506,14 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
             />
 
             <Tooltip
-              content={hasUploadingImages ? t("chat.waitForUpload") : ""}
-              isDisabled={!hasUploadingImages}
+              content={
+                hasUploadingImages
+                  ? t("chat.waitForUpload")
+                  : klingElementsInvalid
+                    ? t("chat.klingElementsInvalid")
+                    : ""
+              }
+              isDisabled={!hasUploadingImages && !klingElementsInvalid}
             >
               {menuState.mode === "video" ? (
                 <Button
@@ -1510,7 +1522,7 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
                   aria-label={t("chat.send")}
                   onPress={onSend}
                   isLoading={isSending}
-                  isDisabled={isRecording || isTranscribing || hasUploadingImages || (videoModelHasImageParams ? pendingImages.length === 0 : !input.trim())}
+                  isDisabled={isRecording || isTranscribing || hasUploadingImages || klingElementsInvalid || (videoModelHasImageParams ? pendingImages.length === 0 : !input.trim())}
                   className="shrink-0"
                   size="sm"
                 >

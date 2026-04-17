@@ -27,6 +27,7 @@ import {
 import { ImageSize } from "@/lib/image/types";
 import { calculateCost, parseImageSizeToNumber } from "@/lib/pricing";
 import { deductCredits, getUserBalance, assertSufficientCredits, InsufficientCreditsError, getActiveAccount } from "@/lib/credits";
+import { classifyImageError } from "@/lib/image/error-classify";
 import {
   getVideoModel,
   validateAndMergeParams,
@@ -765,6 +766,10 @@ export async function POST(
                 } catch (err) {
                   console.error(`Direct image gen error for imageId ${trackingImageId}`, err);
                   const isInsufficientCredits = err instanceof InsufficientCreditsError;
+                  const rawErrMsg = err instanceof Error ? err.message : String(err);
+                  const reason = isInsufficientCredits
+                    ? "INSUFFICIENT_CREDITS"
+                    : classifyImageError(rawErrMsg);
                   const errorPart: MessageContentPart = {
                     type: "direct_image",
                     imageId: trackingImageId,
@@ -772,7 +777,7 @@ export async function POST(
                     aspectRatio: "1:1",
                     prompt: content,
                     status: "error",
-                    reason: isInsufficientCredits ? "INSUFFICIENT_CREDITS" : "generation_failed",
+                    reason,
                   };
                   send({ type: "part_update", imageId: trackingImageId, part: errorPart, variantId });
                   return errorPart;

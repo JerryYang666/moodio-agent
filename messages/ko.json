@@ -354,7 +354,13 @@
     "uploadDocumentInvalidType": "PDF 및 DOCX 파일만 지원됩니다",
     "uploadDocumentFailed": "문서에서 텍스트를 추출하지 못했습니다",
     "uploadDocumentSuccess": "문서 텍스트를 가져왔습니다",
-    "uploadDocumentTruncated": "문서 텍스트가 글자 수 제한에 맞게 잘렸습니다"
+    "uploadDocumentTruncated": "문서 텍스트가 글자 수 제한에 맞게 잘렸습니다",
+    "klingElementsInvalid": "각 요소를 완성해 주세요: 이름, 설명, 최소 2장의 참조 이미지가 모두 필수입니다.",
+    "imageError": {
+      "contentPolicyViolation": "이미지가 차단되었습니다: 프롬프트 또는 참조 이미지가 콘텐츠 정책을 위반했을 수 있습니다. 내용을 수정한 후 다시 시도해 주세요.",
+      "publicFigureBlocked": "이미지가 차단되었습니다: 유명 공인이 포함되어 요청이 플래그되었습니다. 공인 관련 내용을 제거한 후 다시 시도해 주세요.",
+      "generationFailed": "이미지 생성에 실패했습니다. 다시 시도해 주세요."
+    }
   },
   "profile": {
     "title": "프로필 설정",

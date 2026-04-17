@@ -354,7 +354,13 @@
     "uploadDocumentInvalidType": "僅支援 PDF 和 DOCX 檔案",
     "uploadDocumentFailed": "無法從文件中擷取文字",
     "uploadDocumentSuccess": "文件文字已匯入",
-    "uploadDocumentTruncated": "文件文字已截斷以符合字元限制"
+    "uploadDocumentTruncated": "文件文字已截斷以符合字元限制",
+    "klingElementsInvalid": "請完善每個元素：名稱、描述和至少 2 張參考圖片都是必填項。",
+    "imageError": {
+      "contentPolicyViolation": "圖片被攔截：提示詞或參考圖片可能違反了內容政策。請修改後重試。",
+      "publicFigureBlocked": "圖片被攔截：請求因涉及知名公眾人物而被標記。請移除公眾人物相關內容後重試。",
+      "generationFailed": "圖片生成失敗，請重試。"
+    }
   },
   "profile": {
     "title": "個人檔案設定",

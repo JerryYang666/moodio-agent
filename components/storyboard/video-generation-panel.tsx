@@ -21,6 +21,7 @@ import UndoSendOverlay from "./undo-send-overlay";
 import { useGenerateVideoMutation } from "@/lib/redux/services/next-api";
 import { MultiShotEditor } from "@/components/chat/multi-shot-editor";
 import { KlingElementEditor } from "@/components/chat/kling-element-editor";
+import { areKlingElementsValid } from "@/components/chat/kling-element-editor";
 
 interface VideoModelParam {
   name: string;
@@ -1037,7 +1038,7 @@ export default function VideoGenerationPanel({
               className="w-full text-sm sm:text-base"
               startContent={!submitting && <Sparkles size={18} />}
               isLoading={submitting}
-              isDisabled={(!selectedModel?.imageParams ? false : !sourceImageId) || !params.prompt?.trim() || isUploading || showUndoOverlay || insufficientCredits}
+              isDisabled={(!selectedModel?.imageParams ? false : !sourceImageId) || !params.prompt?.trim() || isUploading || showUndoOverlay || insufficientCredits || !areKlingElementsValid(params.kling_elements as any)}
               onPress={handleGenerate}
             >
               {submitting ? (

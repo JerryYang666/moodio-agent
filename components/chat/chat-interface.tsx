@@ -3403,24 +3403,32 @@ export default function ChatInterface({
         }
       }
 
-      // Check if any images had insufficient credits and show toast
+      // Check if any images had errors that should surface as a toast
       const allVariantContents = Object.values(variantContents);
-      let hasInsufficientCredits = false;
+      const seenErrorReasons = new Set<string>();
       for (const content of allVariantContents) {
         for (const part of content) {
           if (isGeneratedImagePart(part)) {
-            if (
-              part.status === "error" &&
-              part.reason?.toUpperCase() === "INSUFFICIENT_CREDITS"
-            ) {
-              hasInsufficientCredits = true;
+            if (part.status === "error" && part.reason) {
+              seenErrorReasons.add(part.reason.toUpperCase());
             }
           }
         }
       }
-      if (hasInsufficientCredits) {
+      if (seenErrorReasons.has("INSUFFICIENT_CREDITS")) {
         addToast({
           title: t("credits.insufficientCredits"),
+          color: "danger",
+        });
+      }
+      if (seenErrorReasons.has("PUBLIC_FIGURE_BLOCKED")) {
+        addToast({
+          title: t("chat.imageError.publicFigureBlocked"),
+          color: "danger",
+        });
+      } else if (seenErrorReasons.has("CONTENT_POLICY_VIOLATION")) {
+        addToast({
+          title: t("chat.imageError.contentPolicyViolation"),
           color: "danger",
         });
       }

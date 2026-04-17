@@ -354,7 +354,13 @@
     "uploadDocumentInvalidType": "仅支持 PDF 和 DOCX 文件",
     "uploadDocumentFailed": "无法从文档中提取文本",
     "uploadDocumentSuccess": "文档文本已导入",
-    "uploadDocumentTruncated": "文档文本已截断以符合字符限制"
+    "uploadDocumentTruncated": "文档文本已截断以符合字符限制",
+    "klingElementsInvalid": "请完善每个元素：名称、描述和至少 2 张参考图片都是必填项。",
+    "imageError": {
+      "contentPolicyViolation": "图片被拦截：提示词或参考图片可能违反了内容政策。请修改后重试。",
+      "publicFigureBlocked": "图片被拦截：请求因涉及知名公众人物而被标记。请移除公众人物相关内容后重试。",
+      "generationFailed": "图片生成失败，请重试。"
+    }
   },
   "profile": {
     "title": "个人设置",
