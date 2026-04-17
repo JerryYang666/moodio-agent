@@ -853,7 +853,7 @@ export function ProductionTableGrid({
     count: rows.length,
     getScrollElement: () => scrollElement,
     estimateSize: (i) => rows[i]?.height ?? DEFAULT_ROW_HEIGHT,
-    overscan: isRowDragging ? rows.length : 5,
+    overscan: isRowDragging ? 30 : 15,
     enabled: !!scrollElement,
     getItemKey: (i) => rows[i]?.id ?? i,
   });
@@ -1045,7 +1045,7 @@ export function ProductionTableGrid({
     {/* tabIndex allows keyboard events */}
     <div
       ref={setScrollElement}
-      className="flex-1 overflow-auto outline-none"
+      className="flex-1 overflow-auto outline-none bg-background"
       onMouseLeave={handleGridMouseLeave}
       onMouseMove={handleGridMouseMove}
       onMouseUp={handlePaintEnd}
@@ -1111,7 +1111,7 @@ export function ProductionTableGrid({
                   </div>
                 )}
                 <div
-                  className={`flex border-b border-default-200 transition-opacity duration-200 ${
+                  className={`flex border-b border-default-200 bg-background transition-opacity duration-200 ${
                     isDraggedRow ? "opacity-30" : ""
                   }`}
                   style={{
