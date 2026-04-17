@@ -105,9 +105,20 @@ export async function POST(request: NextRequest) {
   );
 
   // Kie uses taskId as the request ID we stored at submission time
-  const generation = await findGenerationByRequestId(taskId);
+  let generation = await findGenerationByRequestId(taskId);
   if (!generation) {
-    console.error(`[Webhook/Kie] Generation not found for task ${taskId}`);
+    // Kie can fire the webhook before our submit request returns and
+    // the DB row is committed. Wait briefly and retry once.
+    console.warn(
+      `[Webhook/Kie] Generation not found for task ${taskId}, retrying in 6s…`
+    );
+    await new Promise((r) => setTimeout(r, 6000));
+    generation = await findGenerationByRequestId(taskId);
+  }
+  if (!generation) {
+    console.error(
+      `[Webhook/Kie] Generation still not found for task ${taskId} after retry`
+    );
     return NextResponse.json(
       { error: "Generation not found" },
       { status: 404 }

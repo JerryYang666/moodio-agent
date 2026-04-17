@@ -55,10 +55,19 @@ export async function POST(request: NextRequest) {
     `[Webhook/Fal] Received callback for request ${falRequestId}, status: ${status}`
   );
 
-  const generation = await findGenerationByRequestId(falRequestId);
+  let generation = await findGenerationByRequestId(falRequestId);
+  if (!generation) {
+    // Fal can fire the webhook before our submit request returns and
+    // the DB row is committed. Wait briefly and retry once.
+    console.warn(
+      `[Webhook/Fal] Generation not found for request ${falRequestId}, retrying in 6s…`
+    );
+    await new Promise((r) => setTimeout(r, 6000));
+    generation = await findGenerationByRequestId(falRequestId);
+  }
   if (!generation) {
     console.error(
-      `[Webhook/Fal] Generation not found for request ${falRequestId}`
+      `[Webhook/Fal] Generation still not found for request ${falRequestId} after retry`
     );
     return NextResponse.json(
       { error: "Generation not found" },
