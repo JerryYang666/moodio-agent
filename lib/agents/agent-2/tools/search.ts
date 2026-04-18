@@ -8,7 +8,7 @@ export const searchTool: ToolDefinition = {
 <SEARCH>{"text": "very concise descriptive text search query", "filters": [42]}</SEARCH>
 
 Where:
-- "text": A very concise natural language text search query describing what to look for (can be empty string if only using filters)
+- "text": A very concise natural language text search query describing what to look for (can be empty string if only using filters). If it would help match library phrasing or improve recall, you may add a few synonyms or close alternatives in the same query. Don't add synonyms if the user's query is specific.
 - "filters": An array of taxonomy value IDs from the tree (can be empty array if only using text search). Maximum of 1 taxonomy label IDs allowed.
 
 Don't use text and filters together unless the user explicitly asks for it. Leave text an empty string if you are using filters, and leave filters an empty array if you are using text.
