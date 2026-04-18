@@ -30,7 +30,7 @@ import type { PersistentReferenceImage } from "@/lib/chat/persistent-assets-type
 
 // Min and max width constraints for the resizable panel
 const MIN_PANEL_WIDTH = 320;
-const MAX_PANEL_WIDTH = 600;
+const MAX_PANEL_WIDTH = 1200;
 const DEFAULT_PANEL_WIDTH = 380;
 const COLLAPSED_WIDTH = 48;
 
