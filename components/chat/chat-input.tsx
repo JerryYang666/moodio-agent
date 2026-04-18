@@ -1486,7 +1486,7 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
               mentionItems={mentionItems}
               placeholder={menuState.mode === "image" || menuState.mode === "video" ? t("chat.typePrompt") : t("chat.typeMessage")}
               minRows={1}
-              maxRows={isExpanded ? 5 : 1}
+              maxRows={isExpanded ? 10 : 1}
               onSubmit={onSend}
               onFocusChange={(focused) => {
                 if (focused) {
