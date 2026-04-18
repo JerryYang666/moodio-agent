@@ -20,6 +20,7 @@ import { uploadImage } from "@/lib/upload/client";
 import { uploadAudio } from "@/lib/upload/audio-client";
 import { uploadVideo } from "@/lib/upload/video-client";
 import { siteConfig } from "@/config/site";
+import ImageDownloadDropdown from "@/components/chat/image-download-dropdown";
 
 const AssetPickerModal = dynamic(
   () => import("@/components/chat/asset-picker-modal"),
@@ -559,17 +560,38 @@ export const MediaCell = memo(function MediaCell({
                 <FolderPlus size={16} />
               </button>
 
-              {/* Download button */}
-              <button
-                className="absolute top-2 right-12 z-20 w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center hover:bg-black/70 transition-colors"
-                aria-label="Download"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleDownload();
-                }}
-              >
-                <Download size={16} />
-              </button>
+              {/* Download button — image previews get a format-picker dropdown (PNG/JPEG/WebP), video keeps the plain download */}
+              {previewAsset &&
+              previewAsset.assetType !== "audio" &&
+              previewAsset.assetType !== "video" &&
+              previewAsset.assetType !== "public_video" &&
+              previewAsset.imageUrl &&
+              previewAsset.imageId ? (
+                <div
+                  className="absolute top-2 right-12 z-20"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <ImageDownloadDropdown
+                    imageId={previewAsset.imageId}
+                    title={`image-${previewAsset.assetId}`}
+                    url={previewAsset.imageUrl}
+                    iconSize={16}
+                    className="bg-black/50 text-white rounded-full min-w-8 w-8 h-8 hover:bg-black/70"
+                    downloadSource="detail_view"
+                  />
+                </div>
+              ) : (
+                <button
+                  className="absolute top-2 right-12 z-20 w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center hover:bg-black/70 transition-colors"
+                  aria-label="Download"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDownload();
+                  }}
+                >
+                  <Download size={16} />
+                </button>
+              )}
 
               {/* Close button */}
               <button

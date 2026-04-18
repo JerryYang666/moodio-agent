@@ -1,6 +1,17 @@
 import JSZip from "jszip";
-import type { AssetItem } from "@/lib/types/asset";
 import { normalizeDownloadBasename } from "@/lib/download-filename";
+
+/**
+ * Minimal asset shape required by {@link bulkDownloadAssets}. Callers can pass
+ * any object that structurally satisfies this (e.g. `AssetItem` from
+ * collections, or lightweight objects built from production-table cells).
+ */
+export interface BulkDownloadAsset {
+  assetId?: string;
+  imageId?: string;
+  assetType: string;
+  generationDetails?: { title?: string };
+}
 
 const EXTENSION_BY_ASSET_TYPE: Record<string, string> = {
   image: ".png",
@@ -53,7 +64,7 @@ function deduplicateFilename(
  * Route downloads through backend API proxies to avoid CloudFront
  * signed-cookie / CORS 403 errors on cross-origin CDN fetches.
  */
-function getProxyDownloadUrl(asset: AssetItem): string | null {
+function getProxyDownloadUrl(asset: BulkDownloadAsset): string | null {
   const basename = encodeURIComponent(
     normalizeDownloadBasename(asset.generationDetails?.title, asset.assetType)
   );
@@ -92,10 +103,10 @@ interface DownloadUrlEntry {
 }
 
 /**
- * Map an AssetItem to the ref shape accepted by /api/media/enrich.
+ * Map an BulkDownloadAsset to the ref shape accepted by /api/media/enrich.
  * Returns null when the asset lacks the ID needed for the enrich call.
  */
-function assetToEnrichRef(asset: AssetItem): EnrichRef | null {
+function assetToEnrichRef(asset: BulkDownloadAsset): EnrichRef | null {
   const basename = normalizeDownloadBasename(
     asset.generationDetails?.title,
     asset.assetType
@@ -118,7 +129,7 @@ function assetToEnrichRef(asset: AssetItem): EnrichRef | null {
  * Returns the media ID that identifies the asset in the enrich response
  * (matches the `id` field sent in the EnrichRef).
  */
-function getMediaId(asset: AssetItem): string | null {
+function getMediaId(asset: BulkDownloadAsset): string | null {
   if (asset.assetType === "video" || asset.assetType === "public_video") {
     return asset.assetId || null;
   }
@@ -136,7 +147,7 @@ function getMediaId(asset: AssetItem): string | null {
  * Chunks requests into groups of ENRICH_BATCH_SIZE to respect the endpoint limit.
  */
 async function fetchSignedDownloadUrls(
-  assets: AssetItem[]
+  assets: BulkDownloadAsset[]
 ): Promise<Map<string, DownloadUrlEntry>> {
   const map = new Map<string, DownloadUrlEntry>();
 
@@ -189,7 +200,7 @@ async function fetchSignedDownloadUrls(
 // ---------------------------------------------------------------------------
 
 export async function bulkDownloadAssets(
-  assets: AssetItem[],
+  assets: BulkDownloadAsset[],
   zipFilename = "download.zip",
   onProgress?: (done: number, total: number) => void
 ): Promise<void> {
