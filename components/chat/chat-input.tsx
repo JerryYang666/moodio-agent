@@ -224,7 +224,11 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
   const t = useTranslations();
   const containerRef = useRef<HTMLDivElement>(null);
   const mentionTextboxRef = useRef<MentionTextboxRef>(null);
+  const textareaContainerRef = useRef<HTMLDivElement>(null);
   const [isExpanded, setIsExpanded] = useState(false);
+  // When the textarea grows tall enough to fit two stacked buttons, stack the
+  // image/voice buttons vertically to reclaim horizontal space.
+  const [stackLeftButtons, setStackLeftButtons] = useState(false);
   // Track which image's popover is open (by imageId)
   const [openPopoverId, setOpenPopoverId] = useState<string | null>(null);
   // Track which deck is being hovered
@@ -258,6 +262,24 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
     observer.observe(el);
     return () => observer.disconnect();
   }, [onHeightChange]);
+
+  // Observe the textarea height and stack the image/voice buttons vertically
+  // once there is room for two stacked buttons (~2 * 40px + gap).
+  useEffect(() => {
+    const el = textareaContainerRef.current;
+    if (!el) return;
+    const STACK_THRESHOLD_PX = 88;
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const height =
+          entry.borderBoxSize?.[0]?.blockSize ??
+          entry.target.getBoundingClientRect().height;
+        setStackLeftButtons(height >= STACK_THRESHOLD_PX);
+      }
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   // Convert pending images to mention items for the textbox
   const supportsElements = useMemo(
@@ -1421,89 +1443,104 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
 
           {/* Input Row */}
           <div className={clsx("flex items-center p-2", isExpanded && "gap-2")}>
-            <div
+            <motion.div
+              layout
+              transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
               className={clsx(
-                "flex gap-1 items-center overflow-hidden transition-all duration-300 shrink-0",
+                "flex gap-1 items-center overflow-hidden transition-[width,opacity] duration-300 shrink-0",
+                stackLeftButtons ? "flex-col" : "flex-row",
                 isExpanded ? "w-auto opacity-100" : "w-0 opacity-0"
               )}
             >
               {showFileUpload && (
-                <Button
-                  isIconOnly
-                  variant="flat"
-                  onPress={onOpenAssetPicker}
-                  aria-label={t("chat.addImage")}
+                <motion.div
+                  layout
+                  transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
                 >
-                  <ImagePlus size={24} className="text-default-500" />
-                </Button>
+                  <Button
+                    isIconOnly
+                    variant="flat"
+                    onPress={onOpenAssetPicker}
+                    aria-label={t("chat.addImage")}
+                  >
+                    <ImagePlus size={24} className="text-default-500" />
+                  </Button>
+                </motion.div>
               )}
 
-              <Popover
-                isOpen={
-                  isRecording &&
-                  siteConfig.audioRecording.maxDuration - recordingTime <=
-                  siteConfig.audioRecording.countdownThreshold
-                }
-                placement="top"
+              <motion.div
+                layout
+                transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
               >
-                <PopoverTrigger>
-                  <div className="inline-block">
-                    <Button
-                      isIconOnly
-                      variant={isRecording ? "solid" : "flat"}
-                      color={isRecording ? "danger" : "default"}
-                      onPress={isRecording ? onStopRecording : onStartRecording}
-                      aria-label={t("chat.recordVoice")}
-                      isLoading={isTranscribing}
-                    >
-                      {isRecording ? (
-                        <Square size={20} />
-                      ) : (
-                        <Mic size={24} className="text-default-500" />
-                      )}
-                    </Button>
-                  </div>
-                </PopoverTrigger>
-                <PopoverContent className="bg-danger text-danger-foreground">
-                  <div className="px-1 py-1">
-                    <div className="text-small font-bold">
-                      {t("chat.timeRemaining", {
-                        seconds: Math.max(
-                          0,
-                          siteConfig.audioRecording.maxDuration - recordingTime
-                        ),
-                      })}
+                <Popover
+                  isOpen={
+                    isRecording &&
+                    siteConfig.audioRecording.maxDuration - recordingTime <=
+                    siteConfig.audioRecording.countdownThreshold
+                  }
+                  placement="top"
+                >
+                  <PopoverTrigger>
+                    <div className="inline-block">
+                      <Button
+                        isIconOnly
+                        variant={isRecording ? "solid" : "flat"}
+                        color={isRecording ? "danger" : "default"}
+                        onPress={isRecording ? onStopRecording : onStartRecording}
+                        aria-label={t("chat.recordVoice")}
+                        isLoading={isTranscribing}
+                      >
+                        {isRecording ? (
+                          <Square size={20} />
+                        ) : (
+                          <Mic size={24} className="text-default-500" />
+                        )}
+                      </Button>
                     </div>
-                  </div>
-                </PopoverContent>
-              </Popover>
-            </div>
+                  </PopoverTrigger>
+                  <PopoverContent className="bg-danger text-danger-foreground">
+                    <div className="px-1 py-1">
+                      <div className="text-small font-bold">
+                        {t("chat.timeRemaining", {
+                          seconds: Math.max(
+                            0,
+                            siteConfig.audioRecording.maxDuration - recordingTime
+                          ),
+                        })}
+                      </div>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              </motion.div>
+            </motion.div>
 
-            <MentionTextbox
-              ref={mentionTextboxRef}
-              value={input}
-              onChange={handleMentionChange}
-              mentionItems={mentionItems}
-              placeholder={menuState.mode === "image" || menuState.mode === "video" ? t("chat.typePrompt") : t("chat.typeMessage")}
-              minRows={1}
-              maxRows={isExpanded ? 10 : 1}
-              onSubmit={onSend}
-              onFocusChange={(focused) => {
-                if (focused) {
-                  setIsExpanded(true);
-                } else {
-                  // Trigger draft save on blur
-                  onBlur?.();
-                }
-              }}
-              disabled={isRecording}
-              className="flex-1 min-w-0 bg-transparent"
-              renderDropdownItem={(item, isHighlighted) => (
-                <ImageChipDropdownItem item={item} isHighlighted={isHighlighted} />
-              )}
-              t={(key) => t(`mention.${key}`)}
-              initialContent={initialEditorContent}
-            />
+            <div ref={textareaContainerRef} className="flex-1 min-w-0">
+              <MentionTextbox
+                ref={mentionTextboxRef}
+                value={input}
+                onChange={handleMentionChange}
+                mentionItems={mentionItems}
+                placeholder={menuState.mode === "image" || menuState.mode === "video" ? t("chat.typePrompt") : t("chat.typeMessage")}
+                minRows={1}
+                maxRows={isExpanded ? 10 : 1}
+                onSubmit={onSend}
+                onFocusChange={(focused) => {
+                  if (focused) {
+                    setIsExpanded(true);
+                  } else {
+                    // Trigger draft save on blur
+                    onBlur?.();
+                  }
+                }}
+                disabled={isRecording}
+                className="bg-transparent"
+                renderDropdownItem={(item, isHighlighted) => (
+                  <ImageChipDropdownItem item={item} isHighlighted={isHighlighted} />
+                )}
+                t={(key) => t(`mention.${key}`)}
+                initialContent={initialEditorContent}
+              />
+            </div>
 
             <Tooltip
               content={
