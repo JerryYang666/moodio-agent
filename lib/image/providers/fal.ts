@@ -1,5 +1,9 @@
 import { fal } from "@fal-ai/client";
-import { getSignedImageUrl, validateDownloadUrl } from "@/lib/storage/s3";
+import {
+  getSignedImageUrl,
+  validateDownloadUrl,
+  fetchWithRetry,
+} from "@/lib/storage/s3";
 import {
   ImageEditInput,
   ImageGenerationInput,
@@ -21,7 +25,11 @@ async function downloadFromUrlWithType(url: string): Promise<{
   contentType: string;
 }> {
   validateDownloadUrl(url);
-  const response = await fetch(url);
+  const response = await fetchWithRetry(
+    url,
+    {},
+    { logPrefix: "[fal/downloadFromUrlWithType]" }
+  );
   if (!response.ok) {
     throw new Error(
       `Failed to download from URL: ${response.status} ${response.statusText}`

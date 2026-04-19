@@ -1049,18 +1049,144 @@ export function validateDownloadUrl(url: string): void {
   }
 }
 
+// Retryable fetch errors (network-level, transient).
+// undici surfaces these as error.cause.code on TypeError: fetch failed.
+const RETRYABLE_FETCH_ERROR_CODES = new Set([
+  "UND_ERR_CONNECT_TIMEOUT",
+  "UND_ERR_SOCKET",
+  "UND_ERR_HEADERS_TIMEOUT",
+  "UND_ERR_BODY_TIMEOUT",
+  "ECONNRESET",
+  "ECONNREFUSED",
+  "ETIMEDOUT",
+  "EAI_AGAIN",
+  "ENOTFOUND",
+]);
+
+function isRetryableFetchError(err: unknown): boolean {
+  if (!err) return false;
+  if (err instanceof Error) {
+    if (err.name === "AbortError" || err.name === "TimeoutError") return true;
+    if (err.message === "fetch failed") return true;
+    const cause = (err as { cause?: { code?: string; name?: string } }).cause;
+    if (cause?.code && RETRYABLE_FETCH_ERROR_CODES.has(cause.code)) return true;
+    if (cause?.name === "AbortError" || cause?.name === "TimeoutError") {
+      return true;
+    }
+  }
+  return false;
+}
+
+function isRetryableHttpStatus(status: number): boolean {
+  return status === 408 || status === 425 || status === 429 || status >= 500;
+}
+
+/**
+ * fetch() with retry + per-attempt timeout for transient network errors.
+ * Exponential backoff with jitter. Used by download helpers that pull large
+ * media from third-party hosts (Fal, Kie, Volcengine TOS in China, etc.),
+ * where a single connect timeout would otherwise cause us to drop a
+ * successful generation and refund the user.
+ */
+export async function fetchWithRetry(
+  url: string,
+  init: RequestInit = {},
+  opts: {
+    maxAttempts?: number;
+    timeoutMs?: number;
+    baseBackoffMs?: number;
+    logPrefix?: string;
+  } = {}
+): Promise<Response> {
+  const {
+    maxAttempts = 4,
+    timeoutMs = 60_000,
+    baseBackoffMs = 1_000,
+    logPrefix = "[fetchWithRetry]",
+  } = opts;
+
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const signal = init.signal
+        ? AbortSignal.any([init.signal, AbortSignal.timeout(timeoutMs)])
+        : AbortSignal.timeout(timeoutMs);
+
+      const response = await fetch(url, { ...init, signal });
+
+      if (!response.ok && isRetryableHttpStatus(response.status)) {
+        if (attempt === maxAttempts) return response;
+        lastError = new Error(
+          `HTTP ${response.status} ${response.statusText}`
+        );
+        console.warn(
+          `${logPrefix} attempt ${attempt}/${maxAttempts} got ${response.status} ${response.statusText}, retrying…`
+        );
+      } else {
+        if (attempt > 1) {
+          console.log(
+            `${logPrefix} succeeded on attempt ${attempt}/${maxAttempts}`
+          );
+        }
+        return response;
+      }
+    } catch (err) {
+      lastError = err;
+      const retryable = isRetryableFetchError(err);
+      if (!retryable || attempt === maxAttempts) {
+        throw err;
+      }
+      const causeCode =
+        err instanceof Error
+          ? (err as { cause?: { code?: string } }).cause?.code
+          : undefined;
+      console.warn(
+        `${logPrefix} attempt ${attempt}/${maxAttempts} failed (${
+          causeCode || (err instanceof Error ? err.message : "unknown")
+        }), retrying…`
+      );
+    }
+
+    const backoff =
+      baseBackoffMs * Math.pow(2, attempt - 1) +
+      Math.floor(Math.random() * 500) -
+      250;
+    await new Promise((r) => setTimeout(r, Math.max(0, backoff)));
+  }
+
+  throw lastError instanceof Error
+    ? lastError
+    : new Error("fetchWithRetry exhausted all attempts");
+}
+
 /**
  * Download a file from an external URL
- * Used for downloading video results from Fal
+ * Used for downloading video / image results from third-party providers.
+ *
+ * Retries on transient failures (connect timeout, socket errors, 5xx, 429)
+ * with exponential backoff. This matters a lot for Volcengine TOS and other
+ * cross-region hosts where a single connect timeout would otherwise cause us
+ * to refund a successful generation.
+ *
  * @param url The URL to download from
  * @returns Buffer containing the file data
  */
 export async function downloadFromUrl(url: string): Promise<Buffer> {
   validateDownloadUrl(url);
-  const response = await fetch(url);
+
+  const response = await fetchWithRetry(
+    url,
+    {},
+    { logPrefix: "[downloadFromUrl]" }
+  );
+
   if (!response.ok) {
-    throw new Error(`Failed to download from URL: ${response.status} ${response.statusText}`);
+    throw new Error(
+      `Failed to download from URL: ${response.status} ${response.statusText}`
+    );
   }
+
   const arrayBuffer = await response.arrayBuffer();
   return Buffer.from(arrayBuffer);
 }
