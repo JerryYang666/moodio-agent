@@ -25,7 +25,8 @@ import {
   ModalFooter,
 } from "@heroui/modal";
 import { User as UserAvatar } from "@heroui/user";
-import { ExternalLink, RefreshCw, Video } from "lucide-react";
+import { addToast } from "@heroui/toast";
+import { ExternalLink, LifeBuoy, RefreshCw, Video } from "lucide-react";
 import { api } from "@/lib/api/client";
 import { useAuth } from "@/hooks/use-auth";
 import { SearchIcon } from "@/components/icons";
@@ -35,6 +36,8 @@ interface AdminVideoGeneration {
   id: string;
   modelId: string;
   status: "pending" | "processing" | "completed" | "failed";
+  provider: string | null;
+  providerRequestId: string | null;
   sourceImageId: string;
   sourceImageUrl: string;
   endImageId: string | null;
@@ -68,6 +71,7 @@ export default function VideoManagementPage() {
   const [loading, setLoading] = useState(true);
   const [selectedGeneration, setSelectedGeneration] =
     useState<AdminVideoGeneration | null>(null);
+  const [recoveringId, setRecoveringId] = useState<string | null>(null);
 
   // Filters
   const [filterValue, setFilterValue] = useState("");
@@ -159,6 +163,59 @@ export default function VideoManagementPage() {
       }
     },
     [generations]
+  );
+
+  const handleRecover = useCallback(
+    async (generationId: string) => {
+      setRecoveringId(generationId);
+      try {
+        const result = await api.post(
+          `/api/admin/video-generations/${generationId}/recover`
+        );
+
+        if (result.status === "completed") {
+          addToast({
+            title: "Video recovered",
+            description:
+              result.message ||
+              "Video downloaded from provider and marked completed.",
+            color: "success",
+          });
+          await fetchGenerations();
+          setSelectedGeneration(null);
+        } else if (result.status === "in_progress") {
+          addToast({
+            title: "Still processing",
+            description:
+              result.message ||
+              "Provider reports the task is still running. Try again in a moment.",
+            color: "warning",
+          });
+        } else {
+          addToast({
+            title: "Recovery failed",
+            description:
+              result.error ||
+              result.message ||
+              "Could not recover this generation.",
+            color: "danger",
+          });
+        }
+      } catch (error: any) {
+        const message =
+          error?.response?.data?.error ||
+          error?.message ||
+          "Recovery request failed";
+        addToast({
+          title: "Recovery failed",
+          description: message,
+          color: "danger",
+        });
+      } finally {
+        setRecoveringId(null);
+      }
+    },
+    []
   );
 
   if (authLoading) {
@@ -340,13 +397,31 @@ export default function VideoManagementPage() {
                         : "-"}
                     </TableCell>
                     <TableCell>
-                      <Button
-                        size="sm"
-                        variant="light"
-                        onPress={() => setSelectedGeneration(item)}
-                      >
-                        View
-                      </Button>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          size="sm"
+                          variant="light"
+                          onPress={() => setSelectedGeneration(item)}
+                        >
+                          View
+                        </Button>
+                        {item.status === "failed" && item.providerRequestId && (
+                          <Button
+                            size="sm"
+                            variant="light"
+                            color="warning"
+                            isLoading={recoveringId === item.id}
+                            startContent={
+                              recoveringId === item.id ? null : (
+                                <LifeBuoy size={14} />
+                              )
+                            }
+                            onPress={() => handleRecover(item.id)}
+                          >
+                            Recover
+                          </Button>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 )}
@@ -449,6 +524,18 @@ export default function VideoManagementPage() {
                 )}
               </ModalBody>
               <ModalFooter className="flex-wrap gap-2">
+                {selectedGeneration?.status === "failed" &&
+                  selectedGeneration.providerRequestId && (
+                    <Button
+                      color="warning"
+                      variant="flat"
+                      startContent={<LifeBuoy size={16} />}
+                      isLoading={recoveringId === selectedGeneration.id}
+                      onPress={() => handleRecover(selectedGeneration.id)}
+                    >
+                      Manual Recover
+                    </Button>
+                  )}
                 {selectedGeneration?.videoUrl && (
                   <Button
                     variant="flat"

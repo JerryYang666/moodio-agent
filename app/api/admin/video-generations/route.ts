@@ -23,6 +23,8 @@ export async function GET(request: NextRequest) {
         id: videoGenerations.id,
         modelId: videoGenerations.modelId,
         status: videoGenerations.status,
+        provider: videoGenerations.provider,
+        providerRequestId: videoGenerations.providerRequestId,
         sourceImageId: videoGenerations.sourceImageId,
         endImageId: videoGenerations.endImageId,
         videoId: videoGenerations.videoId,

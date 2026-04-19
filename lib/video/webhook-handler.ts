@@ -42,59 +42,98 @@ export function isTerminal(generation: { status: string }): boolean {
 }
 
 /**
+ * Download a generated video, upload to S3, extract a thumbnail if needed,
+ * and update the generation row to `completed`. Shared between the normal
+ * webhook success path and admin manual recovery.
+ *
+ * Does NOT touch credits. The caller decides whether to refund on failure
+ * (webhook path) or to leave credits untouched (recovery path for a
+ * generation that was already refunded after a transient download failure).
+ *
+ * Throws on any error so the caller can decide how to handle it.
+ */
+export async function downloadAndPersistVideo(
+  generationId: string,
+  result: VideoGenerationResult,
+  logPrefix: string = "[Webhook]"
+): Promise<{ videoId: string }> {
+  console.log(`${logPrefix} Processing video for generation ${generationId}`);
+
+  const videoBuffer = await downloadFromUrl(result.video.url);
+  console.log(`${logPrefix} Downloaded video: ${videoBuffer.length} bytes`);
+
+  const videoId = generateVideoId();
+  const thumbnailId = generateImageId();
+
+  const contentType = result.video.content_type || "video/mp4";
+  await uploadVideo(videoBuffer, contentType, videoId);
+  console.log(`${logPrefix} Uploaded video as ${videoId}`);
+
+  const [generation] = await db
+    .select()
+    .from(videoGenerations)
+    .where(eq(videoGenerations.id, generationId))
+    .limit(1);
+
+  let effectiveSourceImageId = generation?.sourceImageId;
+  let effectiveThumbnailId = generation?.sourceImageId || thumbnailId;
+
+  if (generation?.sourceImageId === TEXT_TO_VIDEO_PLACEHOLDER_IMAGE_ID) {
+    try {
+      const frameImageId = generateImageId();
+      await extractFirstFrameViaLambda(videoId, frameImageId);
+      effectiveSourceImageId = frameImageId;
+      effectiveThumbnailId = frameImageId;
+      console.log(
+        `${logPrefix} Extracted first frame for text-to-video: ${frameImageId}`
+      );
+    } catch (frameError) {
+      console.error(
+        `${logPrefix} First-frame extraction failed, keeping placeholder:`,
+        frameError
+      );
+    }
+  }
+
+  await db
+    .update(videoGenerations)
+    .set({
+      status: "completed",
+      videoId,
+      sourceImageId: effectiveSourceImageId,
+      thumbnailImageId: effectiveThumbnailId,
+      seed: result.seed,
+      error: null,
+      completedAt: new Date(),
+    })
+    .where(eq(videoGenerations.id, generationId));
+
+  return { videoId };
+}
+
+/**
  * Handle a successful video generation result.
- * Downloads the video, uploads to S3, updates DB.
+ * Downloads the video, uploads to S3, updates DB. Refunds on failure.
  */
 export async function processVideoResult(
   generationId: string,
   result: VideoGenerationResult
 ) {
   try {
-    console.log(`[Webhook] Processing video for generation ${generationId}`);
-
-    const videoBuffer = await downloadFromUrl(result.video.url);
-    console.log(`[Webhook] Downloaded video: ${videoBuffer.length} bytes`);
-
-    const videoId = generateVideoId();
-    const thumbnailId = generateImageId();
-
-    const contentType = result.video.content_type || "video/mp4";
-    await uploadVideo(videoBuffer, contentType, videoId);
-    console.log(`[Webhook] Uploaded video as ${videoId}`);
+    const { videoId } = await downloadAndPersistVideo(
+      generationId,
+      result,
+      "[Webhook]"
+    );
 
     const [generation] = await db
-      .select()
+      .select({
+        userId: videoGenerations.userId,
+        modelId: videoGenerations.modelId,
+      })
       .from(videoGenerations)
       .where(eq(videoGenerations.id, generationId))
       .limit(1);
-
-    let effectiveSourceImageId = generation?.sourceImageId;
-    let effectiveThumbnailId = generation?.sourceImageId || thumbnailId;
-
-    if (generation?.sourceImageId === TEXT_TO_VIDEO_PLACEHOLDER_IMAGE_ID) {
-      try {
-        const frameImageId = generateImageId();
-        await extractFirstFrameViaLambda(videoId, frameImageId);
-        effectiveSourceImageId = frameImageId;
-        effectiveThumbnailId = frameImageId;
-        console.log(`[Webhook] Extracted first frame for text-to-video: ${frameImageId}`);
-      } catch (frameError) {
-        console.error(`[Webhook] First-frame extraction failed, keeping placeholder:`, frameError);
-      }
-    }
-
-    await db
-      .update(videoGenerations)
-      .set({
-        status: "completed",
-        videoId,
-        sourceImageId: effectiveSourceImageId,
-        thumbnailImageId: effectiveThumbnailId,
-        seed: result.seed,
-        error: null,
-        completedAt: new Date(),
-      })
-      .where(eq(videoGenerations.id, generationId));
 
     await recordEvent("video_generation", generation?.userId, {
       status: "completed",
