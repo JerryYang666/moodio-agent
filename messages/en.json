@@ -1333,6 +1333,8 @@
     "retakePhoto": "Retake",
     "usePhoto": "Use Photo",
     "cameraAccessDenied": "Unable to access camera. Please check your browser permissions.",
+    "cameraLabel": "Camera",
+    "cameraFallback": "Camera {index}",
     "photoMode": "Photo",
     "videoMode": "Video",
     "retakeVideo": "Retake",

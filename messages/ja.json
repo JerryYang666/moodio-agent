@@ -1181,6 +1181,8 @@
     "retakePhoto": "撮り直す",
     "usePhoto": "写真を使用",
     "cameraAccessDenied": "カメラにアクセスできません。ブラウザの権限を確認してください。",
+    "cameraLabel": "カメラ",
+    "cameraFallback": "カメラ {index}",
     "photoMode": "写真",
     "videoMode": "動画",
     "retakeVideo": "撮り直す",

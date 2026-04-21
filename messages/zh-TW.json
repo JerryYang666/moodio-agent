@@ -1181,6 +1181,8 @@
     "retakePhoto": "重拍",
     "usePhoto": "使用照片",
     "cameraAccessDenied": "無法存取相機，請檢查瀏覽器權限。",
+    "cameraLabel": "相機",
+    "cameraFallback": "相機 {index}",
     "photoMode": "照片",
     "videoMode": "影片",
     "retakeVideo": "重拍",

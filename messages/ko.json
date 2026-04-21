@@ -1181,6 +1181,8 @@
     "retakePhoto": "다시 촬영",
     "usePhoto": "사진 사용",
     "cameraAccessDenied": "카메라에 접근할 수 없습니다. 브라우저 권한을 확인해주세요.",
+    "cameraLabel": "카메라",
+    "cameraFallback": "카메라 {index}",
     "photoMode": "사진",
     "videoMode": "비디오",
     "retakeVideo": "다시 촬영",

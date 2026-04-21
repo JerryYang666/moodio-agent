@@ -66,13 +66,16 @@ const prefersRearCamera = (): boolean => {
 
 const buildVideoConstraints = (
   width: number,
-  height: number
+  height: number,
+  deviceId?: string | null
 ): MediaTrackConstraints => {
   const constraints: MediaTrackConstraints = {
     width: { ideal: width },
     height: { ideal: height },
   };
-  if (prefersRearCamera()) {
+  if (deviceId) {
+    constraints.deviceId = { exact: deviceId };
+  } else if (prefersRearCamera()) {
     constraints.facingMode = { ideal: "environment" };
   }
   return constraints;
@@ -421,6 +424,11 @@ export default function AssetPickerModal({
   const [cameraActive, setCameraActive] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
+  const [videoDevices, setVideoDevices] = useState<MediaDeviceInfo[]>([]);
+  const [selectedCameraId, setSelectedCameraId] = useState<string | null>(null);
+  // Ref mirror so useCallbacks can read the latest selection without re-creating.
+  const selectedCameraIdRef = useRef<string | null>(null);
+  selectedCameraIdRef.current = selectedCameraId;
 
   // Video recording state
   const [cameraMode, setCameraMode] = useState<"photo" | "video">("photo");
@@ -592,12 +600,33 @@ export default function AssetPickerModal({
   }, [assets, query, filterRating, acceptTypes]);
 
   // Camera functions
+  // Populate the list of available cameras. Labels are only exposed after
+  // the user grants permission, so this must be called after getUserMedia.
+  const refreshVideoDevices = useCallback(async () => {
+    if (typeof navigator === "undefined" || !navigator.mediaDevices?.enumerateDevices) {
+      return;
+    }
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videoInputs = devices.filter((d) => d.kind === "videoinput");
+      setVideoDevices(videoInputs);
+      // Sync the picker to the camera the browser actually chose, so the
+      // initial selection reflects reality rather than just the first device.
+      const activeId = streamRef.current?.getVideoTracks()[0]?.getSettings().deviceId;
+      if (activeId && activeId !== selectedCameraIdRef.current) {
+        setSelectedCameraId(activeId);
+      }
+    } catch (err) {
+      console.error("enumerateDevices error:", err);
+    }
+  }, []);
+
   const startCamera = useCallback(async () => {
     setCameraError(null);
     setCapturedPhoto(null);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: buildVideoConstraints(1920, 1080),
+        video: buildVideoConstraints(1920, 1080, selectedCameraIdRef.current),
         audio: false,
       });
       streamRef.current = stream;
@@ -606,12 +635,13 @@ export default function AssetPickerModal({
         await videoRef.current.play();
       }
       setCameraActive(true);
+      refreshVideoDevices();
     } catch (err) {
       console.error("Camera error:", err);
       setCameraError(t("assetPicker.cameraAccessDenied"));
       setCameraActive(false);
     }
-  }, [t]);
+  }, [t, refreshVideoDevices]);
 
   const stopCamera = useCallback(() => {
     if (streamRef.current) {
@@ -662,7 +692,7 @@ export default function AssetPickerModal({
     }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: buildVideoConstraints(1280, 720),
+        video: buildVideoConstraints(1280, 720, selectedCameraIdRef.current),
         audio: true,
       });
       streamRef.current = stream;
@@ -671,6 +701,7 @@ export default function AssetPickerModal({
         await videoRef.current.play();
       }
       setCameraActive(true);
+      refreshVideoDevices();
 
       const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9")
         ? "video/webm;codecs=vp9"
@@ -703,7 +734,22 @@ export default function AssetPickerModal({
       setCameraError(t("assetPicker.cameraAccessDenied"));
       setCameraActive(false);
     }
-  }, [t, stopCamera, recordedVideoUrl]);
+  }, [t, stopCamera, recordedVideoUrl, refreshVideoDevices]);
+
+  const handleCameraSelect = useCallback(
+    async (deviceId: string) => {
+      if (!deviceId || deviceId === selectedCameraIdRef.current) return;
+      setSelectedCameraId(deviceId);
+      selectedCameraIdRef.current = deviceId;
+      // Only restart the preview stream. Don't auto-restart during an active
+      // video recording — switching mid-recording would corrupt the file.
+      if (cameraActive && !isRecordingVideo && cameraMode === "photo") {
+        stopCamera();
+        await startCamera();
+      }
+    },
+    [cameraActive, isRecordingVideo, cameraMode, stopCamera, startCamera]
+  );
 
   // Auto-stop recording when reaching the time limit.
   // Kept outside the state updater to avoid side effects in pure functions.
@@ -909,6 +955,23 @@ export default function AssetPickerModal({
                               />
                               <canvas ref={canvasRef} className="hidden" />
                             </div>
+                            {cameraActive && videoDevices.length > 1 && (
+                              <Select
+                                label={t("assetPicker.cameraLabel")}
+                                size="sm"
+                                selectedKeys={selectedCameraId ? [selectedCameraId] : []}
+                                onChange={(e) => {
+                                  if (e.target.value) handleCameraSelect(e.target.value);
+                                }}
+                                className="max-w-lg w-full"
+                              >
+                                {videoDevices.map((d, i) => (
+                                  <SelectItem key={d.deviceId}>
+                                    {d.label || t("assetPicker.cameraFallback", { index: i + 1 })}
+                                  </SelectItem>
+                                ))}
+                              </Select>
+                            )}
                             {!cameraActive ? (
                               <Button
                                 color="primary"
@@ -980,6 +1043,24 @@ export default function AssetPickerModal({
                                 </div>
                               )}
                             </div>
+                            {cameraActive && videoDevices.length > 1 && (
+                              <Select
+                                label={t("assetPicker.cameraLabel")}
+                                size="sm"
+                                selectedKeys={selectedCameraId ? [selectedCameraId] : []}
+                                isDisabled={isRecordingVideo}
+                                onChange={(e) => {
+                                  if (e.target.value) handleCameraSelect(e.target.value);
+                                }}
+                                className="max-w-lg w-full"
+                              >
+                                {videoDevices.map((d, i) => (
+                                  <SelectItem key={d.deviceId}>
+                                    {d.label || t("assetPicker.cameraFallback", { index: i + 1 })}
+                                  </SelectItem>
+                                ))}
+                              </Select>
+                            )}
                             {!isRecordingVideo ? (
                               <Button
                                 color="danger"
