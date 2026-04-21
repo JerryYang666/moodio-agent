@@ -1181,6 +1181,8 @@
     "retakePhoto": "重拍",
     "usePhoto": "使用照片",
     "cameraAccessDenied": "无法访问相机，请检查浏览器权限。",
+    "cameraLabel": "相机",
+    "cameraFallback": "相机 {index}",
     "photoMode": "照片",
     "videoMode": "视频",
     "retakeVideo": "重拍",
