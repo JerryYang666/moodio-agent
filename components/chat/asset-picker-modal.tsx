@@ -56,6 +56,28 @@ type AssetsPageResponse = {
   nextOffset?: number | null;
 };
 
+// On macOS Safari with Continuity Camera, `facingMode: "environment"` matches
+// the paired iPhone's rear camera and gets picked over the built-in webcam.
+// Only request the rear camera on actual mobile devices.
+const prefersRearCamera = (): boolean => {
+  if (typeof navigator === "undefined") return false;
+  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+};
+
+const buildVideoConstraints = (
+  width: number,
+  height: number
+): MediaTrackConstraints => {
+  const constraints: MediaTrackConstraints = {
+    width: { ideal: width },
+    height: { ideal: height },
+  };
+  if (prefersRearCamera()) {
+    constraints.facingMode = { ideal: "environment" };
+  }
+  return constraints;
+};
+
 /** Memoized grid item – only re-renders when its own selection state or asset changes */
 const AssetGridItem = React.memo(function AssetGridItem({
   asset,
@@ -575,7 +597,7 @@ export default function AssetPickerModal({
     setCapturedPhoto(null);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } },
+        video: buildVideoConstraints(1920, 1080),
         audio: false,
       });
       streamRef.current = stream;
@@ -640,7 +662,7 @@ export default function AssetPickerModal({
     }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } },
+        video: buildVideoConstraints(1280, 720),
         audio: true,
       });
       streamRef.current = stream;
