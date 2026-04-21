@@ -1,6 +1,6 @@
 import { Agent, AgentResponse, ParallelAgentResponse } from "../types";
 import { Message, MessageContentPart, DEFAULT_LLM_MODEL } from "@/lib/llm/types";
-import { ImageSize } from "@/lib/image/types";
+import { ImageQuality, ImageSize } from "@/lib/image/types";
 import OpenAI from "openai";
 import { downloadImage } from "@/lib/storage/s3";
 import { siteConfig } from "@/config/site";
@@ -99,6 +99,7 @@ export class Agent2 implements Agent {
     accountType?: AccountType,
     performedBy?: string,
     chatId?: string,
+    imageQualityOverride?: ImageQuality,
   ): Promise<AgentResponse> {
     const startTime = requestStartTime || Date.now();
     console.log("[Perf] Agent2 processRequest start", `[${Date.now() - startTime}ms]`);
@@ -154,6 +155,7 @@ export class Agent2 implements Agent {
           precisionEditing,
           aspectRatioOverride,
           imageSizeOverride,
+          imageQualityOverride,
           imageModelId,
           maxImageQuantity,
           systemPromptOverride,
@@ -237,6 +239,7 @@ export class Agent2 implements Agent {
     cnMode?: boolean,
     chatId?: string,
     languagePreference?: string,
+    imageQualityOverride?: ImageQuality,
   ): Promise<ParallelAgentResponse> {
     const startTime = requestStartTime || Date.now();
     const variantTimestamp = messageTimestamp || Date.now();
@@ -317,6 +320,7 @@ export class Agent2 implements Agent {
               precisionEditing,
               aspectRatioOverride,
               imageSizeOverride,
+              imageQualityOverride,
               imageModelId,
               maxImageQuantity,
               systemPromptOverride,

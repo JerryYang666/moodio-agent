@@ -4,7 +4,7 @@ import { modelPricing } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { getVideoModel } from "@/lib/video/models";
 import { IMAGE_MODEL_IDS } from "@/lib/image/models";
-import type { ImageSize } from "@/lib/image/types";
+import type { ImageQuality, ImageSize } from "@/lib/image/types";
 
 // Default cost if no formula is defined
 const DEFAULT_COST = 0;
@@ -103,6 +103,23 @@ export function parseImageSizeToNumber(size: ImageSize): number {
   return IMAGE_SIZE_MAP[size] ?? 2;
 }
 
+const IMAGE_QUALITY_MAP: Record<ImageQuality, number> = {
+  low: 1,
+  auto: 2,
+  medium: 2,
+  high: 3,
+};
+
+/**
+ * Convert an ImageQuality string to its numeric tier value for pricing formulas.
+ * Only gpt-image-2 actually varies output by quality; other image providers ignore it.
+ * Unset / undefined defaults to 2 (medium/auto).
+ */
+export function parseImageQualityToNumber(quality?: ImageQuality): number {
+  if (!quality) return 2;
+  return IMAGE_QUALITY_MAP[quality] ?? 2;
+}
+
 /**
  * Calculate the cost for a generation.
  * Looks up the formula from DB, falls back to default if not found.
@@ -135,10 +152,13 @@ export async function calculateCost(
     }
   }
 
-  // For image models, ensure resolution has a default
+  // For image models, ensure resolution and quality have defaults
   if (IMAGE_MODEL_IDS.has(modelId) || modelId === "Image/all") {
     if (paramsWithDefaults.resolution === undefined) {
       paramsWithDefaults.resolution = 2;
+    }
+    if (paramsWithDefaults.quality === undefined) {
+      paramsWithDefaults.quality = 2;
     }
   }
 

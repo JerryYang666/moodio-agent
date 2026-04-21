@@ -802,6 +802,7 @@
       "nano-banana-2": "Nano Banana 2",
       "nano-banana-2-fast": "Nano Banana 2 고속",
       "seedream-45": "Seedream 4.5",
+      "gpt-image-2": "GPT Image 2",
       "midjourney": "Midjourney",
       "gpt-52": "gpt-5.2",
       "gemini-3": "gemini-3"
@@ -831,6 +832,13 @@
       "1k": "1K",
       "2k": "2K",
       "4k": "4K"
+    },
+    "imageQuality": "품질",
+    "imageQualityOptions": {
+      "auto": "자동",
+      "low": "낮음",
+      "medium": "중간",
+      "high": "높음"
     },
     "imageQuantity": "수량",
     "imageQuantityOptions": {
@@ -924,6 +932,7 @@
       "availableParams": "사용 가능한 매개변수",
       "clickToCopy": "클릭하여 매개변수 이름 복사:",
       "copied": "복사됨!",
+      "qualityNote": "quality 매개변수는 gpt-image-2에서만 적용됩니다 (1=낮음, 2=중간/자동, 3=높음). 다른 이미지 모델은 이 값을 무시합니다.",
       "examples": "예시",
       "exampleDuration": "단순 시간 기반",
       "exampleDurationDesc": "비디오 초당 20 크레딧",

@@ -28,6 +28,7 @@ import {
 } from "@heroui/accordion";
 import { Select, SelectItem } from "@heroui/select";
 import { Switch } from "@heroui/switch";
+import { Tooltip } from "@heroui/tooltip";
 import { api } from "@/lib/api/client";
 import { useAuth } from "@/hooks/use-auth";
 import { Spinner } from "@heroui/spinner";
@@ -39,6 +40,7 @@ interface ModelParam {
   type: string;
   options?: (string | number)[];
   default?: string | number | boolean;
+  description?: string;
 }
 
 interface ModelInfo {
@@ -396,24 +398,52 @@ export default function PricingPage() {
                       </p>
                       <div className="flex flex-wrap gap-2">
                         {selectedModel.params.map((param) => (
-                          <button
+                          <Tooltip
                             key={param.name}
-                            type="button"
-                            onClick={() => {
-                              navigator.clipboard.writeText(param.name);
-                              addToast({
-                                title: t("copied"),
-                                description: param.name,
-                                color: "success",
-                              });
-                            }}
-                            className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-default-100 hover:bg-default-200 rounded-md text-xs font-mono transition-colors cursor-pointer group"
+                            content={
+                              param.description ||
+                              `${param.name} (${param.type})`
+                            }
+                            placement="top"
+                            isDisabled={!param.description}
                           >
-                            <span>{param.name}</span>
-                            <Copy size={12} className="text-default-400 group-hover:text-default-600" />
-                          </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                navigator.clipboard.writeText(param.name);
+                                addToast({
+                                  title: t("copied"),
+                                  description: param.name,
+                                  color: "success",
+                                });
+                              }}
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-default-100 hover:bg-default-200 rounded-md text-xs font-mono transition-colors cursor-pointer group"
+                            >
+                              <span>{param.name}</span>
+                              {param.description ? (
+                                <Info
+                                  size={12}
+                                  className="text-default-400 group-hover:text-default-600"
+                                />
+                              ) : (
+                                <Copy
+                                  size={12}
+                                  className="text-default-400 group-hover:text-default-600"
+                                />
+                              )}
+                            </button>
+                          </Tooltip>
                         ))}
                       </div>
+                      {selectedModel.params.some(
+                        (p) => p.name === "quality"
+                      ) &&
+                        selectedModel.id !== "gpt-image-2" && (
+                          <div className="flex items-start gap-2 p-2.5 rounded-md bg-warning-50 border border-warning-200 text-[11px] text-warning-700">
+                            <Info size={14} className="mt-0.5 shrink-0" />
+                            <span>{t("qualityNote")}</span>
+                          </div>
+                        )}
                     </div>
                   )}
 

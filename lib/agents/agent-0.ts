@@ -9,7 +9,7 @@ import {
 import OpenAI, { toFile } from "openai";
 import { getSystemPrompt } from "./system-prompts";
 import { recordEvent, sanitizeOpenAIResponse } from "@/lib/telemetry";
-import { calculateCost, parseImageSizeToNumber } from "@/lib/pricing";
+import { calculateCost, parseImageSizeToNumber, parseImageQualityToNumber } from "@/lib/pricing";
 import { deductCredits, getUserBalance, InsufficientCreditsError, AccountType } from "@/lib/credits";
 import { classifyImageError } from "@/lib/image/error-classify";
 
@@ -314,7 +314,11 @@ export class Agent0 implements Agent {
 
           // Check balance before generating (deduct only on success)
           const resolution = parseImageSizeToNumber(imageSizeOverride || "2k");
-          const cost = await calculateCost(imageModelId || "Image/all", { resolution });
+          const quality = parseImageQualityToNumber(undefined);
+          const cost = await calculateCost(imageModelId || "Image/all", {
+            resolution,
+            quality,
+          });
           if (cost > 0) {
             const balance = await getUserBalance(effectiveAccountId, effectiveAccountType);
             if (balance < cost) {

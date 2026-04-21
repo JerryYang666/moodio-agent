@@ -685,8 +685,8 @@ export default function ChatInterface({
   // Per-image cost estimation (for image size label + send button)
   const imageCostKey = useMemo(() => {
     if (menuState.mode !== "image" && menuState.mode !== "agent") return null;
-    return `${menuState.model}:${menuState.imageSize}`;
-  }, [menuState.mode, menuState.model, menuState.imageSize]);
+    return `${menuState.model}:${menuState.imageSize}:${menuState.imageQuality}`;
+  }, [menuState.mode, menuState.model, menuState.imageSize, menuState.imageQuality]);
 
   useEffect(() => {
     if (menuState.mode !== "image" && menuState.mode !== "agent") {
@@ -701,6 +701,9 @@ export default function ChatInterface({
         const searchParams = new URLSearchParams();
         searchParams.set("modelId", menuState.model);
         searchParams.set("resolution", String(resolution));
+        if (menuState.model === "gpt-image-2" && menuState.imageQuality) {
+          searchParams.set("quality", menuState.imageQuality);
+        }
         const res = await fetch(`/api/image/cost?${searchParams.toString()}`);
         if (res.ok) {
           const data = await res.json();
@@ -2957,6 +2960,9 @@ export default function ChatInterface({
         payload.imageModelId = menuState.model;
         if (menuState.imageSize) {
           payload.imageSize = menuState.imageSize;
+        }
+        if (menuState.model === "gpt-image-2" && menuState.imageQuality) {
+          payload.imageQuality = menuState.imageQuality;
         }
       }
 

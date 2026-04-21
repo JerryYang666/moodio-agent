@@ -1,4 +1,4 @@
-import { ImageSize } from "@/lib/image/types";
+import { ImageQuality, ImageSize } from "@/lib/image/types";
 import { MessageContentPart } from "@/lib/llm/types";
 import type { AccountType } from "@/lib/credits";
 
@@ -48,6 +48,7 @@ export interface RequestContext {
   precisionEditing: boolean;
   aspectRatioOverride?: string;
   imageSizeOverride?: ImageSize;
+  imageQualityOverride?: ImageQuality;
   imageModelId?: string;
   maxImageQuantity?: number;
   systemPromptOverride?: string;
@@ -73,6 +74,7 @@ const SUPPORTED_ASPECT_RATIOS = [
 ] as const;
 
 const SUPPORTED_IMAGE_SIZES: ImageSize[] = ["1k", "2k", "4k"];
+const SUPPORTED_IMAGE_QUALITIES: ImageQuality[] = ["auto", "low", "medium", "high"];
 
 export interface CreateRequestContextInput {
   userId: string;
@@ -90,6 +92,7 @@ export interface CreateRequestContextInput {
   precisionEditing?: boolean;
   aspectRatioOverride?: string;
   imageSizeOverride?: ImageSize;
+  imageQualityOverride?: ImageQuality;
   imageModelId?: string;
   maxImageQuantity?: number;
   systemPromptOverride?: string;
@@ -129,6 +132,19 @@ export function createRequestContext(input: CreateRequestContextInput): RequestC
     }
   }
 
+  // Validate image quality override (only gpt-image-2 respects this at runtime)
+  let validatedImageQuality: ImageQuality | undefined;
+  if (input.imageQualityOverride) {
+    if (SUPPORTED_IMAGE_QUALITIES.includes(input.imageQualityOverride)) {
+      validatedImageQuality = input.imageQualityOverride;
+      console.log(`[Agent-2] User selected image quality: ${validatedImageQuality}`);
+    } else {
+      console.log(
+        `[Agent-2] Invalid image quality "${input.imageQualityOverride}" provided, falling back to auto`
+      );
+    }
+  }
+
   return {
     userId: input.userId,
     isAdmin: input.isAdmin,
@@ -145,6 +161,7 @@ export function createRequestContext(input: CreateRequestContextInput): RequestC
     precisionEditing: input.precisionEditing || false,
     aspectRatioOverride: validatedAspectRatio,
     imageSizeOverride: validatedImageSize,
+    imageQualityOverride: validatedImageQuality,
     imageModelId: input.imageModelId,
     maxImageQuantity: input.maxImageQuantity,
     systemPromptOverride: input.systemPromptOverride,

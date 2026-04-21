@@ -72,7 +72,17 @@ export async function GET(request: NextRequest) {
       id: "Image/all",
       name: "Image (Fallback / All Models)",
       provider: null,
-      params: [{ name: "resolution", type: "enum", options: [1, 2, 4], default: 2 }],
+      params: [
+        { name: "resolution", type: "enum", options: [1, 2, 4], default: 2 },
+        {
+          name: "quality",
+          type: "enum",
+          options: [1, 2, 3],
+          default: 2,
+          description:
+            "Only respected by gpt-image-2 (1=low, 2=medium/auto, 3=high). Other image models ignore this param.",
+        } as any,
+      ],
     });
 
     return NextResponse.json({

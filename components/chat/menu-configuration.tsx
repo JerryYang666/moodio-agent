@@ -36,6 +36,7 @@ export type MenuState = {
   expertise: string;
   aspectRatio: string;
   imageSize: string;
+  imageQuality: string;
   imageQuantity: string;
   videoModelId: string;
   videoParams: Record<string, any>;
@@ -48,6 +49,7 @@ export const INITIAL_MENU_STATE: MenuState = {
   expertise: MENU_CONFIG.categories.expertise.default,
   aspectRatio: MENU_CONFIG.categories.aspectRatio.default,
   imageSize: MENU_CONFIG.categories.imageSize.default,
+  imageQuality: MENU_CONFIG.categories.imageQuality.default,
   imageQuantity: MENU_CONFIG.categories.imageQuantity.default,
   videoModelId: "",
   videoParams: {},
@@ -66,6 +68,7 @@ export const saveMenuState = (state: MenuState) => {
     expertise: state.expertise,
     aspectRatio: state.aspectRatio,
     imageSize: state.imageSize,
+    imageQuality: state.imageQuality,
     imageQuantity: state.imageQuantity,
     videoModelId: state.videoModelId,
   };
@@ -112,6 +115,11 @@ export const loadMenuState = (): MenuState => {
       // Validate and apply saved imageSize
       if (parsed.imageSize && MENU_CONFIG.categories.imageSize.options[parsed.imageSize as keyof typeof MENU_CONFIG.categories.imageSize.options]) {
         loaded.imageSize = parsed.imageSize;
+      }
+
+      // Validate and apply saved imageQuality
+      if (parsed.imageQuality && MENU_CONFIG.categories.imageQuality.options[parsed.imageQuality as keyof typeof MENU_CONFIG.categories.imageQuality.options]) {
+        loaded.imageQuality = parsed.imageQuality;
       }
 
       // Validate and apply saved imageQuantity
@@ -161,7 +169,7 @@ export const resolveMenuState = (
   const newState = { ...currentState, mode };
 
   // Categories to resolve
-  const categories = ["model", "expertise", "aspectRatio", "imageSize", "imageQuantity"] as const;
+  const categories = ["model", "expertise", "aspectRatio", "imageSize", "imageQuality", "imageQuantity"] as const;
 
   categories.forEach((category) => {
     const categoryConfig = availability[category];
@@ -224,7 +232,7 @@ export default function MenuConfiguration({
 }: MenuConfigurationProps) {
   const t = useTranslations("menu");
   const getCategoryLabel = (
-    categoryKey: "model" | "expertise" | "aspectRatio" | "imageSize" | "imageQuantity"
+    categoryKey: "model" | "expertise" | "aspectRatio" | "imageSize" | "imageQuality" | "imageQuantity"
   ) => t(categoryKey);
   const getModeLabel = (key: string) => t(`modes.${key}`);
   const getModeDescription = (key: string) => t(`modes.${key}Desc`);
@@ -232,6 +240,7 @@ export default function MenuConfiguration({
   const getExpertiseLabel = (key: string) => t(`expertiseOptions.${key}`);
   const getAspectRatioLabel = (key: string) => t(`aspectRatioOptions.${key}`);
   const getImageSizeLabel = (key: string) => t(`imageSizeOptions.${key}`);
+  const getImageQualityLabel = (key: string) => t(`imageQualityOptions.${key}`);
   const getImageQuantityLabel = (key: string) => t(`imageQuantityOptions.${key}`);
   const getAspectRatioDescription = (key: string) =>
     key === "smart" ? t("aspectRatioOptions.smartDesc") : undefined;
@@ -258,7 +267,7 @@ export default function MenuConfiguration({
 
   // Render a dropdown for a category
   const renderDropdown = (
-    categoryKey: "model" | "expertise" | "aspectRatio" | "imageSize" | "imageQuantity"
+    categoryKey: "model" | "expertise" | "aspectRatio" | "imageSize" | "imageQuality" | "imageQuantity"
   ) => {
     const availability = currentContext.availability[categoryKey];
 
@@ -267,6 +276,11 @@ export default function MenuConfiguration({
       // Prompt 10: "Disabled categories may be: Hidden entirely OR Shown disabled with reason tooltip"
       // Let's hide for cleanliness as per "Clear its value from state" usually implies it's gone.
       // But let's check if the user wants visibility. "Some categories may disappear". OK, hide.
+    }
+
+    // Quality is only meaningful for gpt-image-2; hide for other models.
+    if (categoryKey === "imageQuality" && state.model !== "gpt-image-2") {
+      return null;
     }
 
     const categoryDef = MENU_CONFIG.categories[categoryKey];
@@ -281,9 +295,11 @@ export default function MenuConfiguration({
           ? getExpertiseLabel(selectedKey)
           : categoryKey === "aspectRatio"
             ? getAspectRatioLabel(selectedKey)
-            : categoryKey === "imageQuantity"
-              ? getImageQuantityLabel(selectedKey)
-              : getImageSizeLabel(selectedKey);
+            : categoryKey === "imageQuality"
+              ? getImageQualityLabel(selectedKey)
+              : categoryKey === "imageQuantity"
+                ? getImageQuantityLabel(selectedKey)
+                : getImageSizeLabel(selectedKey);
     const isAspectRatio = categoryKey === "aspectRatio";
     const isImageQuantity = categoryKey === "imageQuantity";
 
@@ -367,9 +383,11 @@ export default function MenuConfiguration({
                     ? getExpertiseLabel(key)
                     : categoryKey === "aspectRatio"
                       ? getAspectRatioLabel(key)
-                      : categoryKey === "imageQuantity"
-                        ? getImageQuantityLabel(key)
-                        : getImageSizeLabel(key);
+                      : categoryKey === "imageQuality"
+                        ? getImageQualityLabel(key)
+                        : categoryKey === "imageQuantity"
+                          ? getImageQuantityLabel(key)
+                          : getImageSizeLabel(key);
 
               return (
                 <DropdownItem
@@ -513,6 +531,7 @@ export default function MenuConfiguration({
             {renderDropdown("expertise")}
             {renderDropdown("aspectRatio")}
             {renderDropdown("imageSize")}
+            {renderDropdown("imageQuality")}
             {renderDropdown("imageQuantity")}
           </>
         )}

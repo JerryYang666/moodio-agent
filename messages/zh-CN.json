@@ -802,6 +802,7 @@
       "nano-banana-2": "Nano Banana 2",
       "nano-banana-2-fast": "Nano Banana 2 快速",
       "seedream-45": "Seedream 4.5",
+      "gpt-image-2": "GPT Image 2",
       "midjourney": "Midjourney",
       "gpt-52": "gpt-5.2",
       "gemini-3": "gemini-3"
@@ -831,6 +832,13 @@
       "1k": "1K",
       "2k": "2K",
       "4k": "4K"
+    },
+    "imageQuality": "质量",
+    "imageQualityOptions": {
+      "auto": "自动",
+      "low": "低",
+      "medium": "中",
+      "high": "高"
     },
     "imageQuantity": "数量",
     "imageQuantityOptions": {
@@ -924,6 +932,7 @@
       "availableParams": "可用参数",
       "clickToCopy": "点击复制参数名：",
       "copied": "已复制！",
+      "qualityNote": "quality 参数仅对 gpt-image-2 生效（1=低，2=中/自动，3=高）。其他图像模型会忽略此值。",
       "examples": "示例",
       "exampleDuration": "简单时长计费",
       "exampleDurationDesc": "每秒视频 20 积分",

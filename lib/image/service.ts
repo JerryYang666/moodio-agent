@@ -7,6 +7,7 @@ import { ImageEditInput, ImageGenerationInput, ImageResult } from "./types";
 import { generateWithGemini, editWithGemini } from "./providers/google";
 import { generateWithSeedream, editWithSeedream } from "./providers/fal";
 import { generateWithKie, editWithKie } from "./providers/kie";
+import { generateWithOpenAI, editWithOpenAI } from "./providers/openai";
 
 function resolveImageModel(modelId?: string): ImageModelConfig {
   const resolved = modelId ? getImageModel(modelId) : undefined;
@@ -43,6 +44,11 @@ export async function generateImageWithModel(
         modelId: model.id,
         ...(await generateWithKie(model.providerModelIds.generate, input)),
       };
+    case "openai":
+      return {
+        modelId: model.id,
+        ...(await generateWithOpenAI(model.providerModelIds.generate, input)),
+      };
     default:
       throw new Error(`Unsupported provider: ${model.provider}`);
   }
@@ -72,6 +78,11 @@ export async function editImageWithModel(
       return {
         modelId: model.id,
         ...(await editWithKie(model.providerModelIds.edit, input)),
+      };
+    case "openai":
+      return {
+        modelId: model.id,
+        ...(await editWithOpenAI(model.providerModelIds.edit, input)),
       };
     default:
       throw new Error(`Unsupported provider: ${model.provider}`);

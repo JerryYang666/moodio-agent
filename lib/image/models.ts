@@ -1,4 +1,4 @@
-export type ImageModelProvider = "google" | "fal" | "kie";
+export type ImageModelProvider = "google" | "fal" | "kie" | "openai";
 
 export type ImageModelPricingParamType = "string" | "number" | "boolean" | "enum";
 
@@ -7,6 +7,7 @@ export interface ImageModelPricingParam {
   type: ImageModelPricingParamType;
   options?: (string | number)[];
   default?: string | number | boolean;
+  description?: string;
 }
 
 export interface ImageModelConfig {
@@ -26,6 +27,14 @@ export interface ImageModelConfig {
 
 const IMAGE_PRICING_PARAMS: ImageModelPricingParam[] = [
   { name: "resolution", type: "enum", options: [1, 2, 4], default: 2 },
+  {
+    name: "quality",
+    type: "enum",
+    options: [1, 2, 3],
+    default: 2,
+    description:
+      "Only respected by gpt-image-2 (1=low, 2=medium/auto, 3=high). Other image models ignore this param.",
+  },
 ];
 
 /**
@@ -84,7 +93,31 @@ const seedreamV45: ImageModelConfig = {
   },
 };
 
-export const IMAGE_MODELS: ImageModelConfig[] = [nanoBanana2, nanoBanana2Fast, seedreamV45];
+/**
+ * OpenAI GPT Image 2 - Image generation + editing via OpenAI Images API
+ */
+const gptImage2: ImageModelConfig = {
+  id: "gpt-image-2",
+  name: "GPT Image 2",
+  description:
+    "OpenAI GPT Image 2 for high-quality text-to-image and image editing. Supports quality tiers (low/medium/high/auto).",
+  provider: "openai",
+  supports: {
+    generate: true,
+    edit: true,
+  },
+  providerModelIds: {
+    generate: "gpt-image-2",
+    edit: "gpt-image-2",
+  },
+};
+
+export const IMAGE_MODELS: ImageModelConfig[] = [
+  nanoBanana2,
+  nanoBanana2Fast,
+  seedreamV45,
+  gptImage2,
+];
 
 export const DEFAULT_IMAGE_MODEL_ID = nanoBanana2.id;
 
@@ -107,6 +140,7 @@ export function getImageModelConfigForApi(modelId: string) {
       type: p.type,
       options: p.options,
       default: p.default,
+      description: p.description,
     })),
   };
 }

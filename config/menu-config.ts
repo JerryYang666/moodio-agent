@@ -32,6 +32,7 @@ export const MENU_CONFIG = {
         "nano-banana-2": { label: "Nano Banana 2" },
         "nano-banana-2-fast": { label: "Nano Banana 2 Fast" },
         "seedream-45": { label: "Seedream 4.5" },
+        "gpt-image-2": { label: "GPT Image 2" },
         midjourney: { label: "Midjourney" },
         "gpt-5.2": { label: "gpt-5.2" },
         "gemini-3": { label: "gemini-3" },
@@ -86,6 +87,16 @@ export const MENU_CONFIG = {
         "4k": { label: "4k" },
       },
     },
+    imageQuality: {
+      label: "Quality",
+      default: "auto",
+      options: {
+        auto: { label: "Auto" },
+        low: { label: "Low" },
+        medium: { label: "Medium" },
+        high: { label: "High" },
+      },
+    },
     imageQuantity: {
       label: "Image Quantity",
       default: "smart",
@@ -111,12 +122,18 @@ export const MENU_CONFIG = {
         expertise: "smart",
         aspectRatio: "smart",
         imageSize: "2k",
+        imageQuality: "auto",
         imageQuantity: "smart",
       },
       availability: {
         model: {
           enabled: true,
-          allowed: ["nano-banana-2", "nano-banana-2-fast", "seedream-45"],
+          allowed: [
+            "nano-banana-2",
+            "nano-banana-2-fast",
+            "seedream-45",
+            "gpt-image-2",
+          ],
         },
         expertise: {
           enabled: true,
@@ -140,6 +157,10 @@ export const MENU_CONFIG = {
           enabled: true,
           allowed: ["1k", "2k", "4k"],
         },
+        imageQuality: {
+          enabled: true,
+          allowed: ["auto", "low", "medium", "high"],
+        },
         imageQuantity: {
           enabled: true,
           allowed: ["smart", "1", "2", "3", "4"],
@@ -152,10 +173,19 @@ export const MENU_CONFIG = {
         model: "nano-banana-2",
         aspectRatio: "smart",
         imageSize: "2k",
+        imageQuality: "auto",
         imageQuantity: "1",
       },
       availability: {
-        model: { enabled: true, allowed: ["nano-banana-2", "nano-banana-2-fast", "seedream-45"] },
+        model: {
+          enabled: true,
+          allowed: [
+            "nano-banana-2",
+            "nano-banana-2-fast",
+            "seedream-45",
+            "gpt-image-2",
+          ],
+        },
         expertise: {
           enabled: false,
           reason: "Expertise is not available in direct image generation mode.",
@@ -178,6 +208,10 @@ export const MENU_CONFIG = {
           enabled: true,
           allowed: ["1k", "2k", "4k"],
         },
+        imageQuality: {
+          enabled: true,
+          allowed: ["auto", "low", "medium", "high"],
+        },
         imageQuantity: {
           enabled: true,
           allowed: ["1", "2", "3", "4"],
@@ -191,6 +225,7 @@ export const MENU_CONFIG = {
         expertise: { enabled: false },
         aspectRatio: { enabled: false },
         imageSize: { enabled: false },
+        imageQuality: { enabled: false },
         imageQuantity: { enabled: false },
       },
     },

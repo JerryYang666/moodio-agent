@@ -166,6 +166,7 @@ export interface MessageMetadata {
   mode?: string;
   imageModelId?: string;
   imageSize?: string;
+  imageQuality?: string;
   aspectRatio?: string;
   imageQuantity?: number;
   precisionEditing?: boolean;

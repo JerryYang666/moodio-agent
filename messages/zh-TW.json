@@ -802,6 +802,7 @@
       "nano-banana-2": "Nano Banana 2",
       "nano-banana-2-fast": "Nano Banana 2 快速",
       "seedream-45": "Seedream 4.5",
+      "gpt-image-2": "GPT Image 2",
       "midjourney": "Midjourney",
       "gpt-52": "gpt-5.2",
       "gemini-3": "gemini-3"
@@ -831,6 +832,13 @@
       "1k": "1K",
       "2k": "2K",
       "4k": "4K"
+    },
+    "imageQuality": "品質",
+    "imageQualityOptions": {
+      "auto": "自動",
+      "low": "低",
+      "medium": "中",
+      "high": "高"
     },
     "imageQuantity": "數量",
     "imageQuantityOptions": {
@@ -924,6 +932,7 @@
       "availableParams": "可用參數",
       "clickToCopy": "點擊複製參數名稱：",
       "copied": "已複製！",
+      "qualityNote": "quality 參數僅對 gpt-image-2 生效（1=低，2=中/自動，3=高）。其他圖像模型會忽略此值。",
       "examples": "範例",
       "exampleDuration": "簡單時長計費",
       "exampleDurationDesc": "每秒影片 20 點數",

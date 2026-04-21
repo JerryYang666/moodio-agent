@@ -1,5 +1,5 @@
 import { MessageContentPart } from "@/lib/llm/types";
-import { ImageSize } from "@/lib/image/types";
+import { ImageQuality, ImageSize } from "@/lib/image/types";
 import { ToolHandler, ToolResult } from "../tool-executor";
 import { ParsedTag } from "../../core/output-parser";
 import { RequestContext } from "../../context";
@@ -14,14 +14,22 @@ import {
   generateImageWithModel,
 } from "@/lib/image/service";
 import { getImageModel } from "@/lib/image/models";
-import { calculateCost, parseImageSizeToNumber } from "@/lib/pricing";
+import {
+  calculateCost,
+  parseImageSizeToNumber,
+  parseImageQualityToNumber,
+} from "@/lib/pricing";
 import {
   deductCredits,
   assertSufficientCredits,
   InsufficientCreditsError,
   type AccountType,
 } from "@/lib/credits";
-import { recordEvent, sanitizeGeminiResponse } from "@/lib/telemetry";
+import {
+  recordEvent,
+  sanitizeGeminiResponse,
+  sanitizeOpenAIResponse,
+} from "@/lib/telemetry";
 import { classifyImageError } from "@/lib/image/error-classify";
 
 const SUPPORTED_ASPECT_RATIOS = [
@@ -157,7 +165,10 @@ export class ImageGenerateHandler implements ToolHandler {
 
     if (lastError && "response" in lastError) {
       const response = (lastError as any).response;
-      failureMetadata.response = sanitizeGeminiResponse(response);
+      failureMetadata.response =
+        modelConfig?.provider === "openai"
+          ? sanitizeOpenAIResponse(response)
+          : sanitizeGeminiResponse(response);
     }
 
     await recordEvent("image_generation", ctx.userId, failureMetadata);
@@ -182,6 +193,7 @@ export class ImageGenerateHandler implements ToolHandler {
       aspectRatio = "1:1";
     }
     const imageSize: ImageSize = ctx.imageSizeOverride || "2k";
+    const imageQuality: ImageQuality | undefined = ctx.imageQualityOverride;
 
     // Await all image base64 data (user-provided images)
     const imageBase64Data = await Promise.all(ctx.imageBase64Promises);
@@ -222,7 +234,11 @@ export class ImageGenerateHandler implements ToolHandler {
 
     // Verify balance before doing any work
     const resolution = parseImageSizeToNumber(imageSize);
-    const cost = await calculateCost(modelId || "Image/all", { resolution });
+    const quality = parseImageQualityToNumber(imageQuality);
+    const cost = await calculateCost(modelId || "Image/all", {
+      resolution,
+      quality,
+    });
     if (cost > 0) {
       await assertSufficientCredits(ctx.effectiveAccountId, cost, ctx.effectiveAccountType);
     }
@@ -239,12 +255,14 @@ export class ImageGenerateHandler implements ToolHandler {
         imageBase64: effectiveImageBase64,
         aspectRatio,
         imageSize,
+        quality: imageQuality,
       });
     } else {
       result = await generateImageWithModel(modelId, {
         prompt: suggestion.prompt,
         aspectRatio,
         imageSize,
+        quality: imageQuality,
       });
     }
 
@@ -271,7 +289,9 @@ export class ImageGenerateHandler implements ToolHandler {
     const response =
       result.provider === "google"
         ? sanitizeGeminiResponse(result.response)
-        : result.response;
+        : result.provider === "openai"
+          ? sanitizeOpenAIResponse(result.response)
+          : result.response;
 
     // Record success event
     await recordEvent("image_generation", ctx.userId, {

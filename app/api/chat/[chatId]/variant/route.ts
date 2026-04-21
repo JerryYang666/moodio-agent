@@ -221,6 +221,12 @@ export async function POST(
         cnMode,
         undefined, // chatId
         languagePreference || undefined,
+        userMessage.metadata?.imageQuality as
+          | "auto"
+          | "low"
+          | "medium"
+          | "high"
+          | undefined, // imageQualityOverride
       );
 
     // Handle background completion (saving the new variant to history)

@@ -19,13 +19,13 @@ import { createLLMClient } from "@/lib/llm/client";
 import { Message, MessageContentPart, MessageMetadata, DEFAULT_LLM_MODEL, isGeneratedImagePart } from "@/lib/llm/types";
 import { agent2 } from "@/lib/agents/agent-2";
 import { waitUntil } from "@vercel/functions";
-import { recordEvent, sanitizeGeminiResponse } from "@/lib/telemetry";
+import { recordEvent, sanitizeGeminiResponse, sanitizeOpenAIResponse } from "@/lib/telemetry";
 import {
   generateImageWithModel,
   editImageWithModel,
 } from "@/lib/image/service";
 import { ImageSize } from "@/lib/image/types";
-import { calculateCost, parseImageSizeToNumber } from "@/lib/pricing";
+import { calculateCost, parseImageSizeToNumber, parseImageQualityToNumber } from "@/lib/pricing";
 import { deductCredits, getUserBalance, assertSufficientCredits, InsufficientCreditsError, getActiveAccount } from "@/lib/credits";
 import { classifyImageError } from "@/lib/image/error-classify";
 import {
@@ -315,6 +315,13 @@ export async function POST(
         : undefined;
     const imageModelId: string | undefined =
       typeof json.imageModelId === "string" ? json.imageModelId : undefined;
+    const imageQualityOverride: "auto" | "low" | "medium" | "high" | undefined =
+      json.imageQuality === "auto" ||
+      json.imageQuality === "low" ||
+      json.imageQuality === "medium" ||
+      json.imageQuality === "high"
+        ? json.imageQuality
+        : undefined;
     // Accept optional variantCount parameter, default to 1 (lazy variant generation)
     const variantCount: number =
       typeof json.variantCount === "number" && json.variantCount >= 1
@@ -415,6 +422,7 @@ export async function POST(
         aspectRatioOverride,
         imageSizeOverride,
         imageModelId,
+        imageQualityOverride,
       },
       ipAddress
     );
@@ -455,6 +463,7 @@ export async function POST(
       mode,
       imageModelId,
       imageSize: imageSizeOverride,
+      imageQuality: imageQualityOverride,
       aspectRatio: aspectRatioOverride,
       imageQuantity,
       precisionEditing: precisionEditing || undefined,
@@ -636,7 +645,11 @@ export async function POST(
                 try {
                   // Calculate cost and verify balance
                   const resolution = parseImageSizeToNumber(imageSizeOverride || "2k");
-                  const cost = await calculateCost(imageModelId || "Image/all", { resolution });
+                  const quality = parseImageQualityToNumber(imageQualityOverride);
+                  const cost = await calculateCost(imageModelId || "Image/all", {
+                    resolution,
+                    quality,
+                  });
                   if (cost > 0) {
                     const balance = await getUserBalance(account.accountId, account.accountType);
                     if (balance < cost) {
@@ -677,12 +690,14 @@ export async function POST(
                             imageBase64: validImageBase64,
                             aspectRatio: aspectRatioOverride,
                             imageSize: imageSizeOverride,
+                            quality: imageQualityOverride,
                           });
                         } else {
                           result = await generateImageWithModel(imageModelId, {
                             prompt: content,
                             aspectRatio: aspectRatioOverride,
                             imageSize: imageSizeOverride,
+                            quality: imageQualityOverride,
                           });
                         }
                       } else {
@@ -690,6 +705,7 @@ export async function POST(
                           prompt: content,
                           aspectRatio: aspectRatioOverride,
                           imageSize: imageSizeOverride,
+                          quality: imageQualityOverride,
                         });
                       }
 
@@ -739,7 +755,9 @@ export async function POST(
                   const response =
                     result.provider === "google"
                       ? sanitizeGeminiResponse(result.response)
-                      : result.response;
+                      : result.provider === "openai"
+                        ? sanitizeOpenAIResponse(result.response)
+                        : result.response;
                   await recordEvent("image_generation", payload.userId, {
                     status: "success",
                     mode: "direct",
@@ -749,6 +767,7 @@ export async function POST(
                     prompt: content,
                     aspectRatio: aspectRatioOverride,
                     imageSize: imageSizeOverride,
+                    imageQuality: imageQualityOverride,
                     response,
                   });
 
@@ -1175,6 +1194,7 @@ export async function POST(
         cnMode,
         chatId,
         languagePreference || undefined,
+        imageQualityOverride,
       );
 
     // Research telemetry: reference_image_added (agent mode)

@@ -1,6 +1,6 @@
 import { Agent, AgentResponse, ParallelAgentResponse } from "./types";
 import { Message, MessageContentPart, DEFAULT_LLM_MODEL } from "@/lib/llm/types";
-import { ImageSize } from "@/lib/image/types";
+import { ImageQuality, ImageSize } from "@/lib/image/types";
 import {
   downloadImage,
   uploadImage,
@@ -9,7 +9,7 @@ import {
 } from "@/lib/storage/s3";
 import OpenAI from "openai";
 import { getSystemPrompt } from "./system-prompts";
-import { recordEvent, sanitizeGeminiResponse } from "@/lib/telemetry";
+import { recordEvent, sanitizeGeminiResponse, sanitizeOpenAIResponse } from "@/lib/telemetry";
 import {
   editImageWithModel,
   generateImageWithModel,
@@ -21,7 +21,7 @@ import {
   getModelConfigForApi,
   getVideoModelsPromptText,
 } from "@/lib/video/models";
-import { calculateCost, parseImageSizeToNumber } from "@/lib/pricing";
+import { calculateCost, parseImageSizeToNumber, parseImageQualityToNumber } from "@/lib/pricing";
 import { deductCredits, getUserBalance, InsufficientCreditsError, AccountType } from "@/lib/credits";
 import { classifyImageError } from "@/lib/image/error-classify";
 import {
@@ -87,6 +87,7 @@ interface PreparedMessages {
   precisionEditing?: boolean;
   aspectRatioOverride?: AspectRatio;
   imageSizeOverride?: ImageSize;
+  imageQualityOverride?: ImageQuality;
   imageModelId?: string;
 }
 
@@ -137,7 +138,8 @@ export class Agent1 implements Agent {
     maxImageQuantity?: number, // User-selected max image quantity (undefined = smart/agent decides)
     accountId?: string,
     accountType?: AccountType,
-    performedBy?: string
+    performedBy?: string,
+    imageQualityOverride?: ImageQuality,
   ): Promise<AgentResponse> {
     const startTime = requestStartTime || Date.now();
     const effectiveAccountId = accountId || userId;
@@ -189,7 +191,8 @@ export class Agent1 implements Agent {
       validatedImageSize,
       imageModelId,
       undefined, // referenceImages
-      maxImageQuantity
+      maxImageQuantity,
+      imageQualityOverride,
     );
 
     // Determine effective max suggestions: user selection capped at hard limit
@@ -278,7 +281,8 @@ export class Agent1 implements Agent {
     imageSizeOverride?: ImageSize,
     imageModelId?: string,
     referenceImages?: ReferenceImageEntry[], // Reference images with tags
-    maxImageQuantity?: number // User-selected image quantity (undefined = smart/agent decides)
+    maxImageQuantity?: number, // User-selected image quantity (undefined = smart/agent decides)
+    imageQualityOverride?: ImageQuality,
   ): Promise<PreparedMessages> {
     const rawSystemPrompt = systemPromptOverride || getSystemPrompt(this.id);
     const systemPrompt = rawSystemPrompt
@@ -525,6 +529,7 @@ export class Agent1 implements Agent {
       precisionEditing,
       aspectRatioOverride,
       imageSizeOverride,
+      imageQualityOverride,
       imageModelId,
     };
   }
@@ -1112,7 +1117,10 @@ export class Agent1 implements Agent {
 
     if (lastError && "response" in lastError) {
       const response = (lastError as any).response;
-      failureMetadata.response = sanitizeGeminiResponse(response);
+      failureMetadata.response =
+        modelConfig?.provider === "openai"
+          ? sanitizeOpenAIResponse(response)
+          : sanitizeGeminiResponse(response);
     }
 
     await recordEvent("image_generation", userId, failureMetadata);
@@ -1147,6 +1155,7 @@ export class Agent1 implements Agent {
       aspectRatio = "1:1";
     }
     const imageSize = prepared.imageSizeOverride || "2k";
+    const imageQuality = prepared.imageQualityOverride;
 
     let finalImageId: string;
 
@@ -1192,7 +1201,11 @@ export class Agent1 implements Agent {
 
       // Calculate cost and verify balance before generating
       const resolution = parseImageSizeToNumber(imageSize);
-      const cost = await calculateCost(modelId || "Image/all", { resolution });
+      const quality = parseImageQualityToNumber(imageQuality);
+      const cost = await calculateCost(modelId || "Image/all", {
+        resolution,
+        quality,
+      });
       if (cost > 0) {
         const acctId = effectiveAccountId || userId;
         const acctType: AccountType = effectiveAccountType || "personal";
@@ -1213,12 +1226,14 @@ export class Agent1 implements Agent {
           imageBase64: effectiveImageBase64,
           aspectRatio,
           imageSize,
+          quality: imageQuality,
         });
       } else {
         result = await generateImageWithModel(modelId, {
           prompt: suggestion.prompt,
           aspectRatio,
           imageSize,
+          quality: imageQuality,
         });
       }
 
@@ -1248,7 +1263,9 @@ export class Agent1 implements Agent {
       const response =
         result.provider === "google"
           ? sanitizeGeminiResponse(result.response)
-          : result.response;
+          : result.provider === "openai"
+            ? sanitizeOpenAIResponse(result.response)
+            : result.response;
 
       // Record success event
       await recordEvent("image_generation", userId, {
@@ -1306,7 +1323,8 @@ export class Agent1 implements Agent {
     maxImageQuantity?: number, // User-selected max image quantity (undefined = smart/agent decides)
     accountId?: string,
     accountType?: AccountType,
-    performedBy?: string
+    performedBy?: string,
+    imageQualityOverride?: ImageQuality,
   ): Promise<ParallelAgentResponse> {
     const startTime = requestStartTime || Date.now();
     const effectiveAccountId = accountId || userId;
@@ -1351,7 +1369,8 @@ export class Agent1 implements Agent {
       validatedImageSize,
       imageModelId,
       referenceImages,
-      maxImageQuantity
+      maxImageQuantity,
+      imageQualityOverride,
     );
 
     // Determine effective max suggestions: user selection capped at hard limit

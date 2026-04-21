@@ -954,6 +954,7 @@
       "nano-banana-2": "Nano Banana 2",
       "nano-banana-2-fast": "Nano Banana 2 Fast",
       "seedream-45": "Seedream 4.5",
+      "gpt-image-2": "GPT Image 2",
       "midjourney": "Midjourney",
       "gpt-52": "gpt-5.2",
       "gemini-3": "gemini-3"
@@ -983,6 +984,13 @@
       "1k": "1K",
       "2k": "2K",
       "4k": "4K"
+    },
+    "imageQuality": "Quality",
+    "imageQualityOptions": {
+      "auto": "Auto",
+      "low": "Low",
+      "medium": "Medium",
+      "high": "High"
     },
     "imageQuantity": "Quantity",
     "imageQuantityOptions": {
@@ -1076,6 +1084,7 @@
       "availableParams": "Available Parameters",
       "clickToCopy": "Click to copy parameter name:",
       "copied": "Copied!",
+      "qualityNote": "The quality parameter is only respected by gpt-image-2 (1=low, 2=medium/auto, 3=high). Other image models ignore this value.",
       "examples": "Examples",
       "exampleDuration": "Simple duration-based",
       "exampleDurationDesc": "20 credits per second of video",
