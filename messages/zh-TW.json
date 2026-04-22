@@ -1310,6 +1310,7 @@
     "allUsers": "所有使用者",
     "noTransactionsForFilter": "此使用者沒有交易記錄",
     "clearFilter": "清除篩選",
+    "totalUsage": "總使用量",
     "paymentDisclosure": "購買即表示您同意我們的",
     "subscriptionTerms": "訂閱條款",
     "paymentDisclosureAnd": "和",

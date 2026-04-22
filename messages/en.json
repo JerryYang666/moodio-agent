@@ -1466,7 +1466,8 @@
     "filterByUser": "Filter by user",
     "allUsers": "All users",
     "noTransactionsForFilter": "No transactions for this user",
-    "clearFilter": "Clear filter"
+    "clearFilter": "Clear filter",
+    "totalUsage": "Total usage"
   },
   "teams": {
     "title": "Teams",

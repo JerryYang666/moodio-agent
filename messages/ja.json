@@ -1310,6 +1310,7 @@
     "allUsers": "すべてのユーザー",
     "noTransactionsForFilter": "このユーザーの取引はありません",
     "clearFilter": "フィルターをクリア",
+    "totalUsage": "合計使用量",
     "paymentDisclosure": "購入することで、当社の",
     "subscriptionTerms": "サブスクリプション規約",
     "paymentDisclosureAnd": "および",

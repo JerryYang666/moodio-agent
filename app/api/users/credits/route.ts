@@ -8,7 +8,7 @@ import {
   teamCredits,
   creditTransactions,
 } from "@/lib/db/schema";
-import { eq, and, desc, count } from "drizzle-orm";
+import { eq, and, desc, count, sum, lt } from "drizzle-orm";
 import type { AccountType } from "@/lib/credits";
 
 /**
@@ -123,12 +123,26 @@ export async function GET(request: NextRequest) {
       .limit(limit)
       .offset(offset);
 
+    // When a specific performer filter is applied, also return their total
+    // credits spent (sum of negative amounts) against this account.
+    let totalUsage: number | null = null;
+    if (accountType === "team" && performedByParam) {
+      const [usageRow] = await db
+        .select({ total: sum(creditTransactions.amount) })
+        .from(creditTransactions)
+        .where(and(whereClause, lt(creditTransactions.amount, 0)));
+      const rawTotal = usageRow?.total ?? null;
+      const parsed = rawTotal === null ? 0 : Number(rawTotal);
+      totalUsage = Number.isFinite(parsed) ? Math.abs(parsed) : 0;
+    }
+
     return NextResponse.json({
       balance,
       accountType,
       accountId,
       transactions: rows,
       totalCount: total,
+      totalUsage,
       page,
       limit,
     });

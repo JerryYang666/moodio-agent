@@ -1310,6 +1310,7 @@
     "allUsers": "모든 사용자",
     "noTransactionsForFilter": "이 사용자의 거래 내역이 없습니다",
     "clearFilter": "필터 지우기",
+    "totalUsage": "총 사용량",
     "paymentDisclosure": "구매 시 당사의",
     "subscriptionTerms": "구독 약관",
     "paymentDisclosureAnd": "및",

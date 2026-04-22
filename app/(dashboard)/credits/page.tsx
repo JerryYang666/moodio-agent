@@ -85,6 +85,7 @@ export default function CreditsPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [performedByFilter, setPerformedByFilter] = useState<string | null>(null);
   const [performers, setPerformers] = useState<Performer[]>([]);
+  const [totalUsage, setTotalUsage] = useState<number | null>(null);
   const rowsPerPage = 20;
 
   // Video detail modal state
@@ -131,6 +132,7 @@ export default function CreditsPage() {
       setViewBalance(data.balance);
       setTransactions(data.transactions);
       setTotalPages(Math.max(1, Math.ceil((data.totalCount ?? 0) / rowsPerPage)));
+      setTotalUsage(typeof data.totalUsage === "number" ? data.totalUsage : null);
     } catch (error) {
       console.error("Failed to fetch credits:", error);
     } finally {
@@ -366,8 +368,19 @@ export default function CreditsPage() {
 
       {/* Transaction History */}
       <Card>
-        <CardHeader className="pb-0 pt-4 px-4 flex-row items-center justify-between gap-4 flex-wrap">
-          <h2 className="text-lg font-semibold">{t("transactionHistory")}</h2>
+        <CardHeader className="pb-0 pt-4 px-4 flex-row items-start justify-between gap-4 flex-wrap">
+          <div className="flex flex-col gap-1">
+            <h2 className="text-lg font-semibold">{t("transactionHistory")}</h2>
+            {viewAccountType === "team" && performedByFilter && totalUsage !== null && (
+              <p className="text-sm text-default-500 flex items-center gap-1">
+                <span>{t("totalUsage")}:</span>
+                <span className="font-semibold text-danger">
+                  -{totalUsage.toLocaleString()}
+                </span>
+                <Bean size={14} className="text-danger" />
+              </p>
+            )}
+          </div>
           {viewAccountType === "team" && (
             <Select
               aria-label={t("filterByUser")}
