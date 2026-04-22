@@ -371,11 +371,11 @@ export default function CreditsPage() {
         <CardHeader className="pb-0 pt-4 px-4 flex-row items-start justify-between gap-4 flex-wrap">
           <h2 className="text-lg font-semibold">{t("transactionHistory")}</h2>
           {viewAccountType === "team" && (
-            <div className="flex flex-col items-end gap-1">
+            <div className="flex flex-col items-end gap-1 w-full sm:w-64">
               <Select
                 aria-label={t("filterByUser")}
                 size="sm"
-                className="max-w-xs"
+                className="w-full"
                 selectedKeys={performedByFilter ? [performedByFilter] : ["__all"]}
                 onSelectionChange={(keys) => {
                   const key = Array.from(keys)[0] as string | undefined;
