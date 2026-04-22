@@ -34,6 +34,7 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "20");
     const offset = (page - 1) * limit;
+    const performedByParam = searchParams.get("performedBy") || null;
 
     let accountId: string;
 
@@ -82,16 +83,21 @@ export async function GET(request: NextRequest) {
       balance = credits[0].balance;
     }
 
+    // Build where conditions (shared by count + list queries)
+    const conditions = [
+      eq(creditTransactions.accountId, accountId),
+      eq(creditTransactions.accountType, accountType),
+    ];
+    if (accountType === "team" && performedByParam) {
+      conditions.push(eq(creditTransactions.performedBy, performedByParam));
+    }
+    const whereClause = and(...conditions);
+
     // Get total count for pagination
     const [{ total }] = await db
       .select({ total: count() })
       .from(creditTransactions)
-      .where(
-        and(
-          eq(creditTransactions.accountId, accountId),
-          eq(creditTransactions.accountType, accountType)
-        )
-      );
+      .where(whereClause);
 
     // Get transaction history with performer details
     const rows = await db
@@ -112,12 +118,7 @@ export async function GET(request: NextRequest) {
       })
       .from(creditTransactions)
       .leftJoin(users, eq(creditTransactions.performedBy, users.id))
-      .where(
-        and(
-          eq(creditTransactions.accountId, accountId),
-          eq(creditTransactions.accountType, accountType)
-        )
-      )
+      .where(whereClause)
       .orderBy(desc(creditTransactions.createdAt))
       .limit(limit)
       .offset(offset);

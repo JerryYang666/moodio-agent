@@ -19,6 +19,7 @@ import { addToast } from "@heroui/toast";
 import { Tabs, Tab } from "@heroui/tabs";
 import { Pagination } from "@heroui/pagination";
 import { Tooltip } from "@heroui/tooltip";
+import { Select, SelectItem } from "@heroui/select";
 import { Bean, CalendarCheck, MessageSquare, Eye } from "lucide-react";
 import { api } from "@/lib/api/client";
 import { useCredits } from "@/hooks/use-credits";
@@ -47,6 +48,13 @@ interface CheckinStatus {
   nextAvailable: string | null;
 }
 
+interface Performer {
+  userId: string;
+  email: string;
+  firstName: string | null;
+  lastName: string | null;
+}
+
 export default function CreditsPage() {
   const t = useTranslations("credits");
   const searchParams = useSearchParams();
@@ -64,6 +72,7 @@ export default function CreditsPage() {
     setViewAccountType(activeAccountType);
     setViewAccountId(activeAccountId);
     setPage(1);
+    setPerformedByFilter(null);
   }, [activeAccountType, activeAccountId]);
 
   const [viewBalance, setViewBalance] = useState<number | null>(null);
@@ -74,6 +83,8 @@ export default function CreditsPage() {
   const [claiming, setClaiming] = useState(false);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [performedByFilter, setPerformedByFilter] = useState<string | null>(null);
+  const [performers, setPerformers] = useState<Performer[]>([]);
   const rowsPerPage = 20;
 
   // Video detail modal state
@@ -110,6 +121,9 @@ export default function CreditsPage() {
       if (viewAccountType === "team" && viewAccountId) {
         params.set("accountType", "team");
         params.set("accountId", viewAccountId);
+        if (performedByFilter) {
+          params.set("performedBy", performedByFilter);
+        }
       }
       params.set("page", String(page));
       params.set("limit", String(rowsPerPage));
@@ -123,7 +137,7 @@ export default function CreditsPage() {
       setInitialLoading(false);
       setFetchingPage(false);
     }
-  }, [viewAccountType, viewAccountId, page]);
+  }, [viewAccountType, viewAccountId, page, performedByFilter]);
 
   const fetchCheckinStatus = useCallback(async () => {
     try {
@@ -134,6 +148,36 @@ export default function CreditsPage() {
     }
   }, []);
 
+  const fetchPerformers = useCallback(async () => {
+    if (viewAccountType !== "team" || !viewAccountId) {
+      setPerformers([]);
+      return;
+    }
+    try {
+      const params = new URLSearchParams({
+        accountType: "team",
+        accountId: viewAccountId,
+      });
+      const data = await api.get(`/api/users/credits/performers?${params.toString()}`);
+      const list: Performer[] = data.performers ?? [];
+      const sorted = [...list].sort((a, b) => {
+        const nameA =
+          (a.firstName || a.lastName
+            ? `${a.firstName ?? ""} ${a.lastName ?? ""}`.trim()
+            : a.email) || "";
+        const nameB =
+          (b.firstName || b.lastName
+            ? `${b.firstName ?? ""} ${b.lastName ?? ""}`.trim()
+            : b.email) || "";
+        return nameA.localeCompare(nameB);
+      });
+      setPerformers(sorted);
+    } catch (error) {
+      console.error("Failed to fetch performers:", error);
+      setPerformers([]);
+    }
+  }, [viewAccountType, viewAccountId]);
+
   useEffect(() => {
     setFetchingPage(true);
     fetchCredits();
@@ -141,6 +185,10 @@ export default function CreditsPage() {
       fetchCheckinStatus();
     }
   }, [fetchCredits, fetchCheckinStatus, viewAccountType]);
+
+  useEffect(() => {
+    fetchPerformers();
+  }, [fetchPerformers]);
 
   const checkoutHandled = useRef(false);
 
@@ -232,6 +280,7 @@ export default function CreditsPage() {
               setViewAccountId(teamId);
             }
             setPage(1);
+            setPerformedByFilter(null);
           }}
           variant="underlined"
           classNames={{ tabList: "gap-4" }}
@@ -317,13 +366,53 @@ export default function CreditsPage() {
 
       {/* Transaction History */}
       <Card>
-        <CardHeader className="pb-0 pt-4 px-4 flex-col items-start">
+        <CardHeader className="pb-0 pt-4 px-4 flex-row items-center justify-between gap-4 flex-wrap">
           <h2 className="text-lg font-semibold">{t("transactionHistory")}</h2>
+          {viewAccountType === "team" && (
+            <Select
+              aria-label={t("filterByUser")}
+              size="sm"
+              className="max-w-xs"
+              selectedKeys={performedByFilter ? [performedByFilter] : ["__all"]}
+              onSelectionChange={(keys) => {
+                const key = Array.from(keys)[0] as string | undefined;
+                setPerformedByFilter(!key || key === "__all" ? null : key);
+                setPage(1);
+              }}
+            >
+              {[
+                <SelectItem key="__all">{t("allUsers")}</SelectItem>,
+                ...performers.map((p) => (
+                  <SelectItem key={p.userId}>
+                    {p.firstName || p.lastName
+                      ? `${p.firstName ?? ""} ${p.lastName ?? ""}`.trim()
+                      : p.email || p.userId}
+                  </SelectItem>
+                )),
+              ]}
+            </Select>
+          )}
         </CardHeader>
         <CardBody>
           {transactions.length === 0 ? (
-            <div className="text-center py-8 text-default-400">
-              {t("noTransactions")}
+            <div className="text-center py-8 text-default-400 flex flex-col items-center gap-3">
+              <span>
+                {performedByFilter
+                  ? t("noTransactionsForFilter")
+                  : t("noTransactions")}
+              </span>
+              {performedByFilter && (
+                <Button
+                  size="sm"
+                  variant="flat"
+                  onPress={() => {
+                    setPerformedByFilter(null);
+                    setPage(1);
+                  }}
+                >
+                  {t("clearFilter")}
+                </Button>
+              )}
             </div>
           ) : (
             <Table

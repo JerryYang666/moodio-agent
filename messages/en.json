@@ -1462,7 +1462,11 @@
     "purchasingForTeam": "Adding credits to {teamName}",
     "teamPurchaseNotAllowed": "Only team owners and admins can purchase credits for the team",
     "viewChat": "View Chat",
-    "viewGeneration": "View Generation"
+    "viewGeneration": "View Generation",
+    "filterByUser": "Filter by user",
+    "allUsers": "All users",
+    "noTransactionsForFilter": "No transactions for this user",
+    "clearFilter": "Clear filter"
   },
   "teams": {
     "title": "Teams",
