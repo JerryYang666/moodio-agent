@@ -356,6 +356,23 @@
     "uploadDocumentSuccess": "Document text imported",
     "uploadDocumentTruncated": "Document text was truncated to fit the character limit",
     "klingElementsInvalid": "Please complete every element: name, description, and at least 2 reference images are required.",
+    "klingElement": {
+      "header": "Elements ({count}/{max})",
+      "addButton": "Add Element",
+      "emptyHint": "Optional: add up to {max} reusable elements (a character, object, or style), then reference them in your prompt as @name. Works together with first/last frame images.",
+      "defaultName": "Element {index}",
+      "imageCount": "{count, plural, one {# image} other {# images}}",
+      "namePlaceholder": "dog",
+      "nameLabel": "Name",
+      "nameRequired": "Name is required",
+      "nameHint": "Reference in prompt as @name",
+      "descriptionLabel": "Description",
+      "descriptionPlaceholder": "A golden retriever",
+      "descriptionRequired": "Description is required",
+      "referenceImages": "Reference Images ({count}/{max})",
+      "addImages": "Add",
+      "imagesRequired": "At least {min} images required"
+    },
     "imageError": {
       "contentPolicyViolation": "Image blocked: the prompt or reference image may violate content policies. Please revise and try again.",
       "publicFigureBlocked": "Image blocked: the request was flagged for containing a prominent public figure. Please remove the public figure reference and try again.",

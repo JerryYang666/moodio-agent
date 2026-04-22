@@ -4,6 +4,7 @@ import { useCallback, useState } from "react";
 import { Button } from "@heroui/button";
 import { Input } from "@heroui/input";
 import { Plus, Trash2, Sparkles, ImagePlus, X } from "lucide-react";
+import { useTranslations } from "next-intl";
 import type { KlingElement } from "@/lib/video/models";
 
 const MAX_ELEMENTS = 3;
@@ -49,6 +50,7 @@ export function KlingElementEditor({
   onPickImages,
   resolveImageUrl,
 }: KlingElementEditorProps) {
+  const t = useTranslations("chat.klingElement");
   const [expandedIndex, setExpandedIndex] = useState<number | null>(
     elements.length === 0 ? null : 0
   );
@@ -113,7 +115,7 @@ export function KlingElementEditor({
         <div className="flex items-center gap-1.5 text-xs text-default-500">
           <Sparkles size={14} />
           <span className="font-medium">
-            Elements ({elements.length}/{MAX_ELEMENTS})
+            {t("header", { count: elements.length, max: MAX_ELEMENTS })}
           </span>
         </div>
         {!disabled && elements.length < MAX_ELEMENTS && (
@@ -124,7 +126,7 @@ export function KlingElementEditor({
             onPress={addElement}
             className="h-6 min-w-0 px-2 text-xs"
           >
-            Add Element
+            {t("addButton")}
           </Button>
         )}
       </div>
@@ -134,7 +136,7 @@ export function KlingElementEditor({
           onClick={addElement}
           className="w-full rounded-lg border-2 border-dashed border-default-200 p-3 text-xs text-default-400 hover:border-default-300 hover:text-default-500 transition-colors"
         >
-          Add elements to reference in your prompt with @name
+          {t("emptyHint", { max: MAX_ELEMENTS })}
         </button>
       )}
 
@@ -175,12 +177,12 @@ export function KlingElementEditor({
                   }
                 />
                 <span className="text-xs font-medium flex-1 text-left truncate">
-                  {el.name ? `@${el.name}` : `Element ${index + 1}`}
+                  {el.name ? `@${el.name}` : t("defaultName", { index: index + 1 })}
                 </span>
                 <span
                   className={`text-[10px] ${imagesInvalid ? "text-danger" : "text-default-400"}`}
                 >
-                  {imageCount} image{imageCount !== 1 ? "s" : ""}
+                  {t("imageCount", { count: imageCount })}
                 </span>
                 {!disabled && (
                   <button
@@ -199,8 +201,8 @@ export function KlingElementEditor({
                 <div className="px-2.5 pb-2.5 space-y-2 border-t border-divider pt-2">
                   <Input
                     size="sm"
-                    label="Name"
-                    placeholder="dog"
+                    label={t("nameLabel")}
+                    placeholder={t("namePlaceholder")}
                     value={el.name}
                     onValueChange={(v) =>
                       updateElement(index, {
@@ -209,15 +211,15 @@ export function KlingElementEditor({
                     }
                     isRequired
                     isInvalid={nameInvalid}
-                    errorMessage={nameInvalid ? "Name is required" : undefined}
-                    description={nameInvalid ? undefined : "Used in prompt as @name"}
+                    errorMessage={nameInvalid ? t("nameRequired") : undefined}
+                    description={nameInvalid ? undefined : t("nameHint")}
                     isDisabled={disabled}
                     classNames={{ input: "text-xs", label: "text-xs" }}
                   />
                   <Input
                     size="sm"
-                    label="Description"
-                    placeholder="A golden retriever"
+                    label={t("descriptionLabel")}
+                    placeholder={t("descriptionPlaceholder")}
                     value={el.description}
                     onValueChange={(v) =>
                       updateElement(index, { description: v })
@@ -225,7 +227,7 @@ export function KlingElementEditor({
                     isRequired
                     isInvalid={descriptionInvalid}
                     errorMessage={
-                      descriptionInvalid ? "Description is required" : undefined
+                      descriptionInvalid ? t("descriptionRequired") : undefined
                     }
                     isDisabled={disabled}
                     classNames={{ input: "text-xs", label: "text-xs" }}
@@ -234,7 +236,7 @@ export function KlingElementEditor({
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between">
                       <span className="text-[11px] text-default-500">
-                        Reference Images ({imageCount}/{MAX_IMAGES})
+                        {t("referenceImages", { count: imageCount, max: MAX_IMAGES })}
                         <span className="text-danger ml-0.5">*</span>
                       </span>
                       {!disabled && imageCount < MAX_IMAGES && (
@@ -245,13 +247,13 @@ export function KlingElementEditor({
                           onPress={() => onPickImages?.(index, MAX_IMAGES - imageCount)}
                           className="h-5 min-w-0 px-1.5 text-[10px]"
                         >
-                          Add
+                          {t("addImages")}
                         </Button>
                       )}
                     </div>
                     {imagesInvalid && (
                       <p className="text-[10px] text-danger">
-                        At least {MIN_IMAGES} images required
+                        {t("imagesRequired", { min: MIN_IMAGES })}
                       </p>
                     )}
                     <div className="flex flex-wrap gap-1.5">

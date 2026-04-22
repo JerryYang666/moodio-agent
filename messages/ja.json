@@ -356,6 +356,23 @@
     "uploadDocumentSuccess": "ドキュメントのテキストをインポートしました",
     "uploadDocumentTruncated": "ドキュメントのテキストは文字数制限に合わせて切り詰められました",
     "klingElementsInvalid": "各要素を入力してください：名前、説明、参照画像 2 枚以上はすべて必須です。",
+    "klingElement": {
+      "header": "要素 ({count}/{max})",
+      "addButton": "要素を追加",
+      "emptyHint": "任意：再利用できる要素（キャラクター・物体・スタイル）を最大 {max} 個まで追加し、プロンプト内で @名前 として参照できます。最初／最後のフレーム画像と併用できます。",
+      "defaultName": "要素 {index}",
+      "imageCount": "{count} 枚",
+      "namePlaceholder": "犬",
+      "nameLabel": "名前",
+      "nameRequired": "名前を入力してください",
+      "nameHint": "プロンプト内で @名前 として参照されます",
+      "descriptionLabel": "説明",
+      "descriptionPlaceholder": "ゴールデン・レトリバー",
+      "descriptionRequired": "説明を入力してください",
+      "referenceImages": "参照画像 ({count}/{max})",
+      "addImages": "追加",
+      "imagesRequired": "参照画像は最低 {min} 枚必要です"
+    },
     "imageError": {
       "contentPolicyViolation": "画像がブロックされました：プロンプトまたは参照画像がコンテンツポリシーに違反している可能性があります。内容を修正して再度お試しください。",
       "publicFigureBlocked": "画像がブロックされました：著名な公人が含まれているとしてリクエストがフラグされました。公人への言及を削除して再度お試しください。",

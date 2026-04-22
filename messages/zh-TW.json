@@ -356,6 +356,23 @@
     "uploadDocumentSuccess": "文件文字已匯入",
     "uploadDocumentTruncated": "文件文字已截斷以符合字元限制",
     "klingElementsInvalid": "請完善每個元素：名稱、描述和至少 2 張參考圖片都是必填項。",
+    "klingElement": {
+      "header": "元素 ({count}/{max})",
+      "addButton": "新增元素",
+      "emptyHint": "選用：最多新增 {max} 個可重複使用的元素（角色、物件或風格），並在提示詞中以 @名稱 引用它們。可與首幀／尾幀圖片同時使用。",
+      "defaultName": "元素 {index}",
+      "imageCount": "{count} 張圖片",
+      "namePlaceholder": "小狗",
+      "nameLabel": "名稱",
+      "nameRequired": "請輸入名稱",
+      "nameHint": "在提示詞中以 @名稱 引用",
+      "descriptionLabel": "描述",
+      "descriptionPlaceholder": "一隻黃金獵犬",
+      "descriptionRequired": "請輸入描述",
+      "referenceImages": "參考圖片 ({count}/{max})",
+      "addImages": "新增",
+      "imagesRequired": "至少需要 {min} 張圖片"
+    },
     "imageError": {
       "contentPolicyViolation": "圖片被攔截：提示詞或參考圖片可能違反了內容政策。請修改後重試。",
       "publicFigureBlocked": "圖片被攔截：請求因涉及知名公眾人物而被標記。請移除公眾人物相關內容後重試。",
