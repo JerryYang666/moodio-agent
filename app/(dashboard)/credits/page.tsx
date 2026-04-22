@@ -369,41 +369,41 @@ export default function CreditsPage() {
       {/* Transaction History */}
       <Card>
         <CardHeader className="pb-0 pt-4 px-4 flex-row items-start justify-between gap-4 flex-wrap">
-          <div className="flex flex-col gap-1">
-            <h2 className="text-lg font-semibold">{t("transactionHistory")}</h2>
-            {viewAccountType === "team" && performedByFilter && totalUsage !== null && (
-              <p className="text-sm text-default-500 flex items-center gap-1">
-                <span>{t("totalUsage")}:</span>
-                <span className="font-semibold text-danger">
-                  -{totalUsage.toLocaleString()}
-                </span>
-                <Bean size={14} className="text-danger" />
-              </p>
-            )}
-          </div>
+          <h2 className="text-lg font-semibold">{t("transactionHistory")}</h2>
           {viewAccountType === "team" && (
-            <Select
-              aria-label={t("filterByUser")}
-              size="sm"
-              className="max-w-xs"
-              selectedKeys={performedByFilter ? [performedByFilter] : ["__all"]}
-              onSelectionChange={(keys) => {
-                const key = Array.from(keys)[0] as string | undefined;
-                setPerformedByFilter(!key || key === "__all" ? null : key);
-                setPage(1);
-              }}
-            >
-              {[
-                <SelectItem key="__all">{t("allUsers")}</SelectItem>,
-                ...performers.map((p) => (
-                  <SelectItem key={p.userId}>
-                    {p.firstName || p.lastName
-                      ? `${p.firstName ?? ""} ${p.lastName ?? ""}`.trim()
-                      : p.email || p.userId}
-                  </SelectItem>
-                )),
-              ]}
-            </Select>
+            <div className="flex flex-col items-end gap-1">
+              <Select
+                aria-label={t("filterByUser")}
+                size="sm"
+                className="max-w-xs"
+                selectedKeys={performedByFilter ? [performedByFilter] : ["__all"]}
+                onSelectionChange={(keys) => {
+                  const key = Array.from(keys)[0] as string | undefined;
+                  setPerformedByFilter(!key || key === "__all" ? null : key);
+                  setPage(1);
+                }}
+              >
+                {[
+                  <SelectItem key="__all">{t("allUsers")}</SelectItem>,
+                  ...performers.map((p) => (
+                    <SelectItem key={p.userId}>
+                      {p.firstName || p.lastName
+                        ? `${p.firstName ?? ""} ${p.lastName ?? ""}`.trim()
+                        : p.email || p.userId}
+                    </SelectItem>
+                  )),
+                ]}
+              </Select>
+              {performedByFilter && totalUsage !== null && (
+                <p className="text-sm text-default-500 flex items-center gap-1">
+                  <span>{t("totalUsage")}:</span>
+                  <span className="font-semibold text-danger">
+                    -{totalUsage.toLocaleString()}
+                  </span>
+                  <Bean size={14} className="text-danger" />
+                </p>
+              )}
+            </div>
           )}
         </CardHeader>
         <CardBody>
