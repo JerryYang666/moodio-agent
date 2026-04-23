@@ -266,13 +266,16 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
   // Observe the textarea height and stack the image/voice buttons vertically
   // once there is room for two stacked buttons (~2 * 40px + gap).
   //
-  // Uses a hysteresis band to prevent an oscillation feedback loop: stacking
-  // the buttons widens the textarea, which reflows text onto fewer lines and
-  // can drop the height back below the stack threshold — which would unstack
-  // the buttons, narrow the textarea, reflow back to more lines, and restack.
-  // At viewport widths where a line of text sits right at the wrap boundary
-  // this flaps every frame. We require the textarea to shrink well below the
-  // stack threshold (roughly back to a single line) before unstacking.
+  // The button group switches flex-direction (row <-> column) instantly via
+  // CSS — no framer-motion layout animation on it — so state changes here
+  // don't produce a stream of intermediate resize events that could re-cross
+  // the threshold mid-animation. The hysteresis band below is still kept as
+  // a defense against the steady-state feedback loop where stacking widens
+  // the textarea, reflowing text onto fewer lines and dropping the height
+  // back below the stack threshold. Without hysteresis, at viewport widths
+  // where a line of text sits right at the wrap boundary this flaps every
+  // frame. We require the textarea to shrink well below the stack threshold
+  // (roughly back to a single line) before unstacking.
   useEffect(() => {
     const el = textareaContainerRef.current;
     if (!el) return;
@@ -1457,9 +1460,7 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
 
           {/* Input Row */}
           <div className={clsx("flex items-center p-2", isExpanded && "gap-2")}>
-            <motion.div
-              layout
-              transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+            <div
               className={clsx(
                 "flex gap-1 items-center overflow-hidden transition-[width,opacity] duration-300 shrink-0",
                 stackLeftButtons ? "flex-col" : "flex-row",
@@ -1467,66 +1468,56 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
               )}
             >
               {showFileUpload && (
-                <motion.div
-                  layout
-                  transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+                <Button
+                  isIconOnly
+                  variant="flat"
+                  onPress={onOpenAssetPicker}
+                  aria-label={t("chat.addImage")}
                 >
-                  <Button
-                    isIconOnly
-                    variant="flat"
-                    onPress={onOpenAssetPicker}
-                    aria-label={t("chat.addImage")}
-                  >
-                    <ImagePlus size={24} className="text-default-500" />
-                  </Button>
-                </motion.div>
+                  <ImagePlus size={24} className="text-default-500" />
+                </Button>
               )}
 
-              <motion.div
-                layout
-                transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+              <Popover
+                isOpen={
+                  isRecording &&
+                  siteConfig.audioRecording.maxDuration - recordingTime <=
+                  siteConfig.audioRecording.countdownThreshold
+                }
+                placement="top"
               >
-                <Popover
-                  isOpen={
-                    isRecording &&
-                    siteConfig.audioRecording.maxDuration - recordingTime <=
-                    siteConfig.audioRecording.countdownThreshold
-                  }
-                  placement="top"
-                >
-                  <PopoverTrigger>
-                    <div className="inline-block">
-                      <Button
-                        isIconOnly
-                        variant={isRecording ? "solid" : "flat"}
-                        color={isRecording ? "danger" : "default"}
-                        onPress={isRecording ? onStopRecording : onStartRecording}
-                        aria-label={t("chat.recordVoice")}
-                        isLoading={isTranscribing}
-                      >
-                        {isRecording ? (
-                          <Square size={20} />
-                        ) : (
-                          <Mic size={24} className="text-default-500" />
-                        )}
-                      </Button>
+                <PopoverTrigger>
+                  <div className="inline-block">
+                    <Button
+                      isIconOnly
+                      variant={isRecording ? "solid" : "flat"}
+                      color={isRecording ? "danger" : "default"}
+                      onPress={isRecording ? onStopRecording : onStartRecording}
+                      aria-label={t("chat.recordVoice")}
+                      isLoading={isTranscribing}
+                    >
+                      {isRecording ? (
+                        <Square size={20} />
+                      ) : (
+                        <Mic size={24} className="text-default-500" />
+                      )}
+                    </Button>
+                  </div>
+                </PopoverTrigger>
+                <PopoverContent className="bg-danger text-danger-foreground">
+                  <div className="px-1 py-1">
+                    <div className="text-small font-bold">
+                      {t("chat.timeRemaining", {
+                        seconds: Math.max(
+                          0,
+                          siteConfig.audioRecording.maxDuration - recordingTime
+                        ),
+                      })}
                     </div>
-                  </PopoverTrigger>
-                  <PopoverContent className="bg-danger text-danger-foreground">
-                    <div className="px-1 py-1">
-                      <div className="text-small font-bold">
-                        {t("chat.timeRemaining", {
-                          seconds: Math.max(
-                            0,
-                            siteConfig.audioRecording.maxDuration - recordingTime
-                          ),
-                        })}
-                      </div>
-                    </div>
-                  </PopoverContent>
-                </Popover>
-              </motion.div>
-            </motion.div>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            </div>
 
             <div ref={textareaContainerRef} className="flex-1 min-w-0">
               <MentionTextbox
