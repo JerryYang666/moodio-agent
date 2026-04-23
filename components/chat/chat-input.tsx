@@ -265,16 +265,30 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
 
   // Observe the textarea height and stack the image/voice buttons vertically
   // once there is room for two stacked buttons (~2 * 40px + gap).
+  //
+  // Uses a hysteresis band to prevent an oscillation feedback loop: stacking
+  // the buttons widens the textarea, which reflows text onto fewer lines and
+  // can drop the height back below the stack threshold — which would unstack
+  // the buttons, narrow the textarea, reflow back to more lines, and restack.
+  // At viewport widths where a line of text sits right at the wrap boundary
+  // this flaps every frame. We require the textarea to shrink well below the
+  // stack threshold (roughly back to a single line) before unstacking.
   useEffect(() => {
     const el = textareaContainerRef.current;
     if (!el) return;
-    const STACK_THRESHOLD_PX = 88;
+    const STACK_ON_PX = 88;
+    const STACK_OFF_PX = 56;
     const observer = new ResizeObserver((entries) => {
       for (const entry of entries) {
         const height =
           entry.borderBoxSize?.[0]?.blockSize ??
           entry.target.getBoundingClientRect().height;
-        setStackLeftButtons(height >= STACK_THRESHOLD_PX);
+        setStackLeftButtons((prev) => {
+          if (prev) {
+            return height >= STACK_OFF_PX;
+          }
+          return height >= STACK_ON_PX;
+        });
       }
     });
     observer.observe(el);
