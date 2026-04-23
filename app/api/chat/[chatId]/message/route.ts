@@ -1116,12 +1116,16 @@ export async function POST(
                   prompt: content,
                   sourceImageId: effectiveSourceImageId,
                   sourceImageUrl: getSignedImageUrl(effectiveSourceImageId, undefined, cnMode),
+                  endImageId: endImageId || undefined,
+                  endImageUrl: endImageId ? getSignedImageUrl(endImageId, undefined, cnMode) : undefined,
                   params: videoParams,
                 },
+                generationId: generation?.id,
                 status: "failed",
                 error: isInsufficientCredits
                   ? "INSUFFICIENT_CREDITS"
                   : err.message || "Failed to start video generation",
+                thumbnailUrl: getSignedImageUrl(effectiveSourceImageId, undefined, cnMode),
                 createdAt: new Date().toISOString(),
               };
               send({ type: "part", part: generatedPart, variantId });

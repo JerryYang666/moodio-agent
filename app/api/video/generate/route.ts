@@ -13,7 +13,7 @@ import {
 import { deductCredits, assertSufficientCredits, getActiveAccount, InsufficientCreditsError } from "@/lib/credits";
 import { calculateCost } from "@/lib/pricing";
 import { submitVideoGeneration } from "@/lib/video/video-client";
-import { getSignedImageUrl } from "@/lib/storage/s3";
+import { getSignedImageUrl, getSignedVideoUrl, getSignedAudioUrl } from "@/lib/storage/s3";
 import { recordEvent } from "@/lib/telemetry";
 import { isFeatureFlagEnabled } from "@/lib/feature-flags/server";
 import { recordResearchEvent } from "@/lib/research-telemetry";
@@ -111,6 +111,23 @@ export async function POST(request: NextRequest) {
             }
             return getSignedImageUrl(idOrUrl);
           }),
+        })
+      );
+    }
+
+    // Resolve media_references IDs to signed URLs for the provider API
+    if (Array.isArray(fullParams.media_references)) {
+      fullParams.media_references = fullParams.media_references.map(
+        (ref: { type: "image" | "video" | "audio"; id: string }) => ({
+          type: ref.type,
+          id:
+            typeof ref.id === "string" && ref.id.startsWith("http")
+              ? ref.id
+              : ref.type === "video"
+                ? getSignedVideoUrl(ref.id)
+                : ref.type === "audio"
+                  ? getSignedAudioUrl(ref.id)
+                  : getSignedImageUrl(ref.id),
         })
       );
     }

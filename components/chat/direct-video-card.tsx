@@ -171,9 +171,14 @@ export default function DirectVideoCard({
     params: { prompt: part.config.prompt, ...part.config.params },
   };
 
-  const videoDetailData: VideoDetailData | null = part.generationId
+  // Build detail data whenever we have something worth showing —
+  // a generationId (normal path) OR an error on a failed part (fallback for
+  // older history written before failed parts carried a generationId).
+  const hasDetailData =
+    !!part.generationId || (part.status === "failed" && !!part.error);
+  const videoDetailData: VideoDetailData | null = hasDetailData
     ? {
-        id: part.generationId,
+        id: part.generationId ?? "",
         modelId: part.config.modelId,
         provider: part.provider ?? null,
         providerRequestId: part.providerRequestId ?? null,
