@@ -415,7 +415,9 @@
     "languagePreferenceLabel": "使用言語",
     "selectLanguage": "言語を選択",
     "cnMode": "中国モード",
-    "cnModeDescription": "中国本土向けにコンテンツ配信を最適化"
+    "cnModeDescription": "中国本土向けにコンテンツ配信を最適化",
+    "stackChatInputButtons": "チャット入力ボタンを自動で縦に並べる",
+    "stackChatInputButtonsDescription": "チャット入力欄が高くなったとき、画像と音声のボタンを縦に並べて、入力スペースを広く確保します"
   },
   "payments": {
     "title": "お支払いとサブスクリプション",

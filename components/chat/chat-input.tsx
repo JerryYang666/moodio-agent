@@ -2,6 +2,7 @@
 
 import { useRef, useState, useEffect, useMemo, useCallback, forwardRef, useImperativeHandle } from "react";
 import { useFeatureFlag } from "@/lib/feature-flags";
+import { useUserSetting } from "@/lib/user-settings";
 import { useTranslations } from "next-intl";
 import { Button } from "@heroui/button";
 import { Popover, PopoverTrigger, PopoverContent } from "@heroui/popover";
@@ -226,6 +227,9 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
   const mentionTextboxRef = useRef<MentionTextboxRef>(null);
   const textareaContainerRef = useRef<HTMLDivElement>(null);
   const [isExpanded, setIsExpanded] = useState(false);
+  // User-controlled kill switch for the adaptive stacking behavior. Disabled
+  // by default; opt-in from the profile page. See the effect below.
+  const stackChatInputButtonsEnabled = useUserSetting("stackChatInputButtons");
   // When the textarea grows tall enough to fit two stacked buttons, stack the
   // image/voice buttons vertically to reclaim horizontal space.
   const [stackLeftButtons, setStackLeftButtons] = useState(false);
@@ -276,7 +280,16 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
   // where a line of text sits right at the wrap boundary this flaps every
   // frame. We require the textarea to shrink well below the stack threshold
   // (roughly back to a single line) before unstacking.
+  //
+  // Gated on the `stackChatInputButtons` user setting. When disabled, we
+  // skip creating the observer entirely and force the state back to false
+  // so the buttons stay in their default horizontal row. Toggling the
+  // setting live subscribes/unsubscribes the observer via the dep array.
   useEffect(() => {
+    if (!stackChatInputButtonsEnabled) {
+      setStackLeftButtons(false);
+      return;
+    }
     const el = textareaContainerRef.current;
     if (!el) return;
     const STACK_ON_PX = 88;
@@ -296,7 +309,7 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
     });
     observer.observe(el);
     return () => observer.disconnect();
-  }, []);
+  }, [stackChatInputButtonsEnabled]);
 
   // Convert pending images to mention items for the textbox
   const supportsElements = useMemo(

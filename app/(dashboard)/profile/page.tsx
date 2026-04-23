@@ -11,7 +11,7 @@ import { startRegistration } from "@simplewebauthn/browser";
 import { Switch } from "@heroui/switch";
 import { Select, SelectItem } from "@heroui/select";
 import { Chip } from "@heroui/chip";
-import { Key, Lock, Eye, EyeOff, Globe, Sparkles } from "lucide-react";
+import { Key, Lock, Eye, EyeOff, Globe, Sparkles, Rows2 } from "lucide-react";
 import { addToast } from "@heroui/toast";
 import { siteConfig } from "@/config/site";
 import { LegalFooter } from "@/components/legal-footer";
@@ -49,6 +49,7 @@ export default function ProfilePage() {
   const mainGoal = useUserSetting("mainGoal");
   const communicationTone = useUserSetting("communicationTone");
   const explanationDepth = useUserSetting("explanationDepth");
+  const stackChatInputButtons = useUserSetting("stackChatInputButtons");
   const updateSettings = useUpdateSettings();
 
   const AGENT_ONLY_LANGUAGES: { code: string; name: string }[] = [
@@ -287,7 +288,7 @@ export default function ProfilePage() {
         <CardHeader className="pb-0 pt-4 px-4 flex-col items-start">
           <h2 className="text-lg font-semibold">{t("profile.accountSettings")}</h2>
         </CardHeader>
-        <CardBody>
+        <CardBody className="space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <Globe className="w-5 h-5 text-primary" />
@@ -301,6 +302,22 @@ export default function ProfilePage() {
             <Switch
               isSelected={cnMode}
               onValueChange={(val) => updateSettings({ cnMode: val })}
+            />
+          </div>
+
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Rows2 className="w-5 h-5 text-primary" />
+              <div className="flex flex-col">
+                <span className="font-medium">{t("profile.stackChatInputButtons")}</span>
+                <span className="text-xs text-default-400">
+                  {t("profile.stackChatInputButtonsDescription")}
+                </span>
+              </div>
+            </div>
+            <Switch
+              isSelected={stackChatInputButtons}
+              onValueChange={(val) => updateSettings({ stackChatInputButtons: val })}
             />
           </div>
         </CardBody>

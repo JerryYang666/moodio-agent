@@ -415,7 +415,9 @@
     "languagePreferenceLabel": "Preferred Language",
     "selectLanguage": "Select a language",
     "cnMode": "China Mode",
-    "cnModeDescription": "Optimize content delivery for mainland China"
+    "cnModeDescription": "Optimize content delivery for mainland China",
+    "stackChatInputButtons": "Auto-stack chat input buttons",
+    "stackChatInputButtonsDescription": "Stack the image and voice buttons vertically when the chat input grows tall, to leave more room for your prompt"
   },
   "payments": {
     "title": "Payments & Subscriptions",

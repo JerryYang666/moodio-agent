@@ -415,7 +415,9 @@
     "languagePreferenceLabel": "偏好語言",
     "selectLanguage": "選擇語言",
     "cnMode": "國內模式",
-    "cnModeDescription": "優化中國大陸的內容傳遞"
+    "cnModeDescription": "優化中國大陸的內容傳遞",
+    "stackChatInputButtons": "聊天輸入框按鈕自動縱向排列",
+    "stackChatInputButtonsDescription": "當聊天輸入框變高時，將圖片和語音按鈕縱向堆疊，為輸入內容留出更多空間"
   },
   "payments": {
     "title": "付款與訂閱",

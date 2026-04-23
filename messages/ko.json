@@ -415,7 +415,9 @@
     "languagePreferenceLabel": "선호 언어",
     "selectLanguage": "언어 선택",
     "cnMode": "중국 모드",
-    "cnModeDescription": "중국 본토를 위한 콘텐츠 전송 최적화"
+    "cnModeDescription": "중국 본토를 위한 콘텐츠 전송 최적화",
+    "stackChatInputButtons": "채팅 입력창 버튼 자동 세로 정렬",
+    "stackChatInputButtonsDescription": "채팅 입력창이 길어지면 이미지와 음성 버튼을 세로로 쌓아 입력 공간을 더 확보합니다"
   },
   "payments": {
     "title": "결제 및 구독",

@@ -415,7 +415,9 @@
     "languagePreferenceLabel": "首选语言",
     "selectLanguage": "选择语言",
     "cnMode": "国内模式",
-    "cnModeDescription": "优化中国大陆的内容分发"
+    "cnModeDescription": "优化中国大陆的内容分发",
+    "stackChatInputButtons": "聊天输入框按钮自动纵向排列",
+    "stackChatInputButtonsDescription": "当聊天输入框变高时，将图片和语音按钮纵向堆叠，为输入内容留出更多空间"
   },
   "payments": {
     "title": "支付与订阅",
