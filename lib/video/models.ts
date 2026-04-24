@@ -2116,6 +2116,43 @@ export function getModelConfigForApi(modelId: string) {
 }
 
 /**
+ * Get model config for admin pricing UI
+ * Includes hidden parameters (still excludes disabled) so admins can
+ * reference them in pricing formulas. Hidden params — e.g.
+ * reference_video_duration — aren't shown in user-facing config UIs but
+ * still flow into calculateCost.
+ */
+export function getModelConfigForAdmin(modelId: string) {
+  const model = getVideoModel(modelId);
+  if (!model) return null;
+
+  const params = getEffectiveParams(model);
+
+  return {
+    id: model.id,
+    name: model.name,
+    description: model.description,
+    imageParams: model.imageParams || null,
+    params: params
+      .filter((p) => p.status !== "disabled")
+      .map((p) => ({
+        name: p.name,
+        label: p.label || p.name,
+        type: p.type,
+        required: p.required,
+        default: p.default,
+        options: p.options,
+        description: p.description,
+        min: p.min,
+        max: p.max,
+        maxItems: p.maxItems,
+        maxLength: p.maxLength,
+        acceptTypes: p.acceptTypes,
+      })),
+  };
+}
+
+/**
  * Get all models for API response
  */
 export function getAllModelsForApi() {

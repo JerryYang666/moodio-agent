@@ -6,7 +6,7 @@ import {
   savePricingFormula,
   validateFormula,
 } from "@/lib/pricing";
-import { VIDEO_MODELS, getModelConfigForApi } from "@/lib/video/models";
+import { VIDEO_MODELS, getModelConfigForAdmin } from "@/lib/video/models";
 import { getActiveProvider } from "@/lib/video/provider-config";
 import { IMAGE_MODELS, getImageModelConfigForApi } from "@/lib/image/models";
 
@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
         provider = variant.provider;
       } catch {}
 
-      const resolved = getModelConfigForApi(m.id);
+      const resolved = getModelConfigForAdmin(m.id);
       return {
         id: m.id,
         name: m.name,
