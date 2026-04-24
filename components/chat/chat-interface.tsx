@@ -4686,7 +4686,12 @@ export default function ChatInterface({
             : assetPickerMode === "assetParam"
               ? 1
               : assetPickerMode === "mediaRefImage"
-                ? 9
+                ? Math.max(
+                    0,
+                    (menuState.videoModelId === "kling-o3-reference" ? 4 : 9) -
+                      ((menuState.videoParams?.media_references as MediaReference[]) || [])
+                        .filter((r) => r.type === "image").length
+                  )
                 : assetPickerMode === "mediaRefVideo"
                   ? 3
                   : assetPickerMode === "mediaRefAudio"
