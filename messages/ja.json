@@ -372,7 +372,21 @@
       "descriptionRequired": "説明を入力してください",
       "referenceImages": "参照画像 ({count}/{max})",
       "addImages": "追加",
-      "imagesRequired": "参照画像は最低 {min} 枚必要です"
+      "imagesRequired": "参照画像は最低 {min} 枚必要です",
+      "frontalBadge": "正面",
+      "frontalHint": "最初の画像は正面ビューとして使用され、以降の画像はスタイル／見た目の参照として使用されます。"
+    },
+    "seedanceReference": {
+      "header": "参照素材 ({count})",
+      "headerImages": "参照画像 ({count})",
+      "videoDuration": "動画：{seconds}s / {max}s",
+      "imageButton": "画像",
+      "videoButton": "動画",
+      "audioButton": "音声",
+      "emptyHintMixed": "参照画像・動画・音声を追加し、プロンプト内で @image1 / @video1 / @audio1 として参照できます",
+      "emptyHintImages": "参照画像を追加し、プロンプト内で @image1、@image2 … として参照できます",
+      "pin": "ピン留め",
+      "unpin": "ピン留めを解除"
     },
     "imageError": {
       "contentPolicyViolation": "画像がブロックされました：プロンプトまたは参照画像がコンテンツポリシーに違反している可能性があります。内容を修正して再度お試しください。",

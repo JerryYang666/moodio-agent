@@ -372,7 +372,21 @@
       "descriptionRequired": "설명을 입력해 주세요",
       "referenceImages": "참조 이미지 ({count}/{max})",
       "addImages": "추가",
-      "imagesRequired": "참조 이미지는 최소 {min}장 필요합니다"
+      "imagesRequired": "참조 이미지는 최소 {min}장 필요합니다",
+      "frontalBadge": "정면",
+      "frontalHint": "첫 번째 이미지는 정면 뷰로 사용되며, 이후 이미지는 스타일/외형 참조로 사용됩니다."
+    },
+    "seedanceReference": {
+      "header": "참조 자료 ({count})",
+      "headerImages": "참조 이미지 ({count})",
+      "videoDuration": "동영상: {seconds}s / {max}s",
+      "imageButton": "이미지",
+      "videoButton": "동영상",
+      "audioButton": "오디오",
+      "emptyHintMixed": "참조 이미지, 동영상, 오디오를 추가하고 프롬프트에서 @image1 / @video1 / @audio1 으로 참조하세요",
+      "emptyHintImages": "참조 이미지를 추가하고 프롬프트에서 @image1, @image2 … 으로 참조하세요",
+      "pin": "고정",
+      "unpin": "고정 해제"
     },
     "imageError": {
       "contentPolicyViolation": "이미지가 차단되었습니다: 프롬프트 또는 참조 이미지가 콘텐츠 정책을 위반했을 수 있습니다. 내용을 수정한 후 다시 시도해 주세요.",

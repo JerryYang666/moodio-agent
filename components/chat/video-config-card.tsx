@@ -166,12 +166,15 @@ export default function VideoConfigCard({
     () => visibleParams.some((p) => p.type === "kling_elements"),
     [visibleParams]
   );
+  const klingElementVariant =
+    modelConfig?.id === "kling-o3-reference" ? "o3-reference" : "v3";
   const klingElementsInvalid = useMemo(() => {
     if (!hasKlingElements) return false;
     return !areKlingElementsValid(
-      (editedParams.kling_elements as KlingElement[]) || []
+      (editedParams.kling_elements as KlingElement[]) || [],
+      klingElementVariant
     );
-  }, [hasKlingElements, editedParams.kling_elements]);
+  }, [hasKlingElements, editedParams.kling_elements, klingElementVariant]);
   const hasMediaReferences = useMemo(
     () => visibleParams.some((p) => p.type === "media_references"),
     [visibleParams]
@@ -798,6 +801,7 @@ export default function VideoConfigCard({
             disabled={!isEditable}
             compact
             resolveImageUrl={resolveImageUrl}
+            variant={klingElementVariant}
           />
         )}
 
@@ -811,6 +815,9 @@ export default function VideoConfigCard({
             resolveVideoUrl={resolveVideoUrl}
             resolveAudioUrl={resolveAudioUrl}
             videoDurations={videoDurations}
+            {...(modelConfig?.id === "kling-o3-reference"
+              ? { maxImages: 4, maxVideos: 0, maxAudios: 0 }
+              : {})}
           />
         )}
 

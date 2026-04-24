@@ -372,7 +372,21 @@
       "descriptionRequired": "Description is required",
       "referenceImages": "Reference Images ({count}/{max})",
       "addImages": "Add",
-      "imagesRequired": "At least {min} images required"
+      "imagesRequired": "At least {min} images required",
+      "frontalBadge": "Frontal",
+      "frontalHint": "The first image is used as the frontal view; additional images are style/appearance references."
+    },
+    "seedanceReference": {
+      "header": "References ({count})",
+      "headerImages": "Reference Images ({count})",
+      "videoDuration": "Videos: {seconds}s / {max}s",
+      "imageButton": "Image",
+      "videoButton": "Video",
+      "audioButton": "Audio",
+      "emptyHintMixed": "Add reference images, videos, or audio to mention in your prompt with @image1 / @video1 / @audio1",
+      "emptyHintImages": "Add reference images to mention in your prompt with @image1, @image2, …",
+      "pin": "Pin",
+      "unpin": "Unpin"
     },
     "imageError": {
       "contentPolicyViolation": "Image blocked: the prompt or reference image may violate content policies. Please revise and try again.",

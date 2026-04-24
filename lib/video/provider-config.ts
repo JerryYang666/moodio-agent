@@ -18,6 +18,7 @@ const ACTIVE_PROVIDERS: Partial<Record<string, VideoProvider>> = {
   "kling-v2.6-pro": "kie",
   "kling-o1-pro": "fal",
   "kling-o3-pro": "fal",
+  "kling-o3-reference": "fal",
   "kling-v3-pro": "kie",
   "veo-3.1": "kie",
   "veo-3.1-first-last-frame": "kie",

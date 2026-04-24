@@ -3,6 +3,7 @@
 import { useCallback, useMemo } from "react";
 import { Button } from "@heroui/button";
 import { ImagePlus, Film, Music, X, Layers, Pin } from "lucide-react";
+import { useTranslations } from "next-intl";
 import type { MediaReference } from "@/lib/video/models";
 
 const MAX_IMAGES = 9;
@@ -54,9 +55,23 @@ export function SeedanceReferenceEditor({
   videoDurations,
   maxCombinedVideoSeconds = MAX_COMBINED_VIDEO_SECONDS,
 }: SeedanceReferenceEditorProps) {
+  const t = useTranslations("chat.seedanceReference");
   const imageCount = references.filter((r) => r.type === "image").length;
   const videoCount = references.filter((r) => r.type === "video").length;
   const audioCount = references.filter((r) => r.type === "audio").length;
+  const allowsImages = maxImages > 0;
+  const allowsVideos = maxVideos > 0;
+  const allowsAudios = maxAudios > 0;
+
+  const imagesOnly = allowsImages && !allowsVideos && !allowsAudios;
+
+  const headerLabel = imagesOnly
+    ? t("headerImages", { count: references.length })
+    : t("header", { count: references.length });
+
+  const emptyHint = imagesOnly
+    ? t("emptyHintImages")
+    : t("emptyHintMixed");
 
   const combinedVideoSeconds = useMemo(() => {
     if (!videoDurations) return 0;
@@ -90,17 +105,19 @@ export function SeedanceReferenceEditor({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5 text-xs text-default-500">
           <Layers size={14} />
-          <span className="font-medium">
-            References ({references.length})
-          </span>
-          {videoCount > 0 && videoDurations && (
+          <span className="font-medium">{headerLabel}</span>
+          {allowsVideos && videoCount > 0 && videoDurations && (
             <span className={`ml-1 ${videoOverCap ? "text-danger font-medium" : ""}`}>
-              &middot; Videos: {combinedVideoSeconds.toFixed(1)}s / {maxCombinedVideoSeconds}s
+              &middot;{" "}
+              {t("videoDuration", {
+                seconds: combinedVideoSeconds.toFixed(1),
+                max: maxCombinedVideoSeconds,
+              })}
             </span>
           )}
         </div>
         <div className="flex gap-1">
-          {!disabled && imageCount < maxImages && (
+          {!disabled && allowsImages && imageCount < maxImages && (
             <Button
               size="sm"
               variant="flat"
@@ -108,10 +125,10 @@ export function SeedanceReferenceEditor({
               onPress={onPickImage}
               className="h-6 min-w-0 px-2 text-xs"
             >
-              Image
+              {t("imageButton")}
             </Button>
           )}
-          {!disabled && videoCount < maxVideos && (
+          {!disabled && allowsVideos && videoCount < maxVideos && (
             <Button
               size="sm"
               variant="flat"
@@ -119,10 +136,10 @@ export function SeedanceReferenceEditor({
               onPress={onPickVideo}
               className="h-6 min-w-0 px-2 text-xs"
             >
-              Video
+              {t("videoButton")}
             </Button>
           )}
-          {!disabled && audioCount < maxAudios && (
+          {!disabled && allowsAudios && audioCount < maxAudios && (
             <Button
               size="sm"
               variant="flat"
@@ -130,7 +147,7 @@ export function SeedanceReferenceEditor({
               onPress={onPickAudio}
               className="h-6 min-w-0 px-2 text-xs"
             >
-              Audio
+              {t("audioButton")}
             </Button>
           )}
         </div>
@@ -138,11 +155,10 @@ export function SeedanceReferenceEditor({
 
       {references.length === 0 && !disabled && (
         <button
-          onClick={onPickImage}
+          onClick={allowsImages ? onPickImage : allowsVideos ? onPickVideo : onPickAudio}
           className="w-full rounded-lg border-2 border-dashed border-default-200 p-3 text-xs text-default-400 hover:border-default-300 hover:text-default-500 transition-colors"
         >
-          Add reference images, videos, or audio to mention in your prompt with
-          @image1 / @video1 / @audio1
+          {emptyHint}
         </button>
       )}
 
@@ -203,7 +219,7 @@ export function SeedanceReferenceEditor({
                           ? "bg-primary text-white opacity-100"
                           : "bg-black/60 text-white opacity-0 group-hover:opacity-100"
                       }`}
-                      title={ref.pinned ? "Unpin" : "Pin"}
+                      title={ref.pinned ? t("unpin") : t("pin")}
                     >
                       <Pin size={10} />
                     </button>

@@ -11,24 +11,38 @@ const MAX_ELEMENTS = 3;
 const MIN_IMAGES = 2;
 const MAX_IMAGES = 4;
 
-/** A Kling element is valid when name, description, and ≥ MIN_IMAGES reference images are all set. */
-export function isKlingElementValid(el: KlingElement | undefined | null): boolean {
+/**
+ * Element schema variant:
+ * - "v3"            — Kling v3 Pro style: {name, description, 2-4 equal ref images}, referenced as @name.
+ * - "o3-reference"  — Kling O3 reference-to-video style: {name, 2-4 images where image #1 is the frontal
+ *                     view and the rest are style references}, rewritten to @ElementN. Description is not
+ *                     sent to the API and is not required.
+ */
+export type KlingElementVariant = "v3" | "o3-reference";
+
+/** A Kling element is valid when its required fields (per variant) and image count are all set. */
+export function isKlingElementValid(
+  el: KlingElement | undefined | null,
+  variant: KlingElementVariant = "v3"
+): boolean {
   if (!el) return false;
   const imageCount = (el.element_input_ids ?? []).length;
-  return (
-    el.name.trim().length > 0 &&
-    el.description.trim().length > 0 &&
-    imageCount >= MIN_IMAGES &&
-    imageCount <= MAX_IMAGES
-  );
+  if (imageCount < MIN_IMAGES || imageCount > MAX_IMAGES) return false;
+  if (variant === "v3") {
+    if (el.name.trim().length === 0) return false;
+    if (el.description.trim().length === 0) return false;
+  }
+  // o3-reference: name is auto-assigned by the caller as Element{N}, nothing to validate.
+  return true;
 }
 
 /** Validates the entire elements array — every element must be valid. Empty array is valid (elements are optional). */
 export function areKlingElementsValid(
-  elements: KlingElement[] | undefined | null
+  elements: KlingElement[] | undefined | null,
+  variant: KlingElementVariant = "v3"
 ): boolean {
   if (!elements || elements.length === 0) return true;
-  return elements.every(isKlingElementValid);
+  return elements.every((el) => isKlingElementValid(el, variant));
 }
 
 interface KlingElementEditorProps {
@@ -42,6 +56,8 @@ interface KlingElementEditorProps {
   resolveImageUrl?: (imageId: string) => string | undefined;
   /** When true, outside-click collapse is suppressed (e.g. the parent's asset picker modal is open). */
   isAssetPickerOpen?: boolean;
+  /** Element schema variant — defaults to "v3" for backwards compatibility. */
+  variant?: KlingElementVariant;
 }
 
 export function KlingElementEditor({
@@ -52,7 +68,9 @@ export function KlingElementEditor({
   onPickImages,
   resolveImageUrl,
   isAssetPickerOpen = false,
+  variant = "v3",
 }: KlingElementEditorProps) {
+  const isO3Reference = variant === "o3-reference";
   const t = useTranslations("chat.klingElement");
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -75,22 +93,28 @@ export function KlingElementEditor({
   const addElement = useCallback(() => {
     if (elements.length >= MAX_ELEMENTS) return;
     const newElement: KlingElement = {
-      name: "",
+      name: isO3Reference ? `Element${elements.length + 1}` : "",
       description: "",
       element_input_ids: [],
     };
     onChange([...elements, newElement]);
     setExpandedIndex(elements.length);
-  }, [elements, onChange]);
+  }, [elements, onChange, isO3Reference]);
 
   const removeElement = useCallback(
     (index: number) => {
-      onChange(elements.filter((_, i) => i !== index));
+      const next = elements.filter((_, i) => i !== index);
+      // o3-reference names are positional (Element1..N) — re-index after removal.
+      onChange(
+        isO3Reference
+          ? next.map((el, i) => ({ ...el, name: `Element${i + 1}` }))
+          : next
+      );
       if (expandedIndex === index) setExpandedIndex(null);
       else if (expandedIndex !== null && expandedIndex > index)
         setExpandedIndex(expandedIndex - 1);
     },
-    [elements, onChange, expandedIndex]
+    [elements, onChange, expandedIndex, isO3Reference]
   );
 
   const updateElement = useCallback(
@@ -161,10 +185,11 @@ export function KlingElementEditor({
         {elements.map((el, index) => {
           const isExpanded = expandedIndex === index;
           const imageCount = (el.element_input_ids ?? []).length;
-          const nameInvalid = el.name.trim().length === 0;
-          const descriptionInvalid = el.description.trim().length === 0;
+          const nameInvalid = !isO3Reference && el.name.trim().length === 0;
+          const descriptionInvalid =
+            !isO3Reference && el.description.trim().length === 0;
           const imagesInvalid = imageCount < MIN_IMAGES;
-          const isValid = isKlingElementValid(el);
+          const isValid = isKlingElementValid(el, variant);
 
           const coverUrl = resolveImageUrl?.(
             (el.element_input_ids ?? [])[0] ?? ""
@@ -199,7 +224,7 @@ export function KlingElementEditor({
                   ) : (
                     <div className="absolute inset-0 bg-default-100" />
                   )}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-black/20" />
+                  <div className="absolute inset-0 bg-linear-to-t from-black/70 via-black/10 to-black/20" />
                   <Sparkles
                     size={14}
                     className={`absolute top-1.5 left-1.5 drop-shadow ${
@@ -277,39 +302,43 @@ export function KlingElementEditor({
 
               {isExpanded && (
                 <div className="px-2.5 pb-2.5 space-y-2 border-t border-divider pt-2">
-                  <Input
-                    size="sm"
-                    label={t("nameLabel")}
-                    placeholder={t("namePlaceholder")}
-                    value={el.name}
-                    onValueChange={(v) =>
-                      updateElement(index, {
-                        name: v.replace(/@/g, ""),
-                      })
-                    }
-                    isRequired
-                    isInvalid={nameInvalid}
-                    errorMessage={nameInvalid ? t("nameRequired") : undefined}
-                    description={nameInvalid ? undefined : t("nameHint")}
-                    isDisabled={disabled}
-                    classNames={{ input: "text-xs", label: "text-xs" }}
-                  />
-                  <Input
-                    size="sm"
-                    label={t("descriptionLabel")}
-                    placeholder={t("descriptionPlaceholder")}
-                    value={el.description}
-                    onValueChange={(v) =>
-                      updateElement(index, { description: v })
-                    }
-                    isRequired
-                    isInvalid={descriptionInvalid}
-                    errorMessage={
-                      descriptionInvalid ? t("descriptionRequired") : undefined
-                    }
-                    isDisabled={disabled}
-                    classNames={{ input: "text-xs", label: "text-xs" }}
-                  />
+                  {!isO3Reference && (
+                    <Input
+                      size="sm"
+                      label={t("nameLabel")}
+                      placeholder={t("namePlaceholder")}
+                      value={el.name}
+                      onValueChange={(v) =>
+                        updateElement(index, {
+                          name: v.replace(/@/g, ""),
+                        })
+                      }
+                      isRequired
+                      isInvalid={nameInvalid}
+                      errorMessage={nameInvalid ? t("nameRequired") : undefined}
+                      description={nameInvalid ? undefined : t("nameHint")}
+                      isDisabled={disabled}
+                      classNames={{ input: "text-xs", label: "text-xs" }}
+                    />
+                  )}
+                  {!isO3Reference && (
+                    <Input
+                      size="sm"
+                      label={t("descriptionLabel")}
+                      placeholder={t("descriptionPlaceholder")}
+                      value={el.description}
+                      onValueChange={(v) =>
+                        updateElement(index, { description: v })
+                      }
+                      isRequired
+                      isInvalid={descriptionInvalid}
+                      errorMessage={
+                        descriptionInvalid ? t("descriptionRequired") : undefined
+                      }
+                      isDisabled={disabled}
+                      classNames={{ input: "text-xs", label: "text-xs" }}
+                    />
+                  )}
 
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between">
@@ -329,6 +358,11 @@ export function KlingElementEditor({
                         </Button>
                       )}
                     </div>
+                    {isO3Reference && (
+                      <p className="text-[10px] text-default-400">
+                        {t("frontalHint")}
+                      </p>
+                    )}
                     {imagesInvalid && (
                       <p className="text-[10px] text-danger">
                         {t("imagesRequired", { min: MIN_IMAGES })}
@@ -337,10 +371,15 @@ export function KlingElementEditor({
                     <div className="flex flex-wrap gap-1.5">
                       {(el.element_input_ids ?? []).map((imageId, imgIdx) => {
                         const displayUrl = resolveImageUrl?.(imageId);
+                        const isFrontal = isO3Reference && imgIdx === 0;
                         return (
                           <div
                             key={imgIdx}
-                            className="relative w-12 h-12 rounded-md overflow-hidden border border-divider group"
+                            className={`relative w-12 h-12 rounded-md overflow-hidden border group ${
+                              isFrontal
+                                ? "border-primary ring-1 ring-primary/50"
+                                : "border-divider"
+                            }`}
                           >
                             {displayUrl ? (
                               <img
@@ -351,6 +390,11 @@ export function KlingElementEditor({
                             ) : (
                               <div className="w-full h-full bg-default-100 flex items-center justify-center text-[8px] text-default-400 p-0.5 break-all">
                                 {imageId.slice(0, 8)}
+                              </div>
+                            )}
+                            {isFrontal && (
+                              <div className="absolute bottom-0 left-0 right-0 bg-primary/80 text-white text-[8px] text-center py-0.5 font-medium">
+                                {t("frontalBadge")}
                               </div>
                             )}
                             {!disabled && (

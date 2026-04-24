@@ -1031,6 +1031,148 @@ const klingO3Pro: VideoModelConfig = {
 };
 
 /**
+ * Kling O3 Reference-to-Video
+ * Generate a video from up to 4 reference images plus optional start/end frames
+ * and custom Kling elements. Supports std and pro quality tiers via the `mode`
+ * param, which selects the FAL endpoint (standard/reference-to-video vs
+ * pro/reference-to-video).
+ */
+const klingO3Reference: VideoModelConfig = {
+  id: "kling-o3-reference",
+  name: "Kling O3 Reference-to-Video",
+  description:
+    "Reference-to-video with up to 4 image refs (@Image1..@Image4), optional start/end frames, and Kling elements. std and pro quality tiers.",
+  providers: [
+    {
+      provider: "fal",
+      providerModelId: "fal-ai/kling-video/o3/reference-to-video",
+      paramMapping: { kling_elements: "elements" },
+    },
+  ],
+  params: [
+    {
+      name: "prompt",
+      label: "Prompt",
+      type: "string",
+      required: false,
+      maxLength: 2500,
+      description:
+        "Text prompt. Use @Image1..@Image4 to reference attached images and @element_name for elements. Leave blank when using multi-shot mode.",
+    },
+    {
+      name: "mode",
+      label: "Quality",
+      type: "enum",
+      required: false,
+      default: "std",
+      options: ["std", "pro"],
+      description:
+        "Quality tier. std is cheaper and faster; pro is higher quality at higher cost. Selects the FAL endpoint.",
+    },
+    {
+      name: "aspect_ratio",
+      label: "Aspect Ratio",
+      type: "enum",
+      required: false,
+      default: "16:9",
+      options: ["16:9", "9:16", "1:1"],
+      description: "Aspect ratio of the generated video",
+    },
+    {
+      name: "duration",
+      label: "Duration (seconds)",
+      type: "enum",
+      required: false,
+      default: "5",
+      options: [
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "10",
+        "11",
+        "12",
+        "13",
+        "14",
+        "15",
+      ],
+      description: "Video duration in seconds (3-15s)",
+    },
+    {
+      name: "generate_audio",
+      label: "Generate Audio",
+      type: "boolean",
+      required: false,
+      default: false,
+      description: "Generate native audio (increases per-second cost)",
+    },
+    {
+      name: "start_image_url",
+      label: "Start Image",
+      type: "asset",
+      required: false,
+      acceptTypes: ["image"],
+      description: "Optional first frame",
+    },
+    {
+      name: "end_image_url",
+      label: "End Image",
+      type: "asset",
+      required: false,
+      acceptTypes: ["image"],
+      description: "Optional last frame",
+    },
+    {
+      name: "media_references",
+      label: "Reference Images",
+      type: "media_references",
+      required: false,
+      maxItems: 4,
+      description:
+        "Attach up to 4 reference images from the conversation. Reference them in the prompt as @image1, @image2, @image3, @image4 (numbered in order of appearance). Only image references are supported.",
+    },
+    {
+      name: "kling_elements",
+      label: "Element References",
+      type: "kling_elements",
+      required: false,
+      maxItems: 3,
+      description:
+        "Referenced characters/objects — name, description, 2-4 image IDs. Reference in prompts as @element_name. Max 3.",
+    },
+    {
+      name: "multi_shots",
+      label: "Multi-Shot Mode",
+      type: "boolean",
+      required: false,
+      default: false,
+      description:
+        "Enable multi-shot mode. When true, uses multi_prompt instead of prompt.",
+    },
+    {
+      name: "multi_prompt",
+      label: "Shot Prompts",
+      type: "multi_prompt",
+      required: false,
+      description:
+        "Per-shot prompts (prompt ≤500 chars, duration 1-12s). Max 5 shots. Only sent when multi_shots is true.",
+    },
+    {
+      name: "shot_type",
+      label: "Shot Type",
+      type: "string",
+      required: false,
+      default: "customize",
+      description: "Shot type hint; leave as 'customize' unless overridden.",
+      status: "hidden",
+    },
+  ],
+};
+
+/**
  * Kling Video v3 Pro - Image to Video
  * Top-tier image-to-video with cinematic visuals, fluid motion, and native audio generation,
  * with custom element support.
@@ -1695,6 +1837,7 @@ export const VIDEO_MODELS: VideoModelConfig[] = [
   klingV26Pro,
   klingO1Pro,
   klingO3Pro,
+  klingO3Reference,
   klingV3Pro,
   veo31,
   veo31FirstLastFrame,
@@ -1723,6 +1866,8 @@ export const LEGACY_MODEL_ID_MAP: Record<string, string> = {
   "fal-ai/kling-video/v2.6/pro/image-to-video": "kling-v2.6-pro",
   "fal-ai/kling-video/o1/image-to-video": "kling-o1-pro",
   "fal-ai/kling-video/o3/pro/image-to-video": "kling-o3-pro",
+  "fal-ai/kling-video/o3/standard/reference-to-video": "kling-o3-reference",
+  "fal-ai/kling-video/o3/pro/reference-to-video": "kling-o3-reference",
   "fal-ai/kling-video/v3/pro/image-to-video": "kling-v3-pro",
   "fal-ai/veo3.1/image-to-video": "veo-3.1",
   "fal-ai/veo3.1/first-last-frame-to-video": "veo-3.1-first-last-frame",
@@ -2021,9 +2166,12 @@ export function validateAndMergeParams(
               `Each element in ${param.name} must have a non-empty name`
             );
           }
-          if (typeof elem.description !== "string" || !elem.description.trim()) {
+          if (
+            elem.description !== undefined &&
+            typeof elem.description !== "string"
+          ) {
             throw new Error(
-              `Each element in ${param.name} must have a non-empty description`
+              `Each element in ${param.name} description must be a string when provided`
             );
           }
           const urls = elem.element_input_urls || elem.element_input_ids || [];

@@ -19,6 +19,8 @@ const SEEDANCE2_BASES = new Set([
   "bytedance/seedance-2.0/fast",
 ]);
 
+const KLING_O3_REFERENCE_BASE = "fal-ai/kling-video/o3/reference-to-video";
+
 /**
  * For Seedance 2.0 models, resolve the actual Fal sub-endpoint
  * (text-to-video / image-to-video / reference-to-video) based on
@@ -28,6 +30,67 @@ function resolveFalEndpoint(
   providerModelId: string,
   params: Record<string, any>
 ): { endpoint: string; input: Record<string, any> } {
+  // Kling O3 reference-to-video: select std vs pro endpoint from `mode` param.
+  if (providerModelId === KLING_O3_REFERENCE_BASE) {
+    const {
+      mode,
+      multi_shots,
+      prompt,
+      multi_prompt,
+      media_references,
+      elements,
+      ...rest
+    } = params;
+
+    // prompt / multi_prompt are mutually exclusive per the FAL API.
+    if (
+      multi_shots === true &&
+      Array.isArray(multi_prompt) &&
+      multi_prompt.length > 0
+    ) {
+      rest.multi_prompt = multi_prompt;
+    } else if (typeof prompt === "string" && prompt.trim().length > 0) {
+      rest.prompt = prompt;
+    }
+
+    // Convert media_references (image-only) → image_urls for FAL.
+    if (Array.isArray(media_references) && media_references.length > 0) {
+      const imageUrls = media_references
+        .filter((r: any) => r.type === "image")
+        .map((r: any) => r.id);
+      if (imageUrls.length > 0) {
+        rest.image_urls = imageUrls;
+      }
+    }
+
+    // FAL elements: first image is the frontal view, rest are style references.
+    // Names are already positional (Element1..N) from the UI — referenced in prompts
+    // as @Element1, @Element2 with no rewriting needed. Drop name/description fields.
+    if (Array.isArray(elements)) {
+      const normalized = elements
+        .map((el: any) => {
+          const urls: string[] = Array.isArray(el?.element_input_urls)
+            ? el.element_input_urls
+            : [];
+          if (urls.length === 0) return null;
+          return {
+            frontal_image_url: urls[0],
+            reference_image_urls: urls.slice(1),
+          };
+        })
+        .filter((e): e is { frontal_image_url: string; reference_image_urls: string[] } => e !== null);
+      if (normalized.length > 0) {
+        rest.elements = normalized;
+      }
+    }
+
+    const tier = mode === "pro" ? "pro" : "standard";
+    return {
+      endpoint: `fal-ai/kling-video/o3/${tier}/reference-to-video`,
+      input: rest,
+    };
+  }
+
   if (!SEEDANCE2_BASES.has(providerModelId)) {
     return { endpoint: providerModelId, input: params };
   }

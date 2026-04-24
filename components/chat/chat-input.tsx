@@ -328,11 +328,14 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
     [videoModelParams]
   );
 
+  const klingElementVariant =
+    menuState.videoModelId === "kling-o3-reference" ? "o3-reference" : "v3";
+
   const klingElementsInvalid = useMemo(() => {
     if (!supportsElements) return false;
     const elements = (menuState.videoParams?.kling_elements as KlingElement[]) || [];
-    return !areKlingElementsValid(elements);
-  }, [supportsElements, menuState.videoParams?.kling_elements]);
+    return !areKlingElementsValid(elements, klingElementVariant);
+  }, [supportsElements, menuState.videoParams?.kling_elements, klingElementVariant]);
 
   const mentionItems: MentionItem[] = useMemo(() => {
     const imageItems = pendingImages
@@ -345,16 +348,19 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
         metadata: { source: img.source },
       }));
 
-    if (supportsMediaReferences && menuState.mode === "video") {
+    if (menuState.mode !== "video") return imageItems;
+
+    const refItems: MentionItem[] = [];
+    if (supportsMediaReferences) {
       const refs = (menuState.videoParams?.media_references as MediaReference[]) || [];
       let imgCount = 0, vidCount = 0, audCount = 0;
-      const refItems: MentionItem[] = refs.map((ref) => {
+      for (const ref of refs) {
         const name = ref.type === "image"
           ? `image${++imgCount}`
           : ref.type === "video"
             ? `video${++vidCount}`
             : `audio${++audCount}`;
-        return {
+        refItems.push({
           id: name,
           type: "reference",
           label: name,
@@ -364,29 +370,30 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
               ? resolveMediaRefVideoUrl?.(ref.id)
               : resolveMediaRefAudioUrl?.(ref.id),
           metadata: { refType: ref.type, refId: ref.id },
-        };
-      });
-      return [...imageItems, ...refItems];
+        });
+      }
     }
 
-    if (!supportsElements || menuState.mode !== "video") return imageItems;
+    const elementItems: MentionItem[] = [];
+    if (supportsElements) {
+      const imageUrlMap = new Map(pendingImages.map((img) => [img.imageId, img.url]));
+      const klingElements = (menuState.videoParams?.kling_elements as KlingElement[]) || [];
+      for (const el of klingElements) {
+        if (!el.name) continue;
+        elementItems.push({
+          id: el.name,
+          type: "element",
+          label: el.name,
+          thumbnail: (el.element_input_ids?.[0] && (resolveElementImageUrl?.(el.element_input_ids[0]) || imageUrlMap.get(el.element_input_ids[0]))) || undefined,
+          metadata: {
+            description: el.description,
+            element_input_ids: el.element_input_ids,
+          },
+        });
+      }
+    }
 
-    const imageUrlMap = new Map(pendingImages.map((img) => [img.imageId, img.url]));
-    const klingElements = (menuState.videoParams?.kling_elements as KlingElement[]) || [];
-    const elementItems = klingElements
-      .filter((el) => el.name)
-      .map((el) => ({
-        id: el.name,
-        type: "element",
-        label: el.name,
-        thumbnail: (el.element_input_ids?.[0] && (resolveElementImageUrl?.(el.element_input_ids[0]) || imageUrlMap.get(el.element_input_ids[0]))) || undefined,
-        metadata: {
-          description: el.description,
-          element_input_ids: el.element_input_ids,
-        },
-      }));
-
-    return [...imageItems, ...elementItems];
+    return [...imageItems, ...refItems, ...elementItems];
   }, [pendingImages, t, supportsElements, supportsMediaReferences, menuState.mode, menuState.videoParams?.kling_elements, menuState.videoParams?.media_references, resolveElementImageUrl, resolveMediaRefImageUrl, resolveMediaRefVideoUrl, resolveMediaRefAudioUrl]);
 
   // Resolve element image IDs to display URLs using the parent's resolver or pending images
@@ -1693,6 +1700,7 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
                     resolveImageUrl={resolveElementImageUrlLocal}
                     isAssetPickerOpen={isAssetPickerOpen}
                     compact
+                    variant={klingElementVariant}
                   />
                 </div>
               </motion.div>
@@ -1729,6 +1737,9 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
                     resolveVideoUrl={resolveMediaRefVideoUrl}
                     resolveAudioUrl={resolveMediaRefAudioUrl}
                     videoDurations={mediaRefVideoDurations}
+                    {...(menuState.videoModelId === "kling-o3-reference"
+                      ? { maxImages: 4, maxVideos: 0, maxAudios: 0 }
+                      : {})}
                   />
                 </div>
               </motion.div>

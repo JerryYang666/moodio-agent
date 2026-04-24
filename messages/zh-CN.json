@@ -372,7 +372,21 @@
       "descriptionRequired": "请输入描述",
       "referenceImages": "参考图片 ({count}/{max})",
       "addImages": "添加",
-      "imagesRequired": "至少需要 {min} 张图片"
+      "imagesRequired": "至少需要 {min} 张图片",
+      "frontalBadge": "正面",
+      "frontalHint": "第一张图片用作正面视角，其余图片作为风格/外观参考。"
+    },
+    "seedanceReference": {
+      "header": "参考素材 ({count})",
+      "headerImages": "参考图片 ({count})",
+      "videoDuration": "视频：{seconds}s / {max}s",
+      "imageButton": "图片",
+      "videoButton": "视频",
+      "audioButton": "音频",
+      "emptyHintMixed": "添加参考图片、视频或音频，并在提示词中用 @image1 / @video1 / @audio1 引用",
+      "emptyHintImages": "添加参考图片，并在提示词中用 @image1、@image2……引用",
+      "pin": "置顶",
+      "unpin": "取消置顶"
     },
     "imageError": {
       "contentPolicyViolation": "图片被拦截：提示词或参考图片可能违反了内容政策。请修改后重试。",
