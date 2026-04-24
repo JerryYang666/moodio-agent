@@ -51,9 +51,7 @@ export function KlingElementEditor({
   resolveImageUrl,
 }: KlingElementEditorProps) {
   const t = useTranslations("chat.klingElement");
-  const [expandedIndex, setExpandedIndex] = useState<number | null>(
-    elements.length === 0 ? null : 0
-  );
+  const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
 
   const addElement = useCallback(() => {
     if (elements.length >= MAX_ELEMENTS) return;
@@ -63,7 +61,6 @@ export function KlingElementEditor({
       element_input_ids: [],
     };
     onChange([...elements, newElement]);
-    setExpandedIndex(elements.length);
   }, [elements, onChange]);
 
   const removeElement = useCallback(
