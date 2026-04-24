@@ -270,6 +270,28 @@ function stripDerivedUrls(messages: Message[]): Message[] {
           ...rest
         } = part;
         const { sourceImageUrl, endImageUrl, ...cleanConfig } = config;
+        // Normalize kling_elements: rename legacy element_input_urls -> element_input_ids,
+        // and extract bare image IDs from any CloudFront URLs that may have leaked in.
+        if (cleanConfig.params?.kling_elements && Array.isArray(cleanConfig.params.kling_elements)) {
+          cleanConfig.params = {
+            ...cleanConfig.params,
+            kling_elements: cleanConfig.params.kling_elements.map(
+              (el: Record<string, any>) => {
+                const ids = (el.element_input_ids || el.element_input_urls || []).map(
+                  (v: string) => {
+                    const cfMatch = v.match(/\/images\/([^/?]+)/);
+                    return cfMatch ? cfMatch[1] : v;
+                  }
+                );
+                return {
+                  name: el.name,
+                  description: el.description,
+                  element_input_ids: ids,
+                };
+              }
+            ),
+          };
+        }
         return {
           ...rest,
           config: cleanConfig,
@@ -369,15 +391,38 @@ function addDerivedUrls(messages: Message[], cnMode: boolean = false): Message[]
         };
       }
       if (part.type === "direct_video") {
+        const enrichedConfig: typeof part.config = {
+          ...part.config,
+          sourceImageUrl: getImageUrl(part.config.sourceImageId, cnMode),
+          endImageUrl: part.config.endImageId
+            ? getImageUrl(part.config.endImageId, cnMode)
+            : undefined,
+        };
+        // Normalize legacy element_input_urls -> element_input_ids (defensive
+        // recovery in case earlier persistence leaked signed URLs into history).
+        if (enrichedConfig.params?.kling_elements && Array.isArray(enrichedConfig.params.kling_elements)) {
+          enrichedConfig.params = {
+            ...enrichedConfig.params,
+            kling_elements: enrichedConfig.params.kling_elements.map(
+              (el: Record<string, any>) => {
+                const ids = (el.element_input_ids || el.element_input_urls || []).map(
+                  (v: string) => {
+                    const cfMatch = typeof v === "string" ? v.match(/\/images\/([^/?]+)/) : null;
+                    return cfMatch ? cfMatch[1] : v;
+                  }
+                );
+                return {
+                  name: el.name,
+                  description: el.description,
+                  element_input_ids: ids,
+                };
+              }
+            ),
+          };
+        }
         return {
           ...part,
-          config: {
-            ...part.config,
-            sourceImageUrl: getImageUrl(part.config.sourceImageId, cnMode),
-            endImageUrl: part.config.endImageId
-              ? getImageUrl(part.config.endImageId, cnMode)
-              : undefined,
-          },
+          config: enrichedConfig,
           thumbnailUrl: part.thumbnailImageId
             ? getImageUrl(part.thumbnailImageId, cnMode)
             : undefined,

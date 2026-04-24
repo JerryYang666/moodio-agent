@@ -154,7 +154,12 @@ export async function GET(
                     ([key]) =>
                       key !== "prompt" &&
                       key !== "image_url" &&
-                      key !== "end_image_url"
+                      key !== "end_image_url" &&
+                      // kling_elements in the DB was transformed for the provider
+                      // (element_input_ids -> signed element_input_urls). The client
+                      // copy on part.config.params is the source of truth for the UI
+                      // (carries element_input_ids), so don't let the DB clobber it.
+                      key !== "kling_elements"
                   )
                 ),
               };
@@ -245,7 +250,8 @@ export async function GET(
                     ([key]) =>
                       key !== "prompt" &&
                       key !== "image_url" &&
-                      key !== "end_image_url"
+                      key !== "end_image_url" &&
+                      key !== "kling_elements"
                   )
                 ),
               };
