@@ -331,7 +331,18 @@ const seedance20Reference: VideoModelConfig = {
       required: false,
       maxItems: 12,
       description:
-        "Attach reference images (max 9), videos (max 3), and audio files (max 3, MP3/WAV, combined max 15s). Each gets auto-named @image1/@video1/@audio1 etc.",
+        "Attach reference images (max 9), videos (max 3, combined max 15s), and audio files (max 3, MP3/WAV, combined max 15s). Each gets auto-named @image1/@video1/@audio1 etc.",
+    },
+    {
+      name: "reference_video_duration",
+      label: "Reference Video Duration",
+      type: "number",
+      required: false,
+      default: 0,
+      min: 0,
+      max: 15,
+      description: "Combined duration in seconds of all reference videos (0 if none)",
+      status: "hidden",
     },
     {
       name: "duration",
@@ -504,7 +515,18 @@ const seedance20FastReference: VideoModelConfig = {
       required: false,
       maxItems: 12,
       description:
-        "Attach reference images (max 9), videos (max 3), and audio files (max 3, MP3/WAV, combined max 15s). Each gets auto-named @image1/@video1/@audio1 etc.",
+        "Attach reference images (max 9), videos (max 3, combined max 15s), and audio files (max 3, MP3/WAV, combined max 15s). Each gets auto-named @image1/@video1/@audio1 etc.",
+    },
+    {
+      name: "reference_video_duration",
+      label: "Reference Video Duration",
+      type: "number",
+      required: false,
+      default: 0,
+      min: 0,
+      max: 15,
+      description: "Combined duration in seconds of all reference videos (0 if none)",
+      status: "hidden",
     },
     {
       name: "duration",

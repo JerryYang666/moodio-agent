@@ -356,6 +356,7 @@
     "uploadDocumentSuccess": "Document text imported",
     "uploadDocumentTruncated": "Document text was truncated to fit the character limit",
     "klingElementsInvalid": "Please complete every element: name, description, and at least 2 reference images are required.",
+    "referenceVideoOverCap": "Reference videos exceed the {max}s combined limit",
     "klingElement": {
       "header": "Elements ({count}/{max})",
       "addButton": "Add Element",

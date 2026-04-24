@@ -356,6 +356,7 @@
     "uploadDocumentSuccess": "문서 텍스트를 가져왔습니다",
     "uploadDocumentTruncated": "문서 텍스트가 글자 수 제한에 맞게 잘렸습니다",
     "klingElementsInvalid": "각 요소를 완성해 주세요: 이름, 설명, 최소 2장의 참조 이미지가 모두 필수입니다.",
+    "referenceVideoOverCap": "참조 동영상 총 길이가 {max}초 제한을 초과합니다",
     "klingElement": {
       "header": "요소 ({count}/{max})",
       "addButton": "요소 추가",

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import { Button } from "@heroui/button";
 import { ImagePlus, Film, Music, X, Layers, Pin } from "lucide-react";
 import type { MediaReference } from "@/lib/video/models";
@@ -8,6 +8,7 @@ import type { MediaReference } from "@/lib/video/models";
 const MAX_IMAGES = 9;
 const MAX_VIDEOS = 3;
 const MAX_AUDIOS = 3;
+const MAX_COMBINED_VIDEO_SECONDS = 15;
 
 interface SeedanceReferenceEditorProps {
   references: MediaReference[];
@@ -22,6 +23,8 @@ interface SeedanceReferenceEditorProps {
   maxImages?: number;
   maxVideos?: number;
   maxAudios?: number;
+  videoDurations?: Record<string, number>;
+  maxCombinedVideoSeconds?: number;
 }
 
 function getRefName(refs: MediaReference[], index: number): string {
@@ -48,10 +51,21 @@ export function SeedanceReferenceEditor({
   maxImages = MAX_IMAGES,
   maxVideos = MAX_VIDEOS,
   maxAudios = MAX_AUDIOS,
+  videoDurations,
+  maxCombinedVideoSeconds = MAX_COMBINED_VIDEO_SECONDS,
 }: SeedanceReferenceEditorProps) {
   const imageCount = references.filter((r) => r.type === "image").length;
   const videoCount = references.filter((r) => r.type === "video").length;
   const audioCount = references.filter((r) => r.type === "audio").length;
+
+  const combinedVideoSeconds = useMemo(() => {
+    if (!videoDurations) return 0;
+    return references
+      .filter((r) => r.type === "video")
+      .reduce((acc, r) => acc + (videoDurations[r.id] ?? 0), 0);
+  }, [references, videoDurations]);
+
+  const videoOverCap = combinedVideoSeconds > maxCombinedVideoSeconds;
 
   const removeReference = useCallback(
     (index: number) => {
@@ -79,6 +93,11 @@ export function SeedanceReferenceEditor({
           <span className="font-medium">
             References ({references.length})
           </span>
+          {videoCount > 0 && videoDurations && (
+            <span className={`ml-1 ${videoOverCap ? "text-danger font-medium" : ""}`}>
+              &middot; Videos: {combinedVideoSeconds.toFixed(1)}s / {maxCombinedVideoSeconds}s
+            </span>
+          )}
         </div>
         <div className="flex gap-1">
           {!disabled && imageCount < maxImages && (

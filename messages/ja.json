@@ -356,6 +356,7 @@
     "uploadDocumentSuccess": "ドキュメントのテキストをインポートしました",
     "uploadDocumentTruncated": "ドキュメントのテキストは文字数制限に合わせて切り詰められました",
     "klingElementsInvalid": "各要素を入力してください：名前、説明、参照画像 2 枚以上はすべて必須です。",
+    "referenceVideoOverCap": "参照動画の合計が {max} 秒の上限を超えています",
     "klingElement": {
       "header": "要素 ({count}/{max})",
       "addButton": "要素を追加",

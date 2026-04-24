@@ -356,6 +356,7 @@
     "uploadDocumentSuccess": "文档文本已导入",
     "uploadDocumentTruncated": "文档文本已截断以符合字符限制",
     "klingElementsInvalid": "请完善每个元素：名称、描述和至少 2 张参考图片都是必填项。",
+    "referenceVideoOverCap": "参考视频总时长超过 {max} 秒限制",
     "klingElement": {
       "header": "元素 ({count}/{max})",
       "addButton": "添加元素",

@@ -68,6 +68,10 @@ import {
   validateVideoFile,
 } from "@/lib/upload/video-client";
 import {
+  probeVideoDurationFromFile,
+  probeVideoDurationFromUrl,
+} from "@/lib/video/probe-video-duration";
+import {
   uploadAudio,
   validateAudioFile,
 } from "@/lib/upload/audio-client";
@@ -330,6 +334,7 @@ export default function ChatInterface({
     }
   });
   const [assetParamValues, setAssetParamValues] = useState<Record<string, AssetParamValue | null>>({});
+  const [mediaRefVideoDurations, setMediaRefVideoDurations] = useState<Record<string, number>>({});
   const [precisionEditing, setPrecisionEditing] = useState(false);
 
   useEffect(() => {
@@ -438,6 +443,26 @@ export default function ChatInterface({
         for (const id of ids) enrichingIdsRef.current.delete(id);
       });
   }, [menuState.videoParams?.media_references, mediaRefUrls]);
+
+  // Sync reference_video_duration into videoParams for pricing
+  const mediaRefVideoTotal = useMemo(() => {
+    const refs = (menuState.videoParams?.media_references as MediaReference[]) || [];
+    return refs
+      .filter((r) => r.type === "video")
+      .reduce((acc, r) => acc + (mediaRefVideoDurations[r.id] ?? 0), 0);
+  }, [menuState.videoParams?.media_references, mediaRefVideoDurations]);
+
+  const mediaRefVideoOverCap = mediaRefVideoTotal > 15;
+
+  useEffect(() => {
+    if (menuState.mode !== "video") return;
+    const rounded = Math.round(mediaRefVideoTotal * 10) / 10;
+    if ((menuState.videoParams?.reference_video_duration ?? 0) === rounded) return;
+    setMenuState((prev) => ({
+      ...prev,
+      videoParams: { ...prev.videoParams, reference_video_duration: rounded },
+    }));
+  }, [mediaRefVideoTotal, menuState.mode]);
 
   // Video cost estimation state
   const [videoCost, setVideoCost] = useState<number | null>(null);
@@ -1891,7 +1916,10 @@ export default function ChatInterface({
         }
       } else if (assetPickerMode === "mediaRefVideo") {
         for (const file of files) {
-          const result = await uploadVideo(file);
+          const [duration, result] = await Promise.all([
+            probeVideoDurationFromFile(file),
+            uploadVideo(file),
+          ]);
           if (result.success) {
             const ref: MediaReference = { type: "video", id: result.data.videoId };
             setMenuState((prev) => ({
@@ -1902,6 +1930,7 @@ export default function ChatInterface({
               },
             }));
             setMediaRefUrls((prev) => ({ ...prev, [result.data.videoId]: result.data.videoUrl }));
+            setMediaRefVideoDurations((prev) => ({ ...prev, [result.data.videoId]: duration }));
           }
         }
       } else if (assetPickerMode === "mediaRefAudio") {
@@ -2209,7 +2238,9 @@ export default function ChatInterface({
         }));
         setMediaRefUrls((prev) => ({ ...prev, [asset.imageId]: asset.imageUrl }));
       } else if (assetPickerMode === "mediaRefVideo") {
-        const ref: MediaReference = { type: "video", id: asset.assetId || asset.imageId };
+        const videoId = asset.assetId || asset.imageId;
+        const videoUrl = asset.videoUrl || asset.imageUrl;
+        const ref: MediaReference = { type: "video", id: videoId };
         setMenuState((prev) => ({
           ...prev,
           videoParams: {
@@ -2217,7 +2248,10 @@ export default function ChatInterface({
             media_references: [...((prev.videoParams?.media_references as MediaReference[]) || []), ref],
           },
         }));
-        setMediaRefUrls((prev) => ({ ...prev, [asset.assetId || asset.imageId]: asset.videoUrl || asset.imageUrl }));
+        setMediaRefUrls((prev) => ({ ...prev, [videoId]: videoUrl }));
+        probeVideoDurationFromUrl(videoUrl).then((d) =>
+          setMediaRefVideoDurations((prev) => ({ ...prev, [videoId]: d }))
+        );
       } else if (assetPickerMode === "mediaRefAudio") {
         const ref: MediaReference = { type: "audio", id: asset.assetId || asset.imageId };
         setMenuState((prev) => ({
@@ -2333,6 +2367,13 @@ export default function ChatInterface({
           for (const a of assets) next[a.assetId || a.imageId] = a.videoUrl || a.imageUrl;
           return next;
         });
+        for (const a of assets) {
+          const videoId = a.assetId || a.imageId;
+          const videoUrl = a.videoUrl || a.imageUrl;
+          probeVideoDurationFromUrl(videoUrl).then((d) =>
+            setMediaRefVideoDurations((prev) => ({ ...prev, [videoId]: d }))
+          );
+        }
       } else if (assetPickerMode === "mediaRefAudio") {
         const newRefs: MediaReference[] = assets.map((a) => ({ type: "audio", id: a.assetId || a.imageId }));
         setMenuState((prev) => ({
@@ -4587,6 +4628,8 @@ export default function ChatInterface({
           resolveMediaRefImageUrl={resolveMediaRefImageUrl}
           resolveMediaRefVideoUrl={resolveMediaRefVideoUrl}
           resolveMediaRefAudioUrl={resolveMediaRefAudioUrl}
+          mediaRefVideoDurations={mediaRefVideoDurations}
+          mediaRefVideoOverCap={mediaRefVideoOverCap}
           onHeightChange={handleChatInputHeightChange}
           assetParamSlots={assetParamSlots}
           assetParamValues={assetParamValues}

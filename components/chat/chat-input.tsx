@@ -155,6 +155,10 @@ interface ChatInputProps {
   resolveMediaRefVideoUrl?: (id: string) => string | undefined;
   /** Resolve a media reference audio ID to a display URL */
   resolveMediaRefAudioUrl?: (id: string) => string | undefined;
+  /** Map of video reference ID to its duration in seconds */
+  mediaRefVideoDurations?: Record<string, number>;
+  /** Whether the combined reference-video duration exceeds the 15s cap */
+  mediaRefVideoOverCap?: boolean;
 }
 
 /** Ref handle for ChatInput to allow getting editor content */
@@ -221,6 +225,8 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
   resolveMediaRefImageUrl,
   resolveMediaRefVideoUrl,
   resolveMediaRefAudioUrl,
+  mediaRefVideoDurations,
+  mediaRefVideoOverCap = false,
 }, ref) {
   const t = useTranslations();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -1566,9 +1572,11 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
                   ? t("chat.waitForUpload")
                   : klingElementsInvalid
                     ? t("chat.klingElementsInvalid")
-                    : ""
+                    : mediaRefVideoOverCap
+                      ? t("chat.referenceVideoOverCap", { max: 15 })
+                      : ""
               }
-              isDisabled={!hasUploadingImages && !klingElementsInvalid}
+              isDisabled={!hasUploadingImages && !klingElementsInvalid && !mediaRefVideoOverCap}
             >
               {menuState.mode === "video" ? (
                 <Button
@@ -1577,7 +1585,7 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
                   aria-label={t("chat.send")}
                   onPress={onSend}
                   isLoading={isSending}
-                  isDisabled={isRecording || isTranscribing || hasUploadingImages || klingElementsInvalid || (videoModelHasImageParams ? pendingImages.length === 0 : !input.trim())}
+                  isDisabled={isRecording || isTranscribing || hasUploadingImages || klingElementsInvalid || mediaRefVideoOverCap || (videoModelHasImageParams ? pendingImages.length === 0 : !input.trim())}
                   className="shrink-0"
                   size="sm"
                 >
@@ -1719,6 +1727,7 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
                     resolveImageUrl={resolveMediaRefImageUrl}
                     resolveVideoUrl={resolveMediaRefVideoUrl}
                     resolveAudioUrl={resolveMediaRefAudioUrl}
+                    videoDurations={mediaRefVideoDurations}
                   />
                 </div>
               </motion.div>
