@@ -153,7 +153,7 @@ export function KlingElementEditor({
             <div
               key={index}
               className={`rounded-lg border border-divider bg-background/50 overflow-hidden ${
-                isExpanded ? "w-full" : "grow basis-[140px]"
+                isExpanded ? "w-full" : "w-40"
               }`}
             >
               <div
