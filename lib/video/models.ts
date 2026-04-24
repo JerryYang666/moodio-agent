@@ -258,7 +258,7 @@ const seedance20: VideoModelConfig = {
       type: "enum",
       required: false,
       default: "8",
-      options: ["4", "6", "8", "10", "12", "15"],
+      options: ["4", "5", "6", "7", "8", "9", "10", "11", "12", "15"],
       description: "Duration of the generated video in seconds",
     },
     {
@@ -350,7 +350,7 @@ const seedance20Reference: VideoModelConfig = {
       type: "enum",
       required: false,
       default: "8",
-      options: ["4", "6", "8", "10", "12", "15"],
+      options: ["4", "5", "6", "7", "8", "9", "10", "11", "12", "15"],
       description: "Duration of the generated video in seconds",
     },
     {
@@ -443,7 +443,7 @@ const seedance20Fast: VideoModelConfig = {
       type: "enum",
       required: false,
       default: "8",
-      options: ["4", "6", "8", "10", "12", "15"],
+      options: ["4", "5", "6", "7", "8", "9", "10", "11", "12", "15"],
       description: "Duration of the generated video in seconds",
     },
     {
@@ -534,7 +534,7 @@ const seedance20FastReference: VideoModelConfig = {
       type: "enum",
       required: false,
       default: "8",
-      options: ["4", "6", "8", "10", "12", "15"],
+      options: ["4", "5", "6", "7", "8", "9", "10", "11", "12", "15"],
       description: "Duration of the generated video in seconds",
     },
     {
