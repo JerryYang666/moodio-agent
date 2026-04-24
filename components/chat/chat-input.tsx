@@ -1691,6 +1691,7 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
                     }
                     onPickImages={onPickElementImages}
                     resolveImageUrl={resolveElementImageUrlLocal}
+                    isAssetPickerOpen={isAssetPickerOpen}
                     compact
                   />
                 </div>

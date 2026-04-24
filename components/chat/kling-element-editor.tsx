@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@heroui/button";
 import { Input } from "@heroui/input";
 import { Plus, Trash2, Sparkles, ImagePlus, X } from "lucide-react";
@@ -40,6 +40,8 @@ interface KlingElementEditorProps {
   onPickImages?: (elementIndex: number, maxImages: number) => void;
   /** Resolve an image ID to a display URL. */
   resolveImageUrl?: (imageId: string) => string | undefined;
+  /** When true, outside-click collapse is suppressed (e.g. the parent's asset picker modal is open). */
+  isAssetPickerOpen?: boolean;
 }
 
 export function KlingElementEditor({
@@ -49,11 +51,26 @@ export function KlingElementEditor({
   compact = false,
   onPickImages,
   resolveImageUrl,
+  isAssetPickerOpen = false,
 }: KlingElementEditorProps) {
   const t = useTranslations("chat.klingElement");
-  const [expandedIndex, setExpandedIndex] = useState<number | null>(
-    elements.length === 0 ? null : 0
-  );
+  const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (expandedIndex === null) return;
+    const handleOutside = (e: MouseEvent) => {
+      if (isAssetPickerOpen) return;
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(e.target as Node)
+      ) {
+        setExpandedIndex(null);
+      }
+    };
+    document.addEventListener("mousedown", handleOutside);
+    return () => document.removeEventListener("mousedown", handleOutside);
+  }, [expandedIndex, isAssetPickerOpen]);
 
   const addElement = useCallback(() => {
     if (elements.length >= MAX_ELEMENTS) return;
@@ -110,7 +127,7 @@ export function KlingElementEditor({
   );
 
   return (
-    <div className="space-y-2">
+    <div ref={containerRef} className="space-y-2">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5 text-xs text-default-500">
           <Sparkles size={14} />
@@ -140,7 +157,7 @@ export function KlingElementEditor({
         </button>
       )}
 
-      <div className="space-y-2">
+      <div className="flex flex-wrap gap-2">
         {elements.map((el, index) => {
           const isExpanded = expandedIndex === index;
           const imageCount = (el.element_input_ids ?? []).length;
@@ -149,53 +166,114 @@ export function KlingElementEditor({
           const imagesInvalid = imageCount < MIN_IMAGES;
           const isValid = isKlingElementValid(el);
 
+          const coverUrl = resolveImageUrl?.(
+            (el.element_input_ids ?? [])[0] ?? ""
+          );
+
           return (
             <div
               key={index}
-              className="rounded-lg border border-divider bg-background/50 overflow-hidden"
+              className={`rounded-lg border border-divider bg-background/50 overflow-hidden max-w-full ${
+                isExpanded ? "w-72" : "w-36 h-36"
+              }`}
             >
-              <div
-                className="w-full flex items-center gap-2 px-2.5 py-2 hover:bg-default-50 transition-colors cursor-pointer"
-                role="button"
-                tabIndex={0}
-                onClick={() =>
-                  setExpandedIndex(isExpanded ? null : index)
-                }
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    setExpandedIndex(isExpanded ? null : index);
-                  }
-                }}
-              >
-                <Sparkles
-                  size={14}
-                  className={
-                    isValid
-                      ? "text-secondary"
-                      : "text-danger"
-                  }
-                />
-                <span className="text-xs font-medium flex-1 text-left truncate">
-                  {el.name ? `@${el.name}` : t("defaultName", { index: index + 1 })}
-                </span>
-                <span
-                  className={`text-[10px] ${imagesInvalid ? "text-danger" : "text-default-400"}`}
+              {!isExpanded ? (
+                <div
+                  className="relative w-full h-full cursor-pointer"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setExpandedIndex(index)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      setExpandedIndex(index);
+                    }
+                  }}
                 >
-                  {t("imageCount", { count: imageCount })}
-                </span>
-                {!disabled && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      removeElement(index);
-                    }}
-                    className="p-0.5 text-default-400 hover:text-danger transition-colors"
+                  {coverUrl ? (
+                    <img
+                      src={coverUrl}
+                      alt=""
+                      className="absolute inset-0 w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="absolute inset-0 bg-default-100" />
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-black/20" />
+                  <Sparkles
+                    size={14}
+                    className={`absolute top-1.5 left-1.5 drop-shadow ${
+                      isValid ? "text-secondary" : "text-danger"
+                    }`}
+                  />
+                  {!disabled && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removeElement(index);
+                      }}
+                      className="absolute top-1 right-1 p-1 rounded bg-black/50 text-white hover:bg-danger transition-colors"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  )}
+                  <div className="absolute bottom-1.5 left-1.5 right-1.5 text-white">
+                    <div className="text-xs font-medium truncate drop-shadow">
+                      {el.name
+                        ? `@${el.name}`
+                        : t("defaultName", { index: index + 1 })}
+                    </div>
+                    <div
+                      className={`text-[10px] drop-shadow ${
+                        imagesInvalid ? "text-danger" : "text-white/90"
+                      }`}
+                    >
+                      {t("imageCount", { count: imageCount })}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div
+                  className="w-full flex items-center gap-2 px-2.5 py-2 hover:bg-default-50 transition-colors cursor-pointer"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setExpandedIndex(null)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      setExpandedIndex(null);
+                    }
+                  }}
+                >
+                  <Sparkles
+                    size={14}
+                    className={
+                      isValid
+                        ? "text-secondary"
+                        : "text-danger"
+                    }
+                  />
+                  <span className="text-xs font-medium flex-1 text-left truncate">
+                    {el.name ? `@${el.name}` : t("defaultName", { index: index + 1 })}
+                  </span>
+                  <span
+                    className={`text-[10px] ${imagesInvalid ? "text-danger" : "text-default-400"}`}
                   >
-                    <Trash2 size={12} />
-                  </button>
-                )}
-              </div>
+                    {t("imageCount", { count: imageCount })}
+                  </span>
+                  {!disabled && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removeElement(index);
+                      }}
+                      className="p-0.5 text-default-400 hover:text-danger transition-colors"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  )}
+                </div>
+              )}
 
               {isExpanded && (
                 <div className="px-2.5 pb-2.5 space-y-2 border-t border-divider pt-2">
