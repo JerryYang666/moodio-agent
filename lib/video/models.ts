@@ -1821,7 +1821,7 @@ export function getModelDefaults(modelId: string): Record<string, any> {
  *
  * Status handling:
  * - "disabled": Parameter is completely skipped (not in output)
- * - "hidden": User input is ignored, always uses default value
+ * - "hidden": Not shown in UI; keeps system-provided value if present, otherwise default
  * - "active" (default): Normal validation and merge
  */
 export function validateAndMergeParams(
@@ -1841,7 +1841,14 @@ export function validateAndMergeParams(
   // Validate and merge user params
   for (const param of params) {
     if (param.status === "disabled") continue;
-    if (param.status === "hidden") continue;
+    if (param.status === "hidden") {
+      // Hidden params keep the provided value when present (e.g.
+      // reference_video_duration set by the system), otherwise default.
+      if (userParams[param.name] !== undefined) {
+        merged[param.name] = userParams[param.name];
+      }
+      continue;
+    }
 
     const userValue = userParams[param.name];
 
