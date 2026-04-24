@@ -302,6 +302,9 @@ export default function VideoConfigCard({
 
     // Build params for API: substitute display URLs back to image IDs for asset params
     const paramsForApi = { ...editedParams };
+    if (referenceVideoDuration > 0) {
+      paramsForApi.reference_video_duration = referenceVideoDuration;
+    }
     for (const [paramName, imageId] of Object.entries(assetParamImageIds)) {
       if (imageId) paramsForApi[paramName] = imageId;
     }

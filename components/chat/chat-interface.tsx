@@ -444,6 +444,26 @@ export default function ChatInterface({
       });
   }, [menuState.videoParams?.media_references, mediaRefUrls]);
 
+  // Catch-all: auto-probe video durations for any video refs that have a URL
+  // but no duration yet (covers put-back, draft restore, and any future path).
+  useEffect(() => {
+    const refs = (menuState.videoParams?.media_references as MediaReference[]) || [];
+    const videoRefs = refs.filter(
+      (r) => r.type === "video" && mediaRefUrls[r.id] && mediaRefVideoDurations[r.id] === undefined
+    );
+    if (videoRefs.length === 0) return;
+
+    let cancelled = false;
+    for (const ref of videoRefs) {
+      probeVideoDurationFromUrl(mediaRefUrls[ref.id]).then((d) => {
+        if (!cancelled) {
+          setMediaRefVideoDurations((prev) => ({ ...prev, [ref.id]: d }));
+        }
+      });
+    }
+    return () => { cancelled = true; };
+  }, [menuState.videoParams?.media_references, mediaRefUrls, mediaRefVideoDurations]);
+
   // Sync reference_video_duration into videoParams for pricing
   const mediaRefVideoTotal = useMemo(() => {
     const refs = (menuState.videoParams?.media_references as MediaReference[]) || [];
