@@ -462,7 +462,7 @@ export default function ChatInterface({
       ...prev,
       videoParams: { ...prev.videoParams, reference_video_duration: rounded },
     }));
-  }, [mediaRefVideoTotal, menuState.mode]);
+  }, [mediaRefVideoTotal, menuState.mode, menuState.videoParams?.reference_video_duration]);
 
   // Video cost estimation state
   const [videoCost, setVideoCost] = useState<number | null>(null);
