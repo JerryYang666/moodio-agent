@@ -13,6 +13,7 @@
 import { siteConfig } from "@/config/site";
 import { PendingImage } from "./pending-image-types";
 import { MenuState, INITIAL_MENU_STATE } from "./menu-configuration";
+import { MediaReference } from "@/lib/video/models";
 import type { JSONContent } from "@tiptap/react";
 
 /**
@@ -41,6 +42,10 @@ export interface ChatDraft {
   plainText: string;
   /** Pending images (only fully uploaded ones) */
   pendingImages: SerializablePendingImage[];
+  /** Video/image/audio media references for video generation */
+  mediaReferences?: MediaReference[];
+  /** Video duration map (videoId → seconds) for pricing */
+  mediaRefVideoDurations?: Record<string, number>;
   /** Timestamp when draft was saved */
   savedAt: number;
 }
@@ -96,20 +101,23 @@ export function saveChatDraft(
   chatId: string | undefined,
   editorContent: JSONContent | null,
   plainText: string,
-  pendingImages: PendingImage[]
+  pendingImages: PendingImage[],
+  mediaReferences?: MediaReference[],
+  mediaRefVideoDurations?: Record<string, number>,
 ): void {
   if (typeof window === "undefined") return;
-  
+
   const key = getDraftKey(chatId);
-  
+
   // Filter out uploading images and convert to serializable format
   const serializableImages = pendingImages
     .map(toSerializablePendingImage)
     .filter((img): img is SerializablePendingImage => img !== null);
-  
+
   // Check if draft is empty
-  const isEmpty = !plainText.trim() && serializableImages.length === 0;
-  
+  const hasMediaRefs = mediaReferences && mediaReferences.length > 0;
+  const isEmpty = !plainText.trim() && serializableImages.length === 0 && !hasMediaRefs;
+
   if (isEmpty) {
     // Remove draft if empty
     try {
@@ -119,7 +127,7 @@ export function saveChatDraft(
     }
     return;
   }
-  
+
   const draft: ChatDraft = {
     version: 1,
     editorContent,
@@ -127,7 +135,14 @@ export function saveChatDraft(
     pendingImages: serializableImages,
     savedAt: Date.now(),
   };
-  
+
+  if (hasMediaRefs) {
+    draft.mediaReferences = mediaReferences;
+  }
+  if (mediaRefVideoDurations && Object.keys(mediaRefVideoDurations).length > 0) {
+    draft.mediaRefVideoDurations = mediaRefVideoDurations;
+  }
+
   try {
     localStorage.setItem(key, JSON.stringify(draft));
   } catch (e) {

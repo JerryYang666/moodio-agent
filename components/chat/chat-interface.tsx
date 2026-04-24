@@ -510,6 +510,19 @@ export default function ChatInterface({
         setPendingImages(draftImagesToPendingImages(draft.pendingImages));
         setDraftHadImages(true); // Mark that draft had images (skip pre-select)
       }
+      // Restore media references and video durations from draft
+      if (draft.mediaReferences && draft.mediaReferences.length > 0) {
+        setMenuState((prev) => ({
+          ...prev,
+          videoParams: {
+            ...prev.videoParams,
+            media_references: draft.mediaReferences,
+          },
+        }));
+      }
+      if (draft.mediaRefVideoDurations && Object.keys(draft.mediaRefVideoDurations).length > 0) {
+        setMediaRefVideoDurations(draft.mediaRefVideoDurations);
+      }
     } else {
       setInput("");
       // Don't clear pendingImages here - they might be set from other sources
@@ -530,8 +543,9 @@ export default function ChatInterface({
     if (!isDraftLoaded) return;
 
     const editorContent = chatInputRef.current?.getEditorJSON() || null;
-    saveChatDraft(chatId, editorContent, input, pendingImages);
-  }, [chatId, input, pendingImages, isDraftLoaded]);
+    const refs = (menuState.videoParams?.media_references as MediaReference[]) || [];
+    saveChatDraft(chatId, editorContent, input, pendingImages, refs, mediaRefVideoDurations);
+  }, [chatId, input, pendingImages, isDraftLoaded, menuState.videoParams?.media_references, mediaRefVideoDurations]);
 
   // Save draft on visibility change (tab switch, minimize, etc.) + research session_end
   useEffect(() => {
