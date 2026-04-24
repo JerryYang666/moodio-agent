@@ -276,8 +276,9 @@ const seedance20: VideoModelConfig = {
       type: "enum",
       required: false,
       default: "720p",
-      options: ["480p", "720p"],
-      description: "Video resolution — 480p for faster generation, 720p for higher quality",
+      options: ["480p", "720p", "1080p"],
+      description:
+        "Video resolution — 480p for faster generation, 720p for balance, 1080p for higher quality",
     },
     {
       name: "generate_audio",
@@ -356,8 +357,9 @@ const seedance20Reference: VideoModelConfig = {
       type: "enum",
       required: false,
       default: "720p",
-      options: ["480p", "720p"],
-      description: "Video resolution — 480p for faster generation, 720p for higher quality",
+      options: ["480p", "720p", "1080p"],
+      description:
+        "Video resolution — 480p for faster generation, 720p for balance, 1080p for higher quality",
     },
     {
       name: "generate_audio",
