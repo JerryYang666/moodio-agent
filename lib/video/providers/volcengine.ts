@@ -4,8 +4,14 @@ import type { MediaReference } from "@/lib/video/models";
 const ARK_API_BASE = "https://ark.cn-beijing.volces.com/api/v3";
 
 const ARK_FETCH_TIMEOUT_MS = 30_000;
+const ARK_SUBMIT_TIMEOUT_MS = 120_000;
 const ARK_MAX_RETRIES = 3;
 const ARK_RETRY_BASE_DELAY_MS = 2_000;
+
+interface ArkFetchOpts {
+  timeoutMs?: number;
+  retryOnTimeout?: boolean;
+}
 
 /**
  * fetch wrapper for Volcengine Ark API with extended timeout and retry.
@@ -14,24 +20,28 @@ const ARK_RETRY_BASE_DELAY_MS = 2_000;
  */
 async function arkFetch(
   url: string,
-  init?: RequestInit
+  init?: RequestInit,
+  opts?: ArkFetchOpts
 ): Promise<Response> {
+  const timeoutMs = opts?.timeoutMs ?? ARK_FETCH_TIMEOUT_MS;
+  const retryOnTimeout = opts?.retryOnTimeout ?? true;
   let lastError: Error | undefined;
 
   for (let attempt = 0; attempt <= ARK_MAX_RETRIES; attempt++) {
     try {
       const res = await fetch(url, {
         ...init,
-        signal: AbortSignal.timeout(ARK_FETCH_TIMEOUT_MS),
+        signal: AbortSignal.timeout(timeoutMs),
       });
       return res;
     } catch (error: any) {
       lastError = error;
+      const isTimeout = error?.name === "TimeoutError";
       const isRetryable =
         error?.cause?.code === "UND_ERR_CONNECT_TIMEOUT" ||
         error?.cause?.code === "ECONNRESET" ||
         error?.cause?.code === "ETIMEDOUT" ||
-        error?.name === "TimeoutError";
+        (isTimeout && retryOnTimeout);
 
       if (!isRetryable || attempt === ARK_MAX_RETRIES) break;
 
@@ -230,7 +240,8 @@ export class VolcengineVideoProvider implements VideoProviderClient {
         method: "POST",
         headers: arkAuthHeaders(),
         body: JSON.stringify(body),
-      }
+      },
+      { timeoutMs: ARK_SUBMIT_TIMEOUT_MS, retryOnTimeout: false }
     );
 
     if (!res.ok) {
