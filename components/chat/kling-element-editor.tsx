@@ -140,7 +140,7 @@ export function KlingElementEditor({
         </button>
       )}
 
-      <div className="space-y-2">
+      <div className="flex flex-wrap gap-2">
         {elements.map((el, index) => {
           const isExpanded = expandedIndex === index;
           const imageCount = (el.element_input_ids ?? []).length;
@@ -152,7 +152,9 @@ export function KlingElementEditor({
           return (
             <div
               key={index}
-              className="rounded-lg border border-divider bg-background/50 overflow-hidden"
+              className={`rounded-lg border border-divider bg-background/50 overflow-hidden ${
+                isExpanded ? "w-full" : "grow basis-[140px]"
+              }`}
             >
               <div
                 className="w-full flex items-center gap-2 px-2.5 py-2 hover:bg-default-50 transition-colors cursor-pointer"
