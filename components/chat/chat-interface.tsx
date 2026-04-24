@@ -444,6 +444,87 @@ export default function ChatInterface({
       });
   }, [menuState.videoParams?.media_references, mediaRefUrls]);
 
+  // Normalize kling_elements image IDs (any leaked CloudFront URLs -> raw IDs)
+  // and hydrate display URLs for IDs we haven't seen yet. Covers put-back,
+  // draft restore, and any future path that re-seeds elements.
+  const enrichingElementIdsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const elements = (menuState.videoParams?.kling_elements as KlingElement[]) || [];
+    if (elements.length === 0) return;
+
+    // Pass 1: normalise any signed-URL entries back to bare image IDs.
+    const urlIdMap: Record<string, { rawId: string; unsignedUrl: string }> = {};
+    let hasUrlIds = false;
+    for (const el of elements) {
+      for (const id of el.element_input_ids || []) {
+        if (id && id.startsWith("http")) {
+          try {
+            const parsed = new URL(id);
+            const segments = parsed.pathname.split("/").filter(Boolean);
+            if (segments.length >= 2) {
+              const rawId = segments[segments.length - 1];
+              const unsignedUrl = `${parsed.origin}/${segments.join("/")}`;
+              urlIdMap[id] = { rawId, unsignedUrl };
+              hasUrlIds = true;
+            }
+          } catch { /* not a valid URL — ignore */ }
+        }
+      }
+    }
+
+    if (hasUrlIds) {
+      setMenuState((prev) => {
+        const prevElements = (prev.videoParams?.kling_elements as KlingElement[]) || [];
+        const normalised = prevElements.map((el) => ({
+          ...el,
+          element_input_ids: (el.element_input_ids || []).map((id) => urlIdMap[id]?.rawId ?? id),
+        }));
+        return {
+          ...prev,
+          videoParams: { ...prev.videoParams, kling_elements: normalised },
+        };
+      });
+      setElementImageUrls((prev) => {
+        const next = { ...prev };
+        for (const { rawId, unsignedUrl } of Object.values(urlIdMap)) {
+          next[rawId] = unsignedUrl;
+        }
+        return next;
+      });
+      return; // effect will re-run with normalised ids
+    }
+
+    // Pass 2: fetch display URLs for any raw IDs we haven't resolved yet.
+    const missing = new Set<string>();
+    for (const el of elements) {
+      for (const id of el.element_input_ids || []) {
+        if (id && !elementImageUrls[id] && !enrichingElementIdsRef.current.has(id)) {
+          missing.add(id);
+        }
+      }
+    }
+    if (missing.size === 0) return;
+
+    const ids = Array.from(missing);
+    for (const id of ids) enrichingElementIdsRef.current.add(id);
+
+    fetch("/api/media/enrich", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refs: ids.map((id) => ({ type: "image", id })) }),
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { urls: Record<string, string> } | null) => {
+        if (data?.urls && Object.keys(data.urls).length > 0) {
+          setElementImageUrls((prev) => ({ ...prev, ...data.urls }));
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        for (const id of ids) enrichingElementIdsRef.current.delete(id);
+      });
+  }, [menuState.videoParams?.kling_elements, elementImageUrls]);
+
   // Catch-all: auto-probe video durations for any video refs that have a URL
   // but no duration yet (covers put-back, draft restore, and any future path).
   useEffect(() => {
