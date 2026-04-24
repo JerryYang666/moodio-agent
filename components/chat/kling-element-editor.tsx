@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@heroui/button";
 import { Input } from "@heroui/input";
 import { Plus, Trash2, Sparkles, ImagePlus, X } from "lucide-react";
@@ -40,6 +40,8 @@ interface KlingElementEditorProps {
   onPickImages?: (elementIndex: number, maxImages: number) => void;
   /** Resolve an image ID to a display URL. */
   resolveImageUrl?: (imageId: string) => string | undefined;
+  /** When true, outside-click collapse is suppressed (e.g. the parent's asset picker modal is open). */
+  isAssetPickerOpen?: boolean;
 }
 
 export function KlingElementEditor({
@@ -49,9 +51,26 @@ export function KlingElementEditor({
   compact = false,
   onPickImages,
   resolveImageUrl,
+  isAssetPickerOpen = false,
 }: KlingElementEditorProps) {
   const t = useTranslations("chat.klingElement");
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (expandedIndex === null) return;
+    const handleOutside = (e: MouseEvent) => {
+      if (isAssetPickerOpen) return;
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(e.target as Node)
+      ) {
+        setExpandedIndex(null);
+      }
+    };
+    document.addEventListener("mousedown", handleOutside);
+    return () => document.removeEventListener("mousedown", handleOutside);
+  }, [expandedIndex, isAssetPickerOpen]);
 
   const addElement = useCallback(() => {
     if (elements.length >= MAX_ELEMENTS) return;
@@ -61,6 +80,7 @@ export function KlingElementEditor({
       element_input_ids: [],
     };
     onChange([...elements, newElement]);
+    setExpandedIndex(elements.length);
   }, [elements, onChange]);
 
   const removeElement = useCallback(
@@ -107,7 +127,7 @@ export function KlingElementEditor({
   );
 
   return (
-    <div className="space-y-2">
+    <div ref={containerRef} className="space-y-2">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5 text-xs text-default-500">
           <Sparkles size={14} />
