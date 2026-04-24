@@ -36,6 +36,7 @@ import { useGenerateVideoMutation } from "@/lib/redux/services/next-api";
 import { getViewportVisibleCenterPosition } from "@/lib/desktop/types";
 import type { MessageContentPart } from "@/lib/llm/types";
 import { getVideoModel, type VideoModelParam } from "@/lib/video/models";
+import { probeVideoDurationFromUrl } from "@/lib/video/probe-video-duration";
 import { MultiShotEditor } from "./multi-shot-editor";
 import { KlingElementEditor, areKlingElementsValid } from "./kling-element-editor";
 import { SeedanceReferenceEditor } from "./seedance-reference-editor";
@@ -213,6 +214,34 @@ export default function VideoConfigCard({
     [sourceAudios]
   );
 
+  // Probe video durations from reference video URLs
+  const [videoDurations, setVideoDurations] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    const refs = (editedParams.media_references as MediaReference[]) || [];
+    const videoRefs = refs.filter((r) => r.type === "video");
+    if (videoRefs.length === 0) return;
+
+    let cancelled = false;
+    for (const ref of videoRefs) {
+      if (videoDurations[ref.id] !== undefined) continue;
+      const url = resolveVideoUrl(ref.id);
+      if (!url) continue;
+      probeVideoDurationFromUrl(url).then((d) => {
+        if (!cancelled) setVideoDurations((prev) => ({ ...prev, [ref.id]: d }));
+      });
+    }
+    return () => { cancelled = true; };
+  }, [editedParams.media_references, sourceVideos]);
+
+  const referenceVideoDuration = useMemo(() => {
+    const refs = (editedParams.media_references as MediaReference[]) || [];
+    const total = refs
+      .filter((r) => r.type === "video")
+      .reduce((acc, r) => acc + (videoDurations[r.id] ?? 0), 0);
+    return Math.round(total * 10) / 10;
+  }, [editedParams.media_references, videoDurations]);
+
   const costParamsKey = useMemo(() => {
     const entries = Object.entries(editedParams)
       .filter(
@@ -220,8 +249,8 @@ export default function VideoConfigCard({
           value !== undefined && value !== null && value !== ""
       )
       .sort(([a], [b]) => a.localeCompare(b));
-    return JSON.stringify(entries);
-  }, [editedParams]);
+    return JSON.stringify([entries, referenceVideoDuration]);
+  }, [editedParams, referenceVideoDuration]);
 
   useEffect(() => {
     if (!part.config.modelId || status !== "pending") {
@@ -237,9 +266,13 @@ export default function VideoConfigCard({
 
         Object.entries(editedParams).forEach(([key, value]) => {
           if (value !== undefined && value !== null && value !== "") {
+            if (Array.isArray(value) || (typeof value === "object" && value !== null)) return;
             searchParams.set(key, String(value));
           }
         });
+        if (referenceVideoDuration > 0) {
+          searchParams.set("reference_video_duration", String(referenceVideoDuration));
+        }
 
         const res = await fetch(`/api/video/cost?${searchParams.toString()}`);
         if (res.ok) {
@@ -774,6 +807,7 @@ export default function VideoConfigCard({
             resolveImageUrl={resolveImageUrl}
             resolveVideoUrl={resolveVideoUrl}
             resolveAudioUrl={resolveAudioUrl}
+            videoDurations={videoDurations}
           />
         )}
 
