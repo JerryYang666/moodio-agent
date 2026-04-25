@@ -1127,54 +1127,65 @@ function isRetryableHttpStatus(status: number): boolean {
 }
 
 /**
- * fetch() with retry + per-attempt timeout for transient network errors.
- * Exponential backoff with jitter. Used by download helpers that pull large
- * media from third-party hosts (Fal, Kie, Volcengine TOS in China, etc.),
- * where a single connect timeout would otherwise cause us to drop a
- * successful generation and refund the user.
+ * fetch() + full-body read with retry + per-attempt timeout.
+ *
+ * Consumes the response body inside the retry loop, so body-read timeouts
+ * (common for large videos streamed from cross-region hosts like Volcengine
+ * TOS in cn-beijing) are classified as retryable and trigger another attempt
+ * instead of bubbling up and causing us to refund a generation that actually
+ * succeeded upstream.
+ *
+ * The default per-attempt timeout is intentionally large (3 minutes) because
+ * a 15s 1080p video from Volcengine can be 30-80 MB and a single trans-Pacific
+ * transfer can legitimately take over a minute.
  */
-export async function fetchWithRetry(
+export async function downloadWithRetry(
   url: string,
-  init: RequestInit = {},
   opts: {
     maxAttempts?: number;
     timeoutMs?: number;
     baseBackoffMs?: number;
     logPrefix?: string;
   } = {}
-): Promise<Response> {
+): Promise<{ buffer: Buffer; contentType: string | null }> {
   const {
     maxAttempts = 4,
-    timeoutMs = 60_000,
+    timeoutMs = 180_000,
     baseBackoffMs = 1_000,
-    logPrefix = "[fetchWithRetry]",
+    logPrefix = "[downloadWithRetry]",
   } = opts;
 
   let lastError: unknown;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
-      const signal = init.signal
-        ? AbortSignal.any([init.signal, AbortSignal.timeout(timeoutMs)])
-        : AbortSignal.timeout(timeoutMs);
+      const signal = AbortSignal.timeout(timeoutMs);
+      const response = await fetch(url, { signal });
 
-      const response = await fetch(url, { ...init, signal });
-
-      if (!response.ok && isRetryableHttpStatus(response.status)) {
-        if (attempt === maxAttempts) return response;
-        lastError = new Error(
-          `HTTP ${response.status} ${response.statusText}`
-        );
-        console.warn(
-          `${logPrefix} attempt ${attempt}/${maxAttempts} got ${response.status} ${response.statusText}, retrying…`
-        );
+      if (!response.ok) {
+        if (isRetryableHttpStatus(response.status) && attempt < maxAttempts) {
+          lastError = new Error(
+            `HTTP ${response.status} ${response.statusText}`
+          );
+          console.warn(
+            `${logPrefix} attempt ${attempt}/${maxAttempts} got ${response.status} ${response.statusText}, retrying…`
+          );
+        } else {
+          throw new Error(
+            `Failed to download from URL: ${response.status} ${response.statusText}`
+          );
+        }
       } else {
+        const arrayBuffer = await response.arrayBuffer();
         if (attempt > 1) {
           console.log(
             `${logPrefix} succeeded on attempt ${attempt}/${maxAttempts}`
           );
         }
-        return response;
+        return {
+          buffer: Buffer.from(arrayBuffer),
+          contentType: response.headers.get("content-type"),
+        };
       }
     } catch (err) {
       lastError = err;
@@ -1202,36 +1213,25 @@ export async function fetchWithRetry(
 
   throw lastError instanceof Error
     ? lastError
-    : new Error("fetchWithRetry exhausted all attempts");
+    : new Error("downloadWithRetry exhausted all attempts");
 }
 
 /**
  * Download a file from an external URL
  * Used for downloading video / image results from third-party providers.
  *
- * Retries on transient failures (connect timeout, socket errors, 5xx, 429)
- * with exponential backoff. This matters a lot for Volcengine TOS and other
- * cross-region hosts where a single connect timeout would otherwise cause us
- * to refund a successful generation.
+ * Retries on transient failures (connect timeout, socket errors, body-read
+ * timeout, 5xx, 429) with exponential backoff. This matters a lot for
+ * Volcengine TOS and other cross-region hosts where a single slow transfer
+ * would otherwise cause us to refund a successful generation.
  *
  * @param url The URL to download from
  * @returns Buffer containing the file data
  */
 export async function downloadFromUrl(url: string): Promise<Buffer> {
   validateDownloadUrl(url);
-
-  const response = await fetchWithRetry(
-    url,
-    {},
-    { logPrefix: "[downloadFromUrl]" }
-  );
-
-  if (!response.ok) {
-    throw new Error(
-      `Failed to download from URL: ${response.status} ${response.statusText}`
-    );
-  }
-
-  const arrayBuffer = await response.arrayBuffer();
-  return Buffer.from(arrayBuffer);
+  const { buffer } = await downloadWithRetry(url, {
+    logPrefix: "[downloadFromUrl]",
+  });
+  return buffer;
 }

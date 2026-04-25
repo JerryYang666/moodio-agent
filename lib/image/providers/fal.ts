@@ -2,7 +2,7 @@ import { fal } from "@fal-ai/client";
 import {
   getSignedImageUrl,
   validateDownloadUrl,
-  fetchWithRetry,
+  downloadWithRetry,
 } from "@/lib/storage/s3";
 import {
   ImageEditInput,
@@ -25,20 +25,12 @@ async function downloadFromUrlWithType(url: string): Promise<{
   contentType: string;
 }> {
   validateDownloadUrl(url);
-  const response = await fetchWithRetry(
-    url,
-    {},
-    { logPrefix: "[fal/downloadFromUrlWithType]" }
-  );
-  if (!response.ok) {
-    throw new Error(
-      `Failed to download from URL: ${response.status} ${response.statusText}`
-    );
-  }
-  const arrayBuffer = await response.arrayBuffer();
+  const { buffer, contentType } = await downloadWithRetry(url, {
+    logPrefix: "[fal/downloadFromUrlWithType]",
+  });
   return {
-    buffer: Buffer.from(arrayBuffer),
-    contentType: response.headers.get("content-type") || "image/png",
+    buffer,
+    contentType: contentType || "image/png",
   };
 }
 
