@@ -111,6 +111,7 @@
     "react-redux": "^9.2.0",
     "react-simple-code-editor": "^0.14.1",
     "react-zoom-pan-pinch": "^3.7.0",
+    "remark-gfm": "^4.0.1",
     "sharp": "^0.34.5",
     "stripe": "^21.0.1",
     "uuid": "^14.0.0",

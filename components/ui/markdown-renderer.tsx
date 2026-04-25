@@ -1,6 +1,7 @@
 "use client";
 
 import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
+import remarkGfm from "remark-gfm";
 import TaxonomyLink from "@/components/chat/taxonomy-link";
 
 interface MarkdownRendererProps {
@@ -56,6 +57,7 @@ export default function MarkdownRenderer({
 
   return (
     <ReactMarkdown
+      remarkPlugins={[remarkGfm]}
       urlTransform={(url) => {
         if (url.startsWith("taxonomy:")) return url;
         return defaultUrlTransform(url);
