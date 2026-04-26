@@ -916,6 +916,40 @@ export default function DesktopDetailPage({
     setIsAssetPickerOpen(true);
   }, []);
 
+  const handleAddTextAtPosition = useCallback(
+    async (worldPos: { x: number; y: number }) => {
+      try {
+        const res = await fetch(`/api/desktop/${desktopId}/assets`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            assets: [
+              {
+                assetType: "text",
+                metadata: { content: "" },
+                posX: worldPos.x,
+                posY: worldPos.y,
+                width: 300,
+                height: 200,
+              },
+            ],
+          }),
+        });
+        if (!res.ok) throw new Error("Failed to add text asset to desktop");
+        const data = await res.json();
+        window.dispatchEvent(
+          new CustomEvent("desktop-asset-added", {
+            detail: { assets: data.assets, desktopId },
+          })
+        );
+      } catch (error) {
+        console.error("Failed to add text asset to desktop:", error);
+        addToast({ title: t("failedToAddText"), color: "danger" });
+      }
+    },
+    [desktopId, t]
+  );
+
   const handleAssetPickerSelect = useCallback(
     async (asset: AssetSummary) => {
       const pos = addAssetPositionRef.current;
@@ -1153,6 +1187,7 @@ export default function DesktopDetailPage({
           onExternalShotlistDrop={canEdit ? handleExternalShotlistDrop : undefined}
           onExternalVideoSuggestDrop={canEdit ? handleExternalVideoSuggestDrop : undefined}
           onAddAssetAtPosition={canEdit ? handleAddAssetAtPosition : undefined}
+          onAddTextAtPosition={canEdit ? handleAddTextAtPosition : undefined}
           onAssetRename={canEdit ? handleAssetRename : undefined}
         />
         <DesktopToolbar
