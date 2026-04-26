@@ -1527,6 +1527,7 @@
     "fitToView": "ビューに合わせる",
     "desktopNotFound": "デスクトップが見つかりません",
     "addAsset": "アセットを追加",
+    "addText": "テキストを追加",
     "failedToAddAsset": "アセットの追加に失敗しました",
     "uploadFailed": "アップロードに失敗しました",
     "sendToChat": "チャットに送信",

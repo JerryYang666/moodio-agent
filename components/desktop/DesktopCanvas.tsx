@@ -26,6 +26,7 @@ import {
   ArrowDown,
   Maximize2,
   Pencil,
+  Type,
 } from "lucide-react";
 
 const MIN_ZOOM = 0.1;
@@ -101,6 +102,7 @@ interface DesktopCanvasProps {
     position: { x: number; y: number }
   ) => void;
   onAddAssetAtPosition?: (worldPos: { x: number; y: number }) => void;
+  onAddTextAtPosition?: (worldPos: { x: number; y: number }) => void;
   onAssetRename?: (assetId: string, newTitle: string) => void;
 }
 
@@ -189,6 +191,7 @@ export default function DesktopCanvas({
   onVideoSuggestCommit,
   onExternalVideoSuggestDrop,
   onAddAssetAtPosition,
+  onAddTextAtPosition,
   onAssetRename,
 }: DesktopCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -1221,17 +1224,31 @@ export default function DesktopCanvas({
           onPointerDown={(e) => e.stopPropagation()}
         >
           {contextMenu.assetId === null ? (
-            /* Background context menu: add asset */
-            <button
-              className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-default-100 transition-colors text-left"
-              onClick={() => {
-                onAddAssetAtPosition?.({ x: contextMenu.worldX, y: contextMenu.worldY });
-                setContextMenu(null);
-              }}
-            >
-              <Plus size={14} />
-              {t("addAsset")}
-            </button>
+            /* Background context menu: add asset / add text */
+            <>
+              <button
+                className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-default-100 transition-colors text-left"
+                onClick={() => {
+                  onAddAssetAtPosition?.({ x: contextMenu.worldX, y: contextMenu.worldY });
+                  setContextMenu(null);
+                }}
+              >
+                <Plus size={14} />
+                {t("addAsset")}
+              </button>
+              {onAddTextAtPosition && (
+                <button
+                  className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-default-100 transition-colors text-left"
+                  onClick={() => {
+                    onAddTextAtPosition({ x: contextMenu.worldX, y: contextMenu.worldY });
+                    setContextMenu(null);
+                  }}
+                >
+                  <Type size={14} />
+                  {t("addText")}
+                </button>
+              )}
+            </>
           ) : selectedIds.size > 1 ? (
             /* Multi-select context menu: only delete option */
             <button
