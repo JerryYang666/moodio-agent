@@ -48,7 +48,11 @@ function resolveFalEndpoint(
       Array.isArray(multi_prompt) &&
       multi_prompt.length > 0
     ) {
-      rest.multi_prompt = multi_prompt;
+      // FAL requires per-shot duration as a string literal ('1'..'15'), not a number.
+      rest.multi_prompt = multi_prompt.map((shot: any) => ({
+        ...shot,
+        duration: String(shot.duration),
+      }));
     } else if (typeof prompt === "string" && prompt.trim().length > 0) {
       rest.prompt = prompt;
     }
