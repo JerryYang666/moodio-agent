@@ -167,23 +167,37 @@ export async function getEnrichedTable(
 // Column CRUD
 // ---------------------------------------------------------------------------
 
+/**
+ * Insert a new column. An explicit `id` may be supplied to restore a
+ * previously-deleted column (used by undo). Collisions raise the same
+ * unique-key error the insert already does.
+ */
 export async function addColumn(
   tableId: string,
   name: string,
-  cellType: CellType
+  cellType: CellType,
+  options?: { id?: string; width?: number; sortOrder?: number }
 ) {
-  const existing = await db
-    .select({ sortOrder: productionTableColumns.sortOrder })
-    .from(productionTableColumns)
-    .where(eq(productionTableColumns.tableId, tableId))
-    .orderBy(desc(productionTableColumns.sortOrder))
-    .limit(1);
+  let sortOrder: number;
+  if (typeof options?.sortOrder === "number") {
+    sortOrder = options.sortOrder;
+  } else {
+    const existing = await db
+      .select({ sortOrder: productionTableColumns.sortOrder })
+      .from(productionTableColumns)
+      .where(eq(productionTableColumns.tableId, tableId))
+      .orderBy(desc(productionTableColumns.sortOrder))
+      .limit(1);
+    sortOrder = existing.length > 0 ? existing[0].sortOrder + 1 : 0;
+  }
 
-  const nextOrder = existing.length > 0 ? existing[0].sortOrder + 1 : 0;
+  const values: Record<string, unknown> = { tableId, name, cellType, sortOrder };
+  if (options?.id) values.id = options.id;
+  if (typeof options?.width === "number") values.width = options.width;
 
   const [column] = await db
     .insert(productionTableColumns)
-    .values({ tableId, name, cellType, sortOrder: nextOrder })
+    .values(values as typeof productionTableColumns.$inferInsert)
     .returning();
 
   await touchTable(tableId);
@@ -245,19 +259,34 @@ export async function reorderColumns(tableId: string, columnIds: string[]) {
 // Row CRUD
 // ---------------------------------------------------------------------------
 
-export async function addRow(tableId: string) {
-  const existing = await db
-    .select({ sortOrder: productionTableRows.sortOrder })
-    .from(productionTableRows)
-    .where(eq(productionTableRows.tableId, tableId))
-    .orderBy(desc(productionTableRows.sortOrder))
-    .limit(1);
+/**
+ * Insert a new row. An explicit `id` may be supplied to restore a
+ * previously-deleted row (used by undo).
+ */
+export async function addRow(
+  tableId: string,
+  options?: { id?: string; height?: number; sortOrder?: number }
+) {
+  let sortOrder: number;
+  if (typeof options?.sortOrder === "number") {
+    sortOrder = options.sortOrder;
+  } else {
+    const existing = await db
+      .select({ sortOrder: productionTableRows.sortOrder })
+      .from(productionTableRows)
+      .where(eq(productionTableRows.tableId, tableId))
+      .orderBy(desc(productionTableRows.sortOrder))
+      .limit(1);
+    sortOrder = existing.length > 0 ? existing[0].sortOrder + 1 : 0;
+  }
 
-  const nextOrder = existing.length > 0 ? existing[0].sortOrder + 1 : 0;
+  const values: Record<string, unknown> = { tableId, sortOrder };
+  if (options?.id) values.id = options.id;
+  if (typeof options?.height === "number") values.height = options.height;
 
   const [row] = await db
     .insert(productionTableRows)
-    .values({ tableId, sortOrder: nextOrder })
+    .values(values as typeof productionTableRows.$inferInsert)
     .returning();
 
   await touchTable(tableId);
@@ -360,6 +389,42 @@ export async function bulkInsertCells(
     updatedAt: now,
   }));
   await db.insert(productionTableCells).values(values);
+  await touchTable(tableId);
+}
+
+/**
+ * Re-insert a batch of cells verbatim. Used by undo when restoring a deleted
+ * row or column — each cell's original textContent / mediaAssets / comment
+ * is preserved so the user sees the state they had before the delete.
+ *
+ * This is atomic when called inside a transaction; callers that need
+ * atomicity with a row/column insert should wrap both in `db.transaction`.
+ */
+export async function bulkRestoreCells(
+  tableId: string,
+  cells: Array<{
+    columnId: string;
+    rowId: string;
+    textContent: string | null;
+    mediaAssets: MediaAssetRef[] | null;
+    comment: CellComment | null;
+    updatedBy: string | null;
+  }>
+) {
+  if (cells.length === 0) return;
+  const now = new Date();
+  const values = cells.map((c) => ({
+    tableId,
+    columnId: c.columnId,
+    rowId: c.rowId,
+    textContent: c.textContent,
+    mediaAssets: stripMediaUrls(c.mediaAssets),
+    comment: c.comment,
+    updatedBy: c.updatedBy,
+    updatedAt: now,
+  }));
+  // Use onConflictDoNothing so a re-run of the same undo is idempotent.
+  await db.insert(productionTableCells).values(values).onConflictDoNothing();
   await touchTable(tableId);
 }
 

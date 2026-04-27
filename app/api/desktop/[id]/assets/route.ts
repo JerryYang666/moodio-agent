@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { desktopAssets, videoGenerations } from "@/lib/db/schema";
 import { getAccessToken } from "@/lib/auth/cookies";
 import { verifyAccessToken } from "@/lib/auth/jwt";
-import { eq, desc, inArray } from "drizzle-orm";
+import { eq, desc, inArray, and } from "drizzle-orm";
 import { getDesktopPermission } from "@/lib/desktop/permissions";
 import { hasWriteAccess } from "@/lib/permissions";
 import { validateAssetMetadata } from "@/lib/desktop/types";
@@ -177,6 +177,32 @@ export async function POST(
       return NextResponse.json({ error: "No assets provided" }, { status: 400 });
     }
 
+    // An explicit `id` in the payload is used to restore a previously-deleted
+    // asset during undo. It must still belong to this desktop and not collide
+    // with an existing asset — a 409 is returned on collision so the client
+    // can fall back to a fresh-id insert.
+    const restoreIds = rawAssets
+      .map((a: { id?: unknown }) => (typeof a.id === "string" ? a.id : null))
+      .filter((v: string | null): v is string => !!v);
+    if (restoreIds.length > 0) {
+      const clashing = await db
+        .select({ id: desktopAssets.id })
+        .from(desktopAssets)
+        .where(
+          and(eq(desktopAssets.desktopId, id), inArray(desktopAssets.id, restoreIds))
+        );
+      if (clashing.length > 0) {
+        return NextResponse.json(
+          {
+            error: "Asset id already exists",
+            errorCode: "DESKTOP_ASSET_ID_CONFLICT",
+            conflictIds: clashing.map((c) => c.id),
+          },
+          { status: 409 }
+        );
+      }
+    }
+
     const valuesToInsert = [];
     for (const raw of rawAssets) {
       const validation = validateAssetMetadata(raw.assetType, raw.metadata);
@@ -192,6 +218,7 @@ export async function POST(
       }
 
       valuesToInsert.push({
+        ...(typeof raw.id === "string" ? { id: raw.id } : {}),
         desktopId: id,
         assetType: validation.assetType,
         metadata: raw.metadata,

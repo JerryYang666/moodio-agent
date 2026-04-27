@@ -1735,5 +1735,32 @@
       "aiStep8": "正在打磨细节...",
       "aiStep9": "马上就好，请稍候..."
     }
+  },
+  "history": {
+    "undone": "已撤销：{action}",
+    "redone": "已重做：{action}",
+    "actions": {
+      "addAsset": "添加素材",
+      "moveAsset": "移动素材",
+      "moveAssets": "移动 {count} 个素材",
+      "resizeAsset": "调整素材大小",
+      "deleteAsset": "删除素材",
+      "deleteAssets": "删除 {count} 个素材",
+      "editCell": "编辑单元格",
+      "editText": "编辑文本",
+      "changeStackOrder": "调整叠放顺序",
+      "addColumn": "添加列",
+      "addRow": "添加行",
+      "addMedia": "添加媒体",
+      "removeMedia": "移除媒体",
+      "editComment": "编辑备注",
+      "renameColumn": "重命名列",
+      "deleteColumn": "删除列",
+      "deleteRow": "删除行",
+      "resizeColumn": "调整列宽",
+      "resizeRow": "调整行高",
+      "reorderColumns": "重新排序列",
+      "reorderRows": "重新排序行"
+    }
   }
 }
