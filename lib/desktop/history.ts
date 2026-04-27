@@ -74,12 +74,21 @@ export async function applyAssetMove(
   }
 }
 
-/** Resize an asset (width/height only; position stays put). */
-export async function applyAssetResize(
+/**
+ * Resize an asset and optionally shift its position in the same operation.
+ * Used for resize gestures from any handle: the bottom-right (`se`) handle
+ * keeps `posX/posY` equal to the prior values, while handles that anchor the
+ * opposite corner (`nw`/`ne`/`sw`/`n`/`w`) shift `posX/posY` so the anchor
+ * stays steady. Either way the gesture is one user action — one history
+ * entry, one PATCH, one broadcast pair.
+ */
+export async function applyAssetTransform(
   deps: DesktopDispatchDeps,
   assetId: string,
   width: number,
-  height: number
+  height: number,
+  posX: number,
+  posY: number
 ): Promise<ApplyResult> {
   if (!deps.getAssets().some((a) => a.id === assetId)) {
     return { ok: false, reason: "target_missing" };
@@ -88,12 +97,14 @@ export async function applyAssetResize(
     type: "asset_resized",
     payload: { assetId, width, height },
   });
+  deps.applyRemoteEvent({ type: "asset_moved", payload: { assetId, posX, posY } });
   deps.sendEvent("asset_resized", { assetId, width, height });
+  deps.sendEvent("asset_moved", { assetId, posX, posY });
   try {
     const res = await fetch(`/api/desktop/${deps.desktopId}/assets/${assetId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ width, height }),
+      body: JSON.stringify({ width, height, posX, posY }),
     });
     if (res.status === 403) return { ok: false, reason: "permission" };
     if (res.status === 404) return { ok: false, reason: "target_missing" };

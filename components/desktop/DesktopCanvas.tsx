@@ -51,7 +51,13 @@ interface DesktopCanvasProps {
   onAssetBatchMove?: (moves: Array<{ id: string; posX: number; posY: number }>) => void;
   onAssetDelete?: (assetId: string) => void;
   onAssetBatchDelete?: (assetIds: string[]) => void;
-  onAssetResize?: (assetId: string, width: number, height: number) => void;
+  onAssetResize?: (
+    assetId: string,
+    width: number,
+    height: number,
+    posX?: number,
+    posY?: number
+  ) => void;
   onOpenChat?: (chatId: string, messageTimestamp?: number) => void;
   onAssetOpen?: (asset: EnrichedDesktopAsset) => void;
   onAssetClick?: (asset: EnrichedDesktopAsset) => void;
@@ -796,13 +802,18 @@ export default function DesktopCanvas({
         return;
       }
 
-      // Finish resize
+      // Finish resize. Always pass posX/posY: handles like nw/ne/sw/n/w
+      // shift them to keep the opposite anchor steady, and the page handler
+      // records a single history entry covering both axes.
       if (resizingAssetId && resizeDims) {
         containerRef.current?.releasePointerCapture(e.pointerId);
-        onAssetResize?.(resizingAssetId, resizeDims.w, resizeDims.h);
-        if (resizeDims.posX !== resizeStartDims.current.posX || resizeDims.posY !== resizeStartDims.current.posY) {
-          onAssetMove(resizingAssetId, resizeDims.posX, resizeDims.posY);
-        }
+        onAssetResize?.(
+          resizingAssetId,
+          resizeDims.w,
+          resizeDims.h,
+          resizeDims.posX,
+          resizeDims.posY
+        );
         setResizingAssetId(null);
         setResizeDims(null);
         return;

@@ -42,7 +42,7 @@ import { useOperationHistory } from "@/hooks/use-operation-history";
 import { useUndoRedoKeyboard } from "@/hooks/use-undo-redo-keyboard";
 import {
   applyAssetMove,
-  applyAssetResize,
+  applyAssetTransform,
   applyAssetRemove,
   applyAssetRestore,
   applyZIndex,
@@ -504,26 +504,59 @@ export default function DesktopDetailPage({
   );
 
   const handleAssetResize = useCallback(
-    (assetId: string, width: number, height: number) => {
+    (
+      assetId: string,
+      width: number,
+      height: number,
+      posX?: number,
+      posY?: number
+    ) => {
       const prev = assetsRef.current.find((a) => a.id === assetId);
       const prevW = prev?.width ?? width;
       const prevH = prev?.height ?? height;
+      const prevX = prev?.posX ?? 0;
+      const prevY = prev?.posY ?? 0;
 
-      updateAsset(assetId, { width, height });
+      // Handles like nw/ne/sw/n/w shift posX/posY to keep the opposite
+      // anchor steady; se/e/s and the natural-dim fallback don't pass them.
+      const newX = posX ?? prevX;
+      const newY = posY ?? prevY;
+      const dimsChanged = prevW !== width || prevH !== height;
+      const posChanged = newX !== prevX || newY !== prevY;
+
+      const updates: Record<string, number> = { width, height };
+      if (posChanged) {
+        updates.posX = newX;
+        updates.posY = newY;
+      }
+      updateAsset(assetId, updates);
       sendEvent("asset_resized", { assetId, width, height });
+      if (posChanged) {
+        sendEvent("asset_moved", { assetId, posX: newX, posY: newY });
+      }
 
-      if (prev && (prevW !== width || prevH !== height)) {
+      if (prev && (dimsChanged || posChanged)) {
         history.record({
           userId: user?.id ?? "",
           label: { key: "resizeAsset" },
           targetIds: [assetId],
-          forward: () => applyAssetResize(historyDepsRef.current, assetId, width, height),
-          inverse: () =>
-            applyAssetResize(
+          forward: () =>
+            applyAssetTransform(
               historyDepsRef.current,
               assetId,
-              prevW ?? width,
-              prevH ?? height
+              width,
+              height,
+              newX,
+              newY
+            ),
+          inverse: () =>
+            applyAssetTransform(
+              historyDepsRef.current,
+              assetId,
+              prevW,
+              prevH,
+              prevX,
+              prevY
             ),
         });
       }
