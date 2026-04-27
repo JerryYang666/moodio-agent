@@ -1,6 +1,9 @@
 "use client";
 
 import { useEffect } from "react";
+import { useTranslations } from "next-intl";
+import { addToast } from "@heroui/toast";
+import type { HistoryOutcome } from "@/lib/operation-history/store";
 import type { OperationHistoryAPI } from "./use-operation-history";
 
 /**
@@ -36,8 +39,25 @@ interface Options {
  * textareas, or contenteditable descendants are ignored.
  */
 export function useUndoRedoKeyboard({ history, disabled }: Options): void {
+  const tHistory = useTranslations("history");
+  const tActions = useTranslations("history.actions");
+
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
+    const notify = (direction: "undo" | "redo", outcome: HistoryOutcome | null) => {
+      if (!outcome || !outcome.result.ok) return;
+      const { key, values } = outcome.entry.label;
+      // next-intl throws on missing keys in dev; action labels are all declared
+      // up-front in messages/*.json so this call is safe.
+      const action = tActions(key, values);
+      addToast({
+        title:
+          direction === "undo"
+            ? tHistory("undone", { action })
+            : tHistory("redone", { action }),
+      });
+    };
+
+    const handler = async (e: KeyboardEvent) => {
       const mod = e.ctrlKey || e.metaKey;
       if (!mod) return;
 
@@ -51,13 +71,13 @@ export function useUndoRedoKeyboard({ history, disabled }: Options): void {
 
       e.preventDefault();
       if (isUndo) {
-        void history.undo();
+        notify("undo", await history.undo());
       } else {
-        void history.redo();
+        notify("redo", await history.redo());
       }
     };
 
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [history, disabled]);
+  }, [history, disabled, tHistory, tActions]);
 }

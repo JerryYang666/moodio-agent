@@ -446,7 +446,7 @@ export default function ProductionTableDetailPage({
           const insertIndex = (table?.columns.length ?? 0) + i;
           history.record({
             userId: currentUserId ?? "",
-            label: "Add column",
+            label: { key: "addColumn" },
             targetIds: [newColumn.id],
             forward: () =>
               applyColumnRestore(historyDepsRef.current, newColumn, [], insertIndex),
@@ -514,7 +514,7 @@ export default function ProductionTableDetailPage({
         const insertIndex = (table?.rows.length ?? 0) + i;
         history.record({
           userId: currentUserId ?? "",
-          label: "Add row",
+          label: { key: "addRow" },
           targetIds: [newRow.id],
           forward: () =>
             applyRowRestore(historyDepsRef.current, newRow, [], insertIndex),
@@ -690,7 +690,7 @@ export default function ProductionTableDetailPage({
       if (changedText || changedMedia) {
         history.record({
           userId: currentUserId ?? "",
-          label: "Edit cell",
+          label: { key: "editCell" },
           coalesceKey: `pt-cell:${columnId}:${rowId}`,
           targetIds: [key],
           forward: () =>
@@ -725,7 +725,7 @@ export default function ProductionTableDetailPage({
       }
       history.record({
         userId: currentUserId ?? "",
-        label: "Add media",
+        label: { key: "addMedia" },
         targetIds: [key],
         forward: () =>
           applyMediaAdd(historyDepsRef.current, columnId, rowId, asset),
@@ -751,7 +751,7 @@ export default function ProductionTableDetailPage({
       if (prevAsset) {
         history.record({
           userId: currentUserId ?? "",
-          label: "Remove media",
+          label: { key: "removeMedia" },
           targetIds: [key],
           forward: () =>
             applyMediaRemove(historyDepsRef.current, columnId, rowId, assetId),
@@ -788,7 +788,7 @@ export default function ProductionTableDetailPage({
       }
       history.record({
         userId: currentUserId ?? "",
-        label: "Edit comment",
+        label: { key: "editComment" },
         coalesceKey: `pt-comment:${columnId}:${rowId}`,
         targetIds: [key],
         forward: () =>
@@ -811,7 +811,7 @@ export default function ProductionTableDetailPage({
       if (prevName !== name) {
         history.record({
           userId: currentUserId ?? "",
-          label: "Rename column",
+          label: { key: "renameColumn" },
           coalesceKey: `pt-colname:${columnId}`,
           targetIds: [columnId],
           forward: () => applyColumnRename(historyDepsRef.current, columnId, name),
@@ -840,7 +840,7 @@ export default function ProductionTableDetailPage({
       }
       history.record({
         userId: currentUserId ?? "",
-        label: "Delete column",
+        label: { key: "deleteColumn" },
         targetIds: [columnId],
         forward: () => applyColumnDelete(historyDepsRef.current, columnId),
         inverse: () =>
@@ -867,7 +867,7 @@ export default function ProductionTableDetailPage({
       }
       history.record({
         userId: currentUserId ?? "",
-        label: "Delete row",
+        label: { key: "deleteRow" },
         targetIds: [rowId],
         forward: () => applyRowDelete(historyDepsRef.current, rowId),
         inverse: () =>
@@ -923,7 +923,7 @@ export default function ProductionTableDetailPage({
       if (prevWidth != null && prevWidth !== width) {
         history.record({
           userId: currentUserId ?? "",
-          label: "Resize column",
+          label: { key: "resizeColumn" },
           coalesceKey: `pt-colwidth:${columnId}`,
           targetIds: [columnId],
           forward: () => applyColumnResize(historyDepsRef.current, columnId, width),
@@ -946,7 +946,7 @@ export default function ProductionTableDetailPage({
       if (prevHeight != null && prevHeight !== height) {
         history.record({
           userId: currentUserId ?? "",
-          label: "Resize row",
+          label: { key: "resizeRow" },
           coalesceKey: `pt-rowheight:${rowId}`,
           targetIds: [rowId],
           forward: () => applyRowResize(historyDepsRef.current, rowId, height),
@@ -1024,7 +1024,7 @@ export default function ProductionTableDetailPage({
       }
       history.record({
         userId: currentUserId ?? "",
-        label: "Reorder columns",
+        label: { key: "reorderColumns" },
         targetIds: newIds,
         forward: () => applyColumnsReorder(historyDepsRef.current, newIds),
         inverse: () => applyColumnsReorder(historyDepsRef.current, prevIds),
@@ -1050,7 +1050,7 @@ export default function ProductionTableDetailPage({
       }
       history.record({
         userId: currentUserId ?? "",
-        label: "Reorder rows",
+        label: { key: "reorderRows" },
         targetIds: newIds,
         forward: () => applyRowsReorder(historyDepsRef.current, newIds),
         inverse: () => applyRowsReorder(historyDepsRef.current, prevIds),
@@ -1070,7 +1070,7 @@ export default function ProductionTableDetailPage({
       }
       history.record({
         userId: currentUserId ?? "",
-        label: "Reorder rows",
+        label: { key: "reorderRows" },
         targetIds: newRowIds,
         forward: () => applyRowsReorder(historyDepsRef.current, newRowIds),
         inverse: () => applyRowsReorder(historyDepsRef.current, prevIds),
@@ -1090,7 +1090,7 @@ export default function ProductionTableDetailPage({
       }
       history.record({
         userId: currentUserId ?? "",
-        label: "Reorder columns",
+        label: { key: "reorderColumns" },
         targetIds: newColumnIds,
         forward: () => applyColumnsReorder(historyDepsRef.current, newColumnIds),
         inverse: () => applyColumnsReorder(historyDepsRef.current, prevIds),

@@ -13,13 +13,23 @@ import { mergeEntries, shouldCoalesce } from "./coalesce";
  * broadcasting the WebSocket event, and persisting via REST.
  */
 
+/**
+ * Outcome of an undo/redo call. When `entry` is present the engine attempted
+ * to apply it; callers (e.g. toast notifications) can read the entry's label
+ * to tell the user what just happened.
+ */
+export interface HistoryOutcome {
+  result: ApplyResult;
+  entry: HistoryEntry;
+}
+
 interface Actions {
   /** Push a new forward entry. Clears the redo stack. May coalesce. */
   record: (entry: HistoryEntry) => void;
   /** Pop the newest entry off the undo stack and run its inverse. */
-  undo: () => Promise<ApplyResult | null>;
+  undo: () => Promise<HistoryOutcome | null>;
   /** Pop the newest entry off the redo stack and run its forward. */
-  redo: () => Promise<ApplyResult | null>;
+  redo: () => Promise<HistoryOutcome | null>;
   /** Remove the top undo entry without running it (e.g. on conflict skip). */
   discardTopUndo: () => void;
   /** Clear all history (e.g. surface unmount, catastrophic reload). */
@@ -103,7 +113,7 @@ export function createHistoryStore() {
       }
       // `target_missing` / `permission`: entry is dropped.
 
-      return result;
+      return { result, entry };
     },
 
     redo: async () => {
@@ -130,7 +140,7 @@ export function createHistoryStore() {
         }));
       }
 
-      return result;
+      return { result, entry };
     },
 
     discardTopUndo: () => {

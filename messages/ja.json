@@ -1735,5 +1735,32 @@
       "aiStep8": "細部を仕上げ中...",
       "aiStep9": "もう少しです、お待ちください..."
     }
+  },
+  "history": {
+    "undone": "元に戻しました: {action}",
+    "redone": "やり直しました: {action}",
+    "actions": {
+      "addAsset": "アセットを追加",
+      "moveAsset": "アセットを移動",
+      "moveAssets": "{count} 個のアセットを移動",
+      "resizeAsset": "アセットのサイズ変更",
+      "deleteAsset": "アセットを削除",
+      "deleteAssets": "{count} 個のアセットを削除",
+      "editCell": "セルを編集",
+      "editText": "テキストを編集",
+      "changeStackOrder": "重ね順を変更",
+      "addColumn": "列を追加",
+      "addRow": "行を追加",
+      "addMedia": "メディアを追加",
+      "removeMedia": "メディアを削除",
+      "editComment": "コメントを編集",
+      "renameColumn": "列名を変更",
+      "deleteColumn": "列を削除",
+      "deleteRow": "行を削除",
+      "resizeColumn": "列幅を変更",
+      "resizeRow": "行高を変更",
+      "reorderColumns": "列を並べ替え",
+      "reorderRows": "行を並べ替え"
+    }
   }
 }

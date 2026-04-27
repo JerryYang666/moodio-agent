@@ -4,9 +4,10 @@ import { useCallback, useMemo, useRef } from "react";
 import {
   createHistoryStore,
   useHistoryFlags,
+  type HistoryOutcome,
   type HistoryStore,
 } from "@/lib/operation-history/store";
-import type { ApplyResult, HistoryEntry } from "@/lib/operation-history/types";
+import type { HistoryEntry } from "@/lib/operation-history/types";
 
 /**
  * Input for `record`. The caller supplies everything *except* the entry id
@@ -20,9 +21,9 @@ export interface OperationHistoryAPI {
   /** Record a new forward entry. Clears redo; may coalesce with the previous. */
   record: (input: RecordInput) => void;
   /** Revert the most recent user action. */
-  undo: () => Promise<ApplyResult | null>;
+  undo: () => Promise<HistoryOutcome | null>;
   /** Replay the most recently undone action. */
-  redo: () => Promise<ApplyResult | null>;
+  redo: () => Promise<HistoryOutcome | null>;
   /** Clear all entries (e.g. on surface change). */
   clear: () => void;
   /** Reactive: true when there's at least one undoable entry. */

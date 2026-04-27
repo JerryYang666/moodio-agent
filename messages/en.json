@@ -1735,5 +1735,32 @@
       "aiStep8": "Polishing the details...",
       "aiStep9": "Almost there, hang tight..."
     }
+  },
+  "history": {
+    "undone": "Undone: {action}",
+    "redone": "Redone: {action}",
+    "actions": {
+      "addAsset": "Add asset",
+      "moveAsset": "Move asset",
+      "moveAssets": "Move {count} assets",
+      "resizeAsset": "Resize asset",
+      "deleteAsset": "Delete asset",
+      "deleteAssets": "Delete {count} assets",
+      "editCell": "Edit cell",
+      "editText": "Edit text",
+      "changeStackOrder": "Change stack order",
+      "addColumn": "Add column",
+      "addRow": "Add row",
+      "addMedia": "Add media",
+      "removeMedia": "Remove media",
+      "editComment": "Edit comment",
+      "renameColumn": "Rename column",
+      "deleteColumn": "Delete column",
+      "deleteRow": "Delete row",
+      "resizeColumn": "Resize column",
+      "resizeRow": "Resize row",
+      "reorderColumns": "Reorder columns",
+      "reorderRows": "Reorder rows"
+    }
   }
 }

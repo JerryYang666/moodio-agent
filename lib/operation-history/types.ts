@@ -19,6 +19,20 @@ export type ApplyResult =
   | { ok: true }
   | { ok: false; reason: "target_missing" | "locked" | "network" | "permission"; message?: string };
 
+/**
+ * An i18n descriptor for the action that produced this entry. Resolved to a
+ * human-readable string at toast time so the message matches the viewer's
+ * locale (and stays in sync if the user switches languages mid-session).
+ *
+ * `key` is appended to the `history.actions` namespace (e.g. `"addAsset"` →
+ * `t("history.actions.addAsset")`). `values` feeds ICU interpolation for
+ * pluralized labels like `"move {count} assets"`.
+ */
+export interface HistoryLabel {
+  key: string;
+  values?: Record<string, string | number>;
+}
+
 export interface HistoryEntry {
   /** Stable uuid for the entry. Useful for coalescing and tests. */
   id: string;
@@ -26,8 +40,8 @@ export interface HistoryEntry {
   userId: string;
   /** ms since epoch. Used for coalesce-window checks. */
   timestamp: number;
-  /** Human-readable label, used in toasts ("Undo delete row"). */
-  label: string;
+  /** i18n descriptor resolved at toast time. */
+  label: HistoryLabel;
   /**
    * Optional coalesce key. If two consecutive entries by the same user share
    * the same key within `COALESCE_WINDOW_MS`, they are merged — the newer

@@ -1735,5 +1735,32 @@
       "aiStep8": "세부사항을 다듬는 중...",
       "aiStep9": "거의 다 됐어요, 잠시만요..."
     }
+  },
+  "history": {
+    "undone": "실행 취소됨: {action}",
+    "redone": "다시 실행됨: {action}",
+    "actions": {
+      "addAsset": "에셋 추가",
+      "moveAsset": "에셋 이동",
+      "moveAssets": "에셋 {count}개 이동",
+      "resizeAsset": "에셋 크기 조정",
+      "deleteAsset": "에셋 삭제",
+      "deleteAssets": "에셋 {count}개 삭제",
+      "editCell": "셀 편집",
+      "editText": "텍스트 편집",
+      "changeStackOrder": "쌓기 순서 변경",
+      "addColumn": "열 추가",
+      "addRow": "행 추가",
+      "addMedia": "미디어 추가",
+      "removeMedia": "미디어 제거",
+      "editComment": "메모 편집",
+      "renameColumn": "열 이름 변경",
+      "deleteColumn": "열 삭제",
+      "deleteRow": "행 삭제",
+      "resizeColumn": "열 너비 조정",
+      "resizeRow": "행 높이 조정",
+      "reorderColumns": "열 순서 변경",
+      "reorderRows": "행 순서 변경"
+    }
   }
 }

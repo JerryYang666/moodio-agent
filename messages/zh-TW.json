@@ -1735,5 +1735,32 @@
       "aiStep8": "正在打磨細節...",
       "aiStep9": "馬上就好，請稍候..."
     }
+  },
+  "history": {
+    "undone": "已復原：{action}",
+    "redone": "已重做：{action}",
+    "actions": {
+      "addAsset": "新增素材",
+      "moveAsset": "移動素材",
+      "moveAssets": "移動 {count} 個素材",
+      "resizeAsset": "調整素材大小",
+      "deleteAsset": "刪除素材",
+      "deleteAssets": "刪除 {count} 個素材",
+      "editCell": "編輯儲存格",
+      "editText": "編輯文字",
+      "changeStackOrder": "調整堆疊順序",
+      "addColumn": "新增欄",
+      "addRow": "新增列",
+      "addMedia": "新增媒體",
+      "removeMedia": "移除媒體",
+      "editComment": "編輯備註",
+      "renameColumn": "重新命名欄",
+      "deleteColumn": "刪除欄",
+      "deleteRow": "刪除列",
+      "resizeColumn": "調整欄寬",
+      "resizeRow": "調整列高",
+      "reorderColumns": "重新排序欄",
+      "reorderRows": "重新排序列"
+    }
   }
 }

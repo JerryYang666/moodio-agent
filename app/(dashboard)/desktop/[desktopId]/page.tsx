@@ -332,7 +332,7 @@ export default function DesktopDetailPage({
             const snapshot: EnrichedDesktopAsset = { ...asset };
             history.record({
               userId: user?.id ?? "",
-              label: "Add asset",
+              label: { key: "addAsset" },
               targetIds: [asset.id],
               forward: () => applyAssetRestore(historyDepsRef.current, snapshot),
               inverse: () => applyAssetRemove(historyDepsRef.current, asset.id),
@@ -493,7 +493,7 @@ export default function DesktopDetailPage({
       if (prev && (prevX !== posX || prevY !== posY)) {
         history.record({
           userId: user?.id ?? "",
-          label: "Move asset",
+          label: { key: "moveAsset" },
           targetIds: [assetId],
           forward: () => applyAssetMove(historyDepsRef.current, assetId, posX, posY),
           inverse: () => applyAssetMove(historyDepsRef.current, assetId, prevX, prevY),
@@ -515,7 +515,7 @@ export default function DesktopDetailPage({
       if (prev && (prevW !== width || prevH !== height)) {
         history.record({
           userId: user?.id ?? "",
-          label: "Resize asset",
+          label: { key: "resizeAsset" },
           targetIds: [assetId],
           forward: () => applyAssetResize(historyDepsRef.current, assetId, width, height),
           inverse: () =>
@@ -558,7 +558,7 @@ export default function DesktopDetailPage({
         const snapshot: EnrichedDesktopAsset = { ...asset };
         history.record({
           userId: user?.id ?? "",
-          label: "Delete asset",
+          label: { key: "deleteAsset" },
           targetIds: [assetId],
           forward: () => applyAssetRemove(historyDepsRef.current, assetId),
           inverse: () => applyAssetRestore(historyDepsRef.current, snapshot),
@@ -590,7 +590,10 @@ export default function DesktopDetailPage({
         const effective = moves.filter((m) => priors.some((p) => p.id === m.id));
         history.record({
           userId: user?.id ?? "",
-          label: priors.length === 1 ? "Move asset" : `Move ${priors.length} assets`,
+          label:
+            priors.length === 1
+              ? { key: "moveAsset" }
+              : { key: "moveAssets", values: { count: priors.length } },
           targetIds: priors.map((p) => p.id),
           forward: async () => {
             for (const m of effective) {
@@ -639,7 +642,10 @@ export default function DesktopDetailPage({
       if (snapshots.length > 0) {
         history.record({
           userId: user?.id ?? "",
-          label: snapshots.length === 1 ? "Delete asset" : `Delete ${snapshots.length} assets`,
+          label:
+            snapshots.length === 1
+              ? { key: "deleteAsset" }
+              : { key: "deleteAssets", values: { count: snapshots.length } },
           targetIds: snapshots.map((s) => s.id),
           forward: async () => {
             for (const s of snapshots) {
@@ -890,7 +896,7 @@ export default function DesktopDetailPage({
       if (prevValue !== value) {
         history.record({
           userId: user?.id ?? "",
-          label: "Edit cell",
+          label: { key: "editCell" },
           coalesceKey: `desktop-cell:${assetId}:${rowId}:${colIndex}`,
           targetIds: [assetId],
           forward: () =>
@@ -928,7 +934,7 @@ export default function DesktopDetailPage({
       if (prev !== content) {
         history.record({
           userId: user?.id ?? "",
-          label: "Edit text",
+          label: { key: "editText" },
           coalesceKey: `desktop-text:${assetId}`,
           targetIds: [assetId],
           forward: () => applyTextUpdate(historyDepsRef.current, assetId, content),
@@ -1074,7 +1080,7 @@ export default function DesktopDetailPage({
 
       history.record({
         userId: user?.id ?? "",
-        label: "Change stack order",
+        label: { key: "changeStackOrder" },
         targetIds: [assetId],
         forward: () => applyZIndex(historyDepsRef.current, assetId, newZIndex),
         inverse: () => applyZIndex(historyDepsRef.current, assetId, prevZ),
