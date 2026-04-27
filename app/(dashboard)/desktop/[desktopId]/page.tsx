@@ -1007,77 +1007,145 @@ export default function DesktopDetailPage({
   // Upload arbitrary files (image/video/audio) and place each as a new asset
   // at the given world position. Shared by the asset-picker upload, the
   // canvas drag-drop, and the paste-to-desktop flow.
+  //
+  // To make the UI feel responsive even when the upload roundtrip takes a
+  // while, we insert an ephemeral placeholder asset locally (using a blob
+  // URL for images so the user sees their file immediately) and swap it for
+  // the real server-assigned asset once the upload + DB insert finish. This
+  // mirrors the existing __generating_table__ placeholder pattern. Files
+  // are uploaded in parallel so multiple drops/pastes don't queue.
   const uploadFilesToDesktop = useCallback(
     async (files: File[], position: { x: number; y: number }) => {
-      for (const file of files) {
+      const uploadOne = async (file: File) => {
         const isVideo = siteConfig.upload.allowedVideoTypes.includes(file.type);
         const isAudio = siteConfig.upload.allowedAudioTypes.includes(file.type);
+        const blobUrl = URL.createObjectURL(file);
+        const placeholderId = `__uploading_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
-        let asset: { assetType: string; metadata: Record<string, unknown>; posX: number; posY: number; width?: number; height?: number };
-
-        if (isAudio) {
-          const result = await uploadAudio(file, { skipCollection: true });
-          if (!result.success) {
-            addToast({ title: t("uploadFailed"), description: result.error.message, color: "danger" });
-            continue;
+        // For images we pre-load the blob to learn its natural dimensions, so
+        // the placeholder renders at the same size the final asset will. The
+        // load happens against an in-memory blob and is effectively instant.
+        let placeholderDims: { w: number; h: number } = isAudio
+          ? { w: 300, h: 200 }
+          : { w: 300, h: 300 };
+        if (!isVideo && !isAudio) {
+          const natural = await new Promise<{ w: number; h: number } | null>((resolve) => {
+            const img = new Image();
+            img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight });
+            img.onerror = () => resolve(null);
+            img.src = blobUrl;
+          });
+          if (natural && natural.w > 0 && natural.h > 0) {
+            const MAX = 300;
+            const scale = Math.min(MAX / natural.w, MAX / natural.h, 1);
+            placeholderDims = {
+              w: Math.max(1, Math.round(natural.w * scale)),
+              h: Math.max(1, Math.round(natural.h * scale)),
+            };
           }
-          asset = {
-            assetType: "audio",
-            metadata: {
-              audioId: result.data.audioId,
-              title: file.name,
-              status: "completed",
-            },
-            posX: position.x,
-            posY: position.y,
-            width: 300,
-            height: 200,
-          };
-        } else if (isVideo) {
-          const result = await uploadVideo(file);
-          if (!result.success) {
-            addToast({ title: t("uploadFailed"), description: result.error.message, color: "danger" });
-            continue;
-          }
-          asset = {
-            assetType: "video",
-            metadata: {
-              videoId: result.data.videoId,
-              imageId: result.data.thumbnailImageId || result.data.videoId,
-              title: file.name,
-              prompt: "",
-              status: "completed",
-            },
-            posX: position.x,
-            posY: position.y,
-          };
-        } else {
-          const result = await uploadImage(file);
-          if (!result.success) {
-            addToast({ title: t("uploadFailed"), description: result.error.message, color: "danger" });
-            continue;
-          }
-          asset = {
-            assetType: "image",
-            metadata: {
-              imageId: result.data.imageId,
-              title: file.name,
-              prompt: "",
-              status: "generated",
-            },
-            posX: position.x,
-            posY: position.y,
-          };
         }
 
+        const placeholder: EnrichedDesktopAsset = {
+          id: placeholderId,
+          desktopId,
+          assetType: isAudio ? "audio" : isVideo ? "video" : "image",
+          metadata: isAudio
+            ? { audioId: null, title: file.name, status: "uploading" }
+            : isVideo
+              // VideoAsset shows a loading spinner when both src and videoUrl
+              // are absent and status is "processing".
+              ? { videoId: null, imageId: null, title: file.name, prompt: "", status: "processing" }
+              : { imageId: null, title: file.name, prompt: "", status: "uploading" },
+          posX: position.x,
+          posY: position.y,
+          width: placeholderDims.w,
+          height: placeholderDims.h,
+          rotation: 0,
+          // High zIndex so the placeholder is visible above existing assets
+          // while the upload completes (matches the ephemeral table pattern).
+          zIndex: 9999,
+          addedAt: new Date(),
+          // Only images can render directly from the blob; for video/audio we
+          // leave URLs null so the components fall back to their loading state.
+          imageUrl: isVideo || isAudio ? null : blobUrl,
+          videoUrl: null,
+          audioUrl: null,
+        };
+
+        applyRemoteEvent({ type: "asset_added", payload: { asset: placeholder } });
+
+        const removePlaceholder = () => {
+          applyRemoteEvent({ type: "asset_removed", payload: { assetId: placeholderId } });
+          URL.revokeObjectURL(blobUrl);
+        };
+
         try {
+          let assetPayload: { assetType: string; metadata: Record<string, unknown>; posX: number; posY: number; width?: number; height?: number };
+          if (isAudio) {
+            const result = await uploadAudio(file, { skipCollection: true });
+            if (!result.success) {
+              addToast({ title: t("uploadFailed"), description: result.error.message, color: "danger" });
+              removePlaceholder();
+              return;
+            }
+            assetPayload = {
+              assetType: "audio",
+              metadata: { audioId: result.data.audioId, title: file.name, status: "completed" },
+              posX: position.x,
+              posY: position.y,
+              width: 300,
+              height: 200,
+            };
+          } else if (isVideo) {
+            const result = await uploadVideo(file);
+            if (!result.success) {
+              addToast({ title: t("uploadFailed"), description: result.error.message, color: "danger" });
+              removePlaceholder();
+              return;
+            }
+            assetPayload = {
+              assetType: "video",
+              metadata: {
+                videoId: result.data.videoId,
+                imageId: result.data.thumbnailImageId || result.data.videoId,
+                title: file.name,
+                prompt: "",
+                status: "completed",
+              },
+              posX: position.x,
+              posY: position.y,
+            };
+          } else {
+            const result = await uploadImage(file);
+            if (!result.success) {
+              addToast({ title: t("uploadFailed"), description: result.error.message, color: "danger" });
+              removePlaceholder();
+              return;
+            }
+            assetPayload = {
+              assetType: "image",
+              metadata: { imageId: result.data.imageId, title: file.name, prompt: "", status: "generated" },
+              posX: position.x,
+              posY: position.y,
+              // Persist the dims we already computed so the real asset replaces
+              // the placeholder at the same size (no resize jank).
+              width: placeholderDims.w,
+              height: placeholderDims.h,
+            };
+          }
+
           const res = await fetch(`/api/desktop/${desktopId}/assets`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ assets: [asset] }),
+            body: JSON.stringify({ assets: [assetPayload] }),
           });
           if (!res.ok) throw new Error("Failed to add uploaded asset to desktop");
           const data = await res.json();
+
+          // Swap: drop the placeholder before the real asset arrives. Using the
+          // existing "desktop-asset-added" event keeps WS broadcast + telemetry
+          // wiring in one place.
+          removePlaceholder();
           window.dispatchEvent(
             new CustomEvent("desktop-asset-added", {
               detail: { assets: data.assets, desktopId },
@@ -1086,10 +1154,13 @@ export default function DesktopDetailPage({
         } catch (error) {
           console.error("Failed to add uploaded asset to desktop:", error);
           addToast({ title: t("failedToAddAsset"), color: "danger" });
+          removePlaceholder();
         }
-      }
+      };
+
+      await Promise.all(files.map(uploadOne));
     },
-    [desktopId, t]
+    [desktopId, t, applyRemoteEvent]
   );
 
   const handleAssetPickerUpload = useCallback(
