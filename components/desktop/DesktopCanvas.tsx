@@ -27,7 +27,11 @@ import {
   Maximize2,
   Pencil,
   Type,
+  Upload,
 } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { addToast } from "@heroui/toast";
+import { siteConfig } from "@/config/site";
 
 const MIN_ZOOM = 0.1;
 const MAX_ZOOM = 5;
@@ -104,6 +108,12 @@ interface DesktopCanvasProps {
   onAddAssetAtPosition?: (worldPos: { x: number; y: number }) => void;
   onAddTextAtPosition?: (worldPos: { x: number; y: number }) => void;
   onAssetRename?: (assetId: string, newTitle: string) => void;
+  /**
+   * Called when external files (images/videos/audio) are dropped onto the
+   * canvas from outside the browser. Receives the dropped files and the
+   * world-space coordinates where the cursor was released.
+   */
+  onExternalFileDrop?: (files: File[], position: { x: number; y: number }) => void;
 }
 
 interface ContextMenuState {
@@ -193,6 +203,7 @@ export default function DesktopCanvas({
   onAddAssetAtPosition,
   onAddTextAtPosition,
   onAssetRename,
+  onExternalFileDrop,
 }: DesktopCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const isPanning = useRef(false);
@@ -226,7 +237,13 @@ export default function DesktopCanvas({
   const [renameValue, setRenameValue] = useState("");
   const renameInputRef = useRef<HTMLInputElement>(null);
 
+  // Track whether the user is dragging an external file over the canvas, so
+  // we can show a drop-zone overlay scoped to the canvas (not the whole page).
+  const [isDraggingExternalFile, setIsDraggingExternalFile] = useState(false);
+  const externalDragCounter = useRef(0);
+
   const t = useTranslations("desktop");
+  const tChat = useTranslations("chat");
   const canEdit = hasWriteAccess(permission);
 
   const handleImageLoad = useCallback(
@@ -487,18 +504,51 @@ export default function DesktopCanvas({
         (onExternalImageDrop && types.includes(AI_IMAGE_DRAG_MIME)) ||
         (onExternalTextDrop && types.includes(AI_TEXT_DRAG_MIME)) ||
         (onExternalShotlistDrop && types.includes(AI_SHOTLIST_DRAG_MIME)) ||
-        (onExternalVideoSuggestDrop && types.includes(AI_VIDEO_SUGGEST_DRAG_MIME))
+        (onExternalVideoSuggestDrop && types.includes(AI_VIDEO_SUGGEST_DRAG_MIME)) ||
+        (onExternalFileDrop && types.includes("Files"))
       ) {
         e.preventDefault();
         e.dataTransfer.dropEffect = "copy";
       }
     },
-    [canEdit, onExternalImageDrop, onExternalTextDrop, onExternalShotlistDrop, onExternalVideoSuggestDrop]
+    [canEdit, onExternalImageDrop, onExternalTextDrop, onExternalShotlistDrop, onExternalVideoSuggestDrop, onExternalFileDrop]
+  );
+
+  const handleDragEnter = useCallback(
+    (e: React.DragEvent) => {
+      if (!canEdit || !onExternalFileDrop) return;
+      const types = Array.from(e.dataTransfer.types);
+      if (!types.includes("Files")) return;
+      externalDragCounter.current++;
+      if (externalDragCounter.current === 1) {
+        setIsDraggingExternalFile(true);
+      }
+    },
+    [canEdit, onExternalFileDrop]
+  );
+
+  const handleDragLeave = useCallback(
+    (e: React.DragEvent) => {
+      if (!canEdit || !onExternalFileDrop) return;
+      const types = Array.from(e.dataTransfer.types);
+      if (!types.includes("Files")) return;
+      externalDragCounter.current--;
+      if (externalDragCounter.current <= 0) {
+        externalDragCounter.current = 0;
+        setIsDraggingExternalFile(false);
+      }
+    },
+    [canEdit, onExternalFileDrop]
   );
 
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
       if (!canEdit) return;
+
+      // Always reset the external-drag overlay state on drop regardless of
+      // payload type, since dragLeave doesn't fire when the drop completes.
+      externalDragCounter.current = 0;
+      setIsDraggingExternalFile(false);
 
       const imagePayload = onExternalImageDrop ? parseAiImageDropPayload(e) : null;
       if (imagePayload) {
@@ -535,8 +585,36 @@ export default function DesktopCanvas({
         onExternalVideoSuggestDrop!(videoSuggestPayload, world);
         return;
       }
+
+      // External files (e.g. images/videos/audio dragged from the OS).
+      if (onExternalFileDrop && e.dataTransfer.files.length > 0) {
+        e.preventDefault();
+        e.stopPropagation();
+        const allowedTypes = [
+          ...siteConfig.upload.allowedImageTypes,
+          ...siteConfig.upload.allowedVideoTypes,
+          ...siteConfig.upload.allowedAudioTypes,
+        ];
+        const validFiles: File[] = [];
+        let hasInvalid = false;
+        for (const file of Array.from(e.dataTransfer.files)) {
+          if (allowedTypes.includes(file.type)) {
+            validFiles.push(file);
+          } else {
+            hasInvalid = true;
+          }
+        }
+        if (hasInvalid) {
+          addToast({ title: tChat("invalidImageType"), color: "warning" });
+        }
+        if (validFiles.length > 0) {
+          const world = screenToWorld(e.clientX, e.clientY);
+          onExternalFileDrop(validFiles, world);
+        }
+        return;
+      }
     },
-    [canEdit, onExternalImageDrop, onExternalTextDrop, onExternalShotlistDrop, onExternalVideoSuggestDrop, parseAiImageDropPayload, parseAiTextDropPayload, parseAiShotlistDropPayload, parseAiVideoSuggestDropPayload, screenToWorld]
+    [canEdit, onExternalImageDrop, onExternalTextDrop, onExternalShotlistDrop, onExternalVideoSuggestDrop, onExternalFileDrop, parseAiImageDropPayload, parseAiTextDropPayload, parseAiShotlistDropPayload, parseAiVideoSuggestDropPayload, screenToWorld, tChat]
   );
 
   const handlePointerDown = useCallback(
@@ -1008,6 +1086,8 @@ export default function DesktopCanvas({
       onPointerUp={handlePointerUp}
       onPointerLeave={() => sendEvent?.("cursor_leave", {})}
       onContextMenu={handleBackgroundContextMenu}
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
       onDragOver={handleDragOver}
       onDrop={handleDrop}
     >
@@ -1559,6 +1639,34 @@ export default function DesktopCanvas({
           </div>
         );
       })()}
+
+      {/* External file drop overlay — scoped to the canvas. Mirrors the chat
+          input's drop overlay, but the drop position determines the asset's
+          world coordinates on the canvas. */}
+      <AnimatePresence>
+        {isDraggingExternalFile && onExternalFileDrop && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            className="absolute inset-0 z-60 pointer-events-none"
+          >
+            <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+            <div className="absolute inset-0 flex items-center justify-center px-4">
+              <div className="rounded-2xl border-2 border-dashed border-primary bg-primary/10 backdrop-blur-md p-8 flex flex-col items-center gap-2 shadow-xl">
+                <Upload size={36} className="text-primary" />
+                <span className="text-lg font-semibold text-primary">
+                  {tChat("dropZoneTitle")}
+                </span>
+                <span className="text-sm text-default-500">
+                  {tChat("dropZoneSubtitle", { maxSize: siteConfig.upload.maxFileSizeMB })}
+                </span>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
     </div>
   );

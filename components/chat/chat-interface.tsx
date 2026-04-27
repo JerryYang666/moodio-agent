@@ -200,6 +200,12 @@ interface ChatInterfaceProps {
   scrollToMessageTimestamp?: number;
   /** Team ID hint for team-based access control */
   teamId?: string;
+  /**
+   * If provided, the file-drop overlay is portaled into this element and
+   * scoped to fill it instead of covering the full viewport. Used on the
+   * desktop page where the canvas needs its own drop target.
+   */
+  dropOverlayContainer?: HTMLElement | null;
 }
 
 export default function ChatInterface({
@@ -213,6 +219,7 @@ export default function ChatInterface({
   scrollToAssetId,
   scrollToMessageTimestamp,
   teamId,
+  dropOverlayContainer,
 }: ChatInterfaceProps) {
   const t = useTranslations();
   const { user } = useAuth();
@@ -1974,6 +1981,21 @@ export default function ChatInterface({
     },
     [uploadAndAddImages, uploadAndAddVideos, uploadAndAddAudios]
   );
+
+  // Allow other components (e.g. the desktop page's paste handler) to forward
+  // pasted files into the chat input's upload pipeline without reaching into
+  // this component directly.
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      const files = detail?.files;
+      if (Array.isArray(files) && files.length > 0) {
+        void handleFilesUpload(files);
+      }
+    };
+    window.addEventListener("moodio-paste-files-to-chat", handler);
+    return () => window.removeEventListener("moodio-paste-files-to-chat", handler);
+  }, [handleFilesUpload]);
 
   const handleAssetUpload = useCallback(
     async (files: File[]) => {
@@ -4751,6 +4773,7 @@ export default function ChatInterface({
           onOpenAssetParamPicker={openAssetParamPicker}
           onClearAssetParam={clearAssetParam}
           isAssetPickerOpen={isAssetPickerOpen}
+          dropOverlayContainer={dropOverlayContainer}
         />
       )}
 
