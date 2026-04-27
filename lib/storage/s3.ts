@@ -585,6 +585,25 @@ export async function replaceImage(
 }
 
 /**
+ * Defensive: if a caller mistakenly passes an already-built CDN URL (e.g. an
+ * already-signed URL) instead of a bare ID, recover the bare ID so the signing
+ * helpers don't double-prefix it (which produces broken URLs like
+ * `…/images/https://…/images/<id>?…`).
+ */
+function extractAssetId(
+  idOrUrl: string,
+  prefix: "images" | "videos" | "audios"
+): string {
+  if (!idOrUrl.startsWith("http")) return idOrUrl;
+  const match = idOrUrl.match(new RegExp(`/${prefix}/([^/?#]+)`));
+  if (!match) return idOrUrl;
+  console.warn(
+    `[CloudFront] Got URL instead of ${prefix} ID; extracting "${match[1]}". Caller should pass the bare ID.`
+  );
+  return match[1];
+}
+
+/**
  * Generate a CloudFront URL for an image (access via signed cookies)
  *
  * Rule of thumb:
@@ -640,6 +659,8 @@ export function getSignedImageUrl(
     );
     return getImageUrl(imageId, cnMode);
   }
+
+  imageId = extractAssetId(imageId, "images");
 
   // Sign against the original CloudFront domain (CN CDN is a reverse proxy)
   const url = `https://${originDomain}/images/${imageId}`;
@@ -833,6 +854,8 @@ export function getSignedVideoUrl(
     return getVideoUrl(videoId, cnMode);
   }
 
+  videoId = extractAssetId(videoId, "videos");
+
   // Sign against the original CloudFront domain (CN CDN is a reverse proxy)
   const url = `https://${originDomain}/videos/${videoId}`;
   const expiration =
@@ -985,6 +1008,8 @@ export function getSignedAudioUrl(
     );
     return getAudioUrl(audioId, cnMode);
   }
+
+  audioId = extractAssetId(audioId, "audios");
 
   // Sign against the original CloudFront domain (CN CDN is a reverse proxy)
   const url = `https://${originDomain}/audios/${audioId}`;
