@@ -38,6 +38,18 @@ import ShareModal from "@/components/share-modal";
 import { hasWriteAccess } from "@/lib/permissions";
 import { useResearchTelemetry } from "@/hooks/use-research-telemetry";
 import { PresenceAvatars } from "@/components/PresenceAvatars";
+import { useOperationHistory } from "@/hooks/use-operation-history";
+import { useUndoRedoKeyboard } from "@/hooks/use-undo-redo-keyboard";
+import {
+  applyAssetMove,
+  applyAssetResize,
+  applyAssetRemove,
+  applyAssetRestore,
+  applyZIndex,
+  applyTextUpdate,
+  applyTableCellUpdate,
+  type DesktopDispatchDeps,
+} from "@/lib/desktop/history";
 
 const DEFAULT_CAMERA: CameraState = { x: 0, y: 0, zoom: 1 };
 const VIEWPORT_SAVE_DEBOUNCE = 2000;
@@ -75,6 +87,10 @@ export default function DesktopDetailPage({
   const [textLocks, setTextLocks] = useState<Map<string, { userId: string; sessionId: string; firstName: string }>>(
     () => new Map()
   );
+
+  // Per-page operation-history instance. Session-scoped and only replays the
+  // local user's own actions, so Ctrl+Z never clobbers collaborators' work.
+  const history = useOperationHistory();
 
   // Stable ref for the video-sync remote-event handler (defined after the hook below)
   const handleVideoRemoteEventRef = useRef<(event: RemoteEvent) => void>(() => {});
@@ -208,6 +224,40 @@ export default function DesktopDetailPage({
   });
   handleVideoRemoteEventRef.current = handleVideoRemoteEvent;
 
+  // Stable bundle of dispatch deps for the history adapters. Each closure
+  // reads the *current* assets via the ref, so inverse builders recorded
+  // long ago still see up-to-date state.
+  const assetsRef = useRef<EnrichedDesktopAsset[]>([]);
+  assetsRef.current = detail?.assets ?? [];
+  const historyDepsRef = useRef<DesktopDispatchDeps>({
+    desktopId,
+    applyRemoteEvent,
+    sendEvent,
+    getAssets: () => assetsRef.current,
+  });
+  historyDepsRef.current = {
+    desktopId,
+    applyRemoteEvent,
+    sendEvent,
+    getAssets: () => assetsRef.current,
+  };
+
+  // Ctrl+Z / Ctrl+Shift+Z. Skip when a cell/text lock belongs to the local
+  // user — they're mid-edit and the browser's native text undo should win.
+  useUndoRedoKeyboard({
+    history,
+    disabled: useCallback(() => {
+      if (!user?.id) return false;
+      for (const lock of cellLocks.values()) {
+        if (lock.userId === user.id) return true;
+      }
+      for (const lock of textLocks.values()) {
+        if (lock.userId === user.id) return true;
+      }
+      return false;
+    }, [user?.id, cellLocks, textLocks]),
+  });
+
   const [camera, setCamera] = useState<CameraState>(DEFAULT_CAMERA);
   const [canvasMode, setCanvasMode] = useState<CanvasMode>("move");
   const viewportSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -275,6 +325,19 @@ export default function DesktopDetailPage({
         if (newAssets) {
           // Remove the ephemeral placeholder since the real asset has arrived
           applyRemoteEvent({ type: "asset_removed", payload: { assetId: EPHEMERAL_TABLE_ID } });
+
+          // Record each newly-added asset so the local user can Ctrl+Z to
+          // remove it. Restore uses the real server-assigned id + metadata.
+          for (const asset of newAssets) {
+            const snapshot: EnrichedDesktopAsset = { ...asset };
+            history.record({
+              userId: user?.id ?? "",
+              label: "Add asset",
+              targetIds: [asset.id],
+              forward: () => applyAssetRestore(historyDepsRef.current, snapshot),
+              inverse: () => applyAssetRemove(historyDepsRef.current, asset.id),
+            });
+          }
 
           for (const asset of newAssets) {
             sendEvent("asset_added", { asset });
@@ -350,7 +413,7 @@ export default function DesktopDetailPage({
       window.removeEventListener("desktop-table-generating", handleTableGenerating as EventListener);
       window.removeEventListener("desktop-asset-updated", handleAssetUpdated as EventListener);
     };
-  }, [desktopId, fetchDetail, sendEvent, applyRemoteEvent, trackResearch]);
+  }, [desktopId, fetchDetail, sendEvent, applyRemoteEvent, trackResearch, history, user?.id]);
 
   useEffect(() => {
     const expandChat = () => {
@@ -417,18 +480,55 @@ export default function DesktopDetailPage({
 
   const handleAssetMove = useCallback(
     (assetId: string, posX: number, posY: number) => {
+      // Snapshot the prior position from the pre-move asset so undo restores
+      // to where it started. The canvas emits this once per drag (on pointer
+      // up), so we don't need separate coalescing here.
+      const prev = assetsRef.current.find((a) => a.id === assetId);
+      const prevX = prev?.posX ?? posX;
+      const prevY = prev?.posY ?? posY;
+
       updateAsset(assetId, { posX, posY });
       sendEvent("asset_moved", { assetId, posX, posY });
+
+      if (prev && (prevX !== posX || prevY !== posY)) {
+        history.record({
+          userId: user?.id ?? "",
+          label: "Move asset",
+          targetIds: [assetId],
+          forward: () => applyAssetMove(historyDepsRef.current, assetId, posX, posY),
+          inverse: () => applyAssetMove(historyDepsRef.current, assetId, prevX, prevY),
+        });
+      }
     },
-    [updateAsset, sendEvent]
+    [updateAsset, sendEvent, history, user?.id]
   );
 
   const handleAssetResize = useCallback(
     (assetId: string, width: number, height: number) => {
+      const prev = assetsRef.current.find((a) => a.id === assetId);
+      const prevW = prev?.width ?? width;
+      const prevH = prev?.height ?? height;
+
       updateAsset(assetId, { width, height });
       sendEvent("asset_resized", { assetId, width, height });
+
+      if (prev && (prevW !== width || prevH !== height)) {
+        history.record({
+          userId: user?.id ?? "",
+          label: "Resize asset",
+          targetIds: [assetId],
+          forward: () => applyAssetResize(historyDepsRef.current, assetId, width, height),
+          inverse: () =>
+            applyAssetResize(
+              historyDepsRef.current,
+              assetId,
+              prevW ?? width,
+              prevH ?? height
+            ),
+        });
+      }
     },
-    [updateAsset, sendEvent]
+    [updateAsset, sendEvent, history, user?.id]
   );
 
   const handleAssetDelete = useCallback(
@@ -452,22 +552,67 @@ export default function DesktopDetailPage({
       removeAsset(assetId).catch((e) =>
         console.error("Failed to delete asset:", e)
       );
+
+      // Record a full snapshot of the asset so undo can restore it verbatim.
+      if (asset) {
+        const snapshot: EnrichedDesktopAsset = { ...asset };
+        history.record({
+          userId: user?.id ?? "",
+          label: "Delete asset",
+          targetIds: [assetId],
+          forward: () => applyAssetRemove(historyDepsRef.current, assetId),
+          inverse: () => applyAssetRestore(historyDepsRef.current, snapshot),
+        });
+      }
     },
-    [removeAsset, sendEvent, detail?.assets, trackResearch, desktopId]
+    [removeAsset, sendEvent, detail?.assets, trackResearch, desktopId, history, user?.id]
   );
 
   const handleAssetBatchMove = useCallback(
     (moves: Array<{ id: string; posX: number; posY: number }>) => {
+      // Capture each asset's pre-move position so undo can revert the whole
+      // group in one entry. Moves with no change are skipped.
+      const priors = moves
+        .map((m) => {
+          const a = assetsRef.current.find((x) => x.id === m.id);
+          if (!a) return null;
+          if (a.posX === m.posX && a.posY === m.posY) return null;
+          return { id: m.id, posX: a.posX, posY: a.posY };
+        })
+        .filter((v): v is { id: string; posX: number; posY: number } => !!v);
+
       batchUpdateAssets(moves);
       for (const m of moves) {
         sendEvent("asset_moved", { assetId: m.id, posX: m.posX, posY: m.posY });
       }
+
+      if (priors.length > 0) {
+        const effective = moves.filter((m) => priors.some((p) => p.id === m.id));
+        history.record({
+          userId: user?.id ?? "",
+          label: priors.length === 1 ? "Move asset" : `Move ${priors.length} assets`,
+          targetIds: priors.map((p) => p.id),
+          forward: async () => {
+            for (const m of effective) {
+              await applyAssetMove(historyDepsRef.current, m.id, m.posX, m.posY);
+            }
+            return { ok: true };
+          },
+          inverse: async () => {
+            for (const p of priors) {
+              await applyAssetMove(historyDepsRef.current, p.id, p.posX, p.posY);
+            }
+            return { ok: true };
+          },
+        });
+      }
     },
-    [batchUpdateAssets, sendEvent]
+    [batchUpdateAssets, sendEvent, history, user?.id]
   );
 
   const handleAssetBatchDelete = useCallback(
     (assetIds: string[]) => {
+      const snapshots: EnrichedDesktopAsset[] = [];
       for (const id of assetIds) {
         const asset = detail?.assets.find((a) => a.id === id);
         const meta = asset?.metadata as Record<string, any> | undefined;
@@ -488,9 +633,30 @@ export default function DesktopDetailPage({
         removeAsset(id).catch((e) =>
           console.error("Failed to delete asset:", e)
         );
+        if (asset) snapshots.push({ ...asset });
+      }
+
+      if (snapshots.length > 0) {
+        history.record({
+          userId: user?.id ?? "",
+          label: snapshots.length === 1 ? "Delete asset" : `Delete ${snapshots.length} assets`,
+          targetIds: snapshots.map((s) => s.id),
+          forward: async () => {
+            for (const s of snapshots) {
+              await applyAssetRemove(historyDepsRef.current, s.id);
+            }
+            return { ok: true };
+          },
+          inverse: async () => {
+            for (const s of snapshots) {
+              await applyAssetRestore(historyDepsRef.current, s);
+            }
+            return { ok: true };
+          },
+        });
       }
     },
-    [removeAsset, sendEvent, detail?.assets, trackResearch, desktopId]
+    [removeAsset, sendEvent, detail?.assets, trackResearch, desktopId, history, user?.id]
   );
 
   const handleExternalImageDrop = useCallback(
@@ -706,16 +872,45 @@ export default function DesktopDetailPage({
 
   const handleCellCommit = useCallback(
     (assetId: string, rowId: string, colIndex: number, value: string) => {
+      // TableAsset already patched the server + broadcast; we only need to
+      // mirror the write into local React state and record history with the
+      // prior cell value (read from the now-stale copy in assetsRef).
+      const asset = assetsRef.current.find((a) => a.id === assetId);
+      const meta = asset?.metadata as
+        | { rows?: Array<{ id: string; cells?: Array<{ value?: string }> }> }
+        | undefined;
+      const row = meta?.rows?.find((r) => r.id === rowId);
+      const prevValue = row?.cells?.[colIndex]?.value ?? "";
+
       applyRemoteEvent({
         type: "cell_updated",
         payload: { assetId, rowId, colIndex, value },
       });
+
+      if (prevValue !== value) {
+        history.record({
+          userId: user?.id ?? "",
+          label: "Edit cell",
+          coalesceKey: `desktop-cell:${assetId}:${rowId}:${colIndex}`,
+          targetIds: [assetId],
+          forward: () =>
+            applyTableCellUpdate(historyDepsRef.current, assetId, rowId, colIndex, value),
+          inverse: () =>
+            applyTableCellUpdate(historyDepsRef.current, assetId, rowId, colIndex, prevValue),
+        });
+      }
     },
-    [applyRemoteEvent]
+    [applyRemoteEvent, history, user?.id]
   );
 
   const handleTextCommit = useCallback(
     async (assetId: string, content: string) => {
+      const asset = assetsRef.current.find((a) => a.id === assetId);
+      const prev =
+        typeof (asset?.metadata as { content?: unknown })?.content === "string"
+          ? ((asset!.metadata as { content: string }).content)
+          : "";
+
       applyRemoteEvent({
         type: "asset_updated",
         payload: { assetId, metadata: { content } },
@@ -729,8 +924,19 @@ export default function DesktopDetailPage({
       } catch (error) {
         console.error("Failed to save text content:", error);
       }
+
+      if (prev !== content) {
+        history.record({
+          userId: user?.id ?? "",
+          label: "Edit text",
+          coalesceKey: `desktop-text:${assetId}`,
+          targetIds: [assetId],
+          forward: () => applyTextUpdate(historyDepsRef.current, assetId, content),
+          inverse: () => applyTextUpdate(historyDepsRef.current, assetId, prev),
+        });
+      }
     },
-    [desktopId, applyRemoteEvent]
+    [desktopId, applyRemoteEvent, history, user?.id]
   );
 
   const handleVideoSuggestCommit = useCallback(
@@ -861,11 +1067,20 @@ export default function DesktopDetailPage({
     (assetId: string, delta: number) => {
       const asset = detail?.assets.find((a) => a.id === assetId);
       if (!asset) return;
+      const prevZ = asset.zIndex;
       const newZIndex = asset.zIndex + delta;
       updateAsset(assetId, { zIndex: newZIndex });
       sendEvent("asset_z_changed", { assetId, zIndex: newZIndex });
+
+      history.record({
+        userId: user?.id ?? "",
+        label: "Change stack order",
+        targetIds: [assetId],
+        forward: () => applyZIndex(historyDepsRef.current, assetId, newZIndex),
+        inverse: () => applyZIndex(historyDepsRef.current, assetId, prevZ),
+      });
     },
-    [detail?.assets, updateAsset, sendEvent]
+    [detail?.assets, updateAsset, sendEvent, history, user?.id]
   );
 
   const handleSendToTimeline = useCallback(

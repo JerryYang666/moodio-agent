@@ -30,6 +30,24 @@ import {
   type EnrichedMediaAssetRef,
 } from "@/lib/production-table/types";
 import { createProductionTableStore, type ProductionTableStore } from "@/lib/production-table/store";
+import { useOperationHistory } from "@/hooks/use-operation-history";
+import { useUndoRedoKeyboard } from "@/hooks/use-undo-redo-keyboard";
+import {
+  applyCellUpdate,
+  applyCellCommentUpdate,
+  applyMediaAdd,
+  applyMediaRemove,
+  applyColumnRename,
+  applyColumnResize,
+  applyRowResize,
+  applyColumnsReorder,
+  applyRowsReorder,
+  applyColumnDelete,
+  applyRowDelete,
+  applyColumnRestore,
+  applyRowRestore,
+  type PTDispatchDeps,
+} from "@/lib/production-table/history";
 
 const DEFAULT_CHAT_PANEL_WIDTH = 380;
 const COLLAPSED_CHAT_WIDTH = 48;
@@ -54,6 +72,10 @@ export default function ProductionTableDetailPage({
     storeRef.current = createProductionTableStore();
   }
   const store = storeRef.current;
+
+  // Per-page operation history. Stacks are session-scoped and user-specific:
+  // Ctrl+Z only replays the local user's actions, never collaborators'.
+  const history = useOperationHistory();
 
   // Editable column/row IDs for granular permissions
   const [editableColumnIds, setEditableColumnIds] = useState<Set<string>>(
@@ -313,6 +335,36 @@ export default function ProductionTableDetailPage({
     store.setState({ cellLocks });
   }, [cellLocks, store]);
 
+  // Dispatcher deps bundle used by the history adapters. `setTable` is the
+  // page's own state setter so column/row mutations flow through one place.
+  const historyDepsRef = useRef<PTDispatchDeps>({
+    tableId,
+    store,
+    sendEvent,
+    setTable,
+    currentUserId: currentUserId ?? null,
+  });
+  historyDepsRef.current = {
+    tableId,
+    store,
+    sendEvent,
+    setTable,
+    currentUserId: currentUserId ?? null,
+  };
+
+  // Ctrl+Z / Ctrl+Shift+Z. Disabled when the local user holds a cell lock
+  // (they're actively editing — the browser's native text undo should win).
+  useUndoRedoKeyboard({
+    history,
+    disabled: useCallback(() => {
+      if (!currentUserId) return false;
+      for (const lock of cellLocks.values()) {
+        if (lock.userId === currentUserId) return true;
+      }
+      return false;
+    }, [currentUserId, cellLocks]),
+  });
+
   // Permission checks
   const tablePermission = table?.permission ?? null;
   const canEditStructure = hasWriteAccess(tablePermission);
@@ -389,6 +441,17 @@ export default function ProductionTableDetailPage({
           );
           store.getState().setColumns([...store.getState().columns, newColumn]);
           sendEvent("pt_column_added", { tableId, column: newColumn });
+
+          // Undo restores the column with its original id; redo deletes it again.
+          const insertIndex = (table?.columns.length ?? 0) + i;
+          history.record({
+            userId: currentUserId ?? "",
+            label: "Add column",
+            targetIds: [newColumn.id],
+            forward: () =>
+              applyColumnRestore(historyDepsRef.current, newColumn, [], insertIndex),
+            inverse: () => applyColumnDelete(historyDepsRef.current, newColumn.id),
+          });
         } catch (error) {
           const message = resolveApiErrorMessage(
             error,
@@ -407,6 +470,9 @@ export default function ProductionTableDetailPage({
       sendEvent,
       resolveApiErrorMessage,
       t,
+      store,
+      history,
+      currentUserId,
     ]
   );
 
@@ -444,6 +510,16 @@ export default function ProductionTableDetailPage({
         );
         store.getState().setRows([...store.getState().rows, newRow]);
         sendEvent("pt_row_added", { tableId, row: newRow });
+
+        const insertIndex = (table?.rows.length ?? 0) + i;
+        history.record({
+          userId: currentUserId ?? "",
+          label: "Add row",
+          targetIds: [newRow.id],
+          forward: () =>
+            applyRowRestore(historyDepsRef.current, newRow, [], insertIndex),
+          inverse: () => applyRowDelete(historyDepsRef.current, newRow.id),
+        });
       } catch (error) {
         const message = resolveApiErrorMessage(error, t("errors.failedToAddRow"));
         addToast({ title: message, color: "danger" });
@@ -458,6 +534,9 @@ export default function ProductionTableDetailPage({
     sendEvent,
     resolveApiErrorMessage,
     t,
+    store,
+    history,
+    currentUserId,
   ]);
 
   const handleInsertRow = useCallback(
@@ -590,97 +669,98 @@ export default function ProductionTableDetailPage({
       mediaAssets?: EnrichedMediaAssetRef[] | null
     ) => {
       const key = `${columnId}:${rowId}`;
-      const existing = store.getState().cellMap[key];
-      store.getState().setCell(key, {
-        ...(existing ?? {
-          id: "",
-          tableId,
-          columnId,
-          rowId,
-          updatedAt: new Date(),
-          updatedBy: currentUserId ?? null,
-        }),
-        textContent: textContent ?? existing?.textContent ?? null,
-        mediaAssets: mediaAssets ?? existing?.mediaAssets ?? null,
-      } as EnrichedCell);
+      const prev = store.getState().cellMap[key];
+      const prevText = prev?.textContent ?? null;
+      const prevMedia = prev?.mediaAssets ?? null;
 
-      sendEvent("pt_cell_updated", {
-        tableId,
-        rowId,
+      const result = await applyCellUpdate(
+        historyDepsRef.current,
         columnId,
+        rowId,
         textContent,
-        mediaAssets,
-      });
-
-      try {
-        await fetch(`/api/production-table/${tableId}/cells`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ columnId, rowId, textContent, mediaAssets }),
-        });
-      } catch {
+        mediaAssets
+      );
+      if (!result.ok) {
         addToast({ title: t("errors.failedToSaveCell"), color: "danger" });
+        return;
+      }
+
+      const changedText = textContent !== undefined && prevText !== textContent;
+      const changedMedia = mediaAssets !== undefined && prevMedia !== mediaAssets;
+      if (changedText || changedMedia) {
+        history.record({
+          userId: currentUserId ?? "",
+          label: "Edit cell",
+          coalesceKey: `pt-cell:${columnId}:${rowId}`,
+          targetIds: [key],
+          forward: () =>
+            applyCellUpdate(
+              historyDepsRef.current,
+              columnId,
+              rowId,
+              textContent,
+              mediaAssets
+            ),
+          inverse: () =>
+            applyCellUpdate(
+              historyDepsRef.current,
+              columnId,
+              rowId,
+              prevText,
+              prevMedia
+            ),
+        });
       }
     },
-    [tableId, currentUserId, sendEvent, t, store]
+    [store, history, currentUserId, t]
   );
 
   const handleMediaAssetAdd = useCallback(
     async (columnId: string, rowId: string, asset: EnrichedMediaAssetRef) => {
       const key = `${columnId}:${rowId}`;
-      store.getState().addMediaAsset(key, asset, {
-        id: "",
-        tableId,
-        columnId,
-        rowId,
-        textContent: null,
-        updatedAt: new Date(),
-        updatedBy: currentUserId ?? null,
-      } as unknown as Partial<EnrichedCell>);
-
-      sendEvent("pt_media_asset_added", {
-        tableId,
-        rowId,
-        columnId,
-        asset,
-      });
-
-      try {
-        await fetch(`/api/production-table/${tableId}/cells/add-asset`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ columnId, rowId, asset }),
-        });
-      } catch {
+      const result = await applyMediaAdd(historyDepsRef.current, columnId, rowId, asset);
+      if (!result.ok) {
         addToast({ title: t("errors.failedToAddMedia"), color: "danger" });
+        return;
       }
+      history.record({
+        userId: currentUserId ?? "",
+        label: "Add media",
+        targetIds: [key],
+        forward: () =>
+          applyMediaAdd(historyDepsRef.current, columnId, rowId, asset),
+        inverse: () =>
+          applyMediaRemove(historyDepsRef.current, columnId, rowId, asset.assetId),
+      });
     },
-    [tableId, currentUserId, sendEvent, t, store]
+    [history, currentUserId, t]
   );
 
   const handleMediaAssetRemove = useCallback(
     async (columnId: string, rowId: string, assetId: string) => {
       const key = `${columnId}:${rowId}`;
-      store.getState().removeMediaAsset(key, assetId);
+      // Snapshot the asset so undo restores the same reference.
+      const prevAsset = (store.getState().cellMap[key]?.mediaAssets ?? [])
+        .find((a) => a.assetId === assetId);
 
-      sendEvent("pt_media_asset_removed", {
-        tableId,
-        rowId,
-        columnId,
-        assetId,
-      });
-
-      try {
-        await fetch(`/api/production-table/${tableId}/cells/remove-asset`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ columnId, rowId, assetId }),
-        });
-      } catch {
+      const result = await applyMediaRemove(historyDepsRef.current, columnId, rowId, assetId);
+      if (!result.ok) {
         addToast({ title: t("errors.failedToRemoveMedia"), color: "danger" });
+        return;
+      }
+      if (prevAsset) {
+        history.record({
+          userId: currentUserId ?? "",
+          label: "Remove media",
+          targetIds: [key],
+          forward: () =>
+            applyMediaRemove(historyDepsRef.current, columnId, rowId, assetId),
+          inverse: () =>
+            applyMediaAdd(historyDepsRef.current, columnId, rowId, prevAsset),
+        });
       }
     },
-    [tableId, sendEvent, t, store]
+    [store, history, currentUserId, t]
   );
 
   const handleCommentSave = useCallback(
@@ -693,111 +773,108 @@ export default function ProductionTableDetailPage({
             updatedAt: new Date().toISOString(),
           }
         : null;
-
       const key = `${columnId}:${rowId}`;
-      store.getState().updateCellComment(key, stamped, {
-        id: "",
-        tableId,
+      const prevComment = store.getState().cellMap[key]?.comment ?? null;
+
+      const result = await applyCellCommentUpdate(
+        historyDepsRef.current,
         columnId,
         rowId,
-        textContent: null,
-        mediaAssets: null,
-        updatedAt: new Date(),
-        updatedBy: currentUserId ?? null,
-      } as unknown as Partial<EnrichedCell>);
-
-      sendEvent("pt_cell_comment_updated", {
-        tableId,
-        rowId,
-        columnId,
-        comment: stamped,
-      });
-
-      try {
-        await fetch(`/api/production-table/${tableId}/cells/comment`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ columnId, rowId, comment: stamped }),
-        });
-      } catch {
+        stamped
+      );
+      if (!result.ok) {
         addToast({ title: t("errors.failedToSaveComment"), color: "danger" });
+        return;
       }
+      history.record({
+        userId: currentUserId ?? "",
+        label: "Edit comment",
+        coalesceKey: `pt-comment:${columnId}:${rowId}`,
+        targetIds: [key],
+        forward: () =>
+          applyCellCommentUpdate(historyDepsRef.current, columnId, rowId, stamped),
+        inverse: () =>
+          applyCellCommentUpdate(historyDepsRef.current, columnId, rowId, prevComment),
+      });
     },
-    [tableId, currentUserId, user, sendEvent, t, store]
+    [store, history, currentUserId, user, t]
   );
 
   const handleRenameColumn = useCallback(
     async (columnId: string, name: string) => {
-      setTable((prev) =>
-        prev
-          ? {
-              ...prev,
-              columns: prev.columns.map((c) =>
-                c.id === columnId ? { ...c, name } : c
-              ),
-            }
-          : prev
-      );
-      sendEvent("pt_column_renamed", { tableId, columnId, name });
-      try {
-        await fetch(
-          `/api/production-table/${tableId}/columns/${columnId}`,
-          {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ name }),
-          }
-        );
-      } catch {
+      const prevName = table?.columns.find((c) => c.id === columnId)?.name ?? "";
+      const result = await applyColumnRename(historyDepsRef.current, columnId, name);
+      if (!result.ok) {
         addToast({ title: t("errors.failedToRenameColumn"), color: "danger" });
+        return;
+      }
+      if (prevName !== name) {
+        history.record({
+          userId: currentUserId ?? "",
+          label: "Rename column",
+          coalesceKey: `pt-colname:${columnId}`,
+          targetIds: [columnId],
+          forward: () => applyColumnRename(historyDepsRef.current, columnId, name),
+          inverse: () => applyColumnRename(historyDepsRef.current, columnId, prevName),
+        });
       }
     },
-    [tableId, sendEvent, t]
+    [table?.columns, history, currentUserId, t]
   );
 
   const handleDeleteColumn = useCallback(
     async (columnId: string) => {
-      setTable((prev) =>
-        prev
-          ? {
-              ...prev,
-              columns: prev.columns.filter((c) => c.id !== columnId),
-            }
-          : prev
+      if (!table) return;
+      const column = table.columns.find((c) => c.id === columnId);
+      if (!column) return;
+      const insertIndex = table.columns.findIndex((c) => c.id === columnId);
+      // Snapshot every cell in this column so undo can restore content too.
+      const snapshot: EnrichedCell[] = Object.values(store.getState().cellMap).filter(
+        (c) => c.columnId === columnId
       );
-      store.getState().setColumns(store.getState().columns.filter((c) => c.id !== columnId));
-      sendEvent("pt_column_removed", { tableId, columnId });
-      try {
-        await fetch(
-          `/api/production-table/${tableId}/columns/${columnId}`,
-          { method: "DELETE" }
-        );
-      } catch {
+
+      const result = await applyColumnDelete(historyDepsRef.current, columnId);
+      if (!result.ok) {
         addToast({ title: t("errors.failedToDeleteColumn"), color: "danger" });
+        return;
       }
+      history.record({
+        userId: currentUserId ?? "",
+        label: "Delete column",
+        targetIds: [columnId],
+        forward: () => applyColumnDelete(historyDepsRef.current, columnId),
+        inverse: () =>
+          applyColumnRestore(historyDepsRef.current, column, snapshot, insertIndex),
+      });
     },
-    [tableId, sendEvent, t]
+    [table, store, history, currentUserId, t]
   );
 
   const handleDeleteRow = useCallback(
     async (rowId: string) => {
-      setTable((prev) =>
-        prev
-          ? { ...prev, rows: prev.rows.filter((r) => r.id !== rowId) }
-          : prev
+      if (!table) return;
+      const row = table.rows.find((r) => r.id === rowId);
+      if (!row) return;
+      const insertIndex = table.rows.findIndex((r) => r.id === rowId);
+      const snapshot: EnrichedCell[] = Object.values(store.getState().cellMap).filter(
+        (c) => c.rowId === rowId
       );
-      store.getState().setRows(store.getState().rows.filter((r) => r.id !== rowId));
-      sendEvent("pt_row_removed", { tableId, rowId });
-      try {
-        await fetch(
-          `/api/production-table/${tableId}/rows/${rowId}`,
-          { method: "DELETE" }
-        );
-      } catch {
+
+      const result = await applyRowDelete(historyDepsRef.current, rowId);
+      if (!result.ok) {
         addToast({ title: t("errors.failedToDeleteRow"), color: "danger" });
+        return;
       }
+      history.record({
+        userId: currentUserId ?? "",
+        label: "Delete row",
+        targetIds: [rowId],
+        forward: () => applyRowDelete(historyDepsRef.current, rowId),
+        inverse: () =>
+          applyRowRestore(historyDepsRef.current, row, snapshot, insertIndex),
+      });
     },
-    [tableId, sendEvent, t]
+    [table, store, history, currentUserId, t]
   );
 
   const handleBulkDeleteRows = useCallback(
@@ -837,61 +914,47 @@ export default function ProductionTableDetailPage({
   // Column resize
   const handleResizeColumn = useCallback(
     async (columnId: string, width: number) => {
-      setTable((prev) =>
-        prev
-          ? {
-              ...prev,
-              columns: prev.columns.map((c) =>
-                c.id === columnId ? { ...c, width } : c
-              ),
-            }
-          : prev
-      );
-      sendEvent("pt_column_resized", { tableId, columnId, width });
-      try {
-        await fetch(
-          `/api/production-table/${tableId}/columns/${columnId}`,
-          {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ width }),
-          }
-        );
-      } catch {
+      const prevWidth = table?.columns.find((c) => c.id === columnId)?.width;
+      const result = await applyColumnResize(historyDepsRef.current, columnId, width);
+      if (!result.ok) {
         addToast({ title: t("errors.failedToResizeColumn"), color: "danger" });
+        return;
+      }
+      if (prevWidth != null && prevWidth !== width) {
+        history.record({
+          userId: currentUserId ?? "",
+          label: "Resize column",
+          coalesceKey: `pt-colwidth:${columnId}`,
+          targetIds: [columnId],
+          forward: () => applyColumnResize(historyDepsRef.current, columnId, width),
+          inverse: () => applyColumnResize(historyDepsRef.current, columnId, prevWidth),
+        });
       }
     },
-    [tableId, sendEvent, t]
+    [table?.columns, history, currentUserId, t]
   );
 
   // Row resize
   const handleResizeRow = useCallback(
     async (rowId: string, height: number) => {
-      setTable((prev) =>
-        prev
-          ? {
-              ...prev,
-              rows: prev.rows.map((r) =>
-                r.id === rowId ? { ...r, height } : r
-              ),
-            }
-          : prev
-      );
-      sendEvent("pt_row_resized", { tableId, rowId, height });
-      try {
-        await fetch(
-          `/api/production-table/${tableId}/rows/${rowId}`,
-          {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ height }),
-          }
-        );
-      } catch {
+      const prevHeight = table?.rows.find((r) => r.id === rowId)?.height;
+      const result = await applyRowResize(historyDepsRef.current, rowId, height);
+      if (!result.ok) {
         addToast({ title: t("errors.failedToResizeRow"), color: "danger" });
+        return;
+      }
+      if (prevHeight != null && prevHeight !== height) {
+        history.record({
+          userId: currentUserId ?? "",
+          label: "Resize row",
+          coalesceKey: `pt-rowheight:${rowId}`,
+          targetIds: [rowId],
+          forward: () => applyRowResize(historyDepsRef.current, rowId, height),
+          inverse: () => applyRowResize(historyDepsRef.current, rowId, prevHeight),
+        });
       }
     },
-    [tableId, sendEvent, t]
+    [table?.rows, history, currentUserId, t]
   );
 
   const handleBulkResizeRows = useCallback(
@@ -948,102 +1011,92 @@ export default function ProductionTableDetailPage({
   const handleReorderColumns = useCallback(
     async (fromIndex: number, toIndex: number) => {
       if (!table) return;
+      const prevIds = table.columns.map((c) => c.id);
       const cols = [...table.columns];
       const [moved] = cols.splice(fromIndex, 1);
       cols.splice(toIndex, 0, moved);
-
-      setTable((prev) => (prev ? { ...prev, columns: cols } : prev));
-      store.getState().setColumns(cols);
-
       const newIds = cols.map((c) => c.id);
-      sendEvent("pt_columns_reordered", { tableId, columnIds: newIds });
 
-      try {
-        await fetch(
-          `/api/production-table/${tableId}/columns/reorder`,
-          {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ columnIds: newIds }),
-          }
-        );
-      } catch {
+      const result = await applyColumnsReorder(historyDepsRef.current, newIds);
+      if (!result.ok) {
         addToast({ title: t("errors.failedToReorderColumns"), color: "danger" });
+        return;
       }
+      history.record({
+        userId: currentUserId ?? "",
+        label: "Reorder columns",
+        targetIds: newIds,
+        forward: () => applyColumnsReorder(historyDepsRef.current, newIds),
+        inverse: () => applyColumnsReorder(historyDepsRef.current, prevIds),
+      });
     },
-    [table, tableId, sendEvent, t]
+    [table, history, currentUserId, t]
   );
 
   // Row reorder (called by grid after drag-and-drop completes)
   const handleReorderRows = useCallback(
     async (fromIndex: number, toIndex: number) => {
       if (!table) return;
+      const prevIds = table.rows.map((r) => r.id);
       const rowsCopy = [...table.rows];
       const [moved] = rowsCopy.splice(fromIndex, 1);
       rowsCopy.splice(toIndex, 0, moved);
-
-      setTable((prev) => (prev ? { ...prev, rows: rowsCopy } : prev));
-      store.getState().setRows(rowsCopy);
-
       const newIds = rowsCopy.map((r) => r.id);
-      sendEvent("pt_rows_reordered", { tableId, rowIds: newIds });
 
-      try {
-        await fetch(
-          `/api/production-table/${tableId}/rows/reorder`,
-          {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ rowIds: newIds }),
-          }
-        );
-      } catch {
+      const result = await applyRowsReorder(historyDepsRef.current, newIds);
+      if (!result.ok) {
         addToast({ title: t("errors.failedToReorderRows"), color: "danger" });
+        return;
       }
+      history.record({
+        userId: currentUserId ?? "",
+        label: "Reorder rows",
+        targetIds: newIds,
+        forward: () => applyRowsReorder(historyDepsRef.current, newIds),
+        inverse: () => applyRowsReorder(historyDepsRef.current, prevIds),
+      });
     },
-    [table, tableId, sendEvent, t]
+    [table, history, currentUserId, t]
   );
 
   const handleBulkReorderRows = useCallback(
     async (newRowIds: string[]) => {
       if (!table) return;
-      const rowMap = new Map(table.rows.map((r) => [r.id, r]));
-      const reordered = newRowIds.map((id) => rowMap.get(id)).filter(Boolean) as ProductionTableRow[];
-      setTable((prev) => (prev ? { ...prev, rows: reordered } : prev));
-      store.getState().setRows(reordered);
-      sendEvent("pt_rows_reordered", { tableId, rowIds: newRowIds });
-      try {
-        await fetch(`/api/production-table/${tableId}/rows/reorder`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ rowIds: newRowIds }),
-        });
-      } catch {
+      const prevIds = table.rows.map((r) => r.id);
+      const result = await applyRowsReorder(historyDepsRef.current, newRowIds);
+      if (!result.ok) {
         addToast({ title: t("errors.failedToReorderRows"), color: "danger" });
+        return;
       }
+      history.record({
+        userId: currentUserId ?? "",
+        label: "Reorder rows",
+        targetIds: newRowIds,
+        forward: () => applyRowsReorder(historyDepsRef.current, newRowIds),
+        inverse: () => applyRowsReorder(historyDepsRef.current, prevIds),
+      });
     },
-    [table, tableId, sendEvent, t]
+    [table, history, currentUserId, t]
   );
 
   const handleBulkReorderColumns = useCallback(
     async (newColumnIds: string[]) => {
       if (!table) return;
-      const colMap = new Map(table.columns.map((c) => [c.id, c]));
-      const reordered = newColumnIds.map((id) => colMap.get(id)).filter(Boolean) as ProductionTableColumn[];
-      setTable((prev) => (prev ? { ...prev, columns: reordered } : prev));
-      store.getState().setColumns(reordered);
-      sendEvent("pt_columns_reordered", { tableId, columnIds: newColumnIds });
-      try {
-        await fetch(`/api/production-table/${tableId}/columns/reorder`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ columnIds: newColumnIds }),
-        });
-      } catch {
+      const prevIds = table.columns.map((c) => c.id);
+      const result = await applyColumnsReorder(historyDepsRef.current, newColumnIds);
+      if (!result.ok) {
         addToast({ title: t("errors.failedToReorderColumns"), color: "danger" });
+        return;
       }
+      history.record({
+        userId: currentUserId ?? "",
+        label: "Reorder columns",
+        targetIds: newColumnIds,
+        forward: () => applyColumnsReorder(historyDepsRef.current, newColumnIds),
+        inverse: () => applyColumnsReorder(historyDepsRef.current, prevIds),
+      });
     },
-    [table, tableId, sendEvent, t]
+    [table, history, currentUserId, t]
   );
 
   if (loading) {
