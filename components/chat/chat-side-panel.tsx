@@ -45,6 +45,12 @@ export interface ChatSidePanelProps {
   className?: string;
   /** Desktop ID for linking video assets to desktop */
   desktopId?: string;
+  /**
+   * If true, the file-drop overlay rendered by the chat input is scoped to
+   * the side panel area (via a portal) instead of covering the full viewport.
+   * Used on the desktop page so the canvas can have its own drop target.
+   */
+  scopeDropOverlay?: boolean;
 }
 
 /**
@@ -57,6 +63,7 @@ export default function ChatSidePanel({
   onWidthChange,
   className,
   desktopId,
+  scopeDropOverlay = false,
 }: ChatSidePanelProps) {
   const router = useRouter();
   const t = useTranslations("chat");
@@ -79,6 +86,11 @@ export default function ChatSidePanel({
   });
   const [isResizing, setIsResizing] = useState(false);
   const resizeRef = useRef<{ startX: number; startWidth: number } | null>(null);
+
+  // Element used as the portal target for the chat input's file-drop overlay
+  // when scopeDropOverlay is enabled. Tracked in state (not just a ref) so the
+  // initial render after mount picks up the element.
+  const [dropOverlayEl, setDropOverlayEl] = useState<HTMLDivElement | null>(null);
 
   // Load active chat ID from localStorage on mount
   // "new" is a special marker indicating new chat state (no chatId yet)
@@ -301,6 +313,7 @@ export default function ChatSidePanel({
   // Expanded state - full chat panel with resize handle
   return (
     <div
+      ref={scopeDropOverlay ? setDropOverlayEl : undefined}
       className={clsx("h-full flex relative", className)}
       style={{ width: panelWidth }}
     >
@@ -380,6 +393,7 @@ export default function ChatSidePanel({
                   hideAvatars
                   desktopId={desktopId}
                   scrollToMessageTimestamp={scrollToMessageTimestamp}
+                  dropOverlayContainer={scopeDropOverlay ? dropOverlayEl : null}
                 />
               </motion.div>
             )}

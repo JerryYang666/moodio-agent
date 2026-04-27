@@ -6,9 +6,9 @@ import { useTranslations } from "next-intl";
 import { Button } from "@heroui/button";
 import { Spinner } from "@heroui/spinner";
 import { Chip } from "@heroui/chip";
-import { useDisclosure } from "@heroui/modal";
+import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, useDisclosure } from "@heroui/modal";
 import { addToast } from "@heroui/toast";
-import { ArrowLeft, Share2, Pencil, Wifi, WifiOff } from "lucide-react";
+import { ArrowLeft, Share2, Pencil, Wifi, WifiOff, Bot, LayoutDashboard } from "lucide-react";
 import AssetPickerModal, { type AssetSummary } from "@/components/chat/asset-picker-modal";
 import { uploadImage } from "@/lib/upload/client";
 import { uploadVideo } from "@/lib/upload/video-client";
@@ -213,6 +213,11 @@ export default function DesktopDetailPage({
   const viewportSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cameraRef = useRef(camera);
   cameraRef.current = camera;
+
+  // Mirror canEdit into a ref so the window-level paste listener (which is
+  // installed once) can read the current value without re-binding.
+  const canEditRef = useRef(false);
+  canEditRef.current = detail ? hasWriteAccess(detail.desktop.permission) : false;
 
   const canvasWrapperRef = useRef<HTMLDivElement>(null);
 
@@ -999,9 +1004,11 @@ export default function DesktopDetailPage({
     [desktopId]
   );
 
-  const handleAssetPickerUpload = useCallback(
-    async (files: File[]) => {
-      const pos = addAssetPositionRef.current;
+  // Upload arbitrary files (image/video/audio) and place each as a new asset
+  // at the given world position. Shared by the asset-picker upload, the
+  // canvas drag-drop, and the paste-to-desktop flow.
+  const uploadFilesToDesktop = useCallback(
+    async (files: File[], position: { x: number; y: number }) => {
       for (const file of files) {
         const isVideo = siteConfig.upload.allowedVideoTypes.includes(file.type);
         const isAudio = siteConfig.upload.allowedAudioTypes.includes(file.type);
@@ -1021,8 +1028,8 @@ export default function DesktopDetailPage({
               title: file.name,
               status: "completed",
             },
-            posX: pos.x,
-            posY: pos.y,
+            posX: position.x,
+            posY: position.y,
             width: 300,
             height: 200,
           };
@@ -1041,8 +1048,8 @@ export default function DesktopDetailPage({
               prompt: "",
               status: "completed",
             },
-            posX: pos.x,
-            posY: pos.y,
+            posX: position.x,
+            posY: position.y,
           };
         } else {
           const result = await uploadImage(file);
@@ -1058,8 +1065,8 @@ export default function DesktopDetailPage({
               prompt: "",
               status: "generated",
             },
-            posX: pos.x,
-            posY: pos.y,
+            posX: position.x,
+            posY: position.y,
           };
         }
 
@@ -1082,8 +1089,108 @@ export default function DesktopDetailPage({
         }
       }
     },
-    [desktopId]
+    [desktopId, t]
   );
+
+  const handleAssetPickerUpload = useCallback(
+    async (files: File[]) => {
+      await uploadFilesToDesktop(files, addAssetPositionRef.current);
+    },
+    [uploadFilesToDesktop]
+  );
+
+  const handleExternalFileDrop = useCallback(
+    (files: File[], position: { x: number; y: number }) => {
+      void uploadFilesToDesktop(files, position);
+    },
+    [uploadFilesToDesktop]
+  );
+
+  // Returns the world-space coordinates of the canvas viewport center, used
+  // when pasting files (no cursor position is available for paste events).
+  const getViewportCenterWorld = useCallback(() => {
+    const el = canvasWrapperRef.current;
+    if (!el) return { x: 0, y: 0 };
+    const rect = el.getBoundingClientRect();
+    const cam = cameraRef.current;
+    return {
+      x: (rect.width / 2 - cam.x) / cam.zoom,
+      y: (rect.height / 2 - cam.y) / cam.zoom,
+    };
+  }, []);
+
+  // Paste handling for the desktop page. When the chat panel is open the user
+  // is asked whether the pasted files should go to the agent or the canvas;
+  // when collapsed they are added directly to the canvas.
+  const {
+    isOpen: isPasteChoiceOpen,
+    onOpen: openPasteChoice,
+    onOpenChange: onPasteChoiceOpenChange,
+    onClose: closePasteChoice,
+  } = useDisclosure();
+  const pendingPastedFilesRef = useRef<File[]>([]);
+
+  const dispatchFilesToAgent = useCallback((files: File[]) => {
+    if (files.length === 0) return;
+    if (isChatPanelCollapsed) {
+      handleChatPanelCollapseChange(false);
+    }
+    window.dispatchEvent(
+      new CustomEvent("moodio-paste-files-to-chat", { detail: { files } })
+    );
+  }, [isChatPanelCollapsed, handleChatPanelCollapseChange]);
+
+  useEffect(() => {
+    const onPaste = (e: ClipboardEvent) => {
+      if (!canEditRef.current) return;
+      const items = e.clipboardData?.items;
+      if (!items) return;
+
+      // Skip if the paste target is inside an input/textarea/contentEditable —
+      // those are normal text-editing contexts (e.g. typing in the chat input
+      // or renaming a text asset) and should keep their default behavior.
+      const target = e.target as HTMLElement | null;
+      if (target) {
+        const editable = target.closest(
+          'input, textarea, [contenteditable="true"], [contenteditable=""]'
+        );
+        if (editable) return;
+      }
+
+      const allowedTypes = [
+        ...siteConfig.upload.allowedImageTypes,
+        ...siteConfig.upload.allowedVideoTypes,
+        ...siteConfig.upload.allowedAudioTypes,
+      ];
+      const files: File[] = [];
+      for (const item of Array.from(items)) {
+        if (item.kind === "file" && allowedTypes.includes(item.type)) {
+          const file = item.getAsFile();
+          if (file) {
+            files.push(
+              new File(
+                [file],
+                `pasted.${file.type.split("/")[1] || "bin"}`,
+                { type: file.type }
+              )
+            );
+          }
+        }
+      }
+      if (files.length === 0) return;
+
+      e.preventDefault();
+
+      if (!isChatPanelCollapsed) {
+        pendingPastedFilesRef.current = files;
+        openPasteChoice();
+      } else {
+        void uploadFilesToDesktop(files, getViewportCenterWorld());
+      }
+    };
+    window.addEventListener("paste", onPaste);
+    return () => window.removeEventListener("paste", onPaste);
+  }, [isChatPanelCollapsed, openPasteChoice, uploadFilesToDesktop, getViewportCenterWorld]);
 
   if (loading && !detail) {
     return (
@@ -1189,6 +1296,7 @@ export default function DesktopDetailPage({
           onAddAssetAtPosition={canEdit ? handleAddAssetAtPosition : undefined}
           onAddTextAtPosition={canEdit ? handleAddTextAtPosition : undefined}
           onAssetRename={canEdit ? handleAssetRename : undefined}
+          onExternalFileDrop={canEdit ? handleExternalFileDrop : undefined}
         />
         <DesktopToolbar
           camera={camera}
@@ -1236,6 +1344,7 @@ export default function DesktopDetailPage({
           onCollapseChange={handleChatPanelCollapseChange}
           onWidthChange={handleChatPanelWidthChange}
           desktopId={desktopId}
+          scopeDropOverlay
         />
       </div>
 
@@ -1257,6 +1366,53 @@ export default function DesktopDetailPage({
         onUpload={handleAssetPickerUpload}
         acceptTypes={["image", "video", "audio"]}
       />
+
+      {/* Paste destination chooser — shown when the user pastes files while
+          the chat sidebar is open. Asks whether the asset(s) should be sent
+          to the agent or dropped onto the canvas. */}
+      <Modal
+        isOpen={isPasteChoiceOpen}
+        onOpenChange={onPasteChoiceOpenChange}
+        size="sm"
+        onClose={() => {
+          pendingPastedFilesRef.current = [];
+        }}
+      >
+        <ModalContent>
+          <ModalHeader>{t("pasteDestinationTitle")}</ModalHeader>
+          <ModalBody>
+            <p className="text-sm text-default-500">
+              {t("pasteDestinationDescription")}
+            </p>
+          </ModalBody>
+          <ModalFooter className="flex flex-col sm:flex-row gap-2">
+            <Button
+              variant="flat"
+              startContent={<Bot size={16} />}
+              onPress={() => {
+                const files = pendingPastedFilesRef.current;
+                pendingPastedFilesRef.current = [];
+                closePasteChoice();
+                dispatchFilesToAgent(files);
+              }}
+            >
+              {t("pasteToAgent")}
+            </Button>
+            <Button
+              color="primary"
+              startContent={<LayoutDashboard size={16} />}
+              onPress={() => {
+                const files = pendingPastedFilesRef.current;
+                pendingPastedFilesRef.current = [];
+                closePasteChoice();
+                void uploadFilesToDesktop(files, getViewportCenterWorld());
+              }}
+            >
+              {t("pasteToDesktop")}
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, useEffect, useMemo, useCallback, forwardRef, useImperativeHandle } from "react";
+import { createPortal } from "react-dom";
 import { useFeatureFlag } from "@/lib/feature-flags";
 import { useUserSetting } from "@/lib/user-settings";
 import { useTranslations } from "next-intl";
@@ -159,6 +160,13 @@ interface ChatInputProps {
   mediaRefVideoDurations?: Record<string, number>;
   /** Whether the combined reference-video duration exceeds the 15s cap */
   mediaRefVideoOverCap?: boolean;
+  /**
+   * If provided, the file-drop overlay is portaled into this element and
+   * scoped to fill it (absolute inset-0) instead of covering the full viewport.
+   * Used on pages like the desktop where another area (the canvas) needs
+   * its own drop target alongside the chat panel.
+   */
+  dropOverlayContainer?: HTMLElement | null;
 }
 
 /** Ref handle for ChatInput to allow getting editor content */
@@ -227,6 +235,7 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
   resolveMediaRefAudioUrl,
   mediaRefVideoDurations,
   mediaRefVideoOverCap = false,
+  dropOverlayContainer = null,
 }, ref) {
   const t = useTranslations();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -692,39 +701,51 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
     }
   };
 
+  // The file-drop overlay. When dropOverlayContainer is provided, it is
+  // portaled into that element and uses absolute positioning so it scopes to
+  // the chat panel rather than the entire viewport. Otherwise it covers the
+  // full viewport (default behavior on chat-only pages).
+  const dropOverlay = (
+    <AnimatePresence>
+      {isDraggingExternalFile && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.15 }}
+          className={clsx(
+            "z-60 pointer-events-auto",
+            dropOverlayContainer ? "absolute inset-0" : "fixed inset-0"
+          )}
+          onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+          onDrop={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            handleDrop(e);
+          }}
+        >
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+          <div className="absolute inset-x-0 bottom-0 flex justify-center pb-8 px-4">
+            <div className="w-full max-w-2xl rounded-2xl border-2 border-dashed border-primary bg-primary/10 backdrop-blur-md p-8 flex flex-col items-center gap-2 shadow-xl">
+              <Upload size={36} className="text-primary" />
+              <span className="text-lg font-semibold text-primary">
+                {t("chat.dropZoneTitle")}
+              </span>
+              <span className="text-sm text-default-500">
+                {t("chat.dropZoneSubtitle", { maxSize: siteConfig.upload.maxFileSizeMB })}
+              </span>
+            </div>
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+
   return (
     <div className="absolute bottom-4 left-0 right-0 z-50 flex justify-center px-4 pointer-events-none">
-      {/* Full-width drop zone overlay when dragging external files */}
-      <AnimatePresence>
-        {isDraggingExternalFile && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.15 }}
-            className="fixed inset-0 z-60 pointer-events-auto"
-            onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
-            onDrop={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              handleDrop(e);
-            }}
-          >
-            <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
-            <div className="absolute inset-x-0 bottom-0 flex justify-center pb-8 px-4">
-              <div className="w-full max-w-2xl rounded-2xl border-2 border-dashed border-primary bg-primary/10 backdrop-blur-md p-8 flex flex-col items-center gap-2 shadow-xl">
-                <Upload size={36} className="text-primary" />
-                <span className="text-lg font-semibold text-primary">
-                  {t("chat.dropZoneTitle")}
-                </span>
-                <span className="text-sm text-default-500">
-                  {t("chat.dropZoneSubtitle", { maxSize: siteConfig.upload.maxFileSizeMB })}
-                </span>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {dropOverlayContainer
+        ? createPortal(dropOverlay, dropOverlayContainer)
+        : dropOverlay}
 
       <div
         ref={containerRef}

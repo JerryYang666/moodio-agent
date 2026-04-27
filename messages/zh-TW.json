@@ -1566,7 +1566,11 @@
     "imageTitle": "圖片",
     "bringForward": "上移一層",
     "sendBackward": "下移一層",
-    "rename": "重新命名"
+    "rename": "重新命名",
+    "pasteDestinationTitle": "要貼上到哪裡？",
+    "pasteDestinationDescription": "將貼上的檔案傳送給代理或直接放到桌面畫布上。",
+    "pasteToAgent": "傳送給代理",
+    "pasteToDesktop": "新增到桌面"
   },
   "legal": {
     "terms": "條款",

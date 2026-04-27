@@ -803,7 +803,11 @@
     "imageTitle": "Image",
     "bringForward": "Bring Forward",
     "sendBackward": "Send Backward",
-    "rename": "Rename"
+    "rename": "Rename",
+    "pasteDestinationTitle": "Where should this go?",
+    "pasteDestinationDescription": "Send the pasted file to the agent chat or drop it onto the desktop canvas.",
+    "pasteToAgent": "Send to Agent",
+    "pasteToDesktop": "Add to Desktop"
   },
   "storyboard": {
     "title": "Storyboard",

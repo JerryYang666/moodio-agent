@@ -1566,7 +1566,11 @@
     "imageTitle": "이미지",
     "bringForward": "앞으로 가져오기",
     "sendBackward": "뒤로 보내기",
-    "rename": "이름 변경"
+    "rename": "이름 변경",
+    "pasteDestinationTitle": "어디로 보낼까요?",
+    "pasteDestinationDescription": "붙여넣은 파일을 에이전트 채팅으로 보내거나 데스크톱 캔버스에 추가하세요.",
+    "pasteToAgent": "에이전트로 보내기",
+    "pasteToDesktop": "데스크톱에 추가"
   },
   "legal": {
     "terms": "약관",
