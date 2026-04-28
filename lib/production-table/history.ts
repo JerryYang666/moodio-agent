@@ -472,6 +472,13 @@ export async function applyColumnRestore(
   }
 
   deps.sendEvent("pt_column_added", { tableId: deps.tableId, column });
+  // The `pt_column_added` receiver always appends to the end. Follow up
+  // with a reorder broadcast so peers see the column reappear in its
+  // original slot — same pattern handleInsertColumn / handleInsertRow use.
+  deps.sendEvent("pt_columns_reordered", {
+    tableId: deps.tableId,
+    columnIds: storeCols.map((c) => c.id),
+  });
   // Also re-broadcast cell content so peers see it reappear.
   for (const cell of cells) {
     deps.sendEvent("pt_cell_updated", {
@@ -536,6 +543,13 @@ export async function applyRowRestore(
   }
 
   deps.sendEvent("pt_row_added", { tableId: deps.tableId, row });
+  // The `pt_row_added` receiver always appends to the end. Follow up with
+  // a reorder broadcast so peers see the row reappear in its original
+  // slot — same pattern handleInsertRow uses for mid-table inserts.
+  deps.sendEvent("pt_rows_reordered", {
+    tableId: deps.tableId,
+    rowIds: storeRows.map((r) => r.id),
+  });
   for (const cell of cells) {
     deps.sendEvent("pt_cell_updated", {
       tableId: deps.tableId,
