@@ -1,0 +1,11 @@
+[project]
+name = "image-thumbnail"
+version = "0.1.0"
+description = "Generate sm/md WebP thumbnails for S3 images via AWS Lambda"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "boto3",
+    "Pillow>=11.0.0",
+    "pillow-heif>=0.18.0",
+]
