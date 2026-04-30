@@ -1215,6 +1215,13 @@ export class Agent1 implements Agent {
         }
       }
 
+      // Pass the user's raw pick (undefined in "smart" mode) separately from
+      // `aspectRatio`, which has already been merged with the agent's suggestion
+      // and a "1:1" fallback above. gpt-image-2 needs to see the raw pick to
+      // decide between `size=auto` (smart) and a concrete pixel dimension;
+      // other providers only read `aspectRatio` and ignore this field.
+      const userAspectRatio = prepared.aspectRatioOverride;
+
       let result;
       if (useImageEditing) {
         console.log(
@@ -1225,6 +1232,7 @@ export class Agent1 implements Agent {
           imageIds: effectiveImageIds,
           imageBase64: effectiveImageBase64,
           aspectRatio,
+          userAspectRatio,
           imageSize,
           quality: imageQuality,
         });
@@ -1232,6 +1240,7 @@ export class Agent1 implements Agent {
         result = await generateImageWithModel(modelId, {
           prompt: suggestion.prompt,
           aspectRatio,
+          userAspectRatio,
           imageSize,
           quality: imageQuality,
         });

@@ -245,6 +245,15 @@ export class ImageGenerateHandler implements ToolHandler {
 
     let result;
 
+    // Pass the user's raw pick (undefined in "smart" mode) separately from
+    // `aspectRatio`, which has already been merged with the agent's suggestion
+    // and a "1:1" fallback above. gpt-image-2 needs to see the raw pick to
+    // decide between `size=auto` (smart) and a concrete pixel dimension;
+    // other providers only read `aspectRatio` and ignore this field.
+    const userAspectRatio = ctx.aspectRatioOverride && SUPPORTED_ASPECT_RATIOS.includes(ctx.aspectRatioOverride as AspectRatio)
+      ? ctx.aspectRatioOverride
+      : undefined;
+
     if (useImageEditing) {
       console.log(
         `[Agent-2] Using image editing mode with ${effectiveImageBase64.length} image(s)`
@@ -254,6 +263,7 @@ export class ImageGenerateHandler implements ToolHandler {
         imageIds: effectiveImageIds,
         imageBase64: effectiveImageBase64,
         aspectRatio,
+        userAspectRatio,
         imageSize,
         quality: imageQuality,
       });
@@ -261,6 +271,7 @@ export class ImageGenerateHandler implements ToolHandler {
       result = await generateImageWithModel(modelId, {
         prompt: suggestion.prompt,
         aspectRatio,
+        userAspectRatio,
         imageSize,
         quality: imageQuality,
       });

@@ -19,38 +19,49 @@ function getClient(): OpenAI {
 }
 
 /**
- * Map the app's ImageSize (1k/2k/4k) + aspectRatio into an OpenAI gpt-image-2
- * pixel-dimension size string.
+ * Map the app's ImageSize (1k/2k/4k) + aspectRatio into a gpt-image-2 size.
  *
- * gpt-image-2 accepts any resolution satisfying its constraints, but we use a
- * curated set of popular sizes that match the 2K/4K tiers the app exposes.
- * See docs/gpt-image-2.md Size and quality options.
+ * Constraints (from OpenAI docs):
+ *   - max edge ≤ 3840, both edges multiples of 16, long:short ≤ 3:1
+ *   - total pixels in [655_360, 8_294_400]
+ *
+ * Every pair below is /16 on both edges, hits the requested AR exactly, and
+ * fits inside the pixel budget for its tier.
+ *
+ * When `userAspectRatio` is undefined the user is on "smart" mode — we return
+ * `"auto"` so gpt-image-2 infers the ratio from the reference image/prompt
+ * rather than us guessing. Previously we mapped every "portrait" ratio
+ * (3:4, 2:3, 9:16) to 1152×2048, which squashed 3:4 iPhone photos into 9:16.
  */
+const RATIO_TO_SIZE: Record<string, Record<"1k" | "2k" | "4k", string>> = {
+  "1:1":  { "1k": "1024x1024", "2k": "2048x2048", "4k": "2880x2880" },
+  "16:9": { "1k": "1536x864",  "2k": "2048x1152", "4k": "3840x2160" },
+  "9:16": { "1k": "864x1536",  "2k": "1152x2048", "4k": "2160x3840" },
+  "3:2":  { "1k": "1536x1024", "2k": "2016x1344", "4k": "3504x2336" },
+  "2:3":  { "1k": "1024x1536", "2k": "1344x2016", "4k": "2336x3504" },
+  "4:3":  { "1k": "1344x1008", "2k": "2048x1536", "4k": "3264x2448" },
+  "3:4":  { "1k": "1008x1344", "2k": "1536x2048", "4k": "2448x3264" },
+  "5:4":  { "1k": "1280x1024", "2k": "2080x1664", "4k": "3200x2560" },
+  "4:5":  { "1k": "1024x1280", "2k": "1664x2080", "4k": "2560x3200" },
+  "21:9": { "1k": "1680x720",  "2k": "2352x1008", "4k": "3696x1584" },
+};
+
 function mapOpenAISize(
   imageSize?: ImageSize,
-  aspectRatio?: string
+  userAspectRatio?: string
 ): string {
-  const ar = (aspectRatio || "1:1").trim();
+  if (!userAspectRatio) return "auto";
+
+  const ar = userAspectRatio.trim();
   const size = imageSize || "2k";
-
-  const isLandscape = ar === "16:9" || ar === "3:2" || ar === "4:3";
-  const isPortrait = ar === "9:16" || ar === "2:3" || ar === "3:4";
-
-  if (size === "4k") {
-    if (isLandscape) return "3840x2160";
-    if (isPortrait) return "2160x3840";
-    return "2048x2048";
+  const row = RATIO_TO_SIZE[ar];
+  if (!row) {
+    console.warn(
+      `[OpenAI] Unknown aspect ratio "${ar}", falling back to auto`
+    );
+    return "auto";
   }
-
-  if (size === "2k") {
-    if (isLandscape) return "2048x1152";
-    if (isPortrait) return "1152x2048";
-    return "2048x2048";
-  }
-
-  if (isLandscape) return "1536x1024";
-  if (isPortrait) return "1024x1536";
-  return "1024x1024";
+  return row[size];
 }
 
 function mapOpenAIQuality(quality?: ImageQuality): "low" | "medium" | "high" | "auto" {
@@ -75,7 +86,7 @@ export async function generateWithOpenAI(
   input: ImageGenerationInput
 ): Promise<ImageProviderResult> {
   const client = getClient();
-  const size = mapOpenAISize(input.imageSize, input.aspectRatio);
+  const size = mapOpenAISize(input.imageSize, input.userAspectRatio);
   const quality = mapOpenAIQuality(input.quality);
 
   // Cast through `any` because the installed openai SDK types (v6.34.x) don't
@@ -111,7 +122,7 @@ export async function editWithOpenAI(
   input: ImageEditInput
 ): Promise<ImageProviderResult> {
   const client = getClient();
-  const size = mapOpenAISize(input.imageSize, input.aspectRatio);
+  const size = mapOpenAISize(input.imageSize, input.userAspectRatio);
   const quality = mapOpenAIQuality(input.quality);
 
   const imageIds = input.imageIds || [];
