@@ -223,12 +223,12 @@ function stripDerivedUrls(messages: Message[]): Message[] {
     }
 
     const strippedContent = message.content.map((part) => {
-      if (part.type === "image" && "imageUrl" in part) {
-        const { imageUrl, ...rest } = part;
+      if (part.type === "image" && ("imageUrl" in part || "thumbnailMdUrl" in part)) {
+        const { imageUrl, thumbnailMdUrl, ...rest } = part as typeof part & { thumbnailMdUrl?: string };
         return rest;
       }
-      if ((part.type === "agent_image" || part.type === "direct_image" || part.type === "agent_video_suggest") && "imageUrl" in part) {
-        const { imageUrl, ...rest } = part;
+      if ((part.type === "agent_image" || part.type === "direct_image" || part.type === "agent_video_suggest") && ("imageUrl" in part || "thumbnailMdUrl" in part)) {
+        const { imageUrl, thumbnailMdUrl, ...rest } = part as typeof part & { thumbnailMdUrl?: string };
         return rest;
       }
       if (part.type === "agent_video") {
@@ -357,12 +357,14 @@ function addDerivedUrls(messages: Message[], cnMode: boolean = false): Message[]
         return {
           ...part,
           imageUrl: getImageUrl(part.imageId, cnMode),
+          thumbnailMdUrl: getThumbnailUrl(part.imageId, "md", cnMode),
         };
       }
       if ((part.type === "agent_image" || part.type === "direct_image" || part.type === "agent_video_suggest") && part.imageId) {
         return {
           ...part,
           imageUrl: getImageUrl(part.imageId, cnMode),
+          thumbnailMdUrl: getThumbnailUrl(part.imageId, "md", cnMode),
         };
       }
       if (part.type === "agent_video") {

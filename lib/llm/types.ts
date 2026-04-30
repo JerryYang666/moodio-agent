@@ -9,14 +9,16 @@ export type MessageContentPart =
   | {
       type: "image";
       imageId: string;
-      imageUrl?: string; // CloudFront URL from API (access via signed cookies)
+      imageUrl?: string; // CloudFront URL for the original (used for download / enlarge)
+      thumbnailMdUrl?: string; // md WebP thumbnail (used for in-chat display)
       source?: "upload" | "asset" | "ai_generated";
       title?: string; // Display title for the image
     }
   | {
       type: "agent_image";
       imageId?: string; // Generated at start of image generation for tracking
-      imageUrl?: string; // CloudFront URL for display (access via signed cookies)
+      imageUrl?: string; // CloudFront URL for the original (used for download / enlarge)
+      thumbnailMdUrl?: string; // md WebP thumbnail (used for in-chat display)
       title: string;
       aspectRatio?: string;
       prompt: string;
@@ -28,6 +30,7 @@ export type MessageContentPart =
       type: "direct_image";
       imageId?: string;
       imageUrl?: string;
+      thumbnailMdUrl?: string;
       title: string;
       aspectRatio?: string;
       prompt: string;
@@ -39,6 +42,7 @@ export type MessageContentPart =
       type: "agent_video_suggest";
       imageId?: string;
       imageUrl?: string;
+      thumbnailMdUrl?: string;
       title: string;
       aspectRatio?: string;
       prompt: string;

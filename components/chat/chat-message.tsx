@@ -471,6 +471,13 @@ export default function ChatMessage({
                           ? part.imageUrl || ""
                           : part.image_url.url;
                       if (!url) return null;
+                      // In-chat tile uses the md thumbnail when available
+                      // (image parts). image_url parts (non-persisted inline
+                      // image references) never have a thumbnail and render
+                      // the original URL. Hover preview and the enlarge
+                      // modal continue to load the original.
+                      const tileSrc =
+                        (part.type === "image" && part.thumbnailMdUrl) || url;
                       return (
                         <ImageHoverPreview key={`img-${gi}-${i}`} src={url} alt={t("chat.userUpload")}>
                           <button
@@ -481,9 +488,14 @@ export default function ChatMessage({
                             className="h-20 w-20 rounded-lg border border-divider overflow-hidden shrink-0 focus:outline-none focus:ring-2 focus:ring-primary"
                           >
                             <img
-                              src={url}
+                              src={tileSrc}
                               alt={t("chat.userUpload")}
                               className="h-full w-full object-cover"
+                              onError={(e) => {
+                                if (url && e.currentTarget.src !== url) {
+                                  e.currentTarget.src = url;
+                                }
+                              }}
                             />
                           </button>
                         </ImageHoverPreview>
@@ -559,6 +571,10 @@ export default function ChatMessage({
                 <div key={`agent-images-${gi}`} className="grid grid-cols-2 gap-3 mt-2">
                   {group.parts.map((part: any, i) => {
                     const url = part.imageUrl || "";
+                    // In-chat grid renders the md thumbnail. Hover preview
+                    // and the enlarge modal continue to load the original
+                    // via `url` below.
+                    const gridSrc = part.thumbnailMdUrl || url;
                     const isSelected =
                       (part.imageId && selectedImageIds.includes(part.imageId)) ||
                       part.isSelected;
@@ -669,13 +685,21 @@ export default function ChatMessage({
                               )}
                               {effectiveStatus === "generated" && (
                                 <Image
-                                  src={url}
+                                  src={gridSrc}
                                   alt={part.title}
                                   radius="none"
                                   classNames={{
                                     wrapper: "w-full h-full !max-w-full",
                                     img: "w-full h-full object-contain bg-default-100 dark:bg-black",
                                   }}
+                                  onError={
+                                    ((e: React.SyntheticEvent<HTMLImageElement>) => {
+                                      const target = e.currentTarget;
+                                      if (url && target.src !== url) {
+                                        target.src = url;
+                                      }
+                                    }) as unknown as () => void
+                                  }
                                 />
                               )}
                               </div>

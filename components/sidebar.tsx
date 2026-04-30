@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import NextLink from "next/link";
@@ -84,8 +84,10 @@ const ChatItem = ({ chat, isActive, isCollapsed, viewMode }: ChatItemProps) => {
 
   const chatName = chat.name || t("newChat");
   const isMonitored = isChatMonitored(chat.id);
-  // Use CloudFront URL from API response (access via signed cookies)
-  const thumbnailUrl = chat.thumbnailImageUrl || null;
+  // Prefer the md thumbnail variant for the sidebar list; fall back via
+  // onError to the original full image if the variant isn't available yet.
+  const thumbnailMdUrl = chat.thumbnailImageMdUrl || chat.thumbnailImageUrl || null;
+  const thumbnailFullUrl = chat.thumbnailImageUrl || null;
 
   const LinkComponent = (
     <NextLink
@@ -109,12 +111,12 @@ const ChatItem = ({ chat, isActive, isCollapsed, viewMode }: ChatItemProps) => {
           exit={{ opacity: 0, scale: 0.9 }}
           className={clsx(
             "w-full rounded-lg overflow-hidden bg-default-100 relative border border-default-200",
-            !thumbnailUrl && "h-10"
+            !thumbnailMdUrl && "h-10"
           )}
         >
-          {thumbnailUrl ? (
+          {thumbnailMdUrl ? (
             <Image
-              src={thumbnailUrl}
+              src={thumbnailMdUrl}
               alt={chatName}
               width={300}
               radius="none"
@@ -122,6 +124,14 @@ const ChatItem = ({ chat, isActive, isCollapsed, viewMode }: ChatItemProps) => {
                 wrapper: "w-full !max-w-full",
                 img: "w-full h-auto",
               }}
+              onError={
+                ((e: React.SyntheticEvent<HTMLImageElement>) => {
+                  const target = e.currentTarget;
+                  if (thumbnailFullUrl && target.src !== thumbnailFullUrl) {
+                    target.src = thumbnailFullUrl;
+                  }
+                }) as unknown as () => void
+              }
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center text-default-300">
@@ -311,12 +321,13 @@ const ChatItem = ({ chat, isActive, isCollapsed, viewMode }: ChatItemProps) => {
         </PopoverContent>
       </Popover>
 
-      {/* Always show tooltip in List view if it has thumbnail, OR if collapsed */}
-      {(viewMode === "list" || isCollapsed) && thumbnailUrl ? (
+      {/* Always show tooltip in List view if it has thumbnail, OR if collapsed.
+          The tooltip is a hover preview so it loads the full original. */}
+      {(viewMode === "list" || isCollapsed) && thumbnailFullUrl ? (
         <Tooltip
           content={
             <Image
-              src={thumbnailUrl}
+              src={thumbnailFullUrl}
               alt="Chat Thumbnail"
               width={200}
               className="object-contain rounded-lg"

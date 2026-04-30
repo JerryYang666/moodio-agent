@@ -11,7 +11,8 @@ export interface Chat {
   id: string;
   name: string | null;
   thumbnailImageId: string | null;
-  thumbnailImageUrl: string | null; // CloudFront URL (access via signed cookies)
+  thumbnailImageUrl: string | null; // CloudFront URL to the original image (used as onError fallback)
+  thumbnailImageMdUrl: string | null; // CloudFront URL to the md thumbnail variant (used by chat list)
   updatedAt: string;
 }
 

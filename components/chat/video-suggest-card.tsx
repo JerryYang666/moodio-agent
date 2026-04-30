@@ -39,6 +39,9 @@ export default function VideoSuggestCard({
   const [editVideoIdea, setEditVideoIdea] = useState(part.videoIdea || "");
 
   const url = part.imageUrl || "";
+  // In-chat tile uses the md thumbnail when available; the enlarge path
+  // (onExpandClick) still receives the full `part` and loads the original.
+  const tileSrc = part.thumbnailMdUrl || url;
 
   const handleEditClick = useCallback(
     (e: React.MouseEvent) => {
@@ -103,13 +106,21 @@ export default function VideoSuggestCard({
             {effectiveStatus === "generated" && (
               <>
                 <Image
-                  src={url}
+                  src={tileSrc}
                   alt={part.title}
                   radius="none"
                   classNames={{
                     wrapper: "w-full h-full !max-w-full",
                     img: "w-full h-full object-cover",
                   }}
+                  onError={
+                    ((e: React.SyntheticEvent<HTMLImageElement>) => {
+                      const target = e.currentTarget;
+                      if (url && target.src !== url) {
+                        target.src = url;
+                      }
+                    }) as unknown as () => void
+                  }
                 />
                 {onExpandClick && !isEditing && (
                   <Button

@@ -86,8 +86,12 @@ export const ChatItem = ({ chat, isActive, viewMode, onSelect }: ChatItemProps) 
 
   const chatName = chat.name || t("newChat");
   const isMonitored = isChatMonitored(chat.id);
-  // Use CloudFront URL from API response (access via signed cookies)
-  const thumbnailUrl = chat.thumbnailImageUrl || null;
+  // Prefer the md thumbnail variant for the chat list grid. Fall back to the
+  // full original URL if the variant is missing (e.g. freshly-uploaded chat
+  // where the image-thumbnail Lambda hasn't run yet) — the `onError` below
+  // also swaps to the original if the md key 404s.
+  const thumbnailMdUrl = chat.thumbnailImageMdUrl || chat.thumbnailImageUrl || null;
+  const thumbnailFullUrl = chat.thumbnailImageUrl || null;
 
   return (
     <div className="relative group">
@@ -191,12 +195,12 @@ export const ChatItem = ({ chat, isActive, viewMode, onSelect }: ChatItemProps) 
             exit={{ opacity: 0, scale: 0.9 }}
             className={clsx(
               "w-full rounded-lg overflow-hidden bg-default-100 relative border border-default-200",
-              !thumbnailUrl && "h-10"
+              !thumbnailMdUrl && "h-10"
             )}
           >
-            {thumbnailUrl ? (
+            {thumbnailMdUrl ? (
               <Image
-                src={thumbnailUrl}
+                src={thumbnailMdUrl}
                 alt={chatName}
                 width={300}
                 radius="none"
@@ -204,6 +208,14 @@ export const ChatItem = ({ chat, isActive, viewMode, onSelect }: ChatItemProps) 
                   wrapper: "w-full !max-w-full",
                   img: "w-full h-auto",
                 }}
+                onError={
+                  ((e: React.SyntheticEvent<HTMLImageElement>) => {
+                    const target = e.currentTarget;
+                    if (thumbnailFullUrl && target.src !== thumbnailFullUrl) {
+                      target.src = thumbnailFullUrl;
+                    }
+                  }) as unknown as () => void
+                }
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center text-default-300">
