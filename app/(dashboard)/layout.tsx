@@ -9,7 +9,7 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="relative flex h-screen w-full overflow-hidden">
+    <div className="relative flex h-[100dvh] md:h-screen w-full overflow-hidden">
       <PrimarySidebar />
       <div className="flex flex-col flex-1 h-full overflow-hidden">
         <div className="md:hidden">

@@ -742,7 +742,7 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
   );
 
   return (
-    <div className="absolute bottom-4 left-0 right-0 z-50 flex justify-center px-4 pointer-events-none">
+    <div className="absolute bottom-4 left-0 right-0 z-30 md:z-50 flex justify-center px-4 pointer-events-none">
       {dropOverlayContainer
         ? createPortal(dropOverlay, dropOverlayContainer)
         : dropOverlay}
