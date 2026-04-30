@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useCallback } from "react";
+import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { useTranslations } from "next-intl";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@heroui/button";
@@ -37,6 +37,8 @@ type Asset = {
   assetId: string;
   assetType: "image" | "video";
   imageUrl: string;
+  /** md WebP thumbnail, populated for image assets by /api/assets. */
+  thumbnailMdUrl?: string;
   generationDetails: {
     title: string;
     prompt: string;
@@ -569,7 +571,11 @@ export default function AssetsHoverSidebar() {
                       >
                         <div className="relative rounded-lg overflow-hidden border border-divider bg-default-100 aspect-square">
                           <Image
-                            src={a.imageUrl}
+                            src={
+                              a.assetType === "image" && a.thumbnailMdUrl
+                                ? a.thumbnailMdUrl
+                                : a.imageUrl
+                            }
                             alt={
                               a.generationDetails?.title ||
                               t("assetsSidebar.assetAlt")
@@ -579,6 +585,14 @@ export default function AssetsHoverSidebar() {
                               wrapper: "w-full h-full !max-w-full",
                               img: "w-full h-full object-cover",
                             }}
+                            onError={
+                              ((e: React.SyntheticEvent<HTMLImageElement>) => {
+                                const target = e.currentTarget;
+                                if (a.imageUrl && target.src !== a.imageUrl) {
+                                  target.src = a.imageUrl;
+                                }
+                              }) as unknown as () => void
+                            }
                           />
                           {/* Video Badge */}
                           {a.assetType === "video" && (
