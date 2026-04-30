@@ -1,4 +1,5 @@
 import { siteConfig } from "@/config/site";
+import { isHdrGainMapJpeg } from "@/lib/image/hdr-detect";
 
 export interface UploadResult {
   imageId: string;
@@ -100,7 +101,8 @@ export async function uploadImage(file: File, options?: UploadOptions): Promise<
     return { success: false, error: validationError };
   }
 
-  const willCompress = shouldCompressFile(file);
+  const isHdr = await isHdrGainMapJpeg(file);
+  const willCompress = shouldCompressFile(file) || isHdr;
 
   try {
     // Step 1: Get presigned URL from server
@@ -163,6 +165,7 @@ export async function uploadImage(file: File, options?: UploadOptions): Promise<
         skipCollection: options?.skipCollection,
         source: options?.source,
         sourceVideoId: options?.sourceVideoId,
+        isHdr,
       }),
     });
 

@@ -8,14 +8,22 @@ const QUALITY_STEPS = [99, 97, 95] as const;
  * output. Falls back to lower quality steps only if needed.
  * Avoids lossless/nearLossless encoding which is too slow and
  * memory-intensive for serverless runtimes.
+ *
+ * When `forceReencode` is true and the image is already under the target
+ * size, it is still re-encoded as a plain SDR JPEG. This strips Apple/Google
+ * HDR gain maps (MPF + ISO 21496-1 auxiliary images) that gpt-image-2
+ * rejects with "Invalid image file or mode".
  */
 export async function compressImageIfNeeded(
   imageBuffer: Buffer,
   contentType: string,
-  targetSizeBytes: number
+  targetSizeBytes: number,
+  forceReencode = false
 ): Promise<{ buffer: Buffer; contentType: string }> {
   if (imageBuffer.length <= targetSizeBytes) {
-    return { buffer: imageBuffer, contentType };
+    if (!forceReencode) return { buffer: imageBuffer, contentType };
+    const flat = await sharp(imageBuffer).jpeg({ quality: 95 }).toBuffer();
+    return { buffer: flat, contentType: "image/jpeg" };
   }
 
   const originalSizeMB = (imageBuffer.length / (1024 * 1024)).toFixed(2);

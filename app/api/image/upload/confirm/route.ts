@@ -6,6 +6,7 @@ import { collectionImages, collections } from "@/lib/db/schema";
 import { ensureDefaultProject } from "@/lib/db/projects";
 import { checkImageExists, downloadImage, replaceImage, getSignedImageUrl } from "@/lib/storage/s3";
 import { compressImageIfNeeded } from "@/lib/image/compress";
+import { bufferIsHdrGainMapJpeg } from "@/lib/image/hdr-detect";
 import { siteConfig } from "@/config/site";
 import { and, desc, eq } from "drizzle-orm";
 
@@ -45,7 +46,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { imageId, filename, source = "upload", sourceVideoId, skipCollection } = body;
+    const { imageId, filename, source = "upload", sourceVideoId, skipCollection, isHdr } = body;
 
     // Validate required fields
     if (!imageId || typeof imageId !== "string") {
@@ -64,16 +65,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Compress if the uploaded file exceeds the threshold
+    // Compress if the uploaded file exceeds the threshold, OR re-encode if
+    // it is an HDR gain-map JPEG (gpt-image-2 rejects those with
+    // "Invalid image file or mode").
     const compressThreshold = siteConfig.upload.compressThresholdMB * 1024 * 1024;
+    const overThreshold = !!imageCheck.contentLength && imageCheck.contentLength > compressThreshold;
     let wasCompressed = false;
-    if (imageCheck.contentLength && imageCheck.contentLength > compressThreshold) {
+    if (overThreshold || isHdr) {
       const imageBuffer = await downloadImage(imageId);
       if (imageBuffer) {
+        const needsHdrFlatten = isHdr === true || bufferIsHdrGainMapJpeg(imageBuffer);
         const compressed = await compressImageIfNeeded(
           imageBuffer,
           imageCheck.contentType || "image/jpeg",
-          compressThreshold
+          compressThreshold,
+          needsHdrFlatten
         );
         if (compressed.buffer !== imageBuffer) {
           // Note: this second PUT re-triggers the image-thumbnail Lambda via
