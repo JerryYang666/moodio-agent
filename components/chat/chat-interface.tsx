@@ -235,6 +235,13 @@ export default function ChatInterface({
   useEffect(() => {
     messagesRef.current = messages;
   }, [messages]);
+  // Tracks the live SSE state so background polling (chat-provider) can recover
+  // a wedged stream by re-fetching persisted history when the server has
+  // already saved the result but the client never received the final chunk.
+  const isStreamingRef = useRef(false);
+  const lastStreamEventAtRef = useRef(0);
+  const streamReaderRef = useRef<ReadableStreamDefaultReader<Uint8Array> | null>(null);
+  const streamingChatIdRef = useRef<string | null>(null);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(
     !!initialChatId && initialMessages.length === 0
@@ -1208,6 +1215,55 @@ export default function ChatInterface({
       setIsLoading(false);
     }
   }, [chatId, user, teamId]);
+
+  // Recovery path: if background polling (chat-provider) sees a generation
+  // finish on the server while our SSE stream has gone silent (e.g. an edge
+  // proxy dropped it past the keep-alive grace window), abort the wedged
+  // reader and re-fetch persisted history so the user sees the result without
+  // a manual page reload.
+  useEffect(() => {
+    const STREAM_SILENCE_THRESHOLD_MS = 60_000;
+
+    const handler = async (e: Event) => {
+      const detail = (e as CustomEvent<{ chatId: string }>).detail;
+      if (!detail?.chatId) return;
+      if (detail.chatId !== chatIdRef.current) return;
+      if (!isStreamingRef.current) return;
+      if (streamingChatIdRef.current !== detail.chatId) return;
+      const silenceMs = Date.now() - lastStreamEventAtRef.current;
+      if (silenceMs < STREAM_SILENCE_THRESHOLD_MS) return;
+
+      console.warn(
+        `[Chat] SSE wedged for ${silenceMs}ms after generation completed server-side; recovering via re-fetch`
+      );
+
+      try {
+        await streamReaderRef.current?.cancel();
+      } catch {
+        // already cancelled / errored
+      }
+      streamReaderRef.current = null;
+
+      const requestedChatId = detail.chatId;
+      try {
+        const res = await fetch(
+          `/api/chat/${requestedChatId}${teamId ? `?teamId=${teamId}` : ""}`
+        );
+        if (!res.ok) return;
+        const data = await res.json();
+        if (chatIdRef.current !== requestedChatId) return;
+        setMessages(data.messages);
+        if (data.feedbackMap) setFeedbackMap(data.feedbackMap);
+      } catch (err) {
+        console.error("[Chat] Recovery re-fetch failed", err);
+      }
+    };
+
+    window.addEventListener("chat-generation-complete", handler as EventListener);
+    return () => {
+      window.removeEventListener("chat-generation-complete", handler as EventListener);
+    };
+  }, [teamId]);
 
   // Persist active chat ID for cross-page continuity
   // Use "new" as a special marker for new chat state (no chatId yet)
@@ -3214,6 +3270,10 @@ export default function ChatInterface({
       }
 
       const reader = res.body.getReader();
+      streamReaderRef.current = reader;
+      streamingChatIdRef.current = currentChatId ?? null;
+      isStreamingRef.current = true;
+      lastStreamEventAtRef.current = Date.now();
       const decoder = new TextDecoder();
       let buffer = "";
       let isFirstChunkByVariant: Record<string, boolean> = {};
@@ -3244,6 +3304,7 @@ export default function ChatInterface({
         const { done, value } = await reader.read();
         if (done) break;
 
+        lastStreamEventAtRef.current = Date.now();
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split("\n");
         buffer = lines.pop() || "";
@@ -3252,6 +3313,9 @@ export default function ChatInterface({
           if (!line.trim()) continue;
           try {
             const event = JSON.parse(line);
+
+            // Server-side keep-alive heartbeat — ignore.
+            if (event.type === "ping") continue;
 
             // Handle message_timestamp event from backend (sync timestamp)
             if (event.type === "message_timestamp") {
@@ -3651,6 +3715,9 @@ export default function ChatInterface({
         color: "danger",
       });
     } finally {
+      isStreamingRef.current = false;
+      streamReaderRef.current = null;
+      streamingChatIdRef.current = null;
       if (streamingChatId) {
         deleteStreamingChatState(streamingChatId);
       }

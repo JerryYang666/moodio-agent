@@ -39,6 +39,12 @@ import { videoGenerations } from "@/lib/db/schema";
 import { siteConfig } from "@/config/site";
 import { isFeatureFlagEnabled } from "@/lib/feature-flags/server";
 import { recordResearchEvent } from "@/lib/research-telemetry";
+import { withKeepAlive, STREAM_KEEPALIVE_HEADERS } from "@/lib/streaming/keep-alive";
+
+// Long-running image/video generations can hold the streamed response for
+// many minutes. Pin to the platform ceiling so the function isn't killed
+// short of the KIE provider's 780s polling cap.
+export const maxDuration = 800;
 
 const MAX_IMAGES_PER_MESSAGE = siteConfig.imageLimits.maxImagesPerMessage;
 const MAX_SUGGESTIONS_HARD_CAP = siteConfig.imageLimits.maxSuggestionsHardCap;
@@ -844,8 +850,8 @@ export async function POST(
           })
       );
 
-      return new NextResponse(directStream, {
-        headers: { "Content-Type": "text/plain; charset=utf-8" },
+      return new NextResponse(withKeepAlive(directStream), {
+        headers: STREAM_KEEPALIVE_HEADERS,
       });
     }
 
@@ -1165,8 +1171,8 @@ export async function POST(
           })
       );
 
-      return new NextResponse(videoStream, {
-        headers: { "Content-Type": "text/plain; charset=utf-8" },
+      return new NextResponse(withKeepAlive(videoStream), {
+        headers: STREAM_KEEPALIVE_HEADERS,
       });
     }
 
@@ -1264,11 +1270,8 @@ export async function POST(
         })
     );
 
-    return new NextResponse(agentStream, {
-      headers: {
-        "Content-Type": "text/plain; charset=utf-8",
-        // "Transfer-Encoding": "chunked", // Next.js handles this
-      },
+    return new NextResponse(withKeepAlive(agentStream), {
+      headers: STREAM_KEEPALIVE_HEADERS,
     });
   } catch (error) {
     console.error("Error sending message:", error);
