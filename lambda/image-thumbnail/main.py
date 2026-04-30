@@ -38,7 +38,13 @@ def _resize_to_webp(img: Image.Image, longest_side: int, quality: int) -> bytes:
     if img.mode not in ("RGB", "RGBA"):
         img = img.convert("RGBA" if "A" in img.mode else "RGB")
     buf = io.BytesIO()
-    img.save(buf, format="WEBP", quality=quality, method=4)
+    # Preserve the source ICC profile (iPhones shoot Display P3) so thumbnails
+    # match the colour of the full-size image in colour-managed viewers.
+    icc_profile = img.info.get("icc_profile")
+    save_kwargs = {"format": "WEBP", "quality": quality, "method": 4}
+    if icc_profile:
+        save_kwargs["icc_profile"] = icc_profile
+    img.save(buf, **save_kwargs)
     return buf.getvalue()
 
 

@@ -43,7 +43,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "boto3" },
-    { name = "pillow", specifier = ">=11.0.0" },
+    { name = "pillow", specifier = ">=12.0.0" },
     { name = "pillow-heif", specifier = ">=0.18.0" },
 ]
 
