@@ -6,7 +6,7 @@ import { verifyAccessToken } from "@/lib/auth/jwt";
 import { eq, and } from "drizzle-orm";
 import { getDesktopPermission } from "@/lib/desktop/permissions";
 import { hasWriteAccess } from "@/lib/permissions";
-import { getImageUrl, getVideoUrl, getAudioUrl } from "@/lib/storage/s3";
+import { getImageUrl, getVideoUrl, getAudioUrl, getThumbnailUrl } from "@/lib/storage/s3";
 import { getContentUrl } from "@/lib/config/video.config";
 import { getUserSetting } from "@/lib/user-settings/server";
 
@@ -43,6 +43,8 @@ function enrichAsset(
   return {
     ...asset,
     imageUrl: imageId ? getImageUrl(imageId, cnMode) : null,
+    thumbnailSmUrl: imageId ? getThumbnailUrl(imageId, "sm", cnMode) : null,
+    thumbnailMdUrl: imageId ? getThumbnailUrl(imageId, "md", cnMode) : null,
     videoUrl: asset.assetType === "video" && videoId ? getVideoUrl(videoId, cnMode) : null,
   };
 }

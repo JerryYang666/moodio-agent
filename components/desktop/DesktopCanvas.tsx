@@ -1187,6 +1187,7 @@ export default function DesktopCanvas({
               >
               <AssetCardContent
                 asset={asset}
+                containerWidth={w}
                 playing={playingAssetId === asset.id}
                 onPlayToggle={onAssetClick ? () => onAssetClick(asset) : undefined}
                 onImageLoad={handleImageLoad}
@@ -1685,6 +1686,7 @@ export default function DesktopCanvas({
 
 function AssetCardContent({
   asset,
+  containerWidth,
   playing,
   onPlayToggle,
   onImageLoad,
@@ -1699,6 +1701,7 @@ function AssetCardContent({
   onVideoSuggestCommit,
 }: {
   asset: EnrichedDesktopAsset;
+  containerWidth: number;
   playing?: boolean;
   onPlayToggle?: () => void;
   onImageLoad: (assetId: string, naturalWidth: number, naturalHeight: number) => void;
@@ -1715,9 +1718,9 @@ function AssetCardContent({
   switch (asset.assetType) {
     case "image":
     case "public_image":
-      return <ImageAsset asset={asset} onImageLoad={onImageLoad} onFocusAsset={onFocusAsset} zoom={zoom} />;
+      return <ImageAsset asset={asset} containerWidth={containerWidth} onImageLoad={onImageLoad} onFocusAsset={onFocusAsset} zoom={zoom} />;
     case "video":
-      return <VideoAsset asset={asset} playing={playing} onPlayToggle={onPlayToggle} onImageLoad={onImageLoad} onFocusAsset={onFocusAsset} zoom={zoom} />;
+      return <VideoAsset asset={asset} containerWidth={containerWidth} playing={playing} onPlayToggle={onPlayToggle} onImageLoad={onImageLoad} onFocusAsset={onFocusAsset} zoom={zoom} />;
     case "public_video":
       return <PublicVideoAsset asset={asset} playing={playing} onPlayToggle={onPlayToggle} onImageLoad={onImageLoad} onFocusAsset={onFocusAsset} zoom={zoom} />;
     case "text": {

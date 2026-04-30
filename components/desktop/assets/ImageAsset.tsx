@@ -1,33 +1,31 @@
 import { Maximize2 } from "lucide-react";
 import type { ImageAssetMeta } from "@/lib/desktop/types";
 import type { EnrichedDesktopAsset } from "./types";
+import CanvasAssetImage from "./CanvasAssetImage";
 
 interface ImageAssetProps {
   asset: EnrichedDesktopAsset;
+  containerWidth: number;
   onImageLoad: (assetId: string, naturalWidth: number, naturalHeight: number) => void;
   onFocusAsset?: (asset: EnrichedDesktopAsset) => void;
   zoom: number;
 }
 
-export default function ImageAsset({ asset, onImageLoad, onFocusAsset, zoom }: ImageAssetProps) {
+export default function ImageAsset({ asset, containerWidth, onImageLoad, onFocusAsset, zoom }: ImageAssetProps) {
   const meta = asset.metadata as unknown as ImageAssetMeta;
-  const src = asset.imageUrl;
 
-  if (!src) {
+  if (!asset.imageUrl) {
     return <div className="w-full h-full bg-default-200 animate-pulse" />;
   }
 
   return (
     <>
-      <img
-        src={src}
+      <CanvasAssetImage
+        asset={asset}
+        containerWidth={containerWidth}
+        zoom={zoom}
         alt={meta.title || "Image"}
-        draggable={false}
-        className="w-full h-full object-contain"
-        onLoad={(e) => {
-          const img = e.currentTarget;
-          onImageLoad(asset.id, img.naturalWidth, img.naturalHeight);
-        }}
+        onImageLoad={onImageLoad}
       />
       {onFocusAsset && (
         <button
