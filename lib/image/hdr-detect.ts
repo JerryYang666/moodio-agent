@@ -9,11 +9,17 @@
  *
  * Upstream tracking: https://github.com/python-pillow/Pillow/issues/8036
  *
- * We sniff only the first 128 KB because all HDR-related APP segments sit
- * near the file head (before the SOS marker).
+ * iPhones emit HDR gain maps in two different layouts:
+ *   1. iOS 18+ Ultra HDR — the `urn:iso:std:iso:ts:21496` marker sits in an
+ *      APP segment near the file head.
+ *   2. Older Apple HDR — MPF appends a second auxiliary JPEG at the END of
+ *      the file and the `HDRGainMap` / `apdi` XMP lives inside that tail
+ *      image's own header.
+ * We therefore sniff both ends.
  */
 
 const HEAD_BYTES = 128 * 1024;
+const TAIL_BYTES = 512 * 1024;
 
 const HDR_SIGNATURES: readonly string[] = [
   "urn:iso:std:iso:ts:21496", // ISO 21496-1 gain map (iOS 18+, Android Ultra HDR)
@@ -28,7 +34,7 @@ function bytesContainSignature(bytes: Uint8Array): boolean {
 
 /**
  * Returns true if the file is a JPEG that embeds an HDR gain map.
- * Cheap: reads the first 128 KB, no decoding.
+ * Cheap: reads up to 128 KB from the head and 512 KB from the tail.
  */
 export async function isHdrGainMapJpeg(file: File): Promise<boolean> {
   const looksLikeJpeg =
@@ -36,12 +42,21 @@ export async function isHdrGainMapJpeg(file: File): Promise<boolean> {
   if (!looksLikeJpeg) return false;
 
   const head = await file.slice(0, HEAD_BYTES).arrayBuffer();
-  return bytesContainSignature(new Uint8Array(head));
+  if (bytesContainSignature(new Uint8Array(head))) return true;
+
+  if (file.size > HEAD_BYTES) {
+    const tailStart = Math.max(HEAD_BYTES, file.size - TAIL_BYTES);
+    const tail = await file.slice(tailStart, file.size).arrayBuffer();
+    if (bytesContainSignature(new Uint8Array(tail))) return true;
+  }
+
+  return false;
 }
 
 /**
- * Server-side equivalent for a Buffer. Only scans the head.
+ * Server-side equivalent for a Buffer. Scans the whole buffer since it is
+ * already in memory — this also catches Apple's tail-appended gain maps.
  */
 export function bufferIsHdrGainMapJpeg(buf: Buffer): boolean {
-  return bytesContainSignature(buf.subarray(0, HEAD_BYTES));
+  return bytesContainSignature(buf);
 }
