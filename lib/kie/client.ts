@@ -151,7 +151,11 @@ export async function ensureKieSupportedFormat(
   if (!res.ok)
     throw new Error(`Failed to fetch image for conversion: ${res.status}`);
   const buffer = Buffer.from(await res.arrayBuffer());
-  const jpegBuffer = await sharp(buffer).jpeg({ quality: 90 }).toBuffer();
+  const jpegBuffer = await sharp(buffer)
+    .rotate()
+    .jpeg({ quality: 90 })
+    .keepIccProfile()
+    .toBuffer();
   const imageId = await uploadTempImage(jpegBuffer, "image/jpeg");
   return getSignedTempImageUrl(imageId);
 }

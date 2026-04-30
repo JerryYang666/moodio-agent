@@ -53,14 +53,16 @@ async function convertImage(
   imageBuffer: Buffer,
   targetFormat: ImageFormat
 ): Promise<Buffer> {
+  const pipeline = sharp(imageBuffer).rotate();
   switch (targetFormat) {
     case "png":
-      return await sharp(imageBuffer).png().toBuffer();
+      return await pipeline.png().keepIccProfile().toBuffer();
     case "jpeg":
-      return await sharp(imageBuffer).jpeg({ quality: 95 }).toBuffer();
+      return await pipeline.jpeg({ quality: 95 }).keepIccProfile().toBuffer();
     case "webp":
-      return await sharp(imageBuffer)
+      return await pipeline
         .webp({ quality: 95, smartSubsample: true })
+        .keepIccProfile()
         .toBuffer();
   }
 }

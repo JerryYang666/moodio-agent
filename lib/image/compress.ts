@@ -13,6 +13,17 @@ const QUALITY_STEPS = [99, 97, 95] as const;
  * size, it is still re-encoded as a plain SDR JPEG. This strips Apple/Google
  * HDR gain maps (MPF + ISO 21496-1 auxiliary images) that gpt-image-2
  * rejects with "Invalid image file or mode".
+ *
+ * Every sharp pipeline starts with `.rotate()` (no args) so pixels are
+ * baked to their display orientation from EXIF. sharp drops metadata by
+ * default — without this call, an Orientation=6 iPhone photo would come
+ * out visually rotated 90° after re-encode.
+ *
+ * `.keepIccProfile()` preserves the input ICC profile. iPhones shoot in
+ * Display P3 by default; stripping the profile leaves wide-gamut pixels
+ * tagged as sRGB, which causes subtle desaturation in colour-managed
+ * viewers (browsers, gpt-image-2). EXIF/IPTC are intentionally dropped —
+ * removing GPS and other PII from user uploads is desirable.
  */
 export async function compressImageIfNeeded(
   imageBuffer: Buffer,
@@ -22,7 +33,11 @@ export async function compressImageIfNeeded(
 ): Promise<{ buffer: Buffer; contentType: string }> {
   if (imageBuffer.length <= targetSizeBytes) {
     if (!forceReencode) return { buffer: imageBuffer, contentType };
-    const flat = await sharp(imageBuffer).jpeg({ quality: 95 }).toBuffer();
+    const flat = await sharp(imageBuffer)
+      .rotate()
+      .jpeg({ quality: 95 })
+      .keepIccProfile()
+      .toBuffer();
     return { buffer: flat, contentType: "image/jpeg" };
   }
 
@@ -34,7 +49,9 @@ export async function compressImageIfNeeded(
 
   for (const quality of QUALITY_STEPS) {
     const compressed = await sharp(imageBuffer)
+      .rotate()
       .webp({ quality, effort: 2, smartSubsample: true })
+      .keepIccProfile()
       .toBuffer();
 
     const compressedSizeMB = (compressed.length / (1024 * 1024)).toFixed(2);
@@ -48,7 +65,9 @@ export async function compressImageIfNeeded(
   }
 
   const fallback = await sharp(imageBuffer)
+    .rotate()
     .webp({ quality: 85, effort: 4, smartSubsample: true })
+    .keepIccProfile()
     .toBuffer();
 
   const fallbackSizeMB = (fallback.length / (1024 * 1024)).toFixed(2);
