@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import { Card, CardBody, CardFooter } from "@heroui/card";
 import { Chip } from "@heroui/chip";
 import { Image } from "@heroui/image";
@@ -17,6 +18,7 @@ type CollectionCardData = {
   id: string;
   name: string;
   coverImageUrl?: string | null;
+  coverImageMdUrl?: string | null;
   tags?: { id: string; label: string; color: string }[];
   isOwner?: boolean;
   permission?: string;
@@ -54,15 +56,23 @@ export default function CollectionCard({
         <div
           className={`w-full ${thumbnailHeight} bg-default-100 rounded-lg overflow-hidden relative`}
         >
-          {collection.coverImageUrl ? (
+          {collection.coverImageUrl || collection.coverImageMdUrl ? (
             <Image
-              src={collection.coverImageUrl}
+              src={collection.coverImageMdUrl || collection.coverImageUrl || ""}
               alt={collection.name}
               radius="none"
               classNames={{
                 wrapper: "w-full h-full !max-w-full",
                 img: "w-full h-full object-cover",
               }}
+              onError={
+                ((e: React.SyntheticEvent<HTMLImageElement>) => {
+                  const target = e.currentTarget;
+                  if (collection.coverImageUrl && target.src !== collection.coverImageUrl) {
+                    target.src = collection.coverImageUrl;
+                  }
+                }) as unknown as () => void
+              }
             />
           ) : (
             <div className="flex items-center justify-center w-full h-full">

@@ -37,6 +37,7 @@ type Project = {
   createdAt: Date;
   updatedAt: Date;
   coverImageUrl: string | null;
+  coverImageMdUrl: string | null;
 };
 
 type SharedProject = Project & {
@@ -245,15 +246,23 @@ export default function ProjectsPage() {
                       >
                         <CardBody className="p-3 pb-1 relative">
                           <div className="w-full h-40 bg-default-100 rounded-lg overflow-hidden">
-                            {project.coverImageUrl ? (
+                            {project.coverImageUrl || project.coverImageMdUrl ? (
                               <Image
-                                src={project.coverImageUrl}
+                                src={project.coverImageMdUrl || project.coverImageUrl || ""}
                                 alt={project.name}
                                 radius="none"
                                 classNames={{
                                   wrapper: "w-full h-full !max-w-full",
                                   img: "w-full h-full object-cover",
                                 }}
+                                onError={
+                                  ((e: React.SyntheticEvent<HTMLImageElement>) => {
+                                    const target = e.currentTarget;
+                                    if (project.coverImageUrl && target.src !== project.coverImageUrl) {
+                                      target.src = project.coverImageUrl;
+                                    }
+                                  }) as unknown as () => void
+                                }
                               />
                             ) : (
                               <div className="flex items-center justify-center w-full h-full">
@@ -325,15 +334,23 @@ export default function ProjectsPage() {
                         >
                           <CardBody className="p-3 pb-1">
                             <div className="w-full h-40 bg-default-100 rounded-lg overflow-hidden">
-                              {project.coverImageUrl ? (
+                              {project.coverImageUrl || project.coverImageMdUrl ? (
                                 <Image
-                                  src={project.coverImageUrl}
+                                  src={project.coverImageMdUrl || project.coverImageUrl || ""}
                                   alt={project.name}
                                   radius="none"
                                   classNames={{
                                     wrapper: "w-full h-full !max-w-full",
                                     img: "w-full h-full object-cover",
                                   }}
+                                  onError={
+                                    ((e: React.SyntheticEvent<HTMLImageElement>) => {
+                                      const target = e.currentTarget;
+                                      if (project.coverImageUrl && target.src !== project.coverImageUrl) {
+                                        target.src = project.coverImageUrl;
+                                      }
+                                    }) as unknown as () => void
+                                  }
                                 />
                               ) : (
                                 <div className="flex items-center justify-center w-full h-full">
@@ -371,15 +388,23 @@ export default function ProjectsPage() {
                         >
                           <CardBody className="p-3 pb-1">
                             <div className="w-full h-36 bg-default-100 rounded-lg overflow-hidden">
-                              {c.coverImageUrl ? (
+                              {c.coverImageUrl || c.coverImageMdUrl ? (
                                 <Image
-                                  src={c.coverImageUrl}
+                                  src={c.coverImageMdUrl || c.coverImageUrl || ""}
                                   alt={c.name}
                                   radius="none"
                                   classNames={{
                                     wrapper: "w-full h-full !max-w-full",
                                     img: "w-full h-full object-cover",
                                   }}
+                                  onError={
+                                    ((e: React.SyntheticEvent<HTMLImageElement>) => {
+                                      const target = e.currentTarget;
+                                      if (c.coverImageUrl && target.src !== c.coverImageUrl) {
+                                        target.src = c.coverImageUrl;
+                                      }
+                                    }) as unknown as () => void
+                                  }
                                 />
                               ) : (
                                 <div className="flex items-center justify-center w-full h-full">

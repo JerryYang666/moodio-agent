@@ -11,7 +11,7 @@ import {
 import { getAccessToken } from "@/lib/auth/cookies";
 import { verifyAccessToken } from "@/lib/auth/jwt";
 import { eq, and, desc } from "drizzle-orm";
-import { getImageUrl, getVideoUrl, getAudioUrl } from "@/lib/storage/s3";
+import { getImageUrl, getVideoUrl, getAudioUrl, getThumbnailUrl } from "@/lib/storage/s3";
 import {
   getContentUrl,
   getVideoUrl as getPublicVideoUrl,
@@ -111,6 +111,15 @@ export async function GET(
           ...asset,
           imageUrl: "",
           audioUrl: getAudioUrl(asset.assetId, cnMode),
+        };
+      }
+      if (asset.assetType === "image") {
+        return {
+          ...asset,
+          imageUrl: getImageUrl(asset.imageId, cnMode),
+          videoUrl: undefined,
+          thumbnailSmUrl: getThumbnailUrl(asset.imageId, "sm", cnMode),
+          thumbnailMdUrl: getThumbnailUrl(asset.imageId, "md", cnMode),
         };
       }
       return {

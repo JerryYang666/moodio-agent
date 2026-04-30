@@ -6,7 +6,7 @@ import { getAccessToken } from "@/lib/auth/cookies";
 import { verifyAccessToken } from "@/lib/auth/jwt";
 import { desc, eq, sql } from "drizzle-orm";
 import { ensureDefaultProject } from "@/lib/db/projects";
-import { getImageUrl } from "@/lib/storage/s3";
+import { getImageUrl, getThumbnailUrl } from "@/lib/storage/s3";
 
 /**
  * GET /api/projects
@@ -48,21 +48,29 @@ export async function GET(req: NextRequest) {
           .orderBy(desc(collectionImages.addedAt))
       : [];
 
-    // Create a map of projectId -> coverImageUrl (first/most recent for each project)
-    const coverMap = new Map<string, string>();
+    // Create a map of projectId -> {coverImageUrl, coverImageMdUrl}. The md
+    // variant is used for display; the original serves as onError fallback.
+    const coverMap = new Map<string, { full: string; md: string }>();
     for (const cover of coverImages) {
       if (!coverMap.has(cover.projectId)) {
-        coverMap.set(cover.projectId, getImageUrl(cover.imageId));
+        coverMap.set(cover.projectId, {
+          full: getImageUrl(cover.imageId),
+          md: getThumbnailUrl(cover.imageId, "md"),
+        });
       }
     }
 
     // Add cover image URL to each project
-    const projectsWithCovers = rows.map((project) => ({
-      ...project,
-      permission: PERMISSION_OWNER,
-      isOwner: true,
-      coverImageUrl: coverMap.get(project.id) || null,
-    }));
+    const projectsWithCovers = rows.map((project) => {
+      const cover = coverMap.get(project.id);
+      return {
+        ...project,
+        permission: PERMISSION_OWNER,
+        isOwner: true,
+        coverImageUrl: cover?.full || null,
+        coverImageMdUrl: cover?.md || null,
+      };
+    });
 
     // Get projects shared with user
     const sharedProjectsData = await db
@@ -89,20 +97,27 @@ export async function GET(req: NextRequest) {
           .orderBy(desc(collectionImages.addedAt))
       : [];
 
-    const sharedCoverMap = new Map<string, string>();
+    const sharedCoverMap = new Map<string, { full: string; md: string }>();
     for (const cover of sharedCoverImages) {
       if (!sharedCoverMap.has(cover.projectId)) {
-        sharedCoverMap.set(cover.projectId, getImageUrl(cover.imageId));
+        sharedCoverMap.set(cover.projectId, {
+          full: getImageUrl(cover.imageId),
+          md: getThumbnailUrl(cover.imageId, "md"),
+        });
       }
     }
 
-    const sharedProjects = sharedProjectsData.map((item) => ({
-      ...item.project,
-      permission: item.permission,
-      isOwner: false,
-      sharedAt: item.sharedAt,
-      coverImageUrl: sharedCoverMap.get(item.project.id) || null,
-    }));
+    const sharedProjects = sharedProjectsData.map((item) => {
+      const cover = sharedCoverMap.get(item.project.id);
+      return {
+        ...item.project,
+        permission: item.permission,
+        isOwner: false,
+        sharedAt: item.sharedAt,
+        coverImageUrl: cover?.full || null,
+        coverImageMdUrl: cover?.md || null,
+      };
+    });
 
     return NextResponse.json({
       projects: projectsWithCovers,

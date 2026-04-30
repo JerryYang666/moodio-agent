@@ -5,7 +5,7 @@ import { getAccessToken } from "@/lib/auth/cookies";
 import { verifyAccessToken } from "@/lib/auth/jwt";
 import { eq, or, and, desc, sql } from "drizzle-orm";
 import { ensureDefaultProject } from "@/lib/db/projects";
-import { getImageUrl } from "@/lib/storage/s3";
+import { getImageUrl, getThumbnailUrl } from "@/lib/storage/s3";
 import { getContentUrl } from "@/lib/config/video.config";
 import { getProjectPermission, hasProjectWritePermission } from "@/lib/project-utils";
 import { PERMISSION_OWNER } from "@/lib/permissions";
@@ -91,18 +91,27 @@ export async function GET(req: NextRequest) {
           .orderBy(desc(collectionImages.addedAt))
       : [];
 
-    // Create a map of collectionId -> coverImageUrl (first/most recent for each collection)
-    const coverMap = new Map<string, string>();
+    // Create a map of collectionId -> {coverImageUrl, coverImageMdUrl}.
+    // md is used for display; the original covers the onError fallback.
+    // public_image uses CDN-proxied content URLs which aren't thumbnailed
+    // yet; serve them full-size for now (md stays null → frontend falls back).
+    const coverMap = new Map<string, { full: string; md: string | null }>();
     for (const cover of coverImages) {
       if (cover.collectionId && !coverMap.has(cover.collectionId)) {
         if (cover.assetType === "public_video") {
           continue;
         }
         if (cover.assetType === "public_image") {
-          coverMap.set(cover.collectionId, getContentUrl(cover.assetId, cnMode));
+          coverMap.set(cover.collectionId, {
+            full: getContentUrl(cover.assetId, cnMode),
+            md: null,
+          });
           continue;
         }
-        coverMap.set(cover.collectionId, getImageUrl(cover.imageId, cnMode));
+        coverMap.set(cover.collectionId, {
+          full: getImageUrl(cover.imageId, cnMode),
+          md: getThumbnailUrl(cover.imageId, "md", cnMode),
+        });
       }
     }
 
@@ -124,31 +133,43 @@ export async function GET(req: NextRequest) {
     }
 
     // Format response
-    const owned = ownedCollections.map((col) => ({
-      ...col,
-      permission: PERMISSION_OWNER,
-      isOwner: true,
-      coverImageUrl: coverMap.get(col.id) || null,
-      tags: tagsMap.get(col.id) ?? [],
-    }));
+    const owned = ownedCollections.map((col) => {
+      const cover = coverMap.get(col.id);
+      return {
+        ...col,
+        permission: PERMISSION_OWNER,
+        isOwner: true,
+        coverImageUrl: cover?.full || null,
+        coverImageMdUrl: cover?.md || null,
+        tags: tagsMap.get(col.id) ?? [],
+      };
+    });
 
-    const shared = sharedCollectionsData.map((item) => ({
-      ...item.collection,
-      permission: item.permission,
-      isOwner: false,
-      sharedAt: item.sharedAt,
-      coverImageUrl: coverMap.get(item.collection.id) || null,
-      tags: tagsMap.get(item.collection.id) ?? [],
-    }));
+    const shared = sharedCollectionsData.map((item) => {
+      const cover = coverMap.get(item.collection.id);
+      return {
+        ...item.collection,
+        permission: item.permission,
+        isOwner: false,
+        sharedAt: item.sharedAt,
+        coverImageUrl: cover?.full || null,
+        coverImageMdUrl: cover?.md || null,
+        tags: tagsMap.get(item.collection.id) ?? [],
+      };
+    });
 
-    const inherited = inheritedCollections.map((item) => ({
-      ...item.collection,
-      permission: item.permission,
-      isOwner: false,
-      sharedAt: item.sharedAt,
-      coverImageUrl: coverMap.get(item.collection.id) || null,
-      tags: tagsMap.get(item.collection.id) ?? [],
-    }));
+    const inherited = inheritedCollections.map((item) => {
+      const cover = coverMap.get(item.collection.id);
+      return {
+        ...item.collection,
+        permission: item.permission,
+        isOwner: false,
+        sharedAt: item.sharedAt,
+        coverImageUrl: cover?.full || null,
+        coverImageMdUrl: cover?.md || null,
+        tags: tagsMap.get(item.collection.id) ?? [],
+      };
+    });
 
     return NextResponse.json({
       collections: [...owned, ...shared, ...inherited],

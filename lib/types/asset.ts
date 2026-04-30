@@ -8,6 +8,9 @@ export interface AssetItem {
   imageUrl: string;
   videoUrl?: string;
   audioUrl?: string;
+  /** md WebP thumbnail variant (used for grid display; only populated for images). */
+  thumbnailSmUrl?: string;
+  thumbnailMdUrl?: string;
   chatId: string | null;
   generationDetails: {
     title: string;

@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import { Card, CardBody } from "@heroui/card";
 import { Button } from "@heroui/button";
 import { Image } from "@heroui/image";
@@ -113,7 +114,11 @@ export default function AssetCard({
           </div>
         ) : (
           <Image
-            src={asset.imageUrl}
+            src={
+              asset.assetType === "image" && asset.thumbnailMdUrl
+                ? asset.thumbnailMdUrl
+                : asset.imageUrl
+            }
             alt={asset.generationDetails?.title || "Asset"}
             radius="none"
             classNames={{
@@ -121,6 +126,14 @@ export default function AssetCard({
               img: `w-full h-full object-cover transition-opacity ${isSelectionMode && isSelected ? "opacity-80" : ""}`,
             }}
             onClick={() => onClick(asset)}
+            onError={
+              ((e: React.SyntheticEvent<HTMLImageElement>) => {
+                const target = e.currentTarget;
+                if (asset.imageUrl && target.src !== asset.imageUrl) {
+                  target.src = asset.imageUrl;
+                }
+              }) as unknown as () => void
+            }
           />
         )}
 

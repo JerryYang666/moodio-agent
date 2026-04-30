@@ -50,6 +50,7 @@ type Collection = {
   createdAt: Date;
   updatedAt: Date;
   coverImageUrl?: string | null;
+  coverImageMdUrl?: string | null;
   tags?: { id: string; label: string; color: string }[];
 };
 
@@ -59,6 +60,8 @@ type Asset = {
   collectionId: string | null;
   imageId: string;
   imageUrl: string;
+  thumbnailSmUrl?: string;
+  thumbnailMdUrl?: string;
   chatId: string | null;
   generationDetails: {
     title: string;
@@ -378,7 +381,7 @@ export default function ProjectDetailPage({
               <Card key={asset.id} className="group relative">
                 <CardBody className="p-0 overflow-hidden aspect-square relative rounded-lg">
                   <Image
-                    src={asset.imageUrl}
+                    src={asset.thumbnailMdUrl || asset.imageUrl}
                     alt={asset.generationDetails.title}
                     radius="none"
                     classNames={{
@@ -386,6 +389,14 @@ export default function ProjectDetailPage({
                       img: "w-full h-full object-cover",
                     }}
                     onClick={() => handleImageClick(asset)}
+                    onError={
+                      ((e: React.SyntheticEvent<HTMLImageElement>) => {
+                        const target = e.currentTarget;
+                        if (asset.imageUrl && target.src !== asset.imageUrl) {
+                          target.src = asset.imageUrl;
+                        }
+                      }) as unknown as () => void
+                    }
                   />
                   <div className="absolute bottom-0 left-0 right-0 bg-white/90 dark:bg-black/60 text-black dark:text-white p-2 text-xs truncate opacity-0 group-hover:opacity-100 transition-opacity">
                     {asset.generationDetails.title}

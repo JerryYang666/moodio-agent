@@ -160,6 +160,7 @@ export interface CollectionItem {
   isOwner: boolean;
   sharedAt?: Date;
   coverImageUrl?: string | null;
+  coverImageMdUrl?: string | null;
   tags: CollectionTagItem[];
 }
 

@@ -4,7 +4,7 @@ import { collectionImages, collections, collectionTags, projects, projectShares,
 import { getAccessToken } from "@/lib/auth/cookies";
 import { verifyAccessToken } from "@/lib/auth/jwt";
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
-import { getImageUrl } from "@/lib/storage/s3";
+import { getImageUrl, getThumbnailUrl } from "@/lib/storage/s3";
 import { getProjectPermission } from "@/lib/project-utils";
 import { PERMISSION_OWNER, isOwner, type SharePermission } from "@/lib/permissions";
 
@@ -61,10 +61,20 @@ export async function GET(
       .orderBy(desc(collectionImages.addedAt))
       .limit(60);
 
-    const assetsWithUrls = rootAssets.map((a) => ({
-      ...a,
-      imageUrl: getImageUrl(a.imageId),
-    }));
+    const assetsWithUrls = rootAssets.map((a) => {
+      if (a.assetType === "image") {
+        return {
+          ...a,
+          imageUrl: getImageUrl(a.imageId),
+          thumbnailSmUrl: getThumbnailUrl(a.imageId, "sm"),
+          thumbnailMdUrl: getThumbnailUrl(a.imageId, "md"),
+        };
+      }
+      return {
+        ...a,
+        imageUrl: getImageUrl(a.imageId),
+      };
+    });
 
     // Get cover images for each collection (most recently added asset)
     const collectionIds = projectCollections.map((c) => c.id);
@@ -79,11 +89,14 @@ export async function GET(
           .orderBy(desc(collectionImages.addedAt))
       : [];
 
-    // Create a map of collectionId -> coverImageUrl
-    const coverMap = new Map<string, string>();
+    // Create a map of collectionId -> {coverImageUrl, coverImageMdUrl}
+    const coverMap = new Map<string, { full: string; md: string }>();
     for (const cover of coverImages) {
       if (cover.collectionId && !coverMap.has(cover.collectionId)) {
-        coverMap.set(cover.collectionId, getImageUrl(cover.imageId));
+        coverMap.set(cover.collectionId, {
+          full: getImageUrl(cover.imageId),
+          md: getThumbnailUrl(cover.imageId, "md"),
+        });
       }
     }
 
@@ -104,11 +117,15 @@ export async function GET(
     }
 
     // Add cover image URL and tags to each collection
-    const collectionsWithCovers = projectCollections.map((col) => ({
-      ...col,
-      coverImageUrl: coverMap.get(col.id) || null,
-      tags: tagsMap.get(col.id) ?? [],
-    }));
+    const collectionsWithCovers = projectCollections.map((col) => {
+      const cover = coverMap.get(col.id);
+      return {
+        ...col,
+        coverImageUrl: cover?.full || null,
+        coverImageMdUrl: cover?.md || null,
+        tags: tagsMap.get(col.id) ?? [],
+      };
+    });
 
     // Get shares if user is owner
     let shares: (ProjectShare & { email: string })[] = [];
