@@ -20,7 +20,7 @@ import type {
   CellComment,
 } from "./types";
 import { getTablePermission, getEditableGrants } from "./permissions";
-import { getImageUrl, getVideoUrl, getAudioUrl } from "@/lib/storage/s3";
+import { getImageUrl, getVideoUrl, getAudioUrl, getThumbnailUrl } from "@/lib/storage/s3";
 import { getContentUrl } from "@/lib/config/video.config";
 import { getUserSetting } from "@/lib/user-settings/server";
 
@@ -781,6 +781,15 @@ function enrichMediaAssets(
         imageUrl: undefined,
         videoUrl: undefined,
         audioUrl: a.assetId ? getAudioUrl(a.assetId, cnMode) : undefined,
+      };
+    }
+    if (a.assetType === "image") {
+      return {
+        ...a,
+        imageUrl: a.imageId ? getImageUrl(a.imageId, cnMode) : undefined,
+        videoUrl: undefined,
+        thumbnailSmUrl: a.imageId ? getThumbnailUrl(a.imageId, "sm", cnMode) : undefined,
+        thumbnailMdUrl: a.imageId ? getThumbnailUrl(a.imageId, "md", cnMode) : undefined,
       };
     }
     return {

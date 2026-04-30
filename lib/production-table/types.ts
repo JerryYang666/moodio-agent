@@ -50,6 +50,10 @@ export interface EnrichedMediaAssetRef extends MediaAssetRef {
   imageUrl?: string;
   videoUrl?: string;
   audioUrl?: string;
+  /** 384px WebP thumbnail for grid cells. Only populated for image assets. */
+  thumbnailSmUrl?: string;
+  /** 1024px WebP thumbnail for asset-picker modals. Only populated for image assets. */
+  thumbnailMdUrl?: string;
 }
 
 // ---------------------------------------------------------------------------

@@ -32,6 +32,10 @@ export type AssetSummary = {
   imageUrl: string;
   videoUrl?: string;
   audioUrl?: string;
+  /** Only populated for images. */
+  thumbnailSmUrl?: string;
+  /** Only populated for images. */
+  thumbnailMdUrl?: string;
   assetType?: "image" | "video" | "public_image" | "public_video" | "audio";
   chatId: string | null;
   generationDetails: {
@@ -118,13 +122,25 @@ const AssetGridItem = React.memo(function AssetGridItem({
             </div>
           ) : (
             <Image
-              src={asset.imageUrl}
+              src={
+                asset.assetType === "image" && asset.thumbnailMdUrl
+                  ? asset.thumbnailMdUrl
+                  : asset.imageUrl
+              }
               alt={asset.generationDetails?.title || assetAltLabel}
               radius="none"
               classNames={{
                 wrapper: "w-full h-full !max-w-full",
                 img: `w-full h-full object-cover ${multiSelect && isSelected ? "opacity-80" : ""}`,
               }}
+              onError={
+                ((e: React.SyntheticEvent<HTMLImageElement>) => {
+                  const target = e.currentTarget;
+                  if (asset.imageUrl && target.src !== asset.imageUrl) {
+                    target.src = asset.imageUrl;
+                  }
+                }) as unknown as () => void
+              }
             />
           )}
         </button>

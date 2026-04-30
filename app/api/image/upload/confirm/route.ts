@@ -76,6 +76,12 @@ export async function POST(request: NextRequest) {
           compressThreshold
         );
         if (compressed.buffer !== imageBuffer) {
+          // Note: this second PUT re-triggers the image-thumbnail Lambda via
+          // the S3 ObjectCreated event on images/*. Thumbnails are key-
+          // deterministic so the second run safely overwrites the first with
+          // variants derived from the compressed WebP. Accepted cost for now;
+          // a future cleanup could move compression into the Lambda itself so
+          // the original PUT is the only write.
           await replaceImage(imageId, compressed.buffer, compressed.contentType);
           wasCompressed = true;
         }

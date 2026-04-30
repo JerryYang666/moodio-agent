@@ -4,7 +4,7 @@ import { collectionImages } from "@/lib/db/schema";
 import { getAccessToken } from "@/lib/auth/cookies";
 import { verifyAccessToken } from "@/lib/auth/jwt";
 import { eq } from "drizzle-orm";
-import { getImageUrl, getAudioUrl } from "@/lib/storage/s3";
+import { getImageUrl, getAudioUrl, getThumbnailUrl } from "@/lib/storage/s3";
 import { getContentUrl } from "@/lib/config/video.config";
 import { getUserPermission } from "@/lib/collection-utils";
 import { getProjectPermission } from "@/lib/project-utils";
@@ -59,7 +59,14 @@ export async function GET(
       ? { ...asset, imageUrl: "", audioUrl: getAudioUrl(asset.assetId, cnMode) }
       : asset.assetType === "public_image"
         ? { ...asset, imageUrl: getContentUrl(asset.assetId, cnMode) }
-        : { ...asset, imageUrl: getImageUrl(asset.imageId, cnMode) };
+        : asset.assetType === "image"
+          ? {
+              ...asset,
+              imageUrl: getImageUrl(asset.imageId, cnMode),
+              thumbnailSmUrl: getThumbnailUrl(asset.imageId, "sm", cnMode),
+              thumbnailMdUrl: getThumbnailUrl(asset.imageId, "md", cnMode),
+            }
+          : { ...asset, imageUrl: getImageUrl(asset.imageId, cnMode) };
 
     return NextResponse.json({ asset: enriched });
   } catch (error) {

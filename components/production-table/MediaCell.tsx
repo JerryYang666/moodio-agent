@@ -201,6 +201,8 @@ export const MediaCell = memo(function MediaCell({
         imageUrl: asset.imageUrl,
         videoUrl: asset.videoUrl,
         audioUrl: asset.audioUrl,
+        thumbnailSmUrl: asset.thumbnailSmUrl,
+        thumbnailMdUrl: asset.thumbnailMdUrl,
       };
       onAddAsset(ref);
       setPickerOpen(false);
@@ -218,6 +220,8 @@ export const MediaCell = memo(function MediaCell({
           imageUrl: a.imageUrl,
           videoUrl: a.videoUrl,
           audioUrl: a.audioUrl,
+          thumbnailSmUrl: a.thumbnailSmUrl,
+          thumbnailMdUrl: a.thumbnailMdUrl,
         });
       }
       setPickerOpen(false);
@@ -448,7 +452,19 @@ export const MediaCell = memo(function MediaCell({
                   className="object-cover rounded cursor-pointer"
                   height={40}
                   width={40}
-                  src={asset.imageUrl}
+                  src={
+                    asset.assetType === "image" && asset.thumbnailSmUrl
+                      ? asset.thumbnailSmUrl
+                      : asset.imageUrl
+                  }
+                  onError={
+                    ((e: React.SyntheticEvent<HTMLImageElement>) => {
+                      const target = e.currentTarget;
+                      if (asset.imageUrl && target.src !== asset.imageUrl) {
+                        target.src = asset.imageUrl;
+                      }
+                    }) as unknown as () => void
+                  }
                   onClick={() => setPreviewIndex(idx)}
                 />
               </div>

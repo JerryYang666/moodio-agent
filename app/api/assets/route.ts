@@ -9,7 +9,7 @@ import {
 import { getAccessToken } from "@/lib/auth/cookies";
 import { verifyAccessToken } from "@/lib/auth/jwt";
 import { and, desc, eq, inArray, isNull, or } from "drizzle-orm";
-import { getImageUrl, getVideoUrl, getAudioUrl } from "@/lib/storage/s3";
+import { getImageUrl, getVideoUrl, getAudioUrl, getThumbnailUrl } from "@/lib/storage/s3";
 import { getContentUrl } from "@/lib/config/video.config";
 import { ensureDefaultProject } from "@/lib/db/projects";
 import { getUserPermission } from "@/lib/collection-utils";
@@ -32,7 +32,11 @@ function enrichAssetUrls(asset: { assetType: string; imageId: string; assetId: s
   if (asset.assetType === "video") {
     return { imageUrl, videoUrl: getVideoUrl(asset.assetId, cnMode) };
   }
-  return { imageUrl };
+  return {
+    imageUrl,
+    thumbnailSmUrl: getThumbnailUrl(asset.imageId, "sm", cnMode),
+    thumbnailMdUrl: getThumbnailUrl(asset.imageId, "md", cnMode),
+  };
 }
 
 function parseLimit(value: string | null, fallback: number) {
@@ -317,6 +321,8 @@ export async function POST(req: NextRequest) {
       asset: {
         ...created,
         imageUrl: getImageUrl(created.imageId, cnModePost),
+        thumbnailSmUrl: getThumbnailUrl(created.imageId, "sm", cnModePost),
+        thumbnailMdUrl: getThumbnailUrl(created.imageId, "md", cnModePost),
       },
     });
   } catch (error) {
