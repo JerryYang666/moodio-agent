@@ -157,15 +157,9 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   }, [fetchChats]);
 
   const monitorChat = useCallback((chatId: string, startCount: number) => {
-    // Only monitor if we have permission or might get it (don't spam if denied)
-    try {
-      if ("Notification" in window && Notification.permission === "denied")
-        return;
-    } catch (e) {
-      // Ignore potential errors accessing Notification API
-      console.warn("Error checking notification permission:", e);
-    }
-
+    // Always monitor: even when notifications are denied we still need to
+    // poll so the chat page can recover a wedged SSE stream by detecting
+    // server-side completion. The notification branch below gates itself.
     setMonitoredChats((prev) => ({
       ...prev,
       [chatId]: startCount,
@@ -206,6 +200,19 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
             if (currentCount > startCount) {
               // Generation finished!
+
+              // Always notify the open chat UI so it can recover a wedged
+              // SSE stream by re-fetching persisted history. The chat
+              // interface decides whether the recovery is actually needed.
+              try {
+                window.dispatchEvent(
+                  new CustomEvent("chat-generation-complete", {
+                    detail: { chatId },
+                  })
+                );
+              } catch (e) {
+                console.warn("Error dispatching chat-generation-complete:", e);
+              }
 
               const isChatPage = pathname === `/chat/${chatId}`;
               const isHidden = document.hidden;
