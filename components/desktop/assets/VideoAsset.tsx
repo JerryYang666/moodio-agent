@@ -9,9 +9,11 @@ import { useVideo } from "@/components/video-provider";
 import FakeProgressBar from "@/components/video/fake-progress-bar";
 import VideoStatusOverlay from "@/components/video/video-status-overlay";
 import type { VideoGenerationStatus } from "@/components/video-provider";
+import CanvasAssetImage from "./CanvasAssetImage";
 
 interface VideoAssetProps {
   asset: EnrichedDesktopAsset;
+  containerWidth: number;
   playing?: boolean;
   onPlayToggle?: () => void;
   onImageLoad: (
@@ -25,6 +27,7 @@ interface VideoAssetProps {
 
 export default function VideoAsset({
   asset,
+  containerWidth,
   playing,
   onPlayToggle,
   onImageLoad,
@@ -114,15 +117,12 @@ export default function VideoAsset({
 
   return (
     <>
-      <img
-        src={src!}
+      <CanvasAssetImage
+        asset={asset}
+        containerWidth={containerWidth}
+        zoom={zoom}
         alt={meta.title || t("videoTitle")}
-        draggable={false}
-        className="w-full h-full object-contain"
-        onLoad={(e) => {
-          const img = e.currentTarget;
-          onImageLoad(asset.id, img.naturalWidth, img.naturalHeight);
-        }}
+        onImageLoad={onImageLoad}
       />
 
       {/* Processing / pending / failed overlay */}

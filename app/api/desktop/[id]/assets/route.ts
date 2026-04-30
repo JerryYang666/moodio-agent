@@ -7,7 +7,7 @@ import { eq, desc, inArray, and } from "drizzle-orm";
 import { getDesktopPermission } from "@/lib/desktop/permissions";
 import { hasWriteAccess } from "@/lib/permissions";
 import { validateAssetMetadata } from "@/lib/desktop/types";
-import { getImageUrl, getVideoUrl, getAudioUrl } from "@/lib/storage/s3";
+import { getImageUrl, getVideoUrl, getAudioUrl, getThumbnailUrl } from "@/lib/storage/s3";
 import { getContentUrl } from "@/lib/config/video.config";
 import { getUserSetting } from "@/lib/user-settings/server";
 
@@ -126,6 +126,8 @@ export async function GET(
       return {
         ...asset,
         imageUrl: imageId ? getImageUrl(imageId, cnMode) : null,
+        thumbnailSmUrl: imageId ? getThumbnailUrl(imageId, "sm", cnMode) : null,
+        thumbnailMdUrl: imageId ? getThumbnailUrl(imageId, "md", cnMode) : null,
         videoUrl: asset.assetType === "video" && videoId ? getVideoUrl(videoId, cnMode) : null,
         generationData,
       };
@@ -272,6 +274,8 @@ export async function POST(
       return {
         ...asset,
         imageUrl: imgId ? getImageUrl(imgId, cnMode) : null,
+        thumbnailSmUrl: imgId ? getThumbnailUrl(imgId, "sm", cnMode) : null,
+        thumbnailMdUrl: imgId ? getThumbnailUrl(imgId, "md", cnMode) : null,
         videoUrl: asset.assetType === "video" && vidId ? getVideoUrl(vidId, cnMode) : null,
       };
     });

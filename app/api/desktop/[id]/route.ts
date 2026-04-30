@@ -13,7 +13,7 @@ import { getAccessToken } from "@/lib/auth/cookies";
 import { verifyAccessToken } from "@/lib/auth/jwt";
 import { eq, desc, inArray } from "drizzle-orm";
 import { getDesktopPermission } from "@/lib/desktop/permissions";
-import { getImageUrl, getVideoUrl } from "@/lib/storage/s3";
+import { getImageUrl, getVideoUrl, getThumbnailUrl } from "@/lib/storage/s3";
 import { getContentUrl, getVideoUrl as getPublicVideoUrl } from "@/lib/config/video.config";
 import { getUserSetting } from "@/lib/user-settings/server";
 
@@ -128,6 +128,8 @@ export async function GET(
       return {
         ...asset,
         imageUrl: imageId ? getImageUrl(imageId, cnMode) : null,
+        thumbnailSmUrl: imageId ? getThumbnailUrl(imageId, "sm", cnMode) : null,
+        thumbnailMdUrl: imageId ? getThumbnailUrl(imageId, "md", cnMode) : null,
         videoUrl: asset.assetType === "video" && videoId ? getVideoUrl(videoId, cnMode) : null,
         generationData,
       };
