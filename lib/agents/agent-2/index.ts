@@ -2,8 +2,9 @@ import { Agent, AgentResponse, ParallelAgentResponse } from "../types";
 import { Message, MessageContentPart, DEFAULT_LLM_MODEL } from "@/lib/llm/types";
 import { ImageQuality, ImageSize } from "@/lib/image/types";
 import OpenAI from "openai";
-import { downloadImage } from "@/lib/storage/s3";
 import { siteConfig } from "@/config/site";
+import { createImageInputPreparer } from "@/lib/image/prepare-inputs";
+import { getImageModel } from "@/lib/image/models";
 
 import {
   RequestContext,
@@ -125,19 +126,16 @@ export class Agent2 implements Agent {
           }
         };
 
-        // Pre-fetch image base64 data
+        // Lazily prepare reference images for the active provider. Nothing
+        // is downloaded or uploaded until the first image-generation handler
+        // calls into the preparer; from then on the work is memoised across
+        // the rest of the request.
         const pendingImageIds = imageIds || [];
         const referenceImages: ReferenceImageEntry[] = []; // Passed from route handler in parallel mode
         const referenceImageIds = referenceImages.map((ref) => ref.imageId);
         const allImageIds = [...pendingImageIds, ...referenceImageIds];
-        const imageBase64Promises = allImageIds.map((id) =>
-          downloadImage(id).then((buf) => buf?.toString("base64"))
-        );
-
-        console.log(
-          "[Perf] %s image base64 downloads started [%sms]",
-          allImageIds.length,
-          Date.now() - startTime
+        const imageInputPreparer = createImageInputPreparer(
+          imageModelId ? getImageModel(imageModelId)?.provider : undefined
         );
 
         // Create request context
@@ -150,7 +148,7 @@ export class Agent2 implements Agent {
           accountType,
           performedBy,
           imageIds: allImageIds,
-          imageBase64Promises,
+          imageInputPreparer,
           referenceImages,
           precisionEditing,
           aspectRatioOverride,
@@ -251,21 +249,15 @@ export class Agent2 implements Agent {
       Date.now() - startTime
     );
 
-    // Pre-fetch image base64 data (shared across all variants)
+    // Lazy, shared image-input preparer for all variants. The first variant
+    // that hits an image-generation tool kicks off the work; the rest reuse
+    // the cached promises. Nothing happens here for chat-only turns.
     const pendingImageIds = imageIds || [];
     const refImages = referenceImages || [];
     const referenceImageIds = refImages.map((ref) => ref.imageId);
     const allImageIds = [...pendingImageIds, ...referenceImageIds];
-    const imageBase64Promises = allImageIds.map((id) =>
-      downloadImage(id).then((buf) => buf?.toString("base64"))
-    );
-
-    console.log(
-      "[Perf] %s image base64 downloads started (%s pending + %s reference) [%sms]",
-      allImageIds.length,
-      pendingImageIds.length,
-      referenceImageIds.length,
-      Date.now() - startTime
+    const imageInputPreparer = createImageInputPreparer(
+      imageModelId ? getImageModel(imageModelId)?.provider : undefined
     );
 
     const effectiveMaxSuggestions = maxImageQuantity
@@ -314,7 +306,7 @@ export class Agent2 implements Agent {
               performedBy,
               cnMode,
               imageIds: allImageIds,
-              imageBase64Promises,
+              imageInputPreparer,
               referenceImages: refImages,
               persistentTextChunk,
               precisionEditing,

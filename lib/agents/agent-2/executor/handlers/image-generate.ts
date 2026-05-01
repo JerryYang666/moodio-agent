@@ -4,7 +4,6 @@ import { ToolHandler, ToolResult } from "../tool-executor";
 import { ParsedTag } from "../../core/output-parser";
 import { RequestContext } from "../../context";
 import {
-  downloadImage,
   uploadImage,
   getSignedImageUrl,
   generateImageId,
@@ -195,40 +194,34 @@ export class ImageGenerateHandler implements ToolHandler {
     const imageSize: ImageSize = ctx.imageSizeOverride || "2k";
     const imageQuality: ImageQuality | undefined = ctx.imageQualityOverride;
 
-    // Await all image base64 data (user-provided images)
-    const imageBase64Data = await Promise.all(ctx.imageBase64Promises);
-    const validImageBase64: string[] = imageBase64Data.filter(
-      (data): data is string => data !== undefined
-    );
-
-    // If user provided no images, check if the agent specified referenceImageIds
+    // Pick the reference image set: user-provided ids take precedence;
+    // otherwise honour the agent's per-suggestion picks.
+    const userImageIds = ctx.imageIds;
     const agentReferenceImageIds: string[] =
-      validImageBase64.length === 0 && Array.isArray(suggestion.referenceImageIds)
-        ? suggestion.referenceImageIds.filter((id: unknown): id is string => typeof id === "string" && id.length > 0)
+      userImageIds.length === 0 && Array.isArray(suggestion.referenceImageIds)
+        ? suggestion.referenceImageIds.filter(
+            (id: unknown): id is string => typeof id === "string" && id.length > 0
+          )
         : [];
+    const effectiveImageIds =
+      userImageIds.length > 0 ? userImageIds : agentReferenceImageIds;
 
-    let agentReferenceBase64: string[] = [];
-    if (agentReferenceImageIds.length > 0) {
-      const agentImageData: (string | undefined)[] = await Promise.all(
-        agentReferenceImageIds.map((id: string) =>
-          downloadImage(id).then((buf) => buf?.toString("base64"))
-        )
+    const useImageEditing = effectiveImageIds.length > 0;
+    // Triggers the per-request shared download / KIE re-upload on the first
+    // call of the request; subsequent variants and suggestions in the same
+    // request reuse the cached promises and add no S3/KIE traffic.
+    const preparedInputs = useImageEditing
+      ? await ctx.imageInputPreparer.prepareEditInputs(effectiveImageIds)
+      : {};
+    if (
+      useImageEditing &&
+      userImageIds.length === 0 &&
+      agentReferenceImageIds.length > 0
+    ) {
+      console.log(
+        `[Agent-2] Using ${agentReferenceImageIds.length} agent-specified reference image(s) for editing`
       );
-      agentReferenceBase64 = agentImageData.filter(
-        (data): data is string => data !== undefined
-      );
-      if (agentReferenceBase64.length > 0) {
-        console.log(
-          `[Agent-2] Using ${agentReferenceBase64.length} agent-specified reference image(s) for editing`
-        );
-      }
     }
-
-    // Use user images if available, otherwise fall back to agent-specified reference images
-    const effectiveImageBase64 = validImageBase64.length > 0 ? validImageBase64 : agentReferenceBase64;
-    const effectiveImageIds = validImageBase64.length > 0 ? ctx.imageIds : agentReferenceImageIds;
-
-    const useImageEditing = effectiveImageBase64.length > 0;
 
     const modelId = ctx.imageModelId;
 
@@ -256,12 +249,13 @@ export class ImageGenerateHandler implements ToolHandler {
 
     if (useImageEditing) {
       console.log(
-        `[Agent-2] Using image editing mode with ${effectiveImageBase64.length} image(s)`
+        `[Agent-2] Using image editing mode with ${effectiveImageIds.length} image(s)`
       );
       result = await editImageWithModel(modelId, {
         prompt: suggestion.prompt,
         imageIds: effectiveImageIds,
-        imageBase64: effectiveImageBase64,
+        imageBase64: preparedInputs.imageBase64,
+        imageInputUrls: preparedInputs.imageInputUrls,
         aspectRatio,
         userAspectRatio,
         imageSize,

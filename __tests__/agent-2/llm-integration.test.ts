@@ -106,6 +106,7 @@ vi.mock("@/lib/agents/taxonomy-tool", () => ({
 import OpenAI from "openai";
 import { MessageContentPart, DEFAULT_LLM_MODEL, Message } from "@/lib/llm/types";
 import { StreamEvent, createRequestContext, RequestContext } from "@/lib/agents/agent-2/context";
+import { createImageInputPreparer } from "@/lib/image/prepare-inputs";
 import { ToolRegistry } from "@/lib/agents/agent-2/tools/registry";
 import { SystemPromptConstructor } from "@/lib/agents/agent-2/core/system-prompt";
 import { InputParser } from "@/lib/agents/agent-2/core/input-parser";
@@ -175,6 +176,7 @@ async function runPipeline(
     userId: "test-user",
     isAdmin: true,
     requestStartTime: Date.now(),
+    imageInputPreparer: createImageInputPreparer(undefined),
     send: (event: StreamEvent) => events.push(event),
   });
 

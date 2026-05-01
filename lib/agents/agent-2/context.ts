@@ -1,6 +1,7 @@
 import { ImageQuality, ImageSize } from "@/lib/image/types";
 import { MessageContentPart } from "@/lib/llm/types";
 import type { AccountType } from "@/lib/credits";
+import type { ImageInputPreparer } from "@/lib/image/prepare-inputs";
 
 /** Reference image with tag for context */
 export interface ReferenceImageEntry {
@@ -38,7 +39,13 @@ export interface RequestContext {
 
   // User-provided images
   imageIds: string[];
-  imageBase64Promises: Promise<string | undefined>[];
+  /**
+   * Lazy, per-request, per-image-id memoised preparer for the active image
+   * provider. The first image-generation trigger starts the underlying
+   * downloads / KIE uploads; subsequent triggers within the same request
+   * reuse the cached promises.
+   */
+  imageInputPreparer: ImageInputPreparer;
   referenceImages: ReferenceImageEntry[];
 
   // Persistent chat context
@@ -86,7 +93,7 @@ export interface CreateRequestContextInput {
   performedBy?: string;
   cnMode?: boolean;
   imageIds?: string[];
-  imageBase64Promises?: Promise<string | undefined>[];
+  imageInputPreparer: ImageInputPreparer;
   referenceImages?: ReferenceImageEntry[];
   persistentTextChunk?: string;
   precisionEditing?: boolean;
@@ -155,7 +162,7 @@ export function createRequestContext(input: CreateRequestContextInput): RequestC
     effectivePerformedBy: input.performedBy || input.userId,
     cnMode: input.cnMode || false,
     imageIds: input.imageIds || [],
-    imageBase64Promises: input.imageBase64Promises || [],
+    imageInputPreparer: input.imageInputPreparer,
     referenceImages: input.referenceImages || [],
     persistentTextChunk: input.persistentTextChunk || "",
     precisionEditing: input.precisionEditing || false,
