@@ -81,6 +81,12 @@ async function idToFile(imageId: string, index: number) {
   return await toFile(buffer, `image-${index}.png`, { type: "image/png" });
 }
 
+async function base64ToFile(base64: string, index: number) {
+  return await toFile(Buffer.from(base64, "base64"), `image-${index}.png`, {
+    type: "image/png",
+  });
+}
+
 export async function generateWithOpenAI(
   modelId: string,
   input: ImageGenerationInput
@@ -126,11 +132,18 @@ export async function editWithOpenAI(
   const quality = mapOpenAIQuality(input.quality);
 
   const imageIds = input.imageIds || [];
-  if (imageIds.length === 0) {
-    throw new Error("OpenAI edit requires imageIds");
+  const prefetchedBase64 = input.imageBase64?.filter(
+    (s): s is string => typeof s === "string" && s.length > 0
+  ) ?? [];
+  if (imageIds.length === 0 && prefetchedBase64.length === 0) {
+    throw new Error("OpenAI edit requires imageIds or imageBase64");
   }
 
-  const files = await Promise.all(imageIds.map((id, i) => idToFile(id, i)));
+  // Prefer caller-supplied base64 to avoid a second S3 round-trip when the
+  // route already downloaded the references.
+  const files = prefetchedBase64.length > 0
+    ? await Promise.all(prefetchedBase64.map((b64, i) => base64ToFile(b64, i)))
+    : await Promise.all(imageIds.map((id, i) => idToFile(id, i)));
 
   const response = await client.images.edit({
     model: modelId,

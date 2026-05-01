@@ -12,7 +12,6 @@ import {
   getSignedVideoUrl,
   getSignedAudioUrl,
   generateImageId,
-  downloadImage,
 } from "@/lib/storage/s3";
 import { getUserSettingsMulti } from "@/lib/user-settings/server";
 import { createLLMClient } from "@/lib/llm/client";
@@ -25,6 +24,8 @@ import {
   editImageWithModel,
 } from "@/lib/image/service";
 import { ImageSize } from "@/lib/image/types";
+import { getImageModel } from "@/lib/image/models";
+import { createImageInputPreparer } from "@/lib/image/prepare-inputs";
 import { calculateCost, parseImageSizeToNumber, parseImageQualityToNumber } from "@/lib/pricing";
 import { deductCredits, getUserBalance, assertSufficientCredits, InsufficientCreditsError, getActiveAccount } from "@/lib/credits";
 import { classifyImageError } from "@/lib/image/error-classify";
@@ -550,6 +551,16 @@ export async function POST(
       const variantId = `variant-0-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
       const numImages = imageQuantity || 1;
 
+      // Per-request, per-image-id memoised preparer for the active provider:
+      //   google/openai → download + base64 once
+      //   kie           → ingest into KIE temp storage once
+      //   fal / no refs → no work
+      // All N parallel variants and all retry attempts go through the same
+      // preparer, so reference images are fetched / re-uploaded at most once
+      // per request even when the user asks for several variants.
+      const imageProvider = getImageModel(imageModelId ?? "")?.provider;
+      const imageInputPreparer = createImageInputPreparer(imageProvider);
+
       // Generate a concise title from the prompt using LLM
       let baseTitle = content?.slice(0, 50) || "Image";
       try {
@@ -675,32 +686,33 @@ export async function POST(
                       }
 
                       if (imageIds.length > 0) {
-                        const imageBase64Data = await Promise.all(
-                          imageIds.map(async (imgId) => {
-                            try {
-                              const buf = await downloadImage(imgId);
-                              return buf ? buf.toString("base64") : undefined;
-                            } catch {
-                              return undefined;
-                            }
-                          })
-                        );
-                        const validImageBase64 = imageBase64Data.filter(
-                          (data): data is string => data !== undefined
-                        );
+                        // First call kicks off the shared download / KIE
+                        // upload; subsequent variants and retries reuse the
+                        // cached promises and add no S3 / KIE traffic.
+                        const prepared =
+                          await imageInputPreparer.prepareEditInputs(imageIds);
 
-                        if (validImageBase64.length > 0) {
-                          result = await editImageWithModel(imageModelId, {
+                        if (
+                          (imageProvider === "google" ||
+                            imageProvider === "openai") &&
+                          (!prepared.imageBase64 ||
+                            prepared.imageBase64.length === 0)
+                        ) {
+                          // Bytes-needing provider but every download failed.
+                          // Degrade to text-to-image instead of calling edit
+                          // with no reference data.
+                          result = await generateImageWithModel(imageModelId, {
                             prompt: content,
-                            imageIds,
-                            imageBase64: validImageBase64,
                             aspectRatio: aspectRatioOverride,
                             imageSize: imageSizeOverride,
                             quality: imageQualityOverride,
                           });
                         } else {
-                          result = await generateImageWithModel(imageModelId, {
+                          result = await editImageWithModel(imageModelId, {
                             prompt: content,
+                            imageIds,
+                            imageBase64: prepared.imageBase64,
+                            imageInputUrls: prepared.imageInputUrls,
                             aspectRatio: aspectRatioOverride,
                             imageSize: imageSizeOverride,
                             quality: imageQualityOverride,

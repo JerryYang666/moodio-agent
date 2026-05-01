@@ -25,6 +25,14 @@ export interface ImageEditInput {
   prompt: string;
   imageIds?: string[];
   imageBase64?: string[];
+  /**
+   * Provider-prepared input URLs the caller has already ingested into the
+   * provider's storage. KIE consumes these directly as `image_input`,
+   * skipping its own per-call re-upload. Other providers ignore this.
+   * The caller is responsible for ensuring they're aligned with `imageIds`
+   * and produced through the right helper (e.g. `reuploadArrayForKie`).
+   */
+  imageInputUrls?: string[];
   /** See ImageGenerationInput.aspectRatio. */
   aspectRatio?: string;
   /** See ImageGenerationInput.userAspectRatio. */

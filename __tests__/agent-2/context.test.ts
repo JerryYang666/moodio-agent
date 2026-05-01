@@ -1,13 +1,17 @@
 import { describe, it, expect, vi } from "vitest";
 import { createRequestContext } from "@/lib/agents/agent-2/context";
+import { createImageInputPreparer } from "@/lib/image/prepare-inputs";
 
 describe("createRequestContext", () => {
   const baseSend = vi.fn();
+  const makePreparer = () => createImageInputPreparer(undefined);
 
   it("creates a context with all defaults", () => {
+    const preparer = makePreparer();
     const ctx = createRequestContext({
       userId: "user-1",
       isAdmin: false,
+      imageInputPreparer: preparer,
       send: baseSend,
     });
 
@@ -15,7 +19,7 @@ describe("createRequestContext", () => {
     expect(ctx.isAdmin).toBe(false);
     expect(ctx.requestStartTime).toBeGreaterThan(0);
     expect(ctx.imageIds).toEqual([]);
-    expect(ctx.imageBase64Promises).toEqual([]);
+    expect(ctx.imageInputPreparer).toBe(preparer);
     expect(ctx.referenceImages).toEqual([]);
     expect(ctx.precisionEditing).toBe(false);
     expect(ctx.aspectRatioOverride).toBeUndefined();
@@ -31,6 +35,7 @@ describe("createRequestContext", () => {
       userId: "user-1",
       isAdmin: false,
       aspectRatioOverride: "16:9",
+      imageInputPreparer: makePreparer(),
       send: baseSend,
     });
     expect(ctx.aspectRatioOverride).toBe("16:9");
@@ -41,6 +46,7 @@ describe("createRequestContext", () => {
       userId: "user-1",
       isAdmin: false,
       aspectRatioOverride: "7:3",
+      imageInputPreparer: makePreparer(),
       send: baseSend,
     });
     expect(ctx.aspectRatioOverride).toBeUndefined();
@@ -51,6 +57,7 @@ describe("createRequestContext", () => {
       userId: "user-1",
       isAdmin: false,
       imageSizeOverride: "4k",
+      imageInputPreparer: makePreparer(),
       send: baseSend,
     });
     expect(ctx.imageSizeOverride).toBe("4k");
@@ -61,13 +68,14 @@ describe("createRequestContext", () => {
       userId: "user-1",
       isAdmin: false,
       imageSizeOverride: "8k" as any,
+      imageInputPreparer: makePreparer(),
       send: baseSend,
     });
     expect(ctx.imageSizeOverride).toBeUndefined();
   });
 
   it("passes through all provided fields", () => {
-    const imageBase64Promises = [Promise.resolve("base64data")];
+    const preparer = makePreparer();
     const referenceImages = [{ imageId: "ref-1", tag: "style" as const }];
 
     const ctx = createRequestContext({
@@ -75,7 +83,7 @@ describe("createRequestContext", () => {
       isAdmin: true,
       requestStartTime: 12345,
       imageIds: ["img-1"],
-      imageBase64Promises,
+      imageInputPreparer: preparer,
       referenceImages,
       precisionEditing: true,
       aspectRatioOverride: "1:1",
@@ -90,7 +98,7 @@ describe("createRequestContext", () => {
     expect(ctx.isAdmin).toBe(true);
     expect(ctx.requestStartTime).toBe(12345);
     expect(ctx.imageIds).toEqual(["img-1"]);
-    expect(ctx.imageBase64Promises).toBe(imageBase64Promises);
+    expect(ctx.imageInputPreparer).toBe(preparer);
     expect(ctx.referenceImages).toEqual(referenceImages);
     expect(ctx.precisionEditing).toBe(true);
     expect(ctx.aspectRatioOverride).toBe("1:1");

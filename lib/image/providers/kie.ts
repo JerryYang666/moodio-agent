@@ -176,8 +176,21 @@ export async function editWithKie(
     throw new Error("KIE edit requires imageIds");
   }
 
-  const signedUrls = imageIds.map((id) => getSignedImageUrl(id));
-  const imageInput = await reuploadArrayForKie(signedUrls, "moodio/image-inputs", { allowWebp: true });
+  // Prefer caller-prepared KIE inputs to avoid re-running the per-image
+  // file-url-upload for every parallel variant. The route hoists this work
+  // outside the variant loop so KIE only ingests each reference image once
+  // per request.
+  const callerImageInput = input.imageInputUrls?.filter(
+    (u): u is string => typeof u === "string" && u.length > 0
+  );
+  const imageInput =
+    callerImageInput && callerImageInput.length > 0
+      ? callerImageInput
+      : await reuploadArrayForKie(
+          imageIds.map((id) => getSignedImageUrl(id)),
+          "moodio/image-inputs",
+          { allowWebp: true }
+        );
 
   const taskId = await createTask(modelId, {
     prompt: input.prompt,

@@ -4,6 +4,7 @@ import { ToolRegistry } from "@/lib/agents/agent-2/tools/registry";
 import { ToolDefinition } from "@/lib/agents/agent-2/tools/types";
 import { ParsedTag } from "@/lib/agents/agent-2/core/output-parser";
 import { createRequestContext, RequestContext } from "@/lib/agents/agent-2/context";
+import { createImageInputPreparer } from "@/lib/image/prepare-inputs";
 
 const makeTool = (name: string, tag: string): ToolDefinition => ({
   name,
@@ -18,6 +19,7 @@ function makeCtx(): RequestContext {
   return createRequestContext({
     userId: "user-1",
     isAdmin: false,
+    imageInputPreparer: createImageInputPreparer(undefined),
     send: vi.fn(),
   });
 }
