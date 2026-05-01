@@ -78,14 +78,18 @@ export async function inferExtension(url: string): Promise<string> {
  * Upload an external URL to KIE's temp storage so the task API
  * receives a URL it can reliably resolve the file type from.
  * URLs already hosted on KIE's temp storage are passed through as-is.
+ *
+ * `knownExt` lets callers that have already resolved the extension
+ * (e.g. via `ensureKieSupportedFormat`) skip a redundant HEAD request.
  */
 export async function uploadToKie(
   url: string,
-  uploadPath = "moodio/inputs"
+  uploadPath = "moodio/inputs",
+  knownExt?: string
 ): Promise<string> {
   if (url.includes("redpandaai.co")) return url;
 
-  const ext = await inferExtension(url);
+  const ext = knownExt ?? (await inferExtension(url));
   const fileName = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}${ext}`;
 
   console.log(
@@ -133,15 +137,20 @@ const KIE_FORMAT_PROFILES: Record<KieFormatProfile, Set<string>> = {
  * Ensure an image URL is in a format KIE accepts.
  * Uses named format profiles to determine supported extensions.
  * Unsupported formats are converted to JPEG via sharp.
+ *
+ * Returns both the resolved URL and the resolved extension so callers
+ * (e.g. `reuploadForKie`) can forward the extension to `uploadToKie`
+ * without HEAD'ing the URL a second time. Our S3 keys have no extension,
+ * so without this the same CloudFront URL is HEAD'd twice per image.
  */
 export async function ensureKieSupportedFormat(
   url: string,
   { allowWebp = false, formatProfile }: { allowWebp?: boolean; formatProfile?: KieFormatProfile } = {}
-): Promise<string> {
+): Promise<{ url: string; ext: string }> {
   const ext = await inferExtension(url);
   const profile = formatProfile ?? (allowWebp ? "extended" : "default");
   const supported = KIE_FORMAT_PROFILES[profile];
-  if (supported.has(ext)) return url;
+  if (supported.has(ext)) return { url, ext };
 
   console.log(
     `[KIE Upload] Converting ${ext} image to JPEG for KIE compatibility`
@@ -157,7 +166,7 @@ export async function ensureKieSupportedFormat(
     .keepIccProfile()
     .toBuffer();
   const imageId = await uploadTempImage(jpegBuffer, "image/jpeg");
-  return getSignedTempImageUrl(imageId);
+  return { url: getSignedTempImageUrl(imageId), ext: ".jpg" };
 }
 
 /**
@@ -168,8 +177,8 @@ export async function reuploadForKie(
   uploadPath = "moodio/inputs",
   { allowWebp = false, formatProfile }: { allowWebp?: boolean; formatProfile?: KieFormatProfile } = {}
 ): Promise<string> {
-  const converted = await ensureKieSupportedFormat(url, { allowWebp, formatProfile });
-  return uploadToKie(converted, uploadPath);
+  const { url: converted, ext } = await ensureKieSupportedFormat(url, { allowWebp, formatProfile });
+  return uploadToKie(converted, uploadPath, ext);
 }
 
 /**
@@ -183,5 +192,5 @@ export async function reuploadArrayForKie(
   const converted = await Promise.all(
     urls.map((u) => ensureKieSupportedFormat(u, { allowWebp, formatProfile }))
   );
-  return Promise.all(converted.map((u) => uploadToKie(u, uploadPath)));
+  return Promise.all(converted.map(({ url, ext }) => uploadToKie(url, uploadPath, ext)));
 }
