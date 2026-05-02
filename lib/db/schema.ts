@@ -151,6 +151,17 @@ export const folders = pgTable("folders", {
   path: text("path").notNull(),
   depth: integer("depth").notNull().default(0),
   sortOrder: integer("sort_order").notNull().default(0),
+  // Group fields: a folder is a "group" (抽卡组) iff modality is non-null.
+  // Plain folders leave these null/default.
+  modality: varchar("modality", { length: 16 }), // null = regular folder; "image" | "video" = group
+  coverImageId: uuid("cover_image_id").references(
+    (): AnyPgColumn => collectionImages.id,
+    { onDelete: "set null" }
+  ),
+  defaultGenerationConfig: jsonb("default_generation_config")
+    .$type<Record<string, unknown>>()
+    .notNull()
+    .default({}),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -182,6 +193,8 @@ export const collectionImages = pgTable("collection_images", {
   chatId: uuid("chat_id").references(() => chats.id, { onDelete: "set null" }), // Which chat this image came from
   generationDetails: jsonb("generation_details").notNull(), // Prompt, title, status, etc.
   rating: integer("rating"), // 1-5 star rating, null = unrated
+  // Group triage status. Only meaningful when folderId points to a folder with modality set.
+  groupStatus: varchar("group_status", { length: 16 }), // null | "candidate" | "good" | "final"
   addedAt: timestamp("added_at").defaultNow().notNull(),
 });
 
@@ -300,6 +313,11 @@ export const videoGenerations = pgTable("video_generations", {
   params: jsonb("params").notNull(),
   error: text("error"),
   seed: bigint("seed", { mode: "number" }),
+  // When set, the webhook attaches the resulting video as a member of this folder
+  // (only meaningful when the folder is a video group).
+  targetFolderId: uuid("target_folder_id").references(() => folders.id, {
+    onDelete: "set null",
+  }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   completedAt: timestamp("completed_at"),
 });

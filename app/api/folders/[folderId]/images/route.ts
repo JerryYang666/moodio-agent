@@ -10,6 +10,7 @@ import {
   touchFolder,
 } from "@/lib/folder-utils";
 import { hasWriteAccess } from "@/lib/permissions";
+import { assetTypeMatchesModality } from "@/lib/groups/service";
 
 /**
  * POST /api/folders/[folderId]/images
@@ -81,6 +82,24 @@ export async function POST(
         { error: "assetId is required for this asset type" },
         { status: 400 }
       );
+    }
+
+    // Group folders are modality-locked: image groups only accept images,
+    // video groups only accept videos. Plain folders (modality null) skip this.
+    if (folder.modality) {
+      if (
+        !assetTypeMatchesModality(
+          resolvedAssetType,
+          folder.modality as "image" | "video"
+        )
+      ) {
+        return NextResponse.json(
+          {
+            error: `This is a ${folder.modality} group; ${resolvedAssetType} assets cannot be added`,
+          },
+          { status: 409 }
+        );
+      }
     }
 
     // Check for duplicates within the folder

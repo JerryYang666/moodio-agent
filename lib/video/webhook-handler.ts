@@ -143,6 +143,19 @@ export async function processVideoResult(
       seed: result.seed,
     });
 
+    // If this generation targets a group folder, attach the resulting video
+    // as a member. Best-effort — we never fail the webhook on group attach
+    // errors (the asset is already saved via the standard pipeline).
+    try {
+      const { attachVideoToGroup } = await import("@/lib/groups/service");
+      await attachVideoToGroup(generationId);
+    } catch (groupErr) {
+      console.error(
+        `[Webhook] attachVideoToGroup failed for ${generationId}:`,
+        groupErr
+      );
+    }
+
     console.log(`[Webhook] Generation ${generationId} completed successfully`);
   } catch (error) {
     console.error(

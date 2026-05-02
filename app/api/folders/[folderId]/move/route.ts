@@ -111,6 +111,14 @@ export async function POST(
         );
       }
 
+      // Groups are leaf containers — no nesting folders inside a group.
+      if (targetData.folder.modality) {
+        return NextResponse.json(
+          { error: "Cannot move a folder into a group" },
+          { status: 400 }
+        );
+      }
+
       // Cannot move into own descendant (check if target path starts with source path)
       if (
         targetData.folder.path === sourceFolder.path ||

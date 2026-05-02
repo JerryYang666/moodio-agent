@@ -16,6 +16,7 @@ import {
   getFolderWithProject,
   touchFolder,
 } from "@/lib/folder-utils";
+import { assetTypeMatchesModality } from "@/lib/groups/service";
 
 type BulkAction = "move" | "copy" | "delete";
 
@@ -195,6 +196,25 @@ export async function POST(
       const targetData = await getFolderWithProject(targetFolderId);
       if (!targetData) {
         return NextResponse.json({ error: "Target folder not found" }, { status: 404 });
+      }
+
+      // Modality lock for group folders.
+      if (targetData.folder.modality) {
+        const mismatched = sourceItems.find(
+          (it) =>
+            !assetTypeMatchesModality(
+              it.assetType,
+              targetData.folder.modality as "image" | "video"
+            )
+        );
+        if (mismatched) {
+          return NextResponse.json(
+            {
+              error: `Target is a ${targetData.folder.modality} group; ${mismatched.assetType} assets cannot be added`,
+            },
+            { status: 409 }
+          );
+        }
       }
 
       resolvedTargetFolderId = targetFolderId;

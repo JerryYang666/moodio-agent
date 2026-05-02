@@ -10,6 +10,7 @@ import { aspectRatioDimensions } from "@/lib/desktop/types";
 import { ImageAsset, VideoAsset, TextAsset, LinkAsset, VideoSuggestAsset, AudioAsset } from "./assets";
 import PublicVideoAsset from "./assets/PublicVideoAsset";
 import TableAsset from "./assets/TableAsset";
+import GroupAsset from "./assets/GroupAsset";
 import { hasWriteAccess, type Permission } from "@/lib/permissions";
 import { MAX_PENDING_IMAGES } from "@/components/chat/pending-image-types";
 import type { CanvasMode } from "./DesktopToolbar";
@@ -113,6 +114,15 @@ interface DesktopCanvasProps {
   ) => void;
   onAddAssetAtPosition?: (worldPos: { x: number; y: number }) => void;
   onAddTextAtPosition?: (worldPos: { x: number; y: number }) => void;
+  /**
+   * Create a new group (抽卡组) at the given world position. Caller is
+   * responsible for the API call (POST a new folder with `modality` set,
+   * then drop a desktop asset of type "group" referencing it).
+   */
+  onCreateGroupAtPosition?: (
+    worldPos: { x: number; y: number },
+    modality: "image" | "video"
+  ) => void;
   onAssetRename?: (assetId: string, newTitle: string) => void;
   /**
    * Called when external files (images/videos/audio) are dropped onto the
@@ -163,6 +173,10 @@ function getAssetDimensions(
   if (asset.assetType === "video_suggest") {
     return { w: 340, h: 100 };
   }
+  if (asset.assetType === "group") {
+    // Reasonable default footprint for the collapsed group tile.
+    return { w: 360, h: 360 };
+  }
   if (naturalDims) {
     const scale = DEFAULT_ASSET_WIDTH / naturalDims.w;
     return { w: DEFAULT_ASSET_WIDTH, h: naturalDims.h * scale };
@@ -208,6 +222,7 @@ export default function DesktopCanvas({
   onExternalVideoSuggestDrop,
   onAddAssetAtPosition,
   onAddTextAtPosition,
+  onCreateGroupAtPosition,
   onAssetRename,
   onExternalFileDrop,
 }: DesktopCanvasProps) {
@@ -1200,6 +1215,7 @@ export default function DesktopCanvas({
                 onCellCommit={onCellCommit}
                 onTextCommit={onTextCommit}
                 onVideoSuggestCommit={onVideoSuggestCommit}
+                canEdit={canEdit}
               />
               </div>
               {/* Resize handles — visible when selected */}
@@ -1339,6 +1355,37 @@ export default function DesktopCanvas({
                   <Type size={14} />
                   {t("addText")}
                 </button>
+              )}
+              {onCreateGroupAtPosition && (
+                <>
+                  <div className="my-1 border-t border-divider" />
+                  <button
+                    className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-default-100 transition-colors text-left"
+                    onClick={() => {
+                      onCreateGroupAtPosition(
+                        { x: contextMenu.worldX, y: contextMenu.worldY },
+                        "image"
+                      );
+                      setContextMenu(null);
+                    }}
+                  >
+                    <Plus size={14} />
+                    Insert image group
+                  </button>
+                  <button
+                    className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-default-100 transition-colors text-left"
+                    onClick={() => {
+                      onCreateGroupAtPosition(
+                        { x: contextMenu.worldX, y: contextMenu.worldY },
+                        "video"
+                      );
+                      setContextMenu(null);
+                    }}
+                  >
+                    <Plus size={14} />
+                    Insert video group
+                  </button>
+                </>
               )}
             </>
           ) : selectedIds.size > 1 ? (
@@ -1699,6 +1746,7 @@ function AssetCardContent({
   onCellCommit,
   onTextCommit,
   onVideoSuggestCommit,
+  canEdit,
 }: {
   asset: EnrichedDesktopAsset;
   containerWidth: number;
@@ -1714,6 +1762,7 @@ function AssetCardContent({
   onCellCommit?: (assetId: string, rowId: string, colIndex: number, value: string) => void;
   onTextCommit?: (assetId: string, content: string) => void;
   onVideoSuggestCommit?: (assetId: string, updates: { title: string; videoIdea: string }) => void;
+  canEdit?: boolean;
 }) {
   switch (asset.assetType) {
     case "image":
@@ -1768,6 +1817,8 @@ function AssetCardContent({
       }
       return <TableAsset asset={asset} sendEvent={sendEvent} cellLocks={assetCellLocks} currentUserId={currentUserId} onCellCommit={onCellCommit} />;
     }
+    case "group":
+      return <GroupAsset asset={asset} canEdit={!!canEdit} zoom={zoom} />;
     default:
       return (
         <div className="w-full h-full flex items-center justify-center text-default-400 text-xs bg-background">

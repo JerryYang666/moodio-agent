@@ -115,13 +115,35 @@ export async function POST(
     }
 
     const body = await req.json();
-    const { name, parentId } = body as { name?: unknown; parentId?: string };
+    const {
+      name,
+      parentId,
+      modality,
+      defaultGenerationConfig,
+    } = body as {
+      name?: unknown;
+      parentId?: string;
+      modality?: string;
+      defaultGenerationConfig?: Record<string, unknown>;
+    };
 
     if (!name || typeof name !== "string" || !name.trim()) {
       return NextResponse.json(
         { error: "Folder name is required" },
         { status: 400 }
       );
+    }
+
+    // Validate modality if provided. A folder with modality is a group (抽卡组).
+    let resolvedModality: "image" | "video" | null = null;
+    if (modality !== undefined && modality !== null) {
+      if (modality !== "image" && modality !== "video") {
+        return NextResponse.json(
+          { error: "modality must be 'image' or 'video'" },
+          { status: 400 }
+        );
+      }
+      resolvedModality = modality;
     }
 
     let parentPath: string | null = null;
@@ -143,6 +165,14 @@ export async function POST(
         );
       }
 
+      // Disallow nesting any folder under a group. Groups are leaf containers.
+      if (parent.modality) {
+        return NextResponse.json(
+          { error: "Cannot create a folder inside a group" },
+          { status: 400 }
+        );
+      }
+
       parentPath = parent.path;
       depth = parent.depth + 1;
     }
@@ -157,6 +187,11 @@ export async function POST(
         name: name.trim(),
         path: "temp",
         depth,
+        modality: resolvedModality,
+        defaultGenerationConfig:
+          defaultGenerationConfig && typeof defaultGenerationConfig === "object"
+            ? defaultGenerationConfig
+            : {},
       })
       .returning();
 

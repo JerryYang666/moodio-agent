@@ -5,3 +5,8 @@ export const AI_SHOTLIST_DRAG_MIME = "application/x-moodio-ai-shotlist";
 export const AI_VIDEO_SUGGEST_DRAG_MIME = "application/x-moodio-ai-video-suggest";
 export const AI_VIDEO_DRAG_MIME = "application/x-moodio-ai-video";
 export const AI_AUDIO_DRAG_MIME = "application/x-moodio-ai-audio";
+/**
+ * Asset groups (抽卡组). Drag payload is JSON:
+ *   { folderId, modality: "image" | "video", coverImageId, memberCount, name }
+ */
+export const AI_GROUP_DRAG_MIME = "application/x-moodio-ai-group";

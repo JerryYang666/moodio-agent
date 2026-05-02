@@ -8,14 +8,15 @@ import { Image } from "@heroui/image";
 import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, useDisclosure } from "@heroui/modal";
 import { Input } from "@heroui/input";
 import { addToast } from "@heroui/toast";
-import { Plus, X, ChevronLeft, ChevronRight, Download, Music, Loader2, FolderPlus } from "lucide-react";
+import { Plus, X, ChevronLeft, ChevronRight, Download, Music, Loader2, FolderPlus, Layers } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { hasWriteAccess } from "@/lib/permissions";
 import { useCollections } from "@/hooks/use-collections";
 import AudioPlayer from "@/components/audio-player";
 import type { EnrichedMediaAssetRef, CellLock } from "@/lib/production-table/types";
 import type { AssetSummary } from "@/components/chat/asset-picker-modal";
-import { AI_IMAGE_DRAG_MIME, AI_VIDEO_DRAG_MIME, AI_VIDEO_SUGGEST_DRAG_MIME, AI_AUDIO_DRAG_MIME } from "@/components/chat/asset-dnd";
+import { AI_IMAGE_DRAG_MIME, AI_VIDEO_DRAG_MIME, AI_VIDEO_SUGGEST_DRAG_MIME, AI_AUDIO_DRAG_MIME, AI_GROUP_DRAG_MIME } from "@/components/chat/asset-dnd";
+import GroupDetailDrawer from "@/components/production-table/GroupDetailDrawer";
 import { uploadImage } from "@/lib/upload/client";
 import { uploadAudio } from "@/lib/upload/audio-client";
 import { uploadVideo } from "@/lib/upload/video-client";
@@ -92,7 +93,8 @@ export const MediaCell = memo(function MediaCell({
         types.includes(AI_IMAGE_DRAG_MIME) ||
         types.includes(AI_VIDEO_DRAG_MIME) ||
         types.includes(AI_VIDEO_SUGGEST_DRAG_MIME) ||
-        types.includes(AI_AUDIO_DRAG_MIME)
+        types.includes(AI_AUDIO_DRAG_MIME) ||
+        types.includes(AI_GROUP_DRAG_MIME)
       ) {
         e.preventDefault();
         e.stopPropagation();
@@ -117,7 +119,8 @@ export const MediaCell = memo(function MediaCell({
         types.includes(AI_IMAGE_DRAG_MIME) ||
         types.includes(AI_VIDEO_DRAG_MIME) ||
         types.includes(AI_VIDEO_SUGGEST_DRAG_MIME) ||
-        types.includes(AI_AUDIO_DRAG_MIME);
+        types.includes(AI_AUDIO_DRAG_MIME) ||
+        types.includes(AI_GROUP_DRAG_MIME);
       if (!hasAssetDrag) return;
 
       e.preventDefault();
@@ -127,6 +130,25 @@ export const MediaCell = memo(function MediaCell({
       const videoData = e.dataTransfer.getData(AI_VIDEO_DRAG_MIME);
       const videoSuggestData = e.dataTransfer.getData(AI_VIDEO_SUGGEST_DRAG_MIME);
       const audioData = e.dataTransfer.getData(AI_AUDIO_DRAG_MIME);
+      const groupData = e.dataTransfer.getData(AI_GROUP_DRAG_MIME);
+
+      if (groupData) {
+        try {
+          const parsed = JSON.parse(groupData);
+          if (!parsed.folderId) return;
+          const ref: EnrichedMediaAssetRef = {
+            assetId: parsed.folderId,
+            imageId: parsed.coverImageId || parsed.folderId,
+            assetType: "group",
+            folderId: parsed.folderId,
+            groupModality: parsed.modality,
+            groupMemberCount: parsed.memberCount,
+            groupName: parsed.name,
+          };
+          onAddAsset(ref);
+        } catch { /* ignore malformed data */ }
+        return;
+      }
 
       if (imageData) {
         try {
@@ -300,6 +322,11 @@ export const MediaCell = memo(function MediaCell({
 
   const previewAsset = previewIndex !== null ? assets[previewIndex] : null;
 
+  // Group drawer state — opened when a group cell is clicked.
+  const [groupDrawerAsset, setGroupDrawerAsset] =
+    useState<EnrichedMediaAssetRef | null>(null);
+  const closeGroupDrawer = useCallback(() => setGroupDrawerAsset(null), []);
+
   // ── Collection menu state ──
   const tMenu = useTranslations("imageMenu");
   const tCollections = useTranslations("collections");
@@ -437,7 +464,28 @@ export const MediaCell = memo(function MediaCell({
       <div className="flex flex-wrap gap-1">
         {assets.map((asset, idx) => (
           <div key={`${asset.assetId}-${idx}`} className="relative group">
-            {asset.assetType === "audio" ? (
+            {asset.assetType === "group" ? (
+              <button
+                className="relative w-10 h-10 rounded bg-default-100 border border-divider overflow-hidden flex items-center justify-center cursor-pointer hover:border-primary"
+                onClick={() => setGroupDrawerAsset(asset)}
+                title={`${asset.groupName ?? "Group"} (×${asset.groupMemberCount ?? "?"})`}
+              >
+                {asset.imageUrl ? (
+                  <img
+                    src={asset.imageUrl}
+                    alt=""
+                    className="object-cover w-full h-full"
+                  />
+                ) : (
+                  <Layers size={14} className="text-default-500" />
+                )}
+                <span className="absolute bottom-0 right-0 px-1 py-0.5 text-[9px] bg-black/60 text-white font-mono rounded-tl">
+                  ×{asset.groupMemberCount ?? "?"}
+                </span>
+                {/* Stack-of-cards motif */}
+                <span className="pointer-events-none absolute -bottom-0.5 -right-0.5 w-full h-full border-r border-b border-divider/60 rounded" />
+              </button>
+            ) : asset.assetType === "audio" ? (
               <div
                 className="w-10 h-10 rounded bg-violet-500/20 flex items-center justify-center cursor-pointer"
                 onClick={() => setPreviewIndex(idx)}
@@ -739,6 +787,17 @@ export const MediaCell = memo(function MediaCell({
           </div>
         </>,
         document.body
+      )}
+
+      {/* Group detail drawer */}
+      {groupDrawerAsset && groupDrawerAsset.folderId && (
+        <GroupDetailDrawer
+          isOpen={!!groupDrawerAsset}
+          onClose={closeGroupDrawer}
+          folderId={groupDrawerAsset.folderId}
+          modality={groupDrawerAsset.groupModality ?? "image"}
+          canEdit={canEdit}
+        />
       )}
 
       {/* Create Collection Modal */}

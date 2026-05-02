@@ -792,6 +792,23 @@ function enrichMediaAssets(
         thumbnailMdUrl: a.imageId ? getThumbnailUrl(a.imageId, "md", cnMode) : undefined,
       };
     }
+    if (a.assetType === "group") {
+      // The cell stores the cover image S3 ID in `imageId` (or undefined when
+      // empty). We surface a thumbnail URL so the cell can render. Live
+      // member count + group state are loaded by the GroupDetailDrawer when
+      // the user clicks in.
+      return {
+        ...a,
+        imageUrl:
+          a.imageId && a.imageId !== a.assetId
+            ? getImageUrl(a.imageId, cnMode)
+            : undefined,
+        thumbnailSmUrl:
+          a.imageId && a.imageId !== a.assetId
+            ? getThumbnailUrl(a.imageId, "sm", cnMode)
+            : undefined,
+      };
+    }
     return {
       ...a,
       imageUrl: a.imageId ? getImageUrl(a.imageId, cnMode) : undefined,

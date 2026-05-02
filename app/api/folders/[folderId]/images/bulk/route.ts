@@ -11,6 +11,7 @@ import {
   touchFolder,
 } from "@/lib/folder-utils";
 import { getUserPermission, hasWritePermission, getCollection, touchCollection } from "@/lib/collection-utils";
+import { assetTypeMatchesModality } from "@/lib/groups/service";
 
 type BulkAction = "move" | "copy" | "delete";
 
@@ -138,6 +139,25 @@ export async function POST(
       const targetFolder = await getFolder(targetFolderId);
       if (!targetFolder) {
         return NextResponse.json({ error: "Target folder not found" }, { status: 404 });
+      }
+
+      // Modality lock: every source item must match the target group's modality.
+      if (targetFolder.modality) {
+        const mismatched = sourceItems.find(
+          (it) =>
+            !assetTypeMatchesModality(
+              it.assetType,
+              targetFolder.modality as "image" | "video"
+            )
+        );
+        if (mismatched) {
+          return NextResponse.json(
+            {
+              error: `Target is a ${targetFolder.modality} group; ${mismatched.assetType} assets cannot be added`,
+            },
+            { status: 409 }
+          );
+        }
       }
 
       const [coll] = await db

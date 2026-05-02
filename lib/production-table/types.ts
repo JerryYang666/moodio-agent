@@ -41,8 +41,17 @@ export interface CellComment {
 export interface MediaAssetRef {
   assetId: string;
   imageId: string;
+  /**
+   * "image" | "video" | "public_image" | "public_video" | "audio" | "group".
+   * For group refs, `assetId` and `imageId` are both the group folder ID and
+   * the cover image S3 ID respectively (when a cover exists).
+   */
   assetType: string;
   thumbnailImageId?: string;
+  /** Group refs: which folder this points to (== assetId by convention). */
+  folderId?: string;
+  /** Group refs: "image" | "video" — pinned modality of the group. */
+  groupModality?: "image" | "video";
 }
 
 /** Enriched at read-time with derived URLs for the frontend. */
@@ -54,6 +63,10 @@ export interface EnrichedMediaAssetRef extends MediaAssetRef {
   thumbnailSmUrl?: string;
   /** 1024px WebP thumbnail for asset-picker modals. Only populated for image assets. */
   thumbnailMdUrl?: string;
+  /** Group refs: live member count (refreshed at read time). */
+  groupMemberCount?: number;
+  /** Group refs: human name of the group folder. */
+  groupName?: string;
 }
 
 // ---------------------------------------------------------------------------

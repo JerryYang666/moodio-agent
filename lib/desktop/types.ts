@@ -112,6 +112,23 @@ export type VideoSuggestAssetMeta = {
   partTypeIndex?: number;
 };
 
+/**
+ * Asset groups (抽卡组). A group is rendered as a single tile that, when
+ * expanded, reveals the member grid + an in-place "generate more" panel.
+ * The underlying entity is a folder (folders.modality is set). The cover
+ * image is denormalized so we can render a thumbnail without an extra
+ * fetch; the live data is loaded on demand by the group component.
+ */
+export type GroupAssetMeta = {
+  folderId: string;
+  modality: "image" | "video";
+  /** S3 image ID of the cover (thumbnail for video groups). Null when empty. */
+  coverImageId: string | null;
+  /** Last-known member count (denormalized for quick render). */
+  memberCount: number;
+  name?: string;
+};
+
 export type DesktopAssetMetadata =
   | { assetType: "image"; metadata: ImageAssetMeta }
   | { assetType: "video"; metadata: VideoAssetMeta }
@@ -121,9 +138,10 @@ export type DesktopAssetMetadata =
   | { assetType: "link"; metadata: LinkAssetMeta }
   | { assetType: "table"; metadata: TableAssetMeta }
   | { assetType: "video_suggest"; metadata: VideoSuggestAssetMeta }
-  | { assetType: "audio"; metadata: AudioAssetMeta };
+  | { assetType: "audio"; metadata: AudioAssetMeta }
+  | { assetType: "group"; metadata: GroupAssetMeta };
 
-const SUPPORTED_ASSET_TYPES = ["image", "video", "public_video", "public_image", "text", "link", "table", "video_suggest", "audio"] as const;
+const SUPPORTED_ASSET_TYPES = ["image", "video", "public_video", "public_image", "text", "link", "table", "video_suggest", "audio", "group"] as const;
 export type SupportedAssetType = (typeof SUPPORTED_ASSET_TYPES)[number];
 
 export function validateAssetMetadata(
@@ -205,6 +223,14 @@ export function validateAssetMetadata(
     case "audio":
       if (typeof m.audioId !== "string" || !m.audioId) {
         return { valid: false, error: "audio metadata requires a non-empty audioId string" };
+      }
+      break;
+    case "group":
+      if (typeof m.folderId !== "string" || !m.folderId) {
+        return { valid: false, error: "group metadata requires a non-empty folderId string" };
+      }
+      if (m.modality !== "image" && m.modality !== "video") {
+        return { valid: false, error: "group metadata requires modality 'image' or 'video'" };
       }
       break;
   }

@@ -18,6 +18,7 @@ import {
   getFolderWithProject,
   touchFolder,
 } from "@/lib/folder-utils";
+import { assetTypeMatchesModality } from "@/lib/groups/service";
 
 type TransferAction = "move" | "copy";
 
@@ -125,6 +126,22 @@ export async function POST(
         return NextResponse.json(
           { error: "Target folder not found" },
           { status: 404 }
+        );
+      }
+
+      // Modality lock for group folders.
+      if (
+        targetData.folder.modality &&
+        !assetTypeMatchesModality(
+          sourceItem.assetType,
+          targetData.folder.modality as "image" | "video"
+        )
+      ) {
+        return NextResponse.json(
+          {
+            error: `Target is a ${targetData.folder.modality} group; ${sourceItem.assetType} assets cannot be added`,
+          },
+          { status: 409 }
         );
       }
 

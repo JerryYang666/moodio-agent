@@ -31,6 +31,7 @@ import { useDesktopVideoSync } from "@/hooks/use-desktop-video-sync";
 import { setDesktopViewport, clearDesktopViewport } from "@/lib/desktop/types";
 import type { VideoAssetMeta } from "@/lib/desktop/types";
 import { useAuth } from "@/hooks/use-auth";
+import { useCollections } from "@/hooks/use-collections";
 import { TimelinePanel } from "@/components/timeline";
 import { useTimeline } from "@/hooks/use-timeline";
 import { useShareModal } from "@/hooks/use-share-modal";
@@ -1209,6 +1210,89 @@ export default function DesktopDetailPage({
     [desktopId, t]
   );
 
+  const { collections: userCollections } = useCollections();
+
+  const handleCreateGroupAtPosition = useCallback(
+    async (
+      worldPos: { x: number; y: number },
+      modality: "image" | "video"
+    ) => {
+      try {
+        // Pick a writable collection to host the group folder. We prefer
+        // the first owned collection; fall back to any writable one.
+        const target =
+          userCollections.find((c) => c.isOwner) ||
+          userCollections.find((c) => hasWriteAccess(c.permission));
+        if (!target) {
+          addToast({
+            title: "No collection available",
+            description: "Create a collection first, then insert a group.",
+            color: "warning",
+          });
+          return;
+        }
+
+        // 1. Create the folder with modality set — this is the group entity.
+        const folderRes = await fetch(
+          `/api/collection/${target.id}/folders`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              name: `${modality === "image" ? "Image" : "Video"} group`,
+              modality,
+            }),
+          }
+        );
+        if (!folderRes.ok) {
+          const body = await folderRes.json().catch(() => ({}));
+          throw new Error(body?.error || `Failed (${folderRes.status})`);
+        }
+        const folderJson = await folderRes.json();
+        const folder = folderJson.folder;
+
+        // 2. Drop a desktop asset that references the new folder.
+        const res = await fetch(`/api/desktop/${desktopId}/assets`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            assets: [
+              {
+                assetType: "group",
+                metadata: {
+                  folderId: folder.id,
+                  modality,
+                  coverImageId: null,
+                  memberCount: 0,
+                  name: folder.name,
+                },
+                posX: worldPos.x,
+                posY: worldPos.y,
+                width: 360,
+                height: 360,
+              },
+            ],
+          }),
+        });
+        if (!res.ok) throw new Error("Failed to add group asset to desktop");
+        const data = await res.json();
+        window.dispatchEvent(
+          new CustomEvent("desktop-asset-added", {
+            detail: { assets: data.assets, desktopId },
+          })
+        );
+      } catch (error) {
+        console.error("Failed to create group:", error);
+        addToast({
+          title: "Failed to create group",
+          description: error instanceof Error ? error.message : "Unknown error",
+          color: "danger",
+        });
+      }
+    },
+    [desktopId, userCollections]
+  );
+
   const handleAssetPickerSelect = useCallback(
     async (asset: AssetSummary) => {
       const pos = addAssetPositionRef.current;
@@ -1620,6 +1704,7 @@ export default function DesktopDetailPage({
           onExternalVideoSuggestDrop={canEdit ? handleExternalVideoSuggestDrop : undefined}
           onAddAssetAtPosition={canEdit ? handleAddAssetAtPosition : undefined}
           onAddTextAtPosition={canEdit ? handleAddTextAtPosition : undefined}
+          onCreateGroupAtPosition={canEdit ? handleCreateGroupAtPosition : undefined}
           onAssetRename={canEdit ? handleAssetRename : undefined}
           onExternalFileDrop={canEdit ? handleExternalFileDrop : undefined}
         />

@@ -54,7 +54,14 @@ export async function POST(request: NextRequest) {
       sourceImageId,
       endImageId,
       params = {},
-    } = body;
+      targetFolderId,
+    } = body as {
+      modelId?: string;
+      sourceImageId?: string;
+      endImageId?: string;
+      params?: Record<string, any>;
+      targetFolderId?: string;
+    };
 
     // Validate model exists
     const model = getVideoModel(modelId);
@@ -63,6 +70,30 @@ export async function POST(request: NextRequest) {
         { error: `Unknown video model: ${modelId}` },
         { status: 400 }
       );
+    }
+
+    // If a targetFolderId is supplied, the caller is generating into a video
+    // group. Validate the folder is a video group and that the caller has
+    // write permission. The webhook will attach the resulting video as a
+    // member when the generation row carries this targetFolderId.
+    if (targetFolderId) {
+      const { getFolderPermission } = await import("@/lib/folder-utils");
+      const { hasWriteAccess } = await import("@/lib/permissions");
+      const { getFolderModality } = await import("@/lib/groups/service");
+      const folderPerm = await getFolderPermission(targetFolderId, payload.userId);
+      if (!hasWriteAccess(folderPerm)) {
+        return NextResponse.json(
+          { error: "You don't have permission to generate in the target group" },
+          { status: 403 }
+        );
+      }
+      const modality = await getFolderModality(targetFolderId);
+      if (modality !== "video") {
+        return NextResponse.json(
+          { error: "targetFolderId must reference a video group" },
+          { status: 400 }
+        );
+      }
     }
 
     // Validate required source image (only for image-to-video models with required source image)
@@ -182,6 +213,7 @@ export async function POST(request: NextRequest) {
         sourceImageId: effectiveSourceImageId,
         endImageId: endImageId || null,
         params: mergedParams,
+        targetFolderId: targetFolderId || null,
       })
       .returning();
 

@@ -202,18 +202,82 @@ export async function PATCH(
     }
 
     const body = await req.json();
-    const { name } = body as { name?: string };
+    const {
+      name,
+      coverImageId,
+      defaultGenerationConfig,
+    } = body as {
+      name?: string;
+      coverImageId?: string | null;
+      defaultGenerationConfig?: Record<string, unknown>;
+    };
 
-    if (!name || typeof name !== "string" || !name.trim()) {
+    const updates: Partial<{
+      name: string;
+      coverImageId: string | null;
+      defaultGenerationConfig: Record<string, unknown>;
+      updatedAt: Date;
+    }> = { updatedAt: new Date() };
+
+    if (name !== undefined) {
+      if (typeof name !== "string" || !name.trim()) {
+        return NextResponse.json(
+          { error: "Folder name must be a non-empty string" },
+          { status: 400 }
+        );
+      }
+      updates.name = name.trim();
+    }
+
+    if (coverImageId !== undefined) {
+      if (coverImageId === null) {
+        updates.coverImageId = null;
+      } else {
+        // Cover must be a member of this folder
+        const [member] = await db
+          .select({ id: collectionImages.id })
+          .from(collectionImages)
+          .where(
+            and(
+              eq(collectionImages.id, coverImageId),
+              eq(collectionImages.folderId, folderId)
+            )
+          )
+          .limit(1);
+        if (!member) {
+          return NextResponse.json(
+            { error: "Cover candidate is not a member of this folder" },
+            { status: 400 }
+          );
+        }
+        updates.coverImageId = coverImageId;
+      }
+    }
+
+    if (defaultGenerationConfig !== undefined) {
+      if (
+        defaultGenerationConfig === null ||
+        typeof defaultGenerationConfig !== "object"
+      ) {
+        return NextResponse.json(
+          { error: "defaultGenerationConfig must be an object" },
+          { status: 400 }
+        );
+      }
+      updates.defaultGenerationConfig = defaultGenerationConfig;
+    }
+
+    if (Object.keys(updates).length === 1) {
+      // Only updatedAt — caller sent nothing meaningful.
       return NextResponse.json(
-        { error: "Folder name is required" },
+        { error: "No updatable fields provided" },
         { status: 400 }
       );
     }
 
     const [updatedFolder] = await db
       .update(folders)
-      .set({ name: name.trim(), updatedAt: new Date() })
+      .set(updates)
       .where(eq(folders.id, folderId))
       .returning();
 
