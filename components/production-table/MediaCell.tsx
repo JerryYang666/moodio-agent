@@ -52,6 +52,12 @@ interface MediaCellProps {
   onRemoveAsset: (assetId: string) => void;
   /** Label used as asset title when adding to a collection (e.g. "Column · Row 3") */
   assetLabel?: string;
+  /**
+   * Production-table WS sendEvent. Group mutations done via the
+   * GroupDetailDrawer get broadcast through this so other clients with
+   * cells/drawers referencing the same folderId stay in sync.
+   */
+  sendEvent?: (type: string, payload: Record<string, unknown>) => void;
 }
 
 export const MediaCell = memo(function MediaCell({
@@ -68,6 +74,7 @@ export const MediaCell = memo(function MediaCell({
   onAddAsset,
   onRemoveAsset,
   assetLabel,
+  sendEvent,
 }: MediaCellProps) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
@@ -797,6 +804,7 @@ export const MediaCell = memo(function MediaCell({
           folderId={groupDrawerAsset.folderId}
           modality={groupDrawerAsset.groupModality ?? "image"}
           canEdit={canEdit}
+          sendEvent={sendEvent}
         />
       )}
 

@@ -312,6 +312,20 @@ export default function ProductionTableDetailPage({
           });
           break;
         }
+        case "pt_group_mutated": {
+          // A group folder referenced by one of this table's media cells
+          // mutated remotely. Re-emit as a same-tab CustomEvent so every
+          // open GroupDetailDrawer / useGroupSummary keyed to that folderId
+          // refreshes (cell thumbnails + drawer contents).
+          const { folderId } = event.payload as { folderId?: string };
+          if (!folderId || typeof window === "undefined") break;
+          window.dispatchEvent(
+            new CustomEvent("moodio:group-mutated", {
+              detail: { folderId },
+            })
+          );
+          break;
+        }
       }
     },
     [tableId, store]

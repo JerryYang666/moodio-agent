@@ -29,6 +29,11 @@ interface GroupDetailDrawerProps {
    * their denormalized cover + count.
    */
   onMutated?: () => void;
+  /**
+   * Production-table WS sendEvent. Group mutations are broadcast as
+   * `pt_group_mutated` so other clients viewing the same table refresh.
+   */
+  sendEvent?: (type: string, payload: Record<string, unknown>) => void;
 }
 
 export default function GroupDetailDrawer({
@@ -38,6 +43,7 @@ export default function GroupDetailDrawer({
   modality,
   canEdit,
   onMutated,
+  sendEvent,
 }: GroupDetailDrawerProps) {
   const {
     data,
@@ -47,7 +53,12 @@ export default function GroupDetailDrawer({
     setCover,
     removeMember,
     generateImage,
-  } = useGroup(folderId);
+    addMember,
+    notifyMutation,
+  } = useGroup(folderId, {
+    sendEvent,
+    broadcastEventType: "pt_group_mutated",
+  });
 
   const [generating, setGenerating] = useState(false);
   const [activeConfig, setActiveConfig] = useState<Record<string, unknown>>({});
@@ -93,8 +104,11 @@ export default function GroupDetailDrawer({
             const body = await res.json().catch(() => ({}));
             throw new Error(body?.error || `Failed (${res.status})`);
           }
+          // Image-group case already broadcasts via useGroup.generateImage;
+          // for the video path we manually notify peers.
+          await refresh();
+          notifyMutation();
         }
-        await refresh();
         onMutated?.();
       } catch (e) {
         addToast({
@@ -113,21 +127,12 @@ export default function GroupDetailDrawer({
     async (payload: GroupDropPayload) => {
       if (!folderId) return;
       try {
-        const res = await fetch(`/api/folders/${folderId}/images`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            imageId: payload.imageId,
-            assetId: payload.assetId,
-            assetType: payload.assetType,
-            generationDetails: { title: "", prompt: "", status: "generated" },
-          }),
+        await addMember({
+          imageId: payload.imageId,
+          assetId: payload.assetId,
+          assetType: payload.assetType,
+          thumbnailImageId: payload.thumbnailImageId,
         });
-        if (!res.ok) {
-          const body = await res.json().catch(() => ({}));
-          throw new Error(body?.error || `Failed (${res.status})`);
-        }
-        await refresh();
         onMutated?.();
       } catch (e) {
         addToast({
@@ -137,7 +142,7 @@ export default function GroupDetailDrawer({
         });
       }
     },
-    [folderId, refresh, onMutated]
+    [folderId, addMember, onMutated]
   );
 
   const members: GroupMember[] = (data?.members ?? []).map((m) => ({

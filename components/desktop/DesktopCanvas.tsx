@@ -1818,7 +1818,14 @@ function AssetCardContent({
       return <TableAsset asset={asset} sendEvent={sendEvent} cellLocks={assetCellLocks} currentUserId={currentUserId} onCellCommit={onCellCommit} />;
     }
     case "group":
-      return <GroupAsset asset={asset} canEdit={!!canEdit} zoom={zoom} />;
+      return (
+        <GroupAsset
+          asset={asset}
+          canEdit={!!canEdit}
+          zoom={zoom}
+          sendEvent={sendEvent}
+        />
+      );
     default:
       return (
         <div className="w-full h-full flex items-center justify-center text-default-400 text-xs bg-background">

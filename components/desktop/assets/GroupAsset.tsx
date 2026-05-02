@@ -7,6 +7,7 @@ import { addToast } from "@heroui/toast";
 import type { GroupAssetMeta } from "@/lib/desktop/types";
 import type { EnrichedDesktopAsset } from "./types";
 import { useGroup } from "@/hooks/use-group";
+import { useGroupSummary } from "@/hooks/use-group-summary";
 import GroupMemberGrid, {
   type GroupMember,
 } from "@/components/groups/GroupMemberGrid";
@@ -20,15 +21,18 @@ interface GroupAssetProps {
   asset: EnrichedDesktopAsset;
   canEdit: boolean;
   zoom: number;
-  /** Notify the parent when membership/cover changes so it can refresh metadata. */
-  onMutated?: () => void;
+  /**
+   * Desktop's WS sendEvent — used to broadcast group-mutated events to
+   * other clients in the same desktop room so all open GroupAssets refresh.
+   */
+  sendEvent?: (type: string, payload: Record<string, unknown>) => void;
 }
 
 export default function GroupAsset({
   asset,
   canEdit,
   zoom,
-  onMutated,
+  sendEvent,
 }: GroupAssetProps) {
   const meta = asset.metadata as unknown as GroupAssetMeta;
   const [expanded, setExpanded] = useState(false);
@@ -40,7 +44,16 @@ export default function GroupAsset({
     setCover,
     removeMember,
     generateImage,
-  } = useGroup(meta.folderId);
+    addMember,
+    notifyMutation,
+  } = useGroup(meta.folderId, {
+    sendEvent,
+    broadcastEventType: "group_mutated",
+  });
+
+  // Lightweight cover/count for the collapsed tile — keeps in sync via the
+  // same group-mutated event channel even when the asset isn't expanded.
+  const { summary } = useGroupSummary(meta.folderId);
 
   const [generating, setGenerating] = useState(false);
   const [activeConfig, setActiveConfig] = useState<Record<string, unknown>>(
@@ -81,7 +94,10 @@ export default function GroupAsset({
         if (data.modality === "image") {
           await generateImage(config, copiedFromMemberId ?? undefined);
         } else {
-          // Video path: hand off to existing video generate endpoint.
+          // Video path: hand off to existing video generate endpoint. The
+          // webhook will attach the result to this folder. We notify peers
+          // immediately so other open clients see the in-flight state, and
+          // again after the refresh once the asset lands.
           const res = await fetch(`/api/video/generate`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -97,9 +113,9 @@ export default function GroupAsset({
             const body = await res.json().catch(() => ({}));
             throw new Error(body?.error || `Failed (${res.status})`);
           }
+          await refresh();
+          notifyMutation();
         }
-        await refresh();
-        onMutated?.();
       } catch (e) {
         addToast({
           title: "Generation failed",
@@ -110,29 +126,19 @@ export default function GroupAsset({
         setGenerating(false);
       }
     },
-    [data, generateImage, refresh, copiedFromMemberId, onMutated]
+    [data, generateImage, refresh, copiedFromMemberId, notifyMutation]
   );
 
   const handleDrop = useCallback(
     async (payload: GroupDropPayload) => {
       if (!data) return;
       try {
-        const res = await fetch(`/api/folders/${data.folderId}/images`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            imageId: payload.imageId,
-            assetId: payload.assetId,
-            assetType: payload.assetType,
-            generationDetails: { title: "", prompt: "", status: "generated" },
-          }),
+        await addMember({
+          imageId: payload.imageId,
+          assetId: payload.assetId,
+          assetType: payload.assetType,
+          thumbnailImageId: payload.thumbnailImageId,
         });
-        if (!res.ok) {
-          const body = await res.json().catch(() => ({}));
-          throw new Error(body?.error || `Failed (${res.status})`);
-        }
-        await refresh();
-        onMutated?.();
       } catch (e) {
         addToast({
           title: "Failed to add asset",
@@ -141,19 +147,24 @@ export default function GroupAsset({
         });
       }
     },
-    [data, refresh, onMutated]
+    [data, addMember]
   );
 
   const ModalityIcon = meta.modality === "video" ? Film : ImageIcon;
-  const memberCount = data?.members.length ?? meta.memberCount ?? 0;
+  const memberCount =
+    summary?.memberCount ?? data?.members.length ?? meta.memberCount ?? 0;
   const coverUrl = (() => {
-    if (!data) return null;
-    if (!data.coverImageId) {
-      const first = data.members[0];
-      return first?.thumbnailSmUrl || first?.imageUrl || null;
+    // Prefer fully-loaded data; fall back to the cheap summary so the
+    // collapsed tile shows fresh covers even before the heavy fetch lands.
+    if (data) {
+      if (!data.coverImageId) {
+        const first = data.members[0];
+        return first?.thumbnailSmUrl || first?.imageUrl || null;
+      }
+      const cover = data.members.find((m) => m.id === data.coverImageId);
+      return cover?.thumbnailSmUrl || cover?.imageUrl || null;
     }
-    const cover = data.members.find((m) => m.id === data.coverImageId);
-    return cover?.thumbnailSmUrl || cover?.imageUrl || null;
+    return summary?.coverThumbnailSmUrl || summary?.coverImageUrl || null;
   })();
 
   // Members shaped for the grid component
@@ -170,7 +181,7 @@ export default function GroupAsset({
     prompt: m.prompt,
   }));
 
-  const groupName = meta.name || data?.name || "Group";
+  const groupName = summary?.name || meta.name || data?.name || "Group";
 
   return (
     <GroupDropZone
@@ -189,7 +200,7 @@ export default function GroupAsset({
             JSON.stringify({
               folderId: meta.folderId,
               modality: meta.modality,
-              coverImageId: meta.coverImageId,
+              coverImageId: summary?.coverImageId ?? meta.coverImageId,
               memberCount,
               name: groupName,
             })
@@ -265,18 +276,9 @@ export default function GroupAsset({
               <GroupMemberGrid
                 members={members}
                 canEdit={canEdit}
-                onSetStatus={(id, status) =>
-                  setMemberStatus(id, status).then(() => onMutated?.())
-                }
-                onSetCover={(id) =>
-                  setCover(id).then(() => onMutated?.())
-                }
-                onRemove={
-                  canEdit
-                    ? (id) =>
-                        removeMember(id).then(() => onMutated?.())
-                    : undefined
-                }
+                onSetStatus={(id, status) => setMemberStatus(id, status)}
+                onSetCover={(id) => setCover(id)}
+                onRemove={canEdit ? (id) => removeMember(id) : undefined}
                 onCopyConfigFrom={canEdit ? handleCopyFrom : undefined}
                 compact
               />

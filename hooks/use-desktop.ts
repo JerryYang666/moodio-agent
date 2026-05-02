@@ -386,6 +386,20 @@ export function useDesktopDetail(desktopId: string) {
           );
           break;
         }
+        case "group_mutated": {
+          // Group internals (members / cover / status / default config)
+          // changed remotely. Re-broadcast as a same-tab CustomEvent so any
+          // GroupAsset / useGroup / useGroupSummary instance keyed to this
+          // folderId refreshes.
+          const { folderId } = event.payload || {};
+          if (!folderId || typeof window === "undefined") return;
+          window.dispatchEvent(
+            new CustomEvent("moodio:group-mutated", {
+              detail: { folderId },
+            })
+          );
+          break;
+        }
       }
     },
     []
