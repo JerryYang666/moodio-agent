@@ -231,6 +231,7 @@ func TestPTViewerCannotMutate(t *testing.T) {
 		"pt_cell_selected", "pt_cell_deselected", "pt_cell_updated",
 		"pt_column_added", "pt_column_removed", "pt_column_renamed", "pt_columns_reordered",
 		"pt_row_added", "pt_row_removed", "pt_rows_reordered",
+		"pt_group_mutated",
 	}
 	for _, evt := range ptMutations {
 		viewer.send(t, map[string]any{"type": evt, "payload": map[string]any{"id": "x"}})
@@ -265,6 +266,7 @@ func TestPTEditorCanMutate(t *testing.T) {
 		"pt_cell_selected", "pt_cell_deselected", "pt_cell_updated",
 		"pt_column_added", "pt_column_removed", "pt_column_renamed", "pt_columns_reordered",
 		"pt_row_added", "pt_row_removed", "pt_rows_reordered",
+		"pt_group_mutated",
 	}
 	for _, evt := range ptMutations {
 		editor.send(t, map[string]any{"type": evt, "payload": map[string]any{"id": "x"}})
