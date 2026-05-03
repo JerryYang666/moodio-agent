@@ -41,11 +41,19 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { name, description, stripePriceId, priceCents, interval } = body;
+    const { name, description, stripePriceId, priceCents, interval, trialPeriodDays } = body;
 
     if (!name || !stripePriceId || priceCents == null) {
       return NextResponse.json(
         { error: "name, stripePriceId, and priceCents are required" },
+        { status: 400 }
+      );
+    }
+
+    const trialDays = trialPeriodDays == null ? 0 : Number(trialPeriodDays);
+    if (!Number.isInteger(trialDays) || trialDays < 0 || trialDays > 730) {
+      return NextResponse.json(
+        { error: "trialPeriodDays must be an integer between 0 and 730" },
         { status: 400 }
       );
     }
@@ -58,6 +66,7 @@ export async function POST(request: NextRequest) {
         stripePriceId,
         priceCents: Number(priceCents),
         interval: interval || "month",
+        trialPeriodDays: trialDays,
       })
       .returning();
 
@@ -100,8 +109,20 @@ export async function PUT(request: NextRequest) {
       stripePriceId: "stripePriceId",
       priceCents: "priceCents",
       interval: "interval",
+      trialPeriodDays: "trialPeriodDays",
       isActive: "isActive",
     };
+
+    if (updates.trialPeriodDays !== undefined) {
+      const trialDays = Number(updates.trialPeriodDays);
+      if (!Number.isInteger(trialDays) || trialDays < 0 || trialDays > 730) {
+        return NextResponse.json(
+          { error: "trialPeriodDays must be an integer between 0 and 730" },
+          { status: 400 }
+        );
+      }
+      updates.trialPeriodDays = trialDays;
+    }
 
     const setValues: Record<string, any> = { updatedAt: new Date() };
     for (const [key, col] of Object.entries(allowedFields)) {

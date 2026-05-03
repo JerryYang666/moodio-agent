@@ -787,6 +787,7 @@ export const subscriptionPlans = pgTable("subscription_plans", {
   stripePriceId: varchar("stripe_price_id", { length: 255 }).notNull().unique(),
   priceCents: integer("price_cents").notNull(),
   interval: varchar("interval", { length: 20 }).notNull().default("month"),
+  trialPeriodDays: integer("trial_period_days").notNull().default(0),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),

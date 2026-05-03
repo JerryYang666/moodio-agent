@@ -102,6 +102,9 @@ export async function POST(request: NextRequest) {
         cancel_url: `${appUrl}/browse?checkout=canceled`,
         subscription_data: {
           metadata: { userId: payload.userId },
+          ...(plan.trialPeriodDays > 0
+            ? { trial_period_days: plan.trialPeriodDays }
+            : {}),
         },
         metadata: { userId: payload.userId },
       });

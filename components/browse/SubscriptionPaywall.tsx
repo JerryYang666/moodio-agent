@@ -18,6 +18,7 @@ interface SubscriptionPlan {
   description: string | null;
   priceCents: number;
   interval: string;
+  trialPeriodDays: number;
 }
 
 export default function SubscriptionPaywall() {
@@ -80,6 +81,7 @@ export default function SubscriptionPaywall() {
   const priceDisplay = plan
     ? `$${(plan.priceCents / 100).toFixed(2)}/${plan.interval === "year" ? "yr" : "mo"}`
     : null;
+  const trialDays = plan?.trialPeriodDays ?? 0;
 
   return (
     <div className="flex flex-col items-center justify-center min-h-full gap-6 px-4 py-16 max-w-lg mx-auto text-center">
@@ -101,6 +103,12 @@ export default function SubscriptionPaywall() {
             )}
             {priceDisplay && (
               <p className="text-3xl font-bold text-primary">{priceDisplay}</p>
+            )}
+
+            {trialDays > 0 && (
+              <div className="inline-flex mx-auto items-center gap-2 px-3 py-1.5 rounded-full bg-success/15 text-success text-sm font-medium">
+                {t("paywall.freeTrial", { days: trialDays })}
+              </div>
             )}
 
             <ul className="text-sm text-default-600 space-y-1.5 text-left mx-auto">
@@ -169,7 +177,7 @@ export default function SubscriptionPaywall() {
               isDisabled={needsPaymentConsent && !agreedToPaymentTerms}
               onPress={handleSubscribe}
             >
-              {t("paywall.subscribe")}
+              {trialDays > 0 ? t("paywall.startFreeTrial") : t("paywall.subscribe")}
             </Button>
           </CardBody>
         </Card>

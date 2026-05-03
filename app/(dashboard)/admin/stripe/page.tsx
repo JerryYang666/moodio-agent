@@ -39,6 +39,7 @@ interface SubscriptionPlan {
   stripePriceId: string;
   priceCents: number;
   interval: string;
+  trialPeriodDays: number;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -89,6 +90,7 @@ export default function StripeAdminPage() {
     stripePriceId: "",
     priceCents: "",
     interval: "month",
+    trialPeriodDays: "0",
   });
   const [savingPlan, setSavingPlan] = useState(false);
 
@@ -153,7 +155,7 @@ export default function StripeAdminPage() {
 
   const openNewPlan = () => {
     setEditingPlan(null);
-    setPlanForm({ name: "", description: "", stripePriceId: "", priceCents: "", interval: "month" });
+    setPlanForm({ name: "", description: "", stripePriceId: "", priceCents: "", interval: "month", trialPeriodDays: "0" });
     onPlanOpen();
   };
 
@@ -165,11 +167,17 @@ export default function StripeAdminPage() {
       stripePriceId: plan.stripePriceId,
       priceCents: String(plan.priceCents),
       interval: plan.interval,
+      trialPeriodDays: String(plan.trialPeriodDays ?? 0),
     });
     onPlanOpen();
   };
 
   const handleSavePlan = async () => {
+    const trialDays = Number(planForm.trialPeriodDays || 0);
+    if (!Number.isInteger(trialDays) || trialDays < 0 || trialDays > 730) {
+      addToast({ title: t("trialPeriodDaysError"), color: "danger" });
+      return;
+    }
     setSavingPlan(true);
     try {
       if (editingPlan) {
@@ -180,6 +188,7 @@ export default function StripeAdminPage() {
           stripePriceId: planForm.stripePriceId,
           priceCents: Number(planForm.priceCents),
           interval: planForm.interval,
+          trialPeriodDays: trialDays,
         });
       } else {
         await api.post("/api/admin/subscription-plans", {
@@ -188,6 +197,7 @@ export default function StripeAdminPage() {
           stripePriceId: planForm.stripePriceId,
           priceCents: Number(planForm.priceCents),
           interval: planForm.interval,
+          trialPeriodDays: trialDays,
         });
       }
       await fetchAll();
@@ -356,6 +366,7 @@ export default function StripeAdminPage() {
               <TableColumn>{t("stripePriceId")}</TableColumn>
               <TableColumn>{t("price")}</TableColumn>
               <TableColumn>{t("interval")}</TableColumn>
+              <TableColumn>{t("trialPeriodDays")}</TableColumn>
               <TableColumn>{t("status")}</TableColumn>
               <TableColumn>{t("actions")}</TableColumn>
             </TableHeader>
@@ -385,6 +396,15 @@ export default function StripeAdminPage() {
                     <Chip size="sm" variant="flat">
                       {plan.interval}
                     </Chip>
+                  </TableCell>
+                  <TableCell>
+                    {plan.trialPeriodDays > 0 ? (
+                      <Chip size="sm" variant="flat" color="success">
+                        {t("trialDaysValue", { days: plan.trialPeriodDays })}
+                      </Chip>
+                    ) : (
+                      <span className="text-default-400 text-sm">{t("noTrial")}</span>
+                    )}
                   </TableCell>
                   <TableCell>
                     <Switch
@@ -536,6 +556,16 @@ export default function StripeAdminPage() {
                       <SelectItem key="week">Weekly</SelectItem>
                     </Select>
                   </div>
+                  <Input
+                    label={t("trialPeriodDays")}
+                    placeholder="0"
+                    type="number"
+                    min={0}
+                    max={730}
+                    value={planForm.trialPeriodDays}
+                    onValueChange={(v) => setPlanForm({ ...planForm, trialPeriodDays: v })}
+                    description={t("trialPeriodDaysHelp")}
+                  />
                 </div>
               </ModalBody>
               <ModalFooter>
