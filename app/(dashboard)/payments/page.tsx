@@ -32,6 +32,7 @@ import {
   AlertTriangle,
   XCircle,
   RotateCcw,
+  Gift,
 } from "lucide-react";
 import { api, ApiError } from "@/lib/api/client";
 import { STRIPE_ERROR_CODES, type StripeErrorCode } from "@/lib/stripe-errors";
@@ -63,8 +64,34 @@ const STATUS_COLOR: Record<string, "success" | "warning" | "danger" | "default">
 export default function PaymentsPage() {
   const t = useTranslations("payments");
   const tHistory = useTranslations("payments.history");
+  const tSubStatus = useTranslations("payments.subscription.status");
   const tCredits = useTranslations("credits");
   const tStripeErrors = useTranslations("stripeErrors");
+
+  const SUBSCRIPTION_STATUS_KEYS = new Set([
+    "active",
+    "trialing",
+    "admin_granted",
+    "past_due",
+    "unpaid",
+    "canceled",
+    "incomplete",
+    "incomplete_expired",
+    "paused",
+  ]);
+  const formatSubscriptionStatus = (status: string) =>
+    SUBSCRIPTION_STATUS_KEYS.has(status) ? tSubStatus(status) : status;
+
+  const subscriptionStatusColor = (
+    status: string
+  ): "success" | "primary" | "secondary" | "warning" | "danger" | "default" => {
+    if (status === "active") return "success";
+    if (status === "trialing") return "primary";
+    if (status === "admin_granted") return "secondary";
+    if (status === "past_due" || status === "unpaid" || status === "incomplete") return "warning";
+    if (status === "canceled" || status === "incomplete_expired") return "danger";
+    return "default";
+  };
   const { user, loading: authLoading } = useAuth();
   const { hasSubscription, subscription, refresh: refreshSub } = useSubscription();
 
@@ -197,27 +224,37 @@ export default function PaymentsPage() {
               <div className="flex flex-wrap items-center gap-3">
                 <Chip
                   size="sm"
-                  color={
-                    subscription.status === "admin_granted"
-                      ? "secondary"
-                      : subscription.status === "active"
-                        ? "success"
-                        : "warning"
-                  }
+                  color={subscriptionStatusColor(subscription.status)}
                   variant="flat"
                 >
-                  {subscription.status === "admin_granted"
-                    ? "Granted by Admin"
-                    : subscription.status}
+                  {formatSubscriptionStatus(subscription.status)}
                 </Chip>
                 <span className="text-sm text-default-500">
-                  {t(subscription.cancelAtPeriodEnd
-                    ? "subscription.endsOn"
-                    : "subscription.periodEnd", {
-                    date: new Date(subscription.currentPeriodEnd).toLocaleDateString(),
-                  })}
+                  {t(
+                    subscription.status === "trialing"
+                      ? "subscription.trialEndsOn"
+                      : subscription.cancelAtPeriodEnd
+                        ? "subscription.endsOn"
+                        : "subscription.periodEnd",
+                    {
+                      date: new Date(subscription.currentPeriodEnd).toLocaleDateString(),
+                    }
+                  )}
                 </span>
               </div>
+              {subscription.status === "trialing" && (
+                <div className="flex items-start gap-3 p-4 bg-primary-50 rounded-lg text-primary-700">
+                  <Gift size={18} className="mt-0.5 shrink-0" />
+                  <div className="text-sm">
+                    <p className="font-semibold">{t("subscription.trialBannerTitle")}</p>
+                    <p className="mt-0.5">
+                      {t("subscription.trialBannerBody", {
+                        date: new Date(subscription.currentPeriodEnd).toLocaleDateString(),
+                      })}
+                    </p>
+                  </div>
+                </div>
+              )}
               {subscription.cancelAtPeriodEnd && subscription.status !== "admin_granted" && (
                 <div className="flex items-center gap-2 p-3 bg-warning-50 rounded-lg text-warning-700 text-sm">
                   <AlertTriangle size={16} />

@@ -443,6 +443,9 @@
       "title": "订阅",
       "periodEnd": "续费日期：{date}",
       "endsOn": "到期日期：{date}",
+      "trialEndsOn": "免费试用结束日期：{date}",
+      "trialBannerTitle": "您正处于免费试用期",
+      "trialBannerBody": "您的免费试用将于 {date} 结束。在此之前不会扣费。如需避免扣费，请在结束日期前取消。",
       "cancelWarning": "您的订阅将在当前计费周期结束后取消。",
       "cancel": "取消订阅",
       "cancelSuccess": "您的订阅将在当前计费周期结束后取消。",
@@ -460,7 +463,18 @@
       "manage": "管理订阅",
       "portal": "账单中心",
       "none": "您目前没有有效的订阅。",
-      "browseCta": "浏览方案"
+      "browseCta": "浏览方案",
+      "status": {
+        "active": "订阅中",
+        "trialing": "免费试用中",
+        "admin_granted": "管理员授予",
+        "past_due": "逾期未付",
+        "unpaid": "未支付",
+        "canceled": "已取消",
+        "incomplete": "未完成",
+        "incomplete_expired": "已过期",
+        "paused": "已暂停"
+      }
     },
     "history": {
       "title": "支付记录",

@@ -443,6 +443,9 @@
       "title": "サブスクリプション",
       "periodEnd": "更新日：{date}",
       "endsOn": "終了日：{date}",
+      "trialEndsOn": "無料トライアル終了日：{date}",
+      "trialBannerTitle": "無料トライアル中です",
+      "trialBannerBody": "無料トライアルは {date} に終了します。それまでは請求されません。請求を回避するには終了日までにキャンセルしてください。",
       "cancelWarning": "現在の請求期間終了後にサブスクリプションがキャンセルされます。",
       "cancel": "サブスクリプションをキャンセル",
       "cancelSuccess": "現在の請求期間終了後にサブスクリプションがキャンセルされます。",
@@ -460,7 +463,18 @@
       "manage": "サブスクリプションを管理",
       "portal": "請求ポータル",
       "none": "有効なサブスクリプションはありません。",
-      "browseCta": "プランを見る"
+      "browseCta": "プランを見る",
+      "status": {
+        "active": "有効",
+        "trialing": "無料トライアル中",
+        "admin_granted": "管理者付与",
+        "past_due": "支払い遅延",
+        "unpaid": "未払い",
+        "canceled": "キャンセル済み",
+        "incomplete": "未完了",
+        "incomplete_expired": "期限切れ",
+        "paused": "一時停止中"
+      }
     },
     "history": {
       "title": "お支払い履歴",

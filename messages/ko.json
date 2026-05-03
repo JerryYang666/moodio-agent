@@ -443,6 +443,9 @@
       "title": "구독",
       "periodEnd": "갱신일: {date}",
       "endsOn": "종료일: {date}",
+      "trialEndsOn": "무료 체험 종료일: {date}",
+      "trialBannerTitle": "무료 체험 중입니다",
+      "trialBannerBody": "무료 체험은 {date}에 종료됩니다. 그때까지는 요금이 청구되지 않습니다. 청구를 피하려면 종료일 전에 언제든지 취소하세요.",
       "cancelWarning": "현재 결제 기간이 끝나면 구독이 취소됩니다.",
       "cancel": "구독 취소",
       "cancelSuccess": "현재 결제 기간이 끝나면 구독이 취소됩니다.",
@@ -460,7 +463,18 @@
       "manage": "구독 관리",
       "portal": "청구 포털",
       "none": "활성 구독이 없습니다.",
-      "browseCta": "플랜 보기"
+      "browseCta": "플랜 보기",
+      "status": {
+        "active": "활성",
+        "trialing": "무료 체험",
+        "admin_granted": "관리자 부여",
+        "past_due": "연체",
+        "unpaid": "미지급",
+        "canceled": "취소됨",
+        "incomplete": "미완료",
+        "incomplete_expired": "만료됨",
+        "paused": "일시정지됨"
+      }
     },
     "history": {
       "title": "결제 내역",

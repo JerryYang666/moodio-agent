@@ -443,6 +443,9 @@
       "title": "Subscription",
       "periodEnd": "Renews on {date}",
       "endsOn": "Ends on {date}",
+      "trialEndsOn": "Free trial ends on {date}",
+      "trialBannerTitle": "You're on a free trial",
+      "trialBannerBody": "Your free trial ends on {date}. You won't be charged until then. Cancel anytime before then to avoid being billed.",
       "cancelWarning": "Your subscription will be canceled at the end of the current billing period.",
       "manage": "Manage Subscription",
       "cancel": "Cancel Subscription",
@@ -460,7 +463,18 @@
       "resumeConfirmProceed": "Yes, Resume",
       "portal": "Billing Portal",
       "none": "You don't have an active subscription.",
-      "browseCta": "Browse Plans"
+      "browseCta": "Browse Plans",
+      "status": {
+        "active": "Active",
+        "trialing": "Free Trial",
+        "admin_granted": "Granted by Admin",
+        "past_due": "Past Due",
+        "unpaid": "Unpaid",
+        "canceled": "Canceled",
+        "incomplete": "Incomplete",
+        "incomplete_expired": "Expired",
+        "paused": "Paused"
+      }
     },
     "history": {
       "title": "Payment History",

@@ -443,6 +443,9 @@
       "title": "訂閱",
       "periodEnd": "續費日期：{date}",
       "endsOn": "到期日期：{date}",
+      "trialEndsOn": "免費試用結束日期：{date}",
+      "trialBannerTitle": "您正在免費試用中",
+      "trialBannerBody": "您的免費試用將於 {date} 結束。在此之前不會扣款。如需避免扣款，請在結束日期前取消。",
       "cancelWarning": "您的訂閱將在目前計費週期結束後取消。",
       "cancel": "取消訂閱",
       "cancelSuccess": "您的訂閱將在目前計費週期結束後取消。",
@@ -460,7 +463,18 @@
       "manage": "管理訂閱",
       "portal": "帳單中心",
       "none": "您目前沒有有效的訂閱。",
-      "browseCta": "瀏覽方案"
+      "browseCta": "瀏覽方案",
+      "status": {
+        "active": "訂閱中",
+        "trialing": "免費試用中",
+        "admin_granted": "管理員授予",
+        "past_due": "逾期未付",
+        "unpaid": "未付款",
+        "canceled": "已取消",
+        "incomplete": "未完成",
+        "incomplete_expired": "已過期",
+        "paused": "已暫停"
+      }
     },
     "history": {
       "title": "付款紀錄",
