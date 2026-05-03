@@ -17,6 +17,7 @@ import type { EnrichedMediaAssetRef, CellLock } from "@/lib/production-table/typ
 import type { AssetSummary } from "@/components/chat/asset-picker-modal";
 import { AI_IMAGE_DRAG_MIME, AI_VIDEO_DRAG_MIME, AI_VIDEO_SUGGEST_DRAG_MIME, AI_AUDIO_DRAG_MIME, AI_GROUP_DRAG_MIME } from "@/components/chat/asset-dnd";
 import GroupDetailDrawer from "@/components/production-table/GroupDetailDrawer";
+import { useGroupSummary } from "@/hooks/use-group-summary";
 import { uploadImage } from "@/lib/upload/client";
 import { uploadAudio } from "@/lib/upload/audio-client";
 import { uploadVideo } from "@/lib/upload/video-client";
@@ -35,6 +36,46 @@ function userIdToColor(userId: string): string {
   }
   const hue = Math.abs(hash) % 360;
   return `hsl(${hue}, 70%, 50%)`;
+}
+
+/**
+ * Live group thumbnail for media cells. Subscribes to useGroupSummary so
+ * cover + count refresh in real time when peers mutate the group (the
+ * production-table page's WS handler dispatches the same-tab CustomEvent
+ * that the summary hook listens to). Falls back to the cell-stored values
+ * before the first fetch lands.
+ */
+function GroupCellThumb({
+  asset,
+  onClick,
+}: {
+  asset: EnrichedMediaAssetRef;
+  onClick: () => void;
+}) {
+  const { summary } = useGroupSummary(asset.folderId ?? null);
+  const coverUrl =
+    summary?.coverThumbnailSmUrl || summary?.coverImageUrl || asset.imageUrl;
+  const memberCount = summary?.memberCount ?? asset.groupMemberCount ?? null;
+  const name = summary?.name ?? asset.groupName ?? "Group";
+
+  return (
+    <button
+      className="relative w-10 h-10 rounded bg-default-100 border border-divider overflow-hidden flex items-center justify-center cursor-pointer hover:border-primary"
+      onClick={onClick}
+      title={`${name} (×${memberCount ?? "?"})`}
+    >
+      {coverUrl ? (
+        <img src={coverUrl} alt="" className="object-cover w-full h-full" />
+      ) : (
+        <Layers size={14} className="text-default-500" />
+      )}
+      <span className="absolute bottom-0 right-0 px-1 py-0.5 text-[9px] bg-black/60 text-white font-mono rounded-tl">
+        ×{memberCount ?? "?"}
+      </span>
+      {/* Stack-of-cards motif */}
+      <span className="pointer-events-none absolute -bottom-0.5 -right-0.5 w-full h-full border-r border-b border-divider/60 rounded" />
+    </button>
+  );
 }
 
 interface MediaCellProps {
@@ -472,26 +513,10 @@ export const MediaCell = memo(function MediaCell({
         {assets.map((asset, idx) => (
           <div key={`${asset.assetId}-${idx}`} className="relative group">
             {asset.assetType === "group" ? (
-              <button
-                className="relative w-10 h-10 rounded bg-default-100 border border-divider overflow-hidden flex items-center justify-center cursor-pointer hover:border-primary"
+              <GroupCellThumb
+                asset={asset}
                 onClick={() => setGroupDrawerAsset(asset)}
-                title={`${asset.groupName ?? "Group"} (×${asset.groupMemberCount ?? "?"})`}
-              >
-                {asset.imageUrl ? (
-                  <img
-                    src={asset.imageUrl}
-                    alt=""
-                    className="object-cover w-full h-full"
-                  />
-                ) : (
-                  <Layers size={14} className="text-default-500" />
-                )}
-                <span className="absolute bottom-0 right-0 px-1 py-0.5 text-[9px] bg-black/60 text-white font-mono rounded-tl">
-                  ×{asset.groupMemberCount ?? "?"}
-                </span>
-                {/* Stack-of-cards motif */}
-                <span className="pointer-events-none absolute -bottom-0.5 -right-0.5 w-full h-full border-r border-b border-divider/60 rounded" />
-              </button>
+              />
             ) : asset.assetType === "audio" ? (
               <div
                 className="w-10 h-10 rounded bg-violet-500/20 flex items-center justify-center cursor-pointer"

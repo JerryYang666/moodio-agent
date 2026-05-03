@@ -118,6 +118,7 @@ const GridCell = React.memo(function GridCell({
         onAddAsset={handleAddAsset}
         onRemoveAsset={handleRemoveAsset}
         assetLabel={`${colName} - Row ${rowIndex + 1}`}
+        sendEvent={sendEvent}
       />
     );
   }
