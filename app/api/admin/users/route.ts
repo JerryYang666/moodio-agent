@@ -30,6 +30,7 @@ export async function GET(request: NextRequest) {
         credits: userCredits.balance,
         subscriptionStatus: subscriptions.status,
         subscriptionEnd: subscriptions.currentPeriodEnd,
+        stripeSubscriptionId: subscriptions.stripeSubscriptionId,
       })
       .from(users)
       .leftJoin(userCredits, eq(users.id, userCredits.userId))
@@ -37,17 +38,26 @@ export async function GET(request: NextRequest) {
       .orderBy(desc(users.createdAt));
 
     const now = new Date();
-    const usersWithCredits = allUsers.map((user) => ({
-      ...user,
-      credits: user.credits ?? 0,
-      isProSubscriber:
-        (user.subscriptionStatus === "active" ||
-          user.subscriptionStatus === "trialing" ||
-          user.subscriptionStatus === "admin_granted") &&
-        user.subscriptionEnd != null &&
-        new Date(user.subscriptionEnd) > now,
-      subscriptionEnd: user.subscriptionEnd?.toISOString() ?? null,
-    }));
+    const usersWithCredits = allUsers.map((user) => {
+      const hasStripeSubscription =
+        !!user.stripeSubscriptionId &&
+        !user.stripeSubscriptionId.startsWith("admin_grant_") &&
+        user.subscriptionStatus !== "canceled" &&
+        user.subscriptionStatus !== "incomplete_expired";
+      const { stripeSubscriptionId: _sid, ...rest } = user;
+      return {
+        ...rest,
+        credits: user.credits ?? 0,
+        isProSubscriber:
+          (user.subscriptionStatus === "active" ||
+            user.subscriptionStatus === "trialing" ||
+            user.subscriptionStatus === "admin_granted") &&
+          user.subscriptionEnd != null &&
+          new Date(user.subscriptionEnd) > now,
+        subscriptionEnd: user.subscriptionEnd?.toISOString() ?? null,
+        hasStripeSubscription,
+      };
+    });
 
     return NextResponse.json({ users: usersWithCredits });
   } catch (error) {

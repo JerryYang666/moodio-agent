@@ -51,6 +51,7 @@ interface UserWithCredits extends User {
   testingGroups: string[];
   isProSubscriber: boolean;
   subscriptionEnd: string | null;
+  hasStripeSubscription: boolean;
 }
 
 export default function AdminPage() {
@@ -568,15 +569,17 @@ export default function AdminPage() {
                         >
                           {t("addCredits")}
                         </Button>
-                        <Button
-                          size="sm"
-                          variant="flat"
-                          color="secondary"
-                          startContent={<Crown size={14} />}
-                          onPress={() => handleOpenSubModal(item)}
-                        >
-                          Grant Pro
-                        </Button>
+                        {!item.hasStripeSubscription && (
+                          <Button
+                            size="sm"
+                            variant="flat"
+                            color="secondary"
+                            startContent={<Crown size={14} />}
+                            onPress={() => handleOpenSubModal(item)}
+                          >
+                            Grant Pro
+                          </Button>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>

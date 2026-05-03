@@ -47,10 +47,31 @@ export async function POST(request: NextRequest) {
     periodEnd.setMonth(periodEnd.getMonth() + months);
 
     const existing = await db
-      .select({ id: subscriptions.id, currentPeriodEnd: subscriptions.currentPeriodEnd, status: subscriptions.status })
+      .select({
+        id: subscriptions.id,
+        currentPeriodEnd: subscriptions.currentPeriodEnd,
+        status: subscriptions.status,
+        stripeSubscriptionId: subscriptions.stripeSubscriptionId,
+      })
       .from(subscriptions)
       .where(eq(subscriptions.userId, userId))
       .limit(1);
+
+    if (
+      existing.length > 0 &&
+      existing[0].stripeSubscriptionId &&
+      !existing[0].stripeSubscriptionId.startsWith("admin_grant_") &&
+      existing[0].status !== "canceled" &&
+      existing[0].status !== "incomplete_expired"
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "User has an active Stripe subscription. Cancel the Stripe subscription before granting a complimentary one.",
+        },
+        { status: 409 }
+      );
+    }
 
     let result;
 
