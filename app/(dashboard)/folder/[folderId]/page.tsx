@@ -1506,8 +1506,8 @@ export default function FolderPage({
         asset={selectedAudio}
         onDownload={handleAudioDownload}
         labels={{
-          audioDetails: t("audioDetails"),
-          untitledAudio: t("untitledAudio"),
+          audioDetails: tCollections("audioDetails"),
+          untitledAudio: tCollections("untitledAudio"),
           download: tCommon("download"),
           close: tCommon("close"),
         }}
