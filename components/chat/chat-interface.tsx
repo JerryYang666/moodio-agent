@@ -4395,22 +4395,24 @@ export default function ChatInterface({
             }
           : null;
 
+      // IMPORTANT: do NOT pass snapshot.mode as newMode — resolveMenuState
+      // treats that as a mode switch and resets every category to its mode
+      // default, wiping out the model/expertise/quantity/etc we just set.
+      // Passing undefined only validates that snapshot values are allowed,
+      // keeping them intact when they are.
       setMenuState((prev) => ({
-        ...resolveMenuState(
-          {
-            ...prev,
-            mode: snapshot.mode,
-            model: snapshot.model,
-            expertise: snapshot.expertise,
-            aspectRatio: snapshot.aspectRatio,
-            imageSize: snapshot.imageSize,
-            imageQuality: snapshot.imageQuality,
-            imageQuantity: snapshot.imageQuantity,
-            videoModelId: snapshot.videoModelId,
-            videoParams: clonedVideoParams,
-          },
-          snapshot.mode
-        ),
+        ...resolveMenuState({
+          ...prev,
+          mode: snapshot.mode,
+          model: snapshot.model,
+          expertise: snapshot.expertise,
+          aspectRatio: snapshot.aspectRatio,
+          imageSize: snapshot.imageSize,
+          imageQuality: snapshot.imageQuality,
+          imageQuantity: snapshot.imageQuantity,
+          videoModelId: snapshot.videoModelId,
+          videoParams: clonedVideoParams,
+        }),
         videoModelId: snapshot.videoModelId,
         videoParams: clonedVideoParams,
       }));

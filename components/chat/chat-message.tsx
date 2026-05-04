@@ -987,6 +987,61 @@ export default function ChatMessage({
               isUser ? "justify-end" : "justify-start"
             )}
           >
+            {isUser && onRestoreComposer && message.metadata?.composerSnapshot && (
+              <button
+                onClick={() => onRestoreComposer(message.metadata!.composerSnapshot!)}
+                className="md:opacity-0 md:group-hover:opacity-100 transition-opacity p-1 hover:bg-default-100 rounded-full text-default-400 hover:text-default-600"
+                aria-label={t("chat.putBack")}
+                title={t("chat.putBack")}
+              >
+                <RotateCcw size={12} />
+              </button>
+            )}
+            {isUser && messageIndex > 0 && onForkChat && (
+              <Popover
+                isOpen={isForkPopoverOpen}
+                onOpenChange={setIsForkPopoverOpen}
+                placement="bottom-end"
+              >
+                <PopoverTrigger>
+                  <button
+                    className="md:opacity-0 md:group-hover:opacity-100 transition-opacity p-1 hover:bg-default-100 rounded-full text-default-400 hover:text-default-600"
+                    aria-label={t("chat.editMessage")}
+                  >
+                    <Pencil size={12} />
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent>
+                  <div className="px-1 py-2 w-60">
+                    <div className="text-small font-bold mb-1">
+                      {t("chat.editInNewChatTitle")}
+                    </div>
+                    <div className="text-tiny text-default-500 mb-2">
+                      {t("chat.editInNewChatDescription")}
+                    </div>
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        size="sm"
+                        variant="light"
+                        onPress={() => setIsForkPopoverOpen(false)}
+                      >
+                        {t("common.cancel")}
+                      </Button>
+                      <Button
+                        size="sm"
+                        color="primary"
+                        onPress={() => {
+                          setIsForkPopoverOpen(false);
+                          onForkChat(messageIndex);
+                        }}
+                      >
+                        {t("chat.editAndFork")}
+                      </Button>
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            )}
             {isTimestampLoading ? (
               <Spinner
                 variant="dots"
@@ -1051,61 +1106,6 @@ export default function ChatMessage({
             )}
             {!isUser && timestampAction && (
               <div className="ml-auto">{timestampAction}</div>
-            )}
-            {isUser && onRestoreComposer && message.metadata?.composerSnapshot && (
-              <button
-                onClick={() => onRestoreComposer(message.metadata!.composerSnapshot!)}
-                className="md:opacity-0 md:group-hover:opacity-100 transition-opacity p-1 hover:bg-default-100 rounded-full text-default-400 hover:text-default-600"
-                aria-label={t("chat.putBack")}
-                title={t("chat.putBack")}
-              >
-                <RotateCcw size={12} />
-              </button>
-            )}
-            {isUser && messageIndex > 0 && onForkChat && (
-              <Popover
-                isOpen={isForkPopoverOpen}
-                onOpenChange={setIsForkPopoverOpen}
-                placement="bottom-end"
-              >
-                <PopoverTrigger>
-                  <button
-                    className="md:opacity-0 md:group-hover:opacity-100 transition-opacity p-1 hover:bg-default-100 rounded-full text-default-400 hover:text-default-600"
-                    aria-label={t("chat.editMessage")}
-                  >
-                    <Pencil size={12} />
-                  </button>
-                </PopoverTrigger>
-                <PopoverContent>
-                  <div className="px-1 py-2 w-60">
-                    <div className="text-small font-bold mb-1">
-                      {t("chat.editInNewChatTitle")}
-                    </div>
-                    <div className="text-tiny text-default-500 mb-2">
-                      {t("chat.editInNewChatDescription")}
-                    </div>
-                    <div className="flex justify-end gap-2">
-                      <Button
-                        size="sm"
-                        variant="light"
-                        onPress={() => setIsForkPopoverOpen(false)}
-                      >
-                        {t("common.cancel")}
-                      </Button>
-                      <Button
-                        size="sm"
-                        color="primary"
-                        onPress={() => {
-                          setIsForkPopoverOpen(false);
-                          onForkChat(messageIndex);
-                        }}
-                      >
-                        {t("chat.editAndFork")}
-                      </Button>
-                    </div>
-                  </div>
-                </PopoverContent>
-              </Popover>
             )}
           </div>
         )}
