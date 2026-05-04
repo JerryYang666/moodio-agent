@@ -27,6 +27,10 @@ function isPublicPath(pathname: string): boolean {
     "/api/video/webhook/kie",
     "/api/video/webhook/volcengine",
     "/api/stripe/webhook",
+    // Called only by the Go realtime relay with an internal bearer JWT
+    // (aud=realtime-internal). The route handler enforces audience + signature;
+    // the user cookie isn't present here by design.
+    "/api/realtime/authorize",
   ];
 
   if (publicPaths.includes(pathname)) {

@@ -21,9 +21,9 @@ func main() {
 		fatalf(regionLocal, "JWT_ACCESS_SECRET environment variable is required")
 	}
 
-	permissionAPIBase := os.Getenv("PERMISSION_API_BASE")
-	if permissionAPIBase == "" {
-		permissionAPIBase = "http://localhost:3000"
+	apiBase := os.Getenv("PERMISSION_API_BASE")
+	if apiBase == "" {
+		apiBase = "http://localhost:3000"
 	}
 
 	m := melody.New()
@@ -31,10 +31,9 @@ func main() {
 
 	auth := &Auth{jwtSecret: []byte(jwtSecret)}
 	rooms := NewRoomManager(m)
+	rooms.Configure(auth, apiBase)
 
 	// Federation: auto-enable if NATS_URL is configured.
-	// Safe even with a single region -- messages published to NATS are
-	// discarded by the regionId dedup check when no other region exists.
 	if natsURL := os.Getenv("NATS_URL"); natsURL != "" {
 		regionId := os.Getenv("REGION_ID")
 		if regionId == "" {
@@ -56,100 +55,31 @@ func main() {
 		}
 	}
 
-	http.HandleFunc("/ws/desktop/{desktopId}", func(w http.ResponseWriter, r *http.Request) {
-		claims, err := auth.ValidateFromCookie(r)
-		if err != nil {
-			logf(regionLocal, "[auth] rejected connection: %v", err)
-			http.Error(w, "unauthorized", http.StatusUnauthorized)
-			return
-		}
-
-		desktopId := r.PathValue("desktopId")
-		if desktopId == "" {
-			http.Error(w, "missing desktopId", http.StatusBadRequest)
-			return
-		}
-
-		permission, err := checkPermission(permissionAPIBase, desktopId, claims.UserID, r)
-		if err != nil || permission == "" {
-			logf(regionLocal, "[auth] permission denied for user=%s desktop=%s: %v", claims.UserID, desktopId, err)
-			http.Error(w, "forbidden", http.StatusForbidden)
-			return
-		}
-
-		sessionId := generateSessionId()
-		logf(regionLocal, "[connect] user=%s (%s) -> desktop=%s session=%s permission=%s",
-			displayName(claims.FirstName, claims.Email), claims.UserID[:8], desktopId[:8], sessionId, permission)
-
-		err = m.HandleRequestWithKeys(w, r, map[string]any{
-			"sessionId":  sessionId,
-			"userId":     claims.UserID,
-			"firstName":  claims.FirstName,
-			"email":      claims.Email,
-			"permission": permission,
-			"roomId":     "desktop:" + desktopId,
-		})
-		if err != nil {
-			logf(regionLocal, "WebSocket upgrade error: %v", err)
-		}
-	})
+	// Single multiplexed WebSocket endpoint. Identity is verified via the
+	// moodio_access_token cookie on handshake; the verified Claims are cached
+	// on the session for the lifetime of the connection. Topic authorization
+	// happens per-subscribe over the wire, not at handshake.
+	//
+	// Path lives under /ws/ so existing Nginx location blocks route it
+	// correctly without any config change.
+	http.HandleFunc("/ws/connection", wsHandshakeHandler(auth, m))
 
 	m.HandleConnect(func(s *melody.Session) {
 		rooms.HandleConnect(s)
 	})
-
 	m.HandleMessage(func(s *melody.Session, msg []byte) {
 		rooms.HandleMessage(s, msg)
 	})
-
 	m.HandleDisconnect(func(s *melody.Session) {
 		rooms.HandleDisconnect(s)
 	})
 
-	http.HandleFunc("/ws/production-table/{tableId}", func(w http.ResponseWriter, r *http.Request) {
-		claims, err := auth.ValidateFromCookie(r)
-		if err != nil {
-			logf(regionLocal, "[auth] rejected production-table connection: %v", err)
-			http.Error(w, "unauthorized", http.StatusUnauthorized)
-			return
-		}
-
-		tableId := r.PathValue("tableId")
-		if tableId == "" {
-			http.Error(w, "missing tableId", http.StatusBadRequest)
-			return
-		}
-
-		permission, err := checkProductionTablePermission(permissionAPIBase, tableId, claims.UserID, r)
-		if err != nil || permission == "" {
-			logf(regionLocal, "[auth] permission denied for user=%s production-table=%s: %v", claims.UserID, tableId, err)
-			http.Error(w, "forbidden", http.StatusForbidden)
-			return
-		}
-
-		sessionId := generateSessionId()
-		logf(regionLocal, "[connect] user=%s (%s) -> production-table=%s session=%s permission=%s",
-			displayName(claims.FirstName, claims.Email), claims.UserID[:8], tableId[:8], sessionId, permission)
-
-		err = m.HandleRequestWithKeys(w, r, map[string]any{
-			"sessionId":  sessionId,
-			"userId":     claims.UserID,
-			"firstName":  claims.FirstName,
-			"email":      claims.Email,
-			"permission": permission,
-			"roomId":     "production-table:" + tableId,
-		})
-		if err != nil {
-			logf(regionLocal, "WebSocket upgrade error: %v", err)
-		}
-	})
-
+	// Unauthenticated latency echo endpoint used by the admin page.
 	pingMelody := melody.New()
 	pingMelody.Config.MaxMessageSize = 512
 	pingMelody.HandleMessage(func(s *melody.Session, msg []byte) {
 		s.Write(msg)
 	})
-
 	http.HandleFunc("/ws/ping", func(w http.ResponseWriter, r *http.Request) {
 		if err := pingMelody.HandleRequest(w, r); err != nil {
 			logf(regionLocal, "ping WebSocket upgrade error: %v", err)
@@ -186,6 +116,29 @@ func main() {
 	logf(regionLocal, "realtime server starting on :%s", port)
 	if err := http.ListenAndServe(":"+port, nil); err != nil {
 		fatalf(regionLocal, "listen error: %v", err)
+	}
+}
+
+// wsHandshakeHandler returns the /ws HTTP handler. Factored out of main so
+// tests can mount it against an httptest.Server without invoking main().
+func wsHandshakeHandler(auth *Auth, m *melody.Melody) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		claims, err := auth.ValidateFromCookie(r)
+		if err != nil {
+			logf(regionLocal, "[auth] rejected connection: %v", err)
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		sessionId := generateSessionId()
+
+		err = m.HandleRequestWithKeys(w, r, map[string]any{
+			"sessionId": sessionId,
+			"claims":    claims,
+		})
+		if err != nil {
+			logf(regionLocal, "WebSocket upgrade error: %v", err)
+		}
 	}
 }
 

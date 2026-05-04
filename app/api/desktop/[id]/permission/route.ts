@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAccessToken } from "@/lib/auth/cookies";
 import { verifyAccessToken } from "@/lib/auth/jwt";
-import { getDesktopPermission } from "@/lib/desktop/permissions";
+import { authorizeTopic } from "@/lib/realtime/authorize";
 
 /**
  * GET /api/desktop/[id]/permission
  * Returns the calling user's permission level for this desktop.
- * Used by the Go realtime server during WebSocket handshake auth.
+ * Delegates to the shared realtime authorize helper so there's one source
+ * of truth for permission resolution.
  */
 export async function GET(
   req: NextRequest,
@@ -24,15 +25,15 @@ export async function GET(
     }
 
     const { id } = await params;
-    const permission = await getDesktopPermission(id, payload.userId);
-    if (!permission) {
+    const result = await authorizeTopic(`desktop:${id}`, payload.userId);
+    if ("error" in result) {
       return NextResponse.json(
         { error: "No access" },
-        { status: 403 }
+        { status: result.error === "bad_request" ? 400 : 403 }
       );
     }
 
-    return NextResponse.json({ permission });
+    return NextResponse.json({ permission: result.permission });
   } catch {
     return NextResponse.json(
       { error: "Internal server error" },

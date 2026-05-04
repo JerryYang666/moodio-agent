@@ -107,3 +107,38 @@ export async function verifyAccessToken(
     return null;
   }
 }
+
+// REALTIME_INTERNAL_AUDIENCE gates /api/realtime/authorize. Tokens without
+// this audience (e.g. the browser access-token cookie) cannot authenticate
+// that endpoint — only the Go relay, which holds JWT_ACCESS_SECRET, can mint
+// matching bearers. Keep this string in sync with realtime/auth.go.
+export const REALTIME_INTERNAL_AUDIENCE = "realtime-internal";
+
+export interface InternalTokenPayload {
+  userId: string;
+}
+
+/**
+ * Verify a bearer minted by the Go relay for /api/realtime/authorize.
+ * Requires aud=REALTIME_INTERNAL_AUDIENCE. Returns null on any failure.
+ */
+export async function verifyInternalToken(
+  token: string
+): Promise<InternalTokenPayload | null> {
+  try {
+    const secret = getJWTSecret();
+    const { payload } = await jwtVerify(token, secret, {
+      audience: REALTIME_INTERNAL_AUDIENCE,
+      clockTolerance: siteConfig.auth.clockSkewSeconds,
+    });
+    if (!payload.userId || typeof payload.userId !== "string") {
+      return null;
+    }
+    return { userId: payload.userId };
+  } catch (err) {
+    // Log the reason so the relay can be debugged from the Next.js side.
+    // Expected safe: jose messages don't contain secret material.
+    console.error("[realtime/authorize] verifyInternalToken failed:", err);
+    return null;
+  }
+}

@@ -1,20 +1,16 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import {
+  getRealtimeClient,
+  type ConnectionState,
+  type RemoteEvent,
+  type RemoteSession as ClientRemoteSession,
+} from "@/lib/realtime/client";
 
-export type ConnectionState =
-  | "connecting"
-  | "connected"
-  | "reconnecting"
-  | "polling"
-  | "disconnected";
+export type { ConnectionState } from "@/lib/realtime/client";
 
-export interface RemoteSession {
-  sessionId: string;
-  userId: string;
-  firstName: string;
-  email: string;
-  permission: string;
+export interface RemoteSession extends ClientRemoteSession {
   cursorX?: number;
   cursorY?: number;
   selectedAssetIds?: string[];
@@ -35,15 +31,7 @@ export interface RemoteCursor {
   y: number;
 }
 
-export interface RemoteEvent {
-  type: string;
-  sessionId: string;
-  userId: string;
-  firstName: string;
-  email: string;
-  timestamp: number;
-  payload: any;
-}
+export type { RemoteEvent } from "@/lib/realtime/client";
 
 interface UseDesktopWebSocketOptions {
   desktopId: string;
@@ -54,14 +42,6 @@ interface UseDesktopWebSocketOptions {
   fetchDetail?: () => Promise<any>;
 }
 
-const WS_BASE_URL =
-  typeof window !== "undefined"
-    ? process.env.NEXT_PUBLIC_WS_URL || `ws://${window.location.hostname}:8081`
-    : "";
-
-const RECONNECT_BASE_DELAY = 1000;
-const RECONNECT_MAX_DELAY = 30000;
-const MAX_RECONNECT_BEFORE_POLLING = 5;
 const DEFAULT_POLLING_INTERVAL = 10000;
 
 export function useDesktopWebSocket({
@@ -79,75 +59,50 @@ export function useDesktopWebSocket({
     () => new Map()
   );
 
-  const wsRef = useRef<WebSocket | null>(null);
-  const reconnectAttempts = useRef(0);
-  const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pollingTimer = useRef<ReturnType<typeof setInterval> | null>(null);
-  const intentionalClose = useRef(false);
   const onRemoteEventRef = useRef(onRemoteEvent);
   const fetchDetailRef = useRef(fetchDetail);
-
   onRemoteEventRef.current = onRemoteEvent;
   fetchDetailRef.current = fetchDetail;
 
-  const baseUrl = wsUrl || WS_BASE_URL;
-
-  const stopPolling = useCallback(() => {
+  // Manage polling fallback locally — the client reports "polling" as its
+  // connection state, and we turn on a fetchDetail interval while in it.
+  useEffect(() => {
+    if (connectionState === "polling" && fetchDetailRef.current) {
+      pollingTimer.current = setInterval(() => {
+        fetchDetailRef.current?.();
+      }, pollingInterval);
+      return () => {
+        if (pollingTimer.current) {
+          clearInterval(pollingTimer.current);
+          pollingTimer.current = null;
+        }
+      };
+    }
     if (pollingTimer.current) {
       clearInterval(pollingTimer.current);
       pollingTimer.current = null;
     }
-  }, []);
+    return undefined;
+  }, [connectionState, pollingInterval]);
 
-  const startPolling = useCallback(() => {
-    stopPolling();
-    if (!fetchDetailRef.current) return;
-    pollingTimer.current = setInterval(() => {
-      fetchDetailRef.current?.();
-    }, pollingInterval);
-  }, [pollingInterval, stopPolling]);
+  useEffect(() => {
+    if (!enabled || !desktopId) return;
 
-  const connect = useCallback(() => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) return;
-    if (wsRef.current?.readyState === WebSocket.CONNECTING) return;
+    const client = getRealtimeClient({ wsUrl });
+    const topic = `desktop:${desktopId}`;
 
-    intentionalClose.current = false;
-
-    const url = `${baseUrl}/ws/desktop/${desktopId}`;
-    setConnectionState(
-      reconnectAttempts.current > 0 ? "reconnecting" : "connecting"
-    );
-
-    const ws = new WebSocket(url);
-    wsRef.current = ws;
-
-    ws.onopen = () => {
-      reconnectAttempts.current = 0;
-      setConnectionState("connected");
-      stopPolling();
-    };
-
-    ws.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data) as RemoteEvent;
-
-        if (data.type === "room_joined") {
-          const payload = data as unknown as {
-            type: string;
-            sessionId: string;
-            sessions: RemoteSession[];
-          };
-          setMySessionId(payload.sessionId);
-          const newSessions = new Map<string, RemoteSession>();
-          for (const s of payload.sessions) {
-            newSessions.set(s.sessionId, s);
-          }
-          setSessions(newSessions);
-          return;
-        }
-
-        if (data.type === "session_joined") {
-          const info = data.payload as RemoteSession;
+    const unsubscribe = client.subscribe(topic, {
+      onConnectionState: setConnectionState,
+      onRoomState: ({ mySessionId: mine, sessions: list }) => {
+        setMySessionId(mine);
+        const next = new Map<string, RemoteSession>();
+        for (const s of list) next.set(s.sessionId, s as RemoteSession);
+        setSessions(next);
+      },
+      onEvent: (event) => {
+        if (event.type === "session_joined") {
+          const info = event.payload as RemoteSession;
           setSessions((prev) => {
             const next = new Map(prev);
             next.set(info.sessionId, info);
@@ -155,40 +110,36 @@ export function useDesktopWebSocket({
           });
           return;
         }
-
-        if (data.type === "session_left") {
-          const info = data.payload as { sessionId: string };
+        if (event.type === "session_left") {
+          const info = event.payload as { sessionId: string };
           setSessions((prev) => {
             const next = new Map(prev);
             next.delete(info.sessionId);
             return next;
           });
-          // Forward to onRemoteEvent so page can clean up cell locks, etc.
-          onRemoteEventRef.current?.(data);
+          onRemoteEventRef.current?.(event);
           return;
         }
-
-        if (data.type === "cursor_move") {
+        if (event.type === "cursor_move") {
           setSessions((prev) => {
-            const existing = prev.get(data.sessionId);
+            const existing = prev.get(event.sessionId);
             if (!existing) return prev;
             const next = new Map(prev);
-            next.set(data.sessionId, {
+            next.set(event.sessionId, {
               ...existing,
-              cursorX: data.payload?.x,
-              cursorY: data.payload?.y,
+              cursorX: event.payload?.x,
+              cursorY: event.payload?.y,
             });
             return next;
           });
           return;
         }
-
-        if (data.type === "cursor_leave") {
+        if (event.type === "cursor_leave") {
           setSessions((prev) => {
-            const existing = prev.get(data.sessionId);
+            const existing = prev.get(event.sessionId);
             if (!existing) return prev;
             const next = new Map(prev);
-            next.set(data.sessionId, {
+            next.set(event.sessionId, {
               ...existing,
               cursorX: undefined,
               cursorY: undefined,
@@ -197,16 +148,15 @@ export function useDesktopWebSocket({
           });
           return;
         }
-
-        if (data.type === "asset_selected") {
+        if (event.type === "asset_selected") {
           setSessions((prev) => {
-            const existing = prev.get(data.sessionId);
+            const existing = prev.get(event.sessionId);
             if (!existing) return prev;
-            const assetId = data.payload?.assetId;
+            const assetId = event.payload?.assetId;
             if (!assetId) return prev;
             const next = new Map(prev);
             const current = existing.selectedAssetIds || [];
-            next.set(data.sessionId, {
+            next.set(event.sessionId, {
               ...existing,
               selectedAssetIds: [...current, assetId],
             });
@@ -214,15 +164,14 @@ export function useDesktopWebSocket({
           });
           return;
         }
-
-        if (data.type === "asset_deselected") {
+        if (event.type === "asset_deselected") {
           setSessions((prev) => {
-            const existing = prev.get(data.sessionId);
+            const existing = prev.get(event.sessionId);
             if (!existing) return prev;
-            const assetId = data.payload?.assetId;
+            const assetId = event.payload?.assetId;
             if (!assetId) return prev;
             const next = new Map(prev);
-            next.set(data.sessionId, {
+            next.set(event.sessionId, {
               ...existing,
               selectedAssetIds: (existing.selectedAssetIds || []).filter(
                 (id: string) => id !== assetId
@@ -232,64 +181,27 @@ export function useDesktopWebSocket({
           });
           return;
         }
+        onRemoteEventRef.current?.(event);
+      },
+    });
 
-        onRemoteEventRef.current?.(data);
-      } catch {
-        // ignore malformed messages
-      }
-    };
-
-    ws.onclose = () => {
-      wsRef.current = null;
-      if (intentionalClose.current) return;
-      if (reconnectAttempts.current >= MAX_RECONNECT_BEFORE_POLLING) {
-        setConnectionState("polling");
-        startPolling();
-        // Still try to reconnect periodically
-        reconnectTimer.current = setTimeout(() => {
-          reconnectAttempts.current = 0;
-          connect();
-        }, RECONNECT_MAX_DELAY);
-        return;
-      }
-      setConnectionState("reconnecting");
-      const delay = Math.min(
-        RECONNECT_BASE_DELAY * Math.pow(2, reconnectAttempts.current),
-        RECONNECT_MAX_DELAY
-      );
-      reconnectAttempts.current++;
-      reconnectTimer.current = setTimeout(connect, delay);
-    };
-
-    ws.onerror = () => {
-      ws.close();
-    };
-  }, [baseUrl, desktopId, startPolling, stopPolling]);
-
-  useEffect(() => {
-    if (!enabled || !desktopId) return;
-    connect();
     return () => {
-      intentionalClose.current = true;
-      if (reconnectTimer.current) clearTimeout(reconnectTimer.current);
-      stopPolling();
-      wsRef.current?.close();
-      wsRef.current = null;
-      setConnectionState("disconnected");
+      unsubscribe();
       setMySessionId(null);
       setSessions(new Map());
     };
-  }, [enabled, desktopId, connect, stopPolling]);
+  }, [enabled, desktopId, wsUrl]);
 
   const sendEvent = useCallback(
     (type: string, payload: Record<string, unknown>) => {
-      if (wsRef.current?.readyState !== WebSocket.OPEN) return;
-      wsRef.current.send(JSON.stringify({ type, payload }));
+      if (!desktopId) return;
+      const client = getRealtimeClient({ wsUrl });
+      client.publish(`desktop:${desktopId}`, type, payload);
     },
-    []
+    [desktopId, wsUrl]
   );
 
-  const connectedUsers = useMemo(() => {
+  const connectedUsers = useMemo<ConnectedUser[]>(() => {
     const userMap = new Map<
       string,
       { userId: string; firstName: string; email: string; count: number }

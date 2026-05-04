@@ -10,8 +10,8 @@ permissions:
   contents: read
 
 jobs:
-  unit-and-streaming:
-    name: Unit & streaming tests
+  agent-and-realtime:
+    name: Agent-2, operation-history & realtime tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -20,7 +20,29 @@ jobs:
           node-version: "24"
           cache: npm
       - run: npm ci
-      - run: npx vitest run __tests__/agent-2/ --exclude '**/llm-integration*'
+      # Agent 0 and Agent 1 test suites are deprecated and intentionally
+      # excluded. This run covers Agent 2, operation-history, and the
+      # realtime client + authorize tests. LLM integration runs in its own
+      # job below so it can receive API credentials.
+      - run: |
+          npx vitest run \
+            __tests__/agent-2 \
+            __tests__/operation-history \
+            __tests__/realtime-authorize.test.ts \
+            __tests__/realtime-client.test.ts \
+            --exclude '**/llm-integration*'
+
+  typecheck:
+    name: TypeScript typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: npm
+      - run: npm ci
+      - run: npx tsc --noEmit
 
   llm-integration:
     name: LLM integration tests

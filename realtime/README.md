@@ -1,72 +1,72 @@
 # moodio-realtime
 
-WebSocket server for real-time collaboration on Moodio desktops and production tables. Handles room-based presence, event broadcasting, permission enforcement, and optional cross-region federation via NATS. Sits behind Nginx alongside the main Next.js app.
+WebSocket server for real-time collaboration on Moodio desktops and production tables. One authenticated connection per tab carries many dynamic topic subscriptions; permission is checked per-subscribe against the Next.js app. Optional cross-region federation via NATS. Sits behind Nginx alongside the Next.js app.
 
 ## Architecture
 
 ```
                         ┌─── Region A ───────────────────────────┐
-Browser ──WebSocket──▶  │  Nginx (/ws/*) ──▶ Go realtime (:8081) │
-Browser ──HTTP───────▶  │  Nginx (/*) ────▶ Next.js app (:3000)  │
+Browser ──WebSocket──▶  │  Nginx (/ws*)  ──▶ Go realtime (:8081) │
+Browser ──HTTP───────▶  │  Nginx (/*)    ──▶ Next.js app (:3000) │
                         └─────────────┬─────────────────────────┘
                                       │ NATS gateway
                         ┌─────────────┴─────────────────────────┐
-Browser ──WebSocket──▶  │  Nginx (/ws/*) ──▶ Go realtime (:8081) │
-Browser ──HTTP───────▶  │  Nginx (/*) ────▶ Next.js app (:3000)  │
+Browser ──WebSocket──▶  │  Nginx (/ws*)  ──▶ Go realtime (:8081) │
+Browser ──HTTP───────▶  │  Nginx (/*)    ──▶ Next.js app (:3000) │
                         └─── Region B ───────────────────────────┘
 ```
 
-Each region runs an independent relay server. When NATS is configured, events are forwarded across regions transparently so users in different regions collaborating on the same desktop or production table see each other's changes in real time.
+Each region runs an independent relay. When NATS is configured, events are forwarded across regions transparently so users in different regions see each other in real time.
 
 Without NATS the server operates in single-server mode — no external dependencies beyond the Next.js API.
 
-The server uses [melody](https://github.com/olahol/melody) (a gorilla/websocket wrapper) for connection management. Rooms are managed via an in-memory index — each desktop ID maps to a set of WebSocket sessions. There is no external state (no Redis, no database).
+The server uses [melody](https://github.com/olahol/melody) (a gorilla/websocket wrapper) for connection management. Topic membership is an in-memory index (`map[topic] → set[*Session]`); no external state (no Redis, no database).
 
 ### Files
 
 | File | Purpose |
 |---|---|
-| `main.go` | HTTP server, route setup (`/ws/desktop/{id}`, `/ws/production-table/{id}`, `/ws/ping`, `/health`, `/check`), EC2 region auto-detection, federation bootstrap |
-| `room.go` | Room manager, broadcast, session handling, presence events, federation message routing, permission checks |
-| `auth.go` | JWT validation from cookie, permission API calls (desktop + production table), session ID generation |
+| `main.go` | HTTP server, single `/ws/connection` multiplexed endpoint, `/ws/ping`, `/health`, `/check`, EC2 region auto-detection, federation bootstrap |
+| `room.go` | Topic membership map, subscribe/unsubscribe/publish handlers, broadcast, federation message routing, session events |
+| `connection.go` | `SessionKeys`, `SessionSubs` (per-session topic set + rate-limit bucket), per-(session, topic) authorize cache, per-session dispatch goroutine |
+| `auth.go` | JWT validation from cookie, `MintInternalJWT` (aud=realtime-internal), `AuthorizeTopic` HTTP call |
+| `protocol.go` | Wire envelopes (`IncomingOp`, `SubscribedAck`, `TopicEvent`, etc.) and `parseTopic` validation |
 | `federation.go` | `Federator` interface, `FederatedMessage` struct with region ID, encode/decode helpers |
 | `federation_nats.go` | NATS-based `Federator` implementation for cross-region message forwarding |
 | `logging.go` | Region-tagged logging helpers (`logf`, `fatalf`) |
-| `room_test.go` | Functional tests + benchmarks (isolation, permissions, latency under pressure) |
-| `production_table_test.go` | Production table tests (cross-type isolation, PT broadcast, PT permissions, join/disconnect) |
+| `room_test.go` | Functional tests + benchmarks (subscribe/unsubscribe, multi-topic, isolation, rate-limit, cache, latency under pressure) |
+| `production_table_test.go` | Production-table topic tests |
 | `federation_test.go` | Cross-region federation tests using mock federators |
 | `nginx.example.conf` | Example Nginx reverse proxy config |
 | `Dockerfile` | Multi-stage Docker build (golang → distroless) |
 
 ## Connection Flow
 
-### Desktop
+1. Client connects to `GET /ws/connection` with the `moodio_access_token` cookie.
+2. Server validates the JWT (HMAC-SHA256 signature + expiration). On failure → 401.
+3. Server stashes the verified `Claims` on the session and upgrades the connection. **No topic is bound at this point.**
+4. Client sends a `subscribe` op for each topic it cares about. For each subscribe:
+   - Server mints a short-lived (60s) internal JWT (`aud=realtime-internal`) from the cached claims.
+   - Server calls `GET /api/realtime/authorize?topic=<topic>` on the Next.js app with `Authorization: Bearer <internalJWT>`.
+   - On 200 → subscription added, `subscribed` ack sent, `session_joined` broadcast to topic.
+   - On 403/404/400 → `error` frame sent, no membership change.
+   - Result cached per (sessionId, topic) for 30s; invalidated on unsubscribe.
 
-1. Client connects to `GET /ws/desktop/{desktopId}` with a `moodio_access_token` cookie
-2. Server validates the JWT (HMAC-SHA256 signature + expiration)
-3. Server calls the Next.js API at `GET /api/desktop/{desktopId}/permission?userId={userId}` to check the user's permission level, forwarding the original cookies
-4. On success, the connection is upgraded to WebSocket and the session joins room `desktop:{desktopId}`
+Because the relay holds the verified claims for the lifetime of the connection, the user's 30-minute cookie TTL does not bound the WS lifetime — subscribes keep working until the WS itself drops.
 
-### Production Table
+### Why the authorize endpoint is relay-only
 
-1. Client connects to `GET /ws/production-table/{tableId}` with a `moodio_access_token` cookie
-2. Server validates the JWT (HMAC-SHA256 signature + expiration)
-3. Server calls the Next.js API at `GET /api/production-table/{tableId}/permission?userId={userId}` to check the user's permission level, forwarding the original cookies
-4. On success, the connection is upgraded to WebSocket and the session joins room `production-table:{tableId}`
-
-### Room ID Namespacing
-
-Both desktop and production table rooms share a single `RoomManager` and melody instance. Room IDs are prefixed by type (`desktop:` or `production-table:`) to guarantee isolation — even if a desktop and a production table happen to share the same UUID, their rooms are distinct.
+`/api/realtime/authorize` requires a bearer token with `aud: "realtime-internal"`. Only the relay (which holds `JWT_ACCESS_SECRET`) can mint such tokens. The browser's access-token cookie does not carry that audience, so a curl or fetch from the browser cannot authenticate the endpoint.
 
 ## Environment Variables
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
-| `JWT_ACCESS_SECRET` | Yes | — | HMAC-SHA256 secret for validating JWT access tokens |
+| `JWT_ACCESS_SECRET` | Yes | — | HMAC-SHA256 secret shared with Next.js. Used to verify the user's access-token cookie AND to sign internal bearers for the authorize endpoint. |
 | `PORT` | No | `8081` | Port the server listens on |
-| `PERMISSION_API_BASE` | No | `http://localhost:3000` | Base URL for the Next.js permission API |
+| `PERMISSION_API_BASE` | No | `http://localhost:3000` | Base URL for the Next.js authorize endpoint |
 | `NATS_URL` | No | — | NATS server URL. Enables cross-region federation when set. Gracefully falls back to single-server mode if unreachable. |
-| `REGION_ID` | No | auto-detected | Region identifier for federation. Auto-detected from EC2 instance metadata (IMDSv2) when not set. Falls back to `"no-region"`. |
+| `REGION_ID` | No | auto-detected | Region identifier for federation. Auto-detected from EC2 Instance Metadata (IMDSv2) when not set. Falls back to `"no-region"`. |
 | `NATS_REGION` | No | — | Selects the NATS gateway config file (`nats/nats-${NATS_REGION}.conf`) |
 
 ## Running
@@ -107,9 +107,144 @@ GET /ws/ping
 
 Unauthenticated echo endpoint. Echoes back any message sent to it. Used by the admin latency test page to measure round-trip time. Max message size: **512 bytes**.
 
+## WebSocket Protocol
+
+The wire format is a JSON envelope with an `op` field in every frame.
+
+### Connecting
+
+```
+ws://host/ws/connection
+```
+
+The handshake is authenticated by the `moodio_access_token` cookie. The path lives under `/ws/` so existing Nginx `location /ws/` blocks route it to the realtime upstream unchanged. No frames are emitted by the server until the client subscribes.
+
+### Client → Server
+
+Subscribe to a topic (identity is already known; server performs per-topic authorization):
+
+```json
+{ "op": "subscribe", "topic": "desktop:abc123", "ref": "c1" }
+```
+
+Unsubscribe:
+
+```json
+{ "op": "unsubscribe", "topic": "desktop:abc123", "ref": "c2" }
+```
+
+Publish an event to a topic this connection is subscribed to:
+
+```json
+{
+  "op": "publish",
+  "topic": "desktop:abc123",
+  "type": "asset_moved",
+  "payload": { "id": "asset-1", "x": 100, "y": 200 },
+  "ref": "c3"
+}
+```
+
+`ref` is an optional echoable correlation id. Topic format: `<namespace>:<id>` where namespace ∈ `{desktop, production-table}` and id matches `^[A-Za-z0-9_-]{1,128}$`.
+
+### Server → Client
+
+Successful subscribe:
+
+```json
+{
+  "op": "subscribed",
+  "topic": "desktop:abc123",
+  "permission": "editor",
+  "sessionId": "session_...",
+  "sessions": [
+    { "sessionId": "...", "userId": "...", "firstName": "...", "email": "...", "permission": "editor" }
+  ],
+  "ref": "c1"
+}
+```
+
+The `sessions` list includes both local and remote (federated) participants and subsumes the old `room_joined` frame.
+
+Successful unsubscribe:
+
+```json
+{ "op": "unsubscribed", "topic": "desktop:abc123", "ref": "c2" }
+```
+
+Error:
+
+```json
+{ "op": "error", "topic": "desktop:abc123", "code": "forbidden", "message": "...", "ref": "c1" }
+```
+
+Error codes: `forbidden`, `not_found`, `bad_request`, `rate_limited`, `not_subscribed`, `internal`.
+
+Topic event (stamped by the server, scoped to a topic):
+
+```json
+{
+  "op": "event",
+  "topic": "desktop:abc123",
+  "type": "asset_moved",
+  "sessionId": "session_...",
+  "userId": "...",
+  "firstName": "Alice",
+  "email": "alice@example.com",
+  "timestamp": 1709000000000,
+  "payload": { "id": "asset-1", "x": 100, "y": 200 }
+}
+```
+
+`session_joined` / `session_left` use the same `op:"event"` envelope with their own `type`; the payload is a `SessionInfo` object.
+
+### Permissions
+
+Permission is **per-topic**, not per-connection. A session may be a viewer on topic A and an editor on topic B at the same time.
+
+- **owner / editor** — can publish all event types
+- **viewer** — all mutation events (see table below) are silently dropped at the relay
+
+Permission is checked on each `subscribe`, cached per `(sessionId, topic)` for 30s, and invalidated on `unsubscribe`.
+
+### Per-session limits
+
+- **50 active topics** per connection.
+- **20 subscribes / 10s** rolling window. Exceeding either returns `{op:"error", code:"rate_limited"}`.
+
+### Mutation event types
+
+| Event | Namespace | Logged |
+|---|---|---|
+| `asset_moved` | desktop | Yes |
+| `asset_resized` | desktop | Yes |
+| `asset_added` | desktop | Yes |
+| `asset_removed` | desktop | Yes |
+| `asset_dragging` | desktop | No |
+| `asset_resizing` | desktop | No |
+| `asset_selected` / `asset_deselected` | desktop | No |
+| `asset_z_changed` | desktop | No |
+| `cell_selected` / `cell_deselected` / `cell_updated` | desktop | No |
+| `table_generating` | desktop | No |
+| `pt_cell_selected` / `pt_cell_deselected` / `pt_cell_updated` | production-table | No |
+| `pt_cell_comment_updated` | production-table | No |
+| `pt_media_asset_added` / `pt_media_asset_removed` | production-table | No |
+| `pt_column_added` / `pt_column_removed` / `pt_column_renamed` / `pt_column_resized` / `pt_columns_reordered` | production-table | No |
+| `pt_row_added` / `pt_row_removed` / `pt_row_resized` / `pt_rows_reordered` | production-table | No |
+
+Non-mutation events (e.g. `cursor_move`, `cursor_leave`, `pt_cursor_move`, `pt_cursor_leave`, `video_suggest_updated`, `video_generation_polling`) are delivered regardless of viewer/editor permission.
+
+## Topic / Room Model
+
+A "topic" is the unit of fan-out: `<namespace>:<id>`. The `RoomManager` tracks `map[topic] → set[*Session]`. Each session also tracks its own `SessionSubs` (topic → permission), plus a token-bucket subscribe rate limiter. Empty topics are garbage-collected when the last local session unsubscribes or disconnects; when that last session was the last local subscriber, federation unsubscribe also fires.
+
+Messages are broadcast directly to topic members, bypassing Melody's global `BroadcastFilter` so sessions in unrelated topics are never touched.
+
+When federation is active, `broadcastToTopic` delivers locally then publishes to NATS. `broadcastToTopicLocal` is used for messages received from other regions to avoid re-publishing back to NATS.
+
 ## Cross-Region Federation
 
-Federation allows multiple relay servers in different AWS regions to share events for the same desktop rooms, so users connected to different regions see each other in real time.
+Federation allows multiple relay servers in different AWS regions to share events for the same topic, so users connected to different regions see each other in real time.
 
 ### How It Works
 
@@ -121,14 +256,15 @@ Federation allows multiple relay servers in different AWS regions to share event
    ```json
    {"r": "us-east-2", "p": <original event payload>}
    ```
+   The inner payload is the `TopicEvent` JSON — it carries its own `topic` field which receivers cross-check against the NATS subject (defense in depth against cross-wired payloads).
 
-4. **NATS subjects**: Room events are published to `room.{roomId}`. Cross-region forwarding is handled transparently by NATS gateways.
+4. **NATS subjects**: Events are published to `room.{topic}`. Cross-region forwarding is handled transparently by NATS gateways.
 
-5. **Presence sync**: When the first local session joins a room, the server publishes a `presence_sync_request` to NATS. Other regions respond by publishing `session_joined` events for their local sessions, so the newcomer discovers remote participants. This handles the case where a region joins a room after users in other regions are already present.
+5. **Presence sync**: When the first local subscriber joins a topic, the server publishes a `presence_sync_request` to NATS. Other regions respond by publishing `session_joined` events for their local subscribers, so the newcomer discovers remote participants.
 
-6. **Remote session tracking**: The `RoomManager` maintains a `remoteSessions` map (keyed by room ID) that tracks sessions connected to other regional relays. These remote sessions are included in `room_joined` responses so joining clients see the full participant list across all regions.
+6. **Remote session tracking**: The `RoomManager` maintains a `remoteSessions` map (keyed by topic) that tracks sessions connected to other regional relays. These remote sessions are included in `subscribed` ack responses so joining clients see the full participant list across all regions.
 
-7. **Local-only broadcast**: Messages received from other regions via NATS are broadcast only to local sessions (`broadcastToRoomLocal`) — they are not re-published to NATS, preventing infinite loops.
+7. **Local-only broadcast**: Messages received from other regions via NATS are broadcast only to local sessions (`broadcastToTopicLocal`) — they are not re-published to NATS, preventing infinite loops.
 
 ### NATS Connection Resilience
 
@@ -136,136 +272,25 @@ The NATS client is configured with automatic reconnection (2-second wait, unlimi
 
 ## Logging
 
-All log lines are tagged with a region prefix: `[local]` for events originating on the current server, or `[us-east-2]`, `[ap-northeast-1]`, etc. for events received via federation from other regions. This makes it easy to trace cross-region event flow in aggregated logs.
-
-Log categories:
+All log lines are tagged with a region prefix: `[local]` for events originating on the current server, or `[us-east-2]`, `[ap-northeast-1]`, etc. for events received via federation.
 
 | Prefix | Examples |
 |---|---|
-| `[local] [auth]` | JWT validation failures, permission denials |
-| `[local] [connect]` | New WebSocket connections with user/session/permission details |
-| `[local] [room]` | Session joins, leaves, room membership counts |
-| `[local] [event]` | State-changing events (`asset_moved`, `asset_resized`, etc.) with truncated payloads |
-| `[local] [federation]` | Federation enable/disable, publish errors, presence sync |
+| `[local] [auth]` | JWT validation failures |
+| `[local] [connect]` | New WebSocket connections (no topic at this point) |
+| `[local] [sub]` / `[sub-deny]` | Subscribe success / failure with code |
+| `[local] [unsub]` | Unsubscribe |
+| `[local] [disconnect]` | Teardown with total topics dropped |
+| `[local] [room]` | Viewer-mutation drops, federation presence |
+| `[local] [event]` | State-changing events (`asset_moved`, `asset_resized`, `asset_added`, `asset_removed`) |
+| `[local] [federation]` | Federation enable/disable, publish errors, topic mismatches |
 | `[local] [nats]` | NATS connection/disconnection/reconnection events |
-| `[local] [check]` | Region check requests |
-| `[{region}] [room]` | Remote session joins/leaves received via federation |
-| `[{region}] [event]` | Remote state events received via federation |
-
-## WebSocket Protocol
-
-### Connecting
-
-Connect to `ws://host/ws/desktop/{desktopId}` or `ws://host/ws/production-table/{tableId}` with the `moodio_access_token` cookie set.
-
-On connect, the server sends a `room_joined` event to the new client:
-
-```json
-{
-  "type": "room_joined",
-  "sessionId": "session_abc123...",
-  "sessions": [
-    { "sessionId": "...", "userId": "...", "firstName": "...", "email": "...", "permission": "editor" }
-  ]
-}
-```
-
-The `sessions` list includes both local and remote (federated) participants.
-
-All other clients in the room (local and remote via federation) receive a `session_joined` event:
-
-```json
-{
-  "type": "session_joined",
-  "sessionId": "...",
-  "userId": "...",
-  "firstName": "Alice",
-  "email": "alice@example.com",
-  "timestamp": 1709000000000,
-  "payload": { "sessionId": "...", "userId": "...", "firstName": "Alice", "email": "...", "permission": "editor" }
-}
-```
-
-### Sending Events
-
-Send a JSON message with `type` and `payload`:
-
-```json
-{ "type": "asset_moved", "payload": { "id": "asset-1", "x": 100, "y": 200 } }
-```
-
-The server stamps the sender's identity and broadcasts to all other sessions in the same room (including remote sessions via federation):
-
-```json
-{
-  "type": "asset_moved",
-  "sessionId": "session_abc123...",
-  "userId": "user-id",
-  "firstName": "Alice",
-  "email": "alice@example.com",
-  "timestamp": 1709000000000,
-  "payload": { "id": "asset-1", "x": 100, "y": 200 }
-}
-```
-
-### Disconnecting
-
-When a session disconnects, the server broadcasts `session_left` to all remaining room members (local and remote via federation).
-
-### Event Types
-
-| Event | Direction | Mutating | Logged |
-|---|---|---|---|
-| `room_joined` | Server → joining client | — | — |
-| `session_joined` | Server → room | — | — |
-| `session_left` | Server → room | — | — |
-| `asset_moved` | Client → Server → room | Yes | Yes |
-| `asset_resized` | Client → Server → room | Yes | Yes |
-| `asset_added` | Client → Server → room | Yes | Yes |
-| `asset_removed` | Client → Server → room | Yes | Yes |
-| `asset_dragging` | Client → Server → room | Yes | No |
-| `asset_resizing` | Client → Server → room | Yes | No |
-| `asset_selected` | Client → Server → room | Yes | No |
-| `asset_deselected` | Client → Server → room | Yes | No |
-| `cell_selected` | Client → Server → room | Yes | No |
-| `cell_deselected` | Client → Server → room | Yes | No |
-| `cell_updated` | Client → Server → room | Yes | No |
-| `table_generating` | Client → Server → room | Yes | No |
-| `presence_sync_request` | Federation internal | — | — |
-
-#### Production Table Events
-
-| Event | Direction | Mutating | Logged |
-|---|---|---|---|
-| `pt_cell_selected` | Client → Server → room | Yes | No |
-| `pt_cell_deselected` | Client → Server → room | Yes | No |
-| `pt_cell_updated` | Client → Server → room | Yes | No |
-| `pt_column_added` | Client → Server → room | Yes | No |
-| `pt_column_removed` | Client → Server → room | Yes | No |
-| `pt_column_renamed` | Client → Server → room | Yes | No |
-| `pt_columns_reordered` | Client → Server → room | Yes | No |
-| `pt_row_added` | Client → Server → room | Yes | No |
-| `pt_row_removed` | Client → Server → room | Yes | No |
-| `pt_rows_reordered` | Client → Server → room | Yes | No |
-
-### Permissions
-
-- **editor** — can send all event types
-- **viewer** — all mutation events are silently blocked server-side
-
-Permission is checked once at connection time via the Next.js API and cached for the session lifetime.
-
-## Room Model
-
-Rooms are implicit — a room is the set of sessions sharing a namespaced room ID (e.g. `desktop:{desktopId}` or `production-table:{tableId}`). The `RoomManager` maintains an in-memory index (`map[roomId]set[*Session]`) for O(room-size) lookups and broadcasts. Empty rooms are garbage-collected automatically when the last session disconnects.
-
-Messages are broadcast directly to room members, bypassing Melody's global `BroadcastFilter` to avoid iterating over sessions in unrelated rooms.
-
-When federation is active, `broadcastToRoom` delivers locally then publishes to NATS. `broadcastToRoomLocal` is used for messages received from other regions to avoid re-publishing back to NATS.
+| `[{region}] [room]` | Remote session joins/leaves via federation |
+| `[{region}] [event]` | Remote state events via federation |
 
 ## Nginx Setup
 
-See `nginx.example.conf` for routing `/ws/*` to this server and everything else to Next.js. Key settings:
+See `nginx.example.conf` for routing `/ws/` (both `/ws/connection` and `/ws/ping`) to this server and everything else to Next.js. Key settings:
 
 - `proxy_http_version 1.1` + `Upgrade` / `Connection` headers for WebSocket
 - `proxy_read_timeout 86400` to keep idle connections alive for 24h
@@ -275,51 +300,54 @@ See `nginx.example.conf` for routing `/ws/*` to this server and everything else 
 ### Run All Tests
 
 ```bash
-go test -v ./...
+go test -race ./...
 ```
 
-### Run Functional Tests
-
-```bash
-go test -v -run '^Test(RoomIsolation|JoinEvents|Disconnect|Viewer|Editor|Stamped|ManyRooms|Federation|PT)' ./...
-```
-
-### Functional Tests (Desktop)
+### Functional Tests
 
 | Test | What it verifies |
 |---|---|
-| `TestRoomIsolation` | Events in room A don't reach room B; sender doesn't echo |
-| `TestRoomIsolation_BidirectionalMultiRoom` | Two isolated rooms, neither leaks |
-| `TestJoinEventsCorrectness` | `room_joined` lists existing sessions; `session_joined` broadcasts |
-| `TestDisconnectBroadcast` | `session_left` fires on disconnect |
-| `TestViewerCannotMutate` | All mutation types blocked for viewers |
-| `TestEditorCanMutate` | Editors can send mutations |
-| `TestStampedIdentity` | Outgoing events have correct userId, firstName, timestamp |
-| `TestManyRoomsIsolation` | 10 rooms, each receives only its own payloads |
+| `TestSubscribe_Ack` | Subscribe receives `subscribed` with permission + empty sessions list |
+| `TestSubscribe_MultiTopicOneConnection` | One session multiplexes two topics; events route independently |
+| `TestSubscribe_Forbidden` | `authorize` returns 403 → `error forbidden`; no membership leaks |
+| `TestSubscribe_BadRequestForUnknownNamespace` | Unknown namespace → `error bad_request` |
+| `TestUnsubscribe_Leaves` | `session_left` broadcast; former subscriber no longer receives publishes |
+| `TestDisconnect_MultiTopicCleanup` | All subscribed topics see `session_left`; empty topics GC'd |
+| `TestViewer_PerTopic` | Same session viewer on A, editor on B; mutation on A dropped, on B delivered |
+| `TestResubscribe_Idempotent` | Second subscribe sends ack but no extra `session_joined` |
+| `TestSubscribeStorm_RateLimited` | 30 rapid subscribes → some `rate_limited` |
+| `TestAuthorizeCache_HitAndInvalidate` | Cache hit on resubscribe; unsubscribe invalidates |
+| `TestRoomIsolation` | Events in topic A don't reach topic B; sender doesn't echo |
+| `TestJoinEventsCorrectness` | Ack lists existing sessions; `session_joined` broadcasts |
+| `TestDisconnectBroadcast` | `session_left` on disconnect |
+| `TestViewerCannotMutate` | All desktop mutation types blocked for viewers |
+| `TestEditorCanMutate` | Editors can publish mutations |
+| `TestStampedIdentity` | Outgoing events carry correct userId, firstName, timestamp |
+| `TestManyTopicsIsolation` | 10 topics, each receives only its own payloads |
 
-### Functional Tests (Production Table)
+### Production Table Tests
 
 | Test | What it verifies |
 |---|---|
-| `TestPTRoomIsolation_CrossType` | Desktop room and PT room with the same raw UUID are fully isolated via room ID prefix |
-| `TestPTRoomBroadcast` | Events sent in a PT room reach other participants with stamped identity |
-| `TestPTViewerCannotMutate` | All 10 `pt_*` mutation types blocked for viewers |
-| `TestPTEditorCanMutate` | Editors can send all 10 `pt_*` mutation types |
-| `TestPTJoinAndDisconnect` | `room_joined`, `session_joined`, and `session_left` work correctly in PT rooms |
-| `TestPTMultiRoomIsolation` | 5 PT rooms, each receives only its own payloads |
+| `TestPTRoomIsolation_CrossType` | Desktop topic and PT topic with the same id are isolated by namespace prefix |
+| `TestPTRoomBroadcast` | Events sent in a PT topic reach other participants with stamped identity |
+| `TestPTViewerCannotMutate` | All `pt_*` mutation types blocked for viewers |
+| `TestPTEditorCanMutate` | Editors can publish all `pt_*` mutation types |
+| `TestPTJoinAndDisconnect` | Ack session list + `session_joined` + `session_left` work in PT topics |
+| `TestPTMultiRoomIsolation` | 5 PT topics, each receives only its own payloads |
 
 ### Federation Tests
 
 | Test | What it verifies |
 |---|---|
-| `TestFederationCrossRegionBroadcast` | Message sent in US region arrives in HK region via federation |
-| `TestFederationBidirectional` | Messages flow in both directions between regions |
-| `TestFederationPresenceEvents` | `session_joined` and `session_left` propagate cross-region |
-| `TestFederationRoomIsolation` | Cross-region messages respect room boundaries |
+| `TestFederationCrossRegionBroadcast` | Event sent in US region arrives in HK region |
+| `TestFederationBidirectional` | Events flow in both directions |
+| `TestFederationPresenceEvents` | `session_joined` / `session_left` propagate cross-region |
+| `TestFederationRoomIsolation` | Cross-region messages respect topic boundaries |
 | `TestFederationSenderDoesNotEcho` | Sender doesn't receive their own message back via federation |
-| `TestFederationPresenceSync` | Latecomer region discovers existing sessions via presence sync request/response |
+| `TestFederationPresenceSync` | Latecomer region discovers existing subscribers via presence sync |
 
-Federation tests use a `mockFederator` pair that simulates two regions without a real NATS server. Each pair links two mock federators so `Publish` on one delivers to the other's subscribers with proper region ID dedup.
+Federation tests use a `mockFederator` pair that simulates two regions without a real NATS server.
 
 ### Benchmarks
 
@@ -329,36 +357,19 @@ go test -bench=. -benchmem -benchtime=3s -run='^$'
 
 | Benchmark | Setup | What it measures |
 |---|---|---|
-| `BenchmarkBroadcastSameRoom` | 20 clients, 1 room | Single-room broadcast throughput |
-| `BenchmarkBroadcastManyRooms` | 250 sessions, 50 rooms | Multi-room broadcast (room index efficiency) |
-| `BenchmarkGetSessionsInRoom` | 500 sessions, 50 rooms | Room member lookup cost |
-
-### Benchmark Results (Apple M-series, Go 1.25)
-
-| Benchmark | ns/op | B/op | allocs/op |
-|---|---|---|---|
-| `BroadcastSameRoom` (20 clients) | 1,020,192 | 7,297 | 39 |
-| `BroadcastManyRooms` (250 sessions, 50 rooms) | 9,135 | 3,280 | 22 |
-| `GetSessionsInRoom` (500 sessions, 50 rooms) | 14.05 | 0 | 0 |
-
-The room index makes multi-room broadcast **7.2x faster** than the naive global-scan approach, and room member lookups are effectively free at **14 ns** with zero allocations.
+| `BenchmarkBroadcastSameTopic` | 20 clients, 1 topic | Single-topic broadcast throughput |
+| `BenchmarkBroadcastManyTopics` | 250 sessions, 50 topics | Multi-topic broadcast (topic index efficiency) |
+| `BenchmarkGetSessionsInTopic` | 500 sessions, 50 topics | Topic member lookup cost |
 
 ### Latency Under Pressure
 
-`TestLatencyUnderPressure` measures end-to-end event delivery latency in a target room while all other rooms send concurrent traffic. Each room has 20 users; 200 messages are measured per level.
+`TestLatencyUnderPressure` measures end-to-end event delivery latency in a target topic while all other topics send concurrent traffic.
 
 ```bash
 go test -v -run TestLatencyUnderPressure -timeout 300s
 ```
 
-| Level | Sessions | Rooms | p50 | p95 | p99 | max |
-|---|---|---|---|---|---|---|
-| light | 50 | 5 | 27 us | 44 us | 880 us | 2.0 ms |
-| medium | 400 | 20 | 80 us | 215 us | 270 us | 445 us |
-| heavy | 1,000 | 50 | 69 us | 202 us | 339 us | 1.6 ms |
-| extreme | 2,000 | 100 | 49 us | 65 us | 102 us | 226 us |
-
-No latency decay as session count grows. Because broadcasts only touch the target room's members, cross-room pressure has negligible impact on delivery time.
+Set `MOODIO_PRESSURE_LEVELS=all` (or a comma list like `heavy,extreme`) to run all pressure levels; the default runs only `light` and `medium`.
 
 ## Dependencies
 
@@ -369,4 +380,4 @@ No latency decay as session count grows. Because broadcasts only touch the targe
 | [google/uuid](https://github.com/google/uuid) | v1.6.0 | Session ID generation |
 | [nats-io/nats.go](https://github.com/nats-io/nats.go) | v1.49.0 | Cross-region federation pub/sub |
 
-Max message size: **4096 bytes** (desktop, production table), **512 bytes** (ping)..
+Max message size: **65 kB** (`/ws/connection`), **512 B** (`/ws/ping`).

@@ -5,9 +5,11 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -26,6 +28,25 @@ type Claims struct {
 type Auth struct {
 	jwtSecret []byte
 }
+
+// Sentinel errors returned by AuthorizeTopic. They map 1:1 to wire error codes.
+var (
+	ErrTopicForbidden  = errors.New("forbidden")
+	ErrTopicNotFound   = errors.New("not_found")
+	ErrTopicBadRequest = errors.New("bad_request")
+	ErrTopicTransient  = errors.New("internal")
+)
+
+// realtimeInternalAudience is the JWT audience used for bearer tokens minted
+// by the relay and accepted by /api/realtime/authorize. User access JWTs do
+// not carry this audience, so the authorize endpoint is effectively
+// relay-only even though it lives on the public Next.js server.
+const realtimeInternalAudience = "realtime-internal"
+
+const internalJWTTTL = 60 * time.Second
+
+// authHTTPClient is shared across authorize calls so connection reuse kicks in.
+var authHTTPClient = &http.Client{Timeout: 5 * time.Second}
 
 func (a *Auth) ValidateFromCookie(r *http.Request) (*Claims, error) {
 	cookie, err := r.Cookie("moodio_access_token")
@@ -76,8 +97,90 @@ func (a *Auth) validateJWT(token string) (*Claims, error) {
 	return &claims, nil
 }
 
+// MintInternalJWT issues a short-lived HS256 bearer token for calling the
+// Next.js authorize endpoint. The token carries aud="realtime-internal" and
+// the user's identity; the authorize endpoint rejects tokens without this
+// audience, so the endpoint cannot be exercised with a stolen browser cookie.
+func (a *Auth) MintInternalJWT(claims *Claims) (string, error) {
+	if claims == nil || claims.UserID == "" {
+		return "", fmt.Errorf("cannot mint internal JWT without userId")
+	}
+	now := time.Now()
+	header := map[string]string{"alg": "HS256", "typ": "JWT"}
+	payload := map[string]any{
+		"userId": claims.UserID,
+		"aud":    realtimeInternalAudience,
+		"iat":    now.Unix(),
+		"exp":    now.Add(internalJWTTTL).Unix(),
+	}
+	hBytes, err := json.Marshal(header)
+	if err != nil {
+		return "", err
+	}
+	pBytes, err := json.Marshal(payload)
+	if err != nil {
+		return "", err
+	}
+	signingInput := base64URLEncode(hBytes) + "." + base64URLEncode(pBytes)
+
+	mac := hmac.New(sha256.New, a.jwtSecret)
+	mac.Write([]byte(signingInput))
+	sig := mac.Sum(nil)
+
+	return signingInput + "." + base64URLEncode(sig), nil
+}
+
+// AuthorizeTopic calls the Next.js dispatcher to check per-topic permission.
+// The bearer token must be a short-lived internal JWT minted via MintInternalJWT.
+// Returns the permission string ("owner"|"editor"|"viewer") or one of the
+// sentinel errors above.
+func AuthorizeTopic(apiBase, topic, internalJWT string) (string, error) {
+	endpoint := fmt.Sprintf("%s/api/realtime/authorize?topic=%s",
+		strings.TrimRight(apiBase, "/"),
+		url.QueryEscape(topic),
+	)
+	req, err := http.NewRequest(http.MethodGet, endpoint, nil)
+	if err != nil {
+		return "", fmt.Errorf("%w: build request: %v", ErrTopicTransient, err)
+	}
+	req.Header.Set("Authorization", "Bearer "+internalJWT)
+
+	resp, err := authHTTPClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("%w: authorize call failed: %v", ErrTopicTransient, err)
+	}
+	defer resp.Body.Close()
+
+	switch resp.StatusCode {
+	case http.StatusOK:
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return "", fmt.Errorf("%w: read body: %v", ErrTopicTransient, err)
+		}
+		var parsed struct {
+			Permission string `json:"permission"`
+		}
+		if err := json.Unmarshal(body, &parsed); err != nil {
+			return "", fmt.Errorf("%w: invalid authorize response: %v", ErrTopicTransient, err)
+		}
+		if parsed.Permission == "" {
+			return "", fmt.Errorf("%w: empty permission in authorize response", ErrTopicTransient)
+		}
+		return parsed.Permission, nil
+	case http.StatusBadRequest:
+		return "", fmt.Errorf("%w: authorize 400", ErrTopicBadRequest)
+	case http.StatusUnauthorized:
+		return "", fmt.Errorf("%w: authorize 401 (bearer rejected)", ErrTopicForbidden)
+	case http.StatusForbidden:
+		return "", fmt.Errorf("%w: authorize 403 (no access)", ErrTopicForbidden)
+	case http.StatusNotFound:
+		return "", fmt.Errorf("%w: authorize 404", ErrTopicNotFound)
+	default:
+		return "", fmt.Errorf("%w: authorize returned %d", ErrTopicTransient, resp.StatusCode)
+	}
+}
+
 func base64URLDecode(s string) ([]byte, error) {
-	// JWT base64url omits padding
 	switch len(s) % 4 {
 	case 2:
 		s += "=="
@@ -87,84 +190,10 @@ func base64URLDecode(s string) ([]byte, error) {
 	return base64.URLEncoding.DecodeString(s)
 }
 
+func base64URLEncode(b []byte) string {
+	return base64.RawURLEncoding.EncodeToString(b)
+}
+
 func generateSessionId() string {
 	return "session_" + uuid.New().String()
-}
-
-// checkPermission calls the Next.js API to verify the user's permission on a desktop.
-// It forwards the original cookies so the Next.js auth middleware can validate.
-func checkPermission(apiBase, desktopId, userId string, originalReq *http.Request) (string, error) {
-	url := fmt.Sprintf("%s/api/desktop/%s/permission?userId=%s", apiBase, desktopId, userId)
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return "", err
-	}
-
-	// Forward cookies from the original WS handshake request
-	for _, c := range originalReq.Cookies() {
-		req.AddCookie(c)
-	}
-
-	client := &http.Client{Timeout: 5 * time.Second}
-	resp, err := client.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("permission check failed: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("permission denied (status %d)", resp.StatusCode)
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", err
-	}
-
-	var result struct {
-		Permission string `json:"permission"`
-	}
-	if err := json.Unmarshal(body, &result); err != nil {
-		return "", err
-	}
-
-	return result.Permission, nil
-}
-
-// checkProductionTablePermission calls the Next.js API to verify the user's permission on a production table.
-func checkProductionTablePermission(apiBase, tableId, userId string, originalReq *http.Request) (string, error) {
-	url := fmt.Sprintf("%s/api/production-table/%s/permission?userId=%s", apiBase, tableId, userId)
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return "", err
-	}
-
-	for _, c := range originalReq.Cookies() {
-		req.AddCookie(c)
-	}
-
-	client := &http.Client{Timeout: 5 * time.Second}
-	resp, err := client.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("permission check failed: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("permission denied (status %d)", resp.StatusCode)
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", err
-	}
-
-	var result struct {
-		Permission string `json:"permission"`
-	}
-	if err := json.Unmarshal(body, &result); err != nil {
-		return "", err
-	}
-
-	return result.Permission, nil
 }

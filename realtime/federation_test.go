@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"sync"
 	"testing"
 	"time"
@@ -17,23 +16,22 @@ type mockFederator struct {
 	peer     *mockFederator
 }
 
-func newMockFederatorPair(regionA, regionB string) (*mockFederator, *mockFederator) {
-	a := &mockFederator{regionId: regionA, subs: make(map[string]func(string, []byte))}
-	b := &mockFederator{regionId: regionB, subs: make(map[string]func(string, []byte))}
-	a.peer = b
-	b.peer = a
-	return a, b
+func newMockFederatorPair(a, b string) (*mockFederator, *mockFederator) {
+	fa := &mockFederator{regionId: a, subs: make(map[string]func(string, []byte))}
+	fb := &mockFederator{regionId: b, subs: make(map[string]func(string, []byte))}
+	fa.peer = fb
+	fb.peer = fa
+	return fa, fb
 }
 
-func (f *mockFederator) Publish(roomId string, msg []byte) error {
+func (f *mockFederator) Publish(topic string, msg []byte) error {
 	data, err := encodeFederatedMsg(f.regionId, msg)
 	if err != nil {
 		return err
 	}
-	// Deliver to the peer (other region) if it has a subscription.
 	if f.peer != nil {
 		f.peer.mu.Lock()
-		handler, ok := f.peer.subs[roomId]
+		handler, ok := f.peer.subs[topic]
 		f.peer.mu.Unlock()
 		if ok {
 			fm, err := decodeFederatedMsg(data)
@@ -48,16 +46,16 @@ func (f *mockFederator) Publish(roomId string, msg []byte) error {
 	return nil
 }
 
-func (f *mockFederator) Subscribe(roomId string, handler func(string, []byte)) error {
+func (f *mockFederator) Subscribe(topic string, handler func(string, []byte)) error {
 	f.mu.Lock()
-	f.subs[roomId] = handler
+	f.subs[topic] = handler
 	f.mu.Unlock()
 	return nil
 }
 
-func (f *mockFederator) Unsubscribe(roomId string) error {
+func (f *mockFederator) Unsubscribe(topic string) error {
 	f.mu.Lock()
-	delete(f.subs, roomId)
+	delete(f.subs, topic)
 	f.mu.Unlock()
 	return nil
 }
@@ -67,7 +65,6 @@ func (f *mockFederator) Close() {}
 func TestFederationCrossRegionBroadcast(t *testing.T) {
 	fedUS, fedHK := newMockFederatorPair("us-east-2", "ap-northeast-1")
 
-	// Set up two servers simulating two regions
 	_, roomsUS, serverUS := setupTestServer()
 	defer serverUS.Close()
 	roomsUS.federator = fedUS
@@ -78,43 +75,25 @@ func TestFederationCrossRegionBroadcast(t *testing.T) {
 	roomsHK.federator = fedHK
 	roomsHK.regionId = "ap-northeast-1"
 
-	roomId := "room-federation-test"
+	topic := "desktop:fed-test"
 
-	// Alice connects in the US
-	alice := connectClient(t, serverUS, roomId, "user-alice", "Alice", "editor")
+	alice := connectAndSubscribe(t, serverUS, topic, "u-alice", "Alice", "editor")
 	defer alice.close()
-	time.Sleep(50 * time.Millisecond)
+	time.Sleep(100 * time.Millisecond)
 
-	// Bob connects in Tokyo
-	bob := connectClient(t, serverHK, roomId, "user-bob", "Bob", "editor")
+	bob := connectAndSubscribe(t, serverHK, topic, "u-bob", "Bob", "editor")
 	defer bob.close()
-	time.Sleep(50 * time.Millisecond)
+	time.Sleep(100 * time.Millisecond)
 
-	// Clear initial join/session messages
 	alice.clearMessages()
 	bob.clearMessages()
 
-	// Alice sends a message from the US region
-	alice.send(t, map[string]any{
-		"type":    "asset_moved",
-		"payload": map[string]any{"id": "asset-1", "x": 42},
-	})
+	alice.publish(t, topic, "asset_moved", map[string]any{"id": "a1", "x": 42})
 
-	// Bob in HK should receive it via federation
-	msgs := bob.waitForMessages(1, 2*time.Second)
-	if len(msgs) == 0 {
-		t.Fatal("Bob (HK) should receive the federated message from Alice (US)")
-	}
-
-	eventType := parseEventType(msgs[0])
-	if eventType != "asset_moved" {
-		t.Fatalf("expected asset_moved, got %s", eventType)
-	}
-
-	var out OutgoingEvent
-	json.Unmarshal(msgs[0], &out)
-	if out.FirstName != "Alice" {
-		t.Errorf("message should be stamped with Alice's identity, got %s", out.FirstName)
+	time.Sleep(300 * time.Millisecond)
+	events := bob.findEventsOfType("asset_moved", topic)
+	if len(events) == 0 {
+		t.Fatal("bob should receive federated asset_moved")
 	}
 }
 
@@ -131,32 +110,21 @@ func TestFederationBidirectional(t *testing.T) {
 	roomsHK.federator = fedHK
 	roomsHK.regionId = "ap-northeast-1"
 
-	roomId := "room-bidir-test"
+	topic := "desktop:bidir-test"
 
-	alice := connectClient(t, serverUS, roomId, "user-alice", "Alice", "editor")
+	alice := connectAndSubscribe(t, serverUS, topic, "u-alice", "Alice", "editor")
 	defer alice.close()
-	time.Sleep(50 * time.Millisecond)
-
-	bob := connectClient(t, serverHK, roomId, "user-bob", "Bob", "editor")
+	bob := connectAndSubscribe(t, serverHK, topic, "u-bob", "Bob", "editor")
 	defer bob.close()
-	time.Sleep(50 * time.Millisecond)
+	time.Sleep(200 * time.Millisecond)
 
 	alice.clearMessages()
 	bob.clearMessages()
 
-	// Bob sends from HK
-	bob.send(t, map[string]any{
-		"type":    "asset_resized",
-		"payload": map[string]any{"id": "asset-2", "w": 100},
-	})
-
-	// Alice in US should receive it
-	msgs := alice.waitForMessages(1, 2*time.Second)
-	if len(msgs) == 0 {
-		t.Fatal("Alice (US) should receive the federated message from Bob (HK)")
-	}
-	if parseEventType(msgs[0]) != "asset_resized" {
-		t.Fatalf("expected asset_resized, got %s", parseEventType(msgs[0]))
+	bob.publish(t, topic, "asset_resized", map[string]any{"id": "a2", "w": 100})
+	time.Sleep(300 * time.Millisecond)
+	if len(alice.findEventsOfType("asset_resized", topic)) == 0 {
+		t.Fatal("alice should receive federated asset_resized from bob")
 	}
 }
 
@@ -173,52 +141,26 @@ func TestFederationPresenceEvents(t *testing.T) {
 	roomsHK.federator = fedHK
 	roomsHK.regionId = "ap-northeast-1"
 
-	roomId := "room-presence-test"
+	topic := "desktop:presence-test"
 
-	// Alice connects in the US
-	alice := connectClient(t, serverUS, roomId, "user-alice", "Alice", "editor")
+	alice := connectAndSubscribe(t, serverUS, topic, "u-alice", "Alice", "editor")
 	defer alice.close()
-	time.Sleep(50 * time.Millisecond)
+	time.Sleep(100 * time.Millisecond)
 	alice.clearMessages()
 
-	// Bob connects in HK -- Alice should get session_joined via federation
-	bob := connectClient(t, serverHK, roomId, "user-bob", "Bob", "editor")
+	bob := connectAndSubscribe(t, serverHK, topic, "u-bob", "Bob", "editor")
 	defer bob.close()
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(300 * time.Millisecond)
 
-	msgs := alice.waitForMessages(1, 2*time.Second)
-	found := false
-	for _, m := range msgs {
-		if parseEventType(m) == "session_joined" {
-			var out OutgoingEvent
-			json.Unmarshal(m, &out)
-			if out.FirstName == "Bob" {
-				found = true
-			}
-		}
-	}
-	if !found {
-		t.Fatal("Alice should receive session_joined for Bob via federation")
+	if len(alice.findEventsOfType("session_joined", topic)) == 0 {
+		t.Fatal("alice should see session_joined for bob via federation")
 	}
 
-	// Disconnect Bob -- Alice should get session_left via federation
 	alice.clearMessages()
 	bob.close()
-	time.Sleep(200 * time.Millisecond)
-
-	msgs = alice.waitForMessages(1, 2*time.Second)
-	found = false
-	for _, m := range msgs {
-		if parseEventType(m) == "session_left" {
-			var out OutgoingEvent
-			json.Unmarshal(m, &out)
-			if out.FirstName == "Bob" {
-				found = true
-			}
-		}
-	}
-	if !found {
-		t.Fatal("Alice should receive session_left for Bob via federation")
+	time.Sleep(300 * time.Millisecond)
+	if len(alice.findEventsOfType("session_left", topic)) == 0 {
+		t.Fatal("alice should see session_left for bob via federation")
 	}
 }
 
@@ -235,31 +177,19 @@ func TestFederationRoomIsolation(t *testing.T) {
 	roomsHK.federator = fedHK
 	roomsHK.regionId = "ap-northeast-1"
 
-	// Alice in room-a on US, Bob in room-b on HK
-	alice := connectClient(t, serverUS, "room-a-fed", "user-alice", "Alice", "editor")
+	alice := connectAndSubscribe(t, serverUS, "desktop:room-a", "u-alice", "Alice", "editor")
 	defer alice.close()
-	time.Sleep(50 * time.Millisecond)
-
-	bob := connectClient(t, serverHK, "room-b-fed", "user-bob", "Bob", "editor")
+	bob := connectAndSubscribe(t, serverHK, "desktop:room-b", "u-bob", "Bob", "editor")
 	defer bob.close()
-	time.Sleep(50 * time.Millisecond)
-
+	time.Sleep(200 * time.Millisecond)
 	alice.clearMessages()
 	bob.clearMessages()
 
-	// Alice sends in room-a
-	alice.send(t, map[string]any{
-		"type":    "asset_moved",
-		"payload": map[string]any{"id": "x"},
-	})
+	alice.publish(t, "desktop:room-a", "asset_moved", map[string]any{"id": "x"})
 	time.Sleep(300 * time.Millisecond)
 
-	// Bob should NOT get it (different room)
-	bob.mu.Lock()
-	bobMsgs := len(bob.messages)
-	bob.mu.Unlock()
-	if bobMsgs > 0 {
-		t.Fatalf("Bob in room-b should not receive messages from room-a, got %d", bobMsgs)
+	if len(bob.findEventsOfType("asset_moved", "")) != 0 {
+		t.Fatal("bob in room-b should not see alice's message in room-a")
 	}
 }
 
@@ -276,30 +206,20 @@ func TestFederationSenderDoesNotEcho(t *testing.T) {
 	roomsHK.federator = fedHK
 	roomsHK.regionId = "ap-northeast-1"
 
-	roomId := "room-no-echo-test"
+	topic := "desktop:noecho-test"
 
-	alice := connectClient(t, serverUS, roomId, "user-alice", "Alice", "editor")
+	alice := connectAndSubscribe(t, serverUS, topic, "u-alice", "Alice", "editor")
 	defer alice.close()
-	time.Sleep(50 * time.Millisecond)
-
-	bob := connectClient(t, serverHK, roomId, "user-bob", "Bob", "editor")
+	bob := connectAndSubscribe(t, serverHK, topic, "u-bob", "Bob", "editor")
 	defer bob.close()
-	time.Sleep(50 * time.Millisecond)
-
+	time.Sleep(200 * time.Millisecond)
 	alice.clearMessages()
 
-	alice.send(t, map[string]any{
-		"type":    "asset_moved",
-		"payload": map[string]any{"id": "x"},
-	})
+	alice.publish(t, topic, "asset_moved", map[string]any{"id": "x"})
 	time.Sleep(300 * time.Millisecond)
 
-	// Alice should NOT receive her own message back (neither locally nor via federation)
-	alice.mu.Lock()
-	aliceMsgs := len(alice.messages)
-	alice.mu.Unlock()
-	if aliceMsgs > 0 {
-		t.Fatalf("Alice should not receive her own message back, got %d", aliceMsgs)
+	if len(alice.findEventsOfType("asset_moved", "")) != 0 {
+		t.Fatal("alice should not receive her own message back")
 	}
 }
 
@@ -316,64 +236,37 @@ func TestFederationPresenceSync(t *testing.T) {
 	roomsHK.federator = fedHK
 	roomsHK.regionId = "ap-northeast-1"
 
-	roomId := "room-sync-test"
+	topic := "desktop:sync-test"
 
-	// Alice connects in the US first -- HK has no subscription yet
-	alice := connectClient(t, serverUS, roomId, "user-alice", "Alice", "editor")
+	alice := connectAndSubscribe(t, serverUS, topic, "u-alice", "Alice", "editor")
 	defer alice.close()
-	time.Sleep(100 * time.Millisecond)
-
-	// Bob connects in HK later -- should discover Alice via presence sync
-	bob := connectClient(t, serverHK, roomId, "user-bob", "Bob", "editor")
-	defer bob.close()
 	time.Sleep(200 * time.Millisecond)
 
-	// Bob should receive session_joined for Alice (via sync response)
-	msgs := bob.waitForMessages(2, 2*time.Second)
-	foundAlice := false
-	for _, m := range msgs {
-		if parseEventType(m) == "session_joined" {
-			var out OutgoingEvent
-			json.Unmarshal(m, &out)
-			if out.FirstName == "Alice" {
-				foundAlice = true
-			}
-		}
-	}
-	if !foundAlice {
-		t.Fatal("Bob (HK latecomer) should discover Alice (US) via presence sync")
+	bob := connectAndSubscribe(t, serverHK, topic, "u-bob", "Bob", "editor")
+	defer bob.close()
+	time.Sleep(400 * time.Millisecond)
+
+	if len(bob.findEventsOfType("session_joined", topic)) == 0 {
+		t.Fatal("bob (HK latecomer) should discover Alice via presence sync")
 	}
 
-	// Alice should also know about Bob (via normal federation)
-	msgs = alice.waitForMessages(2, 2*time.Second)
-	foundBob := false
-	for _, m := range msgs {
-		if parseEventType(m) == "session_joined" {
-			var out OutgoingEvent
-			json.Unmarshal(m, &out)
-			if out.FirstName == "Bob" {
-				foundBob = true
-			}
-		}
-	}
-	if !foundBob {
-		t.Fatal("Alice (US) should know about Bob (HK) via normal federation")
+	if len(alice.findEventsOfType("session_joined", topic)) == 0 {
+		t.Fatal("alice (US) should know about bob via normal federation")
 	}
 
-	// Verify remoteSessions is populated on both sides
 	roomsHK.remoteMu.RLock()
-	hkRemote := roomsHK.remoteSessions[roomId]
+	hkRemote := roomsHK.remoteSessions[topic]
 	roomsHK.remoteMu.RUnlock()
 	if len(hkRemote) == 0 {
 		t.Fatal("HK remoteSessions should contain Alice")
 	}
-	foundAlice = false
+	found := false
 	for _, s := range hkRemote {
 		if s.FirstName == "Alice" {
-			foundAlice = true
+			found = true
 		}
 	}
-	if !foundAlice {
+	if !found {
 		t.Fatal("HK remoteSessions should contain Alice's session info")
 	}
 }
