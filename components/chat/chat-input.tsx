@@ -107,9 +107,7 @@ interface ChatInputProps {
   menuState: MenuState;
   onMenuStateChange: (newState: MenuState) => void;
   hasUploadingImages: boolean;
-  /** Initial editor content (JSON or plain text) for restoring drafts */
-  initialEditorContent?: JSONContent | string | null;
-  /** Callback when input loses focus (for draft saving) */
+  /** Callback when input loses focus (flushes draft as a safety net) */
   onBlur?: () => void;
   /** Reference images - persistent images that don't get cleared on send */
   /** Estimated video cost (for video mode send button) */
@@ -209,7 +207,6 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
   menuState,
   onMenuStateChange,
   hasUploadingImages,
-  initialEditorContent,
   onBlur,
   videoCost,
   videoCostLoading,
@@ -1590,7 +1587,6 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
                   <ImageChipDropdownItem item={item} isHighlighted={isHighlighted} />
                 )}
                 t={(key) => t(`mention.${key}`)}
-                initialContent={initialEditorContent}
               />
             </div>
 

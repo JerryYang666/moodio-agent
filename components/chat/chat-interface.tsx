@@ -76,15 +76,12 @@ import {
   validateAudioFile,
 } from "@/lib/upload/audio-client";
 import {
-  saveChatDraft,
-  loadChatDraft,
-  clearChatDraft,
-  draftImagesToPendingImages,
-  ChatDraft,
+  saveComposerDraft,
+  loadComposerDraft,
+  clearComposerDraft,
 } from "./draft-utils";
 import {
   buildComposerSnapshot,
-  isComposerSnapshot,
   snapshotImagesToPending,
   snapshotVideosToPending,
   snapshotAudiosToPending,
@@ -606,7 +603,6 @@ export default function ChatInterface({
   const chatInputRef = useRef<ChatInputRef>(null);
 
   // Draft state - loaded once on mount or when chatId changes
-  const [loadedDraft, setLoadedDraft] = useState<ChatDraft | null>(null);
   const [isDraftLoaded, setIsDraftLoaded] = useState(false);
   const [prevChatId, setPrevChatId] = useState(chatId);
   // Track if draft had images - used to skip pre-select when draft takes priority
@@ -616,7 +612,6 @@ export default function ChatInterface({
   if (chatId !== prevChatId) {
     setPrevChatId(chatId);
     setIsDraftLoaded(false);
-    setLoadedDraft(null);
     setDraftHadImages(false);
   }
 
@@ -624,66 +619,30 @@ export default function ChatInterface({
   // (which is declared much further down in this component).
   const applyComposerSnapshotRef = useRef<((s: ComposerSnapshot) => void) | null>(null);
 
-  // Load draft on mount or when chatId changes
+  // Load draft on mount or when chatId changes. A draft IS a ComposerSnapshot —
+  // whether left behind by the last active session, seeded by a fork, or
+  // migrated from legacy storage. Apply it through the same code path as
+  // put-back so all three flows share semantics.
+  //
+  // Gated on !isLoading: while the chat history is fetching, the component
+  // early-returns a spinner and ChatInput is not in the tree, so
+  // chatInputRef.current is null and setEditorContent would silently no-op.
+  // Waiting until isLoading flips ensures the editor exists when we restore.
   useEffect(() => {
     if (isDraftLoaded) return;
+    if (isLoading) return;
 
-    // If a fork just stashed a composer snapshot for this chat, apply it instead
-    // of the plain-text draft path. One-shot: clear the sessionStorage key after use.
-    let pendingSnapshot: ComposerSnapshot | null = null;
-    if (typeof window !== "undefined" && chatId) {
-      try {
-        const key = `moodio.pending-restore.${chatId}`;
-        const raw = sessionStorage.getItem(key);
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          if (isComposerSnapshot(parsed)) {
-            pendingSnapshot = parsed;
-          }
-          sessionStorage.removeItem(key);
-        }
-      } catch { /* ignore bad JSON */ }
-    }
-
-    if (pendingSnapshot && applyComposerSnapshotRef.current) {
-      applyComposerSnapshotRef.current(pendingSnapshot);
-      if (pendingSnapshot.pendingImages.length > 0) {
+    const snapshot = loadComposerDraft(chatId);
+    if (snapshot && applyComposerSnapshotRef.current) {
+      applyComposerSnapshotRef.current(snapshot);
+      if (snapshot.pendingImages.length > 0) {
         setDraftHadImages(true);
       }
-      // Also clear any stale plain-text draft so it doesn't override us later.
-      clearChatDraft(chatId);
-      setIsDraftLoaded(true);
-      return;
-    }
-
-    const draft = loadChatDraft(chatId);
-    if (draft) {
-      setLoadedDraft(draft);
-      setInput(draft.plainText);
-      // Restore pending images from draft
-      if (draft.pendingImages.length > 0) {
-        setPendingImages(draftImagesToPendingImages(draft.pendingImages));
-        setDraftHadImages(true); // Mark that draft had images (skip pre-select)
-      }
-      // Restore media references and video durations from draft
-      if (draft.mediaReferences && draft.mediaReferences.length > 0) {
-        setMenuState((prev) => ({
-          ...prev,
-          videoParams: {
-            ...prev.videoParams,
-            media_references: draft.mediaReferences,
-          },
-        }));
-      }
-      if (draft.mediaRefVideoDurations && Object.keys(draft.mediaRefVideoDurations).length > 0) {
-        setMediaRefVideoDurations(draft.mediaRefVideoDurations);
-      }
-    } else {
+    } else if (!snapshot) {
       setInput("");
-      // Don't clear pendingImages here - they might be set from other sources
     }
     setIsDraftLoaded(true);
-  }, [chatId, isDraftLoaded]);
+  }, [chatId, isDraftLoaded, isLoading]);
 
   // Persistent assets are loaded via RTK Query (useGetPersistentAssetsQuery above)
 
@@ -693,16 +652,45 @@ export default function ChatInterface({
   // Pre-select images refs (useEffects are defined after applyPreselectImages)
   const hasAppliedInitialPreselect = useRef(false);
 
-  // Save draft function - called on blur and visibility change
+  // A draft IS a live ComposerSnapshot: build it from current state and persist
+  // it. Used both by the debounced effect below and by beforeunload as a flush.
   const saveDraft = useCallback(() => {
     if (!isDraftLoaded) return;
+    const snapshot = buildComposerSnapshot({
+      menuState,
+      pendingImages,
+      pendingVideos,
+      pendingAudios,
+      assetParamValues,
+      precisionEditing,
+      plainText: input,
+      editorContent: chatInputRef.current?.getEditorJSON() || null,
+      mediaRefVideoDurations,
+    });
+    saveComposerDraft(chatId, snapshot);
+  }, [
+    chatId,
+    isDraftLoaded,
+    menuState,
+    pendingImages,
+    pendingVideos,
+    pendingAudios,
+    assetParamValues,
+    precisionEditing,
+    input,
+    mediaRefVideoDurations,
+  ]);
 
-    const editorContent = chatInputRef.current?.getEditorJSON() || null;
-    const refs = (menuState.videoParams?.media_references as MediaReference[]) || [];
-    saveChatDraft(chatId, editorContent, input, pendingImages, refs, mediaRefVideoDurations);
-  }, [chatId, input, pendingImages, isDraftLoaded, menuState.videoParams?.media_references, mediaRefVideoDurations]);
+  // Debounced real-time snapshot persistence: every change to the composer
+  // re-saves the draft ~400ms later. This is the unified "draft = real-time
+  // composer snapshot" model — no separate draft data structure exists.
+  useEffect(() => {
+    if (!isDraftLoaded) return;
+    const timeoutId = setTimeout(saveDraft, 400);
+    return () => clearTimeout(timeoutId);
+  }, [saveDraft, isDraftLoaded]);
 
-  // Save draft on visibility change (tab switch, minimize, etc.) + research session_end
+  // Flush on tab-hide/unload as a safety net + research session_end tracking.
   useEffect(() => {
     const sendSessionEnd = (trigger: "page_leave" | "tab_switch" | "inactivity") => {
       if (sessionEndSentRef.current || !chatId || sessionTurnCountRef.current === 0) return;
@@ -724,7 +712,6 @@ export default function ChatInterface({
         saveDraft();
         sendSessionEnd("tab_switch");
       } else if (document.visibilityState === "visible") {
-        // User returned — reset session tracking so future events can fire
         if (sessionEndSentRef.current) {
           sessionStartRef.current = Date.now();
           sessionEndSentRef.current = false;
@@ -808,12 +795,11 @@ export default function ChatInterface({
       setPrecisionEditing(false);
       setIsSending(false);
       setShowCreativeSuggestions(false);
-      setLoadedDraft(null);
       setIsDraftLoaded(false);
       setDraftHadImages(false);
 
       // Clear the draft for new chat
-      clearChatDraft(undefined);
+      clearComposerDraft(undefined);
     };
 
     window.addEventListener("reset-chat", handleReset);
@@ -1251,9 +1237,15 @@ export default function ChatInterface({
 
     if (user && chatId) {
       fetchChat();
-    } else {
+    } else if (!chatId) {
+      // No chat to load — flip off so the empty state renders.
       setIsLoading(false);
     }
+    // If chatId is set but user hasn't resolved yet, leave isLoading as-is:
+    // flipping it to false here would mount ChatInput, let the draft-load
+    // effect apply the snapshot, and then the effect would re-run once user
+    // resolves, re-setting isLoading=true and destroying the TipTap editor
+    // along with the restored content. Hard refresh was hitting exactly this.
   }, [chatId, user, teamId]);
 
   // Recovery path: if background polling (chat-provider) sees a generation
@@ -3166,8 +3158,10 @@ export default function ChatInterface({
       };
     });
 
-    // Clear the draft since we're sending the message
-    clearChatDraft(chatId);
+    // A draft IS a live composer snapshot. The moment we send, the snapshot
+    // lives on inside the message's metadata — so the draft is no longer a
+    // separate concept for this turn.
+    clearComposerDraft(chatId);
     // Reset draftHadImages so pre-select can work after AI response
     setDraftHadImages(false);
 
@@ -4545,32 +4539,47 @@ export default function ChatInterface({
       const newChatId = data.chatId;
       const originalMessage = data.originalMessage;
 
-      // If the original message has a composer snapshot, stash it in sessionStorage
-      // keyed by the new chatId. The draft-load effect in the new chat will pick it
-      // up and call applyComposerSnapshot, fully restoring the composer.
+      // Forking is unified with the draft flow: take the original message's
+      // ComposerSnapshot and seed it as the new chat's draft. When the new chat
+      // mounts it will load the draft like any other and apply the snapshot —
+      // same code path as page reload and put-back.
       const snapshot = originalMessage?.metadata?.composerSnapshot;
-      if (isComposerSnapshot(snapshot) && typeof window !== "undefined") {
-        try {
-          sessionStorage.setItem(
-            `moodio.pending-restore.${newChatId}`,
-            JSON.stringify(snapshot)
-          );
-        } catch { /* quota — fall back silently to plain text */ }
+      if (snapshot) {
+        saveComposerDraft(newChatId, snapshot);
+      } else {
+        // Legacy messages without a snapshot: synthesize a text-only snapshot
+        // so the forked composer still gets pre-filled with the original text.
+        let content = "";
+        if (typeof originalMessage.content === "string") {
+          content = originalMessage.content;
+        } else if (Array.isArray(originalMessage.content)) {
+          content = originalMessage.content
+            .filter((p: { type: string }) => p.type === "text")
+            .map((p: { text: string }) => p.text)
+            .join("\n");
+        }
+        if (content) {
+          saveComposerDraft(newChatId, {
+            version: 1,
+            mode: "",
+            model: "",
+            expertise: "",
+            aspectRatio: "",
+            imageSize: "",
+            imageQuality: "",
+            imageQuantity: "",
+            videoModelId: "",
+            videoParams: {},
+            precisionEditing: false,
+            pendingImages: [],
+            pendingVideos: [],
+            pendingAudios: [],
+            assetParamValues: {},
+            editorContent: null,
+            plainText: content,
+          });
+        }
       }
-
-      // Save draft for new chat using the new draft system
-      let content = "";
-      if (typeof originalMessage.content === "string") {
-        content = originalMessage.content;
-      } else if (Array.isArray(originalMessage.content)) {
-        // Extract text parts
-        content = originalMessage.content
-          .filter((p: any) => p.type === "text")
-          .map((p: any) => p.text)
-          .join("\n");
-      }
-      // Save as a simple text draft (no editor content or images for forked chats)
-      saveChatDraft(newChatId, null, content, []);
 
       // Trigger chat refresh
       window.dispatchEvent(new Event("refresh-chats"));
@@ -5030,7 +5039,6 @@ export default function ChatInterface({
           menuState={menuState}
           onMenuStateChange={handleMenuStateChange}
           hasUploadingImages={hasUploadingImages(pendingImages)}
-          initialEditorContent={loadedDraft?.editorContent || (loadedDraft?.plainText ? loadedDraft.plainText : undefined)}
           onBlur={saveDraft}
           videoCost={videoCost}
           videoCostLoading={videoCostLoading}

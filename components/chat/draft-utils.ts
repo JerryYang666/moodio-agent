@@ -1,125 +1,39 @@
 /**
  * Chat Draft Utilities
- * 
- * Handles saving and loading the complete chat input state including:
- * - Text content with mentions (TipTap JSON format)
- * - Pending images (excluding uploading images and local preview URLs)
- * - Menu configuration state
- * 
- * Drafts are saved on blur/visibility change to avoid performance issues
- * from real-time saving.
+ *
+ * A draft IS a ComposerSnapshot. Drafts are real-time snapshots of the
+ * composer state persisted to localStorage per chat, continuously updated
+ * while the composer is active and deleted the moment the message is sent.
+ *
+ * This file also handles legacy (pre-snapshot) drafts that only carried
+ * plain text + pending images: those are lifted into a minimal
+ * ComposerSnapshot shape on read.
  */
 
 import { siteConfig } from "@/config/site";
-import { PendingImage } from "./pending-image-types";
-import { MenuState, INITIAL_MENU_STATE } from "./menu-configuration";
-import { MediaReference } from "@/lib/video/models";
-import type { JSONContent } from "@tiptap/react";
+import type { ComposerSnapshot } from "@/lib/llm/types";
+import { isComposerSnapshot, COMPOSER_SNAPSHOT_VERSION } from "./composer-snapshot";
 
-/**
- * Serializable version of PendingImage (excludes transient fields)
- */
-export interface SerializablePendingImage {
-  imageId: string;
-  url: string;
-  source: PendingImage["source"];
-  title?: string;
-  messageIndex?: number;
-  partIndex?: number;
-  variantId?: string;
-  markedFromImageId?: string;
-}
-
-/**
- * Complete chat draft state
- */
-export interface ChatDraft {
-  /** Version for future migration support */
-  version: 1;
-  /** TipTap editor JSON content (preserves mentions) */
-  editorContent: JSONContent | null;
-  /** Plain text fallback (for display/debugging) */
-  plainText: string;
-  /** Pending images (only fully uploaded ones) */
-  pendingImages: SerializablePendingImage[];
-  /** Video/image/audio media references for video generation */
-  mediaReferences?: MediaReference[];
-  /** Video duration map (videoId → seconds) for pricing */
-  mediaRefVideoDurations?: Record<string, number>;
-  /** Timestamp when draft was saved */
-  savedAt: number;
-}
-
-/**
- * Get the localStorage key for a chat draft
- */
 export function getDraftKey(chatId: string | undefined): string {
   return `${siteConfig.chatInputPrefix}${chatId || "new-chat"}`;
 }
 
-/**
- * Convert PendingImage to serializable format
- * Excludes transient fields like isUploading and localPreviewUrl
- */
-function toSerializablePendingImage(img: PendingImage): SerializablePendingImage | null {
-  // Skip images that are still uploading
-  if (img.isUploading) {
-    return null;
-  }
-  
-  return {
-    imageId: img.imageId,
-    url: img.url,
-    source: img.source,
-    title: img.title,
-    messageIndex: img.messageIndex,
-    partIndex: img.partIndex,
-    variantId: img.variantId,
-    markedFromImageId: img.markedFromImageId,
-  };
-}
-
-/**
- * Convert serializable format back to PendingImage
- */
-function fromSerializablePendingImage(img: SerializablePendingImage): PendingImage {
-  return {
-    ...img,
-    isUploading: false,
-  };
-}
-
-/**
- * Save chat draft to localStorage
- * 
- * @param chatId - The chat ID (undefined for new chat)
- * @param editorContent - TipTap editor JSON content
- * @param plainText - Plain text content
- * @param pendingImages - Array of pending images
- */
-export function saveChatDraft(
+export function saveComposerDraft(
   chatId: string | undefined,
-  editorContent: JSONContent | null,
-  plainText: string,
-  pendingImages: PendingImage[],
-  mediaReferences?: MediaReference[],
-  mediaRefVideoDurations?: Record<string, number>,
+  snapshot: ComposerSnapshot
 ): void {
   if (typeof window === "undefined") return;
 
   const key = getDraftKey(chatId);
 
-  // Filter out uploading images and convert to serializable format
-  const serializableImages = pendingImages
-    .map(toSerializablePendingImage)
-    .filter((img): img is SerializablePendingImage => img !== null);
-
-  // Check if draft is empty
-  const hasMediaRefs = mediaReferences && mediaReferences.length > 0;
-  const isEmpty = !plainText.trim() && serializableImages.length === 0 && !hasMediaRefs;
+  const isEmpty =
+    !snapshot.plainText.trim() &&
+    snapshot.pendingImages.length === 0 &&
+    snapshot.pendingVideos.length === 0 &&
+    snapshot.pendingAudios.length === 0 &&
+    !((snapshot.videoParams?.media_references as unknown[] | undefined)?.length);
 
   if (isEmpty) {
-    // Remove draft if empty
     try {
       localStorage.removeItem(key);
     } catch (e) {
@@ -128,79 +42,57 @@ export function saveChatDraft(
     return;
   }
 
-  const draft: ChatDraft = {
-    version: 1,
-    editorContent,
-    plainText,
-    pendingImages: serializableImages,
-    savedAt: Date.now(),
-  };
-
-  if (hasMediaRefs) {
-    draft.mediaReferences = mediaReferences;
-  }
-  if (mediaRefVideoDurations && Object.keys(mediaRefVideoDurations).length > 0) {
-    draft.mediaRefVideoDurations = mediaRefVideoDurations;
-  }
-
   try {
-    localStorage.setItem(key, JSON.stringify(draft));
+    localStorage.setItem(key, JSON.stringify(snapshot));
   } catch (e) {
     console.warn("Failed to save chat draft:", e);
   }
 }
 
-/**
- * Load chat draft from localStorage
- * 
- * @param chatId - The chat ID (undefined for new chat)
- * @returns The loaded draft or null if not found/invalid
- */
-export function loadChatDraft(chatId: string | undefined): ChatDraft | null {
+export function loadComposerDraft(
+  chatId: string | undefined
+): ComposerSnapshot | null {
   if (typeof window === "undefined") return null;
-  
+
   const key = getDraftKey(chatId);
-  
+
   try {
     const stored = localStorage.getItem(key);
     if (!stored) return null;
-    
-    const parsed = JSON.parse(stored);
-    
-    // Handle legacy format (plain string)
+
+    const parsed: unknown = JSON.parse(stored);
+
+    if (isComposerSnapshot(parsed)) {
+      return parsed;
+    }
+
+    // Legacy string draft — just the text.
     if (typeof parsed === "string") {
-      return {
-        version: 1,
-        editorContent: null,
-        plainText: parsed,
-        pendingImages: [],
-        savedAt: 0,
-      };
+      return legacyTextDraft(parsed);
     }
-    
-    // Validate version
-    if (parsed.version !== 1) {
-      console.warn("Unknown draft version:", parsed.version);
-      return null;
+
+    // Legacy v1 ChatDraft shape — only plain text and pending images.
+    if (
+      parsed &&
+      typeof parsed === "object" &&
+      (parsed as { version?: unknown }).version === 1 &&
+      typeof (parsed as { plainText?: unknown }).plainText === "string"
+    ) {
+      return legacyChatDraftToSnapshot(parsed as LegacyChatDraft);
     }
-    
-    return parsed as ChatDraft;
+
+    return null;
   } catch (e) {
     console.warn("Failed to load chat draft:", e);
     return null;
   }
 }
 
-/**
- * Clear chat draft from localStorage
- * 
- * @param chatId - The chat ID (undefined for new chat)
- */
-export function clearChatDraft(chatId: string | undefined): void {
+export function clearComposerDraft(chatId: string | undefined): void {
   if (typeof window === "undefined") return;
-  
+
   const key = getDraftKey(chatId);
-  
+
   try {
     localStorage.removeItem(key);
   } catch (e) {
@@ -208,11 +100,78 @@ export function clearChatDraft(chatId: string | undefined): void {
   }
 }
 
-/**
- * Convert loaded draft images back to PendingImage format
- */
-export function draftImagesToPendingImages(
-  draftImages: SerializablePendingImage[]
-): PendingImage[] {
-  return draftImages.map(fromSerializablePendingImage);
+interface LegacyChatDraft {
+  version: 1;
+  editorContent: unknown | null;
+  plainText: string;
+  pendingImages: Array<{
+    imageId: string;
+    source: "upload" | "asset" | "ai_generated";
+    title?: string;
+    messageIndex?: number;
+    partIndex?: number;
+    variantId?: string;
+    markedFromImageId?: string;
+  }>;
+  mediaReferences?: unknown[];
+  mediaRefVideoDurations?: Record<string, number>;
+}
+
+function legacyTextDraft(text: string): ComposerSnapshot {
+  return {
+    version: COMPOSER_SNAPSHOT_VERSION,
+    mode: "",
+    model: "",
+    expertise: "",
+    aspectRatio: "",
+    imageSize: "",
+    imageQuality: "",
+    imageQuantity: "",
+    videoModelId: "",
+    videoParams: {},
+    precisionEditing: false,
+    pendingImages: [],
+    pendingVideos: [],
+    pendingAudios: [],
+    assetParamValues: {},
+    editorContent: null,
+    plainText: text,
+  };
+}
+
+function legacyChatDraftToSnapshot(d: LegacyChatDraft): ComposerSnapshot {
+  const videoParams: Record<string, unknown> = {};
+  if (d.mediaReferences && d.mediaReferences.length > 0) {
+    videoParams.media_references = d.mediaReferences;
+  }
+  return {
+    version: COMPOSER_SNAPSHOT_VERSION,
+    mode: "",
+    model: "",
+    expertise: "",
+    aspectRatio: "",
+    imageSize: "",
+    imageQuality: "",
+    imageQuantity: "",
+    videoModelId: "",
+    videoParams,
+    precisionEditing: false,
+    pendingImages: d.pendingImages.map((img) => ({
+      imageId: img.imageId,
+      source: img.source,
+      title: img.title,
+      messageIndex: img.messageIndex,
+      partIndex: img.partIndex,
+      variantId: img.variantId,
+      markedFromImageId: img.markedFromImageId,
+    })),
+    pendingVideos: [],
+    pendingAudios: [],
+    assetParamValues: {},
+    editorContent: (d.editorContent as ComposerSnapshot["editorContent"]) ?? null,
+    plainText: d.plainText,
+    ...(d.mediaRefVideoDurations && Object.keys(d.mediaRefVideoDurations).length > 0
+      ? { mediaRefVideoDurations: d.mediaRefVideoDurations }
+      : {}),
+  };
 }

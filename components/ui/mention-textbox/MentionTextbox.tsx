@@ -93,6 +93,12 @@ export const MentionTextbox = forwardRef<MentionTextboxRef, MentionTextboxProps>
     const minHeight = minRows * lineHeight + padding;
     const maxHeight = maxRows * lineHeight + padding;
 
+    // setContent() calls that arrive before the editor has finished
+    // initializing (immediatelyRender: false defers creation) would be
+    // silently dropped. Buffer them; onCreate flushes this the moment
+    // TipTap is ready.
+    const pendingSetContentRef = useRef<unknown>(null);
+
     const editor = useEditor({
       immediatelyRender: false,
       extensions: [
@@ -285,6 +291,16 @@ export const MentionTextbox = forwardRef<MentionTextboxRef, MentionTextboxProps>
       // Use initialContent if provided, otherwise empty
       content: initialContent || "",
       editable: !disabled,
+      onCreate: ({ editor }) => {
+        // Flush any setContent() calls that arrived before TipTap finished
+        // initializing (immediatelyRender: false defers creation). Without
+        // this, restoring a draft/fork loses the text because the imperative
+        // setContent lands while editor is still null.
+        if (pendingSetContentRef.current !== null) {
+          editor.commands.setContent(pendingSetContentRef.current as never);
+          pendingSetContentRef.current = null;
+        }
+      },
       onUpdate: ({ editor }) => {
         const text = editor.getText();
         const mentions: MentionItem[] = [];
@@ -341,11 +357,12 @@ export const MentionTextbox = forwardRef<MentionTextboxRef, MentionTextboxProps>
     // Sync external value changes (only when value is empty to clear)
     useEffect(() => {
       if (!editor) return;
-      
+
       if (value === "" && editor.getText() !== "") {
         editor.commands.clearContent();
       }
     }, [value, editor]);
+
 
     // Update editor editable state
     useEffect(() => {
@@ -419,6 +436,8 @@ export const MentionTextbox = forwardRef<MentionTextboxRef, MentionTextboxProps>
       setContent: (content) => {
         if (editor) {
           editor.commands.setContent(content);
+        } else {
+          pendingSetContentRef.current = content;
         }
       },
     }), [editor]);
