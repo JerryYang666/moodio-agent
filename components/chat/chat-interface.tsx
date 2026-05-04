@@ -4428,7 +4428,8 @@ export default function ChatInterface({
         });
       });
 
-      // Restore pending assets
+      // Restore pending assets — URLs are re-hydrated via enrich below since
+      // the snapshot only persists IDs (CDN URLs expire / differ across regions).
       setPendingImages(snapshotImagesToPending(snapshot.pendingImages));
       setPendingVideos(snapshotVideosToPending(snapshot.pendingVideos));
       setPendingAudios(snapshotAudiosToPending(snapshot.pendingAudios));
@@ -4437,35 +4438,52 @@ export default function ChatInterface({
         setMediaRefVideoDurations({ ...snapshot.mediaRefVideoDurations });
       }
 
-      // Restore asset param slots. Hydrate displayUrls via enrich so thumbs render.
-      const paramEntries = Object.entries(snapshot.assetParamValues || {});
+      // Restore asset param slots — displayUrls get hydrated below.
       const paramRestored: Record<string, AssetParamValue | null> = {};
-      const paramIdsToEnrich: string[] = [];
-      for (const [name, v] of paramEntries) {
-        if (v) {
-          paramRestored[name] = { imageId: v.imageId, displayUrl: "" };
-          paramIdsToEnrich.push(v.imageId);
-        } else {
-          paramRestored[name] = null;
-        }
+      for (const [name, v] of Object.entries(snapshot.assetParamValues || {})) {
+        paramRestored[name] = v ? { imageId: v.imageId, displayUrl: "" } : null;
       }
       setAssetParamValues(paramRestored);
-      if (paramIdsToEnrich.length > 0) {
+
+      // Enrich all the IDs we just set in one batched call.
+      const enrichRefs: Array<{ type: "image" | "video" | "audio"; id: string }> = [];
+      for (const img of snapshot.pendingImages) {
+        enrichRefs.push({ type: "image", id: img.imageId });
+      }
+      for (const v of snapshot.pendingVideos) {
+        enrichRefs.push({ type: "video", id: v.videoId });
+      }
+      for (const a of snapshot.pendingAudios) {
+        enrichRefs.push({ type: "audio", id: a.audioId });
+      }
+      for (const v of Object.values(snapshot.assetParamValues || {})) {
+        if (v) enrichRefs.push({ type: "image", id: v.imageId });
+      }
+
+      if (enrichRefs.length > 0) {
         fetch("/api/media/enrich", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            refs: paramIdsToEnrich.map((id) => ({ type: "image", id })),
-          }),
+          body: JSON.stringify({ refs: enrichRefs }),
         })
           .then((res) => (res.ok ? res.json() : null))
           .then((data: { urls: Record<string, string> } | null) => {
             if (!data?.urls) return;
+            const urls = data.urls;
+            setPendingImages((prev) =>
+              prev.map((img) => (urls[img.imageId] ? { ...img, url: urls[img.imageId] } : img))
+            );
+            setPendingVideos((prev) =>
+              prev.map((v) => (urls[v.videoId] ? { ...v, url: urls[v.videoId] } : v))
+            );
+            setPendingAudios((prev) =>
+              prev.map((a) => (urls[a.audioId] ? { ...a, url: urls[a.audioId] } : a))
+            );
             setAssetParamValues((prev) => {
               const next: Record<string, AssetParamValue | null> = { ...prev };
               for (const [name, val] of Object.entries(next)) {
-                if (val && data.urls[val.imageId]) {
-                  next[name] = { imageId: val.imageId, displayUrl: data.urls[val.imageId] };
+                if (val && urls[val.imageId]) {
+                  next[name] = { imageId: val.imageId, displayUrl: urls[val.imageId] };
                 }
               }
               return next;

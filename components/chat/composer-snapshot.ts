@@ -25,12 +25,14 @@ interface BuildArgs {
   mediaRefVideoDurations?: Record<string, number>;
 }
 
+// URLs are deliberately NOT serialized. CloudFront signed URLs expire and the
+// CDN domain can differ between regions (e.g. cnMode). On restore we re-enrich
+// IDs back into current display URLs via /api/media/enrich.
 function serializeImages(imgs: PendingImage[]): SerializableComposerPendingImage[] {
   return imgs
     .filter((img) => !img.isUploading && !img.isCompressing)
     .map((img) => ({
       imageId: img.imageId,
-      url: img.url,
       source: img.source,
       title: img.title,
       messageIndex: img.messageIndex,
@@ -45,7 +47,6 @@ function serializeVideos(vids: PendingVideo[]): SerializableComposerPendingVideo
     .filter((v) => !v.isUploading)
     .map((v) => ({
       videoId: v.videoId,
-      url: v.url,
       source: v.source,
       title: v.title,
     }));
@@ -56,7 +57,6 @@ function serializeAudios(auds: PendingAudio[]): SerializableComposerPendingAudio
     .filter((a) => !a.isUploading)
     .map((a) => ({
       audioId: a.audioId,
-      url: a.url,
       source: a.source,
       title: a.title,
     }));
@@ -118,12 +118,14 @@ export function isComposerSnapshot(value: unknown): value is ComposerSnapshot {
   return v.version === COMPOSER_SNAPSHOT_VERSION && typeof v.mode === "string";
 }
 
+// Converters below leave `url` empty. Caller must enrich via /api/media/enrich
+// and patch the resulting URL map into the pending arrays.
 export function snapshotImagesToPending(
   imgs: SerializableComposerPendingImage[]
 ): PendingImage[] {
   return imgs.map((img) => ({
     imageId: img.imageId,
-    url: img.url,
+    url: "",
     source: img.source,
     title: img.title,
     messageIndex: img.messageIndex,
@@ -139,7 +141,7 @@ export function snapshotVideosToPending(
 ): PendingVideo[] {
   return vids.map((v) => ({
     videoId: v.videoId,
-    url: v.url ?? "",
+    url: "",
     source: v.source,
     title: v.title,
     isUploading: false,
@@ -151,7 +153,7 @@ export function snapshotAudiosToPending(
 ): PendingAudio[] {
   return auds.map((a) => ({
     audioId: a.audioId,
-    url: a.url ?? "",
+    url: "",
     source: a.source,
     title: a.title,
     isUploading: false,

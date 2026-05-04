@@ -181,7 +181,6 @@ export interface MessageMetadata {
 
 export interface SerializableComposerPendingImage {
   imageId: string;
-  url: string;
   source: "upload" | "asset" | "ai_generated";
   title?: string;
   messageIndex?: number;
@@ -192,14 +191,12 @@ export interface SerializableComposerPendingImage {
 
 export interface SerializableComposerPendingVideo {
   videoId: string;
-  url?: string;
   source: "upload" | "library" | "ai_generated" | "retrieval";
   title?: string;
 }
 
 export interface SerializableComposerPendingAudio {
   audioId: string;
-  url?: string;
   source: "upload" | "library";
   title?: string;
 }
