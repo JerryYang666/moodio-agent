@@ -176,6 +176,53 @@ export interface MessageMetadata {
   precisionEditing?: boolean;
   videoModelId?: string;
   videoParams?: Record<string, any>;
+  composerSnapshot?: ComposerSnapshot;
+}
+
+export interface SerializableComposerPendingImage {
+  imageId: string;
+  url: string;
+  source: "upload" | "asset" | "ai_generated";
+  title?: string;
+  messageIndex?: number;
+  partIndex?: number;
+  variantId?: string;
+  markedFromImageId?: string;
+}
+
+export interface SerializableComposerPendingVideo {
+  videoId: string;
+  url?: string;
+  source: "upload" | "library" | "ai_generated" | "retrieval";
+  title?: string;
+}
+
+export interface SerializableComposerPendingAudio {
+  audioId: string;
+  url?: string;
+  source: "upload" | "library";
+  title?: string;
+}
+
+export interface ComposerSnapshot {
+  version: 1;
+  mode: string;
+  model: string;
+  expertise: string;
+  aspectRatio: string;
+  imageSize: string;
+  imageQuality: string;
+  imageQuantity: string;
+  videoModelId: string;
+  videoParams: Record<string, any>;
+  precisionEditing: boolean;
+  pendingImages: SerializableComposerPendingImage[];
+  pendingVideos: SerializableComposerPendingVideo[];
+  pendingAudios: SerializableComposerPendingAudio[];
+  assetParamValues: Record<string, { imageId: string } | null>;
+  editorContent: unknown | null;
+  plainText: string;
+  mediaRefVideoDurations?: Record<string, number>;
 }
 
 export interface Message {

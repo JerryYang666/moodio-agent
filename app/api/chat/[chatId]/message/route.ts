@@ -398,6 +398,13 @@ export async function POST(
         ? json.videoParams
         : {};
 
+    const composerSnapshot =
+      json.composerSnapshot &&
+      typeof json.composerSnapshot === "object" &&
+      json.composerSnapshot.version === 1
+        ? (json.composerSnapshot as MessageMetadata["composerSnapshot"])
+        : undefined;
+
     // Validate: must have content or images
     if (!content && imageIds.length === 0) {
       return NextResponse.json(
@@ -476,6 +483,7 @@ export async function POST(
       precisionEditing: precisionEditing || undefined,
       videoModelId: mode === "video" ? videoModelId : undefined,
       videoParams: mode === "video" ? videoParams : undefined,
+      composerSnapshot,
     };
 
     if (imageIds.length > 0 || videoSources.length > 0 || audioSources.length > 0) {

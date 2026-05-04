@@ -270,6 +270,7 @@
     },
     "userUpload": "User upload",
     "editMessage": "Edit message",
+    "putBack": "Put back into input",
     "editInNewChatTitle": "Edit in new chat?",
     "editInNewChatDescription": "This will create a new chat starting from here, preserving the conversation history up to this point.",
     "editAndFork": "Edit & Fork",

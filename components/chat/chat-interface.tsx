@@ -83,6 +83,14 @@ import {
   ChatDraft,
 } from "./draft-utils";
 import {
+  buildComposerSnapshot,
+  isComposerSnapshot,
+  snapshotImagesToPending,
+  snapshotVideosToPending,
+  snapshotAudiosToPending,
+} from "./composer-snapshot";
+import type { ComposerSnapshot } from "@/lib/llm/types";
+import {
   EMPTY_PERSISTENT_ASSETS,
   MAX_PERSISTENT_REFERENCE_IMAGES,
 } from "@/lib/chat/persistent-assets-types";
@@ -612,9 +620,41 @@ export default function ChatInterface({
     setDraftHadImages(false);
   }
 
+  // Late-bound ref so the draft-load effect can call applyComposerSnapshot
+  // (which is declared much further down in this component).
+  const applyComposerSnapshotRef = useRef<((s: ComposerSnapshot) => void) | null>(null);
+
   // Load draft on mount or when chatId changes
   useEffect(() => {
     if (isDraftLoaded) return;
+
+    // If a fork just stashed a composer snapshot for this chat, apply it instead
+    // of the plain-text draft path. One-shot: clear the sessionStorage key after use.
+    let pendingSnapshot: ComposerSnapshot | null = null;
+    if (typeof window !== "undefined" && chatId) {
+      try {
+        const key = `moodio.pending-restore.${chatId}`;
+        const raw = sessionStorage.getItem(key);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (isComposerSnapshot(parsed)) {
+            pendingSnapshot = parsed;
+          }
+          sessionStorage.removeItem(key);
+        }
+      } catch { /* ignore bad JSON */ }
+    }
+
+    if (pendingSnapshot && applyComposerSnapshotRef.current) {
+      applyComposerSnapshotRef.current(pendingSnapshot);
+      if (pendingSnapshot.pendingImages.length > 0) {
+        setDraftHadImages(true);
+      }
+      // Also clear any stale plain-text draft so it doesn't override us later.
+      clearChatDraft(chatId);
+      setIsDraftLoaded(true);
+      return;
+    }
 
     const draft = loadChatDraft(chatId);
     if (draft) {
@@ -3031,10 +3071,23 @@ export default function ChatInterface({
         })()
         : currentInput;
 
+    const composerSnapshot = buildComposerSnapshot({
+      menuState,
+      pendingImages,
+      pendingVideos,
+      pendingAudios,
+      assetParamValues,
+      precisionEditing,
+      plainText: currentInput,
+      editorContent: chatInputRef.current?.getEditorJSON() || null,
+      mediaRefVideoDurations,
+    });
+
     const userMessage: Message = {
       role: "user",
       content: optimisticContent,
       createdAt: Date.now(),
+      metadata: { composerSnapshot },
     };
 
     // Optimistically update previous messages to mark selected agent images
@@ -3237,6 +3290,8 @@ export default function ChatInterface({
       if (menuState.imageQuantity && menuState.imageQuantity !== "smart") {
         payload.imageQuantity = parseInt(menuState.imageQuantity, 10);
       }
+
+      payload.composerSnapshot = composerSnapshot;
 
       // Check for system prompt override
       const overrideEnabled =
@@ -4323,6 +4378,133 @@ export default function ChatInterface({
     []
   );
 
+  const applyComposerSnapshot = useCallback(
+    (snapshot: ComposerSnapshot) => {
+      // Switch menu state to snapshot (resolve against mode rules)
+      const clonedVideoParams = snapshot.videoParams
+        ? structuredClone(snapshot.videoParams)
+        : {};
+      const isSameVideoModel =
+        snapshot.mode === "video" &&
+        snapshot.videoModelId === menuState.videoModelId;
+      pendingVideoRestoreRef.current =
+        snapshot.mode === "video" && !isSameVideoModel
+          ? {
+              modelId: snapshot.videoModelId,
+              videoParams: clonedVideoParams,
+            }
+          : null;
+
+      setMenuState((prev) => ({
+        ...resolveMenuState(
+          {
+            ...prev,
+            mode: snapshot.mode,
+            model: snapshot.model,
+            expertise: snapshot.expertise,
+            aspectRatio: snapshot.aspectRatio,
+            imageSize: snapshot.imageSize,
+            imageQuality: snapshot.imageQuality,
+            imageQuantity: snapshot.imageQuantity,
+            videoModelId: snapshot.videoModelId,
+            videoParams: clonedVideoParams,
+          },
+          snapshot.mode
+        ),
+        videoModelId: snapshot.videoModelId,
+        videoParams: clonedVideoParams,
+      }));
+
+      // One more pass next tick — same trick as handleDirectVideoRestore
+      queueMicrotask(() => {
+        setMenuState((prev) => {
+          if (prev.mode !== snapshot.mode) return prev;
+          if (snapshot.mode === "video" && prev.videoModelId !== snapshot.videoModelId) {
+            return prev;
+          }
+          return { ...prev, videoParams: clonedVideoParams };
+        });
+      });
+
+      // Restore pending assets
+      setPendingImages(snapshotImagesToPending(snapshot.pendingImages));
+      setPendingVideos(snapshotVideosToPending(snapshot.pendingVideos));
+      setPendingAudios(snapshotAudiosToPending(snapshot.pendingAudios));
+      setPrecisionEditing(snapshot.precisionEditing);
+      if (snapshot.mediaRefVideoDurations) {
+        setMediaRefVideoDurations({ ...snapshot.mediaRefVideoDurations });
+      }
+
+      // Restore asset param slots. Hydrate displayUrls via enrich so thumbs render.
+      const paramEntries = Object.entries(snapshot.assetParamValues || {});
+      const paramRestored: Record<string, AssetParamValue | null> = {};
+      const paramIdsToEnrich: string[] = [];
+      for (const [name, v] of paramEntries) {
+        if (v) {
+          paramRestored[name] = { imageId: v.imageId, displayUrl: "" };
+          paramIdsToEnrich.push(v.imageId);
+        } else {
+          paramRestored[name] = null;
+        }
+      }
+      setAssetParamValues(paramRestored);
+      if (paramIdsToEnrich.length > 0) {
+        fetch("/api/media/enrich", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            refs: paramIdsToEnrich.map((id) => ({ type: "image", id })),
+          }),
+        })
+          .then((res) => (res.ok ? res.json() : null))
+          .then((data: { urls: Record<string, string> } | null) => {
+            if (!data?.urls) return;
+            setAssetParamValues((prev) => {
+              const next: Record<string, AssetParamValue | null> = { ...prev };
+              for (const [name, val] of Object.entries(next)) {
+                if (val && data.urls[val.imageId]) {
+                  next[name] = { imageId: val.imageId, displayUrl: data.urls[val.imageId] };
+                }
+              }
+              return next;
+            });
+          })
+          .catch(() => {});
+      }
+
+      // Restore prompt text + editor JSON
+      setInput(snapshot.plainText || "");
+      if (chatInputRef.current) {
+        if (snapshot.editorContent) {
+          chatInputRef.current.setEditorContent(snapshot.editorContent as JSONContent);
+        } else {
+          const fallback: JSONContent = snapshot.plainText
+            ? {
+                type: "doc",
+                content: [
+                  {
+                    type: "paragraph",
+                    content: [{ type: "text", text: snapshot.plainText }],
+                  },
+                ],
+              }
+            : { type: "doc", content: [{ type: "paragraph" }] };
+          chatInputRef.current.setEditorContent(fallback);
+        }
+      }
+    },
+    [menuState.videoModelId]
+  );
+
+  applyComposerSnapshotRef.current = applyComposerSnapshot;
+
+  const handleRestoreComposer = useCallback(
+    (snapshot: ComposerSnapshot) => {
+      applyComposerSnapshot(snapshot);
+    },
+    [applyComposerSnapshot]
+  );
+
   const handleForkChat = async (messageIndex: number) => {
     if (!chatId) return;
 
@@ -4342,6 +4524,19 @@ export default function ChatInterface({
       const data = await res.json();
       const newChatId = data.chatId;
       const originalMessage = data.originalMessage;
+
+      // If the original message has a composer snapshot, stash it in sessionStorage
+      // keyed by the new chatId. The draft-load effect in the new chat will pick it
+      // up and call applyComposerSnapshot, fully restoring the composer.
+      const snapshot = originalMessage?.metadata?.composerSnapshot;
+      if (isComposerSnapshot(snapshot) && typeof window !== "undefined") {
+        try {
+          sessionStorage.setItem(
+            `moodio.pending-restore.${newChatId}`,
+            JSON.stringify(snapshot)
+          );
+        } catch { /* quota — fall back silently to plain text */ }
+      }
 
       // Save draft for new chat using the new draft system
       let content = "";
@@ -4641,6 +4836,7 @@ export default function ChatInterface({
                   onAgentExpandClick={handleAgentExpandClick}
                   onUserImageClick={handleUserImageClick}
                   onForkChat={handleForkChat}
+                  onRestoreComposer={handleRestoreComposer}
                   hideAvatar={hideAvatars}
                   desktopId={desktopId}
                   allMessages={messages}

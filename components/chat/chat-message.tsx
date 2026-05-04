@@ -4,9 +4,9 @@ import { Card, CardBody } from "@heroui/card";
 import { Spinner } from "@heroui/spinner";
 import { Avatar } from "@heroui/avatar";
 import { Image } from "@heroui/image";
-import { Bot, X, Pencil, ChevronDown, ChevronRight, Brain, Maximize2, Monitor, Video, Music, ThumbsUp, ThumbsDown, Send, Paperclip } from "lucide-react";
+import { Bot, X, Pencil, ChevronDown, ChevronRight, Brain, Maximize2, Monitor, Video, Music, ThumbsUp, ThumbsDown, Send, Paperclip, RotateCcw } from "lucide-react";
 import clsx from "clsx";
-import { Message, MessageContentPart, isGeneratedImagePart } from "@/lib/llm/types";
+import { Message, MessageContentPart, isGeneratedImagePart, ComposerSnapshot } from "@/lib/llm/types";
 import ImageWithMenu from "@/components/collection/image-with-menu";
 import AudioPlayer from "@/components/audio-player";
 import { ImageInfo } from "./image-detail-modal";
@@ -114,6 +114,8 @@ interface ChatMessageProps {
     variantId: string | undefined,
     value: { thumbs: "up" | "down"; comment?: string } | null
   ) => void;
+  /** Callback to restore a user message's composer snapshot back into the input */
+  onRestoreComposer?: (snapshot: ComposerSnapshot) => void;
 }
 
 export default function ChatMessage({
@@ -141,6 +143,7 @@ export default function ChatMessage({
   onImageHoverTrack,
   feedbackValue,
   onFeedback,
+  onRestoreComposer,
 }: ChatMessageProps) {
   const isUser = message.role === "user";
   const [isForkPopoverOpen, setIsForkPopoverOpen] = useState(false);
@@ -1048,6 +1051,16 @@ export default function ChatMessage({
             )}
             {!isUser && timestampAction && (
               <div className="ml-auto">{timestampAction}</div>
+            )}
+            {isUser && onRestoreComposer && message.metadata?.composerSnapshot && (
+              <button
+                onClick={() => onRestoreComposer(message.metadata!.composerSnapshot!)}
+                className="md:opacity-0 md:group-hover:opacity-100 transition-opacity p-1 hover:bg-default-100 rounded-full text-default-400 hover:text-default-600"
+                aria-label={t("chat.putBack")}
+                title={t("chat.putBack")}
+              >
+                <RotateCcw size={12} />
+              </button>
             )}
             {isUser && messageIndex > 0 && onForkChat && (
               <Popover

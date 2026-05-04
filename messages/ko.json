@@ -270,6 +270,7 @@
     },
     "userUpload": "사용자 업로드",
     "editMessage": "메시지 편집",
+    "putBack": "입력창으로 되돌리기",
     "editInNewChatTitle": "새 채팅에서 편집하시겠습니까?",
     "editInNewChatDescription": "이 시점부터 새 채팅이 생성되며, 이 시점까지의 대화 기록이 유지됩니다.",
     "editAndFork": "편집 및 분기",

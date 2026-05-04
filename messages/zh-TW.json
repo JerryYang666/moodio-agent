@@ -270,6 +270,7 @@
     },
     "userUpload": "使用者上傳",
     "editMessage": "編輯訊息",
+    "putBack": "放回輸入框",
     "editInNewChatTitle": "在新對話中編輯？",
     "editInNewChatDescription": "這將從此處建立新對話，並保留到目前為止的對話記錄。",
     "editAndFork": "編輯並分支",

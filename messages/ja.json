@@ -270,6 +270,7 @@
     },
     "userUpload": "ユーザーアップロード",
     "editMessage": "メッセージを編集",
+    "putBack": "入力欄に戻す",
     "editInNewChatTitle": "新しいチャットで編集しますか？",
     "editInNewChatDescription": "ここから新しいチャットを作成し、この時点までの会話履歴を保持します。",
     "editAndFork": "編集して分岐",
