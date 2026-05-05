@@ -1168,6 +1168,7 @@ export default function CollectionPage({
               rename: tCommon("rename"),
               share: tCommon("share"),
               delete: tCommon("delete"),
+              moreActions: tCommon("moreActions"),
             }}
           />
         </div>

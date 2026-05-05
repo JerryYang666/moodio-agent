@@ -2,6 +2,12 @@
 
 import { Button } from "@heroui/button";
 import {
+  Dropdown,
+  DropdownTrigger,
+  DropdownMenu,
+  DropdownItem,
+} from "@heroui/dropdown";
+import {
   Pencil,
   Trash2,
   Share2,
@@ -10,6 +16,7 @@ import {
   CheckSquare,
   X,
   Layers,
+  MoreHorizontal,
 } from "lucide-react";
 
 export interface AssetPageActionsProps {
@@ -37,6 +44,7 @@ export interface AssetPageActionsProps {
     rename: string;
     share: string;
     delete: string;
+    moreActions?: string;
   };
 }
 
@@ -84,59 +92,67 @@ export default function AssetPageActions({
           {isCompressing ? labels.compressing : labels.uploadImages}
         </Button>
       )}
+      {canWrite && canEdit && (
+        <Button
+          variant="flat"
+          startContent={<FolderPlus size={18} />}
+          onPress={onCreateFolder}
+          className={`w-full sm:w-auto ${hiddenWhenSelecting}`}
+          tabIndex={isSelectionMode ? -1 : undefined}
+        >
+          {labels.newFolder}
+        </Button>
+      )}
       {canEdit && (
-        <>
-          <Button
-            variant="flat"
-            startContent={<Pencil size={18} />}
-            onPress={onRename}
-            className={`w-full sm:w-auto ${hiddenWhenSelecting}`}
-            tabIndex={isSelectionMode ? -1 : undefined}
-          >
-            {labels.rename}
-          </Button>
-          <Button
-            variant="flat"
-            startContent={<Share2 size={18} />}
-            onPress={onShare}
-            className={`w-full sm:w-auto ${hiddenWhenSelecting}`}
-            tabIndex={isSelectionMode ? -1 : undefined}
-          >
-            {labels.share}
-          </Button>
-          {canWrite && (
+        <Dropdown>
+          <DropdownTrigger>
             <Button
+              as="div"
+              role="button"
+              tabIndex={isSelectionMode ? -1 : 0}
+              isIconOnly
               variant="flat"
-              startContent={<FolderPlus size={18} />}
-              onPress={onCreateFolder}
+              aria-label={labels.moreActions ?? "More actions"}
               className={`w-full sm:w-auto ${hiddenWhenSelecting}`}
-              tabIndex={isSelectionMode ? -1 : undefined}
             >
-              {labels.newFolder}
+              <MoreHorizontal size={18} />
             </Button>
-          )}
-          {canWrite && onCreateElement && labels.newElement && (
-            <Button
-              variant="flat"
-              startContent={<Layers size={18} />}
-              onPress={onCreateElement}
-              className={`w-full sm:w-auto ${hiddenWhenSelecting}`}
-              tabIndex={isSelectionMode ? -1 : undefined}
+          </DropdownTrigger>
+          <DropdownMenu aria-label={labels.moreActions ?? "More actions"}>
+            {canWrite && onCreateElement && labels.newElement ? (
+              <DropdownItem
+                key="new-element"
+                startContent={<Layers size={16} />}
+                onPress={onCreateElement}
+              >
+                {labels.newElement}
+              </DropdownItem>
+            ) : null}
+            <DropdownItem
+              key="rename"
+              startContent={<Pencil size={16} />}
+              onPress={onRename}
             >
-              {labels.newElement}
-            </Button>
-          )}
-          <Button
-            color="danger"
-            variant="flat"
-            startContent={<Trash2 size={18} />}
-            onPress={onDelete}
-            className={`w-full sm:w-auto ${hiddenWhenSelecting}`}
-            tabIndex={isSelectionMode ? -1 : undefined}
-          >
-            {labels.delete}
-          </Button>
-        </>
+              {labels.rename}
+            </DropdownItem>
+            <DropdownItem
+              key="share"
+              startContent={<Share2 size={16} />}
+              onPress={onShare}
+            >
+              {labels.share}
+            </DropdownItem>
+            <DropdownItem
+              key="delete"
+              startContent={<Trash2 size={16} />}
+              color="danger"
+              className="text-danger"
+              onPress={onDelete}
+            >
+              {labels.delete}
+            </DropdownItem>
+          </DropdownMenu>
+        </Dropdown>
       )}
     </div>
   );

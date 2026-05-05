@@ -31,6 +31,7 @@
     "optional": "可选",
     "move": "移动",
     "copy": "复制",
+    "moreActions": "更多操作",
     "tabsOpen": "{count} 个标签页已打开"
   },
   "share": {

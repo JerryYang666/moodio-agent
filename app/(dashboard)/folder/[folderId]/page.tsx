@@ -1137,6 +1137,7 @@ export default function FolderPage({
             rename: t("rename"),
             share: t("share"),
             delete: t("delete"),
+            moreActions: tCommon("moreActions"),
           }}
         />
       </div>

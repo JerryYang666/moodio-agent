@@ -31,6 +31,7 @@
     "optional": "Optional",
     "move": "Move",
     "copy": "Copy",
+    "moreActions": "More actions",
     "tabsOpen": "{count} tabs open"
   },
   "share": {

@@ -31,6 +31,7 @@
     "optional": "선택 사항",
     "move": "이동",
     "copy": "복사",
+    "moreActions": "더 많은 작업",
     "tabsOpen": "{count}개 탭 열림"
   },
   "share": {

@@ -31,6 +31,7 @@
     "optional": "任意",
     "move": "移動",
     "copy": "コピー",
+    "moreActions": "その他の操作",
     "tabsOpen": "{count} タブを開いています"
   },
   "share": {
