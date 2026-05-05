@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import type { TimelineClip, TimelineState } from "@/components/timeline/types";
 import { getTimelineStorageKey } from "@/components/timeline/types";
+import { probeHasAudio } from "@/lib/timeline/probeAudio";
 
 function loadTimeline(desktopId: string): TimelineClip[] {
   if (typeof window === "undefined") return [];
@@ -72,10 +73,32 @@ export function useTimeline(desktopId: string) {
   }, [clips]);
 
   const addClip = useCallback((clip: TimelineClip) => {
+    // Default hasAudio to true; the async probe below can only downgrade it.
+    // See TimelineClip.hasAudio JSDoc for why false-negatives are avoided.
+    const clipWithDefaults: TimelineClip = {
+      ...clip,
+      hasAudio: clip.hasAudio ?? true,
+    };
+
     setClips((prev) => {
-      if (prev.some((c) => c.assetId === clip.assetId)) return prev;
-      return [...prev, clip];
+      if (prev.some((c) => c.assetId === clipWithDefaults.assetId)) return prev;
+      return [...prev, clipWithDefaults];
     });
+
+    if (clip.hasAudio === undefined && clipWithDefaults.videoUrl) {
+      probeHasAudio(clipWithDefaults.videoUrl)
+        .then((hasAudio) => {
+          if (hasAudio) return;
+          setClips((prev) =>
+            prev.map((c) =>
+              c.assetId === clipWithDefaults.assetId
+                ? { ...c, hasAudio: false }
+                : c
+            )
+          );
+        })
+        .catch(() => {});
+    }
   }, []);
 
   const removeClip = useCallback((clipId: string) => {
@@ -90,6 +113,37 @@ export function useTimeline(desktopId: string) {
     },
     []
   );
+
+  const splitClip = useCallback((clipId: string, splitTime: number) => {
+    setClips((prev) => {
+      const idx = prev.findIndex((c) => c.id === clipId);
+      if (idx === -1) return prev;
+      const clip = prev[idx];
+      const trimStart = clip.trimStart ?? 0;
+      const trimEnd = clip.trimEnd ?? clip.duration;
+      if (splitTime <= trimStart + 0.1 || splitTime >= trimEnd - 0.1) {
+        return prev;
+      }
+
+      const t = Date.now();
+      const clipA: TimelineClip = {
+        ...clip,
+        id: `clip-${clip.assetId}-${t}-a`,
+        trimStart,
+        trimEnd: splitTime,
+      };
+      const clipB: TimelineClip = {
+        ...clip,
+        id: `clip-${clip.assetId}-${t}-b`,
+        trimStart: splitTime,
+        trimEnd,
+      };
+
+      const next = [...prev];
+      next.splice(idx, 1, clipA, clipB);
+      return next;
+    });
+  }, []);
 
   const reorderClips = useCallback((fromIndex: number, toIndex: number) => {
     setClips((prev) => {
@@ -118,6 +172,7 @@ export function useTimeline(desktopId: string) {
     addClip,
     removeClip,
     updateClip,
+    splitClip,
     reorderClips,
     clearTimeline,
   };

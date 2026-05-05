@@ -1077,6 +1077,7 @@ export default function DesktopDetailPage({
     addClip: addTimelineClip,
     removeClip: removeTimelineClip,
     updateClip: updateTimelineClip,
+    splitClip: splitTimelineClip,
     reorderClips: reorderTimelineClips,
     clearTimeline,
   } = useTimeline(desktopId);
@@ -1641,6 +1642,7 @@ export default function DesktopDetailPage({
         onReorderClips={reorderTimelineClips}
         onClearTimeline={clearTimeline}
         onUpdateClip={updateTimelineClip}
+        onSplitClip={splitTimelineClip}
         desktopId={desktopId}
         onExportTrack={(data) => {
           trackResearch({
