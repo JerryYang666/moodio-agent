@@ -35,6 +35,7 @@ import ImageDetailModal, {
   ImageInfo,
 } from "@/components/chat/image-detail-modal";
 import AssetPickerModal from "@/components/chat/asset-picker-modal";
+import ProjectsNavLayout from "@/components/projects-nav-layout";
 import SendToDesktopModal from "@/components/desktop/SendToDesktopModal";
 import { useShareModal } from "@/hooks/use-share-modal";
 import ShareModal from "@/components/share-modal";
@@ -1011,21 +1012,37 @@ export default function FolderPage({
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <Spinner size="lg" />
-      </div>
+      <ProjectsNavLayout selection={{ kind: "projects-root" }}>
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <Spinner size="lg" />
+        </div>
+      </ProjectsNavLayout>
     );
   }
 
   if (!folderData) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <p className="text-default-500">{t("folderNotFound")}</p>
-      </div>
+      <ProjectsNavLayout selection={{ kind: "projects-root" }}>
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <p className="text-default-500">{t("folderNotFound")}</p>
+        </div>
+      </ProjectsNavLayout>
     );
   }
 
   return (
+    <ProjectsNavLayout
+      selection={
+        projectId
+          ? {
+              kind: "folder",
+              projectId,
+              collectionId: folderData.folder.collectionId,
+              folderId,
+            }
+          : { kind: "projects-root" }
+      }
+    >
     <div className="max-w-7xl mx-auto px-4 py-6">
       {/* Breadcrumbs */}
       <nav className="flex items-center gap-1 text-sm text-default-500 mb-4 flex-wrap">
@@ -1684,5 +1701,6 @@ export default function FolderPage({
         }}
       />
     </div>
+    </ProjectsNavLayout>
   );
 }

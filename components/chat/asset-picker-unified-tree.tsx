@@ -323,12 +323,14 @@ export default function AssetPickerUnifiedTree({
   selection,
   onSelect,
   className,
+  hideRecent = false,
 }: {
   projects: Project[];
   collections: CollectionItem[];
   selection: UnifiedSelection;
   onSelect: (s: UnifiedSelection) => void;
   className?: string;
+  hideRecent?: boolean;
 }) {
   const t = useTranslations();
 
@@ -399,16 +401,18 @@ export default function AssetPickerUnifiedTree({
 
   return (
     <div className={`overflow-y-auto pr-1 ${className ?? ""}`}>
-      <button
-        type="button"
-        className={`${rowBase} ${isRecentSelected ? rowActive : rowInactive}`}
-        style={{ paddingLeft: `6px` }}
-        onClick={() => onSelect({ kind: "recent" })}
-      >
-        <span className="w-3 shrink-0" />
-        <Clock size={12} className="shrink-0 text-default-500" />
-        <span className="truncate">{t("assetPicker.recent")}</span>
-      </button>
+      {!hideRecent && (
+        <button
+          type="button"
+          className={`${rowBase} ${isRecentSelected ? rowActive : rowInactive}`}
+          style={{ paddingLeft: `6px` }}
+          onClick={() => onSelect({ kind: "recent" })}
+        >
+          <span className="w-3 shrink-0" />
+          <Clock size={12} className="shrink-0 text-default-500" />
+          <span className="truncate">{t("assetPicker.recent")}</span>
+        </button>
+      )}
 
       {owned.length > 0 && (
         <div className="text-[10px] font-medium text-default-400 uppercase tracking-wider px-2 pt-2 pb-1">

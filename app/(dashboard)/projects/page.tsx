@@ -28,6 +28,7 @@ import { Folder, Plus, Share2, FolderOpen, MoreVertical, Pencil, Video, LayoutGr
 import { useGetCollectionsQuery, useGetSharedFoldersQuery } from "@/lib/redux/services/next-api";
 import VideoList from "@/components/storyboard/video-list";
 import CollectionsContent from "@/components/collection/collections-content";
+import ProjectsNavTree from "@/components/projects-nav-tree";
 
 type Project = {
   id: string;
@@ -191,7 +192,11 @@ export default function ProjectsPage() {
             </div>
           }
         >
-          <div className="pt-6">
+          <div className="pt-6 flex gap-6 items-start">
+            <aside className="hidden lg:block w-[260px] shrink-0 border-r border-divider pr-3 sticky top-4 max-h-[calc(100vh-2rem)] overflow-y-auto">
+              <ProjectsNavTree selection={{ kind: "projects-root" }} />
+            </aside>
+            <div className="flex-1 min-w-0">
             {loading ? (
               <div className="flex items-center justify-center min-h-[60vh]">
                 <Spinner size="lg" />
@@ -465,6 +470,7 @@ export default function ProjectsPage() {
                 )}
               </>
             )}
+            </div>
           </div>
         </Tab>
         <Tab

@@ -19,7 +19,7 @@ import {
   ModalFooter,
   useDisclosure,
 } from "@heroui/modal";
-import { ArrowLeft, Plus, Share2, Tags } from "lucide-react";
+import { Plus, Share2, Tags } from "lucide-react";
 import ImageDetailModal, { ImageInfo } from "@/components/chat/image-detail-modal";
 import { useShareModal, type ShareEntry } from "@/hooks/use-share-modal";
 import ShareModal from "@/components/share-modal";
@@ -30,6 +30,7 @@ import {
 import CollectionCard from "@/components/collection/collection-card";
 import TagInput, { type TagValue } from "@/components/collection/tag-input";
 import { getTagColor } from "@/lib/tag-colors";
+import ProjectsNavLayout from "@/components/projects-nav-layout";
 
 type Project = {
   id: string;
@@ -292,31 +293,28 @@ export default function ProjectDetailPage({
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <Spinner size="lg" />
-      </div>
+      <ProjectsNavLayout selection={{ kind: "project", projectId }}>
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <Spinner size="lg" />
+        </div>
+      </ProjectsNavLayout>
     );
   }
 
   if (!project) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <p className="text-default-500">{t("projectNotFound")}</p>
-      </div>
+      <ProjectsNavLayout selection={{ kind: "project", projectId }}>
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <p className="text-default-500">{t("projectNotFound")}</p>
+        </div>
+      </ProjectsNavLayout>
     );
   }
 
   return (
+    <ProjectsNavLayout selection={{ kind: "project", projectId }}>
     <div className="container mx-auto px-4 py-8 max-w-7xl">
       <div className="mb-8">
-        <Button
-          variant="light"
-          startContent={<ArrowLeft size={20} />}
-          onPress={() => router.push("/projects")}
-          className="mb-4"
-        >
-          {t("backToProjects")}
-        </Button>
 
         <div className="flex flex-col sm:flex-row justify-between sm:items-start gap-4 sm:gap-0">
           <div className="flex-1">
@@ -605,6 +603,7 @@ export default function ProjectDetailPage({
         onClose={onImageDetailClose}
       />
     </div>
+    </ProjectsNavLayout>
   );
 }
 

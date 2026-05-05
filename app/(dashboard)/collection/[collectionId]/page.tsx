@@ -20,7 +20,6 @@ import { addToast } from "@heroui/toast";
 import {
   Pencil,
   Trash2,
-  ArrowLeft,
   X,
   Upload,
   Folder,
@@ -32,6 +31,7 @@ import ImageDetailModal, {
 } from "@/components/chat/image-detail-modal";
 import SendToDesktopModal from "@/components/desktop/SendToDesktopModal";
 import AssetPickerModal from "@/components/chat/asset-picker-modal";
+import ProjectsNavLayout from "@/components/projects-nav-layout";
 import LocationPicker, { type LocationTarget } from "@/components/location-picker";
 import AssetPageActions from "@/components/asset-page-actions";
 import ElementEditorController from "@/components/chat/element-editor-controller";
@@ -1063,17 +1063,21 @@ export default function CollectionPage({
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <Spinner size="lg" />
-      </div>
+      <ProjectsNavLayout selection={{ kind: "projects-root" }}>
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <Spinner size="lg" />
+        </div>
+      </ProjectsNavLayout>
     );
   }
 
   if (!collectionData) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <p className="text-default-500">{t("collectionNotFound")}</p>
-      </div>
+      <ProjectsNavLayout selection={{ kind: "projects-root" }}>
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <p className="text-default-500">{t("collectionNotFound")}</p>
+        </div>
+      </ProjectsNavLayout>
     );
   }
 
@@ -1104,20 +1108,20 @@ export default function CollectionPage({
   };
 
   return (
+    <ProjectsNavLayout
+      selection={
+        collection.projectId
+          ? {
+              kind: "collection",
+              projectId: collection.projectId,
+              collectionId,
+            }
+          : { kind: "projects-root" }
+      }
+    >
     <div className="container mx-auto px-4 py-8 max-w-7xl">
       {/* Header */}
       <div className="mb-8">
-        {collection.projectId && (
-          <Button
-            variant="light"
-            startContent={<ArrowLeft size={20} />}
-            onPress={() => router.push(`/projects/${collection.projectId}`)}
-            className="mb-4"
-          >
-            {t("backToProject")}
-          </Button>
-        )}
-
         <div className="flex flex-col sm:flex-row justify-between sm:items-start gap-4 sm:gap-0">
           <div className="flex-1">
             <div className="flex flex-wrap items-center gap-3 mb-2">
@@ -1723,5 +1727,6 @@ export default function CollectionPage({
         acceptTypes={["image", "video", "audio"]}
       />
     </div>
+    </ProjectsNavLayout>
   );
 }
