@@ -72,6 +72,37 @@ export function useTimeline(desktopId: string) {
     });
   }, [clips]);
 
+  // Probe hasAudio for any clip missing the field — primarily clips
+  // persisted to localStorage before the field existed. Keyed on assetId
+  // so split clips (which share a source) don't trigger N redundant fetches.
+  const audioProbedAssetIdsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const toProbe: TimelineClip[] = [];
+    const seen = new Set<string>();
+    for (const clip of clips) {
+      if (clip.hasAudio !== undefined) continue;
+      if (!clip.videoUrl) continue;
+      if (audioProbedAssetIdsRef.current.has(clip.assetId)) continue;
+      if (seen.has(clip.assetId)) continue;
+      seen.add(clip.assetId);
+      toProbe.push(clip);
+    }
+    if (toProbe.length === 0) return;
+
+    toProbe.forEach((clip) => {
+      audioProbedAssetIdsRef.current.add(clip.assetId);
+      probeHasAudio(clip.videoUrl!)
+        .then((hasAudio) => {
+          setClips((prev) =>
+            prev.map((c) =>
+              c.assetId === clip.assetId ? { ...c, hasAudio } : c
+            )
+          );
+        })
+        .catch(() => {});
+    });
+  }, [clips]);
+
   const addClip = useCallback((clip: TimelineClip) => {
     // Default hasAudio to true; the async probe below can only downgrade it.
     // See TimelineClip.hasAudio JSDoc for why false-negatives are avoided.
