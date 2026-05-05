@@ -100,7 +100,7 @@ export const siteConfig = {
 
   // Upload Configuration
   upload: {
-    maxFileSizeMB: 30,
+    maxFileSizeMB: 50,
     compressThresholdMB: 6,
     serverCompressThresholdMB: 6,
     uploadTimeoutMs: 120_000,
