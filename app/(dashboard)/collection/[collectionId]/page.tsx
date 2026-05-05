@@ -49,7 +49,10 @@ import { uploadAudio as uploadAudioFile, validateAudioFile } from "@/lib/upload/
 import { useShareModal } from "@/hooks/use-share-modal";
 import ShareModal from "@/components/share-modal";
 import type { AssetItem } from "@/lib/types/asset";
-import { bulkDownloadAssets } from "@/lib/bulk-download";
+import {
+  bulkDownloadAssets,
+  type ImageDownloadFormat,
+} from "@/lib/bulk-download";
 
 interface CollectionData {
   collection: {
@@ -666,14 +669,18 @@ export default function CollectionPage({
     }
   };
 
-  const handleBulkDownload = async () => {
+  const handleBulkDownload = async (formatKey?: string) => {
     if (selectedIds.size === 0) return;
     const selectedAssets = images.filter((a) => selectedIds.has(a.id));
     if (selectedAssets.length === 0) return;
+    const imageFormat: ImageDownloadFormat | undefined =
+      formatKey === "png" || formatKey === "jpeg" || formatKey === "webp"
+        ? formatKey
+        : undefined;
     setIsBulkDownloading(true);
     try {
       const zipName = `${collectionData?.collection.name || "collection"}.zip`;
-      await bulkDownloadAssets(selectedAssets, zipName);
+      await bulkDownloadAssets(selectedAssets, zipName, { imageFormat });
       addToast({
         title: t("bulkDownloaded"),
         description: t("bulkDownloadedDesc", { count: selectedAssets.length }),
@@ -1321,6 +1328,12 @@ export default function CollectionPage({
         onDelete={onBulkDeleteOpen}
         onDownload={handleBulkDownload}
         isDownloading={isBulkDownloading}
+        downloadFormats={[
+          { key: "original", label: t("bulkDownloadOriginal") },
+          { key: "png", label: "PNG" },
+          { key: "jpeg", label: "JPEG" },
+          { key: "webp", label: "WebP" },
+        ]}
         labels={{
           selectedCount: t("selectedCount", { count: selectedIds.size }),
           selectAll: t("selectAll"),
@@ -1329,6 +1342,7 @@ export default function CollectionPage({
           bulkMoveTo: t("bulkMoveTo"),
           bulkDelete: t("bulkDelete"),
           bulkDownload: t("bulkDownload"),
+          bulkDownloadFormatLabel: t("bulkDownloadFormatLabel"),
         }}
       />
 

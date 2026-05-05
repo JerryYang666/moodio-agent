@@ -688,6 +688,8 @@
     "bulkDownloaded": "下载完成",
     "bulkDownloadedDesc": "已将 {count} 个文件下载为 ZIP",
     "failedToBulkDownload": "下载文件失败",
+    "bulkDownloadOriginal": "原始格式",
+    "bulkDownloadFormatLabel": "下载格式...",
     "tags": "标签",
     "addTag": "添加标签",
     "add": "添加",
@@ -1554,7 +1556,9 @@
     "bulkDownload": "下载",
     "bulkDownloaded": "下载完成",
     "bulkDownloadedDesc": "已将 {count} 个文件下载为 ZIP",
-    "failedToBulkDownload": "下载文件失败"
+    "failedToBulkDownload": "下载文件失败",
+    "bulkDownloadOriginal": "原始格式",
+    "bulkDownloadFormatLabel": "下载格式..."
   },
   "desktop": {
     "title": "画布",
@@ -1725,6 +1729,8 @@
     "bulkDownloaded": "下载完成",
     "bulkDownloadedDesc": "已将 {count} 个文件下载为 ZIP",
     "failedToBulkDownload": "下载文件失败",
+    "bulkDownloadOriginal": "原始格式",
+    "bulkDownloadFormatLabel": "下载格式...",
     "error": "错误",
     "tableNotFoundOrAccessDenied": "未找到大表或无访问权限。",
     "backToTables": "返回大表列表",

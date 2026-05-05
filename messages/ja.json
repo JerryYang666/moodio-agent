@@ -688,6 +688,8 @@
     "bulkDownloaded": "ダウンロード完了",
     "bulkDownloadedDesc": "{count}件のファイルをZIPでダウンロードしました",
     "failedToBulkDownload": "ファイルのダウンロードに失敗しました",
+    "bulkDownloadOriginal": "元のまま",
+    "bulkDownloadFormatLabel": "形式を選択...",
     "tags": "タグ",
     "addTag": "タグを追加",
     "add": "追加",
@@ -1554,7 +1556,9 @@
     "bulkDownload": "ダウンロード",
     "bulkDownloaded": "ダウンロード完了",
     "bulkDownloadedDesc": "{count}件のファイルをZIPでダウンロードしました",
-    "failedToBulkDownload": "ファイルのダウンロードに失敗しました"
+    "failedToBulkDownload": "ファイルのダウンロードに失敗しました",
+    "bulkDownloadOriginal": "元のまま",
+    "bulkDownloadFormatLabel": "形式を選択..."
   },
   "desktop": {
     "title": "デスクトップ",
@@ -1725,6 +1729,8 @@
     "bulkDownloaded": "ダウンロード完了",
     "bulkDownloadedDesc": "{count}件のファイルをZIPでダウンロードしました",
     "failedToBulkDownload": "ファイルのダウンロードに失敗しました",
+    "bulkDownloadOriginal": "元のまま",
+    "bulkDownloadFormatLabel": "形式を選択...",
     "error": "エラー",
     "tableNotFoundOrAccessDenied": "シートが見つからないか、アクセス権限がありません。",
     "backToTables": "シート一覧に戻る",

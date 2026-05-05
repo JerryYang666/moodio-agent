@@ -5,7 +5,17 @@ import { useTranslations } from "next-intl";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { MousePointer2, Plus, Trash2, SendHorizontal, ArrowUp, ArrowDown, MessageSquare, Download, Loader2 } from "lucide-react";
 import { addToast } from "@heroui/toast";
-import { bulkDownloadAssets, type BulkDownloadAsset } from "@/lib/bulk-download";
+import {
+  bulkDownloadAssets,
+  type BulkDownloadAsset,
+  type ImageDownloadFormat,
+} from "@/lib/bulk-download";
+import {
+  Dropdown,
+  DropdownTrigger,
+  DropdownMenu,
+  DropdownItem,
+} from "@heroui/dropdown";
 import type {
   ProductionTableColumn,
   ProductionTableRow,
@@ -978,51 +988,61 @@ export function ProductionTableGrid({
   // ---- Bulk download media in selected cells ----
   const [isBulkDownloading, setIsBulkDownloading] = useState(false);
 
-  const handleBulkDownload = useCallback(async () => {
-    if (selectedCells.size === 0 || isBulkDownloading) return;
+  const handleBulkDownload = useCallback(
+    async (formatKey?: string) => {
+      if (selectedCells.size === 0 || isBulkDownloading) return;
 
-    const colNameMap = new Map(columns.map((c) => [c.id, c.name]));
-    const rowIndexMap = new Map(rows.map((r, i) => [r.id, i + 1]));
-    const currentCellMap = store.getState().cellMap;
+      const colNameMap = new Map(columns.map((c) => [c.id, c.name]));
+      const rowIndexMap = new Map(rows.map((r, i) => [r.id, i + 1]));
+      const currentCellMap = store.getState().cellMap;
 
-    const downloadAssets: BulkDownloadAsset[] = [];
-    for (const key of Array.from(selectedCells)) {
-      const cell = currentCellMap[key];
-      if (!cell) continue;
-      const assets = cell.mediaAssets as EnrichedMediaAssetRef[] | null;
-      if (!assets || assets.length === 0) continue;
+      const downloadAssets: BulkDownloadAsset[] = [];
+      for (const key of Array.from(selectedCells)) {
+        const cell = currentCellMap[key];
+        if (!cell) continue;
+        const assets = cell.mediaAssets as EnrichedMediaAssetRef[] | null;
+        if (!assets || assets.length === 0) continue;
 
-      const [colId, rowId] = key.split(":");
-      const colName = colNameMap.get(colId) ?? colId;
-      const rowNum = rowIndexMap.get(rowId) ?? "?";
-      const title = `Row ${rowNum} - ${colName}`;
+        const [colId, rowId] = key.split(":");
+        const colName = colNameMap.get(colId) ?? colId;
+        const rowNum = rowIndexMap.get(rowId) ?? "?";
+        const title = `Row ${rowNum} - ${colName}`;
 
-      for (const a of assets) {
-        downloadAssets.push({
-          assetId: a.assetId,
-          imageId: a.imageId,
-          assetType: a.assetType,
-          generationDetails: { title },
-        });
+        for (const a of assets) {
+          downloadAssets.push({
+            assetId: a.assetId,
+            imageId: a.imageId,
+            assetType: a.assetType,
+            generationDetails: { title },
+          });
+        }
       }
-    }
 
-    if (downloadAssets.length === 0) return;
+      if (downloadAssets.length === 0) return;
 
-    setIsBulkDownloading(true);
-    try {
-      await bulkDownloadAssets(downloadAssets, "production-table.zip");
-      addToast({
-        title: t("bulkDownloaded"),
-        description: t("bulkDownloadedDesc", { count: downloadAssets.length }),
-        color: "success",
-      });
-    } catch {
-      addToast({ title: t("error"), description: t("failedToBulkDownload"), color: "danger" });
-    } finally {
-      setIsBulkDownloading(false);
-    }
-  }, [selectedCells, isBulkDownloading, store, columns, rows, t]);
+      const imageFormat: ImageDownloadFormat | undefined =
+        formatKey === "png" || formatKey === "jpeg" || formatKey === "webp"
+          ? formatKey
+          : undefined;
+
+      setIsBulkDownloading(true);
+      try {
+        await bulkDownloadAssets(downloadAssets, "production-table.zip", {
+          imageFormat,
+        });
+        addToast({
+          title: t("bulkDownloaded"),
+          description: t("bulkDownloadedDesc", { count: downloadAssets.length }),
+          color: "success",
+        });
+      } catch {
+        addToast({ title: t("error"), description: t("failedToBulkDownload"), color: "danger" });
+      } finally {
+        setIsBulkDownloading(false);
+      }
+    },
+    [selectedCells, isBulkDownloading, store, columns, rows, t]
+  );
 
   // Any selected cell contains at least one media asset — used to enable the
   // bulk download button.
@@ -1412,19 +1432,33 @@ export function ProductionTableGrid({
     {/* Floating selection action bar */}
     {selectedCells.size > 0 && (
       <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-4 py-2.5 rounded-full shadow-lg border border-default-200 bg-content1/95 backdrop-blur-sm">
-        <button
-          className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-primary hover:bg-primary/10 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
-          onClick={handleBulkDownload}
-          disabled={!selectionHasMedia || isBulkDownloading}
-          aria-label={t("download")}
-        >
-          {isBulkDownloading ? (
-            <Loader2 size={14} className="animate-spin" />
-          ) : (
-            <Download size={14} />
-          )}
-          {t("download")}
-        </button>
+        <Dropdown isDisabled={!selectionHasMedia || isBulkDownloading}>
+          <DropdownTrigger>
+            <button
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-primary hover:bg-primary/10 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+              disabled={!selectionHasMedia || isBulkDownloading}
+              aria-label={t("download")}
+            >
+              {isBulkDownloading ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                <Download size={14} />
+              )}
+              {t("download")}
+            </button>
+          </DropdownTrigger>
+          <DropdownMenu
+            aria-label={t("bulkDownloadFormatLabel")}
+            onAction={(key) => handleBulkDownload(String(key))}
+          >
+            <DropdownItem key="original">
+              {t("bulkDownloadOriginal")}
+            </DropdownItem>
+            <DropdownItem key="png">PNG</DropdownItem>
+            <DropdownItem key="jpeg">JPEG</DropdownItem>
+            <DropdownItem key="webp">WebP</DropdownItem>
+          </DropdownMenu>
+        </Dropdown>
         <span className="text-sm text-default-600">
           {selectedCells.size} {selectedCells.size === 1 ? t("cellSelected") : t("cellsSelected")}
         </span>

@@ -688,6 +688,8 @@
     "bulkDownloaded": "Download complete",
     "bulkDownloadedDesc": "{count, plural, one {# file} other {# files}} downloaded as ZIP",
     "failedToBulkDownload": "Failed to download files",
+    "bulkDownloadOriginal": "Original",
+    "bulkDownloadFormatLabel": "Download as...",
     "tags": "Tags",
     "addTag": "Add Tag",
     "add": "Add",
@@ -766,7 +768,9 @@
     "bulkDownload": "Download",
     "bulkDownloaded": "Download complete",
     "bulkDownloadedDesc": "{count, plural, one {# file} other {# files}} downloaded as ZIP",
-    "failedToBulkDownload": "Failed to download files"
+    "failedToBulkDownload": "Failed to download files",
+    "bulkDownloadOriginal": "Original",
+    "bulkDownloadFormatLabel": "Download as..."
   },
   "desktop": {
     "title": "Desktops",
@@ -1725,6 +1729,8 @@
     "bulkDownloaded": "Download complete",
     "bulkDownloadedDesc": "{count, plural, one {# file} other {# files}} downloaded as ZIP",
     "failedToBulkDownload": "Failed to download files",
+    "bulkDownloadOriginal": "Original",
+    "bulkDownloadFormatLabel": "Download as...",
     "error": "Error",
     "tableNotFoundOrAccessDenied": "Table not found or access denied.",
     "backToTables": "Back to tables",

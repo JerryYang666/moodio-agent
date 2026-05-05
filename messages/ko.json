@@ -688,6 +688,8 @@
     "bulkDownloaded": "다운로드 완료",
     "bulkDownloadedDesc": "{count}개 파일이 ZIP으로 다운로드됨",
     "failedToBulkDownload": "파일 다운로드 실패",
+    "bulkDownloadOriginal": "원본",
+    "bulkDownloadFormatLabel": "다운로드 형식...",
     "tags": "태그",
     "addTag": "태그 추가",
     "add": "추가",
@@ -1554,7 +1556,9 @@
     "bulkDownload": "다운로드",
     "bulkDownloaded": "다운로드 완료",
     "bulkDownloadedDesc": "{count}개 파일이 ZIP으로 다운로드됨",
-    "failedToBulkDownload": "파일 다운로드 실패"
+    "failedToBulkDownload": "파일 다운로드 실패",
+    "bulkDownloadOriginal": "원본",
+    "bulkDownloadFormatLabel": "다운로드 형식..."
   },
   "desktop": {
     "title": "데스크톱",
@@ -1725,6 +1729,8 @@
     "bulkDownloaded": "다운로드 완료",
     "bulkDownloadedDesc": "{count}개 파일이 ZIP으로 다운로드됨",
     "failedToBulkDownload": "파일 다운로드 실패",
+    "bulkDownloadOriginal": "원본",
+    "bulkDownloadFormatLabel": "다운로드 형식...",
     "error": "오류",
     "tableNotFoundOrAccessDenied": "시트를 찾을 수 없거나 접근 권한이 없습니다.",
     "backToTables": "시트 목록으로 돌아가기",
