@@ -21,12 +21,15 @@ interface TimelineClipCardProps {
   onDragEnd: () => void;
   onTrimChange?: (clipId: string, trimStart: number, trimEnd: number) => void;
   onTrimScrub?: (time: number | null) => void;
+  /** Fired synchronously on trim-handle mousedown, before any selection change. */
+  onTrimDragStart?: () => void;
+  /** Click seek. `sourceTime` is mapped from x-offset across the trimmed range. */
+  onSeekInClip?: (index: number, sourceTime: number) => void;
 }
 
 const MIN_CLIP_DURATION = 0.5;
 const HANDLE_WIDTH = 6;
 const PX_PER_SECOND = 30;
-const MIN_CLIP_WIDTH = 36;
 const DEFAULT_LOADING_WIDTH = 120;
 
 // Module-level flag to block onClick across all clip instances during/after trim drag
@@ -45,6 +48,8 @@ export default function TimelineClipCard({
   onDragEnd,
   onTrimChange,
   onTrimScrub,
+  onTrimDragStart,
+  onSeekInClip,
 }: TimelineClipCardProps) {
   const cardRef = useRef<HTMLDivElement>(null);
   const [trimDrag, setTrimDrag] = useState<{
@@ -103,7 +108,11 @@ export default function TimelineClipCard({
       e.preventDefault();
       if (!onTrimChange || clip.duration <= 0) return;
 
-      // Select this clip and block other clips from capturing click
+      // Must fire before onClick(index) below — otherwise the active-clip
+      // switch happens first and the playhead jumps before the panel
+      // can snapshot its pixel position.
+      onTrimDragStart?.();
+
       _trimDragActive = true;
       onClick(index);
 
@@ -116,7 +125,6 @@ export default function TimelineClipCard({
         currentValue: side === "left" ? startTrimStart : startTrimEnd,
       });
 
-      // Fire initial scrub and track latest value for mouseUp
       let latestScrubValue = side === "left" ? startTrimStart : startTrimEnd;
       onTrimScrub?.(latestScrubValue);
       let lastScrubTime = Date.now();
@@ -144,7 +152,7 @@ export default function TimelineClipCard({
 
         onTrimChange(clip.id, newTrimStart, newTrimEnd);
 
-        // Throttled scrub (~60ms)
+        // Throttle scrub at ~60ms to avoid spamming the preview element.
         const now = Date.now();
         if (now - lastScrubTime >= 60) {
           lastScrubTime = now;
@@ -153,23 +161,21 @@ export default function TimelineClipCard({
       };
 
       const handleMouseUp = () => {
-        // Final scrub to the exact last value
         onTrimScrub?.(latestScrubValue);
-        // Clear scrub on next frame so the video stays on this frame
+        // Clear next frame so the preview stays painted on the final frame.
         requestAnimationFrame(() => onTrimScrub?.(null));
 
         setTrimDrag(null);
         document.removeEventListener("mousemove", handleMouseMove);
         document.removeEventListener("mouseup", handleMouseUp);
 
-        // Clear flag after click event cycle completes
         setTimeout(() => { _trimDragActive = false; }, 50);
       };
 
       document.addEventListener("mousemove", handleMouseMove);
       document.addEventListener("mouseup", handleMouseUp);
     },
-    [clip, onTrimChange, onTrimScrub, onClick, index]
+    [clip, onTrimChange, onTrimScrub, onTrimDragStart, onClick, index]
   );
 
   const handleHandleDoubleClick = useCallback(
@@ -190,27 +196,24 @@ export default function TimelineClipCard({
 
   const isVideo = variant === "video";
   const effectiveDuration = getEffectiveDuration(clip);
-  const isTrimmed =
-    (clip.trimStart != null && clip.trimStart > 0) ||
-    (clip.trimEnd != null && clip.trimEnd < clip.duration);
   const durationKnown = clip.duration > 0;
   const canTrim = isVideo && !!onTrimChange;
 
-  // Width: default 120px when duration unknown, otherwise proportional with 36px minimum
+  // Strictly proportional to duration so the timeline reflects real length.
+  // Falls back to DEFAULT_LOADING_WIDTH while the duration probe is in flight.
   const fullWidth = !durationKnown
     ? DEFAULT_LOADING_WIDTH
-    : Math.max(MIN_CLIP_WIDTH, clip.duration * PX_PER_SECOND);
+    : clip.duration * PX_PER_SECOND;
   const width = !durationKnown
     ? DEFAULT_LOADING_WIDTH
-    : Math.max(MIN_CLIP_WIDTH, effectiveDuration * PX_PER_SECOND);
+    : effectiveDuration * PX_PER_SECOND;
 
-  // Thumbnail crop offset: shift left by trimStart, clamped so image right edge doesn't pass clip right edge
+  // Crop thumbnail by trimStart; clamp so its right edge never crosses the card's.
   const trimStartRatio = durationKnown && clip.duration > 0 ? (clip.trimStart ?? 0) / clip.duration : 0;
   const thumbOffset = Math.max(-(fullWidth - width), -(trimStartRatio * fullWidth));
 
   return (
     <div className="flex flex-col items-start shrink-0">
-      {/* Title + duration label above the clip */}
       <div
         className="flex items-center gap-1 px-0.5 mb-0.5 min-w-0"
         style={{ maxWidth: width }}
@@ -218,23 +221,31 @@ export default function TimelineClipCard({
         <span className="text-[10px] text-default-400 truncate min-w-0">
           {clip.title || "Untitled"}
         </span>
-        {effectiveDuration > 0 && (
-          <span className="text-[10px] text-default-400 shrink-0 tabular-nums">
-            · {isTrimmed ? `${effectiveDuration.toFixed(1)}s` : `${effectiveDuration.toFixed(1)}s`}
-          </span>
-        )}
       </div>
 
       {/* Clip card */}
       <div
         ref={cardRef}
         draggable
-        onClick={() => { if (!_trimDragActive) onClick(index); }}
+        onClick={(e) => {
+          if (_trimDragActive) return;
+          onClick(index);
+          const rect = cardRef.current?.getBoundingClientRect();
+          if (rect && onSeekInClip && clip.duration > 0 && rect.width > 0) {
+            const progress = Math.max(
+              0,
+              Math.min(1, (e.clientX - rect.left) / rect.width)
+            );
+            const trimStart = clip.trimStart ?? 0;
+            const trimEnd = clip.trimEnd ?? clip.duration;
+            onSeekInClip(index, trimStart + progress * (trimEnd - trimStart));
+          }
+        }}
         onContextMenu={handleContextMenu}
         onDragStart={handleReorderDragStart}
         onDragOver={handleDragOver}
         onDragEnd={onDragEnd}
-        className={`relative shrink-0 h-[44px] rounded-lg border overflow-visible cursor-pointer active:cursor-grabbing select-none group/clip ${
+        className={`relative shrink-0 h-[64px] rounded-lg border overflow-visible cursor-pointer active:cursor-grabbing select-none group/clip ${
           isDragging ? "opacity-30" : ""
         } ${
           isActive
@@ -245,7 +256,6 @@ export default function TimelineClipCard({
         }`}
         style={{ width }}
       >
-        {/* Thumbnail — crops with trim, not scale */}
         <div className="absolute inset-0 rounded-lg overflow-hidden">
           {isVideo && clip.thumbnailUrl ? (
             <img
@@ -258,14 +268,12 @@ export default function TimelineClipCard({
           ) : null}
         </div>
 
-        {/* Loading indicator when duration is being probed */}
         {!durationKnown && (
           <div className="absolute inset-0 z-10 flex items-center justify-center">
             <Loader2 size={14} className="animate-spin text-default-400" />
           </div>
         )}
 
-        {/* Left trim handle — always visible */}
         {canTrim && (
           <div
             className="absolute left-0 top-0 bottom-0 z-20 cursor-col-resize group/handle-l flex items-center justify-center"
@@ -288,7 +296,6 @@ export default function TimelineClipCard({
           </div>
         )}
 
-        {/* Right trim handle — always visible */}
         {canTrim && (
           <div
             className="absolute right-0 top-0 bottom-0 z-20 cursor-col-resize group/handle-r flex items-center justify-center"
@@ -312,7 +319,7 @@ export default function TimelineClipCard({
         )}
       </div>
 
-      {/* Right-click context menu — portaled to body to escape backdrop-blur stacking context */}
+      {/* Portaled to body so the fixed menu escapes backdrop-blur stacking context. */}
       {contextMenu && onRemove && createPortal(
         <div
           className="fixed z-9999 bg-background border border-divider rounded-lg shadow-lg py-1 min-w-[140px]"

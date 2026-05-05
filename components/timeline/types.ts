@@ -22,6 +22,12 @@ export interface TimelineClip {
   trimStart?: number;
   /** Trim end in seconds (default: duration = end of clip) */
   trimEnd?: number;
+  /**
+   * Whether the source video has an audio track. Probed asynchronously
+   * in `useTimeline.addClip`; `undefined` is treated as `true` so
+   * XML exports / UI only drop audio when `hasAudio === false`.
+   */
+  hasAudio?: boolean;
 }
 
 export interface TimelineState {

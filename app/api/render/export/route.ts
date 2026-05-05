@@ -98,11 +98,17 @@ export async function POST(request: Request) {
 
     const { output_bucket, output_key } = result.body;
 
+    // ResponseContentDisposition forces attachment download cross-origin
+    // without a client-side blob fetch.
+    const outputFormat = renderRequest.output_format || "mp4";
+    const suggestedFilename = `moodio-export-${Date.now()}.${outputFormat}`;
+
     const downloadUrl = await getSignedUrl(
       s3Client,
       new GetObjectCommand({
         Bucket: output_bucket,
         Key: output_key,
+        ResponseContentDisposition: `attachment; filename="${suggestedFilename}"`,
       }),
       { expiresIn: 3600 }
     );
