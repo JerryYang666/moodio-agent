@@ -9,6 +9,7 @@ import {
   ImagePlus,
   CheckSquare,
   X,
+  Layers,
 } from "lucide-react";
 
 export interface AssetPageActionsProps {
@@ -21,6 +22,8 @@ export interface AssetPageActionsProps {
   onToggleSelection: () => void;
   onUpload: () => void;
   onCreateFolder: () => void;
+  /** Optional: show a "Create element" button next to "New folder" when provided. */
+  onCreateElement?: () => void;
   onRename: () => void;
   onShare: () => void;
   onDelete: () => void;
@@ -30,6 +33,7 @@ export interface AssetPageActionsProps {
     uploadImages: string;
     compressing: string;
     newFolder: string;
+    newElement?: string;
     rename: string;
     share: string;
     delete: string;
@@ -46,6 +50,7 @@ export default function AssetPageActions({
   onToggleSelection,
   onUpload,
   onCreateFolder,
+  onCreateElement,
   onRename,
   onShare,
   onDelete,
@@ -108,6 +113,17 @@ export default function AssetPageActions({
               tabIndex={isSelectionMode ? -1 : undefined}
             >
               {labels.newFolder}
+            </Button>
+          )}
+          {canWrite && onCreateElement && labels.newElement && (
+            <Button
+              variant="flat"
+              startContent={<Layers size={18} />}
+              onPress={onCreateElement}
+              className={`w-full sm:w-auto ${hiddenWhenSelecting}`}
+              tabIndex={isSelectionMode ? -1 : undefined}
+            >
+              {labels.newElement}
             </Button>
           )}
           <Button

@@ -23,12 +23,15 @@ import {
   Music,
   Check,
   Star,
+  Layers,
+  Video as VideoIcon,
 } from "lucide-react";
 import AudioPlayer from "@/components/audio-player";
 import type { AssetItem } from "@/lib/types/asset";
 
 export interface AssetCardLabels {
   video: string;
+  element?: string;
   viewDetails: string;
   rename: string;
   moveTo: string;
@@ -85,7 +88,35 @@ export default function AssetCard({
       className={`group relative ${isSelectionMode && isSelected ? "ring-2 ring-primary ring-offset-2 ring-offset-background" : ""}`}
     >
       <CardBody className="p-0 overflow-hidden aspect-square relative rounded-lg">
-        {asset.assetType === "audio" ? (
+        {asset.assetType === "element" ? (
+          <div
+            className={`w-full h-full cursor-pointer grid grid-cols-2 grid-rows-2 gap-0.5 bg-default-200 ${isSelectionMode && isSelected ? "opacity-80" : ""}`}
+            onClick={() => onClick(asset)}
+          >
+            {Array.from({ length: 4 }).map((_, i) => {
+              const url = asset.elementDetails?.imageUrls?.[i];
+              return (
+                <div
+                  key={i}
+                  className="relative bg-default-100 overflow-hidden"
+                >
+                  {url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={url}
+                      alt=""
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-default-300">
+                      <Layers size={14} />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ) : asset.assetType === "audio" ? (
           <div
             className={`w-full h-full cursor-pointer bg-linear-to-br from-violet-500/20 to-purple-600/20 ${isSelectionMode && isSelected ? "opacity-80" : ""}`}
             onClick={() => onClick(asset)}
@@ -177,6 +208,30 @@ export default function AssetCard({
                 {labels.video}
               </span>
             </div>
+          </div>
+        )}
+
+        {/* Element badge + optional video/voice sub-badges */}
+        {asset.assetType === "element" && (
+          <div
+            className={`absolute ${isSelectionMode ? "top-2 left-10" : "top-2 left-2"} z-10 flex items-center gap-1`}
+          >
+            <div className="bg-sky-600/80 text-white rounded-full p-1.5 flex items-center gap-1">
+              <Layers size={12} />
+              <span className="text-[10px] font-medium pr-1">
+                {labels.element ?? "Element"}
+              </span>
+            </div>
+            {asset.elementDetails?.videoUrl && (
+              <div className="bg-black/70 text-white rounded-full p-1 flex items-center">
+                <VideoIcon size={10} />
+              </div>
+            )}
+            {asset.elementDetails?.voiceId && (
+              <div className="bg-violet-600/80 text-white rounded-full p-1 flex items-center">
+                <Music size={10} />
+              </div>
+            )}
           </div>
         )}
 

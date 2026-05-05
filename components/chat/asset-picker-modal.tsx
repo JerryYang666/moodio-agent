@@ -16,7 +16,7 @@ import { Select, SelectItem } from "@heroui/select";
 import { Input } from "@heroui/input";
 import { Image } from "@heroui/image";
 import { Tab, Tabs } from "@heroui/tabs";
-import { Search, Expand, Camera, Star, X, Check, Video, Music, FolderTree } from "lucide-react";
+import { Search, Expand, Camera, Star, X, Check, Video, Music, FolderTree, Layers } from "lucide-react";
 import AudioPlayer from "@/components/audio-player";
 import { siteConfig } from "@/config/site";
 import { useGetCollectionsQuery } from "@/lib/redux/services/next-api";
@@ -24,6 +24,8 @@ import AssetPickerUnifiedTree, {
   type UnifiedSelection,
 } from "./asset-picker-unified-tree";
 import AssetPickerBreadcrumbs from "./asset-picker-breadcrumbs";
+import type { ElementAsset } from "@/lib/video/models";
+import { blobToWav } from "@/lib/audio/encode-wav";
 
 export type AssetSummary = {
   id: string;
@@ -38,12 +40,27 @@ export type AssetSummary = {
   thumbnailSmUrl?: string;
   /** Only populated for images. */
   thumbnailMdUrl?: string;
-  assetType?: "image" | "video" | "public_image" | "public_video" | "audio";
+  assetType?:
+    | "image"
+    | "video"
+    | "public_image"
+    | "public_video"
+    | "audio"
+    | "element";
   chatId: string | null;
   generationDetails: {
     title: string;
     prompt: string;
     status: "loading" | "generated" | "error";
+  };
+  /**
+   * Populated when assetType === "element". Structured fields for the
+   * aggregated element, plus resolved URLs for the constituent images/video
+   * so the grid tile can render a composite preview without extra fetches.
+   */
+  elementDetails?: ElementAsset & {
+    imageUrls?: string[];
+    videoUrl?: string;
   };
   rating?: number | null;
   addedAt: Date;
@@ -93,6 +110,7 @@ const AssetGridItem = React.memo(function AssetGridItem({
   index,
   isSelected,
   multiSelect,
+  disabledReason,
   onClick,
   onExpand,
   untitledLabel,
@@ -103,22 +121,65 @@ const AssetGridItem = React.memo(function AssetGridItem({
   index: number;
   isSelected: boolean;
   multiSelect: boolean;
+  /** When set, the tile is shown but not clickable; tooltip explains why. */
+  disabledReason?: string | null;
   onClick: (asset: AssetSummary, index: number, e: React.MouseEvent) => void;
   onExpand: (asset: AssetSummary) => void;
   untitledLabel: string;
   viewFullLabel: string;
   assetAltLabel: string;
 }) {
+  const isElement = asset.assetType === "element";
+  const elementImageUrls = asset.elementDetails?.imageUrls ?? [];
+  const elementVideoUrl = asset.elementDetails?.videoUrl;
+  const elementVoiceId = asset.elementDetails?.voiceId;
+  const isDisabled = Boolean(disabledReason);
   return (
     <div
-      className={`group relative rounded-lg overflow-hidden border border-divider bg-default-100 ${multiSelect && isSelected ? "ring-2 ring-primary ring-offset-2 ring-offset-background" : ""}`}
+      className={`group relative rounded-lg overflow-hidden border border-divider bg-default-100 ${multiSelect && isSelected ? "ring-2 ring-primary ring-offset-2 ring-offset-background" : ""} ${isDisabled ? "opacity-50 cursor-not-allowed" : ""}`}
+      title={disabledReason || undefined}
     >
       <div className="aspect-square relative">
         <button
           className="w-full h-full"
-          onClick={(e) => onClick(asset, index, e)}
+          onClick={(e) => {
+            if (isDisabled) {
+              e.stopPropagation();
+              return;
+            }
+            onClick(asset, index, e);
+          }}
+          disabled={isDisabled}
         >
-          {asset.assetType === "audio" ? (
+          {isElement ? (
+            /* Composite element preview: up to 4 images in a 2×2 grid */
+            <div
+              className={`w-full h-full grid grid-cols-2 grid-rows-2 gap-0.5 bg-default-200 ${multiSelect && isSelected ? "opacity-80" : ""}`}
+            >
+              {Array.from({ length: 4 }).map((_, i) => {
+                const url = elementImageUrls[i];
+                return (
+                  <div
+                    key={i}
+                    className="relative bg-default-100 overflow-hidden"
+                  >
+                    {url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={url}
+                        alt=""
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-default-300">
+                        <Layers size={12} />
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ) : asset.assetType === "audio" ? (
             <div className={`w-full h-full flex items-center justify-center bg-linear-to-br from-violet-500/20 to-purple-600/20 ${multiSelect && isSelected ? "opacity-80" : ""}`}>
               <Music size={32} className="text-violet-400" />
             </div>
@@ -146,6 +207,25 @@ const AssetGridItem = React.memo(function AssetGridItem({
             />
           )}
         </button>
+
+        {/* Element badges: element icon + video/voice indicators */}
+        {isElement && (
+          <div className="absolute top-2 left-2 z-10 flex items-center gap-1">
+            <span className="text-[9px] font-semibold bg-sky-600/90 text-white px-1.5 py-0.5 rounded flex items-center gap-0.5">
+              <Layers size={8} />
+            </span>
+            {elementVideoUrl && (
+              <span className="text-[9px] font-semibold bg-danger/90 text-white px-1.5 py-0.5 rounded flex items-center gap-0.5">
+                <Video size={8} />
+              </span>
+            )}
+            {elementVoiceId && (
+              <span className="text-[9px] font-semibold bg-violet-600/90 text-white px-1.5 py-0.5 rounded flex items-center gap-0.5">
+                <Music size={8} />
+              </span>
+            )}
+          </div>
+        )}
 
         {/* Audio badge */}
         {asset.assetType === "audio" && (
@@ -238,6 +318,7 @@ function VirtualAssetGrid({
   multiSelect,
   hasMore,
   isLoadingMore,
+  validateOnSelect,
   onLoadMore,
   onClick,
   onExpand,
@@ -250,6 +331,8 @@ function VirtualAssetGrid({
   multiSelect: boolean;
   hasMore: boolean;
   isLoadingMore: boolean;
+  /** When provided, returns a user-visible reason for blocking selection, or null to allow. */
+  validateOnSelect?: (asset: AssetSummary) => string | null;
   onLoadMore: () => void;
   onClick: (asset: AssetSummary, index: number, e: React.MouseEvent) => void;
   onExpand: (asset: AssetSummary) => void;
@@ -352,6 +435,7 @@ function VirtualAssetGrid({
                     index={idx}
                     isSelected={selectedIds.has(a.id)}
                     multiSelect={multiSelect}
+                    disabledReason={validateOnSelect?.(a) ?? null}
                     onClick={onClick}
                     onExpand={onExpand}
                     untitledLabel={untitledLabel}
@@ -379,6 +463,7 @@ export default function AssetPickerModal({
   onSelect,
   onSelectMultiple,
   onUpload,
+  validateOnSelect,
   hideLibraryTab = false,
   multiSelect = false,
   maxSelectCount,
@@ -390,6 +475,8 @@ export default function AssetPickerModal({
   /** Called with all selected assets when multiSelect is enabled and user confirms */
   onSelectMultiple?: (assets: AssetSummary[]) => void;
   onUpload: (files: File[]) => void;
+  /** Optional per-tile validation — return a non-null string to disable selection (with a tooltip). */
+  validateOnSelect?: (asset: AssetSummary) => string | null;
   /** When true, only shows the upload tab (hides the library picker) */
   hideLibraryTab?: boolean;
   /** Enable multiselect mode in the library tab */
@@ -397,7 +484,7 @@ export default function AssetPickerModal({
   /** Max number of images that can be selected (multiSelect mode) */
   maxSelectCount?: number;
   /** When provided, only show assets of these types (and restrict upload accordingly) */
-  acceptTypes?: ("image" | "video" | "audio")[];
+  acceptTypes?: ("image" | "video" | "audio" | "element")[];
 }) {
   const t = useTranslations();
   const [loading, setLoading] = useState(false);
@@ -410,7 +497,9 @@ export default function AssetPickerModal({
   const [selection, setSelection] = useState<UnifiedSelection>({ kind: "recent" });
   const [mobileBrowserOpen, setMobileBrowserOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const [tabKey, setTabKey] = useState<"library" | "upload" | "camera">("library");
+  const [tabKey, setTabKey] = useState<
+    "library" | "upload" | "camera" | "audio-record"
+  >("library");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [previewAsset, setPreviewAsset] = useState<AssetSummary | null>(null);
@@ -456,6 +545,33 @@ export default function AssetPickerModal({
   const [recordedVideoUrl, setRecordedVideoUrl] = useState<string | null>(null);
   const MAX_VIDEO_RECORDING_SECONDS = 15;
 
+  // Audio recording state — parallel to the video recorder but on a mic-only
+  // stream. Target range matches FAL create-voice: 5–30s single-voice clips.
+  const audioStreamRef = useRef<MediaStream | null>(null);
+  const audioRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const [isRecordingAudio, setIsRecordingAudio] = useState(false);
+  const [audioRecordingSeconds, setAudioRecordingSeconds] = useState(0);
+  const audioRecordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(
+    null
+  );
+  const [recordedAudioUrl, setRecordedAudioUrl] = useState<string | null>(null);
+  const [audioError, setAudioError] = useState<string | null>(null);
+  const MIN_AUDIO_RECORDING_SECONDS = 5;
+  const MAX_AUDIO_RECORDING_SECONDS = 30;
+
+  // Show/hide tab logic based on acceptTypes:
+  //   - cameraOnly videos/images → camera tab visible, audio tab hidden
+  //   - audio in acceptTypes     → audio tab visible
+  //   - audio-only               → camera tab hidden (you can't get mp3 from a camera)
+  const showAudioTab =
+    !acceptTypes || acceptTypes.length === 0 || acceptTypes.includes("audio");
+  const showCameraTab =
+    !acceptTypes ||
+    acceptTypes.length === 0 ||
+    acceptTypes.includes("image") ||
+    acceptTypes.includes("video");
+
   useEffect(() => {
     if (!isOpen) {
       setPreviewAsset(null);
@@ -475,6 +591,18 @@ export default function AssetPickerModal({
       if (recordedVideoUrl) URL.revokeObjectURL(recordedVideoUrl);
       setRecordedVideoUrl(null);
       if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+      // Audio cleanup mirrors video cleanup on close.
+      if (audioStreamRef.current) {
+        audioStreamRef.current.getTracks().forEach((t) => t.stop());
+        audioStreamRef.current = null;
+      }
+      setIsRecordingAudio(false);
+      setAudioRecordingSeconds(0);
+      if (recordedAudioUrl) URL.revokeObjectURL(recordedAudioUrl);
+      setRecordedAudioUrl(null);
+      setAudioError(null);
+      if (audioRecordingTimerRef.current)
+        clearInterval(audioRecordingTimerRef.current);
       return;
     }
     setTabKey(hideLibraryTab ? "upload" : "library");
@@ -515,6 +643,26 @@ export default function AssetPickerModal({
     }
   }, [tabKey, acceptTypes]);
 
+  // Stop audio recording when switching away from the audio tab.
+  useEffect(() => {
+    if (tabKey !== "audio-record") {
+      if (audioRecorderRef.current && audioRecorderRef.current.state !== "inactive") {
+        audioRecorderRef.current.stop();
+      }
+      if (audioStreamRef.current) {
+        audioStreamRef.current.getTracks().forEach((t) => t.stop());
+        audioStreamRef.current = null;
+      }
+      setIsRecordingAudio(false);
+      setAudioRecordingSeconds(0);
+      if (recordedAudioUrl) URL.revokeObjectURL(recordedAudioUrl);
+      setRecordedAudioUrl(null);
+      setAudioError(null);
+      if (audioRecordingTimerRef.current)
+        clearInterval(audioRecordingTimerRef.current);
+    }
+  }, [tabKey, recordedAudioUrl]);
+
   // Collection name for breadcrumb header when inside a folder.
   const selectedCollectionName = useMemo(() => {
     if (selection.kind !== "folder") return null;
@@ -547,10 +695,13 @@ export default function AssetPickerModal({
         const res = await fetch(`/api/assets?${params.toString()}`);
         if (!res.ok) return;
         const data = (await res.json()) as AssetsPageResponse;
-        // Only include audio assets when explicitly requested via acceptTypes
-        const incoming = (data.assets || []).filter(
-          (a) => (a.assetType as string) !== "audio" || acceptTypes?.includes("audio")
-        );
+        // Only include audio/element assets when explicitly requested via acceptTypes.
+        const incoming = (data.assets || []).filter((a) => {
+          const type = a.assetType as string;
+          if (type === "audio") return acceptTypes?.includes("audio") ?? false;
+          if (type === "element") return acceptTypes?.includes("element") ?? false;
+          return true;
+        });
 
         setAssets((prev) => {
           if (!append) return incoming;
@@ -599,7 +750,11 @@ export default function AssetPickerModal({
     if (acceptTypes && acceptTypes.length > 0) {
       result = result.filter((a) => {
         const type = a.assetType || "image";
-        const baseType = type.replace("public_", "") as "image" | "video" | "audio";
+        const baseType = type.replace("public_", "") as
+          | "image"
+          | "video"
+          | "audio"
+          | "element";
         return acceptTypes.includes(baseType);
       });
     }
@@ -808,6 +963,120 @@ export default function AssetPickerModal({
     [recordedVideoUrl, onUpload]
   );
 
+  // ── Audio recording ─────────────────────────────────────────────────────
+  const startAudioRecording = useCallback(async () => {
+    setAudioError(null);
+    if (recordedAudioUrl) {
+      URL.revokeObjectURL(recordedAudioUrl);
+      setRecordedAudioUrl(null);
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+        video: false,
+      });
+      audioStreamRef.current = stream;
+
+      // Pick a mime the browser actually supports. Order matters — Safari
+      // prefers audio/mp4 (AAC); Chrome/Firefox default to audio/webm (Opus).
+      const candidateMimes = [
+        "audio/webm;codecs=opus",
+        "audio/webm",
+        "audio/mp4",
+        "audio/ogg",
+      ];
+      const mimeType =
+        candidateMimes.find(
+          (m) =>
+            typeof MediaRecorder !== "undefined" &&
+            MediaRecorder.isTypeSupported(m)
+        ) ?? "";
+
+      const recorder = mimeType
+        ? new MediaRecorder(stream, { mimeType })
+        : new MediaRecorder(stream);
+      audioRecorderRef.current = recorder;
+      audioChunksRef.current = [];
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
+      recorder.onstop = () => {
+        const blob = new Blob(audioChunksRef.current, {
+          type: recorder.mimeType || mimeType || "audio/webm",
+        });
+        const url = URL.createObjectURL(blob);
+        setRecordedAudioUrl(url);
+        // Release mic immediately once stopped.
+        if (audioStreamRef.current) {
+          audioStreamRef.current.getTracks().forEach((tr) => tr.stop());
+          audioStreamRef.current = null;
+        }
+      };
+
+      recorder.start(100);
+      setIsRecordingAudio(true);
+      setAudioRecordingSeconds(0);
+      const timerId = setInterval(() => {
+        setAudioRecordingSeconds((prev) => prev + 1);
+      }, 1000);
+      audioRecordingTimerRef.current = timerId;
+    } catch (err) {
+      console.error("Audio recording error:", err);
+      setAudioError(t("assetPicker.audioAccessDenied"));
+      setIsRecordingAudio(false);
+    }
+  }, [recordedAudioUrl, t]);
+
+  const stopAudioRecording = useCallback(() => {
+    if (
+      audioRecorderRef.current &&
+      audioRecorderRef.current.state !== "inactive"
+    ) {
+      audioRecorderRef.current.stop();
+    }
+    if (audioRecordingTimerRef.current) {
+      clearInterval(audioRecordingTimerRef.current);
+    }
+    setIsRecordingAudio(false);
+  }, []);
+
+  // Auto-stop at the hard 30s ceiling so the clip stays within FAL's window.
+  useEffect(() => {
+    if (
+      audioRecordingSeconds >= MAX_AUDIO_RECORDING_SECONDS &&
+      isRecordingAudio
+    ) {
+      stopAudioRecording();
+    }
+  }, [audioRecordingSeconds, isRecordingAudio, stopAudioRecording]);
+
+  const useRecordedAudio = useCallback(
+    async (onClose: () => void) => {
+      if (!recordedAudioUrl) return;
+      const res = await fetch(recordedAudioUrl);
+      const srcBlob = await res.blob();
+      // Server only accepts mp3/wav (and FAL create-voice accepts .mp3/.wav
+      // too). Browsers record to webm/mp4/ogg — transcode to WAV client-side
+      // so the file passes validation either way.
+      try {
+        const wav = await blobToWav(srcBlob);
+        const file = new File([wav], `voice-recording-${Date.now()}.wav`, {
+          type: "audio/wav",
+        });
+        onUpload([file]);
+      } catch (err) {
+        console.error("Audio WAV encode failed:", err);
+        setAudioError(t("assetPicker.audioEncodeFailed"));
+        return;
+      }
+      URL.revokeObjectURL(recordedAudioUrl);
+      setRecordedAudioUrl(null);
+      onClose();
+    },
+    [recordedAudioUrl, onUpload, t]
+  );
+
   // Keep filteredAssets in a ref so handleAssetClick doesn't depend on it
   const filteredAssetsRef = useRef(filteredAssets);
   filteredAssetsRef.current = filteredAssets;
@@ -889,7 +1158,11 @@ export default function AssetPickerModal({
                 <div>{t("assetPicker.title")}</div>
                 <Tabs
                   selectedKey={tabKey}
-                  onSelectionChange={(k) => setTabKey(k as "library" | "upload" | "camera")}
+                  onSelectionChange={(k) =>
+                    setTabKey(
+                      k as "library" | "upload" | "camera" | "audio-record"
+                    )
+                  }
                   size="sm"
                   variant="underlined"
                 >
@@ -897,12 +1170,131 @@ export default function AssetPickerModal({
                     <Tab key="library" title={t("assetPicker.libraryTab")} />
                   )}
                   <Tab key="upload" title={t("assetPicker.uploadTab")} />
-                  <Tab key="camera" title={t("assetPicker.cameraTab")} />
+                  {showCameraTab && (
+                    <Tab key="camera" title={t("assetPicker.cameraTab")} />
+                  )}
+                  {showAudioTab && (
+                    <Tab
+                      key="audio-record"
+                      title={t("assetPicker.audioRecordTab")}
+                    />
+                  )}
                 </Tabs>
               </ModalHeader>
 
               <ModalBody className="overflow-hidden">
-                {tabKey === "camera" ? (
+                {tabKey === "audio-record" ? (
+                  /* ── Audio Record Tab ── */
+                  <div className="flex flex-col gap-4 items-center">
+                    {audioError && (
+                      <div className="text-sm text-danger text-center py-2">
+                        {audioError}
+                      </div>
+                    )}
+
+                    <div className="w-full max-w-lg">
+                      <div className="text-xs font-medium text-default-600 mb-1">
+                        {t("assetPicker.audioRecordReadingTitle")}
+                      </div>
+                      <div className="rounded-lg border border-divider bg-default-50 p-3 text-sm leading-relaxed whitespace-pre-wrap">
+                        {t("assetPicker.audioRecordSamplePassage")}
+                      </div>
+                      <div className="text-[11px] text-default-500 mt-2">
+                        {t("assetPicker.audioRecordHint", {
+                          min: MIN_AUDIO_RECORDING_SECONDS,
+                          max: MAX_AUDIO_RECORDING_SECONDS,
+                        })}
+                      </div>
+                    </div>
+
+                    {recordedAudioUrl ? (
+                      <div className="flex flex-col items-center gap-4 w-full max-w-lg">
+                        <audio
+                          src={recordedAudioUrl}
+                          controls
+                          className="w-full"
+                        />
+                        <div className="flex gap-2">
+                          <Button
+                            variant="flat"
+                            onPress={() => {
+                              if (recordedAudioUrl)
+                                URL.revokeObjectURL(recordedAudioUrl);
+                              setRecordedAudioUrl(null);
+                              setAudioRecordingSeconds(0);
+                            }}
+                          >
+                            {t("assetPicker.retakeAudio")}
+                          </Button>
+                          <Button
+                            color="primary"
+                            isDisabled={
+                              audioRecordingSeconds <
+                              MIN_AUDIO_RECORDING_SECONDS
+                            }
+                            onPress={() => useRecordedAudio(onClose)}
+                          >
+                            {t("assetPicker.useAudio")}
+                          </Button>
+                        </div>
+                        {audioRecordingSeconds < MIN_AUDIO_RECORDING_SECONDS && (
+                          <div className="text-[11px] text-warning">
+                            {t("assetPicker.audioTooShort", {
+                              min: MIN_AUDIO_RECORDING_SECONDS,
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center gap-4 w-full max-w-lg">
+                        <div className="w-full rounded-lg border border-divider bg-black/5 dark:bg-white/5 p-6 flex flex-col items-center gap-3">
+                          <div
+                            className={`w-20 h-20 rounded-full flex items-center justify-center ${
+                              isRecordingAudio
+                                ? "bg-danger/20"
+                                : "bg-default-200"
+                            }`}
+                          >
+                            <Music
+                              size={32}
+                              className={
+                                isRecordingAudio
+                                  ? "text-danger"
+                                  : "text-default-500"
+                              }
+                            />
+                          </div>
+                          <div className="text-lg font-mono tabular-nums">
+                            {audioRecordingSeconds}s /{" "}
+                            {MAX_AUDIO_RECORDING_SECONDS}s
+                          </div>
+                          {isRecordingAudio && (
+                            <div className="flex items-center gap-2 text-xs text-danger">
+                              <div className="w-2 h-2 rounded-full bg-danger animate-pulse" />
+                              {t("assetPicker.audioRecording")}
+                            </div>
+                          )}
+                        </div>
+                        {!isRecordingAudio ? (
+                          <Button
+                            color="danger"
+                            onPress={startAudioRecording}
+                          >
+                            {t("assetPicker.startAudioRecording")}
+                          </Button>
+                        ) : (
+                          <Button
+                            color="danger"
+                            variant="bordered"
+                            onPress={stopAudioRecording}
+                          >
+                            {t("assetPicker.stopAudioRecording")}
+                          </Button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ) : tabKey === "camera" ? (
                   /* ── Camera Tab ── */
                   <div className="flex flex-col gap-4 items-center">
                     {/* Photo / Video mode toggle — hidden when acceptTypes restricts to one type */}
@@ -1331,6 +1723,7 @@ export default function AssetPickerModal({
                             multiSelect={multiSelect}
                             hasMore={hasMoreAssets}
                             isLoadingMore={loadingMoreAssets}
+                            validateOnSelect={validateOnSelect}
                             onLoadMore={handleLoadMoreAssets}
                             onClick={handleAssetClick}
                             onExpand={setPreviewAsset}
@@ -1395,7 +1788,43 @@ export default function AssetPickerModal({
               </ModalHeader>
               <ModalBody className="flex items-center justify-center p-4">
                 {previewAsset && (
-                  previewAsset.assetType === "video" && previewAsset.videoUrl ? (
+                  previewAsset.assetType === "element" && previewAsset.elementDetails ? (
+                    <div className="w-full max-w-3xl text-white space-y-4">
+                      <div className="grid grid-cols-2 gap-2">
+                        {(previewAsset.elementDetails.imageUrls ?? []).map(
+                          (url, i) => (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              key={i}
+                              src={url}
+                              alt=""
+                              className="w-full aspect-square object-cover rounded"
+                            />
+                          )
+                        )}
+                      </div>
+                      {previewAsset.elementDetails.videoUrl && (
+                        <video
+                          src={previewAsset.elementDetails.videoUrl}
+                          controls
+                          muted
+                          playsInline
+                          className="w-full max-h-[40vh] object-contain rounded"
+                        />
+                      )}
+                      {previewAsset.elementDetails.description && (
+                        <p className="text-sm text-white/80 whitespace-pre-wrap">
+                          {previewAsset.elementDetails.description}
+                        </p>
+                      )}
+                      {previewAsset.elementDetails.voiceId && (
+                        <p className="text-xs text-white/60 flex items-center gap-1">
+                          <Music size={12} />
+                          {previewAsset.elementDetails.voiceId}
+                        </p>
+                      )}
+                    </div>
+                  ) : previewAsset.assetType === "video" && previewAsset.videoUrl ? (
                     <video
                       src={previewAsset.videoUrl}
                       controls

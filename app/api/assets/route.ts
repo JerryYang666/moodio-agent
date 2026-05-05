@@ -16,7 +16,29 @@ import { getUserPermission } from "@/lib/collection-utils";
 import { getProjectPermission } from "@/lib/project-utils";
 import { getUserSetting } from "@/lib/user-settings/server";
 
-function enrichAssetUrls(asset: { assetType: string; imageId: string; assetId: string }, cnMode: boolean = false) {
+type ElementDetailsRow = {
+  imageIds?: unknown;
+  videoId?: unknown;
+  voiceId?: unknown;
+  voiceProvider?: unknown;
+};
+
+type GenerationDetailsRow = {
+  title?: unknown;
+  prompt?: unknown;
+};
+
+function enrichAssetUrls(
+  asset: {
+    id?: string;
+    assetType: string;
+    imageId: string;
+    assetId: string;
+    elementDetails?: unknown;
+    generationDetails?: unknown;
+  },
+  cnMode: boolean = false
+) {
   if (asset.assetType === "public_image") {
     return { imageUrl: getContentUrl(asset.assetId, cnMode) };
   }
@@ -26,6 +48,36 @@ function enrichAssetUrls(asset: { assetType: string; imageId: string; assetId: s
 
   if (asset.assetType === "audio") {
     return { imageUrl: "", audioUrl: getAudioUrl(asset.assetId, cnMode) };
+  }
+
+  if (asset.assetType === "element") {
+    const details = (asset.elementDetails ?? {}) as ElementDetailsRow;
+    const gen = (asset.generationDetails ?? {}) as GenerationDetailsRow;
+    const imageIds = Array.isArray(details.imageIds)
+      ? (details.imageIds as unknown[]).filter(
+          (v): v is string => typeof v === "string"
+        )
+      : [];
+    const videoId = typeof details.videoId === "string" ? details.videoId : undefined;
+    const imageUrls = imageIds.map((id) => getImageUrl(id, cnMode));
+    const primaryThumb = imageIds[0] ? getImageUrl(imageIds[0], cnMode) : "";
+    return {
+      imageUrl: primaryThumb,
+      elementDetails: {
+        id: asset.id ?? "",
+        // name/description are sourced from generationDetails (title/prompt) so
+        // every asset surface that reads generationDetails continues to work.
+        name: typeof gen.title === "string" ? gen.title : "",
+        description: typeof gen.prompt === "string" ? gen.prompt : "",
+        imageIds,
+        videoId,
+        voiceId: typeof details.voiceId === "string" ? details.voiceId : undefined,
+        voiceProvider:
+          details.voiceProvider === "fal" ? ("fal" as const) : undefined,
+        imageUrls,
+        videoUrl: videoId ? getVideoUrl(videoId, cnMode) : undefined,
+      },
+    };
   }
 
   const imageUrl = getImageUrl(asset.imageId, cnMode);

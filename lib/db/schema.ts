@@ -178,9 +178,13 @@ export const collectionImages = pgTable("collection_images", {
   }),
   imageId: varchar("image_id", { length: 255 }).notNull(), // Thumbnail/display image ID (S3 image ID)
   assetId: varchar("asset_id", { length: 255 }).notNull(), // Actual asset ID (same as imageId for images, video ID for videos)
-  assetType: varchar("asset_type", { length: 20 }).notNull().default("image"), // "image" or "video"
+  assetType: varchar("asset_type", { length: 20 }).notNull().default("image"), // "image" | "video" | "audio" | "element"
   chatId: uuid("chat_id").references(() => chats.id, { onDelete: "set null" }), // Which chat this image came from
   generationDetails: jsonb("generation_details").notNull(), // Prompt, title, status, etc.
+  // Populated when assetType === "element" — structured fields for aggregated assets. Shape:
+  //   { imageIds: string[], videoId?: string, voiceId?: string, voiceProvider?: string }
+  // Kept open so additional element fields (lora IDs, pose refs, etc.) can be added without migrations.
+  elementDetails: jsonb("element_details"),
   rating: integer("rating"), // 1-5 star rating, null = unrated
   addedAt: timestamp("added_at").defaultNow().notNull(),
 });

@@ -35,7 +35,34 @@ export interface MediaReference {
   pinned?: boolean;
 }
 
-export type AssetAcceptType = "image" | "video";
+/**
+ * ElementAsset — the first aggregated asset type.
+ *
+ * An element bundles up to 4 images, 1 optional video, a free-text description,
+ * and a voice ID (currently FAL provider). When selected from the asset picker
+ * for a reference-capable model, model-specific adapters (see
+ * `lib/adapters/element-adapters.ts`) decompose the element into the model's
+ * native inputs.
+ *
+ * Schema stays open: additional fields (lora IDs, pose references, etc.) can be
+ * added to `element_details` JSONB without migrations.
+ */
+export interface ElementAsset {
+  /** collection_images.id — the element's own asset row ID. */
+  id: string;
+  name: string;
+  description: string;
+  /** Up to 4 image IDs (S3 image IDs). May be empty. */
+  imageIds: string[];
+  /** Optional video ID (S3 video ID). */
+  videoId?: string;
+  /** Optional voice ID. Provider-specific; currently FAL. */
+  voiceId?: string;
+  /** Voice provider — kept open for future non-FAL voices. Defaults to "fal". */
+  voiceProvider?: "fal";
+}
+
+export type AssetAcceptType = "image" | "video" | "audio" | "element";
 
 /**
  * Parameter status controls visibility and behavior:

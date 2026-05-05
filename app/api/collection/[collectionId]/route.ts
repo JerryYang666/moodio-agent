@@ -96,6 +96,43 @@ export async function GET(
           audioUrl: getAudioUrl(asset.assetId, cnMode),
         };
       }
+      if (asset.assetType === "element") {
+        const details = (asset.elementDetails ?? {}) as {
+          imageIds?: unknown;
+          videoId?: unknown;
+          voiceId?: unknown;
+          voiceProvider?: unknown;
+        };
+        const gen = (asset.generationDetails ?? {}) as {
+          title?: unknown;
+          prompt?: unknown;
+        };
+        const imageIds = Array.isArray(details.imageIds)
+          ? (details.imageIds as unknown[]).filter(
+              (v): v is string => typeof v === "string"
+            )
+          : [];
+        const videoId =
+          typeof details.videoId === "string" ? details.videoId : undefined;
+        return {
+          ...asset,
+          imageUrl: imageIds[0] ? getImageUrl(imageIds[0], cnMode) : "",
+          videoUrl: undefined,
+          elementDetails: {
+            id: asset.id,
+            name: typeof gen.title === "string" ? gen.title : "",
+            description: typeof gen.prompt === "string" ? gen.prompt : "",
+            imageIds,
+            videoId,
+            voiceId:
+              typeof details.voiceId === "string" ? details.voiceId : undefined,
+            voiceProvider:
+              details.voiceProvider === "fal" ? ("fal" as const) : undefined,
+            imageUrls: imageIds.map((id) => getImageUrl(id, cnMode)),
+            videoUrl: videoId ? getVideoUrl(videoId, cnMode) : undefined,
+          },
+        };
+      }
       if (asset.assetType === "image") {
         return {
           ...asset,

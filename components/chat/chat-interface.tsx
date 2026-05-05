@@ -17,6 +17,10 @@ import {
 } from "@/components/notification-permission-modal";
 import { Message, MessageContentPart, isGeneratedImagePart } from "@/lib/llm/types";
 import { getVideoModel, type KlingElement, type MediaReference } from "@/lib/video/models";
+import {
+  applyElementToKlingElements,
+  applyElementToSeedanceReference,
+} from "@/lib/adapters/element-adapters";
 import { getUserFriendlyErrorKey } from "@/lib/video/error-classify";
 import ImageDetailModal, { ImageInfo } from "./image-detail-modal";
 import ImageDrawingModal from "./image-drawing-modal";
@@ -337,7 +341,15 @@ export default function ChatInterface({
   const [isAssetPickerOpen, setIsAssetPickerOpen] = useState(false);
   const toggleAssetPicker = useCallback(() => setIsAssetPickerOpen((v) => !v), []);
   // Track which picker mode is active: "pending" for regular images, "persistent" for persistent assets, "assetParam" for type:"asset" params
-  const [assetPickerMode, setAssetPickerMode] = useState<"pending" | "persistent" | "assetParam" | "elementImages" | "mediaRefImage" | "mediaRefVideo" | "mediaRefAudio">("pending");
+  const [assetPickerMode, setAssetPickerMode] = useState<
+    | "pending"
+    | "persistent"
+    | "assetParam"
+    | "elementImages"
+    | "mediaRefImage"
+    | "mediaRefVideo"
+    | "mediaRefAudio"
+  >("pending");
   const [activeAssetParamName, setActiveAssetParamName] = useState<string | null>(null);
   const [activeElementIndex, setActiveElementIndex] = useState<number | null>(null);
   const [activeElementMaxImages, setActiveElementMaxImages] = useState(4);
@@ -2433,6 +2445,101 @@ export default function ChatInterface({
 
   const handleAssetPicked = useCallback(
     (asset: AssetSummary) => {
+      // Aggregated element selected for a Seedance media_references param:
+      // decompose into ≤2 image refs + video + voice ref, and append name+desc
+      // into the composer prompt.
+      if (
+        asset.assetType === "element" &&
+        asset.elementDetails &&
+        (assetPickerMode === "mediaRefImage" ||
+          assetPickerMode === "mediaRefVideo" ||
+          assetPickerMode === "mediaRefAudio")
+      ) {
+        const { appendReferences, promptAppend } =
+          applyElementToSeedanceReference(asset.elementDetails);
+        if (appendReferences.length > 0) {
+          setMenuState((prev) => ({
+            ...prev,
+            videoParams: {
+              ...prev.videoParams,
+              media_references: [
+                ...((prev.videoParams?.media_references as MediaReference[]) || []),
+                ...appendReferences,
+              ],
+            },
+          }));
+          setMediaRefUrls((prev) => {
+            const next = { ...prev };
+            const urls = asset.elementDetails!.imageUrls ?? [];
+            appendReferences.forEach((ref, idx) => {
+              if (ref.type === "image") {
+                const url = urls[idx];
+                if (url) next[ref.id] = url;
+              } else if (ref.type === "video" && asset.elementDetails!.videoUrl) {
+                next[ref.id] = asset.elementDetails!.videoUrl;
+              }
+            });
+            return next;
+          });
+          // Probe video durations for any newly added video refs.
+          for (const ref of appendReferences) {
+            if (ref.type === "video" && asset.elementDetails!.videoUrl) {
+              probeVideoDurationFromUrl(asset.elementDetails!.videoUrl).then(
+                (d) =>
+                  setMediaRefVideoDurations((prev) => ({
+                    ...prev,
+                    [ref.id]: d,
+                  }))
+              );
+            }
+          }
+        }
+        if (promptAppend) {
+          setInput((prev) =>
+            prev && prev.trim().length > 0
+              ? `${prev}\n\n${promptAppend}`
+              : promptAppend
+          );
+        }
+        return;
+      }
+
+      // Aggregated element selected for a Kling element param: append as a new
+      // kling_element. The picker's validateOnSelect already blocks <2 images,
+      // so this path receives valid elements only.
+      if (
+        asset.assetType === "element" &&
+        asset.elementDetails &&
+        assetPickerMode === "elementImages"
+      ) {
+        const current = (menuState.videoParams?.kling_elements as KlingElement[]) || [];
+        const { next, error } = applyElementToKlingElements(
+          asset.elementDetails,
+          current
+        );
+        if (error) {
+          addToast({
+            title: t("chat.element.selectNeedsTwoImages"),
+            color: "warning",
+          });
+          return;
+        }
+        setMenuState((prev) => ({
+          ...prev,
+          videoParams: { ...prev.videoParams, kling_elements: next },
+        }));
+        setElementImageUrls((prev) => {
+          const updated = { ...prev };
+          const urls = asset.elementDetails!.imageUrls ?? [];
+          asset.elementDetails!.imageIds.forEach((id, idx) => {
+            if (urls[idx]) updated[id] = urls[idx];
+          });
+          return updated;
+        });
+        setActiveElementIndex(null);
+        return;
+      }
+
       if (assetPickerMode === "elementImages" && activeElementIndex !== null) {
         const elements = [...((menuState.videoParams?.kling_elements as KlingElement[]) || [])];
         const el = elements[activeElementIndex];
@@ -2544,6 +2651,122 @@ export default function ChatInterface({
 
   const handleAssetPickedMultiple = useCallback(
     async (assets: AssetSummary[]) => {
+      // Decompose any element assets through adapters before the primitive
+      // handling below. We process elements one at a time (each one expands
+      // into multiple refs) and collect the remaining primitives for the
+      // existing fast paths.
+      const elementAssets = assets.filter(
+        (a) => a.assetType === "element" && a.elementDetails
+      );
+      const primitiveAssets = assets.filter(
+        (a) => a.assetType !== "element"
+      );
+
+      if (elementAssets.length > 0) {
+        if (
+          assetPickerMode === "mediaRefImage" ||
+          assetPickerMode === "mediaRefVideo" ||
+          assetPickerMode === "mediaRefAudio"
+        ) {
+          let accumulatedRefs: MediaReference[] = [];
+          const accumulatedUrls: Record<string, string> = {};
+          const videoProbes: Array<{ id: string; url: string }> = [];
+          let accumulatedPrompt = "";
+          for (const a of elementAssets) {
+            const res = applyElementToSeedanceReference(a.elementDetails!);
+            accumulatedRefs = [...accumulatedRefs, ...res.appendReferences];
+            const urls = a.elementDetails!.imageUrls ?? [];
+            res.appendReferences.forEach((ref, idx) => {
+              if (ref.type === "image") {
+                const url = urls[idx];
+                if (url) accumulatedUrls[ref.id] = url;
+              } else if (ref.type === "video" && a.elementDetails!.videoUrl) {
+                accumulatedUrls[ref.id] = a.elementDetails!.videoUrl;
+                videoProbes.push({
+                  id: ref.id,
+                  url: a.elementDetails!.videoUrl,
+                });
+              }
+            });
+            if (res.promptAppend) {
+              accumulatedPrompt = accumulatedPrompt
+                ? `${accumulatedPrompt}\n\n${res.promptAppend}`
+                : res.promptAppend;
+            }
+          }
+          if (accumulatedRefs.length > 0) {
+            setMenuState((prev) => ({
+              ...prev,
+              videoParams: {
+                ...prev.videoParams,
+                media_references: [
+                  ...((prev.videoParams?.media_references as MediaReference[]) || []),
+                  ...accumulatedRefs,
+                ],
+              },
+            }));
+            setMediaRefUrls((prev) => ({ ...prev, ...accumulatedUrls }));
+            for (const probe of videoProbes) {
+              probeVideoDurationFromUrl(probe.url).then((d) =>
+                setMediaRefVideoDurations((prev) => ({
+                  ...prev,
+                  [probe.id]: d,
+                }))
+              );
+            }
+          }
+          if (accumulatedPrompt) {
+            setInput((prev) =>
+              prev && prev.trim().length > 0
+                ? `${prev}\n\n${accumulatedPrompt}`
+                : accumulatedPrompt
+            );
+          }
+        } else if (assetPickerMode === "elementImages") {
+          let current =
+            (menuState.videoParams?.kling_elements as KlingElement[]) || [];
+          const accumulatedUrls: Record<string, string> = {};
+          let blocked = 0;
+          for (const a of elementAssets) {
+            const { next, error } = applyElementToKlingElements(
+              a.elementDetails!,
+              current
+            );
+            if (error) {
+              blocked++;
+              continue;
+            }
+            current = next;
+            const urls = a.elementDetails!.imageUrls ?? [];
+            a.elementDetails!.imageIds.forEach((id, idx) => {
+              if (urls[idx]) accumulatedUrls[id] = urls[idx];
+            });
+          }
+          if (current !== (menuState.videoParams?.kling_elements as KlingElement[])) {
+            setMenuState((prev) => ({
+              ...prev,
+              videoParams: { ...prev.videoParams, kling_elements: current },
+            }));
+            setElementImageUrls((prev) => ({ ...prev, ...accumulatedUrls }));
+          }
+          if (blocked > 0) {
+            addToast({
+              title: t("chat.element.selectNeedsTwoImages"),
+              color: "warning",
+            });
+          }
+          setActiveElementIndex(null);
+        }
+
+        // If only elements were picked, short-circuit. Otherwise fall through
+        // to the primitives branch for the remaining assets.
+        if (primitiveAssets.length === 0) return;
+      }
+
+      // Shadow `assets` for the remainder so the existing branches just see
+      // primitives. (Using a local re-binding to avoid touching each branch.)
+      assets = primitiveAssets;
+
       if (assetPickerMode === "elementImages" && activeElementIndex !== null) {
         const elements = [...((menuState.videoParams?.kling_elements as KlingElement[]) || [])];
         const el = elements[activeElementIndex];
@@ -5075,6 +5298,15 @@ export default function ChatInterface({
         onSelectMultiple={handleAssetPickedMultiple}
         onUpload={handleAssetUpload}
         multiSelect={assetPickerMode !== "assetParam"}
+        validateOnSelect={
+          assetPickerMode === "elementImages"
+            ? (a) =>
+                a.assetType === "element" &&
+                (a.elementDetails?.imageIds.length ?? 0) < 2
+                  ? t("chat.element.selectNeedsTwoImages")
+                  : null
+            : undefined
+        }
         maxSelectCount={
           assetPickerMode === "elementImages"
             ? activeElementMaxImages
@@ -5097,13 +5329,13 @@ export default function ChatInterface({
         }
         acceptTypes={
           assetPickerMode === "elementImages"
-            ? ["image"]
+            ? ["image", "element"]
             : assetPickerMode === "mediaRefImage"
-              ? ["image"]
+              ? ["image", "element"]
               : assetPickerMode === "mediaRefVideo"
-                ? ["video"]
+                ? ["video", "element"]
                 : assetPickerMode === "mediaRefAudio"
-                  ? ["audio"]
+                  ? ["audio", "element"]
                   : assetPickerMode === "persistent"
                     ? ["image"]
                     : assetPickerMode === "assetParam" && activeAssetParamName
@@ -5111,6 +5343,7 @@ export default function ChatInterface({
                       : ["image", "video", "audio"]
         }
       />
+
 
       <ImageDetailModal
         isOpen={isOpen}

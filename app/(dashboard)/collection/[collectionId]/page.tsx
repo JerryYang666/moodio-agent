@@ -35,6 +35,7 @@ import SendToDesktopModal from "@/components/desktop/SendToDesktopModal";
 import AssetPickerModal from "@/components/chat/asset-picker-modal";
 import LocationPicker, { type LocationTarget } from "@/components/location-picker";
 import AssetPageActions from "@/components/asset-page-actions";
+import ElementEditorController from "@/components/chat/element-editor-controller";
 import AssetCard from "@/components/asset-card";
 import AssetSearchFilter from "@/components/asset-search-filter";
 import BulkSelectionBar from "@/components/bulk-selection-bar";
@@ -123,6 +124,8 @@ export default function CollectionPage({
     onOpen: onCreateFolderOpen,
     onOpenChange: onCreateFolderOpenChange,
   } = useDisclosure();
+  const [isCreateElementOpen, setIsCreateElementOpen] = useState(false);
+  const [editingElement, setEditingElement] = useState<AssetItem | null>(null);
 
   const shareModal = useShareModal({
     shareApiPath: `/api/collection/${collectionId}/share`,
@@ -655,6 +658,10 @@ export default function CollectionPage({
       toggleSelection(asset.id);
       return;
     }
+    if (asset.assetType === "element") {
+      setEditingElement(asset);
+      return;
+    }
     if (asset.assetType === "audio") {
       setSelectedAudio(asset);
       onAudioDetailOpen();
@@ -1110,6 +1117,7 @@ export default function CollectionPage({
             onToggleSelection={() => isSelectionMode ? exitSelectionMode() : setIsSelectionMode(true)}
             onUpload={() => setIsUploadPickerOpen(true)}
             onCreateFolder={onCreateFolderOpen}
+            onCreateElement={() => setIsCreateElementOpen(true)}
             onRename={onRenameOpen}
             onShare={onShareOpen}
             onDelete={onDeleteOpen}
@@ -1119,6 +1127,7 @@ export default function CollectionPage({
               uploadImages: t("uploadImages"),
               compressing: t("compressing"),
               newFolder: tFolders("newFolder"),
+              newElement: tFolders("newElement"),
               rename: tCommon("rename"),
               share: tCommon("share"),
               delete: tCommon("delete"),
@@ -1220,6 +1229,7 @@ export default function CollectionPage({
                     onRemove={confirmRemoveImage}
                     labels={{
                       video: t("video"),
+                      element: tFolders("element"),
                       viewDetails: t("viewDetails"),
                       rename: tCommon("rename"),
                       moveTo: t("moveTo"),
@@ -1407,6 +1417,62 @@ export default function CollectionPage({
         hasWriteAccess={canAddImages}
       />
 
+      <ElementEditorController
+        isOpen={isCreateElementOpen}
+        onOpenChange={setIsCreateElementOpen}
+        projectId={collection.projectId ?? undefined}
+        collectionId={collectionId}
+        onSaved={() => {
+          setIsCreateElementOpen(false);
+          fetchCollectionData();
+        }}
+      />
+
+      <ElementEditorController
+        isOpen={editingElement !== null}
+        onOpenChange={(open) => {
+          if (!open) setEditingElement(null);
+        }}
+        projectId={collection.projectId ?? undefined}
+        collectionId={collectionId}
+        initialElement={
+          editingElement?.elementDetails
+            ? {
+                id: editingElement.elementDetails.id,
+                name: editingElement.elementDetails.name,
+                description: editingElement.elementDetails.description,
+                imageIds: editingElement.elementDetails.imageIds,
+                videoId: editingElement.elementDetails.videoId,
+                voiceId: editingElement.elementDetails.voiceId,
+                voiceProvider: editingElement.elementDetails.voiceProvider,
+              }
+            : null
+        }
+        initialImageUrls={
+          editingElement?.elementDetails
+            ? Object.fromEntries(
+                (editingElement.elementDetails.imageIds ?? []).map((id, i) => [
+                  id,
+                  editingElement.elementDetails!.imageUrls?.[i] ?? "",
+                ])
+              )
+            : undefined
+        }
+        initialVideoUrl={
+          editingElement?.elementDetails?.videoId &&
+          editingElement.elementDetails.videoUrl
+            ? {
+                id: editingElement.elementDetails.videoId,
+                url: editingElement.elementDetails.videoUrl,
+              }
+            : undefined
+        }
+        onSaved={() => {
+          setEditingElement(null);
+          fetchCollectionData();
+        }}
+      />
+
       {/* Remove Image Confirmation Modal */}
       <Modal isOpen={isRemoveImageOpen} onOpenChange={onRemoveImageOpenChange}>
         <ModalContent>
@@ -1532,7 +1598,21 @@ export default function CollectionPage({
       <SendToDesktopModal
         isOpen={isSendToDesktopOpen}
         onOpenChange={onSendToDesktopOpenChange}
-        assets={desktopSendAsset ? [buildDesktopSendPayload(desktopSendAsset)] : []}
+        assets={
+          desktopSendAsset && desktopSendAsset.assetType !== "element"
+            ? [
+                buildDesktopSendPayload(desktopSendAsset) as {
+                  assetType:
+                    | "image"
+                    | "video"
+                    | "public_video"
+                    | "public_image"
+                    | "audio";
+                  metadata: Record<string, unknown>;
+                },
+              ]
+            : []
+        }
       />
 
       {/* Create Folder Modal */}

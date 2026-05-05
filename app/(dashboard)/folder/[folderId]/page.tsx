@@ -41,6 +41,7 @@ import { useShareModal } from "@/hooks/use-share-modal";
 import ShareModal from "@/components/share-modal";
 import LocationPicker, { type LocationTarget } from "@/components/location-picker";
 import AssetPageActions from "@/components/asset-page-actions";
+import ElementEditorController from "@/components/chat/element-editor-controller";
 import AssetCard from "@/components/asset-card";
 import AssetSearchFilter from "@/components/asset-search-filter";
 import BulkSelectionBar from "@/components/bulk-selection-bar";
@@ -151,6 +152,8 @@ export default function FolderPage({
     onOpen: onCreateFolderOpen,
     onOpenChange: onCreateFolderOpenChange,
   } = useDisclosure();
+  const [isCreateElementOpen, setIsCreateElementOpen] = useState(false);
+  const [editingElement, setEditingElement] = useState<AssetItem | null>(null);
   const {
     isOpen: isShareOpen,
     onOpen: onShareOpen,
@@ -383,6 +386,10 @@ export default function FolderPage({
   const handleAssetClick = (asset: AssetItem) => {
     if (isSelectionMode) {
       toggleSelection(asset.id);
+      return;
+    }
+    if (asset.assetType === "element") {
+      setEditingElement(asset);
       return;
     }
     if (asset.assetType === "audio") {
@@ -1068,6 +1075,7 @@ export default function FolderPage({
           onToggleSelection={() => isSelectionMode ? exitSelectionMode() : setIsSelectionMode(true)}
           onUpload={toggleUploadPicker}
           onCreateFolder={onCreateFolderOpen}
+          onCreateElement={() => setIsCreateElementOpen(true)}
           onRename={() => {
             setNewName(folderData.folder.name);
             onRenameOpen();
@@ -1080,6 +1088,7 @@ export default function FolderPage({
             uploadImages: t("uploadImages"),
             compressing: t("compressing"),
             newFolder: t("newFolder"),
+            newElement: t("newElement"),
             rename: t("rename"),
             share: t("share"),
             delete: t("delete"),
@@ -1186,6 +1195,7 @@ export default function FolderPage({
                     onRemove={confirmRemoveAsset}
                     labels={{
                       video: tCollections("video"),
+                      element: t("element"),
                       viewDetails: t("viewDetails"),
                       rename: tCommon("rename"),
                       moveTo: t("moveTo"),
@@ -1556,7 +1566,21 @@ export default function FolderPage({
       <SendToDesktopModal
         isOpen={isSendToDesktopOpen}
         onOpenChange={onSendToDesktopOpenChange}
-        assets={desktopSendAsset ? [buildDesktopSendPayload(desktopSendAsset)] : []}
+        assets={
+          desktopSendAsset && desktopSendAsset.assetType !== "element"
+            ? [
+                buildDesktopSendPayload(desktopSendAsset) as {
+                  assetType:
+                    | "image"
+                    | "video"
+                    | "public_video"
+                    | "public_image"
+                    | "audio";
+                  metadata: Record<string, unknown>;
+                },
+              ]
+            : []
+        }
       />
 
       {/* Share Modal */}
@@ -1575,6 +1599,64 @@ export default function FolderPage({
         share={shareModal}
         publicShareConfig={{ resourceType: "folder", resourceId: folderId }}
         hasWriteAccess={canWrite}
+      />
+
+      <ElementEditorController
+        isOpen={isCreateElementOpen}
+        onOpenChange={setIsCreateElementOpen}
+        projectId={projectId ?? undefined}
+        collectionId={folderData.folder.collectionId}
+        folderId={folderId}
+        onSaved={() => {
+          setIsCreateElementOpen(false);
+          fetchFolderData();
+        }}
+      />
+
+      <ElementEditorController
+        isOpen={editingElement !== null}
+        onOpenChange={(open) => {
+          if (!open) setEditingElement(null);
+        }}
+        projectId={projectId ?? undefined}
+        collectionId={folderData.folder.collectionId}
+        folderId={folderId}
+        initialElement={
+          editingElement?.elementDetails
+            ? {
+                id: editingElement.elementDetails.id,
+                name: editingElement.elementDetails.name,
+                description: editingElement.elementDetails.description,
+                imageIds: editingElement.elementDetails.imageIds,
+                videoId: editingElement.elementDetails.videoId,
+                voiceId: editingElement.elementDetails.voiceId,
+                voiceProvider: editingElement.elementDetails.voiceProvider,
+              }
+            : null
+        }
+        initialImageUrls={
+          editingElement?.elementDetails
+            ? Object.fromEntries(
+                (editingElement.elementDetails.imageIds ?? []).map((id, i) => [
+                  id,
+                  editingElement.elementDetails!.imageUrls?.[i] ?? "",
+                ])
+              )
+            : undefined
+        }
+        initialVideoUrl={
+          editingElement?.elementDetails?.videoId &&
+          editingElement.elementDetails.videoUrl
+            ? {
+                id: editingElement.elementDetails.videoId,
+                url: editingElement.elementDetails.videoUrl,
+              }
+            : undefined
+        }
+        onSaved={() => {
+          setEditingElement(null);
+          fetchFolderData();
+        }}
       />
     </div>
   );
