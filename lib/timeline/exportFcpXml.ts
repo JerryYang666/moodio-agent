@@ -328,6 +328,10 @@ async function fetchUniqueAssets(
 
   const mediaFolder = zip.folder("media");
   if (!mediaFolder) return;
+  // Re-bind so the nested worker closure captures the narrowed (non-null)
+  // type — TS doesn't propagate the !mediaFolder narrowing into nested
+  // function declarations.
+  const folder = mediaFolder;
 
   let done = 0;
   const total = entries.length + skipped.length;
@@ -353,7 +357,7 @@ async function fetchUniqueAssets(
           const blob = await res.blob();
           // Zip entry must be keyed on assetId to match `media/{assetId}.mp4`
           // in the generated XML (the proxy is fetched by storage videoId).
-          mediaFolder.file(`${assetId}.mp4`, blob);
+          folder.file(`${assetId}.mp4`, blob);
         } else {
           console.warn(
             `[exportFcpXml] Failed to download ${videoId}: HTTP ${res.status}`
