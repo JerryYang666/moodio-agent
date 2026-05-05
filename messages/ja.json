@@ -1261,7 +1261,12 @@
     "folders": "フォルダ",
     "allAssets": "すべてのアセット",
     "rootOnly": "ルート（フォルダなし）",
-    "noFolders": "フォルダなし"
+    "noFolders": "フォルダなし",
+    "noCollections": "コレクションなし",
+    "myProjects": "マイプロジェクト",
+    "sharedProjects": "共有プロジェクト",
+    "browse": "参照",
+    "closeBrowser": "ブラウザを閉じる"
   },
   "assetsSidebar": {
     "title": "アセット",

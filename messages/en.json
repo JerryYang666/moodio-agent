@@ -1418,7 +1418,12 @@
     "folders": "Folders",
     "allAssets": "All assets",
     "rootOnly": "Root (no folder)",
-    "noFolders": "No folders"
+    "noFolders": "No folders",
+    "noCollections": "No collections",
+    "myProjects": "My projects",
+    "sharedProjects": "Shared projects",
+    "browse": "Browse",
+    "closeBrowser": "Close browser"
   },
   "assetsSidebar": {
     "title": "Assets",

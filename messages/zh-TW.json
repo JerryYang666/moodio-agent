@@ -1261,7 +1261,12 @@
     "folders": "資料夾",
     "allAssets": "所有素材",
     "rootOnly": "根目錄（無資料夾）",
-    "noFolders": "沒有資料夾"
+    "noFolders": "沒有資料夾",
+    "noCollections": "沒有集合",
+    "myProjects": "我的專案",
+    "sharedProjects": "共享專案",
+    "browse": "瀏覽",
+    "closeBrowser": "關閉瀏覽器"
   },
   "assetsSidebar": {
     "title": "素材",

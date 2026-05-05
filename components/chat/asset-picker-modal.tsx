@@ -16,11 +16,13 @@ import { Select, SelectItem } from "@heroui/select";
 import { Input } from "@heroui/input";
 import { Image } from "@heroui/image";
 import { Tab, Tabs } from "@heroui/tabs";
-import { Search, Expand, Camera, Star, X, Check, Video, Music } from "lucide-react";
+import { Search, Expand, Camera, Star, X, Check, Video, Music, FolderTree } from "lucide-react";
 import AudioPlayer from "@/components/audio-player";
 import { siteConfig } from "@/config/site";
 import { useGetCollectionsQuery } from "@/lib/redux/services/next-api";
-import AssetPickerFolderTree from "./asset-picker-folder-tree";
+import AssetPickerUnifiedTree, {
+  type UnifiedSelection,
+} from "./asset-picker-unified-tree";
 import AssetPickerBreadcrumbs from "./asset-picker-breadcrumbs";
 
 export type AssetSummary = {
@@ -405,10 +407,8 @@ export default function AssetPickerModal({
   const [hasMoreAssets, setHasMoreAssets] = useState(false);
   const [nextAssetsOffset, setNextAssetsOffset] = useState(0);
   const [loadingMoreAssets, setLoadingMoreAssets] = useState(false);
-  const [projectId, setProjectId] = useState<string>("recent");
-  const [collectionId, setCollectionId] = useState<string>("all");
-  const [folderId, setFolderId] = useState<string | null>(null);
-  const [folderRoot, setFolderRoot] = useState(false);
+  const [selection, setSelection] = useState<UnifiedSelection>({ kind: "recent" });
+  const [mobileBrowserOpen, setMobileBrowserOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [tabKey, setTabKey] = useState<"library" | "upload" | "camera">("library");
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -462,8 +462,8 @@ export default function AssetPickerModal({
       setSelectedIds(new Set());
       lastClickedIndexRef.current = null;
       setFilterRating(null);
-      setFolderId(null);
-      setFolderRoot(false);
+      setSelection({ kind: "recent" });
+      setMobileBrowserOpen(false);
       setHasMoreAssets(false);
       setNextAssetsOffset(0);
       setLoadingMoreAssets(false);
@@ -515,11 +515,11 @@ export default function AssetPickerModal({
     }
   }, [tabKey, acceptTypes]);
 
-  const visibleCollections = useMemo(() => {
-    const all = collections;
-    if (projectId === "recent") return all;
-    return all.filter((c) => c.projectId === projectId);
-  }, [collections, projectId]);
+  // Collection name for breadcrumb header when inside a folder.
+  const selectedCollectionName = useMemo(() => {
+    if (selection.kind !== "folder") return null;
+    return collections.find((c) => c.id === selection.collectionId)?.name ?? null;
+  }, [collections, selection]);
 
   const loadAssetsPage = useCallback(
     async ({ offset, append }: { offset: number; append: boolean }) => {
@@ -532,15 +532,17 @@ export default function AssetPickerModal({
         const params = new URLSearchParams();
         params.set("limit", String(ASSET_PAGE_SIZE));
         params.set("offset", String(offset));
-        if (collectionId !== "all") {
-          params.set("collectionId", collectionId);
-          if (folderId) {
-            params.set("folderId", folderId);
-          } else if (folderRoot) {
+        if (selection.kind === "folder") {
+          params.set("collectionId", selection.collectionId);
+          if (selection.folderId) {
+            params.set("folderId", selection.folderId);
+          } else if (selection.folderRoot) {
             params.set("folderRoot", "true");
           }
-        } else if (projectId !== "recent") {
-          params.set("projectId", projectId);
+        } else if (selection.kind === "collection") {
+          params.set("collectionId", selection.collectionId);
+        } else if (selection.kind === "project") {
+          params.set("projectId", selection.projectId);
         }
         const res = await fetch(`/api/assets?${params.toString()}`);
         if (!res.ok) return;
@@ -575,7 +577,7 @@ export default function AssetPickerModal({
         }
       }
     },
-    [collectionId, projectId, folderId, folderRoot]
+    [selection]
   );
 
   useEffect(() => {
@@ -585,7 +587,7 @@ export default function AssetPickerModal({
     setNextAssetsOffset(0);
     setLoadingMoreAssets(false);
     void loadAssetsPage({ offset: 0, append: false });
-  }, [isOpen, projectId, collectionId, folderId, folderRoot, loadAssetsPage]);
+  }, [isOpen, selection, loadAssetsPage]);
 
   const handleLoadMoreAssets = useCallback(() => {
     if (loading || loadingMoreAssets || !hasMoreAssets) return;
@@ -873,9 +875,12 @@ export default function AssetPickerModal({
       <Modal
         isOpen={isOpen}
         onOpenChange={onOpenChange}
-        size="4xl"
+        size="5xl"
         scrollBehavior="inside"
-        classNames={{ base: "max-h-[90dvh]", wrapper: "z-[120]" }}
+        classNames={{
+          base: "max-h-[90dvh] md:!max-w-[90vw] md:w-[90vw]",
+          wrapper: "z-[120]",
+        }}
       >
         <ModalContent>
           {(onClose) => (
@@ -1187,91 +1192,84 @@ export default function AssetPickerModal({
                   </div>
                 ) : (
                   /* ── Library Tab ── */
-                  <div className="flex flex-col gap-3 min-h-0">
-                    <div className="flex flex-col md:flex-row gap-3 shrink-0">
-                      <Select
-                        label={t("assetPicker.projectLabel")}
-                        selectedKeys={[projectId]}
-                        onChange={(e) => {
-                          const next = e.target.value;
-                          setProjectId(next);
-                          setCollectionId("all");
-                          setFolderId(null);
-                          setFolderRoot(false);
-                        }}
-                        className="md:w-1/2"
-                      >
-                        <SelectItem key="recent">
-                          {t("assetPicker.recent")}
-                        </SelectItem>
-                        <>
-                          {projects.map((p) => (
-                            <SelectItem key={p.id}>
-                              {p.isDefault
-                                ? `${p.name} (${t("assetPicker.defaultSuffix")})`
-                                : !p.isOwner
-                                  ? `${p.name} (${t("assetPicker.sharedSuffix")})`
-                                : p.name}
-                            </SelectItem>
-                          ))}
-                        </>
-                      </Select>
-
-                      <Select
-                        label={t("assetPicker.collectionLabel")}
-                        selectedKeys={[collectionId]}
-                        onChange={(e) => {
-                          setCollectionId(e.target.value);
-                          setFolderId(null);
-                          setFolderRoot(false);
-                        }}
-                        className="md:w-1/2"
-                      >
-                        <SelectItem key="all">{t("assetPicker.all")}</SelectItem>
-                        <>
-                          {visibleCollections.map((c) => (
-                            <SelectItem key={c.id}>
-                              {c.isOwner
-                                ? c.name
-                                : `${c.name} (${t("assetPicker.sharedSuffix")})`}
-                            </SelectItem>
-                          ))}
-                        </>
-                      </Select>
+                  <div className="flex flex-row gap-0 min-h-0 flex-1">
+                    <div className="hidden md:block w-[240px] shrink-0 border-r border-divider">
+                      <AssetPickerUnifiedTree
+                        projects={projects}
+                        collections={collections}
+                        selection={selection}
+                        onSelect={(s) => setSelection(s)}
+                        className="h-full py-1"
+                      />
                     </div>
 
-                    <div className="flex flex-row gap-0 min-h-0 flex-1">
-                      {collectionId !== "all" && (
-                        <div className="hidden md:block">
-                          <AssetPickerFolderTree
-                            collectionId={collectionId}
-                            selectedFolderId={folderId}
-                            isCollectionRoot={folderRoot}
-                            onSelectFolder={(id, isRoot) => {
-                              setFolderId(id);
-                              setFolderRoot(isRoot);
+                    {mobileBrowserOpen && (
+                      <div
+                        className="md:hidden fixed inset-0 z-130 bg-black/50"
+                        onClick={() => setMobileBrowserOpen(false)}
+                      >
+                        <div
+                          className="absolute left-0 top-0 bottom-0 w-[80%] max-w-[320px] bg-background p-2 overflow-hidden flex flex-col"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <div className="flex items-center justify-between pb-2 border-b border-divider shrink-0">
+                            <span className="text-sm font-medium">
+                              {t("assetPicker.browse")}
+                            </span>
+                            <Button
+                              size="sm"
+                              variant="light"
+                              isIconOnly
+                              onPress={() => setMobileBrowserOpen(false)}
+                              aria-label={t("assetPicker.closeBrowser")}
+                            >
+                              <X size={16} />
+                            </Button>
+                          </div>
+                          <AssetPickerUnifiedTree
+                            projects={projects}
+                            collections={collections}
+                            selection={selection}
+                            onSelect={(s) => {
+                              setSelection(s);
+                              setMobileBrowserOpen(false);
                             }}
+                            className="flex-1 min-h-0 pt-1"
                           />
                         </div>
-                      )}
+                      </div>
+                    )}
 
-                      <div className="flex flex-col gap-3 min-h-0 flex-1 min-w-0">
-                        {folderId && (
+                    <div className="flex flex-col gap-3 min-h-0 flex-1 min-w-0 md:pl-2">
+                        {selection.kind === "folder" && selection.folderId && (
                           <div className="shrink-0 px-1">
                             <AssetPickerBreadcrumbs
-                              collectionName={
-                                visibleCollections.find((c) => c.id === collectionId)?.name ?? null
-                              }
-                              folderId={folderId}
+                              collectionName={selectedCollectionName}
+                              folderId={selection.folderId}
                               onNavigate={(id) => {
-                                setFolderId(id);
-                                setFolderRoot(false);
+                                if (selection.kind !== "folder") return;
+                                setSelection({
+                                  kind: "folder",
+                                  projectId: selection.projectId,
+                                  collectionId: selection.collectionId,
+                                  folderId: id,
+                                  folderRoot: false,
+                                });
                               }}
                             />
                           </div>
                         )}
 
-                        <div className="flex flex-wrap items-center gap-3 shrink-0">
+                        <div className="flex flex-wrap items-center gap-2 shrink-0">
+                          <Button
+                            size="sm"
+                            variant="flat"
+                            className="md:hidden shrink-0"
+                            startContent={<FolderTree size={14} />}
+                            onPress={() => setMobileBrowserOpen(true)}
+                          >
+                            {t("assetPicker.browse")}
+                          </Button>
                           <Input
                             startContent={
                               <Search size={16} className="text-default-400" />
@@ -1341,7 +1339,6 @@ export default function AssetPickerModal({
                             assetAltLabel={t("assetPicker.assetAlt")}
                           />
                         )}
-                      </div>
                     </div>
                   </div>
                 )}

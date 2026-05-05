@@ -1261,7 +1261,12 @@
     "folders": "폴더",
     "allAssets": "모든 애셋",
     "rootOnly": "루트 (폴더 없음)",
-    "noFolders": "폴더 없음"
+    "noFolders": "폴더 없음",
+    "noCollections": "컬렉션 없음",
+    "myProjects": "내 프로젝트",
+    "sharedProjects": "공유 프로젝트",
+    "browse": "탐색",
+    "closeBrowser": "탐색기 닫기"
   },
   "assetsSidebar": {
     "title": "애셋",

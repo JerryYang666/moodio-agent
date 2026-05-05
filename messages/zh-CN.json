@@ -1261,7 +1261,12 @@
     "folders": "文件夹",
     "allAssets": "所有素材",
     "rootOnly": "根目录（无文件夹）",
-    "noFolders": "暂无文件夹"
+    "noFolders": "暂无文件夹",
+    "noCollections": "暂无集合",
+    "myProjects": "我的项目",
+    "sharedProjects": "共享项目",
+    "browse": "浏览",
+    "closeBrowser": "关闭浏览器"
   },
   "assetsSidebar": {
     "title": "素材",
