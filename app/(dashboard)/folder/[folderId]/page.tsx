@@ -2,7 +2,6 @@
 
 import { useState, useEffect, use, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Card, CardBody } from "@heroui/card";
 import { Button } from "@heroui/button";
 import { Input } from "@heroui/input";
 import { Spinner } from "@heroui/spinner";
@@ -43,6 +42,8 @@ import LocationPicker, { type LocationTarget } from "@/components/location-picke
 import AssetPageActions from "@/components/asset-page-actions";
 import ElementEditorController from "@/components/chat/element-editor-controller";
 import AssetCard from "@/components/asset-card";
+import FolderDropCard from "@/components/folder-drop-card";
+import { useAssetDragAutoScroll } from "@/hooks/use-asset-drag-autoscroll";
 import AssetSearchFilter from "@/components/asset-search-filter";
 import BulkSelectionBar from "@/components/bulk-selection-bar";
 import VideoDetailModal from "@/components/video-detail-modal";
@@ -106,6 +107,7 @@ export default function FolderPage({
 }) {
   const { folderId } = use(params);
   const router = useRouter();
+  useAssetDragAutoScroll();
   const t = useTranslations("folders");
   const tCommon = useTranslations("common");
   const tCollections = useTranslations("collections");
@@ -786,6 +788,32 @@ export default function FolderPage({
     onRemoveAssetOpen();
   };
 
+  const handleDropAssetOnFolder = async (assetId: string, targetFolderId: string) => {
+    const asset = folderData?.images.find((img) => img.id === assetId);
+    if (!asset) return;
+    setFolderData((prev) =>
+      prev ? { ...prev, images: prev.images.filter((img) => img.id !== assetId) } : null
+    );
+    try {
+      const res = await fetch(`/api/folders/${folderId}/images/bulk`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          itemIds: [assetId],
+          action: "move",
+          targetFolderId,
+        }),
+      });
+      if (!res.ok) throw new Error("Failed to move item");
+      addToast({ title: t("itemMoved"), color: "success" });
+    } catch {
+      setFolderData((prev) =>
+        prev ? { ...prev, images: [...prev.images, asset] } : null
+      );
+      addToast({ title: t("failedToMove"), color: "danger" });
+    }
+  };
+
   const handleMoveItem = async (target: LocationTarget) => {
     if (!itemToMove || !folderData) return;
     setIsMovingItem(true);
@@ -1102,17 +1130,14 @@ export default function FolderPage({
           <h2 className="text-lg font-semibold mb-3">{t("folders")}</h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
             {folderData.childFolders.map((child) => (
-              <Card
+              <FolderDropCard
                 key={child.id}
-                isPressable
-                onPress={() => router.push(`/folder/${child.id}`)}
-                className="hover:bg-default-100 transition-colors"
-              >
-                <CardBody className="flex flex-row items-center gap-3 py-3">
-                  <Folder size={20} className="text-default-500 shrink-0" />
-                  <span className="font-medium truncate">{child.name}</span>
-                </CardBody>
-              </Card>
+                id={child.id}
+                name={child.name}
+                onOpen={(id) => router.push(`/folder/${id}`)}
+                onAssetDrop={canWrite ? handleDropAssetOnFolder : undefined}
+                canAcceptDrop={canWrite}
+              />
             ))}
           </div>
         </div>

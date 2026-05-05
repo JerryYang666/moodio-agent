@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import AudioPlayer from "@/components/audio-player";
 import type { AssetItem } from "@/lib/types/asset";
+import { ASSET_DRAG_MIME } from "@/hooks/use-asset-drag-autoscroll";
 
 export interface AssetCardLabels {
   video: string;
@@ -83,9 +84,19 @@ export default function AssetCard({
   const preview =
     hoveredRating?.assetId === asset.id ? hoveredRating.star : null;
 
+  const isDraggable = canWrite && !isSelectionMode;
+
+  const handleDragStart = (e: React.DragEvent<HTMLDivElement>) => {
+    if (!isDraggable) return;
+    e.dataTransfer.setData(ASSET_DRAG_MIME, asset.id);
+    e.dataTransfer.effectAllowed = "move";
+  };
+
   return (
     <Card
-      className={`group relative ${isSelectionMode && isSelected ? "ring-2 ring-primary ring-offset-2 ring-offset-background" : ""}`}
+      draggable={isDraggable}
+      onDragStart={handleDragStart}
+      className={`group relative ${isDraggable ? "cursor-grab active:cursor-grabbing" : ""} ${isSelectionMode && isSelected ? "ring-2 ring-primary ring-offset-2 ring-offset-background" : ""}`}
     >
       <CardBody className="p-0 overflow-hidden aspect-square relative rounded-lg">
         {asset.assetType === "element" ? (

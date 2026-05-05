@@ -3,7 +3,6 @@
 import { useState, useEffect, use, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Card, CardBody } from "@heroui/card";
 import { Button } from "@heroui/button";
 import { Input } from "@heroui/input";
 import { Spinner } from "@heroui/spinner";
@@ -37,6 +36,8 @@ import LocationPicker, { type LocationTarget } from "@/components/location-picke
 import AssetPageActions from "@/components/asset-page-actions";
 import ElementEditorController from "@/components/chat/element-editor-controller";
 import AssetCard from "@/components/asset-card";
+import FolderDropCard from "@/components/folder-drop-card";
+import { useAssetDragAutoScroll } from "@/hooks/use-asset-drag-autoscroll";
 import AssetSearchFilter from "@/components/asset-search-filter";
 import BulkSelectionBar from "@/components/bulk-selection-bar";
 import VideoDetailModal from "@/components/video-detail-modal";
@@ -89,6 +90,7 @@ export default function CollectionPage({
 }) {
   const { collectionId } = use(params);
   const router = useRouter();
+  useAssetDragAutoScroll();
   const t = useTranslations("collections");
   const tCommon = useTranslations("common");
   const tFolders = useTranslations("folders");
@@ -402,6 +404,37 @@ export default function CollectionPage({
     setItemToRename(asset);
     setNewItemTitle(asset.generationDetails.title);
     onRenameItemOpen();
+  };
+
+  const handleDropAssetOnFolder = async (assetId: string, folderId: string) => {
+    const asset = collectionData?.images.find((img) => img.id === assetId);
+    if (!asset) return;
+    setCollectionData((prev) =>
+      prev ? { ...prev, images: prev.images.filter((img) => img.id !== assetId) } : null
+    );
+    try {
+      const res = await fetch(`/api/collection/${collectionId}/images/bulk`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          itemIds: [assetId],
+          action: "move",
+          targetFolderId: folderId,
+        }),
+      });
+      if (!res.ok) throw new Error("Failed to move item");
+      addToast({ title: t("itemMoved"), color: "success" });
+      refreshCollections();
+    } catch {
+      setCollectionData((prev) =>
+        prev ? { ...prev, images: [...prev.images, asset] } : null
+      );
+      addToast({
+        title: tCommon("error"),
+        description: t("failedToMoveItem"),
+        color: "danger",
+      });
+    }
   };
 
   const handleMoveItem = async (target: LocationTarget) => {
@@ -1145,17 +1178,14 @@ export default function CollectionPage({
           </h3>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
             {collectionData.folders.map((folder) => (
-              <Card
+              <FolderDropCard
                 key={folder.id}
-                isPressable
-                onPress={() => router.push(`/folder/${folder.id}`)}
-                className="hover:bg-default-100 transition-colors"
-              >
-                <CardBody className="flex flex-row items-center gap-3 py-3">
-                  <Folder size={20} className="text-default-500 shrink-0" />
-                  <span className="font-medium truncate">{folder.name}</span>
-                </CardBody>
-              </Card>
+                id={folder.id}
+                name={folder.name}
+                onOpen={(id) => router.push(`/folder/${id}`)}
+                onAssetDrop={canAddImages ? handleDropAssetOnFolder : undefined}
+                canAcceptDrop={canAddImages}
+              />
             ))}
           </div>
         </div>
