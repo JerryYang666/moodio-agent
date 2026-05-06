@@ -88,7 +88,7 @@ export interface VideoModelParam {
   acceptTypes?: AssetAcceptType[]; // For "asset" type - which asset types the picker allows
 }
 
-export type VideoProvider = "fal" | "kie" | "volcengine";
+export type VideoProvider = "fal" | "kie" | "volcengine" | "ksyun";
 
 /**
  * Per-provider overrides for a single parameter.
@@ -1200,6 +1200,106 @@ const klingO3Reference: VideoModelConfig = {
 };
 
 /**
+ * Kling v3 Omni (ksyun) — fork of Kling O3 Reference routed through Kingsoft Cloud.
+ * Mirrors the o3-reference feature set (up to 4 reference images, optional start/end
+ * frames, Kling elements) but also accepts a single reference video, which ksyun maps
+ * to its `video_list` parameter. Multi-shot mode is not supported on this provider.
+ */
+const klingV3Omni: VideoModelConfig = {
+  id: "kling-v3-omni",
+  name: "Kling v3 Omni (金山云)",
+  description:
+    "Reference-to-video via Kingsoft Cloud (kling-v3-omni). Up to 4 reference images plus 1 optional reference video, optional start/end frames, and Kling elements. std and pro quality tiers.",
+  providers: [
+    {
+      provider: "ksyun",
+      providerModelId: "kling-v3-omni",
+    },
+  ],
+  params: [
+    {
+      name: "prompt",
+      label: "Prompt",
+      type: "string",
+      required: false,
+      maxLength: 2500,
+      description:
+        "Text prompt. Use @Image1..@Image4 to reference attached images and @element_name for elements.",
+    },
+    {
+      name: "mode",
+      label: "Quality",
+      type: "enum",
+      required: false,
+      default: "std",
+      options: ["std", "pro"],
+      description:
+        "Quality tier. std is cheaper and faster; pro is higher quality at higher cost.",
+    },
+    {
+      name: "aspect_ratio",
+      label: "Aspect Ratio",
+      type: "enum",
+      required: false,
+      default: "16:9",
+      options: ["16:9", "9:16", "1:1"],
+      description: "Aspect ratio of the generated video",
+    },
+    {
+      name: "duration",
+      label: "Duration (seconds)",
+      type: "enum",
+      required: false,
+      default: "5",
+      options: ["3", "4", "5", "6", "7", "8", "9", "10"],
+      description: "Video duration in seconds (3-10s)",
+    },
+    {
+      name: "generate_audio",
+      label: "Generate Audio",
+      type: "boolean",
+      required: false,
+      default: false,
+      description: "Generate native audio",
+    },
+    {
+      name: "start_image_url",
+      label: "Start Image",
+      type: "asset",
+      required: false,
+      acceptTypes: ["image"],
+      description: "Optional first frame",
+    },
+    {
+      name: "end_image_url",
+      label: "End Image",
+      type: "asset",
+      required: false,
+      acceptTypes: ["image"],
+      description: "Optional last frame",
+    },
+    {
+      name: "media_references",
+      label: "References",
+      type: "media_references",
+      required: false,
+      maxItems: 5,
+      description:
+        "Up to 4 reference images and 1 reference video. Reference images in the prompt as @image1..@image4.",
+    },
+    {
+      name: "kling_elements",
+      label: "Element References",
+      type: "kling_elements",
+      required: false,
+      maxItems: 3,
+      description:
+        "Referenced characters/objects — name, description, 2-4 image IDs. Reference in prompts as @element_name. Max 3.",
+    },
+  ],
+};
+
+/**
  * Kling Video v3 Pro - Image to Video
  * Top-tier image-to-video with cinematic visuals, fluid motion, and native audio generation,
  * with custom element support.
@@ -1865,6 +1965,7 @@ export const VIDEO_MODELS: VideoModelConfig[] = [
   klingO1Pro,
   klingO3Pro,
   klingO3Reference,
+  klingV3Omni,
   klingV3Pro,
   veo31,
   veo31FirstLastFrame,

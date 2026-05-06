@@ -167,7 +167,9 @@ export default function VideoConfigCard({
     [visibleParams]
   );
   const klingElementVariant =
-    modelConfig?.id === "kling-o3-reference" ? "o3-reference" : "v3";
+    modelConfig?.id === "kling-o3-reference" || modelConfig?.id === "kling-v3-omni"
+      ? "o3-reference"
+      : "v3";
   const klingElementsInvalid = useMemo(() => {
     if (!hasKlingElements) return false;
     return !areKlingElementsValid(
@@ -817,7 +819,9 @@ export default function VideoConfigCard({
             videoDurations={videoDurations}
             {...(modelConfig?.id === "kling-o3-reference"
               ? { maxImages: 4, maxVideos: 0, maxAudios: 0 }
-              : {})}
+              : modelConfig?.id === "kling-v3-omni"
+                ? { maxImages: 4, maxVideos: 1, maxAudios: 0 }
+                : {})}
           />
         )}
 

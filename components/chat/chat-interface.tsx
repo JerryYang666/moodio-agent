@@ -5315,12 +5315,22 @@ export default function ChatInterface({
               : assetPickerMode === "mediaRefImage"
                 ? Math.max(
                     0,
-                    (menuState.videoModelId === "kling-o3-reference" ? 4 : 9) -
+                    (menuState.videoModelId === "kling-o3-reference" ||
+                    menuState.videoModelId === "kling-v3-omni"
+                      ? 4
+                      : 9) -
                       ((menuState.videoParams?.media_references as MediaReference[]) || [])
                         .filter((r) => r.type === "image").length
                   )
                 : assetPickerMode === "mediaRefVideo"
-                  ? 3
+                  ? menuState.videoModelId === "kling-v3-omni"
+                    ? Math.max(
+                        0,
+                        1 -
+                          ((menuState.videoParams?.media_references as MediaReference[]) || [])
+                            .filter((r) => r.type === "video").length
+                      )
+                    : 3
                   : assetPickerMode === "mediaRefAudio"
                     ? 3
                     : assetPickerMode === "persistent"

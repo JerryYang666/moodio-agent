@@ -966,7 +966,8 @@ export default function VideoGenerationPanel({
                       onChange={(e) => handleParamChange(param.name, e)}
                       resolveImageUrl={resolveElementImageUrl}
                       variant={
-                        selectedModelId === "kling-o3-reference"
+                        selectedModelId === "kling-o3-reference" ||
+                        selectedModelId === "kling-v3-omni"
                           ? "o3-reference"
                           : "v3"
                       }

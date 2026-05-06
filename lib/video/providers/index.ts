@@ -40,11 +40,13 @@ export interface VideoProviderClient {
 import { FalVideoProvider } from "./fal";
 import { KieVideoProvider } from "./kie";
 import { VolcengineVideoProvider } from "./volcengine";
+import { KsyunVideoProvider } from "./ksyun";
 
 const providers: Record<VideoProvider, VideoProviderClient> = {
   fal: new FalVideoProvider(),
   kie: new KieVideoProvider(),
   volcengine: new VolcengineVideoProvider(),
+  ksyun: new KsyunVideoProvider(),
 };
 
 export function getProviderClient(provider: VideoProvider): VideoProviderClient {

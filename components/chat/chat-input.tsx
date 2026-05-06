@@ -335,7 +335,10 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
   );
 
   const klingElementVariant =
-    menuState.videoModelId === "kling-o3-reference" ? "o3-reference" : "v3";
+    menuState.videoModelId === "kling-o3-reference" ||
+    menuState.videoModelId === "kling-v3-omni"
+      ? "o3-reference"
+      : "v3";
 
   const klingElementsInvalid = useMemo(() => {
     if (!supportsElements) return false;
@@ -1756,7 +1759,9 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
                     videoDurations={mediaRefVideoDurations}
                     {...(menuState.videoModelId === "kling-o3-reference"
                       ? { maxImages: 4, maxVideos: 0, maxAudios: 0 }
-                      : {})}
+                      : menuState.videoModelId === "kling-v3-omni"
+                        ? { maxImages: 4, maxVideos: 1, maxAudios: 0 }
+                        : {})}
                   />
                 </div>
               </motion.div>
