@@ -347,34 +347,54 @@ export class KsyunVideoProvider implements VideoProviderClient {
       body.element_list = elementIds.map((element_id) => ({ element_id }));
     }
 
+    const submitUrl = `${KSYUN_API_BASE}/${modelName}/v1/videos/omni-video`;
+    const bodyJson = JSON.stringify(body);
     console.log(
-      "[ksyun Submit] Request:",
-      JSON.stringify(body, null, 2)
+      `[ksyun Submit] POST ${submitUrl}\n` +
+        `  headers: ${JSON.stringify({
+          "Content-Type": "application/json",
+          Authorization: "Bearer <redacted>",
+        })}\n` +
+        `  body: ${bodyJson}`
     );
 
-    const res = await fetch(
-      `${KSYUN_API_BASE}/${modelName}/v1/videos/omni-video`,
-      {
-        method: "POST",
-        headers: ksyunAuthHeaders(),
-        body: JSON.stringify(body),
-      }
-    );
+    const res = await fetch(submitUrl, {
+      method: "POST",
+      headers: ksyunAuthHeaders(),
+      body: bodyJson,
+    });
+
+    const rawText = await res.text();
+    console.log(`[ksyun Submit] Response ${res.status}:`, rawText);
 
     if (!res.ok) {
-      const text = await res.text();
-      console.error("[ksyun Submit] HTTP error:", res.status, text);
-      throw new Error(`ksyun submit failed (${res.status}): ${text}`);
+      throw new Error(`ksyun submit failed (${res.status}): ${rawText}`);
     }
 
-    const json = (await res.json()) as KsyunTaskEnvelope<KsyunTaskData>;
-    console.log("[ksyun Submit] Response:", JSON.stringify(json, null, 2));
-
-    if (json.code !== 0 || !json.data?.task_id) {
-      throw new Error(`ksyun submit error (code ${json.code}): ${json.message}`);
+    let json: any;
+    try {
+      json = JSON.parse(rawText);
+    } catch {
+      throw new Error(
+        `ksyun submit returned non-JSON: ${rawText.slice(0, 500)}`
+      );
     }
 
-    return { requestId: json.data.task_id };
+    // ksyun's omni-video submit returns a flat {taskId} body in practice,
+    // even though the docs show the enveloped {code, data:{task_id}} form.
+    // Accept both.
+    const taskId: string | undefined =
+      json?.data?.task_id ?? json?.task_id ?? json?.taskId;
+
+    if (!taskId) {
+      const code = json?.code;
+      const msg = json?.message ?? json?.msg;
+      throw new Error(
+        `ksyun submit error (code ${code}): ${msg ?? "no task id in response"}`
+      );
+    }
+
+    return { requestId: taskId };
   }
 
   async getStatus(
