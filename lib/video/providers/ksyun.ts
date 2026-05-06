@@ -31,11 +31,11 @@ interface KsyunTaskEnvelope<T = unknown> {
   data?: T;
 }
 
-type KsyunTaskStatus = "submitted" | "processing" | "succeed" | "failed";
+type KsyunElementTaskStatus = "submitted" | "processing" | "succeed" | "failed";
 
 interface KsyunTaskData {
   task_id: string;
-  task_status: KsyunTaskStatus;
+  task_status: KsyunElementTaskStatus;
   task_status_msg?: string;
   task_info?: { external_task_id?: string };
   task_result?: {
@@ -44,6 +44,47 @@ interface KsyunTaskData {
   };
   created_at?: number;
   updated_at?: number;
+}
+
+/**
+ * Shape returned by GET /{model}/v1/videos/omni-video/{task_id}.
+ *
+ * NOTE: This is NOT what ksyun's docs describe (the docs show the enveloped
+ * {code, data:{task_status, task_result:{videos:[{url}]}}} form used for element
+ * tasks). The real video-task query endpoint returns a flat, camelCased shape
+ * that we discovered by probing. The video URL lives inside
+ * `videoGenerateTaskOutput.mediaBasicInfos[]` — we accept a couple of likely
+ * key spellings (`url`, `mediaUrl`, `resourceUrl`) since we haven't seen a
+ * real success response yet.
+ */
+type KsyunVideoTaskStatus =
+  | "PENDING"
+  | "QUEUED"
+  | "PROCESSING"
+  | "RUNNING"
+  | "SUCCEEDED"
+  | "FAILED";
+
+interface KsyunMediaBasicInfo {
+  url?: string;
+  mediaUrl?: string;
+  resourceUrl?: string;
+  duration?: string | number;
+}
+
+interface KsyunVideoTaskResponse {
+  taskId: string;
+  type?: string;
+  status: KsyunVideoTaskStatus | string;
+  createTime?: string;
+  videoGenerateTaskInfo?: {
+    status?: string;
+    errMsg?: string;
+    unitPrice?: number;
+  };
+  videoGenerateTaskOutput?: {
+    mediaBasicInfos?: KsyunMediaBasicInfo[];
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -256,26 +297,44 @@ async function pollElementUntilReady(taskId: string): Promise<number> {
 // Task-status mapping
 // ---------------------------------------------------------------------------
 
-function mapKsyunStatus(
-  status: KsyunTaskStatus | undefined
+/**
+ * Map ksyun's uppercase video-task status to our internal enum. Status values
+ * are uppercased via toUpperCase() first so we tolerate casing drift.
+ */
+function mapKsyunVideoStatus(
+  status: string | undefined
 ): "in_queue" | "in_progress" | "completed" | "failed" {
-  switch (status) {
-    case "submitted":
+  switch ((status ?? "").toUpperCase()) {
+    case "PENDING":
+    case "QUEUED":
       return "in_queue";
-    case "processing":
+    case "PROCESSING":
+    case "RUNNING":
       return "in_progress";
-    case "succeed":
+    case "SUCCEEDED":
+    case "SUCCESS":
+    case "SUCCEED":
       return "completed";
-    case "failed":
+    case "FAILED":
     default:
       return "failed";
   }
 }
 
-function parseVideoResult(data: KsyunTaskData): VideoGenerationResult | null {
-  const url = data.task_result?.videos?.[0]?.url;
+function parseVideoResult(
+  task: KsyunVideoTaskResponse
+): VideoGenerationResult | null {
+  const info = task.videoGenerateTaskOutput?.mediaBasicInfos?.[0];
+  const url = info?.url ?? info?.mediaUrl ?? info?.resourceUrl;
   if (!url) return null;
   return { video: { url }, seed: 0 };
+}
+
+function getTaskErrorMessage(task: KsyunVideoTaskResponse): string {
+  return (
+    task.videoGenerateTaskInfo?.errMsg ||
+    `Generation ${task.status} on ksyun`
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -402,7 +461,7 @@ export class KsyunVideoProvider implements VideoProviderClient {
     requestId: string
   ): Promise<{ status: "in_queue" | "in_progress" | "completed" | "failed" }> {
     const task = await this.fetchTask(providerModelId, requestId);
-    return { status: mapKsyunStatus(task.task_status) };
+    return { status: mapKsyunVideoStatus(task.status) };
   }
 
   async getResult(
@@ -410,9 +469,9 @@ export class KsyunVideoProvider implements VideoProviderClient {
     requestId: string
   ): Promise<{ data: any }> {
     const task = await this.fetchTask(providerModelId, requestId);
-    if (task.task_status !== "succeed") {
+    if (mapKsyunVideoStatus(task.status) !== "completed") {
       throw new Error(
-        `Task ${requestId} is not complete (status: ${task.task_status})`
+        `Task ${requestId} is not complete (status: ${task.status})`
       );
     }
     return { data: parseVideoResult(task) };
@@ -428,24 +487,19 @@ export class KsyunVideoProvider implements VideoProviderClient {
   }> {
     try {
       const task = await this.fetchTask(providerModelId, requestId);
-      const status = task.task_status;
-      if (status === "submitted" || status === "processing") {
+      const mapped = mapKsyunVideoStatus(task.status);
+      if (mapped === "in_queue" || mapped === "in_progress") {
         return { status: "in_progress" };
       }
-      if (status === "failed") {
-        return {
-          status: "failed",
-          error: task.task_status_msg || "Generation failed on ksyun",
-        };
+      if (mapped === "failed") {
+        return { status: "failed", error: getTaskErrorMessage(task) };
       }
-      if (status === "succeed") {
-        const result = parseVideoResult(task);
-        if (!result?.video?.url) {
-          return { status: "failed", error: "No video URL in ksyun result" };
-        }
-        return { status: "completed", result };
+      // completed
+      const result = parseVideoResult(task);
+      if (!result?.video?.url) {
+        return { status: "failed", error: "No video URL in ksyun result" };
       }
-      return { status: "failed", error: `Unknown ksyun status: ${status}` };
+      return { status: "completed", result };
     } catch (error: any) {
       console.error("[ksyun Recovery] Error recovering generation:", error);
       return {
@@ -458,20 +512,42 @@ export class KsyunVideoProvider implements VideoProviderClient {
   private async fetchTask(
     providerModelId: string,
     taskId: string
-  ): Promise<KsyunTaskData> {
+  ): Promise<KsyunVideoTaskResponse> {
     const modelName = providerModelId || KSYUN_MODEL_NAME;
-    const url =
-      `${KSYUN_API_BASE}/${modelName}/v1/videos/text2video/${encodeURIComponent(taskId)}` +
-      `?kling_model=${encodeURIComponent(modelName)}`;
+    const url = `${KSYUN_API_BASE}/${modelName}/v1/videos/omni-video/${encodeURIComponent(taskId)}`;
+    console.log(`[ksyun QueryTask] GET ${url}`);
     const res = await fetch(url, { headers: ksyunAuthHeaders() });
+    const rawText = await res.text();
+    console.log(`[ksyun QueryTask] Response ${res.status}:`, rawText);
+
     if (!res.ok) {
-      const text = await res.text();
-      throw new Error(`ksyun queryTask failed (${res.status}): ${text}`);
+      throw new Error(`ksyun queryTask failed (${res.status}): ${rawText}`);
     }
-    const json = (await res.json()) as KsyunTaskEnvelope<KsyunTaskData>;
-    if (json.code !== 0 || !json.data) {
-      throw new Error(`ksyun queryTask error (code ${json.code}): ${json.message}`);
+
+    let json: any;
+    try {
+      json = JSON.parse(rawText);
+    } catch {
+      throw new Error(
+        `ksyun queryTask returned non-JSON: ${rawText.slice(0, 500)}`
+      );
     }
-    return json.data;
+
+    // Non-zero `code` responses (e.g. kling_task_not_exist) come back with
+    // HTTP 200 / 400 inside an envelope, not the flat task shape.
+    if (typeof json?.code === "number" && json.code !== 0) {
+      throw new Error(
+        `ksyun queryTask error (code ${json.code}): ${json.message ?? json.msg ?? "unknown"}`
+      );
+    }
+
+    // Real task responses are flat with a top-level `taskId`.
+    if (!json?.taskId && !json?.status) {
+      throw new Error(
+        `ksyun queryTask returned unexpected shape: ${rawText.slice(0, 500)}`
+      );
+    }
+
+    return json as KsyunVideoTaskResponse;
   }
 }

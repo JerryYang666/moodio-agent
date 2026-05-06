@@ -9,25 +9,77 @@ import {
 import { waitUntil } from "@vercel/functions";
 
 /**
- * ksyun callback payload. Ref: Kingsoft Cloud Kling v3 Omni callback docs.
+ * ksyun callback payload. Two shapes have been observed:
  *
- * ksyun fires callbacks on each state transition (submitted → processing →
- * succeed/failed). No signature verification is offered — we gate on the
- * task_id lookup against our DB.
+ * 1. The documented enveloped form (used by element tasks, possibly by video
+ *    tasks too):
+ *    { task_id, task_status: submitted|processing|succeed|failed,
+ *      task_status_msg, task_result: { videos: [{ url }] } }
+ *
+ * 2. The same flat/camelCased shape the video query endpoint returns:
+ *    { taskId, status: PENDING|PROCESSING|SUCCEEDED|FAILED,
+ *      videoGenerateTaskInfo: { errMsg }, videoGenerateTaskOutput: { mediaBasicInfos: [{ url }] } }
+ *
+ * We don't know which form ksyun will actually POST here, so we accept both.
+ * The raw request body is always logged so we can confirm which arrived.
  */
 interface KsyunCallbackPayload {
   task_id?: string;
-  task_status?: "submitted" | "processing" | "succeed" | "failed";
+  taskId?: string;
+  task_status?: string;
+  status?: string;
   task_status_msg?: string;
-  created_at?: number;
-  updated_at?: number;
-  final_unit_deduction?: string;
-  task_info?: {
-    external_task_id?: string;
-  };
   task_result?: {
     videos?: Array<{ id?: string; url?: string; duration?: string }>;
   };
+  videoGenerateTaskInfo?: {
+    status?: string;
+    errMsg?: string;
+  };
+  videoGenerateTaskOutput?: {
+    mediaBasicInfos?: Array<{
+      url?: string;
+      mediaUrl?: string;
+      resourceUrl?: string;
+    }>;
+  };
+}
+
+type NormalizedStatus = "in_queue" | "in_progress" | "completed" | "failed";
+
+function normalizeStatus(raw: string | undefined): NormalizedStatus | null {
+  switch ((raw ?? "").toUpperCase()) {
+    case "SUBMITTED":
+    case "PENDING":
+    case "QUEUED":
+      return "in_queue";
+    case "PROCESSING":
+    case "RUNNING":
+      return "in_progress";
+    case "SUCCEED":
+    case "SUCCEEDED":
+    case "SUCCESS":
+      return "completed";
+    case "FAILED":
+      return "failed";
+    default:
+      return null;
+  }
+}
+
+function extractVideoUrl(payload: KsyunCallbackPayload): string | undefined {
+  const fromEnvelope = payload.task_result?.videos?.[0]?.url;
+  if (fromEnvelope) return fromEnvelope;
+  const info = payload.videoGenerateTaskOutput?.mediaBasicInfos?.[0];
+  return info?.url ?? info?.mediaUrl ?? info?.resourceUrl;
+}
+
+function extractErrorMessage(payload: KsyunCallbackPayload): string {
+  return (
+    payload.task_status_msg ||
+    payload.videoGenerateTaskInfo?.errMsg ||
+    "Generation failed on ksyun"
+  );
 }
 
 /**
@@ -36,22 +88,24 @@ interface KsyunCallbackPayload {
  * Returns {code:0, msg:"ok"} per ksyun's expected format.
  */
 export async function POST(request: NextRequest) {
+  const rawText = await request.text();
+  console.log(
+    `[Webhook/ksyun] Received POST\n` +
+      `  headers: ${JSON.stringify(Object.fromEntries(request.headers.entries()))}\n` +
+      `  body: ${rawText}`
+  );
+
   let payload: KsyunCallbackPayload;
   try {
-    payload = await request.json();
+    payload = JSON.parse(rawText);
   } catch (e) {
     console.error("[Webhook/ksyun] Failed to parse payload:", e);
     return NextResponse.json({ code: 1, msg: "Invalid payload" }, { status: 400 });
   }
 
-  console.log(
-    "[Webhook/ksyun] Received payload:",
-    JSON.stringify(payload, null, 2)
-  );
-
-  const taskId = payload.task_id;
+  const taskId = payload.task_id ?? payload.taskId;
   if (!taskId) {
-    console.error("[Webhook/ksyun] Missing task_id in payload");
+    console.error("[Webhook/ksyun] Missing task_id / taskId in payload");
     return NextResponse.json({ code: 1, msg: "Missing task_id" }, { status: 400 });
   }
 
@@ -80,18 +134,25 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ code: 0, msg: "ok" });
   }
 
-  const status = payload.task_status;
+  const rawStatus = payload.task_status ?? payload.status;
+  const status = normalizeStatus(rawStatus);
 
-  if (status === "submitted" || status === "processing") {
+  if (status === null) {
+    console.warn(
+      `[Webhook/ksyun] Unknown status "${rawStatus}" for task ${taskId}`
+    );
+    return NextResponse.json({ code: 0, msg: "ok" });
+  }
+
+  if (status === "in_queue" || status === "in_progress") {
     console.log(
-      `[Webhook/ksyun] Task ${taskId} still ${status}, ignoring intermediate callback`
+      `[Webhook/ksyun] Task ${taskId} still ${rawStatus}, ignoring intermediate callback`
     );
     return NextResponse.json({ code: 0, msg: "ok" });
   }
 
   if (status === "failed") {
-    const errorMsg =
-      payload.task_status_msg || "Generation failed on ksyun";
+    const errorMsg = extractErrorMessage(payload);
     await handleGenerationFailure(
       generation.id,
       generation.userId,
@@ -105,31 +166,25 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ code: 0, msg: "ok" });
   }
 
-  if (status === "succeed") {
-    const url = payload.task_result?.videos?.[0]?.url;
-    if (!url) {
-      const msg = "ksyun callback succeeded but no video URL in payload";
-      await handleGenerationFailure(
-        generation.id,
-        generation.userId,
-        generation.modelId,
-        msg
-      );
-      console.error(`[Webhook/ksyun] ${msg}`);
-      return NextResponse.json({ code: 0, msg: "ok" });
-    }
-
-    const result: VideoGenerationResult = {
-      video: { url },
-      seed: 0,
-    };
-
-    waitUntil(processVideoResult(generation.id, result));
+  // completed
+  const url = extractVideoUrl(payload);
+  if (!url) {
+    const msg = "ksyun callback succeeded but no video URL in payload";
+    await handleGenerationFailure(
+      generation.id,
+      generation.userId,
+      generation.modelId,
+      msg
+    );
+    console.error(`[Webhook/ksyun] ${msg}`);
     return NextResponse.json({ code: 0, msg: "ok" });
   }
 
-  console.warn(
-    `[Webhook/ksyun] Unknown status "${status}" for task ${taskId}`
-  );
+  const result: VideoGenerationResult = {
+    video: { url },
+    seed: 0,
+  };
+
+  waitUntil(processVideoResult(generation.id, result));
   return NextResponse.json({ code: 0, msg: "ok" });
 }
