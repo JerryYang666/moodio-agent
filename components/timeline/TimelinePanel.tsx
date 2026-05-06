@@ -53,6 +53,14 @@ interface TimelinePanelProps {
     clipId: string,
     updates: Partial<Omit<TimelineClip, "id">>
   ) => void;
+  /** Fires once on trim drag-end / reset. Undoable counterpart to onUpdateClip. */
+  onCommitTrim?: (
+    clipId: string,
+    prevTrimStart: number,
+    prevTrimEnd: number,
+    nextTrimStart: number,
+    nextTrimEnd: number
+  ) => void;
   onSplitClip?: (clipId: string, splitTime: number) => void;
   desktopId?: string;
   /** Callback for telemetry when export is triggered */
@@ -101,6 +109,7 @@ export default function TimelinePanel({
   onReorderClips,
   onClearTimeline,
   onUpdateClip,
+  onCommitTrim,
   onSplitClip,
   desktopId,
   onExportTrack,
@@ -642,6 +651,7 @@ export default function TimelinePanel({
                     onClipClick={handleActiveClipChange}
                     onRemoveClip={onRemoveClip}
                     onTrimChange={handleTrimChange}
+                    onTrimCommit={onCommitTrim}
                     onTrimScrub={handleTrimScrub}
                     onTrimDragStart={handleTrimDragStart}
                     onSeekInClip={handleSeekInClip}

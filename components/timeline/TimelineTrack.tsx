@@ -17,6 +17,14 @@ interface TimelineTrackProps {
   onClipClick: (index: number) => void;
   onRemoveClip?: (clipId: string) => void;
   onTrimChange?: (clipId: string, trimStart: number, trimEnd: number) => void;
+  /** Fires once on trim drag-end / reset. Undoable counterpart to onTrimChange. */
+  onTrimCommit?: (
+    clipId: string,
+    prevTrimStart: number,
+    prevTrimEnd: number,
+    nextTrimStart: number,
+    nextTrimEnd: number
+  ) => void;
   onTrimScrub?: (time: number | null) => void;
   /** Fired on trim-handle mousedown (before selection changes) so the panel can freeze the playhead. */
   onTrimDragStart?: () => void;
@@ -42,6 +50,7 @@ export default function TimelineTrack({
   onClipClick,
   onRemoveClip,
   onTrimChange,
+  onTrimCommit,
   onTrimScrub,
   onTrimDragStart,
   onSeekInClip,
@@ -126,6 +135,7 @@ export default function TimelineTrack({
                     onDragOver={onDragOver}
                     onDragEnd={onDragEnd}
                     onTrimChange={onTrimChange}
+                    onTrimCommit={onTrimCommit}
                     onTrimScrub={onTrimScrub}
                     onTrimDragStart={onTrimDragStart}
                     onSeekInClip={onSeekInClip}

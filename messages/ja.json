@@ -1823,6 +1823,11 @@
     "redone": "やり直しました: {action}",
     "actions": {
       "addAsset": "アセットを追加",
+      "addTimelineClip": "タイムラインに追加",
+      "removeTimelineClip": "タイムラインから削除",
+      "splitTimelineClip": "クリップを分割",
+      "reorderTimelineClips": "クリップを並べ替え",
+      "trimTimelineClip": "クリップをトリミング",
       "moveAsset": "アセットを移動",
       "moveAssets": "{count} 個のアセットを移動",
       "resizeAsset": "アセットのサイズ変更",

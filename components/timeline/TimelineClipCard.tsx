@@ -20,6 +20,14 @@ interface TimelineClipCardProps {
   onDragOver: (index: number, side: DropSide) => void;
   onDragEnd: () => void;
   onTrimChange?: (clipId: string, trimStart: number, trimEnd: number) => void;
+  /** Fires once on drag-end / reset with the prev→next trim values. Undoable counterpart to onTrimChange. */
+  onTrimCommit?: (
+    clipId: string,
+    prevTrimStart: number,
+    prevTrimEnd: number,
+    nextTrimStart: number,
+    nextTrimEnd: number
+  ) => void;
   onTrimScrub?: (time: number | null) => void;
   /** Fired synchronously on trim-handle mousedown, before any selection change. */
   onTrimDragStart?: () => void;
@@ -47,6 +55,7 @@ export default function TimelineClipCard({
   onDragOver,
   onDragEnd,
   onTrimChange,
+  onTrimCommit,
   onTrimScrub,
   onTrimDragStart,
   onSeekInClip,
@@ -165,6 +174,19 @@ export default function TimelineClipCard({
         // Clear next frame so the preview stays painted on the final frame.
         requestAnimationFrame(() => onTrimScrub?.(null));
 
+        const initial = side === "left" ? startTrimStart : startTrimEnd;
+        if (latestScrubValue !== initial) {
+          const finalStart = side === "left" ? latestScrubValue : startTrimStart;
+          const finalEnd = side === "right" ? latestScrubValue : startTrimEnd;
+          onTrimCommit?.(
+            clip.id,
+            startTrimStart,
+            startTrimEnd,
+            finalStart,
+            finalEnd
+          );
+        }
+
         setTrimDrag(null);
         document.removeEventListener("mousemove", handleMouseMove);
         document.removeEventListener("mouseup", handleMouseUp);
@@ -175,7 +197,7 @@ export default function TimelineClipCard({
       document.addEventListener("mousemove", handleMouseMove);
       document.addEventListener("mouseup", handleMouseUp);
     },
-    [clip, onTrimChange, onTrimScrub, onTrimDragStart, onClick, index]
+    [clip, onTrimChange, onTrimCommit, onTrimScrub, onTrimDragStart, onClick, index]
   );
 
   const handleHandleDoubleClick = useCallback(
@@ -185,13 +207,13 @@ export default function TimelineClipCard({
       if (!onTrimChange || clip.duration <= 0) return;
       const trimStart = clip.trimStart ?? 0;
       const trimEnd = clip.trimEnd ?? clip.duration;
-      if (side === "left") {
-        onTrimChange(clip.id, 0, trimEnd);
-      } else {
-        onTrimChange(clip.id, trimStart, clip.duration);
-      }
+      const nextStart = side === "left" ? 0 : trimStart;
+      const nextEnd = side === "right" ? clip.duration : trimEnd;
+      if (nextStart === trimStart && nextEnd === trimEnd) return;
+      onTrimChange(clip.id, nextStart, nextEnd);
+      onTrimCommit?.(clip.id, trimStart, trimEnd, nextStart, nextEnd);
     },
-    [clip, onTrimChange]
+    [clip, onTrimChange, onTrimCommit]
   );
 
   const isVideo = variant === "video";

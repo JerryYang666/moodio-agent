@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import type { TimelineClip, TimelineState } from "@/components/timeline/types";
 import { getTimelineStorageKey } from "@/components/timeline/types";
 import { probeHasAudio } from "@/lib/timeline/probeAudio";
+import type { OperationHistoryAPI } from "./use-operation-history";
 
 function loadTimeline(desktopId: string): TimelineClip[] {
   if (typeof window === "undefined") return [];
@@ -39,20 +40,34 @@ function probeDuration(videoUrl: string): Promise<number> {
   });
 }
 
-export function useTimeline(desktopId: string) {
+export function useTimeline(
+  desktopId: string,
+  history?: OperationHistoryAPI,
+  userId?: string
+) {
   const [clips, setClips] = useState<TimelineClip[]>(() =>
     loadTimeline(desktopId)
   );
   const [isExpanded, setIsExpanded] = useState(false);
 
-  // Persist on every clips change
   const clipsRef = useRef(clips);
   clipsRef.current = clips;
   useEffect(() => {
     saveTimeline(desktopId, clipsRef.current);
   }, [clips, desktopId]);
 
-  // Probe duration for any clip with duration=0 (newly added or loaded from storage)
+  // Called from history forward/inverse closures so undo/redo of any
+  // timeline mutation pops the panel open if it was collapsed.
+  const ensureExpanded = useCallback(() => {
+    setIsExpanded(true);
+  }, []);
+
+  // Refs so applier closures stay stable across renders.
+  const historyRef = useRef(history);
+  historyRef.current = history;
+  const userIdRef = useRef(userId);
+  userIdRef.current = userId;
+
   const probedIdsRef = useRef<Set<string>>(new Set());
   useEffect(() => {
     const zeroDurationClips = clips.filter(
@@ -103,40 +118,29 @@ export function useTimeline(desktopId: string) {
     });
   }, [clips]);
 
-  const addClip = useCallback((clip: TimelineClip) => {
-    // Default hasAudio to true; the async probe below can only downgrade it.
-    // See TimelineClip.hasAudio JSDoc for why false-negatives are avoided.
-    const clipWithDefaults: TimelineClip = {
-      ...clip,
-      hasAudio: clip.hasAudio ?? true,
-    };
-
+  // Raw appliers — used by both public mutations and history forward/inverse
+  // closures. They never record.
+  const applyAdd = useCallback((clip: TimelineClip) => {
     setClips((prev) => {
-      if (prev.some((c) => c.assetId === clipWithDefaults.assetId)) return prev;
-      return [...prev, clipWithDefaults];
+      if (prev.some((c) => c.assetId === clip.assetId)) return prev;
+      return [...prev, clip];
     });
-
-    if (clip.hasAudio === undefined && clipWithDefaults.videoUrl) {
-      probeHasAudio(clipWithDefaults.videoUrl)
-        .then((hasAudio) => {
-          if (hasAudio) return;
-          setClips((prev) =>
-            prev.map((c) =>
-              c.assetId === clipWithDefaults.assetId
-                ? { ...c, hasAudio: false }
-                : c
-            )
-          );
-        })
-        .catch(() => {});
-    }
   }, []);
 
-  const removeClip = useCallback((clipId: string) => {
+  const applyInsertAt = useCallback((clip: TimelineClip, index: number) => {
+    setClips((prev) => {
+      const next = [...prev];
+      const safe = Math.max(0, Math.min(index, next.length));
+      next.splice(safe, 0, clip);
+      return next;
+    });
+  }, []);
+
+  const applyRemove = useCallback((clipId: string) => {
     setClips((prev) => prev.filter((c) => c.id !== clipId));
   }, []);
 
-  const updateClip = useCallback(
+  const applyUpdate = useCallback(
     (clipId: string, updates: Partial<Omit<TimelineClip, "id">>) => {
       setClips((prev) =>
         prev.map((c) => (c.id === clipId ? { ...c, ...updates } : c))
@@ -145,38 +149,53 @@ export function useTimeline(desktopId: string) {
     []
   );
 
-  const splitClip = useCallback((clipId: string, splitTime: number) => {
-    setClips((prev) => {
-      const idx = prev.findIndex((c) => c.id === clipId);
-      if (idx === -1) return prev;
-      const clip = prev[idx];
-      const trimStart = clip.trimStart ?? 0;
-      const trimEnd = clip.trimEnd ?? clip.duration;
-      if (splitTime <= trimStart + 0.1 || splitTime >= trimEnd - 0.1) {
-        return prev;
-      }
+  const applySplit = useCallback(
+    (
+      original: TimelineClip,
+      originalIndex: number,
+      splitTime: number,
+      idA: string,
+      idB: string
+    ) => {
+      setClips((prev) => {
+        const trimStart = original.trimStart ?? 0;
+        const trimEnd = original.trimEnd ?? original.duration;
+        const next = [...prev];
+        const safeIndex = Math.max(0, Math.min(originalIndex, next.length));
+        const targetIndex =
+          next[safeIndex]?.id === original.id
+            ? safeIndex
+            : next.findIndex((c) => c.id === original.id);
+        if (targetIndex === -1) return prev;
+        next.splice(
+          targetIndex,
+          1,
+          { ...original, id: idA, trimStart, trimEnd: splitTime },
+          { ...original, id: idB, trimStart: splitTime, trimEnd }
+        );
+        return next;
+      });
+    },
+    []
+  );
 
-      const t = Date.now();
-      const clipA: TimelineClip = {
-        ...clip,
-        id: `clip-${clip.assetId}-${t}-a`,
-        trimStart,
-        trimEnd: splitTime,
-      };
-      const clipB: TimelineClip = {
-        ...clip,
-        id: `clip-${clip.assetId}-${t}-b`,
-        trimStart: splitTime,
-        trimEnd,
-      };
+  const applyUnsplit = useCallback(
+    (idA: string, idB: string, original: TimelineClip, originalIndex: number) => {
+      setClips((prev) => {
+        const aIdx = prev.findIndex((c) => c.id === idA);
+        const bIdx = prev.findIndex((c) => c.id === idB);
+        if (aIdx === -1 || bIdx === -1) return prev;
+        const next = [...prev];
+        for (const i of [aIdx, bIdx].sort((x, y) => y - x)) next.splice(i, 1);
+        const safeIndex = Math.max(0, Math.min(originalIndex, next.length));
+        next.splice(safeIndex, 0, original);
+        return next;
+      });
+    },
+    []
+  );
 
-      const next = [...prev];
-      next.splice(idx, 1, clipA, clipB);
-      return next;
-    });
-  }, []);
-
-  const reorderClips = useCallback((fromIndex: number, toIndex: number) => {
+  const applyReorder = useCallback((fromIndex: number, toIndex: number) => {
     setClips((prev) => {
       if (fromIndex < 0 || fromIndex >= prev.length) return prev;
       if (toIndex < 0 || toIndex >= prev.length) return prev;
@@ -186,6 +205,210 @@ export function useTimeline(desktopId: string) {
       return next;
     });
   }, []);
+
+  const addClip = useCallback(
+    (clip: TimelineClip) => {
+      // Default hasAudio to true; the async probe below can only downgrade it.
+      // See TimelineClip.hasAudio JSDoc for why false-negatives are avoided.
+      const clipWithDefaults: TimelineClip = {
+        ...clip,
+        hasAudio: clip.hasAudio ?? true,
+      };
+
+      const alreadyPresent = clipsRef.current.some(
+        (c) => c.assetId === clipWithDefaults.assetId
+      );
+
+      applyAdd(clipWithDefaults);
+
+      if (!alreadyPresent) {
+        // Async probes mutate duration / hasAudio after the clip is added.
+        // Refresh the snapshot inside `inverse` so redo restores the
+        // post-probe state, and clear probe tracking so a fresh probe runs
+        // if the in-flight one was discarded by removal.
+        let snapshot = clipWithDefaults;
+        historyRef.current?.record({
+          userId: userIdRef.current ?? "",
+          label: { key: "addTimelineClip" },
+          targetIds: [clipWithDefaults.id],
+          forward: () => {
+            ensureExpanded();
+            applyAdd(snapshot);
+            return { ok: true };
+          },
+          inverse: () => {
+            ensureExpanded();
+            const latest = clipsRef.current.find(
+              (c) => c.id === clipWithDefaults.id
+            );
+            if (latest) snapshot = latest;
+            probedIdsRef.current.delete(clipWithDefaults.id);
+            audioProbedAssetIdsRef.current.delete(clipWithDefaults.assetId);
+            applyRemove(clipWithDefaults.id);
+            return { ok: true };
+          },
+        });
+      }
+
+      if (clip.hasAudio === undefined && clipWithDefaults.videoUrl) {
+        probeHasAudio(clipWithDefaults.videoUrl)
+          .then((hasAudio) => {
+            if (hasAudio) return;
+            setClips((prev) =>
+              prev.map((c) =>
+                c.assetId === clipWithDefaults.assetId
+                  ? { ...c, hasAudio: false }
+                  : c
+              )
+            );
+          })
+          .catch(() => {});
+      }
+    },
+    [applyAdd, applyRemove, ensureExpanded]
+  );
+
+  const removeClip = useCallback(
+    (clipId: string) => {
+      const idx = clipsRef.current.findIndex((c) => c.id === clipId);
+      if (idx === -1) return;
+      const original = clipsRef.current[idx];
+
+      applyRemove(clipId);
+
+      historyRef.current?.record({
+        userId: userIdRef.current ?? "",
+        label: { key: "removeTimelineClip" },
+        targetIds: [clipId],
+        forward: () => {
+          ensureExpanded();
+          applyRemove(clipId);
+          return { ok: true };
+        },
+        inverse: () => {
+          ensureExpanded();
+          applyInsertAt(original, idx);
+          return { ok: true };
+        },
+      });
+    },
+    [applyRemove, applyInsertAt, ensureExpanded]
+  );
+
+  // Live (non-recording) update — used per-frame during trim drag. The
+  // undoable, drag-end counterpart is `commitTrim` below.
+  const updateClip = useCallback(
+    (clipId: string, updates: Partial<Omit<TimelineClip, "id">>) => {
+      applyUpdate(clipId, updates);
+    },
+    [applyUpdate]
+  );
+
+  const commitTrim = useCallback(
+    (
+      clipId: string,
+      prevTrimStart: number,
+      prevTrimEnd: number,
+      nextTrimStart: number,
+      nextTrimEnd: number
+    ) => {
+      if (
+        prevTrimStart === nextTrimStart &&
+        prevTrimEnd === nextTrimEnd
+      ) {
+        return;
+      }
+
+      applyUpdate(clipId, { trimStart: nextTrimStart, trimEnd: nextTrimEnd });
+
+      historyRef.current?.record({
+        userId: userIdRef.current ?? "",
+        label: { key: "trimTimelineClip" },
+        targetIds: [clipId],
+        coalesceKey: `timeline-trim:${clipId}`,
+        forward: () => {
+          ensureExpanded();
+          applyUpdate(clipId, {
+            trimStart: nextTrimStart,
+            trimEnd: nextTrimEnd,
+          });
+          return { ok: true };
+        },
+        inverse: () => {
+          ensureExpanded();
+          applyUpdate(clipId, {
+            trimStart: prevTrimStart,
+            trimEnd: prevTrimEnd,
+          });
+          return { ok: true };
+        },
+      });
+    },
+    [applyUpdate, ensureExpanded]
+  );
+
+  const splitClip = useCallback(
+    (clipId: string, splitTime: number) => {
+      const idx = clipsRef.current.findIndex((c) => c.id === clipId);
+      if (idx === -1) return;
+      const original = clipsRef.current[idx];
+      const trimStart = original.trimStart ?? 0;
+      const trimEnd = original.trimEnd ?? original.duration;
+      if (splitTime <= trimStart + 0.1 || splitTime >= trimEnd - 0.1) return;
+
+      const t = Date.now();
+      const idA = `clip-${original.assetId}-${t}-a`;
+      const idB = `clip-${original.assetId}-${t}-b`;
+
+      applySplit(original, idx, splitTime, idA, idB);
+
+      historyRef.current?.record({
+        userId: userIdRef.current ?? "",
+        label: { key: "splitTimelineClip" },
+        targetIds: [clipId],
+        forward: () => {
+          ensureExpanded();
+          applySplit(original, idx, splitTime, idA, idB);
+          return { ok: true };
+        },
+        inverse: () => {
+          ensureExpanded();
+          applyUnsplit(idA, idB, original, idx);
+          return { ok: true };
+        },
+      });
+    },
+    [applySplit, applyUnsplit, ensureExpanded]
+  );
+
+  const reorderClips = useCallback(
+    (fromIndex: number, toIndex: number) => {
+      if (fromIndex < 0 || fromIndex >= clipsRef.current.length) return;
+      if (toIndex < 0 || toIndex >= clipsRef.current.length) return;
+      if (fromIndex === toIndex) return;
+
+      const movedId = clipsRef.current[fromIndex]?.id;
+
+      applyReorder(fromIndex, toIndex);
+
+      historyRef.current?.record({
+        userId: userIdRef.current ?? "",
+        label: { key: "reorderTimelineClips" },
+        targetIds: movedId ? [movedId] : [],
+        forward: () => {
+          ensureExpanded();
+          applyReorder(fromIndex, toIndex);
+          return { ok: true };
+        },
+        inverse: () => {
+          ensureExpanded();
+          applyReorder(toIndex, fromIndex);
+          return { ok: true };
+        },
+      });
+    },
+    [applyReorder, ensureExpanded]
+  );
 
   const clearTimeline = useCallback(() => {
     setClips([]);
@@ -203,6 +426,7 @@ export function useTimeline(desktopId: string) {
     addClip,
     removeClip,
     updateClip,
+    commitTrim,
     splitClip,
     reorderClips,
     clearTimeline,

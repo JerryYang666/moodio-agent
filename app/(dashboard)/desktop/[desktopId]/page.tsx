@@ -88,8 +88,10 @@ export default function DesktopDetailPage({
     () => new Map()
   );
 
-  // Per-page operation-history instance. Session-scoped and only replays the
-  // local user's own actions, so Ctrl+Z never clobbers collaborators' work.
+  // Single per-page operation-history instance, shared by canvas and
+  // timeline mutations so Ctrl+Z follows one linear timeline of actions.
+  // Session-scoped and only replays the local user's own actions, so
+  // undo never clobbers collaborators' work.
   const history = useOperationHistory();
 
   // Stable ref for the video-sync remote-event handler (defined after the hook below)
@@ -1077,10 +1079,11 @@ export default function DesktopDetailPage({
     addClip: addTimelineClip,
     removeClip: removeTimelineClip,
     updateClip: updateTimelineClip,
+    commitTrim: commitTimelineTrim,
     splitClip: splitTimelineClip,
     reorderClips: reorderTimelineClips,
     clearTimeline,
-  } = useTimeline(desktopId);
+  } = useTimeline(desktopId, history, user?.id);
 
   const handleTimelineClipRemove = useCallback(
     (clipId: string) => {
@@ -1642,6 +1645,7 @@ export default function DesktopDetailPage({
         onReorderClips={reorderTimelineClips}
         onClearTimeline={clearTimeline}
         onUpdateClip={updateTimelineClip}
+        onCommitTrim={commitTimelineTrim}
         onSplitClip={splitTimelineClip}
         desktopId={desktopId}
         onExportTrack={(data) => {

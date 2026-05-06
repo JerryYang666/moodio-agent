@@ -1823,6 +1823,11 @@
     "redone": "已重做：{action}",
     "actions": {
       "addAsset": "新增素材",
+      "addTimelineClip": "新增至時間軸",
+      "removeTimelineClip": "從時間軸移除",
+      "splitTimelineClip": "分割剪輯",
+      "reorderTimelineClips": "重新排序剪輯",
+      "trimTimelineClip": "修剪剪輯",
       "moveAsset": "移動素材",
       "moveAssets": "移動 {count} 個素材",
       "resizeAsset": "調整素材大小",
