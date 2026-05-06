@@ -1823,6 +1823,11 @@
     "redone": "다시 실행됨: {action}",
     "actions": {
       "addAsset": "에셋 추가",
+      "addTimelineClip": "타임라인에 추가",
+      "removeTimelineClip": "타임라인에서 제거",
+      "splitTimelineClip": "클립 분할",
+      "reorderTimelineClips": "클립 순서 변경",
+      "trimTimelineClip": "클립 자르기",
       "moveAsset": "에셋 이동",
       "moveAssets": "에셋 {count}개 이동",
       "resizeAsset": "에셋 크기 조정",

@@ -1823,6 +1823,11 @@
     "redone": "Redone: {action}",
     "actions": {
       "addAsset": "Add asset",
+      "addTimelineClip": "Add timeline clip",
+      "removeTimelineClip": "Remove timeline clip",
+      "splitTimelineClip": "Split clip",
+      "reorderTimelineClips": "Reorder clips",
+      "trimTimelineClip": "Trim clip",
       "moveAsset": "Move asset",
       "moveAssets": "Move {count} assets",
       "resizeAsset": "Resize asset",
