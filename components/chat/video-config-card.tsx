@@ -167,9 +167,11 @@ export default function VideoConfigCard({
     [visibleParams]
   );
   const klingElementVariant =
-    modelConfig?.id === "kling-o3-reference" || modelConfig?.id === "kling-v3-omni"
+    modelConfig?.id === "kling-o3-reference"
       ? "o3-reference"
-      : "v3";
+      : modelConfig?.id === "kling-v3-omni"
+        ? "ksyun"
+        : "v3";
   const klingElementsInvalid = useMemo(() => {
     if (!hasKlingElements) return false;
     return !areKlingElementsValid(

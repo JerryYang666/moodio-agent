@@ -335,10 +335,11 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
   );
 
   const klingElementVariant =
-    menuState.videoModelId === "kling-o3-reference" ||
-    menuState.videoModelId === "kling-v3-omni"
+    menuState.videoModelId === "kling-o3-reference"
       ? "o3-reference"
-      : "v3";
+      : menuState.videoModelId === "kling-v3-omni"
+        ? "ksyun"
+        : "v3";
 
   const klingElementsInvalid = useMemo(() => {
     if (!supportsElements) return false;

@@ -17,8 +17,11 @@ const MAX_IMAGES = 4;
  * - "o3-reference"  — Kling O3 reference-to-video style: {name, 2-4 images where image #1 is the frontal
  *                     view and the rest are style references}, rewritten to @ElementN. Description is not
  *                     sent to the API and is not required.
+ * - "ksyun"         — Kingsoft Cloud kling-v3-omni style: user-provided {name, description, 2-4 images
+ *                     where image #1 is the frontal view}, referenced as @name (rewritten to <<<element_N>>>
+ *                     by the provider adapter).
  */
-export type KlingElementVariant = "v3" | "o3-reference";
+export type KlingElementVariant = "v3" | "o3-reference" | "ksyun";
 
 /** A Kling element is valid when its required fields (per variant) and image count are all set. */
 export function isKlingElementValid(
@@ -28,7 +31,7 @@ export function isKlingElementValid(
   if (!el) return false;
   const imageCount = (el.element_input_ids ?? []).length;
   if (imageCount < MIN_IMAGES || imageCount > MAX_IMAGES) return false;
-  if (variant === "v3") {
+  if (variant === "v3" || variant === "ksyun") {
     if (el.name.trim().length === 0) return false;
     if (el.description.trim().length === 0) return false;
   }
@@ -71,6 +74,9 @@ export function KlingElementEditor({
   variant = "v3",
 }: KlingElementEditorProps) {
   const isO3Reference = variant === "o3-reference";
+  const isKsyun = variant === "ksyun";
+  const hasFrontalImage = isO3Reference || isKsyun;
+  const showNameDescription = !isO3Reference;
   const t = useTranslations("chat.klingElement");
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -185,9 +191,9 @@ export function KlingElementEditor({
         {elements.map((el, index) => {
           const isExpanded = expandedIndex === index;
           const imageCount = (el.element_input_ids ?? []).length;
-          const nameInvalid = !isO3Reference && el.name.trim().length === 0;
+          const nameInvalid = showNameDescription && el.name.trim().length === 0;
           const descriptionInvalid =
-            !isO3Reference && el.description.trim().length === 0;
+            showNameDescription && el.description.trim().length === 0;
           const imagesInvalid = imageCount < MIN_IMAGES;
           const isValid = isKlingElementValid(el, variant);
 
@@ -302,7 +308,7 @@ export function KlingElementEditor({
 
               {isExpanded && (
                 <div className="px-2.5 pb-2.5 space-y-2 border-t border-divider pt-2">
-                  {!isO3Reference && (
+                  {showNameDescription && (
                     <Input
                       size="sm"
                       label={t("nameLabel")}
@@ -321,7 +327,7 @@ export function KlingElementEditor({
                       classNames={{ input: "text-xs", label: "text-xs" }}
                     />
                   )}
-                  {!isO3Reference && (
+                  {showNameDescription && (
                     <Input
                       size="sm"
                       label={t("descriptionLabel")}
@@ -358,7 +364,7 @@ export function KlingElementEditor({
                         </Button>
                       )}
                     </div>
-                    {isO3Reference && (
+                    {hasFrontalImage && (
                       <p className="text-[10px] text-default-400">
                         {t("frontalHint")}
                       </p>
@@ -371,7 +377,7 @@ export function KlingElementEditor({
                     <div className="flex flex-wrap gap-1.5">
                       {(el.element_input_ids ?? []).map((imageId, imgIdx) => {
                         const displayUrl = resolveImageUrl?.(imageId);
-                        const isFrontal = isO3Reference && imgIdx === 0;
+                        const isFrontal = hasFrontalImage && imgIdx === 0;
                         return (
                           <div
                             key={imgIdx}
