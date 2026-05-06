@@ -166,25 +166,46 @@ async function createElement(input: CreateElementInput): Promise<number> {
     reference_type: "image_refer",
     element_image_list: {
       frontal_image: frontal,
-      refer_images: refs.slice(0, 3),
+      refer_images: refs.slice(0, 3).map((image_url) => ({ image_url })),
     },
   };
 
-  const res = await fetch(
-    `${KSYUN_API_BASE}/v1/general/advanced-custom-elements`,
-    {
-      method: "POST",
-      headers: ksyunAuthHeaders(),
-      body: JSON.stringify(body),
-    }
+  const url = `${KSYUN_API_BASE}/v1/general/advanced-custom-elements`;
+  const bodyJson = JSON.stringify(body);
+  console.log(
+    `[ksyun CreateElement] POST ${url}\n` +
+      `  headers: ${JSON.stringify({
+        "Content-Type": "application/json",
+        Authorization: "Bearer <redacted>",
+      })}\n` +
+      `  body: ${bodyJson}`
+  );
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: ksyunAuthHeaders(),
+    body: bodyJson,
+  });
+
+  const rawText = await res.text();
+  console.log(
+    `[ksyun CreateElement] Response ${res.status}:`,
+    rawText
   );
 
   if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`ksyun createElement failed (${res.status}): ${text}`);
+    throw new Error(`ksyun createElement failed (${res.status}): ${rawText}`);
   }
 
-  const json = (await res.json()) as KsyunTaskEnvelope<KsyunTaskData>;
+  let json: KsyunTaskEnvelope<KsyunTaskData>;
+  try {
+    json = JSON.parse(rawText) as KsyunTaskEnvelope<KsyunTaskData>;
+  } catch (e) {
+    throw new Error(
+      `ksyun createElement returned non-JSON: ${rawText.slice(0, 500)}`
+    );
+  }
+
   if (json.code !== 0 || !json.data?.task_id) {
     throw new Error(
       `ksyun createElement error (code ${json.code}): ${json.message}`
