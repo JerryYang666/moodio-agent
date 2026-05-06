@@ -1965,7 +1965,6 @@ export const VIDEO_MODELS: VideoModelConfig[] = [
   klingO1Pro,
   klingO3Pro,
   klingO3Reference,
-  klingV3Omni,
   klingV3Pro,
   veo31,
   veo31FirstLastFrame,
