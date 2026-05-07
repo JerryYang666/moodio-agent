@@ -208,6 +208,7 @@ function applyKlingTransforms(params: Record<string, any>): Record<string, any> 
     delete out.start_image_url;
   }
   if (out.mode === undefined) out.mode = "pro";
+  if (out.mode === "4k") out.mode = "4K";
   if (out.multi_shots === undefined) out.multi_shots = false;
   return out;
 }

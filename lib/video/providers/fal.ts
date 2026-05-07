@@ -140,7 +140,8 @@ function resolveFalEndpoint(
       }
     }
 
-    const tier = mode === "pro" ? "pro" : "standard";
+    const tier =
+      mode === "pro" ? "pro" : mode === "4k" ? "4k" : "standard";
     return {
       endpoint: `fal-ai/kling-video/o3/${tier}/reference-to-video`,
       input: rest,
