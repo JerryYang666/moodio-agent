@@ -2598,13 +2598,16 @@ export default function ChatInterface({
       // chat-level "Pick from library" entry. Append as a new kling_elements
       // entry tagged with libraryElementId so the backend hydrates canonical
       // fields and persists any KSyun element_id minted during submit.
+      // Don't toggle the picker here — `handleAssetClick` in
+      // AssetPickerModal calls `onOpenChange()` (which is `toggleAssetPicker`)
+      // right after `onSelect`, so closing it ourselves would race with the
+      // toggle and end up re-opening the modal.
       if (
         assetPickerMode === "libraryElement" &&
         asset.assetType === "element" &&
         asset.elementDetails
       ) {
         appendLibraryElement(asset);
-        setIsAssetPickerOpen(false);
         return;
       }
 
