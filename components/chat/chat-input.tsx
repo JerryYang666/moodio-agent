@@ -38,6 +38,8 @@ import { PendingVideo, MAX_PENDING_VIDEOS } from "./pending-video-types";
 import { PendingAudio } from "./pending-audio-types";
 import clsx from "clsx";
 import { ASSET_DRAG_MIME } from "./asset-dnd";
+import { AssetDropTarget } from "./asset-drop-target";
+import type { AssetDropPayload } from "@/hooks/use-asset-drop-zone";
 import {
   MentionTextbox,
   MentionTextboxRef,
@@ -165,6 +167,14 @@ interface ChatInputProps {
   mediaRefVideoDurations?: Record<string, number>;
   /** Whether the combined reference-video duration exceeds the 15s cap */
   mediaRefVideoOverCap?: boolean;
+  /** Drop on the video first-frame (source) slot. Replaces pendingImages[0]. */
+  onDropOnSourceFrame?: (payload: AssetDropPayload) => void;
+  /** Drop on the video last-frame (end) slot. Replaces pendingImages[1]. */
+  onDropOnEndFrame?: (payload: AssetDropPayload) => void;
+  /** Drop on a specific asset-param slot. */
+  onDropOnAssetParam?: (paramName: string, payload: AssetDropPayload) => void;
+  /** Drop on the Seedance media-references zone. */
+  onDropOnMediaReference?: (payload: AssetDropPayload) => void;
   /**
    * If provided, the file-drop overlay is portaled into this element and
    * scoped to fill it (absolute inset-0) instead of covering the full viewport.
@@ -240,6 +250,10 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
   resolveMediaRefAudioUrl,
   mediaRefVideoDurations,
   mediaRefVideoOverCap = false,
+  onDropOnSourceFrame,
+  onDropOnEndFrame,
+  onDropOnAssetParam,
+  onDropOnMediaReference,
   dropOverlayContainer = null,
 }, ref) {
   const t = useTranslations();
@@ -785,7 +799,11 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
                 <div className="flex gap-3 mb-2">
                   {/* Source frame slot - only when model has imageParams */}
                   {videoModelHasImageParams && (
-                    <>
+                    <AssetDropTarget
+                      onAssetDrop={(payload) => onDropOnSourceFrame?.(payload)}
+                      disabled={!onDropOnSourceFrame}
+                      className="w-fit"
+                    >
                   {pendingImages[0] ? (
                     <div className="relative w-fit group">
                       <div className="h-20 w-20 rounded-lg border border-divider overflow-hidden relative">
@@ -847,12 +865,16 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
                       </span>
                     </button>
                   )}
-                    </>
+                    </AssetDropTarget>
                   )}
 
                   {/* End frame slot - only when model supports it */}
                   {videoModelSupportsEndImage && (
-                    <>
+                    <AssetDropTarget
+                      onAssetDrop={(payload) => onDropOnEndFrame?.(payload)}
+                      disabled={!onDropOnEndFrame}
+                      className="w-fit"
+                    >
                       {pendingImages[1] ? (
                         <div className="relative w-fit group">
                           <div className="h-20 w-20 rounded-lg border border-divider overflow-hidden relative">
@@ -914,14 +936,14 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
                           </span>
                         </button>
                       )}
-                    </>
+                    </AssetDropTarget>
                   )}
 
                   {/* Asset param slots for type: "asset" params */}
                   {assetParamSlots.map((slot) => {
                     const val = assetParamValues[slot.name];
-                    return val ? (
-                      <div key={slot.name} className="relative w-fit group">
+                    const inner = val ? (
+                      <div className="relative w-fit group">
                         <div className="h-20 w-20 rounded-lg border border-divider overflow-hidden relative">
                           <img
                             src={val.displayUrl}
@@ -946,7 +968,6 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
                       </div>
                     ) : (
                       <button
-                        key={slot.name}
                         onClick={() => onOpenAssetParamPicker?.(slot.name)}
                         className="h-20 w-20 rounded-lg border-2 border-dashed border-default-300 hover:border-primary hover:bg-primary/5 flex flex-col items-center justify-center transition-colors gap-1"
                       >
@@ -958,6 +979,18 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
                           <span className="text-[8px] text-default-300">{t("common.optional")}</span>
                         )}
                       </button>
+                    );
+                    return (
+                      <AssetDropTarget
+                        key={slot.name}
+                        onAssetDrop={(payload) =>
+                          onDropOnAssetParam?.(slot.name, payload)
+                        }
+                        disabled={!onDropOnAssetParam}
+                        className="w-fit"
+                      >
+                        {inner}
+                      </AssetDropTarget>
                     );
                   })}
                 </div>
@@ -1748,7 +1781,12 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
                 transition={{ duration: 0.2 }}
                 className="overflow-hidden"
               >
-                <div className="px-2 py-1.5 border-t border-divider">
+                <AssetDropTarget
+                  onAssetDrop={(payload) => onDropOnMediaReference?.(payload)}
+                  disabled={!onDropOnMediaReference}
+                  className="px-2 py-1.5 border-t border-divider"
+                  activeClassName="ring-2 ring-inset ring-primary"
+                >
                   <SeedanceReferenceEditor
                     references={(menuState.videoParams?.media_references as MediaReference[]) || []}
                     onChange={(refs) =>
@@ -1773,7 +1811,7 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
                         ? { maxImages: 4, maxVideos: 1, maxAudios: 0 }
                         : {})}
                   />
-                </div>
+                </AssetDropTarget>
               </motion.div>
             )}
           </AnimatePresence>

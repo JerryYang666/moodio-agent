@@ -26,6 +26,7 @@ import ImageDetailModal, { ImageInfo } from "./image-detail-modal";
 import ImageDrawingModal from "./image-drawing-modal";
 import ChatMessage from "./chat-message";
 import ChatInput, { ChatInputRef, type AssetParamValue } from "./chat-input";
+import type { AssetDropPayload } from "@/hooks/use-asset-drop-zone";
 import ParallelMessage from "./parallel-message";
 import AssetPickerModal, { type AssetSummary } from "./asset-picker-modal";
 import ElementEditorController from "./element-editor-controller";
@@ -2495,6 +2496,236 @@ export default function ChatInterface({
       }
     },
     [addAssetImage, pendingAudios, t]
+  );
+
+  // Fetch the full asset record for a drop payload (which only carries an
+  // assetId reliably). Returns the enriched API response or null on failure.
+  const fetchAssetForDrop = useCallback(
+    async (
+      payload: AssetDropPayload
+    ): Promise<{
+      id: string;
+      assetType: string;
+      imageId: string;
+      assetId: string;
+      imageUrl: string;
+      videoUrl?: string;
+      audioUrl?: string;
+      generationDetails?: { title?: string };
+    } | null> => {
+      if (!payload?.assetId) return null;
+      try {
+        const res = await fetch(`/api/assets/${payload.assetId}`);
+        if (!res.ok) return null;
+        const data = await res.json();
+        return data.asset ?? null;
+      } catch (e) {
+        console.error("Failed to load dropped asset", e);
+        return null;
+      }
+    },
+    []
+  );
+
+  const isImageType = (assetType: string) =>
+    assetType === "image" || assetType === "public_image";
+
+  const placePendingImageAt = useCallback(
+    (index: 0 | 1, image: PendingImage) => {
+      setPendingImages((prev) => {
+        const next = [...prev];
+        if (next.length <= index) {
+          next.push(image);
+        } else {
+          // Revoke any blob preview URL on the slot we're replacing.
+          const replaced = next[index];
+          if (replaced?.localPreviewUrl) {
+            URL.revokeObjectURL(replaced.localPreviewUrl);
+          }
+          next[index] = image;
+        }
+        return next;
+      });
+      setSuggestedImages([]);
+    },
+    []
+  );
+
+  const handleDropOnSourceFrame = useCallback(
+    async (payload: AssetDropPayload) => {
+      const asset = await fetchAssetForDrop(payload);
+      if (!asset) return;
+      if (!isImageType(asset.assetType)) {
+        addToast({ title: t("chat.dropSlotImageOnly"), color: "warning" });
+        return;
+      }
+      placePendingImageAt(0, {
+        imageId: asset.imageId,
+        url: asset.imageUrl,
+        source: "asset",
+        title: asset.generationDetails?.title || t("chat.selectedAsset"),
+      });
+    },
+    [fetchAssetForDrop, placePendingImageAt, t]
+  );
+
+  const handleDropOnEndFrame = useCallback(
+    async (payload: AssetDropPayload) => {
+      const asset = await fetchAssetForDrop(payload);
+      if (!asset) return;
+      if (!isImageType(asset.assetType)) {
+        addToast({ title: t("chat.dropSlotImageOnly"), color: "warning" });
+        return;
+      }
+      placePendingImageAt(1, {
+        imageId: asset.imageId,
+        url: asset.imageUrl,
+        source: "asset",
+        title: asset.generationDetails?.title || t("chat.selectedAsset"),
+      });
+    },
+    [fetchAssetForDrop, placePendingImageAt, t]
+  );
+
+  const handleDropOnAssetParam = useCallback(
+    async (paramName: string, payload: AssetDropPayload) => {
+      const slot = assetParamSlots.find((s) => s.name === paramName);
+      const accept: ("image" | "video")[] = slot?.acceptTypes ?? ["image", "video"];
+      const asset = await fetchAssetForDrop(payload);
+      if (!asset) return;
+      const isImage = isImageType(asset.assetType);
+      const isVideo = asset.assetType === "video";
+      if (isImage && !accept.includes("image")) {
+        addToast({ title: t("chat.dropSlotTypeNotSupported"), color: "warning" });
+        return;
+      }
+      if (isVideo && !accept.includes("video")) {
+        addToast({ title: t("chat.dropSlotVideoNotSupported"), color: "warning" });
+        return;
+      }
+      if (!isImage && !isVideo) {
+        addToast({ title: t("chat.dropSlotTypeNotSupported"), color: "warning" });
+        return;
+      }
+      const displayUrl = isVideo
+        ? asset.videoUrl || asset.imageUrl
+        : asset.imageUrl;
+      setAssetParamValues((prev) => ({
+        ...prev,
+        [paramName]: { imageId: asset.imageId, displayUrl },
+      }));
+    },
+    [assetParamSlots, fetchAssetForDrop, t]
+  );
+
+  const handleDropOnMediaReference = useCallback(
+    async (payload: AssetDropPayload) => {
+      const asset = await fetchAssetForDrop(payload);
+      if (!asset) return;
+
+      // Mirror the per-model caps applied in chat-input's
+      // SeedanceReferenceEditor render. Default Seedance maxes (9/3/3) match
+      // the editor's MAX_* constants when no override is in play.
+      const modelId = menuState.videoModelId;
+      const isKlingO3 = modelId === "kling-o3-reference";
+      const isKlingV3Omni = modelId === "kling-v3-omni";
+      const maxImages = isKlingO3 || isKlingV3Omni ? 4 : 9;
+      const maxVideos = isKlingO3 ? 0 : isKlingV3Omni ? 1 : 3;
+      const maxAudios = isKlingO3 || isKlingV3Omni ? 0 : 3;
+
+      const refs = (menuState.videoParams?.media_references as MediaReference[]) || [];
+      const counts = {
+        image: refs.filter((r) => r.type === "image").length,
+        video: refs.filter((r) => r.type === "video").length,
+        audio: refs.filter((r) => r.type === "audio").length,
+      };
+
+      if (isImageType(asset.assetType)) {
+        if (counts.image >= maxImages) {
+          addToast({
+            title: t("chat.maxImagesReached", { max: maxImages }),
+            color: "warning",
+          });
+          return;
+        }
+        const ref: MediaReference = { type: "image", id: asset.imageId };
+        setMenuState((prev) => ({
+          ...prev,
+          videoParams: {
+            ...prev.videoParams,
+            media_references: [
+              ...((prev.videoParams?.media_references as MediaReference[]) || []),
+              ref,
+            ],
+          },
+        }));
+        setMediaRefUrls((prev) => ({ ...prev, [asset.imageId]: asset.imageUrl }));
+        return;
+      }
+
+      if (asset.assetType === "video") {
+        if (maxVideos === 0) {
+          addToast({ title: t("chat.dropSlotVideoNotSupported"), color: "warning" });
+          return;
+        }
+        if (counts.video >= maxVideos) {
+          addToast({
+            title: t("chat.maxVideosReached", { max: maxVideos }),
+            color: "warning",
+          });
+          return;
+        }
+        const videoId = asset.assetId || asset.imageId;
+        const videoUrl = asset.videoUrl || asset.imageUrl;
+        const ref: MediaReference = { type: "video", id: videoId };
+        setMenuState((prev) => ({
+          ...prev,
+          videoParams: {
+            ...prev.videoParams,
+            media_references: [
+              ...((prev.videoParams?.media_references as MediaReference[]) || []),
+              ref,
+            ],
+          },
+        }));
+        setMediaRefUrls((prev) => ({ ...prev, [videoId]: videoUrl }));
+        probeVideoDurationFromUrl(videoUrl).then((d) =>
+          setMediaRefVideoDurations((prev) => ({ ...prev, [videoId]: d }))
+        );
+        return;
+      }
+
+      if (asset.assetType === "audio") {
+        if (maxAudios === 0) {
+          addToast({ title: t("chat.dropSlotAudioNotSupported"), color: "warning" });
+          return;
+        }
+        if (counts.audio >= maxAudios) {
+          addToast({
+            title: t("chat.maxAudiosReached", { max: maxAudios }),
+            color: "warning",
+          });
+          return;
+        }
+        const audioId = asset.assetId || asset.imageId;
+        const ref: MediaReference = { type: "audio", id: audioId };
+        setMenuState((prev) => ({
+          ...prev,
+          videoParams: {
+            ...prev.videoParams,
+            media_references: [
+              ...((prev.videoParams?.media_references as MediaReference[]) || []),
+              ref,
+            ],
+          },
+        }));
+        setMediaRefUrls((prev) => ({ ...prev, [audioId]: asset.audioUrl || "" }));
+        return;
+      }
+
+      addToast({ title: t("chat.dropSlotTypeNotSupported"), color: "warning" });
+    },
+    [fetchAssetForDrop, menuState.videoModelId, menuState.videoParams?.media_references, t]
   );
 
   const handleAssetPicked = useCallback(
@@ -5359,6 +5590,10 @@ export default function ChatInterface({
           onOpenAssetParamPicker={openAssetParamPicker}
           onClearAssetParam={clearAssetParam}
           isAssetPickerOpen={isAssetPickerOpen}
+          onDropOnSourceFrame={handleDropOnSourceFrame}
+          onDropOnEndFrame={handleDropOnEndFrame}
+          onDropOnAssetParam={handleDropOnAssetParam}
+          onDropOnMediaReference={handleDropOnMediaReference}
           dropOverlayContainer={dropOverlayContainer}
         />
       )}
