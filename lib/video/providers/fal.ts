@@ -56,10 +56,16 @@ function normalizeFalKlingElements(
       if (typeof el?.description === "string" && el.description) {
         out.description = el.description;
       }
-      if (typeof el?.videoUrl === "string" && el.videoUrl) {
+      const hasVideo =
+        typeof el?.videoUrl === "string" && el.videoUrl.length > 0;
+      if (hasVideo) {
         out.video_url = el.videoUrl;
       }
-      if (typeof el?.voiceId === "string" && el.voiceId) {
+      // FAL constraint: "Voice binding is only supported for video elements,
+      // and cannot be used with image elements." Sending voice_id on an
+      // image-only element returns 422. Drop voice_id silently when there's
+      // no video on the element — the rest of the element is still valid.
+      if (hasVideo && typeof el?.voiceId === "string" && el.voiceId) {
         out.voice_id = el.voiceId;
       }
       return out;
