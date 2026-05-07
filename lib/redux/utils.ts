@@ -19,7 +19,11 @@ export const buildApiQueryParams = (
 ): URLSearchParams => {
   const params = new URLSearchParams();
 
-  if (queryState.textSearch.trim()) {
+  // Image search takes precedence over text search. The backend ignores
+  // text_search if both are present, but we omit it for cleanliness.
+  if (queryState.imageSearchUploadId) {
+    params.append("upload", queryState.imageSearchUploadId);
+  } else if (queryState.textSearch.trim()) {
     params.append("text_search", queryState.textSearch.trim());
   }
 

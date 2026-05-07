@@ -10,6 +10,8 @@ const initialState: QueryState = {
   isAigc: undefined,
   cursor: null,
   searchId: null,
+  imageSearchUploadId: null,
+  imageSearchPreviewUrl: null,
 };
 
 const querySlice = createSlice({
@@ -18,7 +20,27 @@ const querySlice = createSlice({
   reducers: {
     setTextSearch: (state, action: PayloadAction<string>) => {
       state.textSearch = action.payload;
+      // Text search clears any active image search
+      state.imageSearchUploadId = null;
+      state.imageSearchPreviewUrl = null;
       // Reset pagination when search changes
+      state.cursor = null;
+      state.searchId = null;
+    },
+    setImageSearch: (
+      state,
+      action: PayloadAction<{ uploadId: string; previewUrl: string | null }>
+    ) => {
+      state.imageSearchUploadId = action.payload.uploadId;
+      state.imageSearchPreviewUrl = action.payload.previewUrl;
+      // Image search supersedes text search
+      state.textSearch = "";
+      state.cursor = null;
+      state.searchId = null;
+    },
+    clearImageSearch: (state) => {
+      state.imageSearchUploadId = null;
+      state.imageSearchPreviewUrl = null;
       state.cursor = null;
       state.searchId = null;
     },
@@ -95,12 +117,16 @@ const querySlice = createSlice({
       state.isAigc = undefined;
       state.cursor = null;
       state.searchId = null;
+      state.imageSearchUploadId = null;
+      state.imageSearchPreviewUrl = null;
     },
   },
 });
 
 export const {
   setTextSearch,
+  setImageSearch,
+  clearImageSearch,
   setSelectedFolders,
   setSelectedFilters,
   setContentTypes,

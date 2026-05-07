@@ -98,6 +98,40 @@ export interface VideoDetail {
   labels: ContentLabel[];
 }
 
+export interface ImageUploadResponse {
+  upload_id: string;
+  mime_type: string;
+}
+
+export interface SimilarityScore {
+  aggregate: number;
+  components: Record<string, number>;
+  weights: Record<string, number>;
+}
+
+export interface SimilarContentItem {
+  id: number;
+  content_uuid: string;
+  storage_key: string;
+  width: number;
+  height: number;
+  content_type: string;
+  is_aigc: boolean;
+  similarity_score?: SimilarityScore;
+}
+
+export interface SimilarContentResponse {
+  content: SimilarContentItem[];
+  total_content: number;
+  strategy_name?: string;
+  anchor?: {
+    id: number;
+    content_type: string;
+    used_caption_types: string[];
+    missing_caption_types: string[];
+  };
+}
+
 export const api = createApi({
   reducerPath: "api",
   baseQuery: createBaseQueryWithReauth(API_BASE_URL),
@@ -137,11 +171,13 @@ export const api = createApi({
       // This ensures same intent = same cache entry, regardless of pagination state
       serializeQueryArgs: ({ queryArgs }) => {
         const { queryState } = queryArgs;
-        const { textSearch, selectedFolders, selectedFilters, contentTypes, isAigc } = queryState;
+        const { textSearch, selectedFolders, selectedFilters, contentTypes, isAigc, imageSearchUploadId } = queryState;
         // Include contentTypes and isAigc in cache key since they affect results
         // Sort contentTypes array for consistent cache key regardless of selection order
         const sortedContentTypes = [...contentTypes].sort().join(",");
-        return `videos-${textSearch}-${selectedFolders.join(",")}-${selectedFilters.join(",")}-${sortedContentTypes}-${isAigc ?? ""}`;
+        // imageSearchUploadId takes precedence over textSearch for cache differentiation
+        const intentKey = imageSearchUploadId ? `img:${imageSearchUploadId}` : `txt:${textSearch}`;
+        return `videos-${intentKey}-${selectedFolders.join(",")}-${selectedFilters.join(",")}-${sortedContentTypes}-${isAigc ?? ""}`;
       },
 
       // Merge pages for infinite scroll functionality
@@ -182,6 +218,7 @@ export const api = createApi({
         // Intent changed
         if (
           cur?.textSearch !== prev?.textSearch ||
+          cur?.imageSearchUploadId !== prev?.imageSearchUploadId ||
           JSON.stringify(cur?.selectedFolders) !== JSON.stringify(prev?.selectedFolders) ||
           JSON.stringify(cur?.selectedFilters) !== JSON.stringify(prev?.selectedFilters) ||
           JSON.stringify([...(cur?.contentTypes || [])].sort()) !== JSON.stringify([...(prev?.contentTypes || [])].sort()) ||
@@ -236,6 +273,23 @@ export const api = createApi({
       keepUnusedDataFor: 1800,
     }),
 
+    uploadImageSearch: builder.mutation<ImageUploadResponse, File>({
+      query: (file) => {
+        const formData = new FormData();
+        formData.append("image", file);
+        return {
+          url: "/upload",
+          method: "POST",
+          body: formData,
+        };
+      },
+    }),
+
+    getSimilarContent: builder.query<SimilarContentResponse, number>({
+      query: (contentId) => `/content/${contentId}/similar`,
+      keepUnusedDataFor: 60,
+    }),
+
     getInspiration: builder.query<{ term: string }, string>({
       queryFn: async (locale) => {
         try {
@@ -283,4 +337,6 @@ export const {
   useGetVideoDetailQuery,
   useGetPropertiesQuery,
   useGetInspirationQuery,
+  useUploadImageSearchMutation,
+  useGetSimilarContentQuery,
 } = api;
