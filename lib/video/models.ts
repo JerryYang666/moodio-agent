@@ -1088,7 +1088,7 @@ const klingO3Reference: VideoModelConfig = {
   id: "kling-o3-reference",
   name: "Kling O3 Reference-to-Video",
   description:
-    "Reference-to-video with up to 4 image refs (@Image1..@Image4), optional start/end frames, and Kling elements. std and pro quality tiers.",
+    "Reference-to-video with up to 4 image refs (@Image1..@Image4), optional start/end frames, and Kling elements. std, pro, and 4k quality tiers.",
   providers: [
     {
       provider: "fal",
@@ -1112,9 +1112,9 @@ const klingO3Reference: VideoModelConfig = {
       type: "enum",
       required: false,
       default: "std",
-      options: ["std", "pro"],
+      options: ["std", "pro", "4k"],
       description:
-        "Quality tier. std is cheaper and faster; pro is higher quality at higher cost. Selects the FAL endpoint.",
+        "Quality tier. std is cheaper and faster; pro is higher quality at higher cost; 4k outputs native 4K resolution. Selects the FAL endpoint.",
     },
     {
       name: "aspect_ratio",
@@ -1416,9 +1416,9 @@ const klingV3Pro: VideoModelConfig = {
       type: "enum",
       required: false,
       default: "pro",
-      options: ["std", "pro"],
+      options: ["std", "pro", "4k"],
       description:
-        "Generation mode. std has standard resolution, pro has higher resolution",
+        "Generation mode. std has standard resolution, pro has higher resolution, 4k outputs native 4K resolution",
     },
     {
       name: "negative_prompt",
@@ -2015,6 +2015,7 @@ export const LEGACY_MODEL_ID_MAP: Record<string, string> = {
   "fal-ai/kling-video/o3/pro/image-to-video": "kling-o3-pro",
   "fal-ai/kling-video/o3/standard/reference-to-video": "kling-o3-reference",
   "fal-ai/kling-video/o3/pro/reference-to-video": "kling-o3-reference",
+  "fal-ai/kling-video/o3/4k/reference-to-video": "kling-o3-reference",
   "fal-ai/kling-video/v3/pro/image-to-video": "kling-v3-pro",
   "fal-ai/veo3.1/image-to-video": "veo-3.1",
   "fal-ai/veo3.1/first-last-frame-to-video": "veo-3.1-first-last-frame",
