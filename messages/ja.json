@@ -362,6 +362,7 @@
     "klingElement": {
       "header": "要素 ({count}/{max})",
       "addButton": "要素を追加",
+      "pickFromLibrary": "ライブラリ",
       "emptyHint": "任意：再利用できる要素（キャラクター・物体・スタイル）を最大 {max} 個まで追加し、プロンプト内で @名前 として参照できます。最初／最後のフレーム画像と併用できます。",
       "defaultName": "要素 {index}",
       "imageCount": "{count} 枚",
@@ -421,7 +422,8 @@
       "saveFailed": "エレメントの保存に失敗しました",
       "created": "エレメントを作成しました",
       "updated": "エレメントを更新しました",
-      "uploadFromLibrary": "先にライブラリへアップロードしてから選択してください"
+      "uploadFromLibrary": "先にライブラリへアップロードしてから選択してください",
+      "createNew": "新しい要素を作成"
     },
     "imageError": {
       "contentPolicyViolation": "画像がブロックされました：プロンプトまたは参照画像がコンテンツポリシーに違反している可能性があります。内容を修正して再度お試しください。",

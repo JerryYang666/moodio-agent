@@ -130,6 +130,13 @@ interface ChatInputProps {
   onPickElementImages?: (elementIndex: number, maxImages: number) => void;
   /** Resolve an element image ID to a display URL. */
   resolveElementImageUrl?: (imageId: string) => string | undefined;
+  /**
+   * Opens the asset picker filtered to library elements (with a "Create new"
+   * CTA). When the user picks/creates one, the parent appends a new
+   * kling_elements entry with `libraryElementId` set so the backend can
+   * hydrate canonical fields at submit time.
+   */
+  onPickLibraryElement?: () => void;
   /** Callback when the input container height changes */
   onHeightChange?: (height: number) => void;
   /** Asset param slots for type: "asset" video model params (rendered in Video Frames Area) */
@@ -218,6 +225,7 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
   videoModelParams = [],
   onPickElementImages,
   resolveElementImageUrl,
+  onPickLibraryElement,
   onHeightChange,
   assetParamSlots = [],
   assetParamValues = {},
@@ -1722,6 +1730,7 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
                     isAssetPickerOpen={isAssetPickerOpen}
                     compact
                     variant={klingElementVariant}
+                    onPickFromLibrary={onPickLibraryElement}
                   />
                 </div>
               </motion.div>

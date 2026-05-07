@@ -27,6 +27,13 @@ export interface KlingElement {
   name: string;
   description: string;
   element_input_ids: string[];
+  /**
+   * When set, this entry was sourced from a library element (collection_images
+   * row with assetType="element"). The backend hydrates the row at submit time
+   * so adapters get the canonical name/description/imageIds/videoId/voiceId/
+   * ksyunElementId, and so KSyun can write its element_id back to the library.
+   */
+  libraryElementId?: string;
 }
 
 export interface MediaReference {
@@ -60,6 +67,19 @@ export interface ElementAsset {
   voiceId?: string;
   /** Voice provider — kept open for future non-FAL voices. Defaults to "fal". */
   voiceProvider?: "fal";
+  /**
+   * Numeric element_id minted by Kingsoft Cloud's `/v1/general/advanced-custom-elements`
+   * endpoint for KSyun's kling-v3-omni model. Persisted so subsequent generations
+   * skip the (slow) create-and-poll round trip. Invalidated when the element's
+   * source images change (see ksyunSourceFingerprint).
+   */
+  ksyunElementId?: number;
+  /**
+   * sha1 of the imageIds joined with newlines, captured at the time
+   * ksyunElementId was minted. If the current imageIds hash to a different
+   * value, the stored ksyunElementId is stale and must be re-created.
+   */
+  ksyunSourceFingerprint?: string;
 }
 
 export type AssetAcceptType = "image" | "video" | "audio" | "element";
@@ -1317,11 +1337,11 @@ const klingV3Pro: VideoModelConfig = {
     {
       provider: "fal",
       providerModelId: "fal-ai/kling-video/v3/pro/image-to-video",
+      paramMapping: { kling_elements: "elements" },
       paramOverrides: {
         mode: { status: "disabled" },
         multi_shots: { status: "disabled" },
         multi_prompt: { status: "disabled" },
-        kling_elements: { status: "disabled" },
       },
     },
     {

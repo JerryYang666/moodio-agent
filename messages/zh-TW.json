@@ -362,6 +362,7 @@
     "klingElement": {
       "header": "元素 ({count}/{max})",
       "addButton": "新增元素",
+      "pickFromLibrary": "素材庫",
       "emptyHint": "選用：最多新增 {max} 個可重複使用的元素（角色、物件或風格），並在提示詞中以 @名稱 引用它們。可與首幀／尾幀圖片同時使用。",
       "defaultName": "元素 {index}",
       "imageCount": "{count} 張圖片",
@@ -421,7 +422,8 @@
       "saveFailed": "儲存元素失敗",
       "created": "已建立元素",
       "updated": "已更新元素",
-      "uploadFromLibrary": "請先上傳到素材庫，再於此處挑選"
+      "uploadFromLibrary": "請先上傳到素材庫，再於此處挑選",
+      "createNew": "建立新元素"
     },
     "imageError": {
       "contentPolicyViolation": "圖片被攔截：提示詞或參考圖片可能違反了內容政策。請修改後重試。",

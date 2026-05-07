@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAccessToken } from "@/lib/auth/cookies";
 import { verifyAccessToken } from "@/lib/auth/jwt";
 import { db } from "@/lib/db";
-import { videoGenerations } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { collectionImages, projects, videoGenerations } from "@/lib/db/schema";
+import { and, eq, inArray } from "drizzle-orm";
 import {
   getVideoModel,
   validateAndMergeParams,
@@ -14,6 +14,10 @@ import { deductCredits, assertSufficientCredits, getActiveAccount, InsufficientC
 import { calculateCost } from "@/lib/pricing";
 import { submitVideoGeneration } from "@/lib/video/video-client";
 import { getSignedImageUrl, getSignedVideoUrl, getSignedAudioUrl } from "@/lib/storage/s3";
+import {
+  buildElementDetails,
+  ksyunSourceFingerprint,
+} from "@/lib/elements/helpers";
 import { recordEvent } from "@/lib/telemetry";
 import { isFeatureFlagEnabled } from "@/lib/feature-flags/server";
 import { recordResearchEvent } from "@/lib/research-telemetry";
@@ -95,24 +99,120 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Resolve image IDs inside kling_elements to signed URLs for the provider API
+    // Resolve image IDs inside kling_elements to signed URLs for the provider
+    // API. When an entry references a library element via `libraryElementId`,
+    // we hydrate the canonical fields (name/description/imageIds/videoId/
+    // ksyunElementId) from the DB row — the library element is the source of
+    // truth, the chat-side denormalized snapshot is just for display.
     if (Array.isArray(fullParams.kling_elements)) {
-      fullParams.kling_elements = fullParams.kling_elements.map(
-        (el: { name: string; description: string; element_input_ids?: string[]; element_input_urls?: string[] }) => ({
-          name: el.name,
-          description: el.description,
-          element_input_urls: (el.element_input_ids || el.element_input_urls || []).map((idOrUrl: string) => {
-            if (idOrUrl.startsWith("http") && !idOrUrl.includes("moodio.art/images/")) {
-              return idOrUrl;
+      const rawEntries: any[] = fullParams.kling_elements;
+      const libIds = rawEntries
+        .map((e) => (typeof e?.libraryElementId === "string" ? e.libraryElementId : null))
+        .filter((id): id is string => id !== null);
+
+      const libRows = libIds.length > 0
+        ? await db
+            .select({
+              id: collectionImages.id,
+              userId: projects.userId,
+              elementDetails: collectionImages.elementDetails,
+              generationDetails: collectionImages.generationDetails,
+            })
+            .from(collectionImages)
+            .innerJoin(projects, eq(collectionImages.projectId, projects.id))
+            .where(
+              and(
+                inArray(collectionImages.id, libIds),
+                eq(collectionImages.assetType, "element")
+              )
+            )
+        : [];
+      const libById = new Map(libRows.map((r) => [r.id, r]));
+
+      fullParams.kling_elements = rawEntries.map((el: any) => {
+        let name: string = typeof el?.name === "string" ? el.name : "";
+        let description: string =
+          typeof el?.description === "string" ? el.description : "";
+        let inputIds: string[] = Array.isArray(el?.element_input_ids)
+          ? el.element_input_ids
+          : Array.isArray(el?.element_input_urls)
+            ? el.element_input_urls
+            : [];
+        let videoId: string | undefined;
+        let cachedKsyunId: number | undefined;
+        let cachedFingerprint: string | undefined;
+
+        if (typeof el?.libraryElementId === "string") {
+          const row = libById.get(el.libraryElementId);
+          if (row && row.userId === payload.userId) {
+            const det = (row.elementDetails ?? {}) as {
+              imageIds?: unknown;
+              videoId?: unknown;
+              ksyunElementId?: unknown;
+              ksyunSourceFingerprint?: unknown;
+            };
+            const gen = (row.generationDetails ?? {}) as {
+              title?: unknown;
+              prompt?: unknown;
+            };
+            if (typeof gen.title === "string" && gen.title) name = gen.title;
+            if (typeof gen.prompt === "string") description = gen.prompt;
+            if (Array.isArray(det.imageIds)) {
+              const arr = (det.imageIds as unknown[]).filter(
+                (v): v is string => typeof v === "string"
+              );
+              if (arr.length > 0) inputIds = arr;
             }
-            const cfMatch = idOrUrl.match(/\/images\/([^/?]+)/);
-            if (cfMatch) {
-              return getSignedImageUrl(cfMatch[1]);
+            if (typeof det.videoId === "string" && det.videoId) {
+              videoId = det.videoId;
             }
-            return getSignedImageUrl(idOrUrl);
-          }),
-        })
-      );
+            if (typeof det.ksyunElementId === "number") {
+              cachedKsyunId = det.ksyunElementId;
+              cachedFingerprint =
+                typeof det.ksyunSourceFingerprint === "string"
+                  ? det.ksyunSourceFingerprint
+                  : undefined;
+            }
+          }
+        }
+
+        // Validate cached KSyun id against the current image fingerprint —
+        // drop a stale id if the source images shifted since it was minted.
+        const currentFp = ksyunSourceFingerprint(inputIds);
+        const useCachedKsyunId =
+          typeof cachedKsyunId === "number" &&
+          cachedFingerprint === currentFp
+            ? cachedKsyunId
+            : undefined;
+
+        const element_input_urls = inputIds.map((idOrUrl: string) => {
+          if (idOrUrl.startsWith("http") && !idOrUrl.includes("moodio.art/images/")) {
+            return idOrUrl;
+          }
+          const cfMatch = idOrUrl.match(/\/images\/([^/?]+)/);
+          if (cfMatch) {
+            return getSignedImageUrl(cfMatch[1]);
+          }
+          return getSignedImageUrl(idOrUrl);
+        });
+
+        const out: Record<string, unknown> = {
+          name,
+          description,
+          element_input_urls,
+        };
+        if (typeof el?.libraryElementId === "string") {
+          out.libraryElementId = el.libraryElementId;
+        }
+        if (videoId) {
+          // FAL Kling V3 consumes this as `video_url` on the element entry.
+          out.videoUrl = getSignedVideoUrl(videoId);
+        }
+        if (typeof useCachedKsyunId === "number") {
+          out.ksyunElementId = useCachedKsyunId;
+        }
+        return out;
+      });
     }
 
     // Resolve media_references IDs to signed URLs for the provider API
@@ -207,10 +307,69 @@ export async function POST(request: NextRequest) {
 
     // Submit to provider
     try {
-      const { requestId, provider, providerModelId } = await submitVideoGeneration(
-        modelId,
-        mergedParams,
-      );
+      const { requestId, provider, providerModelId, ksyunElementWriteBacks } =
+        await submitVideoGeneration(modelId, mergedParams);
+
+      // Persist any freshly-minted KSyun element IDs onto the library rows so
+      // subsequent submissions reuse them. We do this after the provider
+      // accepted the job (so the IDs are known good) but before we deduct
+      // credits — a write failure here is non-fatal: the next submit just
+      // pays the create-and-poll cost again.
+      if (ksyunElementWriteBacks && ksyunElementWriteBacks.length > 0) {
+        await Promise.all(
+          ksyunElementWriteBacks.map(async (wb) => {
+            try {
+              const [row] = await db
+                .select({
+                  details: collectionImages.elementDetails,
+                  id: collectionImages.id,
+                })
+                .from(collectionImages)
+                .innerJoin(projects, eq(collectionImages.projectId, projects.id))
+                .where(
+                  and(
+                    eq(collectionImages.id, wb.libraryElementId),
+                    eq(collectionImages.assetType, "element"),
+                    eq(projects.userId, payload.userId)
+                  )
+                )
+                .limit(1);
+              if (!row) return;
+              const det = (row.details ?? {}) as {
+                imageIds?: unknown;
+                videoId?: unknown;
+                voiceId?: unknown;
+              };
+              const imageIds = Array.isArray(det.imageIds)
+                ? (det.imageIds as unknown[]).filter(
+                    (v): v is string => typeof v === "string"
+                  )
+                : [];
+              const videoId =
+                typeof det.videoId === "string" ? det.videoId : null;
+              const voiceId =
+                typeof det.voiceId === "string" ? det.voiceId : null;
+              await db
+                .update(collectionImages)
+                .set({
+                  elementDetails: buildElementDetails({
+                    imageIds,
+                    videoId,
+                    voiceId,
+                    ksyunElementId: wb.ksyunElementId,
+                    ksyunSourceFingerprint: ksyunSourceFingerprint(imageIds),
+                  }),
+                })
+                .where(eq(collectionImages.id, row.id));
+            } catch (e) {
+              console.error(
+                `[Video Generate] Failed to persist ksyunElementId for library element ${wb.libraryElementId}:`,
+                e
+              );
+            }
+          })
+        );
+      }
 
       // Submission succeeded — deduct credits and update record atomically
       await db.transaction(async (tx) => {

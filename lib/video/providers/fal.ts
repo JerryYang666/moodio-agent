@@ -20,6 +20,49 @@ const SEEDANCE2_BASES = new Set([
 ]);
 
 const KLING_O3_REFERENCE_BASE = "fal-ai/kling-video/o3/reference-to-video";
+const KLING_V3_PRO_I2V = "fal-ai/kling-video/v3/pro/image-to-video";
+
+/**
+ * Normalize a `kling_elements` array into FAL's `elements` shape.
+ *
+ * - Drops entries with no images (defensive — UI prevents it).
+ * - imageIds are already resolved to URLs by /api/video/generate (it sets
+ *   `element_input_urls` on each entry).
+ * - When `videoId` is set on the entry (the library element has an attached
+ *   video), it's already been resolved to a signed `videoUrl` by the route
+ *   and surfaces here as `video_url` on the entry — FAL Kling V3 supports
+ *   `video_url` as an alternative element source per its llms.txt.
+ *   FAL Kling O3 does NOT support `video_url` and we drop it for that variant.
+ * - name/description are the user-facing fields; FAL accepts an optional
+ *   `name` (used for prompt @-references) and optional `description`.
+ */
+function normalizeFalKlingElements(
+  raw: any[],
+  variant: "v3" | "o3"
+): Array<Record<string, unknown>> {
+  return raw
+    .map((el: any) => {
+      const urls: string[] = Array.isArray(el?.element_input_urls)
+        ? el.element_input_urls
+        : [];
+      if (urls.length === 0) return null;
+      const out: Record<string, unknown> = {
+        frontal_image_url: urls[0],
+        reference_image_urls: urls.slice(1),
+      };
+      if (typeof el?.name === "string" && el.name) out.name = el.name;
+      if (typeof el?.description === "string" && el.description) {
+        out.description = el.description;
+      }
+      // V3 image-to-video elements support an alternative `video_url` source;
+      // O3 reference-to-video does not (per FAL llms.txt).
+      if (variant === "v3" && typeof el?.videoUrl === "string" && el.videoUrl) {
+        out.video_url = el.videoUrl;
+      }
+      return out;
+    })
+    .filter((e): e is Record<string, unknown> => e !== null);
+}
 
 /**
  * For Seedance 2.0 models, resolve the actual Fal sub-endpoint
@@ -67,22 +110,11 @@ function resolveFalEndpoint(
       }
     }
 
-    // FAL elements: first image is the frontal view, rest are style references.
-    // Names are already positional (Element1..N) from the UI — referenced in prompts
-    // as @Element1, @Element2 with no rewriting needed. Drop name/description fields.
+    // FAL Kling O3 elements: first image is the frontal view, rest are style refs.
+    // Names are typically positional (Element1..N) from the UI — referenced in
+    // prompts as @Element1, @Element2 with no rewriting needed.
     if (Array.isArray(elements)) {
-      const normalized = elements
-        .map((el: any) => {
-          const urls: string[] = Array.isArray(el?.element_input_urls)
-            ? el.element_input_urls
-            : [];
-          if (urls.length === 0) return null;
-          return {
-            frontal_image_url: urls[0],
-            reference_image_urls: urls.slice(1),
-          };
-        })
-        .filter((e): e is { frontal_image_url: string; reference_image_urls: string[] } => e !== null);
+      const normalized = normalizeFalKlingElements(elements, "o3");
       if (normalized.length > 0) {
         rest.elements = normalized;
       }
@@ -93,6 +125,25 @@ function resolveFalEndpoint(
       endpoint: `fal-ai/kling-video/o3/${tier}/reference-to-video`,
       input: rest,
     };
+  }
+
+  // Kling V3 Pro image-to-video: supports `elements` with frontal_image_url +
+  // reference_image_urls + optional video_url per element.
+  if (providerModelId === KLING_V3_PRO_I2V) {
+    const { kling_elements, elements, ...rest } = params;
+    const raw =
+      Array.isArray(elements) && elements.length > 0
+        ? elements
+        : Array.isArray(kling_elements)
+          ? kling_elements
+          : null;
+    if (raw) {
+      const normalized = normalizeFalKlingElements(raw, "v3");
+      if (normalized.length > 0) {
+        rest.elements = normalized;
+      }
+    }
+    return { endpoint: providerModelId, input: rest };
   }
 
   if (!SEEDANCE2_BASES.has(providerModelId)) {

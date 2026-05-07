@@ -1,12 +1,19 @@
 /**
- * Element adapters — decompose an aggregated `ElementAsset` into the native
- * input shape for reference-capable video models.
+ * Element adapters — decompose an aggregated `ElementAsset` (the library
+ * source-of-truth) into the native input shape for each reference-capable
+ * video model. Pure functions: no UI, no network, no side effects.
  *
- * Pure functions: no UI, no network, no side effects. Trivially testable.
+ * One library element fans out to many providers:
  *
- * See `lib/video/models.ts` for the source types and
- * `/Users/yangrh/.claude/plans/here-is-a-feature-fluffy-lecun.md` for the
- * design rationale.
+ *   ElementAsset                                  ┌─► Seedance 2.0 reference
+ *   ├─ imageIds[]                  applyElement…  ├─► FAL Kling V3 image-to-video
+ *   ├─ videoId?                    ─────────────► ├─► FAL Kling O3 reference-to-video
+ *   ├─ voiceId? (FAL provider)                    └─► KSyun Kling V3 Omni
+ *   └─ ksyunElementId? (cached)
+ *
+ * Each adapter only exposes what its target accepts; fields without a slot
+ * are dropped and the dropping is documented inline so future readers don't
+ * re-investigate.
  */
 
 import type {
@@ -24,8 +31,7 @@ export interface SeedanceApplyResult {
   appendReferences: MediaReference[];
   /**
    * Text to append to the composer's prompt field. Joined from element name +
-   * description. The caller decides replace-vs-append (current recommendation
-   * is append with a separator, see plan Open Question #2).
+   * description.
    */
   promptAppend: string;
 }
@@ -43,10 +49,6 @@ export interface KlingApplyResult {
  *   - videoId (if set)  → video reference
  *   - voiceId (if set)  → audio reference (FAL voice ID passed as the audio id)
  *   - name + description → promptAppend ("name\ndescription")
- *
- * The composer's existing `media_references` are NOT returned — the caller
- * merges `appendReferences` onto its current state so it retains pins and
- * ordering.
  */
 export function applyElementToSeedanceReference(
   el: ElementAsset
@@ -74,14 +76,21 @@ export function applyElementToSeedanceReference(
 }
 
 /**
- * Kling O3 / V3 Reference mapping:
+ * Kling element mapping (used by all three Kling-family models — FAL V3
+ * image-to-video, FAL O3 reference-to-video, KSyun V3 Omni). Each model has
+ * its own provider-side normalization (see `lib/video/providers/*.ts`) that
+ * picks up additional fields from the entry — `videoId` (V3 only), and
+ * `ksyunElementId` (KSyun only) — when present.
+ *
  *   - imageIds (up to 4) → element.element_input_ids
  *   - name, description  → element.name, element.description
- *   - videoId, voiceId   → dropped silently (no slot in Kling elements)
+ *   - videoId            → carried on the element entry (FAL V3 maps it to video_url)
+ *   - voiceId            → dropped (FAL Kling V3/O3 expose only `generate_audio`,
+ *                          a boolean; no voice/audio input slot per their llms.txt)
+ *   - ksyunElementId     → carried on the element entry (KSyun reuses it to skip create+poll)
+ *   - libraryElementId   → carried so the backend can write KSyun id back to the library
  *
- * Returns an error when imageIds.length < 2 — Kling elements require 2–4
- * images. The caller should block selection before invoking this, but the
- * adapter stays defensive.
+ * Returns an error when imageIds.length < 2 — Kling elements require 2–4 images.
  */
 export function applyElementToKlingElements(
   el: ElementAsset,
@@ -91,13 +100,21 @@ export function applyElementToKlingElements(
     return { next: current, error: "min-images" };
   }
 
-  const next: KlingElement[] = [
-    ...current,
-    {
-      name: el.name,
-      description: el.description,
-      element_input_ids: el.imageIds.slice(0, KLING_ELEMENT_MAX_IMAGES),
-    },
-  ];
+  const entry: KlingElement & {
+    videoId?: string;
+    ksyunElementId?: number;
+    ksyunSourceFingerprint?: string;
+  } = {
+    name: el.name,
+    description: el.description,
+    element_input_ids: el.imageIds.slice(0, KLING_ELEMENT_MAX_IMAGES),
+    libraryElementId: el.id,
+  };
+  if (el.videoId) entry.videoId = el.videoId;
+  if (typeof el.ksyunElementId === "number") {
+    entry.ksyunElementId = el.ksyunElementId;
+  }
+
+  const next: KlingElement[] = [...current, entry];
   return { next };
 }

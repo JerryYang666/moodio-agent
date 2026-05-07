@@ -362,6 +362,7 @@
     "klingElement": {
       "header": "Elements ({count}/{max})",
       "addButton": "Add Element",
+      "pickFromLibrary": "Library",
       "emptyHint": "Optional: add up to {max} reusable elements (a character, object, or style), then reference them in your prompt as @name. Works together with first/last frame images.",
       "defaultName": "Element {index}",
       "imageCount": "{count, plural, one {# image} other {# images}}",
@@ -421,7 +422,8 @@
       "saveFailed": "Failed to save element",
       "created": "Element created",
       "updated": "Element updated",
-      "uploadFromLibrary": "Upload to your library first, then pick it here"
+      "uploadFromLibrary": "Upload to your library first, then pick it here",
+      "createNew": "Create new element"
     },
     "imageError": {
       "contentPolicyViolation": "Image blocked: the prompt or reference image may violate content policies. Please revise and try again.",

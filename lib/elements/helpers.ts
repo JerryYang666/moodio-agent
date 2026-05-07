@@ -1,3 +1,4 @@
+import { createHash } from "crypto";
 import { db } from "@/lib/db";
 import { collections, folders } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
@@ -34,16 +35,35 @@ export function parseStringArray(
   return out;
 }
 
+/**
+ * Stable fingerprint of the constituent image IDs. KSyun mints an element_id
+ * tied to specific frontal+reference images; if the user later swaps or
+ * reorders the images, the cached id is no longer valid for the new content.
+ * We snapshot this fingerprint alongside the id and recompute on read.
+ */
+export function ksyunSourceFingerprint(imageIds: string[]): string {
+  return createHash("sha1").update(imageIds.join("\n")).digest("hex");
+}
+
 export function buildElementDetails(input: {
   imageIds: string[];
   videoId?: string | null;
   voiceId?: string | null;
+  ksyunElementId?: number | null;
+  ksyunSourceFingerprint?: string | null;
 }) {
   const details: Record<string, unknown> = { imageIds: input.imageIds };
   if (input.videoId) details.videoId = input.videoId;
   if (input.voiceId) {
     details.voiceId = input.voiceId;
     details.voiceProvider = "fal";
+  }
+  if (typeof input.ksyunElementId === "number") {
+    details.ksyunElementId = input.ksyunElementId;
+    // Always store the fingerprint that matches the saved id, recomputing from
+    // the (just-saved) imageIds when the caller didn't supply one.
+    details.ksyunSourceFingerprint =
+      input.ksyunSourceFingerprint ?? ksyunSourceFingerprint(input.imageIds);
   }
   return details;
 }

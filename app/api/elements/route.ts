@@ -5,6 +5,7 @@ import { getAccessToken } from "@/lib/auth/cookies";
 import { verifyAccessToken } from "@/lib/auth/jwt";
 import { getImageUrl, getVideoUrl } from "@/lib/storage/s3";
 import { ensureDefaultProject } from "@/lib/db/projects";
+import { ensureDefaultElementsCollection } from "@/lib/db/elements-collection";
 import { getUserSetting } from "@/lib/user-settings/server";
 import {
   MAX_ELEMENT_IMAGES,
@@ -26,6 +27,12 @@ type ElementCreateBody = {
   imageIds?: string[];
   videoId?: string | null;
   voiceId?: string | null;
+  /**
+   * When true and projectId/collectionId are omitted, the server routes the
+   * new element into the user's default project + default "My Elements"
+   * collection. Used by the chat composer's "create element on the spot" flow.
+   */
+  useDefaultElementsCollection?: boolean;
 };
 
 /**
@@ -90,12 +97,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const resolvedProjectId =
+    const explicitProjectId =
       typeof body.projectId === "string" && body.projectId.trim()
         ? body.projectId.trim()
-        : (await ensureDefaultProject(userId)).id;
-
-    const collectionId =
+        : null;
+    const explicitCollectionId =
       typeof body.collectionId === "string" && body.collectionId.trim()
         ? body.collectionId.trim()
         : null;
@@ -103,6 +109,27 @@ export async function POST(req: NextRequest) {
       typeof body.folderId === "string" && body.folderId.trim()
         ? body.folderId.trim()
         : null;
+
+    let resolvedProjectId: string;
+    let collectionId: string | null;
+    if (
+      body.useDefaultElementsCollection &&
+      !explicitProjectId &&
+      !explicitCollectionId &&
+      !folderId
+    ) {
+      const project = await ensureDefaultProject(userId);
+      const defaultColl = await ensureDefaultElementsCollection(
+        userId,
+        project.id
+      );
+      resolvedProjectId = project.id;
+      collectionId = defaultColl.id;
+    } else {
+      resolvedProjectId =
+        explicitProjectId ?? (await ensureDefaultProject(userId)).id;
+      collectionId = explicitCollectionId;
+    }
 
     const destCheck = await validateDestinationTuple({
       projectId: resolvedProjectId,
@@ -169,6 +196,8 @@ export async function POST(req: NextRequest) {
           videoId: videoId ?? undefined,
           voiceId: voiceId ?? undefined,
           voiceProvider: voiceId ? ("fal" as const) : undefined,
+          ksyunElementId: undefined,
+          ksyunSourceFingerprint: undefined,
           imageUrls,
           videoUrl: videoId ? getVideoUrl(videoId, cnMode) : undefined,
         },

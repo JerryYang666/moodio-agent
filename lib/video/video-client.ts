@@ -18,6 +18,17 @@ export interface SubmitVideoGenerationResult {
   requestId: string;
   provider: string;
   providerModelId: string;
+  /**
+   * IDs the KSyun provider freshly minted for library elements on this submit.
+   * The /api/video/generate route persists these onto the corresponding
+   * `collection_images.element_details.ksyunElementId` so the next submission
+   * skips the create-and-poll round trip. Empty/undefined for non-KSyun
+   * submissions and for KSyun submissions where every element was a cache hit.
+   */
+  ksyunElementWriteBacks?: Array<{
+    libraryElementId: string;
+    ksyunElementId: number;
+  }>;
 }
 
 /**
@@ -77,10 +88,19 @@ export async function submitVideoGeneration(
     webhookUrl
   );
 
+  // KSyun stashes any freshly minted element IDs on the params object as a
+  // side channel; lift them onto the typed result for the route to persist.
+  const writeBacks =
+    (mappedParams as any).__ksyunElementWriteBacks as
+      | Array<{ libraryElementId: string; ksyunElementId: number }>
+      | undefined;
+
   return {
     requestId: result.requestId,
     provider: variant.provider,
     providerModelId: result.providerModelId ?? variant.providerModelId,
+    ksyunElementWriteBacks:
+      writeBacks && writeBacks.length > 0 ? writeBacks : undefined,
   };
 }
 

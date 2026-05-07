@@ -355,25 +355,53 @@ export class KsyunVideoProvider implements VideoProviderClient {
       ? params.kling_elements
       : [];
 
+    // KSyun's createElement is a 2-step async API (POST + poll, up to 120s).
+    // We cache the returned element_id on the library element row keyed by a
+    // fingerprint of the source images. Reuse paths land here as a pre-set
+    // `ksyunElementId` on the kling_elements entry — emitted by the
+    // video-generate route after it loads the library row.
+    //
+    // Shape of `el` at this point (set by the route):
+    //   { name, description, element_input_urls, libraryElementId?,
+    //     ksyunElementId? (cached), ksyunSourceFingerprint? }
     const elementNames: string[] = [];
     const elementIds: number[] = [];
+    const writeBacks: Array<{
+      libraryElementId: string;
+      ksyunElementId: number;
+    }> = [];
     for (const el of klingElements) {
-      // The generate route resolves element_input_ids → element_input_urls
-      // before we get here, so we read URLs.
       const urls: string[] = Array.isArray((el as any).element_input_urls)
         ? (el as any).element_input_urls
         : Array.isArray(el.element_input_ids)
           ? el.element_input_ids
           : [];
       if (urls.length === 0) continue;
-      const id = await createElement({
-        name: el.name,
-        description: el.description,
-        imageUrls: urls,
-      });
+
+      const cachedId = (el as any).ksyunElementId;
+      let id: number;
+      if (typeof cachedId === "number" && Number.isFinite(cachedId)) {
+        console.log(
+          `[ksyun CreateElement] Reusing cached element_id=${cachedId} for "${el.name}"`
+        );
+        id = cachedId;
+      } else {
+        id = await createElement({
+          name: el.name,
+          description: el.description,
+          imageUrls: urls,
+        });
+        const libraryElementId = (el as any).libraryElementId;
+        if (typeof libraryElementId === "string" && libraryElementId) {
+          writeBacks.push({ libraryElementId, ksyunElementId: id });
+        }
+      }
       elementNames.push(el.name);
       elementIds.push(id);
     }
+    // Make the freshly minted IDs available to the caller so it can persist
+    // them back onto the library element rows.
+    (params as any).__ksyunElementWriteBacks = writeBacks;
 
     const body: Record<string, any> = {
       model_name: modelName,
