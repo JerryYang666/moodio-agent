@@ -47,6 +47,28 @@ function normalizeFalKlingElements(
       const urls: string[] = Array.isArray(el?.element_input_urls)
         ? el.element_input_urls
         : [];
+      const hasVideo =
+        typeof el?.videoUrl === "string" && el.videoUrl.length > 0;
+      // FAL constraint: an element is EITHER image-based (frontal_image_url +
+      // reference_image_urls) OR video-based (video_url, with optional
+      // voice_id). Sending both shapes returns 422:
+      //   "Cannot provide both image URLs and video URL for the same element."
+      // When a library element has both attached (allowed for forward-compat
+      // with future models), prefer the video shape — voice_id depends on it,
+      // and the user explicitly attached a video. The unused images stay on
+      // the library row and flow through to other providers (e.g. KSyun, which
+      // only accepts image elements).
+      if (hasVideo) {
+        const out: Record<string, unknown> = { video_url: el.videoUrl };
+        if (typeof el?.name === "string" && el.name) out.name = el.name;
+        if (typeof el?.description === "string" && el.description) {
+          out.description = el.description;
+        }
+        if (typeof el?.voiceId === "string" && el.voiceId) {
+          out.voice_id = el.voiceId;
+        }
+        return out;
+      }
       if (urls.length === 0) return null;
       const out: Record<string, unknown> = {
         frontal_image_url: urls[0],
@@ -56,18 +78,7 @@ function normalizeFalKlingElements(
       if (typeof el?.description === "string" && el.description) {
         out.description = el.description;
       }
-      const hasVideo =
-        typeof el?.videoUrl === "string" && el.videoUrl.length > 0;
-      if (hasVideo) {
-        out.video_url = el.videoUrl;
-      }
-      // FAL constraint: "Voice binding is only supported for video elements,
-      // and cannot be used with image elements." Sending voice_id on an
-      // image-only element returns 422. Drop voice_id silently when there's
-      // no video on the element — the rest of the element is still valid.
-      if (hasVideo && typeof el?.voiceId === "string" && el.voiceId) {
-        out.voice_id = el.voiceId;
-      }
+      // voice_id is rejected on image elements — only sent on video elements above.
       return out;
     })
     .filter((e): e is Record<string, unknown> => e !== null);

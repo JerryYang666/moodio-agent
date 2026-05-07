@@ -193,6 +193,14 @@ export default function ElementEditorModal({
         </ModalHeader>
 
         <ModalBody className="space-y-4">
+          {/* Today's video models (Kling V3, O3, KSyun Omni, …) only accept
+              one mode per element: images OR a video (with optional voice).
+              The library row can store both for forward-compat, but at submit
+              time the provider picks one — let the user know upfront. */}
+          <div className="rounded-md border border-default-200 bg-default-50 px-3 py-2 text-[11px] leading-snug text-default-600">
+            {t("modeHint")}
+          </div>
+
           <div className="space-y-1">
             <label className="text-xs font-medium text-default-600">
               {t("nameLabel")}
