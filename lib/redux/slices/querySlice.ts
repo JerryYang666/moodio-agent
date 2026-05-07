@@ -12,6 +12,7 @@ const initialState: QueryState = {
   searchId: null,
   imageSearchUploadId: null,
   imageSearchPreviewUrl: null,
+  imageSearchPending: false,
 };
 
 const querySlice = createSlice({
@@ -23,7 +24,19 @@ const querySlice = createSlice({
       // Text search clears any active image search
       state.imageSearchUploadId = null;
       state.imageSearchPreviewUrl = null;
+      state.imageSearchPending = false;
       // Reset pagination when search changes
+      state.cursor = null;
+      state.searchId = null;
+    },
+    // Optimistic state set immediately on drop/select. Drives the spinner UI
+    // before the /api/upload round-trip completes. Does NOT trigger a search
+    // yet (search is gated on imageSearchUploadId).
+    beginImageSearch: (state, action: PayloadAction<{ previewUrl: string | null }>) => {
+      state.imageSearchPending = true;
+      state.imageSearchPreviewUrl = action.payload.previewUrl;
+      state.imageSearchUploadId = null;
+      state.textSearch = "";
       state.cursor = null;
       state.searchId = null;
     },
@@ -33,6 +46,7 @@ const querySlice = createSlice({
     ) => {
       state.imageSearchUploadId = action.payload.uploadId;
       state.imageSearchPreviewUrl = action.payload.previewUrl;
+      state.imageSearchPending = false;
       // Image search supersedes text search
       state.textSearch = "";
       state.cursor = null;
@@ -41,6 +55,7 @@ const querySlice = createSlice({
     clearImageSearch: (state) => {
       state.imageSearchUploadId = null;
       state.imageSearchPreviewUrl = null;
+      state.imageSearchPending = false;
       state.cursor = null;
       state.searchId = null;
     },
@@ -119,12 +134,14 @@ const querySlice = createSlice({
       state.searchId = null;
       state.imageSearchUploadId = null;
       state.imageSearchPreviewUrl = null;
+      state.imageSearchPending = false;
     },
   },
 });
 
 export const {
   setTextSearch,
+  beginImageSearch,
   setImageSearch,
   clearImageSearch,
   setSelectedFolders,

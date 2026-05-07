@@ -46,9 +46,12 @@ const SearchBar: React.FC<SearchBarProps> = ({
   const imageSearchPreviewUrl = useSelector(
     (state: RootState) => state.query.imageSearchPreviewUrl
   );
+  const imageSearchPending = useSelector(
+    (state: RootState) => state.query.imageSearchPending
+  );
 
   const [isPickerOpen, setIsPickerOpen] = useState(false);
-  const { searchByFile, searchByUrl, clear: clearImage, isUploading } = useImageSearch();
+  const { searchByFile, searchByLibraryAsset, clear: clearImage } = useImageSearch();
 
   // Local state for input field (for continuous re-renders)
   // Use initialDisplayValue if provided (for HomePage), otherwise use Redux state
@@ -102,7 +105,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
       router.push('/browse');
     }
     setLocalSearchText('');
-    await searchByUrl(asset.imageUrl);
+    await searchByLibraryAsset({ imageId: asset.imageId, imageUrl: asset.imageUrl });
   };
 
   const handleAssetUpload = async (files: File[]) => {
@@ -119,68 +122,49 @@ const SearchBar: React.FC<SearchBarProps> = ({
     await searchByFile(file);
   };
 
-  const hasActiveImageSearch = !!imageSearchUploadId;
-  const showImageButton = enableImageSearch && !hasActiveImageSearch;
+  // "Active" covers both the in-flight upload (pending) and the resolved
+  // upload_id state. Both render the chip control instead of a text input
+  // so the X button is always interactive.
+  const isImageSearchActive =
+    enableImageSearch && (imageSearchPending || !!imageSearchUploadId);
 
   return (
     <div className={className}>
-      <Input
-        type="text"
-        value={localSearchText}
-        onValueChange={handleInputChange}
-        onKeyDown={handleKeyPress}
-        placeholder={hasActiveImageSearch ? 'Searching by image…' : placeholder}
-        isDisabled={hasActiveImageSearch}
-        startContent={
-          hasActiveImageSearch && imageSearchPreviewUrl ? (
-            <div className="flex items-center gap-2">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={imageSearchPreviewUrl}
-                alt="Image search preview"
-                className="h-7 w-7 rounded object-cover ring-1 ring-default-200"
-              />
-              <span className="text-xs text-default-500 hidden sm:inline">
-                Image search
-              </span>
+      {isImageSearchActive ? (
+        <ImageSearchChip
+          previewUrl={imageSearchPreviewUrl}
+          isPending={!!imageSearchPending}
+          onClear={clearImage}
+        />
+      ) : (
+        <Input
+          type="text"
+          value={localSearchText}
+          onValueChange={handleInputChange}
+          onKeyDown={handleKeyPress}
+          placeholder={placeholder}
+          startContent={<Search size={18} className="text-default-400" />}
+          endContent={
+            enableImageSearch ? (
               <button
                 type="button"
-                aria-label="Clear image search"
-                onClick={clearImage}
-                className="rounded-full p-0.5 text-default-500 hover:bg-default-100 hover:text-default-700"
+                aria-label="Search by image"
+                title="Search by image"
+                onClick={() => setIsPickerOpen(true)}
+                className="flex items-center justify-center rounded-md p-1.5 text-default-500 hover:bg-default-100 hover:text-default-700"
               >
-                <X size={14} />
-              </button>
-            </div>
-          ) : (
-            <Search size={18} className="text-default-400" />
-          )
-        }
-        endContent={
-          showImageButton ? (
-            <button
-              type="button"
-              aria-label="Search by image"
-              title="Search by image"
-              onClick={() => setIsPickerOpen(true)}
-              disabled={isUploading}
-              className="flex items-center justify-center rounded-md p-1.5 text-default-500 hover:bg-default-100 hover:text-default-700 disabled:opacity-50"
-            >
-              {isUploading ? (
-                <Loader2 size={18} className="animate-spin" />
-              ) : (
                 <ImagePlus size={18} />
-              )}
-            </button>
-          ) : null
-        }
-        variant="bordered"
-        size="lg"
-        classNames={{
-          input: "text-sm",
-          inputWrapper: "bg-background",
-        }}
-      />
+              </button>
+            ) : null
+          }
+          variant="bordered"
+          size="lg"
+          classNames={{
+            input: "text-sm",
+            inputWrapper: "bg-background",
+          }}
+        />
+      )}
 
       {enableImageSearch && isPickerOpen && (
         <AssetPickerModal
@@ -194,5 +178,53 @@ const SearchBar: React.FC<SearchBarProps> = ({
     </div>
   );
 };
+
+interface ImageSearchChipProps {
+  previewUrl: string | null | undefined;
+  isPending: boolean;
+  onClear: () => void;
+}
+
+// Custom control that mimics the bordered Input shell but stays fully
+// interactive — most importantly, the clear button is always clickable
+// even while the upload is in flight.
+function ImageSearchChip({ previewUrl, isPending, onClear }: ImageSearchChipProps) {
+  return (
+    <div
+      className="relative flex h-12 w-full items-center gap-3 rounded-medium border-2 border-default-200 bg-background px-3"
+      role="group"
+      aria-label="Image search"
+    >
+      <div className="relative h-8 w-8 shrink-0 overflow-hidden rounded ring-1 ring-default-200">
+        {previewUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={previewUrl}
+            alt="Image search preview"
+            className="h-full w-full object-cover"
+          />
+        ) : (
+          <div className="h-full w-full bg-default-100" />
+        )}
+        {isPending && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+            <Loader2 size={14} className="animate-spin text-white" />
+          </div>
+        )}
+      </div>
+      <span className="flex-1 truncate text-sm text-default-600">
+        {isPending ? "Uploading image…" : "Searching by image"}
+      </span>
+      <button
+        type="button"
+        aria-label="Clear image search"
+        onClick={onClear}
+        className="flex h-7 w-7 items-center justify-center rounded-full text-default-500 hover:bg-default-100 hover:text-default-700"
+      >
+        <X size={16} />
+      </button>
+    </div>
+  );
+}
 
 export default SearchBar;
