@@ -26,19 +26,21 @@ const KLING_V3_PRO_I2V = "fal-ai/kling-video/v3/pro/image-to-video";
  * Normalize a `kling_elements` array into FAL's `elements` shape.
  *
  * - Drops entries with no images (defensive — UI prevents it).
- * - imageIds are already resolved to URLs by /api/video/generate (it sets
+ * - imageIds are already resolved to URLs by the route hydrator (it sets
  *   `element_input_urls` on each entry).
  * - When `videoId` is set on the entry (the library element has an attached
- *   video), it's already been resolved to a signed `videoUrl` by the route
- *   and surfaces here as `video_url` on the entry — FAL Kling V3 supports
- *   `video_url` as an alternative element source per its llms.txt.
- *   FAL Kling O3 does NOT support `video_url` and we drop it for that variant.
+ *   video), it's already been resolved to a signed URL surfaced as `videoUrl`
+ *   on the entry — both Kling V3 image-to-video and Kling O3 reference-to-video
+ *   accept `video_url` per element (undocumented in their llms.txt but
+ *   supported by the API).
+ * - When `voiceId` is set (the library element has a FAL-provider voice id),
+ *   it's mapped to `voice_id` per element. Same status: undocumented in
+ *   llms.txt but supported by both Kling V3 and O3.
  * - name/description are the user-facing fields; FAL accepts an optional
  *   `name` (used for prompt @-references) and optional `description`.
  */
 function normalizeFalKlingElements(
-  raw: any[],
-  variant: "v3" | "o3"
+  raw: any[]
 ): Array<Record<string, unknown>> {
   return raw
     .map((el: any) => {
@@ -54,10 +56,11 @@ function normalizeFalKlingElements(
       if (typeof el?.description === "string" && el.description) {
         out.description = el.description;
       }
-      // V3 image-to-video elements support an alternative `video_url` source;
-      // O3 reference-to-video does not (per FAL llms.txt).
-      if (variant === "v3" && typeof el?.videoUrl === "string" && el.videoUrl) {
+      if (typeof el?.videoUrl === "string" && el.videoUrl) {
         out.video_url = el.videoUrl;
+      }
+      if (typeof el?.voiceId === "string" && el.voiceId) {
+        out.voice_id = el.voiceId;
       }
       return out;
     })
@@ -114,7 +117,7 @@ function resolveFalEndpoint(
     // Names are typically positional (Element1..N) from the UI — referenced in
     // prompts as @Element1, @Element2 with no rewriting needed.
     if (Array.isArray(elements)) {
-      const normalized = normalizeFalKlingElements(elements, "o3");
+      const normalized = normalizeFalKlingElements(elements);
       if (normalized.length > 0) {
         rest.elements = normalized;
       }
@@ -138,7 +141,7 @@ function resolveFalEndpoint(
           ? kling_elements
           : null;
     if (raw) {
-      const normalized = normalizeFalKlingElements(raw, "v3");
+      const normalized = normalizeFalKlingElements(raw);
       if (normalized.length > 0) {
         rest.elements = normalized;
       }

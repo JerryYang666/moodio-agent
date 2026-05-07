@@ -79,15 +79,15 @@ export function applyElementToSeedanceReference(
  * Kling element mapping (used by all three Kling-family models — FAL V3
  * image-to-video, FAL O3 reference-to-video, KSyun V3 Omni). Each model has
  * its own provider-side normalization (see `lib/video/providers/*.ts`) that
- * picks up additional fields from the entry — `videoId` (V3 only), and
- * `ksyunElementId` (KSyun only) — when present.
+ * picks up additional fields from the entry — `videoId`/`voiceId` (FAL Kling
+ * V3 + O3) and `ksyunElementId` (KSyun) — when present.
  *
  *   - imageIds (up to 4) → element.element_input_ids
  *   - name, description  → element.name, element.description
- *   - videoId            → carried on the element entry (FAL V3 maps it to video_url)
- *   - voiceId            → dropped (FAL Kling V3/O3 expose only `generate_audio`,
- *                          a boolean; no voice/audio input slot per their llms.txt)
- *   - ksyunElementId     → carried on the element entry (KSyun reuses it to skip create+poll)
+ *   - videoId            → carried on the entry (FAL Kling V3/O3 → `video_url`)
+ *   - voiceId            → carried on the entry (FAL Kling V3/O3 → `voice_id`;
+ *                          undocumented in FAL llms.txt but supported by the API)
+ *   - ksyunElementId     → carried on the entry (KSyun reuses it to skip create+poll)
  *   - libraryElementId   → carried so the backend can write KSyun id back to the library
  *
  * Returns an error when imageIds.length < 2 — Kling elements require 2–4 images.
@@ -102,6 +102,7 @@ export function applyElementToKlingElements(
 
   const entry: KlingElement & {
     videoId?: string;
+    voiceId?: string;
     ksyunElementId?: number;
     ksyunSourceFingerprint?: string;
   } = {
@@ -111,6 +112,7 @@ export function applyElementToKlingElements(
     libraryElementId: el.id,
   };
   if (el.videoId) entry.videoId = el.videoId;
+  if (el.voiceId) entry.voiceId = el.voiceId;
   if (typeof el.ksyunElementId === "number") {
     entry.ksyunElementId = el.ksyunElementId;
   }

@@ -114,7 +114,7 @@ describe("applyElementToKlingElements", () => {
     expect(next[0].element_input_ids).toEqual(["a", "b", "c", "d"]);
   });
 
-  it("carries videoId on the entry (FAL V3 maps it to video_url) and drops voiceId", () => {
+  it("carries videoId and voiceId on the entry (FAL Kling V3/O3 map them to video_url/voice_id)", () => {
     const el = makeElement({
       imageIds: ["a", "b"],
       videoId: "vid_x",
@@ -127,7 +127,7 @@ describe("applyElementToKlingElements", () => {
     };
     expect(appended.element_input_ids).toEqual(["a", "b"]);
     expect(appended.videoId).toBe("vid_x");
-    expect(appended.voiceId).toBeUndefined();
+    expect(appended.voiceId).toBe("voice_1");
   });
 
   it("carries cached ksyunElementId on the entry when present", () => {

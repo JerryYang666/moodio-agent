@@ -74,6 +74,7 @@ export async function hydrateKlingElementsFromLibrary(
         ? el.element_input_urls
         : [];
     let videoId: string | undefined;
+    let voiceId: string | undefined;
     let cachedKsyunId: number | undefined;
     let cachedFingerprint: string | undefined;
 
@@ -83,6 +84,7 @@ export async function hydrateKlingElementsFromLibrary(
         const det = (row.elementDetails ?? {}) as {
           imageIds?: unknown;
           videoId?: unknown;
+          voiceId?: unknown;
           ksyunElementId?: unknown;
           ksyunSourceFingerprint?: unknown;
         };
@@ -100,6 +102,9 @@ export async function hydrateKlingElementsFromLibrary(
         }
         if (typeof det.videoId === "string" && det.videoId) {
           videoId = det.videoId;
+        }
+        if (typeof det.voiceId === "string" && det.voiceId) {
+          voiceId = det.voiceId;
         }
         if (typeof det.ksyunElementId === "number") {
           cachedKsyunId = det.ksyunElementId;
@@ -137,8 +142,13 @@ export async function hydrateKlingElementsFromLibrary(
       out.libraryElementId = el.libraryElementId;
     }
     if (videoId) {
-      // FAL Kling V3 consumes this as `video_url` on the element entry.
+      // FAL Kling V3/O3 consume this as `video_url` on the element entry.
       out.videoUrl = getSignedVideoUrl(videoId);
+    }
+    if (voiceId) {
+      // FAL Kling V3/O3 consume this as `voice_id` on the element entry
+      // (FAL provider voice IDs are passed straight through, not re-signed).
+      out.voiceId = voiceId;
     }
     if (typeof useCachedKsyunId === "number") {
       out.ksyunElementId = useCachedKsyunId;
