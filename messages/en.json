@@ -423,7 +423,8 @@
       "created": "Element created",
       "updated": "Element updated",
       "uploadFromLibrary": "Upload to your library first, then pick it here",
-      "createNew": "Create new element"
+      "createNew": "Create new element",
+      "modeHint": "Heads up: today's video models accept only one mode per element — either images, or a video (with an optional voice). You can save both here for future use, but at generation time the provider picks one (video + voice if present, otherwise images)."
     },
     "imageError": {
       "contentPolicyViolation": "Image blocked: the prompt or reference image may violate content policies. Please revise and try again.",
