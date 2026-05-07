@@ -16,7 +16,7 @@ import { Select, SelectItem } from "@heroui/select";
 import { Input } from "@heroui/input";
 import { Image } from "@heroui/image";
 import { Tab, Tabs } from "@heroui/tabs";
-import { Search, Expand, Camera, Star, X, Check, Video, Music, FolderTree, Layers } from "lucide-react";
+import { Search, Expand, Camera, Star, X, Check, Video, Music, FolderTree, Layers, Plus } from "lucide-react";
 import AudioPlayer from "@/components/audio-player";
 import { siteConfig } from "@/config/site";
 import { useGetCollectionsQuery } from "@/lib/redux/services/next-api";
@@ -468,6 +468,7 @@ export default function AssetPickerModal({
   multiSelect = false,
   maxSelectCount,
   acceptTypes,
+  onCreateNew,
 }: {
   isOpen: boolean;
   onOpenChange: () => void;
@@ -485,6 +486,13 @@ export default function AssetPickerModal({
   maxSelectCount?: number;
   /** When provided, only show assets of these types (and restrict upload accordingly) */
   acceptTypes?: ("image" | "video" | "audio" | "element")[];
+  /**
+   * Optional. When set, a "Create new" call-to-action is rendered above the
+   * library grid. Used for the chat composer's element flow: user can pick
+   * an existing library element OR create one on the spot. Caller decides
+   * what "create" means (typically: open ElementEditorController).
+   */
+  onCreateNew?: { label: string; onPress: () => void };
 }) {
   const t = useTranslations();
   const [loading, setLoading] = useState(false);
@@ -1649,6 +1657,20 @@ export default function AssetPickerModal({
                                 });
                               }}
                             />
+                          </div>
+                        )}
+
+                        {onCreateNew && (
+                          <div className="shrink-0 px-1">
+                            <Button
+                              size="sm"
+                              variant="flat"
+                              color="primary"
+                              startContent={<Plus size={14} />}
+                              onPress={onCreateNew.onPress}
+                            >
+                              {onCreateNew.label}
+                            </Button>
                           </div>
                         )}
 

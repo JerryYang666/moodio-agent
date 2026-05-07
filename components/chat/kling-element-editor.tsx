@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@heroui/button";
 import { Input } from "@heroui/input";
-import { Plus, Trash2, Sparkles, ImagePlus, X } from "lucide-react";
+import { Plus, Trash2, Sparkles, ImagePlus, X, Library } from "lucide-react";
 import { useTranslations } from "next-intl";
 import type { KlingElement } from "@/lib/video/models";
 
@@ -61,6 +61,14 @@ interface KlingElementEditorProps {
   isAssetPickerOpen?: boolean;
   /** Element schema variant — defaults to "v3" for backwards compatibility. */
   variant?: KlingElementVariant;
+  /**
+   * When provided, a "Pick from library" button is rendered next to "Add"
+   * which opens the asset picker filtered to library elements. Selecting one
+   * appends it to this editor's `elements` array with `libraryElementId` set.
+   * The parent decides where the click leads (typically: open AssetPickerModal
+   * with acceptTypes:["element"] and the create-new CTA).
+   */
+  onPickFromLibrary?: () => void;
 }
 
 export function KlingElementEditor({
@@ -72,6 +80,7 @@ export function KlingElementEditor({
   resolveImageUrl,
   isAssetPickerOpen = false,
   variant = "v3",
+  onPickFromLibrary,
 }: KlingElementEditorProps) {
   const isO3Reference = variant === "o3-reference";
   const isKsyun = variant === "ksyun";
@@ -166,15 +175,29 @@ export function KlingElementEditor({
           </span>
         </div>
         {!disabled && elements.length < MAX_ELEMENTS && (
-          <Button
-            size="sm"
-            variant="flat"
-            startContent={<Plus size={14} />}
-            onPress={addElement}
-            className="h-6 min-w-0 px-2 text-xs"
-          >
-            {t("addButton")}
-          </Button>
+          <div className="flex items-center gap-1">
+            {onPickFromLibrary && (
+              <Button
+                size="sm"
+                variant="flat"
+                color="primary"
+                startContent={<Library size={14} />}
+                onPress={onPickFromLibrary}
+                className="h-6 min-w-0 px-2 text-xs"
+              >
+                {t("pickFromLibrary")}
+              </Button>
+            )}
+            <Button
+              size="sm"
+              variant="flat"
+              startContent={<Plus size={14} />}
+              onPress={addElement}
+              className="h-6 min-w-0 px-2 text-xs"
+            >
+              {t("addButton")}
+            </Button>
+          </div>
         )}
       </div>
 

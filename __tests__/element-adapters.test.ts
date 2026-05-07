@@ -102,6 +102,7 @@ describe("applyElementToKlingElements", () => {
       name: "Hero",
       description: "A confident hero in a red cape",
       element_input_ids: ["img_a", "img_b", "img_c", "img_d"],
+      libraryElementId: "el_1",
     });
   });
 
@@ -113,7 +114,7 @@ describe("applyElementToKlingElements", () => {
     expect(next[0].element_input_ids).toEqual(["a", "b", "c", "d"]);
   });
 
-  it("drops video and voice silently", () => {
+  it("carries videoId and voiceId on the entry (FAL Kling V3/O3 map them to video_url/voice_id)", () => {
     const el = makeElement({
       imageIds: ["a", "b"],
       videoId: "vid_x",
@@ -125,8 +126,24 @@ describe("applyElementToKlingElements", () => {
       voiceId?: string;
     };
     expect(appended.element_input_ids).toEqual(["a", "b"]);
-    expect(appended.videoId).toBeUndefined();
-    expect(appended.voiceId).toBeUndefined();
+    expect(appended.videoId).toBe("vid_x");
+    expect(appended.voiceId).toBe("voice_1");
+  });
+
+  it("carries cached ksyunElementId on the entry when present", () => {
+    const el = makeElement({
+      imageIds: ["a", "b"],
+      ksyunElementId: 12345,
+    });
+    const { next } = applyElementToKlingElements(el, []);
+    const appended = next[0] as KlingElement & { ksyunElementId?: number };
+    expect(appended.ksyunElementId).toBe(12345);
+  });
+
+  it("tags every entry with the source library element id", () => {
+    const el = makeElement({ id: "lib_42", imageIds: ["a", "b"] });
+    const { next } = applyElementToKlingElements(el, []);
+    expect(next[0].libraryElementId).toBe("lib_42");
   });
 
   it("returns an error when imageIds has fewer than 2", () => {

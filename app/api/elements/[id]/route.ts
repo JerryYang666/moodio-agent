@@ -12,6 +12,7 @@ import {
   MAX_DESCRIPTION_LEN,
   MAX_VOICE_ID_LEN,
   buildElementDetails,
+  ksyunSourceFingerprint,
   parseStringArray,
   resolveDestinationPermission,
 } from "@/lib/elements/helpers";
@@ -22,6 +23,13 @@ type ElementPatchBody = {
   imageIds?: string[];
   videoId?: string | null;
   voiceId?: string | null;
+  /**
+   * Optional. Only the server-side video-generate route writes this — clients
+   * never need to set it. When provided, it's stored alongside a fingerprint
+   * derived from the (post-update) imageIds so the next KSyun submission
+   * skips create+poll while still invalidating after a content change.
+   */
+  ksyunElementId?: number | null;
 };
 
 async function loadElement(id: string) {
@@ -82,6 +90,8 @@ export async function PATCH(
       imageIds?: unknown;
       videoId?: unknown;
       voiceId?: unknown;
+      ksyunElementId?: unknown;
+      ksyunSourceFingerprint?: unknown;
     };
 
     const nextName =
@@ -170,6 +180,44 @@ export async function PATCH(
 
     const primaryImageId = nextImageIds[0] ?? "";
 
+    // KSyun element id round-trip:
+    // - If imageIds didn't change, preserve any existing id+fingerprint on the
+    //   row (no need for the caller to know it).
+    // - If the caller is explicitly writing a fresh id (server-side write-back),
+    //   accept it and pin a fingerprint matching the just-saved imageIds.
+    // - If imageIds changed and no new id is supplied, drop the stale id so
+    //   the next submission re-creates against the new content.
+    const imageIdsChanged =
+      body.imageIds !== undefined &&
+      JSON.stringify(
+        Array.isArray(currentDetails.imageIds)
+          ? (currentDetails.imageIds as unknown[]).filter(
+              (v): v is string => typeof v === "string"
+            )
+          : []
+      ) !== JSON.stringify(nextImageIds);
+
+    let nextKsyunId: number | null;
+    let nextKsyunFp: string | null;
+    if (body.ksyunElementId !== undefined) {
+      nextKsyunId =
+        typeof body.ksyunElementId === "number" ? body.ksyunElementId : null;
+      nextKsyunFp =
+        nextKsyunId !== null ? ksyunSourceFingerprint(nextImageIds) : null;
+    } else if (imageIdsChanged) {
+      nextKsyunId = null;
+      nextKsyunFp = null;
+    } else {
+      nextKsyunId =
+        typeof currentDetails.ksyunElementId === "number"
+          ? currentDetails.ksyunElementId
+          : null;
+      nextKsyunFp =
+        typeof currentDetails.ksyunSourceFingerprint === "string"
+          ? currentDetails.ksyunSourceFingerprint
+          : null;
+    }
+
     const nextGenerationDetails = {
       ...gen,
       title: nextName,
@@ -187,6 +235,8 @@ export async function PATCH(
           imageIds: nextImageIds,
           videoId: nextVideoId,
           voiceId: nextVoiceId,
+          ksyunElementId: nextKsyunId,
+          ksyunSourceFingerprint: nextKsyunFp,
         }),
       })
       .where(eq(collectionImages.id, id))
@@ -206,6 +256,8 @@ export async function PATCH(
           videoId: nextVideoId ?? undefined,
           voiceId: nextVoiceId ?? undefined,
           voiceProvider: nextVoiceId ? ("fal" as const) : undefined,
+          ksyunElementId: nextKsyunId ?? undefined,
+          ksyunSourceFingerprint: nextKsyunFp ?? undefined,
           imageUrls: nextImageIds.map((imgId) => getImageUrl(imgId, cnMode)),
           videoUrl: nextVideoId ? getVideoUrl(nextVideoId, cnMode) : undefined,
         },

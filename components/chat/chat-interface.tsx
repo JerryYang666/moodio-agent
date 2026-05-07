@@ -28,6 +28,7 @@ import ChatMessage from "./chat-message";
 import ChatInput, { ChatInputRef, type AssetParamValue } from "./chat-input";
 import ParallelMessage from "./parallel-message";
 import AssetPickerModal, { type AssetSummary } from "./asset-picker-modal";
+import ElementEditorController from "./element-editor-controller";
 import { PersistentAssetsPanel } from "./persistent-assets-panel";
 import { useGetPersistentAssetsQuery, useUpdatePersistentAssetsMutation } from "@/lib/redux/services/next-api";
 import { siteConfig } from "@/config/site";
@@ -346,10 +347,14 @@ export default function ChatInterface({
     | "persistent"
     | "assetParam"
     | "elementImages"
+    | "libraryElement"
     | "mediaRefImage"
     | "mediaRefVideo"
     | "mediaRefAudio"
   >("pending");
+  // Library-element flow: picker → optional ElementEditorController (Create new) → result back to kling_elements.
+  const [isLibraryElementEditorOpen, setIsLibraryElementEditorOpen] =
+    useState(false);
   const [activeAssetParamName, setActiveAssetParamName] = useState<string | null>(null);
   const [activeElementIndex, setActiveElementIndex] = useState<number | null>(null);
   const [activeElementMaxImages, setActiveElementMaxImages] = useState(4);
@@ -1983,6 +1988,55 @@ export default function ChatInterface({
     setIsAssetPickerOpen(true);
   }, []);
 
+  const openLibraryElementPicker = useCallback(() => {
+    setAssetPickerMode("libraryElement");
+    setIsAssetPickerOpen(true);
+  }, []);
+
+  /**
+   * Append a library element to the chat composer's kling_elements array.
+   * The entry carries `libraryElementId` plus a denormalized snapshot of the
+   * element fields for chip display; the backend re-hydrates from the library
+   * row at submit time so the snapshot can't desync.
+   */
+  const appendLibraryElement = useCallback(
+    (asset: AssetSummary) => {
+      const det = asset.elementDetails;
+      if (!det || !asset.id) return;
+      const current =
+        (menuState.videoParams?.kling_elements as KlingElement[]) || [];
+      if (current.length >= 3) return;
+      const next: KlingElement = {
+        name: det.name,
+        description: det.description,
+        element_input_ids: det.imageIds.slice(0, 4),
+        libraryElementId: asset.id,
+      };
+      // Cache constituent image URLs so the editor can render them without a refetch.
+      if (det.imageUrls) {
+        const updates: Record<string, string> = {};
+        det.imageIds.forEach((id, i) => {
+          const url = det.imageUrls?.[i];
+          if (id && url) updates[id] = url;
+        });
+        if (Object.keys(updates).length > 0) {
+          setElementImageUrls((prev) => ({ ...prev, ...updates }));
+        }
+      }
+      setMenuState((prev) => ({
+        ...prev,
+        videoParams: {
+          ...prev.videoParams,
+          kling_elements: [
+            ...((prev.videoParams?.kling_elements as KlingElement[]) || []),
+            next,
+          ],
+        },
+      }));
+    },
+    [menuState.videoParams?.kling_elements]
+  );
+
   const resolveElementImageUrl = useCallback(
     (imageId: string) => elementImageUrls[imageId],
     [elementImageUrls]
@@ -2537,6 +2591,20 @@ export default function ChatInterface({
           return updated;
         });
         setActiveElementIndex(null);
+        return;
+      }
+
+      // Library-element flow: user picked a library element from the
+      // chat-level "Pick from library" entry. Append as a new kling_elements
+      // entry tagged with libraryElementId so the backend hydrates canonical
+      // fields and persists any KSyun element_id minted during submit.
+      if (
+        assetPickerMode === "libraryElement" &&
+        asset.assetType === "element" &&
+        asset.elementDetails
+      ) {
+        appendLibraryElement(asset);
+        setIsAssetPickerOpen(false);
         return;
       }
 
@@ -5273,6 +5341,7 @@ export default function ChatInterface({
           videoModelParams={videoModelParams}
           onPickElementImages={openElementImagePicker}
           resolveElementImageUrl={resolveElementImageUrl}
+          onPickLibraryElement={openLibraryElementPicker}
           onPickMediaRefImage={openMediaRefImagePicker}
           onPickMediaRefVideo={openMediaRefVideoPicker}
           onPickMediaRefAudio={openMediaRefAudioPicker}
@@ -5297,9 +5366,10 @@ export default function ChatInterface({
         onSelect={handleAssetPicked}
         onSelectMultiple={handleAssetPickedMultiple}
         onUpload={handleAssetUpload}
-        multiSelect={assetPickerMode !== "assetParam"}
+        multiSelect={assetPickerMode !== "assetParam" && assetPickerMode !== "libraryElement"}
         validateOnSelect={
-          assetPickerMode === "elementImages"
+          assetPickerMode === "elementImages" ||
+          assetPickerMode === "libraryElement"
             ? (a) =>
                 a.assetType === "element" &&
                 (a.elementDetails?.imageIds.length ?? 0) < 2
@@ -5307,8 +5377,24 @@ export default function ChatInterface({
                   : null
             : undefined
         }
+        onCreateNew={
+          assetPickerMode === "libraryElement"
+            ? {
+                label: t("chat.element.createNew"),
+                onPress: () => {
+                  // Close the picker, open the editor on top. On save the
+                  // editor's onSaved callback re-uses the appendLibraryElement
+                  // path with the freshly created element.
+                  setIsAssetPickerOpen(false);
+                  setIsLibraryElementEditorOpen(true);
+                },
+              }
+            : undefined
+        }
         maxSelectCount={
-          assetPickerMode === "elementImages"
+          assetPickerMode === "libraryElement"
+            ? 1
+            : assetPickerMode === "elementImages"
             ? activeElementMaxImages
             : assetPickerMode === "assetParam"
               ? 1
@@ -5338,7 +5424,9 @@ export default function ChatInterface({
                       : MAX_PENDING_IMAGES - pendingImagesRef.current.length
         }
         acceptTypes={
-          assetPickerMode === "elementImages"
+          assetPickerMode === "libraryElement"
+            ? ["element"]
+            : assetPickerMode === "elementImages"
             ? ["image", "element"]
             : assetPickerMode === "mediaRefImage"
               ? ["image", "element"]
@@ -5354,6 +5442,22 @@ export default function ChatInterface({
         }
       />
 
+      {/* Library element create-on-the-spot flow. Opened from the asset
+          picker's "Create new" CTA when assetPickerMode === "libraryElement".
+          Saves into the user's default project + "My Elements" collection
+          (via useDefaultElementsCollection), then appends to kling_elements. */}
+      <ElementEditorController
+        isOpen={isLibraryElementEditorOpen}
+        onOpenChange={(open) => setIsLibraryElementEditorOpen(open)}
+        useDefaultElementsCollection
+        onSaved={(asset) => {
+          setIsLibraryElementEditorOpen(false);
+          const a = asset as AssetSummary | undefined;
+          if (a?.assetType === "element" && a.elementDetails) {
+            appendLibraryElement(a);
+          }
+        }}
+      />
 
       <ImageDetailModal
         isOpen={isOpen}

@@ -37,6 +37,10 @@ export interface AssetItem {
     videoId?: string;
     voiceId?: string;
     voiceProvider?: "fal";
+    /** Persisted KSyun element_id, reused across generations until source changes. */
+    ksyunElementId?: number;
+    /** sha1 of imageIds at the time ksyunElementId was stored. */
+    ksyunSourceFingerprint?: string;
     imageUrls?: string[];
     videoUrl?: string;
   };

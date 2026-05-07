@@ -36,6 +36,10 @@ import {
   TEXT_TO_VIDEO_PLACEHOLDER_IMAGE_ID,
 } from "@/lib/video/models";
 import { submitVideoGeneration } from "@/lib/video/video-client";
+import {
+  hydrateKlingElementsFromLibrary,
+  persistKsyunElementWriteBacks,
+} from "@/lib/elements/hydrate";
 import { videoGenerations } from "@/lib/db/schema";
 import { siteConfig } from "@/config/site";
 import { isFeatureFlagEnabled } from "@/lib/feature-flags/server";
@@ -926,25 +930,12 @@ export async function POST(
         }
       }
 
-      // Resolve image IDs inside kling_elements to signed URLs for the provider API
-      if (Array.isArray(fullParams.kling_elements)) {
-        fullParams.kling_elements = fullParams.kling_elements.map(
-          (el: { name: string; description: string; element_input_ids?: string[]; element_input_urls?: string[] }) => ({
-            name: el.name,
-            description: el.description,
-            element_input_urls: (el.element_input_ids || el.element_input_urls || []).map((idOrUrl: string) => {
-              if (idOrUrl.startsWith("http") && !idOrUrl.includes("moodio.art/images/")) {
-                return idOrUrl;
-              }
-              const cfMatch = idOrUrl.match(/\/images\/([^/?]+)/);
-              if (cfMatch) {
-                return getSignedImageUrl(cfMatch[1]);
-              }
-              return getSignedImageUrl(idOrUrl);
-            }),
-          })
-        );
-      }
+      // Hydrate kling_elements from the library when entries carry a
+      // libraryElementId, then resolve image IDs to signed URLs (and the
+      // optional video to a signed URL surfaced as videoUrl). The library
+      // element is the source of truth — entries without libraryElementId
+      // keep their inline element_input_ids path.
+      await hydrateKlingElementsFromLibrary(fullParams, payload.userId);
 
       // Resolve media_references IDs to signed URLs for the provider API
       if (Array.isArray(fullParams.media_references)) {
@@ -1064,10 +1055,17 @@ export async function POST(
               send({ type: "part", part: pendingPart, variantId });
 
               // Submit to provider queue
-              const { requestId, provider, providerModelId } = await submitVideoGeneration(
-                modelId,
-                mergedParams,
-              );
+              const { requestId, provider, providerModelId, ksyunElementWriteBacks } =
+                await submitVideoGeneration(modelId, mergedParams);
+
+              // Persist freshly-minted KSyun element IDs onto the library rows
+              // so the next submission reuses them. Best-effort; non-fatal.
+              if (ksyunElementWriteBacks) {
+                await persistKsyunElementWriteBacks(
+                  ksyunElementWriteBacks,
+                  payload.userId
+                );
+              }
 
               // Submission succeeded — deduct credits and update record atomically
               await db.transaction(async (tx) => {

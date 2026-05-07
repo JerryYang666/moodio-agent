@@ -26,6 +26,13 @@ interface ElementEditorControllerProps {
   projectId?: string;
   collectionId?: string | null;
   folderId?: string | null;
+  /**
+   * When true and no projectId/collectionId/folderId are supplied, the create
+   * request asks the server to route the element into the user's default
+   * project + default "My Elements" collection. Used by the chat composer's
+   * "create on the spot" flow.
+   */
+  useDefaultElementsCollection?: boolean;
 
   /** Pre-fill the editor in edit mode. */
   initialElement?: ElementAsset | null;
@@ -58,6 +65,7 @@ export default function ElementEditorController({
   projectId,
   collectionId,
   folderId,
+  useDefaultElementsCollection,
   initialElement = null,
   initialImageUrls,
   initialVideoUrl,
@@ -183,6 +191,13 @@ export default function ElementEditorController({
             projectId,
             collectionId: collectionId ?? null,
             folderId: folderId ?? null,
+            useDefaultElementsCollection:
+              useDefaultElementsCollection &&
+              !projectId &&
+              collectionId == null &&
+              folderId == null
+                ? true
+                : undefined,
           };
       const res = await fetch(url, {
         method,
@@ -202,7 +217,15 @@ export default function ElementEditorController({
       });
       onSaved?.(data?.asset);
     },
-    [initialElement, projectId, collectionId, folderId, onSaved, t]
+    [
+      initialElement,
+      projectId,
+      collectionId,
+      folderId,
+      useDefaultElementsCollection,
+      onSaved,
+      t,
+    ]
   );
 
   return (

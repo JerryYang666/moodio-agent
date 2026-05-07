@@ -14,6 +14,10 @@ import { deductCredits, assertSufficientCredits, getActiveAccount, InsufficientC
 import { calculateCost } from "@/lib/pricing";
 import { submitVideoGeneration } from "@/lib/video/video-client";
 import { getSignedImageUrl, getSignedVideoUrl, getSignedAudioUrl } from "@/lib/storage/s3";
+import {
+  hydrateKlingElementsFromLibrary,
+  persistKsyunElementWriteBacks,
+} from "@/lib/elements/hydrate";
 import { recordEvent } from "@/lib/telemetry";
 import { isFeatureFlagEnabled } from "@/lib/feature-flags/server";
 import { recordResearchEvent } from "@/lib/research-telemetry";
@@ -95,25 +99,12 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Resolve image IDs inside kling_elements to signed URLs for the provider API
-    if (Array.isArray(fullParams.kling_elements)) {
-      fullParams.kling_elements = fullParams.kling_elements.map(
-        (el: { name: string; description: string; element_input_ids?: string[]; element_input_urls?: string[] }) => ({
-          name: el.name,
-          description: el.description,
-          element_input_urls: (el.element_input_ids || el.element_input_urls || []).map((idOrUrl: string) => {
-            if (idOrUrl.startsWith("http") && !idOrUrl.includes("moodio.art/images/")) {
-              return idOrUrl;
-            }
-            const cfMatch = idOrUrl.match(/\/images\/([^/?]+)/);
-            if (cfMatch) {
-              return getSignedImageUrl(cfMatch[1]);
-            }
-            return getSignedImageUrl(idOrUrl);
-          }),
-        })
-      );
-    }
+    // Resolve image IDs inside kling_elements to signed URLs for the provider
+    // API. When an entry references a library element via `libraryElementId`,
+    // we hydrate the canonical fields (name/description/imageIds/videoId/
+    // ksyunElementId) from the DB row — the library element is the source of
+    // truth, the chat-side denormalized snapshot is just for display.
+    await hydrateKlingElementsFromLibrary(fullParams, payload.userId);
 
     // Resolve media_references IDs to signed URLs for the provider API
     if (Array.isArray(fullParams.media_references)) {
@@ -207,10 +198,17 @@ export async function POST(request: NextRequest) {
 
     // Submit to provider
     try {
-      const { requestId, provider, providerModelId } = await submitVideoGeneration(
-        modelId,
-        mergedParams,
-      );
+      const { requestId, provider, providerModelId, ksyunElementWriteBacks } =
+        await submitVideoGeneration(modelId, mergedParams);
+
+      // Persist freshly-minted KSyun element IDs onto the library rows so
+      // subsequent submissions reuse them. Best-effort; non-fatal on failure.
+      if (ksyunElementWriteBacks) {
+        await persistKsyunElementWriteBacks(
+          ksyunElementWriteBacks,
+          payload.userId
+        );
+      }
 
       // Submission succeeded — deduct credits and update record atomically
       await db.transaction(async (tx) => {
