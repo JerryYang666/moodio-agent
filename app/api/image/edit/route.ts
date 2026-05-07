@@ -24,12 +24,20 @@ export type ImageEditOperation =
   | "cutout-auto"
   | "cutout-manual";
 
-const ERASE_PROMPT =
-  "Remove the content marked in red from this image and naturally fill the area to seamlessly match the surrounding context. Do not leave any red marks in the output.";
+const VALID_MARK_COLORS = ["red", "blue", "green", "yellow", "magenta"] as const;
+type MarkColorName = (typeof VALID_MARK_COLORS)[number];
+
+const buildErasePrompt = (color: MarkColorName) =>
+  `Remove the content marked in semi-transparent ${color} from this image and naturally fill the area to seamlessly match the surrounding context. The ${color} marking is a translucent overlay drawn by the user — preserve everything outside it and do not leave any ${color} tint in the output.`;
+
 const CUTOUT_AUTO_PROMPT =
   "Extract the main subject of this image and remove the background. Return a PNG with a fully transparent background showing only the main subject.";
-const CUTOUT_MANUAL_PROMPT =
-  "Extract only the content marked in red in this image and remove everything else. Return a PNG with a fully transparent background showing only the content that was marked.";
+
+const buildCutoutManualPrompt = (color: MarkColorName) =>
+  `Extract only the content marked in semi-transparent ${color} in this image and remove everything else. The ${color} marking is a translucent overlay drawn by the user — return a PNG with a fully transparent background showing only the content that was beneath the ${color} marking, with no ${color} tint left over.`;
+
+const buildRedrawPrompt = (userPrompt: string, color: MarkColorName) =>
+  `${userPrompt}\n\n(The area to change is indicated by a semi-transparent ${color} marking on the input image. The marking is a translucent overlay drawn by the user — the original content underneath is still visible to you and should inform style, lighting, and composition. Apply the change only inside the marked area, preserve everything outside, and do not leave any ${color} tint in the output.)`;
 
 /**
  * POST /api/image/edit
@@ -90,6 +98,9 @@ export async function POST(req: NextRequest) {
       body.imageQuality === "high"
         ? body.imageQuality
         : "auto";
+    const markColor: MarkColorName = VALID_MARK_COLORS.includes(body.markColor)
+      ? (body.markColor as MarkColorName)
+      : "red";
 
     if (
       operation !== "redraw" &&
@@ -128,7 +139,7 @@ export async function POST(req: NextRequest) {
         );
       }
       inputImageId = markedImageId;
-      prompt = `${userPrompt}\n\n(The area to change is marked in red on the input image. Apply the change only inside the marked area, preserve everything else, and do not leave any red marks in the output.)`;
+      prompt = buildRedrawPrompt(userPrompt, markColor);
     } else if (operation === "erase") {
       if (!markedImageId) {
         return NextResponse.json(
@@ -137,7 +148,7 @@ export async function POST(req: NextRequest) {
         );
       }
       inputImageId = markedImageId;
-      prompt = ERASE_PROMPT;
+      prompt = buildErasePrompt(markColor);
     } else if (operation === "cutout-manual") {
       if (!markedImageId) {
         return NextResponse.json(
@@ -146,9 +157,9 @@ export async function POST(req: NextRequest) {
         );
       }
       inputImageId = markedImageId;
-      prompt = CUTOUT_MANUAL_PROMPT;
+      prompt = buildCutoutManualPrompt(markColor);
     } else {
-      // cutout-auto
+      // cutout-auto: no user marking, so markColor doesn't apply.
       inputImageId = sourceImageId;
       prompt = CUTOUT_AUTO_PROMPT;
     }

@@ -26,13 +26,17 @@ import ReactCrop, {
 } from "react-image-crop";
 import "react-image-crop/dist/ReactCrop.css";
 import { uploadImage as uploadImageClient } from "@/lib/upload/client";
+import {
+  DEFAULT_MARK_COLOR,
+  DEFAULT_MARK_WIDTH,
+  MARK_COMPOSITE_ALPHA,
+  markColorNameFromHex,
+} from "@/lib/image/mark-config";
+import MarkControls from "@/components/chat/mark-controls";
 import MagicProgress from "./magic-progress";
 
 export type ImageEditMode = "redraw" | "crop" | "erase" | "cutout";
 export type CutoutSubMode = "auto" | "manual";
-
-const PEN_COLOR = "#FF0000";
-const PEN_WIDTH = 6;
 
 interface ImageEditOverlayProps {
   /** Which operation. The modal swaps panes/controls based on this. */
@@ -81,6 +85,8 @@ export default function ImageEditOverlay({
   const [isDrawing, setIsDrawing] = useState(false);
   const [hasDrawing, setHasDrawing] = useState(false);
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
+  const [brushColor, setBrushColor] = useState<string>(DEFAULT_MARK_COLOR.value);
+  const [brushWidth, setBrushWidth] = useState<number>(DEFAULT_MARK_WIDTH.value);
 
   // Crop state.
   const [crop, setCrop] = useState<ReactCropArea>();
@@ -112,12 +118,22 @@ export default function ImageEditOverlay({
     setCanvasSize({ width: rect.width, height: rect.height });
     const ctx = canvas.getContext("2d");
     if (ctx) {
-      ctx.strokeStyle = PEN_COLOR;
-      ctx.lineWidth = PEN_WIDTH;
+      ctx.strokeStyle = brushColor;
+      ctx.lineWidth = brushWidth;
       ctx.lineCap = "round";
       ctx.lineJoin = "round";
     }
-  }, []);
+  }, [brushColor, brushWidth]);
+
+  // Sync brush settings onto the canvas context whenever the user picks a
+  // new color or width. Existing strokes keep their original look; future
+  // strokes use the new settings.
+  useEffect(() => {
+    const ctx = canvasRef.current?.getContext("2d");
+    if (!ctx) return;
+    ctx.strokeStyle = brushColor;
+    ctx.lineWidth = brushWidth;
+  }, [brushColor, brushWidth]);
 
   useEffect(() => {
     if (!imageLoaded || !usesBrush) return;
@@ -172,8 +188,8 @@ export default function ImageEditOverlay({
     const ctx = canvasRef.current?.getContext("2d");
     if (ctx) {
       ctx.beginPath();
-      ctx.arc(point.x, point.y, PEN_WIDTH / 2, 0, Math.PI * 2);
-      ctx.fillStyle = PEN_COLOR;
+      ctx.arc(point.x, point.y, brushWidth / 2, 0, Math.PI * 2);
+      ctx.fillStyle = brushColor;
       ctx.fill();
       setHasDrawing(true);
     }
@@ -250,10 +266,15 @@ export default function ImageEditOverlay({
     const ctx = out.getContext("2d");
     if (!ctx) throw new Error("Failed to get output 2d context");
     ctx.drawImage(cleanImage, 0, 0);
+    // The brush canvas is at displayed-pixel resolution; scale onto the
+    // original-resolution output and composite once at MARK_COMPOSITE_ALPHA
+    // so overlapping strokes don't compound and the underlying content
+    // stays visible to the model.
     const scaleX = cleanImage.naturalWidth / canvasSize.width;
     const scaleY = cleanImage.naturalHeight / canvasSize.height;
     ctx.save();
     ctx.scale(scaleX, scaleY);
+    ctx.globalAlpha = MARK_COMPOSITE_ALPHA;
     ctx.drawImage(canvas, 0, 0);
     ctx.restore();
 
@@ -370,6 +391,11 @@ export default function ImageEditOverlay({
           sourceImageId,
           markedImageId,
           prompt: mode === "redraw" ? prompt.trim() : undefined,
+          // Pass the user's chosen mark color so the prompt template can
+          // reference it explicitly (e.g. "the area marked in blue…").
+          markColor: requireMarking
+            ? markColorNameFromHex(brushColor)
+            : undefined,
         }),
       });
       if (!apiRes.ok) {
@@ -612,12 +638,20 @@ export default function ImageEditOverlay({
         </div>
       </div>
 
-      {/* Bottom pane (clear-drawing for brush modes). */}
+      {/* Bottom pane: brush color + width picker, and the clear-drawing
+          button. Only rendered for brush modes. */}
       {usesBrush && !isProcessing && (
         <div
           style={bottomPaneStyle}
-          className="flex justify-center pointer-events-auto"
+          className="flex justify-center gap-2 pointer-events-auto flex-wrap"
         >
+          <MarkControls
+            color={brushColor}
+            width={brushWidth}
+            onColorChange={setBrushColor}
+            onWidthChange={setBrushWidth}
+            className="bg-background"
+          />
           <button
             type="button"
             onClick={handleClearDrawing}
