@@ -7,7 +7,7 @@ import { Button } from "@heroui/button";
 import { Spinner } from "@heroui/spinner";
 import { Chip } from "@heroui/chip";
 import { Image } from "@heroui/image";
-import { Folder, Clock, Images, ChevronLeft, ChevronRight, Pin, PinOff, X, Play, ArrowLeft } from "lucide-react";
+import { Folder, Clock, Images, ChevronLeft, ChevronRight, Pin, PinOff, X, Play, ArrowLeft, Layers, Music, Video as VideoIcon } from "lucide-react";
 import clsx from "clsx";
 import { addToast } from "@heroui/toast";
 import { ASSET_DRAG_MIME, AI_IMAGE_DRAG_MIME } from "./asset-dnd";
@@ -35,10 +35,20 @@ type Asset = {
   collectionId: string | null;
   imageId: string;
   assetId: string;
-  assetType: "image" | "video";
+  assetType: "image" | "video" | "public_image" | "public_video" | "audio" | "element";
   imageUrl: string;
   /** md WebP thumbnail, populated for image assets by /api/assets. */
   thumbnailMdUrl?: string;
+  elementDetails?: {
+    id: string;
+    name: string;
+    description: string;
+    imageIds: string[];
+    videoId?: string;
+    voiceId?: string;
+    imageUrls?: string[];
+    videoUrl?: string;
+  };
   generationDetails: {
     title: string;
     prompt: string;
@@ -559,7 +569,9 @@ export default function AssetsHoverSidebar() {
                   </div>
                 ) : (
                   <div className="grid grid-cols-2 gap-2">
-                    {assets.filter((a) => a.imageUrl).map((a) => (
+                    {assets
+                      .filter((a) => a.imageUrl || a.assetType === "element")
+                      .map((a) => (
                       <div
                         key={a.id}
                         draggable
@@ -570,30 +582,57 @@ export default function AssetsHoverSidebar() {
                         tabIndex={0}
                       >
                         <div className="relative rounded-lg overflow-hidden border border-divider bg-default-100 aspect-square">
-                          <Image
-                            src={
-                              a.assetType === "image" && a.thumbnailMdUrl
-                                ? a.thumbnailMdUrl
-                                : a.imageUrl
-                            }
-                            alt={
-                              a.generationDetails?.title ||
-                              t("assetsSidebar.assetAlt")
-                            }
-                            radius="none"
-                            classNames={{
-                              wrapper: "w-full h-full !max-w-full",
-                              img: "w-full h-full object-cover",
-                            }}
-                            onError={
-                              ((e: React.SyntheticEvent<HTMLImageElement>) => {
-                                const target = e.currentTarget;
-                                if (a.imageUrl && target.src !== a.imageUrl) {
-                                  target.src = a.imageUrl;
-                                }
-                              }) as unknown as () => void
-                            }
-                          />
+                          {a.assetType === "element" ? (
+                            <div className="w-full h-full grid grid-cols-2 grid-rows-2 gap-0.5 bg-default-200">
+                              {Array.from({ length: 4 }).map((_, i) => {
+                                const url = a.elementDetails?.imageUrls?.[i];
+                                return (
+                                  <div
+                                    key={i}
+                                    className="relative bg-default-100 overflow-hidden"
+                                  >
+                                    {url ? (
+                                      // eslint-disable-next-line @next/next/no-img-element
+                                      <img
+                                        src={url}
+                                        alt=""
+                                        className="w-full h-full object-cover"
+                                      />
+                                    ) : (
+                                      <div className="w-full h-full flex items-center justify-center text-default-300">
+                                        <Layers size={12} />
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <Image
+                              src={
+                                a.assetType === "image" && a.thumbnailMdUrl
+                                  ? a.thumbnailMdUrl
+                                  : a.imageUrl
+                              }
+                              alt={
+                                a.generationDetails?.title ||
+                                t("assetsSidebar.assetAlt")
+                              }
+                              radius="none"
+                              classNames={{
+                                wrapper: "w-full h-full !max-w-full",
+                                img: "w-full h-full object-cover",
+                              }}
+                              onError={
+                                ((e: React.SyntheticEvent<HTMLImageElement>) => {
+                                  const target = e.currentTarget;
+                                  if (a.imageUrl && target.src !== a.imageUrl) {
+                                    target.src = a.imageUrl;
+                                  }
+                                }) as unknown as () => void
+                              }
+                            />
+                          )}
                           {/* Video Badge */}
                           {a.assetType === "video" && (
                             <div className="absolute top-1 left-1 z-10">
@@ -601,6 +640,25 @@ export default function AssetsHoverSidebar() {
                                 <Play size={10} fill="white" />
                                 <span className="text-[8px] font-medium pr-0.5">Video</span>
                               </div>
+                            </div>
+                          )}
+                          {/* Element Badge + optional video/voice sub-badges */}
+                          {a.assetType === "element" && (
+                            <div className="absolute top-1 left-1 z-10 flex items-center gap-0.5">
+                              <div className="bg-sky-600/80 text-white rounded-full p-1 flex items-center gap-0.5">
+                                <Layers size={10} />
+                                <span className="text-[8px] font-medium pr-0.5">Element</span>
+                              </div>
+                              {a.elementDetails?.videoUrl && (
+                                <div className="bg-black/70 text-white rounded-full p-1 flex items-center">
+                                  <VideoIcon size={8} />
+                                </div>
+                              )}
+                              {a.elementDetails?.voiceId && (
+                                <div className="bg-violet-600/80 text-white rounded-full p-1 flex items-center">
+                                  <Music size={8} />
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>
