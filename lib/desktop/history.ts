@@ -256,6 +256,41 @@ export async function applyTextUpdate(
   }
 }
 
+/**
+ * Swap an image asset's `imageId` (and the parallel `imageHistory` stack) in
+ * one operation. Forward applies the new state; the inverse closure simply
+ * calls this same helper with the previous values, so undo/redo cleanly walks
+ * back and forth across the history.
+ */
+export async function applyAssetImagePatch(
+  deps: DesktopDispatchDeps,
+  assetId: string,
+  imageId: string,
+  imageHistory: string[]
+): Promise<ApplyResult> {
+  if (!deps.getAssets().some((a) => a.id === assetId)) {
+    return { ok: false, reason: "target_missing" };
+  }
+  deps.applyRemoteEvent({
+    type: "asset_updated",
+    payload: { assetId, metadata: { imageId, imageHistory } },
+  });
+  deps.sendEvent("asset_image_changed", { assetId, imageId, imageHistory });
+  try {
+    const res = await fetch(`/api/desktop/${deps.desktopId}/assets/${assetId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ imagePatch: { imageId, imageHistory } }),
+    });
+    if (res.status === 403) return { ok: false, reason: "permission" };
+    if (res.status === 404) return { ok: false, reason: "target_missing" };
+    if (!res.ok) return { ok: false, reason: "network" };
+    return { ok: true };
+  } catch (e) {
+    return networkError(e);
+  }
+}
+
 /** Replace a single table-asset cell value. */
 export async function applyTableCellUpdate(
   deps: DesktopDispatchDeps,

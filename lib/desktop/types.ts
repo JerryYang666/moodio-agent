@@ -7,6 +7,14 @@ export type ImageAssetMeta = {
   status?: string;
   modelId?: string;
   aspectRatio?: string;
+  /**
+   * Stack of prior `imageId`s for this canvas tile. Newest-last. Each in-canvas
+   * image edit (redraw / crop / erase / cutout) appends the previous imageId
+   * here before swapping to the new one, so undo/redo can walk the chain.
+   * Lineage of HOW each historical image was produced lives on the
+   * collection_images row's generationDetails JSONB, not here.
+   */
+  imageHistory?: string[];
 };
 
 /**

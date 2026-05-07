@@ -48,8 +48,10 @@ import {
   applyZIndex,
   applyTextUpdate,
   applyTableCellUpdate,
+  applyAssetImagePatch,
   type DesktopDispatchDeps,
 } from "@/lib/desktop/history";
+import type { ImageEditMode } from "@/components/desktop/image-edit-overlay";
 
 const DEFAULT_CAMERA: CameraState = { x: 0, y: 0, zoom: 1 };
 const VIEWPORT_SAVE_DEBOUNCE = 2000;
@@ -146,6 +148,18 @@ export default function DesktopDetailPage({
           applyRemoteEvent({
             type: "asset_updated",
             payload: { assetId, metadata: { content } },
+          });
+        }
+      } else if (event.type === "asset_image_changed") {
+        const { assetId, imageId, imageHistory } = event.payload || {};
+        if (assetId && typeof imageId === "string") {
+          const metadata: Record<string, unknown> = { imageId };
+          if (Array.isArray(imageHistory)) {
+            metadata.imageHistory = imageHistory;
+          }
+          applyRemoteEvent({
+            type: "asset_updated",
+            payload: { assetId, metadata },
           });
         }
       } else if (event.type === "video_suggest_updated") {
@@ -262,6 +276,14 @@ export default function DesktopDetailPage({
 
   const [camera, setCamera] = useState<CameraState>(DEFAULT_CAMERA);
   const [canvasMode, setCanvasMode] = useState<CanvasMode>("move");
+
+  // In-canvas image-edit overlay (重绘 / 裁切 / 擦除 / 抠图). Set by the
+  // `moodio-image-edit` listener below; cleared when the user submits or
+  // cancels.
+  const [imageEditState, setImageEditState] = useState<{
+    assetId: string;
+    mode: ImageEditMode;
+  } | null>(null);
   const viewportSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cameraRef = useRef(camera);
   cameraRef.current = camera;
@@ -431,6 +453,21 @@ export default function DesktopDetailPage({
     };
   }, [isChatPanelCollapsed, handleChatPanelCollapseChange]);
 
+  // Open the in-canvas image-edit overlay when a floating-bar button asks
+  // for it. The DesktopCanvas button calls handleFocusAsset before
+  // dispatching, so the asset is already centered by the time we mount.
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      const mode: ImageEditMode | undefined = detail?.mode;
+      const assetId: string | undefined = detail?.assetId;
+      if (!mode || !assetId) return;
+      setImageEditState({ assetId, mode });
+    };
+    window.addEventListener("moodio-image-edit", handler);
+    return () => window.removeEventListener("moodio-image-edit", handler);
+  }, []);
+
   const handleCameraChange = useCallback(
     (newCamera: CameraState) => {
       setCamera(newCamera);
@@ -565,6 +602,61 @@ export default function DesktopDetailPage({
     },
     [updateAsset, sendEvent, history, user?.id]
   );
+
+  // Commit handler for the in-canvas image-edit overlay. Runs after the
+  // overlay has produced a new imageId. Pushes the previous imageId onto
+  // metadata.imageHistory and routes the swap through the undo/redo engine
+  // so Cmd/Ctrl+Z walks back through prior versions.
+  const handleImageEditCommit = useCallback(
+    (args: {
+      assetId: string;
+      newImageId: string;
+      newImageUrl: string;
+      editType: string;
+    }) => {
+      const { assetId, newImageId } = args;
+      const asset = assetsRef.current.find((a) => a.id === assetId);
+      setImageEditState(null);
+      if (!asset || asset.assetType !== "image") return;
+      const meta = asset.metadata as Record<string, unknown>;
+      const prevImageId =
+        typeof meta.imageId === "string" ? meta.imageId : null;
+      if (!prevImageId) return;
+      const prevHistory: string[] = Array.isArray(meta.imageHistory)
+        ? (meta.imageHistory as unknown[]).filter(
+            (id): id is string => typeof id === "string"
+          )
+        : [];
+      // Forward state appends prev id to the history; inverse restores
+      // exactly the prev (prev imageId, prev history).
+      const nextHistory = [...prevHistory, prevImageId];
+
+      history.record({
+        userId: user?.id ?? "",
+        label: { key: "editAssetImage" },
+        targetIds: [assetId],
+        forward: () =>
+          applyAssetImagePatch(
+            historyDepsRef.current,
+            assetId,
+            newImageId,
+            nextHistory
+          ),
+        inverse: () =>
+          applyAssetImagePatch(
+            historyDepsRef.current,
+            assetId,
+            prevImageId,
+            prevHistory
+          ),
+      });
+    },
+    [history, user?.id]
+  );
+
+  const handleImageEditCancel = useCallback(() => {
+    setImageEditState(null);
+  }, []);
 
   const handleAssetDelete = useCallback(
     (assetId: string) => {
@@ -1626,6 +1718,9 @@ export default function DesktopDetailPage({
           onAddTextAtPosition={canEdit ? handleAddTextAtPosition : undefined}
           onAssetRename={canEdit ? handleAssetRename : undefined}
           onExternalFileDrop={canEdit ? handleExternalFileDrop : undefined}
+          imageEditState={canEdit ? imageEditState : null}
+          onImageEditCommit={canEdit ? handleImageEditCommit : undefined}
+          onImageEditCancel={canEdit ? handleImageEditCancel : undefined}
         />
         <DesktopToolbar
           camera={camera}

@@ -107,6 +107,7 @@
     "prismjs": "^1.30.0",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
+    "react-image-crop": "^11.0.10",
     "react-markdown": "^10.1.0",
     "react-redux": "^9.2.0",
     "react-simple-code-editor": "^0.14.1",

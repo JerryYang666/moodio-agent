@@ -28,7 +28,14 @@ import {
   Pencil,
   Type,
   Upload,
+  Paintbrush,
+  Crop,
+  Eraser,
+  Scissors,
 } from "lucide-react";
+import ImageEditOverlay, {
+  type ImageEditMode,
+} from "./image-edit-overlay";
 import { motion, AnimatePresence } from "framer-motion";
 import { addToast } from "@heroui/toast";
 import { siteConfig } from "@/config/site";
@@ -120,6 +127,22 @@ interface DesktopCanvasProps {
    * world-space coordinates where the cursor was released.
    */
   onExternalFileDrop?: (files: File[], position: { x: number; y: number }) => void;
+  /**
+   * In-canvas image-edit overlay state. When non-null, an `<ImageEditOverlay>`
+   * is rendered over the target asset and the floating action bar is hidden
+   * (since the overlay's own panes take over).
+   */
+  imageEditState?: {
+    assetId: string;
+    mode: ImageEditMode;
+  } | null;
+  onImageEditCommit?: (args: {
+    assetId: string;
+    newImageId: string;
+    newImageUrl: string;
+    editType: string;
+  }) => void;
+  onImageEditCancel?: () => void;
 }
 
 interface ContextMenuState {
@@ -210,6 +233,9 @@ export default function DesktopCanvas({
   onAddTextAtPosition,
   onAssetRename,
   onExternalFileDrop,
+  imageEditState,
+  onImageEditCommit,
+  onImageEditCancel,
 }: DesktopCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const isPanning = useRef(false);
@@ -1434,8 +1460,9 @@ export default function DesktopCanvas({
         );
       })()}
 
-      {/* Floating action bar — appears above the single selected asset */}
-      {singleSelectedAsset && canEdit && !contextMenu && (() => {
+      {/* Floating action bar — appears above the single selected asset.
+          Hidden while the image-edit overlay is active so its own panes take over. */}
+      {singleSelectedAsset && canEdit && !contextMenu && !imageEditState && (() => {
         const dims = getAssetDimensions(singleSelectedAsset, naturalDims.get(singleSelectedAsset.id));
         const screenX = singleSelectedAsset.posX * camera.zoom + camera.x;
         const screenY = singleSelectedAsset.posY * camera.zoom + camera.y;
@@ -1481,6 +1508,43 @@ export default function DesktopCanvas({
                 {t("sendToChat")}
               </button>
             )}
+            {/* Image-editing operations: 重绘 / 裁切 / 擦除 / 抠图.
+                Each button auto-focuses the asset (pan + zoom into view) then
+                dispatches `moodio-image-edit` with the chosen mode, which the
+                page-level listener turns into an inline editing overlay. */}
+            {floatingBarImageInfo?.imageId &&
+              floatingBarImageInfo.url &&
+              ([
+                { mode: "redraw" as const, Icon: Paintbrush, labelKey: "redraw" as const },
+                { mode: "crop" as const, Icon: Crop, labelKey: "crop" as const },
+                { mode: "erase" as const, Icon: Eraser, labelKey: "erase" as const },
+                { mode: "cutout" as const, Icon: Scissors, labelKey: "cutout" as const },
+              ]).map(({ mode, Icon, labelKey }) => (
+                <button
+                  key={mode}
+                  className="flex items-center gap-1.5 px-2 py-1 text-xs hover:bg-default-100 rounded-md transition-colors whitespace-nowrap"
+                  onClick={() => {
+                    if (singleSelectedAsset) {
+                      handleFocusAsset(singleSelectedAsset);
+                    }
+                    window.dispatchEvent(
+                      new CustomEvent("moodio-image-edit", {
+                        detail: {
+                          mode,
+                          assetId: floatingBarImageInfo.assetId,
+                          imageId: floatingBarImageInfo.imageId,
+                          url: floatingBarImageInfo.url,
+                          title: floatingBarImageInfo.title,
+                        },
+                      })
+                    );
+                  }}
+                  title={t(labelKey)}
+                >
+                  <Icon size={13} />
+                  {t(labelKey)}
+                </button>
+              ))}
             {floatingBarVideoInfo?.videoId && floatingBarVideoInfo.url && (
               <button
                 className="flex items-center gap-1.5 px-2 py-1 text-xs hover:bg-default-100 rounded-md transition-colors whitespace-nowrap"
@@ -1585,6 +1649,42 @@ export default function DesktopCanvas({
               </button>
             )}
           </div>
+        );
+      })()}
+
+      {/* In-canvas image-edit overlay (重绘 / 裁切 / 擦除 / 抠图).
+          Pinned to the asset's projected screen rect; surrounding panes float
+          to the right of and below the asset. Mounted by page-level state
+          set in response to a `moodio-image-edit` event. */}
+      {imageEditState && canEdit && (() => {
+        const target = assets.find((a) => a.id === imageEditState.assetId);
+        if (!target || target.assetType !== "image") return null;
+        const meta = target.metadata as Record<string, unknown>;
+        const sourceImageId = typeof meta.imageId === "string" ? meta.imageId : null;
+        const sourceImageUrl = target.imageUrl;
+        if (!sourceImageId || !sourceImageUrl) return null;
+        const dims = getAssetDimensions(target, naturalDims.get(target.id));
+        const left = target.posX * camera.zoom + camera.x;
+        const top = target.posY * camera.zoom + camera.y;
+        const width = dims.w * camera.zoom;
+        const height = dims.h * camera.zoom;
+        return (
+          <ImageEditOverlay
+            mode={imageEditState.mode}
+            assetId={target.id}
+            sourceImageId={sourceImageId}
+            sourceImageUrl={sourceImageUrl}
+            screenRect={{ left, top, width, height }}
+            onCommit={({ newImageId, newImageUrl, editType }) =>
+              onImageEditCommit?.({
+                assetId: target.id,
+                newImageId,
+                newImageUrl,
+                editType,
+              })
+            }
+            onCancel={() => onImageEditCancel?.()}
+          />
         );
       })()}
 

@@ -167,6 +167,68 @@ export async function PATCH(
       return NextResponse.json({ asset: enrichAsset(updated, cnMode) });
     }
 
+    // Image patch for image assets (read-modify-write imageId + imageHistory).
+    // Used by the in-canvas image-edit overlay so the client doesn't have to
+    // fetch the asset's full metadata before swapping the image.
+    if (body.imagePatch && typeof body.imagePatch === "object") {
+      const patch = body.imagePatch as {
+        imageId?: unknown;
+        imageHistory?: unknown;
+      };
+      const newImageId = patch.imageId;
+      const imageHistory = patch.imageHistory;
+      if (typeof newImageId !== "string" || !newImageId) {
+        return NextResponse.json(
+          { error: "imagePatch requires a non-empty imageId string" },
+          { status: 400 }
+        );
+      }
+      if (
+        imageHistory !== undefined &&
+        (!Array.isArray(imageHistory) ||
+          imageHistory.some((id) => typeof id !== "string"))
+      ) {
+        return NextResponse.json(
+          { error: "imagePatch.imageHistory must be an array of strings" },
+          { status: 400 }
+        );
+      }
+
+      const [existing] = await db
+        .select()
+        .from(desktopAssets)
+        .where(and(eq(desktopAssets.id, assetId), eq(desktopAssets.desktopId, id)));
+
+      if (!existing) {
+        return NextResponse.json({ error: "Asset not found" }, { status: 404 });
+      }
+
+      if (existing.assetType !== "image") {
+        return NextResponse.json(
+          { error: "imagePatch is only supported for image assets" },
+          { status: 400 }
+        );
+      }
+
+      const meta = existing.metadata as Record<string, unknown>;
+      const patchedMetadata: Record<string, unknown> = { ...meta, imageId: newImageId };
+      if (imageHistory !== undefined) {
+        patchedMetadata.imageHistory = imageHistory;
+      }
+
+      const [updated] = await db
+        .update(desktopAssets)
+        .set({ metadata: patchedMetadata })
+        .where(and(eq(desktopAssets.id, assetId), eq(desktopAssets.desktopId, id)))
+        .returning();
+
+      if (!updated) {
+        return NextResponse.json({ error: "Asset not found" }, { status: 404 });
+      }
+
+      return NextResponse.json({ asset: enrichAsset(updated, cnMode) });
+    }
+
     // Text content patch for text assets (read-modify-write the content field)
     if (body.textPatch && typeof body.textPatch === "object") {
       const { content } = body.textPatch;
