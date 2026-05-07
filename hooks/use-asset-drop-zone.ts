@@ -64,7 +64,11 @@ export function useAssetDropZone({ onDrop, disabled = false }: UseAssetDropZoneO
       if (!hasAssetType(e)) return;
       e.preventDefault();
       e.stopPropagation();
-      if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
+      // Don't set dropEffect: drag sources in this app use different
+      // effectAllowed values (asset-card sets "move"; assets-hover-sidebar
+      // sets "copy"). Forcing dropEffect to one of those breaks the other —
+      // the highlight shows but the browser silently rejects the drop event
+      // when dropEffect is incompatible with effectAllowed.
     },
     [disabled]
   );
