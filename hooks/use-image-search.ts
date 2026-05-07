@@ -4,19 +4,26 @@ import { useCallback } from "react";
 import { useDispatch } from "react-redux";
 import { addToast } from "@heroui/toast";
 import { useUploadImageSearchMutation } from "@/lib/redux/services/api";
-import { setImageSearch, clearImageSearch } from "@/lib/redux/slices/querySlice";
+import {
+  beginImageSearch,
+  setImageSearch,
+  clearImageSearch,
+} from "@/lib/redux/slices/querySlice";
 
 const ALLOWED_MIME = ["image/png", "image/jpeg", "image/webp", "image/gif"];
 const MAX_BYTES = 10 * 1024 * 1024;
 
-export interface ImageSearchUploadOptions {
-  /** Optional override for the preview URL stored in Redux (defaults to a blob URL of the file). */
-  previewUrl?: string | null;
-}
+const guessMimeFromExtension = (url: string): string | null => {
+  const match = url.toLowerCase().match(/\.(png|jpe?g|webp|gif)(?:\?|#|$)/);
+  if (!match) return null;
+  const ext = match[1] === "jpg" ? "jpeg" : match[1];
+  return `image/${ext}`;
+};
 
 export function useImageSearch() {
   const dispatch = useDispatch();
-  const [uploadImage, { isLoading }] = useUploadImageSearchMutation();
+  const [uploadImage, { isLoading: isUploadingMutation }] =
+    useUploadImageSearchMutation();
 
   const validate = useCallback((file: File): string | null => {
     if (!ALLOWED_MIME.includes(file.type)) {
@@ -29,26 +36,25 @@ export function useImageSearch() {
   }, []);
 
   const searchByFile = useCallback(
-    async (file: File, options?: ImageSearchUploadOptions): Promise<boolean> => {
+    async (file: File): Promise<boolean> => {
       const error = validate(file);
       if (error) {
         addToast({ title: "Image search failed", description: error, color: "danger" });
         return false;
       }
 
-      const previewUrl =
-        options?.previewUrl !== undefined ? options.previewUrl : URL.createObjectURL(file);
+      // Show the spinner chip immediately so the user has feedback while
+      // /api/upload is in flight.
+      const previewUrl = URL.createObjectURL(file);
+      dispatch(beginImageSearch({ previewUrl }));
 
       try {
         const result = await uploadImage(file).unwrap();
-        dispatch(
-          setImageSearch({ uploadId: result.upload_id, previewUrl: previewUrl ?? null })
-        );
+        dispatch(setImageSearch({ uploadId: result.upload_id, previewUrl }));
         return true;
       } catch (err) {
-        if (previewUrl && options?.previewUrl === undefined) {
-          URL.revokeObjectURL(previewUrl);
-        }
+        URL.revokeObjectURL(previewUrl);
+        dispatch(clearImageSearch());
         const message =
           (err as { data?: { error?: string } })?.data?.error ??
           "Could not upload image for search.";
@@ -59,31 +65,80 @@ export function useImageSearch() {
     [uploadImage, validate, dispatch]
   );
 
-  const searchByUrl = useCallback(
-    async (imageUrl: string): Promise<boolean> => {
+  // For library assets we can't fetch the CloudFront URL directly from the
+  // browser (cookie-based signed URLs + cross-origin CORS make `fetch` fail).
+  // Route through the existing /api/image/proxy server endpoint, which holds
+  // the auth context and returns the bytes same-origin.
+  const searchByLibraryAsset = useCallback(
+    async (asset: { imageId: string; imageUrl: string }): Promise<boolean> => {
+      // Show the chip with the rendered library URL immediately — no need to
+      // wait for the proxy fetch.
+      dispatch(beginImageSearch({ previewUrl: asset.imageUrl }));
+
       try {
-        const response = await fetch(imageUrl, { credentials: "include" });
-        if (!response.ok) throw new Error(`Fetch failed: ${response.status}`);
-        const blob = await response.blob();
-        const fileType = ALLOWED_MIME.includes(blob.type) ? blob.type : "image/jpeg";
-        const ext = fileType.split("/")[1] ?? "jpg";
-        const file = new File([blob], `library-asset.${ext}`, { type: fileType });
-        return await searchByFile(file, { previewUrl: imageUrl });
-      } catch {
+        const proxied = await fetch(
+          `/api/image/proxy?imageId=${encodeURIComponent(asset.imageId)}`,
+          { credentials: "include" }
+        );
+        if (!proxied.ok) {
+          throw new Error(`Proxy fetch failed: ${proxied.status}`);
+        }
+        const blob = await proxied.blob();
+
+        // The proxy returns the original Content-Type, but fall back to the
+        // URL extension and finally to JPEG so we always pass an allowed MIME
+        // through validate().
+        const blobType = blob.type;
+        const guessed =
+          ALLOWED_MIME.includes(blobType)
+            ? blobType
+            : guessMimeFromExtension(asset.imageUrl) ?? "image/jpeg";
+        const ext = guessed.split("/")[1] ?? "jpg";
+        const file = new File([blob], `library-${asset.imageId}.${ext}`, {
+          type: guessed,
+        });
+
+        const validationError = validate(file);
+        if (validationError) {
+          dispatch(clearImageSearch());
+          addToast({
+            title: "Image search failed",
+            description: validationError,
+            color: "danger",
+          });
+          return false;
+        }
+
+        const result = await uploadImage(file).unwrap();
+        dispatch(
+          setImageSearch({ uploadId: result.upload_id, previewUrl: asset.imageUrl })
+        );
+        return true;
+      } catch (err) {
+        console.error("[image-search] library asset upload failed", err);
+        dispatch(clearImageSearch());
+        const message =
+          (err as { data?: { error?: string } })?.data?.error ??
+          "Could not load the selected library image.";
         addToast({
           title: "Image search failed",
-          description: "Could not load the selected library image.",
+          description: message,
           color: "danger",
         });
         return false;
       }
     },
-    [searchByFile]
+    [dispatch, uploadImage, validate]
   );
 
   const clear = useCallback(() => {
     dispatch(clearImageSearch());
   }, [dispatch]);
 
-  return { searchByFile, searchByUrl, clear, isUploading: isLoading };
+  return {
+    searchByFile,
+    searchByLibraryAsset,
+    clear,
+    isUploading: isUploadingMutation,
+  };
 }

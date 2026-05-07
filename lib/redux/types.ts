@@ -10,6 +10,7 @@ export interface QueryState {
   searchId?: string | null;  // Opaque search session ID for pagination
   imageSearchUploadId?: string | null;  // Upload ID from /api/upload — when present, takes precedence over textSearch
   imageSearchPreviewUrl?: string | null;  // Local preview URL for the image being searched (for chip display)
+  imageSearchPending?: boolean;  // True from drop/select until /api/upload returns; drives the UI spinner
 }
 
 export interface UIState {
