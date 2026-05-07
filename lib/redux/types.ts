@@ -8,6 +8,8 @@ export interface QueryState {
   isAigc?: boolean;  // AI-generated content filter (undefined = all, true = AIGC only, false = non-AIGC only)
   cursor?: string | null;  // Base64-encoded cursor for pagination
   searchId?: string | null;  // Opaque search session ID for pagination
+  imageSearchUploadId?: string | null;  // Upload ID from /api/upload — when present, takes precedence over textSearch
+  imageSearchPreviewUrl?: string | null;  // Local preview URL for the image being searched (for chip display)
 }
 
 export interface UIState {

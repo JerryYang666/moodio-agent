@@ -35,7 +35,12 @@ import { JustifiedGallery, type Photo } from "./JustifiedGallery";
 import { Squircle } from "@/components/Squircle";
 import { VideoVisibilityProvider } from "@/hooks/use-video-visibility";
 import { MOCK_VIDEO_DETAIL, type VideoDetailData } from "./video-detail-data";
-import { useGetVideoDetailQuery, type ContentLabel } from "@/lib/redux/services/api";
+import {
+  useGetVideoDetailQuery,
+  useGetSimilarContentQuery,
+  type ContentLabel,
+  type SimilarContentItem,
+} from "@/lib/redux/services/api";
 import { getContentUrl } from "@/lib/config/video.config";
 import { useUserSetting } from "@/lib/user-settings";
 import { useCollections } from "@/hooks/use-collections";
@@ -90,18 +95,29 @@ function MetadataItem({ label, value }: MetadataItemProps) {
 
 interface VideoDetailViewProps {
   selectedPhoto: Photo;
-  similarPhotos: Photo[];
-  allPhotos: Photo[];
   onClose: () => void;
   onTargetReady: (rect: DOMRect) => void;
   videoVisible: boolean;
   desktopId?: string;
 }
 
+const similarItemToPhoto = (
+  item: SimilarContentItem,
+  cnMode: boolean
+): Photo & { similarityAggregate?: number } => ({
+  src: getContentUrl(item.storage_key, cnMode),
+  width: item.width,
+  height: item.height,
+  id: item.id,
+  key: item.id.toString(),
+  alt: item.content_uuid,
+  videoName: item.content_uuid,
+  mediaType: normalizeMediaType(item.content_type),
+  similarityAggregate: item.similarity_score?.aggregate,
+});
+
 export function VideoDetailView({
   selectedPhoto,
-  similarPhotos,
-  allPhotos,
   onClose,
   onTargetReady,
   videoVisible,
@@ -119,11 +135,6 @@ export function VideoDetailView({
   }, [onClose]);
 
   const currentPhoto = photoStack.length > 0 ? photoStack[photoStack.length - 1] : selectedPhoto;
-
-  const currentSimilarPhotos = useMemo(() => {
-    if (photoStack.length === 0) return similarPhotos;
-    return allPhotos.filter((p) => p.key !== currentPhoto.key);
-  }, [photoStack, similarPhotos, allPhotos, currentPhoto.key]);
 
   const handleSimilarClick = useCallback((photo: Photo) => {
     setPhotoStack((prev) => [...prev, photo]);
@@ -148,7 +159,6 @@ export function VideoDetailView({
       <VideoDetailContent
         key={currentPhoto.key}
         selectedPhoto={currentPhoto}
-        similarPhotos={currentSimilarPhotos}
         onTargetReady={isFirstLevel ? onTargetReady : () => {}}
         videoVisible={isFirstLevel ? videoVisible : true}
         desktopId={desktopId}
@@ -160,7 +170,6 @@ export function VideoDetailView({
 
 interface VideoDetailContentProps {
   selectedPhoto: Photo;
-  similarPhotos: Photo[];
   onTargetReady: (rect: DOMRect) => void;
   videoVisible: boolean;
   desktopId?: string;
@@ -169,7 +178,6 @@ interface VideoDetailContentProps {
 
 function VideoDetailContent({
   selectedPhoto,
-  similarPhotos,
   onTargetReady,
   videoVisible,
   desktopId,
@@ -179,7 +187,18 @@ function VideoDetailContent({
   const detail: VideoDetailData = MOCK_VIDEO_DETAIL;
   const videoTargetRef = useRef<HTMLDivElement>(null);
   const { data: videoDetail, isLoading: isLoadingDetail } = useGetVideoDetailQuery(selectedPhoto.id);
+  const {
+    data: similarData,
+    isLoading: isLoadingSimilar,
+    isFetching: isFetchingSimilar,
+  } = useGetSimilarContentQuery(selectedPhoto.id);
   const tCollections = useTranslations("collections");
+
+  const similarPhotos = useMemo(
+    () => (similarData?.content ?? []).map((item) => similarItemToPhoto(item, cnMode)),
+    [similarData, cnMode]
+  );
+  const missingCaptionTypes = similarData?.anchor?.missing_caption_types ?? [];
 
   const showDesktop = useFeatureFlag<boolean>("user_desktop") ?? false;
   const {
@@ -455,23 +474,37 @@ function VideoDetailContent({
         ) : null}
       </motion.div>
 
-      {/* Similar Shots */}
+      {/* Similar Shots — driven by /api/content/<id>/similar */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.4, duration: 0.4 }}
       >
-        <h3 className="text-sm font-semibold uppercase tracking-widest text-default-400 dark:text-default-500 mb-4">
-          Similar Shots
-        </h3>
-        <VideoVisibilityProvider>
-          <JustifiedGallery
-            photos={similarPhotos}
-            targetRowHeight={140}
-            spacing={4}
-            onClick={onSimilarClick}
-          />
-        </VideoVisibilityProvider>
+        <div className="flex items-baseline justify-between mb-4">
+          <h3 className="text-sm font-semibold uppercase tracking-widest text-default-400 dark:text-default-500">
+            Similar Shots
+          </h3>
+          {missingCaptionTypes.length > 0 && (
+            <span className="text-[10px] text-default-400">
+              Limited relevance: missing {missingCaptionTypes.join(", ")}
+            </span>
+          )}
+        </div>
+
+        {(isLoadingSimilar || isFetchingSimilar) && similarPhotos.length === 0 ? (
+          <div className="text-sm text-default-400 py-4">Finding similar items…</div>
+        ) : similarPhotos.length === 0 ? (
+          <div className="text-sm text-default-400 py-4">No similar items found.</div>
+        ) : (
+          <VideoVisibilityProvider>
+            <JustifiedGallery
+              photos={similarPhotos}
+              targetRowHeight={140}
+              spacing={4}
+              onClick={onSimilarClick}
+            />
+          </VideoVisibilityProvider>
+        )}
       </motion.div>
 
       {/* Create Collection Modal */}

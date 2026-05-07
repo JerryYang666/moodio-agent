@@ -6,8 +6,10 @@ import { useSearchParams } from "next/navigation";
 import { useSelector } from "react-redux";
 import { useFeatureFlag } from "@/lib/feature-flags";
 import { useSubscription } from "@/hooks/use-subscription";
+import { useImageSearch } from "@/hooks/use-image-search";
 import FilterMenu from "@/components/browse/FilterMenu";
 import SearchBar from "@/components/browse/SearchBar";
+import { ImageUp } from "lucide-react";
 import Breadcrumb from "@/components/browse/Breadcrumb";
 import { BreadcrumbDescription } from "@/components/browse/Breadcrumb";
 import VideoGrid from "@/components/browse/VideoGrid";
@@ -109,6 +111,53 @@ export default function BrowsePage() {
   // Only disable body scroll when the full browse UI is active
   useDisableBodyScroll(showBrowse && hasSubscription);
 
+  // Drag-and-drop image search — drop an image anywhere on the browse area
+  // to upload it for image search.
+  const { searchByFile } = useImageSearch();
+  const [isDraggingImage, setIsDraggingImage] = useState(false);
+  const dragCounterRef = useRef(0);
+
+  const hasImageInDrag = (e: React.DragEvent) =>
+    Array.from(e.dataTransfer?.items ?? []).some((it) =>
+      it.kind === "file" && it.type.startsWith("image/")
+    );
+
+  const handleDragEnter = useCallback((e: React.DragEvent) => {
+    if (!hasImageInDrag(e)) return;
+    e.preventDefault();
+    dragCounterRef.current += 1;
+    setIsDraggingImage(true);
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    if (!hasImageInDrag(e)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    if (!hasImageInDrag(e)) return;
+    e.preventDefault();
+    dragCounterRef.current = Math.max(0, dragCounterRef.current - 1);
+    if (dragCounterRef.current === 0) {
+      setIsDraggingImage(false);
+    }
+  }, []);
+
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      if (!hasImageInDrag(e)) return;
+      e.preventDefault();
+      dragCounterRef.current = 0;
+      setIsDraggingImage(false);
+      const file = Array.from(e.dataTransfer.files).find((f) =>
+        f.type.startsWith("image/")
+      );
+      if (file) void searchByFile(file);
+    },
+    [searchByFile]
+  );
+
   if (!showBrowse) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-default-500">
@@ -131,7 +180,25 @@ export default function BrowsePage() {
   }
 
   return (
-    <div className="flex h-screen bg-background overflow-hidden">
+    <div
+      className="relative flex h-screen bg-background overflow-hidden"
+      onDragEnter={handleDragEnter}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      {isDraggingImage && (
+        <div className="pointer-events-none absolute inset-0 z-[200] flex items-center justify-center bg-primary/10 backdrop-blur-[2px] border-2 border-dashed border-primary rounded-lg">
+          <div className="flex flex-col items-center gap-2 px-6 py-4 rounded-lg bg-background/90 shadow-lg">
+            <ImageUp size={32} className="text-primary" />
+            <span className="text-sm font-medium text-default-700">
+              Drop an image to search
+            </span>
+            <span className="text-xs text-default-400">PNG, JPEG, WebP, or GIF · max 10 MB</span>
+          </div>
+        </div>
+      )}
+
       {/* Desktop sidebar filter — full height, collapsible, hidden on mobile */}
       <div
         className={`shrink-0 hidden lg:flex flex-col transition-[width] duration-300 ease-in-out overflow-hidden border-r border-divider ${
@@ -174,6 +241,7 @@ export default function BrowsePage() {
             <SearchBar
               placeholder={t("searchPlaceholder")}
               className="flex-1 min-w-0"
+              enableImageSearch
             />
 
             {/* Mobile filter trigger button — visible only below lg breakpoint */}
