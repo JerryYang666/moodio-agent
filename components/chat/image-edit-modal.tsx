@@ -567,13 +567,13 @@ export default function ImageEditModal({
                   {/* Image surface — hugs the image's natural aspect ratio,
                       centered in its column. */}
                   <div className="flex-1 min-w-0 flex items-center justify-center">
-                    <div className="relative inline-block bg-black/5 rounded-lg overflow-hidden max-w-full">
+                    <div className="relative inline-flex bg-black/5 overflow-hidden max-w-full">
                       {!usesCrop && (
                         <img
                           ref={imageRef}
                           src={sourceImageUrl}
                           alt=""
-                          className="max-w-full max-h-[72vh] object-contain select-none"
+                          className="block max-w-full max-h-[72vh] object-contain select-none"
                           onLoad={() => setImageLoaded(true)}
                           draggable={false}
                         />
@@ -598,16 +598,21 @@ export default function ImageEditModal({
                       )}
 
                       {!isProcessing && usesCrop && (
+                        // react-image-crop pins its inner <img> to
+                        // max-height:inherit, so any cap has to live on the
+                        // <ReactCrop> element itself — otherwise the img
+                        // renders at natural size and the modal body scrolls.
                         <ReactCrop
                           crop={crop}
                           onChange={(c) => setCrop(c)}
                           onComplete={(c) => setCompletedCrop(c)}
+                          style={{ maxHeight: "72vh", maxWidth: "100%" }}
                         >
                           <img
                             ref={imageRef}
                             src={sourceImageUrl}
                             alt=""
-                            className="max-w-full max-h-[72vh] object-contain select-none"
+                            className="block max-w-full max-h-[72vh] object-contain select-none"
                             onLoad={() => setImageLoaded(true)}
                             draggable={false}
                           />

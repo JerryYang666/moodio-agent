@@ -32,7 +32,9 @@ export default function MarkControls({
   return (
     <div
       className={[
-        "inline-flex items-center gap-3 px-2 py-1.5 rounded-md bg-default-100 border border-divider",
+        // flex-wrap lets the brush-size group drop to its own row when the
+        // available width can't fit colors + divider + sizes on a single line.
+        "flex flex-wrap items-center gap-x-3 gap-y-1.5 px-2 py-1.5 rounded-md bg-default-100 border border-divider",
         disabled ? "opacity-50 pointer-events-none" : "",
         className || "",
       ].join(" ")}
