@@ -47,7 +47,7 @@ export const DEFAULT_MARK_WIDTH: MarkWidth = MARK_WIDTHS[1]; // M (6px)
  * whole canvas is drawn once with this alpha — giving a uniform
  * translucent mark regardless of how the user painted.
  */
-export const MARK_COMPOSITE_ALPHA = 0.45;
+export const MARK_COMPOSITE_ALPHA = 0.6;
 
 /** Map a hex value back to its declared color name. Falls back to red. */
 export function markColorNameFromHex(hex: string): MarkColorName {
