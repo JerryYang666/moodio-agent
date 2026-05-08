@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import { hasWriteAccess } from "@/lib/permissions";
 import { useTranslations } from "next-intl";
 import { Button } from "@heroui/button";
@@ -25,6 +25,7 @@ import {
   MoreVertical,
   Eye,
   FolderPlus,
+  FolderTree,
   Plus,
   Folder,
   Video,
@@ -35,6 +36,18 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
 import SendToDesktopModal from "@/components/desktop/SendToDesktopModal";
 import { useFeatureFlag } from "@/lib/feature-flags";
+import DestinationPickerModal, {
+  type DestinationPick,
+} from "@/components/chat/destination-picker-modal";
+import ImageEditModal, {
+  type ChatImageEditMode,
+} from "@/components/chat/image-edit-modal";
+import {
+  Paintbrush,
+  Crop as CropIcon,
+  Eraser,
+  Scissors,
+} from "lucide-react";
 
 interface ImageWithMenuProps {
   imageId: string;
@@ -148,6 +161,31 @@ export default function ImageWithMenu({
     onOpenChange: onDesktopOpenChange,
   } = useDisclosure();
 
+  // Destination picker (tree) for "Add to Existing Collection".
+  const {
+    isOpen: isDestOpen,
+    onOpen: onDestOpen,
+    onOpenChange: onDestOpenChange,
+  } = useDisclosure();
+
+  // Destination picker for image-edit ops (Redraw/Crop/Erase/Cutout).
+  const [pendingEditMode, setPendingEditMode] = useState<ChatImageEditMode | null>(
+    null
+  );
+  const {
+    isOpen: isEditDestOpen,
+    onOpen: onEditDestOpen,
+    onOpenChange: onEditDestOpenChange,
+  } = useDisclosure();
+  const [editDestination, setEditDestination] = useState<DestinationPick | null>(
+    null
+  );
+  const {
+    isOpen: isEditOpen,
+    onOpen: onEditOpen,
+    onOpenChange: onEditOpenChange,
+  } = useDisclosure();
+
   // End position: right side of screen (aligned with assets sidebar)
   const getEndPosition = () => {
     if (typeof window === "undefined") return { x: 0, y: 100 };
@@ -181,6 +219,61 @@ export default function ImageWithMenu({
     if (success) {
       startFlyingAnimation();
     }
+  };
+
+  // Add to a collection/folder destination (used by the tree picker).
+  // Uses the raw /api/collection endpoint directly so we can pass folderId —
+  // the useCollections hook doesn't support folder targets.
+  const addImageToDestination = async (pick: DestinationPick) => {
+    const details = messageTimestamp
+      ? { ...generationDetails, messageTimestamp }
+      : generationDetails;
+    try {
+      const res = await fetch(`/api/collection/${pick.collectionId}/images`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          imageId,
+          chatId: chatId || null,
+          generationDetails: details,
+          folderId: pick.folderId,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Failed to add to destination");
+      }
+      startFlyingAnimation();
+      addToast({
+        title: tMenu("savedToast", { name: pick.collectionName }),
+        color: "success",
+      });
+      return true;
+    } catch (err: any) {
+      addToast({
+        title: tCollections("error"),
+        description: err?.message ?? "Failed to save",
+        color: "danger",
+      });
+      return false;
+    }
+  };
+
+  const handleDestinationConfirm = (pick: DestinationPick) => {
+    onDestOpenChange();
+    addImageToDestination(pick);
+  };
+
+  const startEditFlow = (mode: ChatImageEditMode) => {
+    setPendingEditMode(mode);
+    setEditDestination(null);
+    onEditDestOpen();
+  };
+
+  const handleEditDestinationConfirm = (pick: DestinationPick) => {
+    setEditDestination(pick);
+    onEditDestOpenChange();
+    onEditOpen();
   };
 
   const handleSaveToProject = async () => {
@@ -248,6 +341,20 @@ export default function ImageWithMenu({
 
   const endPos = getEndPosition();
 
+  // Hybrid menu: show up to 8 most-recently-updated writable collections as
+  // flat items; users can still open the tree picker for anything else.
+  const recentCollections = useMemo(() => {
+    return collections
+      .filter((c) => hasWriteAccess(c.permission))
+      .slice()
+      .sort((a, b) => {
+        const at = new Date(a.updatedAt as unknown as string | Date).getTime();
+        const bt = new Date(b.updatedAt as unknown as string | Date).getTime();
+        return bt - at;
+      })
+      .slice(0, 8);
+  }, [collections]);
+
   return (
     <>
       <div ref={imageRef} className="relative group">
@@ -279,6 +386,16 @@ export default function ImageWithMenu({
                   handleCreateNewCollection();
                 } else if (key === "send-to-desktop") {
                   onDesktopOpen();
+                } else if (key === "add-to-existing") {
+                  onDestOpen();
+                } else if (key === "edit-redraw") {
+                  startEditFlow("redraw");
+                } else if (key === "edit-crop") {
+                  startEditFlow("crop");
+                } else if (key === "edit-erase") {
+                  startEditFlow("erase");
+                } else if (key === "edit-cutout") {
+                  startEditFlow("cutout");
                 }
               }}
             >
@@ -299,6 +416,32 @@ export default function ImageWithMenu({
               >
                 Send to Desktop
               </DropdownItem>
+              <DropdownSection title={tMenu("editGroup")} showDivider>
+                <DropdownItem
+                  key="edit-redraw"
+                  startContent={<Paintbrush size={16} />}
+                >
+                  {tMenu("editRedraw")}
+                </DropdownItem>
+                <DropdownItem
+                  key="edit-crop"
+                  startContent={<CropIcon size={16} />}
+                >
+                  {tMenu("editCrop")}
+                </DropdownItem>
+                <DropdownItem
+                  key="edit-erase"
+                  startContent={<Eraser size={16} />}
+                >
+                  {tMenu("editErase")}
+                </DropdownItem>
+                <DropdownItem
+                  key="edit-cutout"
+                  startContent={<Scissors size={16} />}
+                >
+                  {tMenu("editCutout")}
+                </DropdownItem>
+              </DropdownSection>
               <DropdownSection title={tMenu("addToCollection")} showDivider>
                 <DropdownItem
                   key="create-new"
@@ -307,33 +450,37 @@ export default function ImageWithMenu({
                 >
                   {tCollections("createNewCollection")}
                 </DropdownItem>
+                <DropdownItem
+                  key="add-to-existing"
+                  startContent={<FolderTree size={16} />}
+                  className="font-semibold"
+                >
+                  {tMenu("addToExistingCollection")}
+                </DropdownItem>
               </DropdownSection>
               <DropdownSection
                 title={
-                  collections.length > 0 ? tMenu("yourCollections") : undefined
+                  recentCollections.length > 0
+                    ? tMenu("recentCollections")
+                    : undefined
                 }
               >
-                {collections.length === 0 ? (
+                {recentCollections.length === 0 ? (
                   <DropdownItem key="no-collections" isReadOnly>
                     <span className="text-xs text-default-400">
                       {tCollections("noCollectionsYet")}
                     </span>
                   </DropdownItem>
                 ) : (
-                  collections
-                    .filter(
-                      (c) =>
-                        hasWriteAccess(c.permission)
-                    )
-                    .map((collection) => (
-                      <DropdownItem
-                        key={collection.id}
-                        startContent={<FolderPlus size={16} />}
-                        onPress={() => handleAddToCollection(collection.id)}
-                      >
-                        {collection.name}
-                      </DropdownItem>
-                    ))
+                  recentCollections.map((collection) => (
+                    <DropdownItem
+                      key={collection.id}
+                      startContent={<FolderPlus size={16} />}
+                      onPress={() => handleAddToCollection(collection.id)}
+                    >
+                      {collection.name}
+                    </DropdownItem>
+                  ))
                 )}
               </DropdownSection>
             </DropdownMenu>
@@ -412,6 +559,39 @@ export default function ImageWithMenu({
           },
         ]}
       />
+
+      {/* Destination picker for "Add to Existing Collection" */}
+      <DestinationPickerModal
+        isOpen={isDestOpen}
+        onOpenChange={onDestOpenChange}
+        onConfirm={handleDestinationConfirm}
+      />
+
+      {/* Destination picker for image-edit ops (choose where result goes first) */}
+      <DestinationPickerModal
+        isOpen={isEditDestOpen}
+        onOpenChange={onEditDestOpenChange}
+        onConfirm={handleEditDestinationConfirm}
+        title={tMenu("editGroup")}
+      />
+
+      {/* Image edit modal (runs the chosen operation) */}
+      {pendingEditMode && editDestination && (
+        <ImageEditModal
+          isOpen={isEditOpen}
+          onOpenChange={onEditOpenChange}
+          mode={pendingEditMode}
+          sourceImageId={imageId}
+          sourceImageUrl={imageUrl}
+          sourceTitle={generationDetails.title}
+          destination={editDestination}
+          chatId={chatId || null}
+          onClose={() => {
+            setPendingEditMode(null);
+            setEditDestination(null);
+          }}
+        />
+      )}
     </>
   );
 }

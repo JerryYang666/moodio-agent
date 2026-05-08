@@ -1363,8 +1363,35 @@
     "viewDetails": "檢視詳細資訊",
     "addToCollection": "新增至集合",
     "yourCollections": "您的集合",
+    "recentCollections": "最近使用的集合",
+    "addToExistingCollection": "新增至現有集合…",
     "createAndAdd": "建立並新增",
-    "flyingImageAlt": "飛行中的圖片"
+    "flyingImageAlt": "飛行中的圖片",
+    "editRedraw": "重繪",
+    "editCrop": "裁切",
+    "editErase": "擦除",
+    "editCutout": "去背",
+    "editGroup": "編輯圖片",
+    "savedToast": "已儲存至 {name}"
+  },
+  "destinationPicker": {
+    "title": "選擇目的地",
+    "hint": "選擇要儲存的集合或資料夾。",
+    "confirm": "選擇",
+    "editTitle": "結果儲存至…",
+    "editConfirm": "繼續"
+  },
+  "imageEditModal": {
+    "titleRedraw": "重繪",
+    "titleCrop": "裁切",
+    "titleErase": "擦除",
+    "titleCutout": "去背",
+    "destinationLabel": "儲存至",
+    "submit": "套用",
+    "close": "關閉",
+    "savedHeading": "完成 — 圖片已就緒",
+    "savedSubheading": "已儲存至 {name}",
+    "errorTitle": "發生錯誤"
   },
   "language": {
     "switchLanguage": "語言",

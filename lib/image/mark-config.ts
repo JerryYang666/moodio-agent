@@ -26,7 +26,7 @@ export const MARK_COLORS: readonly MarkColor[] = [
 
 export interface MarkWidth {
   value: number;
-  label: "S" | "M" | "L" | "XL";
+  label: "S" | "M" | "L" | "XL" | "2XL";
 }
 
 export const MARK_WIDTHS: readonly MarkWidth[] = [
@@ -34,6 +34,7 @@ export const MARK_WIDTHS: readonly MarkWidth[] = [
   { value: 6, label: "M" },
   { value: 12, label: "L" },
   { value: 24, label: "XL" },
+  { value: 48, label: "2XL" },
 ] as const;
 
 export const DEFAULT_MARK_COLOR: MarkColor = MARK_COLORS[0]; // red

@@ -1,11 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { collections, collectionImages } from "@/lib/db/schema";
+import { collections, collectionImages, folders } from "@/lib/db/schema";
 import { getAccessToken } from "@/lib/auth/cookies";
 import { verifyAccessToken } from "@/lib/auth/jwt";
 import { eq, and } from "drizzle-orm";
 import { getUserPermission } from "@/lib/collection-utils";
 import { hasWriteAccess } from "@/lib/permissions";
+import {
+  getFolderPermission,
+  hasFolderWritePermission,
+  touchFolder,
+} from "@/lib/folder-utils";
 import { isFeatureFlagEnabled } from "@/lib/feature-flags/server";
 import { recordResearchEvent } from "@/lib/research-telemetry";
 
@@ -75,13 +80,37 @@ export async function POST(
     }
 
     const body = await req.json();
-    const { imageId, assetId, assetType, chatId, generationDetails } = body;
+    const { imageId, assetId, assetType, chatId, generationDetails, folderId } = body;
 
     if (!imageId || !generationDetails) {
       return NextResponse.json(
         { error: "imageId and generationDetails are required" },
         { status: 400 }
       );
+    }
+
+    // Validate folderId belongs to this collection and user has write access.
+    if (folderId) {
+      const [folder] = await db
+        .select({ collectionId: folders.collectionId })
+        .from(folders)
+        .where(eq(folders.id, folderId))
+        .limit(1);
+
+      if (!folder || folder.collectionId !== collectionId) {
+        return NextResponse.json(
+          { error: "Folder not found in this collection" },
+          { status: 400 }
+        );
+      }
+
+      const folderPerm = await getFolderPermission(folderId, userId);
+      if (!hasFolderWritePermission(folderPerm)) {
+        return NextResponse.json(
+          { error: "You don't have permission to add assets to this folder" },
+          { status: 403 }
+        );
+      }
     }
 
     // For videos, assetId must be provided

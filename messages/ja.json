@@ -1363,8 +1363,35 @@
     "viewDetails": "詳細を表示",
     "addToCollection": "コレクションに追加",
     "yourCollections": "あなたのコレクション",
+    "recentCollections": "最近のコレクション",
+    "addToExistingCollection": "既存のコレクションに追加…",
     "createAndAdd": "作成して追加",
-    "flyingImageAlt": "飛んでいる画像"
+    "flyingImageAlt": "飛んでいる画像",
+    "editRedraw": "描き直し",
+    "editCrop": "トリミング",
+    "editErase": "消去",
+    "editCutout": "切り抜き",
+    "editGroup": "画像を編集",
+    "savedToast": "{name} に保存しました"
+  },
+  "destinationPicker": {
+    "title": "保存先を選択",
+    "hint": "コレクションまたはフォルダを選択してください。",
+    "confirm": "選択",
+    "editTitle": "結果の保存先…",
+    "editConfirm": "続行"
+  },
+  "imageEditModal": {
+    "titleRedraw": "描き直し",
+    "titleCrop": "トリミング",
+    "titleErase": "消去",
+    "titleCutout": "切り抜き",
+    "destinationLabel": "保存先",
+    "submit": "適用",
+    "close": "閉じる",
+    "savedHeading": "完了 — 画像の準備ができました",
+    "savedSubheading": "{name} に保存しました",
+    "errorTitle": "エラーが発生しました"
   },
   "language": {
     "switchLanguage": "言語",

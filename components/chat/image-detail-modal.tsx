@@ -31,11 +31,16 @@ import {
   ChevronRight,
   MoreVertical,
   FolderPlus,
+  FolderTree,
   Plus,
   Video,
   LayoutDashboard,
+  Paintbrush,
+  Crop as CropIcon,
+  Eraser,
+  Scissors,
 } from "lucide-react";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useTranslations } from "next-intl";
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 import { useRouter } from "next/navigation";
@@ -44,6 +49,10 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useFeatureFlag } from "@/lib/feature-flags";
 import ImageDownloadDropdown from "./image-download-dropdown";
 import SendToDesktopModal from "@/components/desktop/SendToDesktopModal";
+import DestinationPickerModal, {
+  type DestinationPick,
+} from "./destination-picker-modal";
+import ImageEditModal, { type ChatImageEditMode } from "./image-edit-modal";
 
 export interface ImageInfo {
   url: string;
@@ -165,6 +174,31 @@ export default function ImageDetailModal({
     onOpenChange: onDesktopOpenChange,
   } = useDisclosure();
 
+  // Destination picker (tree) for "Add to Existing Collection".
+  const {
+    isOpen: isDestOpen,
+    onOpen: onDestOpen,
+    onOpenChange: onDestOpenChange,
+  } = useDisclosure();
+
+  // Destination picker + edit modal for Redraw/Crop/Erase/Cutout.
+  const [pendingEditMode, setPendingEditMode] = useState<ChatImageEditMode | null>(
+    null
+  );
+  const {
+    isOpen: isEditDestOpen,
+    onOpen: onEditDestOpen,
+    onOpenChange: onEditDestOpenChange,
+  } = useDisclosure();
+  const [editDestination, setEditDestination] = useState<DestinationPick | null>(
+    null
+  );
+  const {
+    isOpen: isEditOpen,
+    onOpen: onEditOpen,
+    onOpenChange: onEditOpenChange,
+  } = useDisclosure();
+
   const canNavigatePrev = currentIndex > 0;
   const canNavigateNext = currentIndex < allImages.length - 1;
 
@@ -277,6 +311,74 @@ export default function ImageDetailModal({
       router.push(`/storyboard?imageId=${selectedImage.imageId}`);
     }
   };
+
+  const addImageToDestination = async (pick: DestinationPick) => {
+    if (!selectedImage?.imageId) return false;
+    try {
+      const res = await fetch(`/api/collection/${pick.collectionId}/images`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          imageId: selectedImage.imageId,
+          chatId: chatId || null,
+          generationDetails: {
+            title: selectedImage.title || "",
+            prompt: selectedImage.prompt || "",
+            status: selectedImage.status || "generated",
+          },
+          folderId: pick.folderId,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Failed to add to destination");
+      }
+      startFlyingAnimation();
+      addToast({
+        title: tMenu("savedToast", { name: pick.collectionName }),
+        color: "success",
+      });
+      return true;
+    } catch (err: any) {
+      addToast({
+        title: tCollections("error"),
+        description: err?.message ?? "Failed to save",
+        color: "danger",
+      });
+      return false;
+    }
+  };
+
+  const handleDestinationConfirm = (pick: DestinationPick) => {
+    onDestOpenChange();
+    addImageToDestination(pick);
+  };
+
+  const startEditFlow = (mode: ChatImageEditMode) => {
+    setPendingEditMode(mode);
+    setEditDestination(null);
+    onEditDestOpen();
+  };
+
+  const handleEditDestinationConfirm = (pick: DestinationPick) => {
+    setEditDestination(pick);
+    onEditDestOpenChange();
+    onEditOpen();
+  };
+
+  // Hybrid menu: top-8 most-recently-updated writable collections as flat
+  // items, plus a tree picker entrypoint for everything else.
+  const recentCollections = useMemo(() => {
+    return collections
+      .filter((c) => hasWriteAccess(c.permission))
+      .slice()
+      .sort((a, b) => {
+        const at = new Date(a.updatedAt as unknown as string | Date).getTime();
+        const bt = new Date(b.updatedAt as unknown as string | Date).getTime();
+        return bt - at;
+      })
+      .slice(0, 8);
+  }, [collections]);
 
   const removeFlyingImage = (id: string) => {
     setFlyingImages((prev) => prev.filter((img) => img.id !== id));
@@ -405,6 +507,16 @@ export default function ImageDetailModal({
                                         onDesktopOpen();
                                       } else if (key === "create-new") {
                                         handleCreateNewCollection();
+                                      } else if (key === "add-to-existing") {
+                                        onDestOpen();
+                                      } else if (key === "edit-redraw") {
+                                        startEditFlow("redraw");
+                                      } else if (key === "edit-crop") {
+                                        startEditFlow("crop");
+                                      } else if (key === "edit-erase") {
+                                        startEditFlow("erase");
+                                      } else if (key === "edit-cutout") {
+                                        startEditFlow("cutout");
                                       }
                                     }}
                                   >
@@ -423,6 +535,35 @@ export default function ImageDetailModal({
                                       Send to Desktop
                                     </DropdownItem>
                                     <DropdownSection
+                                      title={tMenu("editGroup")}
+                                      showDivider
+                                    >
+                                      <DropdownItem
+                                        key="edit-redraw"
+                                        startContent={<Paintbrush size={16} />}
+                                      >
+                                        {tMenu("editRedraw")}
+                                      </DropdownItem>
+                                      <DropdownItem
+                                        key="edit-crop"
+                                        startContent={<CropIcon size={16} />}
+                                      >
+                                        {tMenu("editCrop")}
+                                      </DropdownItem>
+                                      <DropdownItem
+                                        key="edit-erase"
+                                        startContent={<Eraser size={16} />}
+                                      >
+                                        {tMenu("editErase")}
+                                      </DropdownItem>
+                                      <DropdownItem
+                                        key="edit-cutout"
+                                        startContent={<Scissors size={16} />}
+                                      >
+                                        {tMenu("editCutout")}
+                                      </DropdownItem>
+                                    </DropdownSection>
+                                    <DropdownSection
                                       title={tMenu("addToCollection")}
                                       showDivider
                                     >
@@ -433,15 +574,22 @@ export default function ImageDetailModal({
                                       >
                                         {tCollections("createNewCollection")}
                                       </DropdownItem>
+                                      <DropdownItem
+                                        key="add-to-existing"
+                                        startContent={<FolderTree size={16} />}
+                                        className="font-semibold"
+                                      >
+                                        {tMenu("addToExistingCollection")}
+                                      </DropdownItem>
                                     </DropdownSection>
                                     <DropdownSection
                                       title={
-                                        collections.length > 0
-                                          ? tMenu("yourCollections")
+                                        recentCollections.length > 0
+                                          ? tMenu("recentCollections")
                                           : undefined
                                       }
                                     >
-                                      {collections.length === 0 ? (
+                                      {recentCollections.length === 0 ? (
                                         <DropdownItem
                                           key="no-collections"
                                           isReadOnly
@@ -451,26 +599,21 @@ export default function ImageDetailModal({
                                           </span>
                                         </DropdownItem>
                                       ) : (
-                                        collections
-                                          .filter(
-                                            (c) =>
-                                              hasWriteAccess(c.permission)
-                                          )
-                                          .map((collection) => (
-                                            <DropdownItem
-                                              key={collection.id}
-                                              startContent={
-                                                <FolderPlus size={16} />
-                                              }
-                                              onPress={() =>
-                                                handleAddToCollection(
-                                                  collection.id
-                                                )
-                                              }
-                                            >
-                                              {collection.name}
-                                            </DropdownItem>
-                                          ))
+                                        recentCollections.map((collection) => (
+                                          <DropdownItem
+                                            key={collection.id}
+                                            startContent={
+                                              <FolderPlus size={16} />
+                                            }
+                                            onPress={() =>
+                                              handleAddToCollection(
+                                                collection.id
+                                              )
+                                            }
+                                          >
+                                            {collection.name}
+                                          </DropdownItem>
+                                        ))
                                       )}
                                     </DropdownSection>
                                   </DropdownMenu>
@@ -637,6 +780,16 @@ export default function ImageDetailModal({
                                         onDesktopOpen();
                                       } else if (key === "create-new") {
                                         handleCreateNewCollection();
+                                      } else if (key === "add-to-existing") {
+                                        onDestOpen();
+                                      } else if (key === "edit-redraw") {
+                                        startEditFlow("redraw");
+                                      } else if (key === "edit-crop") {
+                                        startEditFlow("crop");
+                                      } else if (key === "edit-erase") {
+                                        startEditFlow("erase");
+                                      } else if (key === "edit-cutout") {
+                                        startEditFlow("cutout");
                                       }
                                     }}
                                   >
@@ -655,6 +808,35 @@ export default function ImageDetailModal({
                                       Send to Desktop
                                     </DropdownItem>
                                     <DropdownSection
+                                      title={tMenu("editGroup")}
+                                      showDivider
+                                    >
+                                      <DropdownItem
+                                        key="edit-redraw"
+                                        startContent={<Paintbrush size={16} />}
+                                      >
+                                        {tMenu("editRedraw")}
+                                      </DropdownItem>
+                                      <DropdownItem
+                                        key="edit-crop"
+                                        startContent={<CropIcon size={16} />}
+                                      >
+                                        {tMenu("editCrop")}
+                                      </DropdownItem>
+                                      <DropdownItem
+                                        key="edit-erase"
+                                        startContent={<Eraser size={16} />}
+                                      >
+                                        {tMenu("editErase")}
+                                      </DropdownItem>
+                                      <DropdownItem
+                                        key="edit-cutout"
+                                        startContent={<Scissors size={16} />}
+                                      >
+                                        {tMenu("editCutout")}
+                                      </DropdownItem>
+                                    </DropdownSection>
+                                    <DropdownSection
                                       title={tMenu("addToCollection")}
                                       showDivider
                                     >
@@ -665,15 +847,22 @@ export default function ImageDetailModal({
                                       >
                                         {tCollections("createNewCollection")}
                                       </DropdownItem>
+                                      <DropdownItem
+                                        key="add-to-existing"
+                                        startContent={<FolderTree size={16} />}
+                                        className="font-semibold"
+                                      >
+                                        {tMenu("addToExistingCollection")}
+                                      </DropdownItem>
                                     </DropdownSection>
                                     <DropdownSection
                                       title={
-                                        collections.length > 0
-                                          ? tMenu("yourCollections")
+                                        recentCollections.length > 0
+                                          ? tMenu("recentCollections")
                                           : undefined
                                       }
                                     >
-                                      {collections.length === 0 ? (
+                                      {recentCollections.length === 0 ? (
                                         <DropdownItem
                                           key="no-collections"
                                           isReadOnly
@@ -683,26 +872,21 @@ export default function ImageDetailModal({
                                           </span>
                                         </DropdownItem>
                                       ) : (
-                                        collections
-                                          .filter(
-                                            (c) =>
-                                              hasWriteAccess(c.permission)
-                                          )
-                                          .map((collection) => (
-                                            <DropdownItem
-                                              key={collection.id}
-                                              startContent={
-                                                <FolderPlus size={16} />
-                                              }
-                                              onPress={() =>
-                                                handleAddToCollection(
-                                                  collection.id
-                                                )
-                                              }
-                                            >
-                                              {collection.name}
-                                            </DropdownItem>
-                                          ))
+                                        recentCollections.map((collection) => (
+                                          <DropdownItem
+                                            key={collection.id}
+                                            startContent={
+                                              <FolderPlus size={16} />
+                                            }
+                                            onPress={() =>
+                                              handleAddToCollection(
+                                                collection.id
+                                              )
+                                            }
+                                          >
+                                            {collection.name}
+                                          </DropdownItem>
+                                        ))
                                       )}
                                     </DropdownSection>
                                   </DropdownMenu>
@@ -811,6 +995,39 @@ export default function ImageDetailModal({
               },
             },
           ]}
+        />
+      )}
+
+      {/* Destination picker for "Add to Existing Collection" */}
+      <DestinationPickerModal
+        isOpen={isDestOpen}
+        onOpenChange={onDestOpenChange}
+        onConfirm={handleDestinationConfirm}
+      />
+
+      {/* Destination picker for image-edit ops */}
+      <DestinationPickerModal
+        isOpen={isEditDestOpen}
+        onOpenChange={onEditDestOpenChange}
+        onConfirm={handleEditDestinationConfirm}
+        title={tMenu("editGroup")}
+      />
+
+      {/* Image edit modal */}
+      {pendingEditMode && editDestination && selectedImage?.imageId && (
+        <ImageEditModal
+          isOpen={isEditOpen}
+          onOpenChange={onEditOpenChange}
+          mode={pendingEditMode}
+          sourceImageId={selectedImage.imageId}
+          sourceImageUrl={selectedImage.url}
+          sourceTitle={selectedImage.title}
+          destination={editDestination}
+          chatId={chatId || null}
+          onClose={() => {
+            setPendingEditMode(null);
+            setEditDestination(null);
+          }}
         />
       )}
     </Modal>

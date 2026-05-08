@@ -1363,8 +1363,35 @@
     "viewDetails": "상세 정보 보기",
     "addToCollection": "컬렉션에 추가",
     "yourCollections": "내 컬렉션",
+    "recentCollections": "최근 컬렉션",
+    "addToExistingCollection": "기존 컬렉션에 추가…",
     "createAndAdd": "만들고 추가",
-    "flyingImageAlt": "날아가는 이미지"
+    "flyingImageAlt": "날아가는 이미지",
+    "editRedraw": "다시 그리기",
+    "editCrop": "자르기",
+    "editErase": "지우기",
+    "editCutout": "오려내기",
+    "editGroup": "이미지 편집",
+    "savedToast": "{name}에 저장됨"
+  },
+  "destinationPicker": {
+    "title": "대상 선택",
+    "hint": "저장할 컬렉션 또는 폴더를 선택하세요.",
+    "confirm": "선택",
+    "editTitle": "결과 저장 위치…",
+    "editConfirm": "계속"
+  },
+  "imageEditModal": {
+    "titleRedraw": "다시 그리기",
+    "titleCrop": "자르기",
+    "titleErase": "지우기",
+    "titleCutout": "오려내기",
+    "destinationLabel": "저장 위치",
+    "submit": "적용",
+    "close": "닫기",
+    "savedHeading": "완료 — 이미지가 준비되었습니다",
+    "savedSubheading": "{name}에 저장되었습니다",
+    "errorTitle": "오류가 발생했습니다"
   },
   "language": {
     "switchLanguage": "언어",

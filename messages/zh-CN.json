@@ -1363,8 +1363,35 @@
     "viewDetails": "查看详情",
     "addToCollection": "添加到集合",
     "yourCollections": "我的集合",
+    "recentCollections": "最近使用的集合",
+    "addToExistingCollection": "添加到已有集合…",
     "createAndAdd": "创建并添加",
-    "flyingImageAlt": "飞行图片"
+    "flyingImageAlt": "飞行图片",
+    "editRedraw": "重绘",
+    "editCrop": "裁剪",
+    "editErase": "擦除",
+    "editCutout": "抠图",
+    "editGroup": "编辑图片",
+    "savedToast": "已保存到 {name}"
+  },
+  "destinationPicker": {
+    "title": "选择目的地",
+    "hint": "选择一个集合或文件夹来保存。",
+    "confirm": "选择",
+    "editTitle": "结果保存到…",
+    "editConfirm": "继续"
+  },
+  "imageEditModal": {
+    "titleRedraw": "重绘",
+    "titleCrop": "裁剪",
+    "titleErase": "擦除",
+    "titleCutout": "抠图",
+    "destinationLabel": "保存到",
+    "submit": "应用",
+    "close": "关闭",
+    "savedHeading": "完成 — 图片已就绪",
+    "savedSubheading": "已保存到 {name}",
+    "errorTitle": "出错了"
   },
   "language": {
     "switchLanguage": "语言",

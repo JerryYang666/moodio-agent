@@ -1554,8 +1554,35 @@
     "viewDetails": "View Details",
     "addToCollection": "Add to Collection",
     "yourCollections": "Your Collections",
+    "recentCollections": "Recent Collections",
+    "addToExistingCollection": "Add to Existing Collection…",
     "createAndAdd": "Create & Add",
-    "flyingImageAlt": "Flying image"
+    "flyingImageAlt": "Flying image",
+    "editRedraw": "Redraw",
+    "editCrop": "Crop",
+    "editErase": "Erase",
+    "editCutout": "Cutout",
+    "editGroup": "Edit Image",
+    "savedToast": "Saved to {name}"
+  },
+  "destinationPicker": {
+    "title": "Choose Destination",
+    "hint": "Select a collection or folder to save into.",
+    "confirm": "Choose",
+    "editTitle": "Save result to…",
+    "editConfirm": "Continue"
+  },
+  "imageEditModal": {
+    "titleRedraw": "Redraw",
+    "titleCrop": "Crop",
+    "titleErase": "Erase",
+    "titleCutout": "Cutout",
+    "destinationLabel": "Saving to",
+    "submit": "Apply",
+    "close": "Close",
+    "savedHeading": "Done — your image is ready",
+    "savedSubheading": "Saved to {name}",
+    "errorTitle": "Something went wrong"
   },
   "language": {
     "switchLanguage": "Language",
