@@ -304,39 +304,49 @@ export default function ImageEditModal({
     return new File([blob], `marked_${Date.now()}.png`, { type: "image/png" });
   }, [canvasSize.height, canvasSize.width, fetchOriginalImage]);
 
-  const composeCroppedImage = useCallback(async (): Promise<File> => {
-    if (
-      !completedCrop ||
-      completedCrop.width === 0 ||
-      completedCrop.height === 0
-    ) {
-      throw new Error("Please select a crop area");
-    }
-    const cleanImage = await fetchOriginalImage();
-    const displayed = imageRef.current?.getBoundingClientRect();
-    const dispW = displayed?.width || cleanImage.naturalWidth;
-    const dispH = displayed?.height || cleanImage.naturalHeight;
-    const sx = (completedCrop.x * cleanImage.naturalWidth) / dispW;
-    const sy = (completedCrop.y * cleanImage.naturalHeight) / dispH;
-    const sw = (completedCrop.width * cleanImage.naturalWidth) / dispW;
-    const sh = (completedCrop.height * cleanImage.naturalHeight) / dispH;
+  // Unlike the desktop overlay, the crop <img> here lives inside a
+  // `{!isProcessing && usesCrop && ...}` branch, so it unmounts the moment
+  // we flip `isProcessing` on submit. That means imageRef.current is null
+  // by the time this runs — the caller must pass the rendered rect it
+  // captured *before* setIsProcessing(true). Falling back to natural
+  // dimensions produces a silently-broken crop anchored at top-left.
+  const composeCroppedImage = useCallback(
+    async (displayedRect: DOMRect | null): Promise<File> => {
+      if (
+        !completedCrop ||
+        completedCrop.width === 0 ||
+        completedCrop.height === 0
+      ) {
+        throw new Error("Please select a crop area");
+      }
+      const cleanImage = await fetchOriginalImage();
+      const dispW = displayedRect?.width || cleanImage.naturalWidth;
+      const dispH = displayedRect?.height || cleanImage.naturalHeight;
+      const sx = (completedCrop.x * cleanImage.naturalWidth) / dispW;
+      const sy = (completedCrop.y * cleanImage.naturalHeight) / dispH;
+      const sw = (completedCrop.width * cleanImage.naturalWidth) / dispW;
+      const sh = (completedCrop.height * cleanImage.naturalHeight) / dispH;
 
-    const out = document.createElement("canvas");
-    out.width = Math.max(1, Math.round(sw));
-    out.height = Math.max(1, Math.round(sh));
-    const ctx = out.getContext("2d");
-    if (!ctx) throw new Error("Failed to get output 2d context");
-    ctx.drawImage(cleanImage, sx, sy, sw, sh, 0, 0, out.width, out.height);
+      const out = document.createElement("canvas");
+      out.width = Math.max(1, Math.round(sw));
+      out.height = Math.max(1, Math.round(sh));
+      const ctx = out.getContext("2d");
+      if (!ctx) throw new Error("Failed to get output 2d context");
+      ctx.drawImage(cleanImage, sx, sy, sw, sh, 0, 0, out.width, out.height);
 
-    const blob = await new Promise<Blob>((resolve, reject) => {
-      out.toBlob(
-        (b) => (b ? resolve(b) : reject(new Error("toBlob failed"))),
-        "image/png",
-        1.0
-      );
-    });
-    return new File([blob], `cropped_${Date.now()}.png`, { type: "image/png" });
-  }, [completedCrop, fetchOriginalImage]);
+      const blob = await new Promise<Blob>((resolve, reject) => {
+        out.toBlob(
+          (b) => (b ? resolve(b) : reject(new Error("toBlob failed"))),
+          "image/png",
+          1.0
+        );
+      });
+      return new File([blob], `cropped_${Date.now()}.png`, {
+        type: "image/png",
+      });
+    },
+    [completedCrop, fetchOriginalImage]
+  );
 
   // Save the generated image into the chosen destination collection/folder.
   // Non-fatal if this fails: we still show the result, with a toast.
@@ -386,8 +396,13 @@ export default function ImageEditModal({
           setErrorMsg(t("cropErrorEmpty"));
           return;
         }
+        // Must capture the rendered <img> rect BEFORE flipping isProcessing:
+        // the crop <img> is gated on `!isProcessing` and will unmount
+        // synchronously on the next render, taking imageRef.current with it.
+        const displayedRect =
+          imageRef.current?.getBoundingClientRect() ?? null;
         setIsProcessing(true);
-        const file = await composeCroppedImage();
+        const file = await composeCroppedImage(displayedRect);
         const upload = await uploadImageClient(file);
         if (!upload.success) {
           throw new Error(upload.error.message || "Upload failed");
