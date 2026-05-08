@@ -305,29 +305,70 @@ export default function DesktopCanvas({
   );
 
   const handleFocusAsset = useCallback(
-    (asset: EnrichedDesktopAsset) => {
+    (
+      asset: EnrichedDesktopAsset,
+      padding?: {
+        left?: number;
+        right?: number;
+        top?: number;
+        bottom?: number;
+      }
+    ) => {
       const rect = containerRef.current?.getBoundingClientRect();
       if (!rect) return;
       const dims = getAssetDimensions(asset, naturalDims.get(asset.id));
+      // The container's bounding rect already reflects whatever the
+      // chat side-panel is doing (the canvas lives in a flex-1
+      // container that shrinks when the panel opens), so this width
+      // is the *actual* visible canvas width. Just subtract any
+      // caller-supplied padding (e.g., space reserved for the
+      // image-edit overlay's side panes) before computing zoom.
       const viewportW = rect.width;
       const viewportH = rect.height;
-      // Zoom so asset fills ~80% of viewport
+      const padLeft = padding?.left ?? 0;
+      const padRight = padding?.right ?? 0;
+      const padTop = padding?.top ?? 0;
+      const padBottom = padding?.bottom ?? 0;
+      const availableW = Math.max(100, viewportW - padLeft - padRight);
+      const availableH = Math.max(100, viewportH - padTop - padBottom);
+      // Without padding, fall back to the original 80%-of-viewport
+      // breathing room. With explicit padding the caller has already
+      // reserved space for surrounding UI, so a smaller breathing
+      // factor (5% margin inside available) is enough.
+      const fillFactor = padding ? 0.95 : 0.8;
       const zoom = Math.min(
-        (viewportW * 0.8) / dims.w,
-        (viewportH * 0.8) / dims.h,
+        (availableW * fillFactor) / dims.w,
+        (availableH * fillFactor) / dims.h,
         MAX_ZOOM
       );
-      // Center the asset in the viewport
+      // Place the asset's center at the center of the available area
+      // (offset from the viewport origin by the left/top padding) so
+      // the reserved padding regions stay clear.
       const assetCenterX = asset.posX + dims.w / 2;
       const assetCenterY = asset.posY + dims.h / 2;
       onCameraChange({
-        x: viewportW / 2 - assetCenterX * zoom,
-        y: viewportH / 2 - assetCenterY * zoom,
+        x: padLeft + availableW / 2 - assetCenterX * zoom,
+        y: padTop + availableH / 2 - assetCenterY * zoom,
         zoom,
       });
     },
     [naturalDims, onCameraChange]
   );
+
+  // Padding reserved when auto-focusing for an image-edit operation,
+  // so the asset + the overlay's right pane (prompt / submit / etc.)
+  // and bottom pane (mark controls + clear) all fit on screen.
+  // Numbers track the overlay's `screenRect` math in
+  // `components/desktop/image-edit-overlay.tsx`:
+  //   right pane: 280px wide + 12px gap + ~28px outer margin → 320
+  //   bottom pane: ~50px tall + 12px gap + ~28px outer margin → 90
+  //   left/top: small breathing room
+  const IMAGE_EDIT_FOCUS_PADDING = {
+    left: 40,
+    right: 320,
+    top: 40,
+    bottom: 90,
+  } as const;
 
   const handleResizePointerDown = useCallback(
     (e: React.PointerEvent, asset: DesktopAsset, handle: string) => {
@@ -1525,7 +1566,14 @@ export default function DesktopCanvas({
                   className="flex items-center gap-1.5 px-2 py-1 text-xs hover:bg-default-100 rounded-md transition-colors whitespace-nowrap"
                   onClick={() => {
                     if (singleSelectedAsset) {
-                      handleFocusAsset(singleSelectedAsset);
+                      // Reserve space for the overlay's right + bottom
+                      // panes so they stay inside the visible canvas
+                      // viewport (which already excludes the chat
+                      // side-panel via the flex layout).
+                      handleFocusAsset(
+                        singleSelectedAsset,
+                        IMAGE_EDIT_FOCUS_PADDING
+                      );
                     }
                     window.dispatchEvent(
                       new CustomEvent("moodio-image-edit", {
