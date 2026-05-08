@@ -132,6 +132,7 @@ export default function ImageWithMenu({
   const tCollections = useTranslations("collections");
   const tCommon = useTranslations("common");
   const tVideo = useTranslations("video");
+  const tDest = useTranslations("destinationPicker");
   const router = useRouter();
   const showDesktop = useFeatureFlag<boolean>("user_desktop") ?? false;
   const {
@@ -572,7 +573,9 @@ export default function ImageWithMenu({
         isOpen={isEditDestOpen}
         onOpenChange={onEditDestOpenChange}
         onConfirm={handleEditDestinationConfirm}
-        title={tMenu("editGroup")}
+        title={tDest("editTitle")}
+        subtitle={tDest("editSubtitle")}
+        confirmLabel={tDest("editConfirm")}
       />
 
       {/* Image edit modal (runs the chosen operation) */}

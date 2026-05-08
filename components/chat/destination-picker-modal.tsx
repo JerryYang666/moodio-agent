@@ -35,6 +35,7 @@ interface DestinationPickerModalProps {
   onOpenChange: () => void;
   onConfirm: (pick: DestinationPick) => void;
   title?: string;
+  subtitle?: string;
   confirmLabel?: string;
 }
 
@@ -48,6 +49,7 @@ export default function DestinationPickerModal({
   onOpenChange,
   onConfirm,
   title,
+  subtitle,
   confirmLabel,
 }: DestinationPickerModalProps) {
   const t = useTranslations();
@@ -128,8 +130,13 @@ export default function DestinationPickerModal({
       <ModalContent>
         {(onClose) => (
           <>
-            <ModalHeader>
-              {title ?? t("destinationPicker.title")}
+            <ModalHeader className="flex flex-col gap-0.5">
+              <span>{title ?? t("destinationPicker.title")}</span>
+              {subtitle && (
+                <span className="text-xs font-normal text-default-500">
+                  {subtitle}
+                </span>
+              )}
             </ModalHeader>
             <ModalBody>
               {loading ? (

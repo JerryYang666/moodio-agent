@@ -108,6 +108,7 @@ export default function ImageEditModal({
     imageUrl: string;
   } | null>(null);
 
+
   const usesBrush =
     mode === "redraw" ||
     mode === "erase" ||
@@ -161,17 +162,21 @@ export default function ImageEditModal({
     requestAnimationFrame(() => initializeCanvas());
   }, [imageLoaded, usesBrush, initializeCanvas]);
 
-  // Re-initialize on window resize so the brush stays aligned to the image.
+  // Keep the brush canvas aligned to the image's rendered box. Covers window
+  // resizes *and* in-modal layout flips (e.g. controls moving from beside to
+  // below once the image's aspect ratio is known).
   useEffect(() => {
     if (!usesBrush || !imageLoaded) return;
-    const onResize = () => {
+    const img = imageRef.current;
+    if (!img) return;
+    const ro = new ResizeObserver(() => {
       requestAnimationFrame(() => {
         initializeCanvas();
         setHasDrawing(false);
       });
-    };
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
+    });
+    ro.observe(img);
+    return () => ro.disconnect();
   }, [usesBrush, imageLoaded, initializeCanvas]);
 
   const getCanvasCoords = (
@@ -503,12 +508,16 @@ export default function ImageEditModal({
     <Modal
       isOpen={isOpen}
       onOpenChange={onOpenChange}
-      size="3xl"
+      size="5xl"
       backdrop="blur"
       scrollBehavior="inside"
-      isDismissable={!isProcessing}
+      isDismissable={false}
+      isKeyboardDismissDisabled
       hideCloseButton={isProcessing}
-      classNames={{ wrapper: "z-[75]" }}
+      classNames={{
+        wrapper: "z-[75]",
+        base: "max-h-[92dvh] md:!max-w-[92vw] md:w-[92vw]",
+      }}
       onClose={result ? onClose : undefined}
     >
       <ModalContent>
@@ -544,22 +553,27 @@ export default function ImageEditModal({
                     <img
                       src={result.imageUrl}
                       alt={sourceTitle || "Result"}
-                      className="max-h-[60vh] object-contain rounded-md"
+                      className="max-h-[72vh] object-contain rounded-md"
                     />
                   </div>
                 </div>
               ) : (
                 // --- EDITING STATE ---
-                <div className="flex flex-col md:flex-row gap-4">
-                  {/* Image surface */}
-                  <div className="relative flex-1 min-h-[320px] bg-black/5 rounded-lg flex items-center justify-center overflow-hidden">
-                    <div className="relative inline-block max-w-full max-h-[60vh]">
+                // Controls always sit to the right of the image on md+; they
+                // get a fixed width and their own scroll so they can never be
+                // clipped by a very wide source image. The image column uses
+                // min-w-0 so it yields space rather than pushing them out.
+                <div className="flex flex-col md:flex-row gap-4 items-stretch">
+                  {/* Image surface — hugs the image's natural aspect ratio,
+                      centered in its column. */}
+                  <div className="flex-1 min-w-0 flex items-center justify-center">
+                    <div className="relative inline-block bg-black/5 rounded-lg overflow-hidden max-w-full">
                       {!usesCrop && (
                         <img
                           ref={imageRef}
                           src={sourceImageUrl}
                           alt=""
-                          className="max-w-full max-h-[60vh] object-contain select-none"
+                          className="max-w-full max-h-[72vh] object-contain select-none"
                           onLoad={() => setImageLoaded(true)}
                           draggable={false}
                         />
@@ -593,7 +607,7 @@ export default function ImageEditModal({
                             ref={imageRef}
                             src={sourceImageUrl}
                             alt=""
-                            className="max-w-full max-h-[60vh] object-contain select-none"
+                            className="max-w-full max-h-[72vh] object-contain select-none"
                             onLoad={() => setImageLoaded(true)}
                             draggable={false}
                           />
@@ -604,8 +618,9 @@ export default function ImageEditModal({
                     </div>
                   </div>
 
-                  {/* Controls pane */}
-                  <div className="w-full md:w-64 flex flex-col gap-3">
+                  {/* Controls pane — fixed width on md+, scrolls internally so
+                      nothing gets clipped when the modal or image is tall. */}
+                  <div className="w-full md:w-72 shrink-0 flex flex-col gap-3 md:max-h-[72vh] md:overflow-y-auto md:pr-1">
                     {mode === "cutout" && !isProcessing && (
                       <div className="flex gap-1 p-1 rounded-md bg-default-100">
                         <button

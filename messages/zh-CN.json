@@ -1378,8 +1378,9 @@
     "title": "选择目的地",
     "hint": "选择一个集合或文件夹来保存。",
     "confirm": "选择",
-    "editTitle": "结果保存到…",
-    "editConfirm": "继续"
+    "editTitle": "编辑后的图片保存到哪里？",
+    "editSubtitle": "选择编辑结果的保存位置。原图不会被修改。",
+    "editConfirm": "继续编辑"
   },
   "imageEditModal": {
     "titleRedraw": "重绘",

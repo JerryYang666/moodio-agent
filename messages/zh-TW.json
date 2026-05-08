@@ -1378,8 +1378,9 @@
     "title": "選擇目的地",
     "hint": "選擇要儲存的集合或資料夾。",
     "confirm": "選擇",
-    "editTitle": "結果儲存至…",
-    "editConfirm": "繼續"
+    "editTitle": "編輯後的圖片儲存到哪裡？",
+    "editSubtitle": "選擇編輯結果的儲存位置。原圖不會被修改。",
+    "editConfirm": "繼續編輯"
   },
   "imageEditModal": {
     "titleRedraw": "重繪",

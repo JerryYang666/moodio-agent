@@ -1378,8 +1378,9 @@
     "title": "保存先を選択",
     "hint": "コレクションまたはフォルダを選択してください。",
     "confirm": "選択",
-    "editTitle": "結果の保存先…",
-    "editConfirm": "続行"
+    "editTitle": "編集後の画像をどこに保存しますか？",
+    "editSubtitle": "編集結果の保存先を選択してください。元の画像は変更されません。",
+    "editConfirm": "編集に進む"
   },
   "imageEditModal": {
     "titleRedraw": "描き直し",

@@ -1569,8 +1569,9 @@
     "title": "Choose Destination",
     "hint": "Select a collection or folder to save into.",
     "confirm": "Choose",
-    "editTitle": "Save result to…",
-    "editConfirm": "Continue"
+    "editTitle": "Where should the edited image go?",
+    "editSubtitle": "Pick a destination for the edit result. The original image stays unchanged.",
+    "editConfirm": "Continue to edit"
   },
   "imageEditModal": {
     "titleRedraw": "Redraw",
