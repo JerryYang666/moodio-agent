@@ -1,6 +1,6 @@
 import sharp from "sharp";
 import { uploadTempImage, getSignedTempImageUrl } from "@/lib/storage/s3";
-import { assertAllowedFetchHost } from "./allowed-hosts";
+import { assertAllowedFetchHost } from "@/lib/security/allowed-fetch-hosts";
 
 export const KIE_API_BASE = "https://api.kie.ai";
 export const KIE_FILE_UPLOAD_BASE = "https://kieai.redpandaai.co";

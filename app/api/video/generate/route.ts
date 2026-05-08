@@ -21,7 +21,7 @@ import {
 import { recordEvent } from "@/lib/telemetry";
 import { isFeatureFlagEnabled } from "@/lib/feature-flags/server";
 import { recordResearchEvent } from "@/lib/research-telemetry";
-import { isAllowedFetchHost } from "@/lib/kie/allowed-hosts";
+import { isAllowedFetchHost } from "@/lib/security/allowed-fetch-hosts";
 
 /**
  * POST /api/video/generate

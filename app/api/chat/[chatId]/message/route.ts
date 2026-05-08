@@ -45,7 +45,7 @@ import { siteConfig } from "@/config/site";
 import { isFeatureFlagEnabled } from "@/lib/feature-flags/server";
 import { recordResearchEvent } from "@/lib/research-telemetry";
 import { withKeepAlive, STREAM_KEEPALIVE_HEADERS } from "@/lib/streaming/keep-alive";
-import { isAllowedFetchHost } from "@/lib/kie/allowed-hosts";
+import { isAllowedFetchHost } from "@/lib/security/allowed-fetch-hosts";
 
 // Long-running image/video generations can hold the streamed response for
 // many minutes. Pin to the platform ceiling so the function isn't killed
