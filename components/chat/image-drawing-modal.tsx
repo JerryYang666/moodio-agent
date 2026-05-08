@@ -12,6 +12,12 @@ import {
 import { Button } from "@heroui/button";
 import { Spinner } from "@heroui/spinner";
 import { Eraser, Check } from "lucide-react";
+import {
+  DEFAULT_MARK_COLOR,
+  DEFAULT_MARK_WIDTH,
+  MARK_COMPOSITE_ALPHA,
+} from "@/lib/image/mark-config";
+import MarkControls from "./mark-controls";
 
 interface ImageDrawingModalProps {
   isOpen: boolean;
@@ -21,9 +27,6 @@ interface ImageDrawingModalProps {
   imageTitle?: string;
   onSaveMarkedImage: (file: File, originalImageId: string) => Promise<void>;
 }
-
-const PEN_COLOR = "#FF0000";
-const PEN_WIDTH = 6;
 
 export default function ImageDrawingModal({
   isOpen,
@@ -44,6 +47,8 @@ export default function ImageDrawingModal({
   const [isSaving, setIsSaving] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
+  const [brushColor, setBrushColor] = useState<string>(DEFAULT_MARK_COLOR.value);
+  const [brushWidth, setBrushWidth] = useState<number>(DEFAULT_MARK_WIDTH.value);
 
   // Track the last point for smooth drawing
   const lastPointRef = useRef<{ x: number; y: number } | null>(null);
@@ -73,12 +78,22 @@ export default function ImageDrawingModal({
     // Configure canvas context
     const ctx = canvas.getContext("2d");
     if (ctx) {
-      ctx.strokeStyle = PEN_COLOR;
-      ctx.lineWidth = PEN_WIDTH;
+      ctx.strokeStyle = brushColor;
+      ctx.lineWidth = brushWidth;
       ctx.lineCap = "round";
       ctx.lineJoin = "round";
     }
-  }, []);
+  }, [brushColor, brushWidth]);
+
+  // Sync brush settings onto the canvas context whenever the user picks a
+  // new color or width. Existing strokes keep their original look; future
+  // strokes use the new settings.
+  useEffect(() => {
+    const ctx = canvasRef.current?.getContext("2d");
+    if (!ctx) return;
+    ctx.strokeStyle = brushColor;
+    ctx.lineWidth = brushWidth;
+  }, [brushColor, brushWidth]);
 
   // Reset state when modal opens/closes
   useEffect(() => {
@@ -155,8 +170,8 @@ export default function ImageDrawingModal({
     const ctx = canvas?.getContext("2d");
     if (ctx) {
       ctx.beginPath();
-      ctx.arc(point.x, point.y, PEN_WIDTH / 2, 0, Math.PI * 2);
-      ctx.fillStyle = PEN_COLOR;
+      ctx.arc(point.x, point.y, brushWidth / 2, 0, Math.PI * 2);
+      ctx.fillStyle = brushColor;
       ctx.fill();
       setHasDrawing(true);
     }
@@ -245,13 +260,18 @@ export default function ImageDrawingModal({
       // Clean up the blob URL
       URL.revokeObjectURL(cleanImage.src);
 
-      // Scale and draw the canvas drawing on top
-      // We need to scale from displayed size to original size
+      // Scale and draw the canvas drawing on top — the brush canvas is in
+      // displayed-pixel space; the output canvas is at original-image
+      // resolution. Compositing once at MARK_COMPOSITE_ALPHA gives a
+      // uniform translucent mark regardless of how the user painted, so
+      // overlapping strokes don't compound and the underlying content
+      // stays readable to the model.
       const scaleX = cleanImage.naturalWidth / canvasSize.width;
       const scaleY = cleanImage.naturalHeight / canvasSize.height;
 
       outputCtx.save();
       outputCtx.scale(scaleX, scaleY);
+      outputCtx.globalAlpha = MARK_COMPOSITE_ALPHA;
       outputCtx.drawImage(canvas, 0, 0);
       outputCtx.restore();
 
@@ -301,6 +321,15 @@ export default function ImageDrawingModal({
         </ModalHeader>
 
         <ModalBody>
+          <div className="flex justify-center px-4 pt-2">
+            <MarkControls
+              color={brushColor}
+              width={brushWidth}
+              onColorChange={setBrushColor}
+              onWidthChange={setBrushWidth}
+              disabled={isSaving}
+            />
+          </div>
           <div
             ref={containerRef}
             className="relative flex items-center justify-center bg-black/5 dark:bg-white/5 min-h-[300px] max-h-[60vh] overflow-hidden"

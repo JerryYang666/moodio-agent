@@ -1,5 +1,6 @@
 import sharp from "sharp";
 import { uploadTempImage, getSignedTempImageUrl } from "@/lib/storage/s3";
+import { assertAllowedFetchHost } from "@/lib/security/allowed-fetch-hosts";
 
 export const KIE_API_BASE = "https://api.kie.ai";
 export const KIE_FILE_UPLOAD_BASE = "https://kieai.redpandaai.co";
@@ -54,6 +55,16 @@ const MIME_TO_EXT: Record<string, string> = {
  * 3. Default to ".jpg" — KIE needs *some* extension.
  */
 export async function inferExtension(url: string): Promise<string> {
+  // SSRF guard: refuse to fetch (HEAD) URLs outside our allowlist.
+  // The path-based inspection below is still attempted because it does
+  // not perform any network I/O.
+  let canFetch = true;
+  try {
+    assertAllowedFetchHost(url);
+  } catch {
+    canFetch = false;
+  }
+
   try {
     const pathname = new URL(url).pathname;
     const match = pathname.match(/\.([a-zA-Z0-9]{2,5})(?:[?#]|$)/);
@@ -63,12 +74,14 @@ export async function inferExtension(url: string): Promise<string> {
     }
   } catch {}
 
-  try {
-    const head = await fetch(url, { method: "HEAD" });
-    const ct = head.headers.get("content-type")?.split(";")[0]?.trim();
-    if (ct && MIME_TO_EXT[ct]) return MIME_TO_EXT[ct];
-  } catch (err) {
-    console.warn("[KIE Upload] HEAD request failed, defaulting to .jpg", err);
+  if (canFetch) {
+    try {
+      const head = await fetch(url, { method: "HEAD" });
+      const ct = head.headers.get("content-type")?.split(";")[0]?.trim();
+      if (ct && MIME_TO_EXT[ct]) return MIME_TO_EXT[ct];
+    } catch (err) {
+      console.warn("[KIE Upload] HEAD request failed, defaulting to .jpg", err);
+    }
   }
 
   return ".jpg";
@@ -87,6 +100,10 @@ export async function uploadToKie(
   uploadPath = "moodio/inputs",
   knownExt?: string
 ): Promise<string> {
+  // KIE itself fetches the URL we send to its upload-by-URL endpoint, so
+  // an unvalidated URL here would just relay an SSRF to KIE. Block at
+  // the boundary.
+  assertAllowedFetchHost(url);
   if (url.includes("redpandaai.co")) return url;
 
   const ext = knownExt ?? (await inferExtension(url));
@@ -147,6 +164,10 @@ export async function ensureKieSupportedFormat(
   url: string,
   { allowWebp = false, formatProfile }: { allowWebp?: boolean; formatProfile?: KieFormatProfile } = {}
 ): Promise<{ url: string; ext: string }> {
+  // SSRF guard before any network I/O. inferExtension also has its own
+  // guard but the GET below would still happen if format conversion is
+  // required, so we check here too.
+  assertAllowedFetchHost(url);
   const ext = await inferExtension(url);
   const profile = formatProfile ?? (allowWebp ? "extended" : "default");
   const supported = KIE_FORMAT_PROFILES[profile];

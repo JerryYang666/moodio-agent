@@ -45,6 +45,7 @@ import { siteConfig } from "@/config/site";
 import { isFeatureFlagEnabled } from "@/lib/feature-flags/server";
 import { recordResearchEvent } from "@/lib/research-telemetry";
 import { withKeepAlive, STREAM_KEEPALIVE_HEADERS } from "@/lib/streaming/keep-alive";
+import { isAllowedFetchHost } from "@/lib/security/allowed-fetch-hosts";
 
 // Long-running image/video generations can hold the streamed response for
 // many minutes. Pin to the platform ceiling so the function isn't killed
@@ -937,8 +938,23 @@ export async function POST(
       // keep their inline element_input_ids path.
       await hydrateKlingElementsFromLibrary(fullParams, payload.userId);
 
-      // Resolve media_references IDs to signed URLs for the provider API
+      // Resolve media_references IDs to signed URLs for the provider API.
+      // SSRF guard: any pre-baked http(s) URLs from the client must be on
+      // our allowlist (own CDN or KIE storage). Otherwise an authenticated
+      // user could trigger fetches against arbitrary hosts (loopback,
+      // 169.254.x AWS metadata, etc.) downstream in the KIE pipeline.
       if (Array.isArray(fullParams.media_references)) {
+        for (const ref of fullParams.media_references as Array<{
+          type: string;
+          id: unknown;
+        }>) {
+          if (typeof ref.id === "string" && ref.id.startsWith("http") && !isAllowedFetchHost(ref.id)) {
+            return NextResponse.json(
+              { error: "media_references.id host is not in the allowlist" },
+              { status: 400 }
+            );
+          }
+        }
         fullParams.media_references = fullParams.media_references.map(
           (ref: { type: "image" | "video" | "audio"; id: string }) => ({
             type: ref.type,

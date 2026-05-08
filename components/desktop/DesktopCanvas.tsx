@@ -28,7 +28,14 @@ import {
   Pencil,
   Type,
   Upload,
+  Paintbrush,
+  Crop,
+  Eraser,
+  Scissors,
 } from "lucide-react";
+import ImageEditOverlay, {
+  type ImageEditMode,
+} from "./image-edit-overlay";
 import { motion, AnimatePresence } from "framer-motion";
 import { addToast } from "@heroui/toast";
 import { siteConfig } from "@/config/site";
@@ -120,6 +127,22 @@ interface DesktopCanvasProps {
    * world-space coordinates where the cursor was released.
    */
   onExternalFileDrop?: (files: File[], position: { x: number; y: number }) => void;
+  /**
+   * In-canvas image-edit overlay state. When non-null, an `<ImageEditOverlay>`
+   * is rendered over the target asset and the floating action bar is hidden
+   * (since the overlay's own panes take over).
+   */
+  imageEditState?: {
+    assetId: string;
+    mode: ImageEditMode;
+  } | null;
+  onImageEditCommit?: (args: {
+    assetId: string;
+    newImageId: string;
+    newImageUrl: string;
+    editType: string;
+  }) => void;
+  onImageEditCancel?: () => void;
 }
 
 interface ContextMenuState {
@@ -210,6 +233,9 @@ export default function DesktopCanvas({
   onAddTextAtPosition,
   onAssetRename,
   onExternalFileDrop,
+  imageEditState,
+  onImageEditCommit,
+  onImageEditCancel,
 }: DesktopCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const isPanning = useRef(false);
@@ -279,29 +305,70 @@ export default function DesktopCanvas({
   );
 
   const handleFocusAsset = useCallback(
-    (asset: EnrichedDesktopAsset) => {
+    (
+      asset: EnrichedDesktopAsset,
+      padding?: {
+        left?: number;
+        right?: number;
+        top?: number;
+        bottom?: number;
+      }
+    ) => {
       const rect = containerRef.current?.getBoundingClientRect();
       if (!rect) return;
       const dims = getAssetDimensions(asset, naturalDims.get(asset.id));
+      // The container's bounding rect already reflects whatever the
+      // chat side-panel is doing (the canvas lives in a flex-1
+      // container that shrinks when the panel opens), so this width
+      // is the *actual* visible canvas width. Just subtract any
+      // caller-supplied padding (e.g., space reserved for the
+      // image-edit overlay's side panes) before computing zoom.
       const viewportW = rect.width;
       const viewportH = rect.height;
-      // Zoom so asset fills ~80% of viewport
+      const padLeft = padding?.left ?? 0;
+      const padRight = padding?.right ?? 0;
+      const padTop = padding?.top ?? 0;
+      const padBottom = padding?.bottom ?? 0;
+      const availableW = Math.max(100, viewportW - padLeft - padRight);
+      const availableH = Math.max(100, viewportH - padTop - padBottom);
+      // Without padding, fall back to the original 80%-of-viewport
+      // breathing room. With explicit padding the caller has already
+      // reserved space for surrounding UI, so a smaller breathing
+      // factor (5% margin inside available) is enough.
+      const fillFactor = padding ? 0.95 : 0.8;
       const zoom = Math.min(
-        (viewportW * 0.8) / dims.w,
-        (viewportH * 0.8) / dims.h,
+        (availableW * fillFactor) / dims.w,
+        (availableH * fillFactor) / dims.h,
         MAX_ZOOM
       );
-      // Center the asset in the viewport
+      // Place the asset's center at the center of the available area
+      // (offset from the viewport origin by the left/top padding) so
+      // the reserved padding regions stay clear.
       const assetCenterX = asset.posX + dims.w / 2;
       const assetCenterY = asset.posY + dims.h / 2;
       onCameraChange({
-        x: viewportW / 2 - assetCenterX * zoom,
-        y: viewportH / 2 - assetCenterY * zoom,
+        x: padLeft + availableW / 2 - assetCenterX * zoom,
+        y: padTop + availableH / 2 - assetCenterY * zoom,
         zoom,
       });
     },
     [naturalDims, onCameraChange]
   );
+
+  // Padding reserved when auto-focusing for an image-edit operation,
+  // so the asset + the overlay's right pane (prompt / submit / etc.)
+  // and bottom pane (mark controls + clear) all fit on screen.
+  // Numbers track the overlay's `screenRect` math in
+  // `components/desktop/image-edit-overlay.tsx`:
+  //   right pane: 280px wide + 12px gap + ~28px outer margin → 320
+  //   bottom pane: ~50px tall + 12px gap + ~28px outer margin → 90
+  //   left/top: small breathing room
+  const IMAGE_EDIT_FOCUS_PADDING = {
+    left: 40,
+    right: 320,
+    top: 40,
+    bottom: 90,
+  } as const;
 
   const handleResizePointerDown = useCallback(
     (e: React.PointerEvent, asset: DesktopAsset, handle: string) => {
@@ -1434,8 +1501,9 @@ export default function DesktopCanvas({
         );
       })()}
 
-      {/* Floating action bar — appears above the single selected asset */}
-      {singleSelectedAsset && canEdit && !contextMenu && (() => {
+      {/* Floating action bar — appears above the single selected asset.
+          Hidden while the image-edit overlay is active so its own panes take over. */}
+      {singleSelectedAsset && canEdit && !contextMenu && !imageEditState && (() => {
         const dims = getAssetDimensions(singleSelectedAsset, naturalDims.get(singleSelectedAsset.id));
         const screenX = singleSelectedAsset.posX * camera.zoom + camera.x;
         const screenY = singleSelectedAsset.posY * camera.zoom + camera.y;
@@ -1481,6 +1549,50 @@ export default function DesktopCanvas({
                 {t("sendToChat")}
               </button>
             )}
+            {/* Image-editing operations: 重绘 / 裁切 / 擦除 / 抠图.
+                Each button auto-focuses the asset (pan + zoom into view) then
+                dispatches `moodio-image-edit` with the chosen mode, which the
+                page-level listener turns into an inline editing overlay. */}
+            {floatingBarImageInfo?.imageId &&
+              floatingBarImageInfo.url &&
+              ([
+                { mode: "redraw" as const, Icon: Paintbrush, labelKey: "redraw" as const },
+                { mode: "crop" as const, Icon: Crop, labelKey: "crop" as const },
+                { mode: "erase" as const, Icon: Eraser, labelKey: "erase" as const },
+                { mode: "cutout" as const, Icon: Scissors, labelKey: "cutout" as const },
+              ]).map(({ mode, Icon, labelKey }) => (
+                <button
+                  key={mode}
+                  className="flex items-center gap-1.5 px-2 py-1 text-xs hover:bg-default-100 rounded-md transition-colors whitespace-nowrap"
+                  onClick={() => {
+                    if (singleSelectedAsset) {
+                      // Reserve space for the overlay's right + bottom
+                      // panes so they stay inside the visible canvas
+                      // viewport (which already excludes the chat
+                      // side-panel via the flex layout).
+                      handleFocusAsset(
+                        singleSelectedAsset,
+                        IMAGE_EDIT_FOCUS_PADDING
+                      );
+                    }
+                    window.dispatchEvent(
+                      new CustomEvent("moodio-image-edit", {
+                        detail: {
+                          mode,
+                          assetId: floatingBarImageInfo.assetId,
+                          imageId: floatingBarImageInfo.imageId,
+                          url: floatingBarImageInfo.url,
+                          title: floatingBarImageInfo.title,
+                        },
+                      })
+                    );
+                  }}
+                  title={t(labelKey)}
+                >
+                  <Icon size={13} />
+                  {t(labelKey)}
+                </button>
+              ))}
             {floatingBarVideoInfo?.videoId && floatingBarVideoInfo.url && (
               <button
                 className="flex items-center gap-1.5 px-2 py-1 text-xs hover:bg-default-100 rounded-md transition-colors whitespace-nowrap"
@@ -1585,6 +1697,42 @@ export default function DesktopCanvas({
               </button>
             )}
           </div>
+        );
+      })()}
+
+      {/* In-canvas image-edit overlay (重绘 / 裁切 / 擦除 / 抠图).
+          Pinned to the asset's projected screen rect; surrounding panes float
+          to the right of and below the asset. Mounted by page-level state
+          set in response to a `moodio-image-edit` event. */}
+      {imageEditState && canEdit && (() => {
+        const target = assets.find((a) => a.id === imageEditState.assetId);
+        if (!target || target.assetType !== "image") return null;
+        const meta = target.metadata as Record<string, unknown>;
+        const sourceImageId = typeof meta.imageId === "string" ? meta.imageId : null;
+        const sourceImageUrl = target.imageUrl;
+        if (!sourceImageId || !sourceImageUrl) return null;
+        const dims = getAssetDimensions(target, naturalDims.get(target.id));
+        const left = target.posX * camera.zoom + camera.x;
+        const top = target.posY * camera.zoom + camera.y;
+        const width = dims.w * camera.zoom;
+        const height = dims.h * camera.zoom;
+        return (
+          <ImageEditOverlay
+            mode={imageEditState.mode}
+            assetId={target.id}
+            sourceImageId={sourceImageId}
+            sourceImageUrl={sourceImageUrl}
+            screenRect={{ left, top, width, height }}
+            onCommit={({ newImageId, newImageUrl, editType }) =>
+              onImageEditCommit?.({
+                assetId: target.id,
+                newImageId,
+                newImageUrl,
+                editType,
+              })
+            }
+            onCancel={() => onImageEditCancel?.()}
+          />
         );
       })()}
 
