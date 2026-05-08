@@ -458,6 +458,7 @@ export default function ImageEditModal({
           sourceImageId,
           markedImageId,
           prompt: mode === "redraw" ? prompt.trim() : undefined,
+          modelId: "nano-banana-2-fast",
           markColor: requireMarking
             ? markColorNameFromHex(brushColor)
             : undefined,

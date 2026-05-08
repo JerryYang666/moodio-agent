@@ -391,6 +391,7 @@ export default function ImageEditOverlay({
           sourceImageId,
           markedImageId,
           prompt: mode === "redraw" ? prompt.trim() : undefined,
+          modelId: "nano-banana-2-fast",
           // Pass the user's chosen mark color so the prompt template can
           // reference it explicitly (e.g. "the area marked in blue…").
           markColor: requireMarking
