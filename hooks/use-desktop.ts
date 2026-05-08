@@ -386,6 +386,49 @@ export function useDesktopDetail(desktopId: string) {
           );
           break;
         }
+        case "asset_image_changed": {
+          // Image-asset-specific update: swaps metadata.imageId AND the
+          // top-level derived `imageUrl`. The thumbnail URLs are nulled so
+          // the tier-loading <img> falls through to the full URL — the
+          // newly-uploaded imageId has no Lambda-generated thumbnails yet.
+          const { assetId, imageId, imageUrl, imageHistory } = event.payload || {};
+          if (!assetId || typeof imageId !== "string") return;
+          setDetail((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  assets: prev.assets.map((a) => {
+                    if (a.id !== assetId) return a;
+                    const meta = a.metadata as Record<string, unknown>;
+                    const newMeta: Record<string, unknown> = { ...meta, imageId };
+                    if (Array.isArray(imageHistory)) {
+                      newMeta.imageHistory = imageHistory;
+                    }
+                    // The hook types `assets` as raw DesktopAsset[] but the
+                    // server enriches each row with imageUrl/thumbnail*Url
+                    // before returning, and the rest of the codebase reads
+                    // those fields. Cast to access them.
+                    const enriched = a as DesktopAsset & {
+                      imageUrl?: string | null;
+                      thumbnailSmUrl?: string | null;
+                      thumbnailMdUrl?: string | null;
+                    };
+                    return {
+                      ...a,
+                      metadata: newMeta,
+                      imageUrl:
+                        typeof imageUrl === "string"
+                          ? imageUrl
+                          : enriched.imageUrl ?? null,
+                      thumbnailSmUrl: null,
+                      thumbnailMdUrl: null,
+                    };
+                  }),
+                }
+              : null
+          );
+          break;
+        }
       }
     },
     []

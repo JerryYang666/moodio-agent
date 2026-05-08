@@ -261,21 +261,34 @@ export async function applyTextUpdate(
  * one operation. Forward applies the new state; the inverse closure simply
  * calls this same helper with the previous values, so undo/redo cleanly walks
  * back and forth across the history.
+ *
+ * `imageUrl` MUST be passed alongside `imageId`: the displayed image on the
+ * canvas is rendered from the asset's top-level `imageUrl` (a server-derived
+ * field), not from `metadata.imageId` directly. Bumping just the metadata
+ * leaves the canvas showing the previous image until the next polling
+ * refetch. So both forward and inverse closures should capture the URL at
+ * record time and pass it back here.
  */
 export async function applyAssetImagePatch(
   deps: DesktopDispatchDeps,
   assetId: string,
   imageId: string,
+  imageUrl: string | null,
   imageHistory: string[]
 ): Promise<ApplyResult> {
   if (!deps.getAssets().some((a) => a.id === assetId)) {
     return { ok: false, reason: "target_missing" };
   }
   deps.applyRemoteEvent({
-    type: "asset_updated",
-    payload: { assetId, metadata: { imageId, imageHistory } },
+    type: "asset_image_changed",
+    payload: { assetId, imageId, imageUrl, imageHistory },
   });
-  deps.sendEvent("asset_image_changed", { assetId, imageId, imageHistory });
+  deps.sendEvent("asset_image_changed", {
+    assetId,
+    imageId,
+    imageUrl,
+    imageHistory,
+  });
   try {
     const res = await fetch(`/api/desktop/${deps.desktopId}/assets/${assetId}`, {
       method: "PATCH",

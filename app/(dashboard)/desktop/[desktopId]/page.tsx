@@ -150,18 +150,6 @@ export default function DesktopDetailPage({
             payload: { assetId, metadata: { content } },
           });
         }
-      } else if (event.type === "asset_image_changed") {
-        const { assetId, imageId, imageHistory } = event.payload || {};
-        if (assetId && typeof imageId === "string") {
-          const metadata: Record<string, unknown> = { imageId };
-          if (Array.isArray(imageHistory)) {
-            metadata.imageHistory = imageHistory;
-          }
-          applyRemoteEvent({
-            type: "asset_updated",
-            payload: { assetId, metadata },
-          });
-        }
       } else if (event.type === "video_suggest_updated") {
         const { assetId, title, videoIdea } = event.payload || {};
         if (assetId) {
@@ -614,13 +602,14 @@ export default function DesktopDetailPage({
       newImageUrl: string;
       editType: string;
     }) => {
-      const { assetId, newImageId } = args;
+      const { assetId, newImageId, newImageUrl } = args;
       const asset = assetsRef.current.find((a) => a.id === assetId);
       setImageEditState(null);
       if (!asset || asset.assetType !== "image") return;
       const meta = asset.metadata as Record<string, unknown>;
       const prevImageId =
         typeof meta.imageId === "string" ? meta.imageId : null;
+      const prevImageUrl = asset.imageUrl ?? null;
       if (!prevImageId) return;
       const prevHistory: string[] = Array.isArray(meta.imageHistory)
         ? (meta.imageHistory as unknown[]).filter(
@@ -631,6 +620,18 @@ export default function DesktopDetailPage({
       // exactly the prev (prev imageId, prev history).
       const nextHistory = [...prevHistory, prevImageId];
 
+      // Apply the change immediately. `history.record` only STORES the
+      // forward/inverse closures for later replay during undo/redo — it
+      // does NOT execute `forward` itself. So the optimistic state update,
+      // WS broadcast, and DB PATCH all have to fire here.
+      void applyAssetImagePatch(
+        historyDepsRef.current,
+        assetId,
+        newImageId,
+        newImageUrl,
+        nextHistory
+      );
+
       history.record({
         userId: user?.id ?? "",
         label: { key: "editAssetImage" },
@@ -640,6 +641,7 @@ export default function DesktopDetailPage({
             historyDepsRef.current,
             assetId,
             newImageId,
+            newImageUrl,
             nextHistory
           ),
         inverse: () =>
@@ -647,6 +649,7 @@ export default function DesktopDetailPage({
             historyDepsRef.current,
             assetId,
             prevImageId,
+            prevImageUrl,
             prevHistory
           ),
       });
