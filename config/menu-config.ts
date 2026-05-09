@@ -1,4 +1,5 @@
 import { DEFAULT_LLM_MODEL } from "@/lib/llm/types";
+import { UI_IMAGE_ASPECT_RATIOS } from "@/lib/image/aspect-ratios";
 
 export const MENU_CONFIG = {
   version: "1.0",
@@ -68,14 +69,9 @@ export const MENU_CONFIG = {
             "Let the model choose the best aspect ratio for your content",
           icon: "Sparkles",
         },
-        "21:9": { label: "21:9" },
-        "16:9": { label: "16:9" },
-        "3:2": { label: "3:2" },
-        "4:3": { label: "4:3" },
-        "1:1": { label: "1:1" },
-        "3:4": { label: "3:4" },
-        "2:3": { label: "2:3" },
-        "9:16": { label: "9:16" },
+        ...Object.fromEntries(
+          UI_IMAGE_ASPECT_RATIOS.map((ratio) => [ratio, { label: ratio }])
+        ),
       },
     },
     imageSize: {
@@ -141,17 +137,7 @@ export const MENU_CONFIG = {
         },
         aspectRatio: {
           enabled: true,
-          allowed: [
-            "smart",
-            "21:9",
-            "16:9",
-            "3:2",
-            "4:3",
-            "1:1",
-            "3:4",
-            "2:3",
-            "9:16",
-          ],
+          allowed: ["smart", ...UI_IMAGE_ASPECT_RATIOS],
         },
         imageSize: {
           enabled: true,
@@ -192,17 +178,7 @@ export const MENU_CONFIG = {
         },
         aspectRatio: {
           enabled: true,
-          allowed: [
-            "smart",
-            "21:9",
-            "16:9",
-            "3:2",
-            "4:3",
-            "1:1",
-            "3:4",
-            "2:3",
-            "9:16",
-          ],
+          allowed: ["smart", ...UI_IMAGE_ASPECT_RATIOS],
         },
         imageSize: {
           enabled: true,

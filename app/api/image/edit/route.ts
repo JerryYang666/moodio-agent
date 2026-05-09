@@ -19,18 +19,7 @@ import {
 import { uploadImage, getSignedImageUrl } from "@/lib/storage/s3";
 import sharp from "sharp";
 
-const SUPPORTED_ASPECT_RATIOS = [
-  "1:1",
-  "2:3",
-  "3:2",
-  "3:4",
-  "4:3",
-  "4:5",
-  "5:4",
-  "9:16",
-  "16:9",
-  "21:9",
-] as const;
+import { NANO_BANANA_SUPPORTED_ASPECT_RATIOS } from "@/lib/image/aspect-ratios";
 
 function gcd(a: number, b: number): number {
   let x = Math.abs(Math.round(a));
@@ -62,7 +51,7 @@ function closestSupportedAspectRatio(rawRatio: string): string | undefined {
 
   let best: string | undefined;
   let bestDiff = Number.POSITIVE_INFINITY;
-  for (const candidate of SUPPORTED_ASPECT_RATIOS) {
+  for (const candidate of NANO_BANANA_SUPPORTED_ASPECT_RATIOS) {
     const value = parseAspectRatio(candidate);
     if (!value) continue;
     const diff = Math.abs(value - target);
