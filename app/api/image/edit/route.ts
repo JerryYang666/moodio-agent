@@ -19,6 +19,19 @@ import {
 import { uploadImage, getSignedImageUrl } from "@/lib/storage/s3";
 import sharp from "sharp";
 
+const SUPPORTED_ASPECT_RATIOS = [
+  "1:1",
+  "2:3",
+  "3:2",
+  "3:4",
+  "4:3",
+  "4:5",
+  "5:4",
+  "9:16",
+  "16:9",
+  "21:9",
+] as const;
+
 function gcd(a: number, b: number): number {
   let x = Math.abs(Math.round(a));
   let y = Math.abs(Math.round(b));
@@ -33,6 +46,32 @@ function gcd(a: number, b: number): number {
 function inferAspectRatio(width: number, height: number): string {
   const d = gcd(width, height);
   return `${Math.round(width / d)}:${Math.round(height / d)}`;
+}
+
+function parseAspectRatio(ratio: string): number | null {
+  const [w, h] = ratio.split(":").map(Number);
+  if (!Number.isFinite(w) || !Number.isFinite(h) || w <= 0 || h <= 0) {
+    return null;
+  }
+  return w / h;
+}
+
+function closestSupportedAspectRatio(rawRatio: string): string | undefined {
+  const target = parseAspectRatio(rawRatio);
+  if (!target) return undefined;
+
+  let best: string | undefined;
+  let bestDiff = Number.POSITIVE_INFINITY;
+  for (const candidate of SUPPORTED_ASPECT_RATIOS) {
+    const value = parseAspectRatio(candidate);
+    if (!value) continue;
+    const diff = Math.abs(value - target);
+    if (diff < bestDiff) {
+      best = candidate;
+      bestDiff = diff;
+    }
+  }
+  return best;
 }
 
 export type ImageEditOperation =
@@ -208,7 +247,9 @@ export async function POST(req: NextRequest) {
       if (sourceForRatio) {
         const meta = await sharp(sourceForRatio).metadata();
         if (meta.width && meta.height && meta.width > 0 && meta.height > 0) {
-          inferredAspectRatio = inferAspectRatio(meta.width, meta.height);
+          inferredAspectRatio = closestSupportedAspectRatio(
+            inferAspectRatio(meta.width, meta.height)
+          );
         }
       }
     } catch (ratioErr) {
