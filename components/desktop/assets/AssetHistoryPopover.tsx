@@ -12,10 +12,13 @@ import {
 import { Button } from "@heroui/button";
 import { Spinner } from "@heroui/spinner";
 import { X } from "lucide-react";
+import type { ImageHistoryOperation } from "@/lib/desktop/types";
 
 interface HistoryVersion {
   imageId: string;
   isCurrent: boolean;
+  operation: ImageHistoryOperation | null;
+  timestamp: number | null;
   thumbnailSmUrl: string;
   thumbnailMdUrl: string;
   imageUrl: string;
@@ -117,18 +120,68 @@ export default function AssetHistoryPopover({
     []
   );
 
-  // Clamp anchor so the popover stays on-screen
+  // Clamp anchor so the popover stays on-screen, then let the user drag it
+  // around via the header. Position state lives here so both the popover
+  // itself and the hover-preview (which is anchored relative to the popover)
+  // track in sync.
   const viewportW = typeof window !== "undefined" ? window.innerWidth : 1920;
   const viewportH = typeof window !== "undefined" ? window.innerHeight : 1080;
-  const left = Math.min(anchor.x, viewportW - POPOVER_WIDTH - 8);
-  const top = Math.min(anchor.y, viewportH - POPOVER_MAX_HEIGHT - 8);
+  const [pos, setPos] = useState(() => ({
+    x: Math.max(8, Math.min(anchor.x, viewportW - POPOVER_WIDTH - 8)),
+    y: Math.max(8, Math.min(anchor.y, viewportH - POPOVER_MAX_HEIGHT - 8)),
+  }));
+  const dragOffsetRef = useRef<{ dx: number; dy: number } | null>(null);
+
+  const handleHeaderPointerDown = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      // Let the close button handle its own click
+      if ((e.target as HTMLElement).closest("button")) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const el = popoverRef.current;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      dragOffsetRef.current = {
+        dx: e.clientX - rect.left,
+        dy: e.clientY - rect.top,
+      };
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    },
+    []
+  );
+
+  const handleHeaderPointerMove = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      const off = dragOffsetRef.current;
+      if (!off) return;
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      setPos({
+        x: Math.max(8, Math.min(e.clientX - off.dx, vw - POPOVER_WIDTH - 8)),
+        y: Math.max(8, Math.min(e.clientY - off.dy, vh - 48)),
+      });
+    },
+    []
+  );
+
+  const handleHeaderPointerUp = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      dragOffsetRef.current = null;
+      try {
+        (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+      } catch {
+        // pointer may have already been released
+      }
+    },
+    []
+  );
 
   // Preview panel sits to the left of the popover when there's room, else to the right.
-  const previewOnLeft = left > PREVIEW_SIZE + 16;
+  const previewOnLeft = pos.x > PREVIEW_SIZE + 16;
   const previewLeft = previewOnLeft
-    ? Math.max(8, left - PREVIEW_SIZE - 12)
-    : Math.min(viewportW - PREVIEW_SIZE - 8, left + POPOVER_WIDTH + 12);
-  const previewTop = Math.min(top, viewportH - PREVIEW_SIZE - 8);
+    ? Math.max(8, pos.x - PREVIEW_SIZE - 12)
+    : Math.min(viewportW - PREVIEW_SIZE - 8, pos.x + POPOVER_WIDTH + 12);
+  const previewTop = Math.min(pos.y, viewportH - PREVIEW_SIZE - 8);
 
   const hoveredVersion = hoveredImageId
     ? versions?.find((v) => v.imageId === hoveredImageId) ?? null
@@ -140,14 +193,22 @@ export default function AssetHistoryPopover({
         ref={popoverRef}
         className="fixed z-110 bg-background border border-divider rounded-xl shadow-lg flex flex-col overflow-hidden"
         style={{
-          left,
-          top,
+          left: pos.x,
+          top: pos.y,
           width: POPOVER_WIDTH,
           maxHeight: POPOVER_MAX_HEIGHT,
         }}
         onPointerDown={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-3 py-2 border-b border-divider shrink-0">
+        <div
+          className={`flex items-center justify-between px-3 py-2 border-b border-divider shrink-0 select-none ${
+            dragOffsetRef.current ? "cursor-grabbing" : "cursor-grab"
+          }`}
+          onPointerDown={handleHeaderPointerDown}
+          onPointerMove={handleHeaderPointerMove}
+          onPointerUp={handleHeaderPointerUp}
+          onPointerCancel={handleHeaderPointerUp}
+        >
           <div className="flex items-baseline gap-2">
             <span className="text-sm font-medium">
               {t("imageHistory.title")}
@@ -160,7 +221,7 @@ export default function AssetHistoryPopover({
           </div>
           <button
             aria-label={t("imageHistory.close")}
-            className="text-default-500 hover:text-foreground transition-colors"
+            className="text-default-500 hover:text-foreground transition-colors cursor-pointer"
             onClick={onClose}
           >
             <X size={14} />
@@ -184,9 +245,16 @@ export default function AssetHistoryPopover({
           {versions?.map((v, idx) => {
             const label = v.isCurrent
               ? t("imageHistory.currentLabel")
-              : t("imageHistory.versionLabel", {
-                  n: versions.length - idx,
-                });
+              : v.operation
+                ? t(`imageHistory.op.${v.operation}`)
+                : t("imageHistory.op.unknown");
+            const timeLabel =
+              !v.isCurrent && v.timestamp
+                ? formatRelativeTime(v.timestamp)
+                : null;
+            const fallbackLabel = v.isCurrent
+              ? null
+              : t("imageHistory.versionLabel", { n: versions.length - idx });
             const isClickable = !v.isCurrent && canRestore;
             return (
               <button
@@ -217,7 +285,28 @@ export default function AssetHistoryPopover({
                   alt={label}
                 />
                 <div className="flex-1 min-w-0 flex items-center gap-2">
-                  <span className="text-sm truncate">{label}</span>
+                  <span
+                    className="text-sm truncate"
+                    title={
+                      !v.isCurrent && v.timestamp
+                        ? new Date(v.timestamp).toLocaleString()
+                        : undefined
+                    }
+                  >
+                    {label}
+                    {timeLabel && (
+                      <span className="text-default-500">
+                        {" · "}
+                        {timeLabel}
+                      </span>
+                    )}
+                    {!v.isCurrent && !timeLabel && fallbackLabel && (
+                      <span className="text-default-500">
+                        {" · "}
+                        {fallbackLabel}
+                      </span>
+                    )}
+                  </span>
                   {v.isCurrent && (
                     <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-primary-100 text-primary-700">
                       {t("imageHistory.currentBadge")}
@@ -371,4 +460,24 @@ function HistoryPreview({
       />
     </div>
   );
+}
+
+// Compact relative time ("just now", "2h ago", "3d ago"). Uses
+// Intl.RelativeTimeFormat so it follows the browser locale without needing
+// message-file entries for every unit.
+function formatRelativeTime(timestamp: number): string {
+  const rtf = new Intl.RelativeTimeFormat(undefined, {
+    numeric: "auto",
+    style: "short",
+  });
+  const diffSec = Math.round((timestamp - Date.now()) / 1000);
+  const absSec = Math.abs(diffSec);
+  if (absSec < 45) return rtf.format(0, "second");
+  if (absSec < 60 * 60) return rtf.format(Math.round(diffSec / 60), "minute");
+  if (absSec < 60 * 60 * 24) return rtf.format(Math.round(diffSec / 3600), "hour");
+  if (absSec < 60 * 60 * 24 * 30)
+    return rtf.format(Math.round(diffSec / 86400), "day");
+  if (absSec < 60 * 60 * 24 * 365)
+    return rtf.format(Math.round(diffSec / (86400 * 30)), "month");
+  return rtf.format(Math.round(diffSec / (86400 * 365)), "year");
 }
