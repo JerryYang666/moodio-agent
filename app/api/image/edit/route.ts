@@ -17,6 +17,23 @@ import {
   parseImageQualityToNumber,
 } from "@/lib/pricing";
 import { uploadImage, getSignedImageUrl } from "@/lib/storage/s3";
+import sharp from "sharp";
+
+function gcd(a: number, b: number): number {
+  let x = Math.abs(Math.round(a));
+  let y = Math.abs(Math.round(b));
+  while (y !== 0) {
+    const t = y;
+    y = x % y;
+    x = t;
+  }
+  return x || 1;
+}
+
+function inferAspectRatio(width: number, height: number): string {
+  const d = gcd(width, height);
+  return `${Math.round(width / d)}:${Math.round(height / d)}`;
+}
 
 export type ImageEditOperation =
   | "redraw"
@@ -180,6 +197,24 @@ export async function POST(req: NextRequest) {
     const preparer = createImageInputPreparer(provider);
     const prepared = await preparer.prepareEditInputs([inputImageId]);
 
+    // Preserve the original framing for model-based edits by inferring the
+    // source image aspect ratio and passing it through provider adapters.
+    // Without this, providers may default to square/canonical ratios.
+    let inferredAspectRatio: string | undefined;
+    try {
+      const sourceForRatio = prepared.imageBase64?.[0]
+        ? Buffer.from(prepared.imageBase64[0], "base64")
+        : undefined;
+      if (sourceForRatio) {
+        const meta = await sharp(sourceForRatio).metadata();
+        if (meta.width && meta.height && meta.width > 0 && meta.height > 0) {
+          inferredAspectRatio = inferAspectRatio(meta.width, meta.height);
+        }
+      }
+    } catch (ratioErr) {
+      console.warn("[image/edit] failed to infer aspect ratio:", ratioErr);
+    }
+
     let result;
     try {
       result = await editImageWithModel(modelId, {
@@ -187,6 +222,8 @@ export async function POST(req: NextRequest) {
         imageIds: [inputImageId],
         imageBase64: prepared.imageBase64,
         imageInputUrls: prepared.imageInputUrls,
+        aspectRatio: inferredAspectRatio,
+        userAspectRatio: inferredAspectRatio,
         imageSize,
         quality: imageQuality,
       });
