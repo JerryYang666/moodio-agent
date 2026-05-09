@@ -13,6 +13,7 @@
 
 import type { EnrichedDesktopAsset } from "@/components/desktop/assets";
 import type { ApplyResult } from "@/lib/operation-history/types";
+import type { ImageHistoryEntry } from "@/lib/desktop/types";
 
 /** Shape of the local-state mutator passed in from `useDesktopDetail`. */
 export type ApplyRemoteEvent = (event: { type: string; payload: unknown }) => void;
@@ -274,7 +275,7 @@ export async function applyAssetImagePatch(
   assetId: string,
   imageId: string,
   imageUrl: string | null,
-  imageHistory: string[]
+  imageHistory: ImageHistoryEntry[]
 ): Promise<ApplyResult> {
   if (!deps.getAssets().some((a) => a.id === assetId)) {
     return { ok: false, reason: "target_missing" };

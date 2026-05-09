@@ -1695,7 +1695,16 @@
       "restoreTitle": "このバージョンを復元しますか？",
       "restoreBody": "現在のバージョンが履歴に追加されます。",
       "restore": "復元",
-      "cancel": "キャンセル"
+      "cancel": "キャンセル",
+      "op": {
+        "redraw": "再描画",
+        "erase": "消去",
+        "cutout-auto": "背景透過",
+        "cutout-manual": "背景透過",
+        "crop": "切り抜き",
+        "restore": "復元",
+        "unknown": "編集"
+      }
     },
     "pasteDestinationTitle": "どこに貼り付けますか？",
     "pasteDestinationDescription": "貼り付けたファイルをエージェントに送信するか、デスクトップキャンバスに追加します。",

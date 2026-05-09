@@ -51,6 +51,11 @@ import {
   applyAssetImagePatch,
   type DesktopDispatchDeps,
 } from "@/lib/desktop/history";
+import {
+  normalizeImageHistory,
+  type ImageHistoryEntry,
+  type ImageHistoryOperation,
+} from "@/lib/desktop/types";
 import type { ImageEditMode } from "@/components/desktop/image-edit-overlay";
 
 const DEFAULT_CAMERA: CameraState = { x: 0, y: 0, zoom: 1 };
@@ -602,7 +607,7 @@ export default function DesktopDetailPage({
       newImageUrl: string;
       editType: string;
     }) => {
-      const { assetId, newImageId, newImageUrl } = args;
+      const { assetId, newImageId, newImageUrl, editType } = args;
       const asset = assetsRef.current.find((a) => a.id === assetId);
       setImageEditState(null);
       if (!asset || asset.assetType !== "image") return;
@@ -611,14 +616,34 @@ export default function DesktopDetailPage({
         typeof meta.imageId === "string" ? meta.imageId : null;
       const prevImageUrl = asset.imageUrl ?? null;
       if (!prevImageId) return;
-      const prevHistory: string[] = Array.isArray(meta.imageHistory)
-        ? (meta.imageHistory as unknown[]).filter(
-            (id): id is string => typeof id === "string"
-          )
-        : [];
-      // Forward state appends prev id to the history; inverse restores
-      // exactly the prev (prev imageId, prev history).
-      const nextHistory = [...prevHistory, prevImageId];
+      const prevHistory: ImageHistoryEntry[] = normalizeImageHistory(
+        meta.imageHistory
+      );
+      // Forward state appends a new entry for the prev version (operation =
+      // what produced the *new* image, so consumers can label "Redraw · 2h
+      // ago" on the row they just came from). Inverse restores the prev
+      // (prev imageId, prev history).
+      const operation = ((): ImageHistoryOperation | undefined => {
+        switch (editType) {
+          case "redraw":
+          case "erase":
+          case "cutout-auto":
+          case "cutout-manual":
+          case "crop":
+          case "restore":
+            return editType;
+          default:
+            return undefined;
+        }
+      })();
+      const nextHistory: ImageHistoryEntry[] = [
+        ...prevHistory,
+        {
+          imageId: prevImageId,
+          ...(operation ? { operation } : {}),
+          timestamp: Date.now(),
+        },
+      ];
 
       // Apply the change immediately. `history.record` only STORES the
       // forward/inverse closures for later replay during undo/redo — it
@@ -675,16 +700,19 @@ export default function DesktopDetailPage({
         typeof meta.imageId === "string" ? meta.imageId : null;
       const prevImageUrl = asset.imageUrl ?? null;
       if (!prevImageId || prevImageId === restoredImageId) return;
-      const prevHistory: string[] = Array.isArray(meta.imageHistory)
-        ? (meta.imageHistory as unknown[]).filter(
-            (id): id is string => typeof id === "string"
-          )
-        : [];
-      // Remove the restored id from history (it's no longer "past"), then
-      // append the current id since it's now a prior version.
-      const nextHistory = [
-        ...prevHistory.filter((id) => id !== restoredImageId),
-        prevImageId,
+      const prevHistory: ImageHistoryEntry[] = normalizeImageHistory(
+        meta.imageHistory
+      );
+      // Remove the restored imageId from history (it's no longer "past"),
+      // then append the current imageId with operation="restore" so the
+      // list still reads "I restored an older version at X time".
+      const nextHistory: ImageHistoryEntry[] = [
+        ...prevHistory.filter((e) => e.imageId !== restoredImageId),
+        {
+          imageId: prevImageId,
+          operation: "restore",
+          timestamp: Date.now(),
+        },
       ];
 
       void applyAssetImagePatch(

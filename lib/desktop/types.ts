@@ -1,3 +1,21 @@
+export type ImageHistoryOperation =
+  | "redraw"
+  | "erase"
+  | "cutout-auto"
+  | "cutout-manual"
+  | "crop"
+  | "restore";
+
+export type ImageHistoryEntry = {
+  imageId: string;
+  /** Operation that produced the *next* image (i.e. the one that bumped this
+   * imageId into history). Absent for legacy entries written before we
+   * started recording the op. */
+  operation?: ImageHistoryOperation;
+  /** Epoch ms when the edit happened. Absent for legacy entries. */
+  timestamp?: number;
+};
+
 export type ImageAssetMeta = {
   imageId: string;
   chatId?: string;
@@ -8,14 +26,47 @@ export type ImageAssetMeta = {
   modelId?: string;
   aspectRatio?: string;
   /**
-   * Stack of prior `imageId`s for this canvas tile. Newest-last. Each in-canvas
-   * image edit (redraw / crop / erase / cutout) appends the previous imageId
-   * here before swapping to the new one, so undo/redo can walk the chain.
+   * Stack of prior image versions for this canvas tile. Newest-last.
+   * Each in-canvas edit appends an entry here before swapping in the new
+   * image, so undo/redo and the edit-history UI can walk the chain.
+   *
+   * For backward-compatibility the array may contain bare strings (legacy
+   * shape). Consumers should normalize via `normalizeImageHistory()`.
+   *
    * Lineage of HOW each historical image was produced lives on the
    * collection_images row's generationDetails JSONB, not here.
    */
-  imageHistory?: string[];
+  imageHistory?: Array<string | ImageHistoryEntry>;
 };
+
+/** Normalize a stored `imageHistory` array (possibly a mix of legacy strings
+ * and new entries) into ImageHistoryEntry[]. */
+export function normalizeImageHistory(
+  raw: unknown
+): ImageHistoryEntry[] {
+  if (!Array.isArray(raw)) return [];
+  const out: ImageHistoryEntry[] = [];
+  for (const item of raw) {
+    if (typeof item === "string") {
+      out.push({ imageId: item });
+    } else if (
+      item &&
+      typeof item === "object" &&
+      typeof (item as Record<string, unknown>).imageId === "string"
+    ) {
+      const r = item as Record<string, unknown>;
+      const entry: ImageHistoryEntry = { imageId: r.imageId as string };
+      if (typeof r.operation === "string") {
+        entry.operation = r.operation as ImageHistoryOperation;
+      }
+      if (typeof r.timestamp === "number") {
+        entry.timestamp = r.timestamp;
+      }
+      out.push(entry);
+    }
+  }
+  return out;
+}
 
 /**
  * Convert an aspect ratio string (e.g. "16:9") into pixel dimensions

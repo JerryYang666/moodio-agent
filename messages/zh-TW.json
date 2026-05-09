@@ -1695,7 +1695,16 @@
       "restoreTitle": "還原此版本？",
       "restoreBody": "目前版本將被加入記錄。",
       "restore": "還原",
-      "cancel": "取消"
+      "cancel": "取消",
+      "op": {
+        "redraw": "重繪",
+        "erase": "擦除",
+        "cutout-auto": "去背",
+        "cutout-manual": "去背",
+        "crop": "裁切",
+        "restore": "已還原",
+        "unknown": "編輯"
+      }
     },
     "pasteDestinationTitle": "要貼上到哪裡？",
     "pasteDestinationDescription": "將貼上的檔案傳送給代理或直接放到桌面畫布上。",

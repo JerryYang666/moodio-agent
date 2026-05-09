@@ -183,15 +183,33 @@ export async function PATCH(
           { status: 400 }
         );
       }
-      if (
-        imageHistory !== undefined &&
-        (!Array.isArray(imageHistory) ||
-          imageHistory.some((id) => typeof id !== "string"))
-      ) {
-        return NextResponse.json(
-          { error: "imagePatch.imageHistory must be an array of strings" },
-          { status: 400 }
-        );
+      // imageHistory may be an array of legacy strings or new-shape entries
+      // { imageId, operation?, timestamp? }. Either shape is valid on the
+      // wire; readers normalize via normalizeImageHistory().
+      if (imageHistory !== undefined) {
+        if (!Array.isArray(imageHistory)) {
+          return NextResponse.json(
+            { error: "imagePatch.imageHistory must be an array" },
+            { status: 400 }
+          );
+        }
+        const invalid = imageHistory.some((item) => {
+          if (typeof item === "string") return false;
+          if (item && typeof item === "object") {
+            const r = item as Record<string, unknown>;
+            return typeof r.imageId !== "string" || !r.imageId;
+          }
+          return true;
+        });
+        if (invalid) {
+          return NextResponse.json(
+            {
+              error:
+                "imagePatch.imageHistory entries must be a string or { imageId, operation?, timestamp? }",
+            },
+            { status: 400 }
+          );
+        }
       }
 
       const [existing] = await db

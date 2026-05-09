@@ -7,6 +7,10 @@ import { eq, and } from "drizzle-orm";
 import { getDesktopPermission } from "@/lib/desktop/permissions";
 import { getImageUrl, getThumbnailUrl } from "@/lib/storage/s3";
 import { getUserSetting } from "@/lib/user-settings/server";
+import {
+  normalizeImageHistory,
+  type ImageHistoryOperation,
+} from "@/lib/desktop/types";
 
 export async function GET(
   req: NextRequest,
@@ -46,24 +50,34 @@ export async function GET(
 
   const meta = asset.metadata as Record<string, unknown>;
   const currentImageId = typeof meta.imageId === "string" ? meta.imageId : null;
-  const history = Array.isArray(meta.imageHistory)
-    ? (meta.imageHistory as unknown[]).filter(
-        (x): x is string => typeof x === "string"
-      )
-    : [];
+  const history = normalizeImageHistory(meta.imageHistory);
 
-  // Newest-first: current, then history reversed (history is stored oldest-first)
-  const ordered: Array<{ imageId: string; isCurrent: boolean }> = [];
+  // Newest-first: current, then history reversed (history is stored oldest-first).
+  // The current row has no operation/timestamp — it's the live version.
+  const ordered: Array<{
+    imageId: string;
+    isCurrent: boolean;
+    operation?: ImageHistoryOperation;
+    timestamp?: number;
+  }> = [];
   if (currentImageId) {
     ordered.push({ imageId: currentImageId, isCurrent: true });
   }
   for (let i = history.length - 1; i >= 0; i--) {
-    ordered.push({ imageId: history[i], isCurrent: false });
+    const e = history[i];
+    ordered.push({
+      imageId: e.imageId,
+      isCurrent: false,
+      operation: e.operation,
+      timestamp: e.timestamp,
+    });
   }
 
   const versions = ordered.map((v) => ({
     imageId: v.imageId,
     isCurrent: v.isCurrent,
+    operation: v.operation ?? null,
+    timestamp: v.timestamp ?? null,
     thumbnailSmUrl: getThumbnailUrl(v.imageId, "sm", cnMode),
     thumbnailMdUrl: getThumbnailUrl(v.imageId, "md", cnMode),
     imageUrl: getImageUrl(v.imageId, cnMode),

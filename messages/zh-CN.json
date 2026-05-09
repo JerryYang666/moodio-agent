@@ -1695,7 +1695,16 @@
       "restoreTitle": "恢复此版本？",
       "restoreBody": "当前版本将被添加到历史记录。",
       "restore": "恢复",
-      "cancel": "取消"
+      "cancel": "取消",
+      "op": {
+        "redraw": "重绘",
+        "erase": "擦除",
+        "cutout-auto": "抠图",
+        "cutout-manual": "抠图",
+        "crop": "裁切",
+        "restore": "已恢复",
+        "unknown": "编辑"
+      }
     },
     "pasteDestinationTitle": "要粘贴到哪里？",
     "pasteDestinationDescription": "将粘贴的文件发送给智能体或直接放到桌面画布上。",
