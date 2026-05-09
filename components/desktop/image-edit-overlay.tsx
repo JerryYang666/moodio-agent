@@ -32,6 +32,7 @@ import {
   MARK_COMPOSITE_ALPHA,
   markColorNameFromHex,
 } from "@/lib/image/mark-config";
+import { snapToSupportedAspectRatio } from "@/lib/image/aspect-ratio";
 import MarkControls from "@/components/chat/mark-controls";
 import MagicProgress from "./magic-progress";
 
@@ -383,6 +384,19 @@ export default function ImageEditOverlay({
       const editType =
         mode === "cutout" ? `cutout-${cutoutSub}` : (mode as string);
 
+      // Ask the model to preserve the source image's shape by snapping its
+      // natural dimensions to the closest supported aspect ratio. Without
+      // this the provider defaults to "auto" and each edit can change the
+      // canvas tile's proportions.
+      const srcImg = imageRef.current;
+      const aspectRatio =
+        srcImg && srcImg.naturalWidth > 0 && srcImg.naturalHeight > 0
+          ? snapToSupportedAspectRatio(
+              srcImg.naturalWidth,
+              srcImg.naturalHeight
+            )
+          : null;
+
       const apiRes = await fetch("/api/image/edit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -397,6 +411,7 @@ export default function ImageEditOverlay({
           markColor: requireMarking
             ? markColorNameFromHex(brushColor)
             : undefined,
+          aspectRatio: aspectRatio ?? undefined,
         }),
       });
       if (!apiRes.ok) {

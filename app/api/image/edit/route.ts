@@ -17,6 +17,10 @@ import {
   parseImageQualityToNumber,
 } from "@/lib/pricing";
 import { uploadImage, getSignedImageUrl } from "@/lib/storage/s3";
+import {
+  SUPPORTED_ASPECT_RATIOS,
+  type SupportedAspectRatio,
+} from "@/lib/image/aspect-ratio";
 
 export type ImageEditOperation =
   | "redraw"
@@ -101,6 +105,14 @@ export async function POST(req: NextRequest) {
     const markColor: MarkColorName = VALID_MARK_COLORS.includes(body.markColor)
       ? (body.markColor as MarkColorName)
       : "red";
+    // Caller passes a pre-snapped aspect ratio (client computes it from the
+    // source image's natural dimensions). Validate against the model's
+    // supported list and drop anything else — providers fall back to "auto".
+    const aspectRatio: SupportedAspectRatio | undefined =
+      typeof body.aspectRatio === "string" &&
+      (SUPPORTED_ASPECT_RATIOS as readonly string[]).includes(body.aspectRatio)
+        ? (body.aspectRatio as SupportedAspectRatio)
+        : undefined;
 
     if (
       operation !== "redraw" &&
@@ -189,6 +201,7 @@ export async function POST(req: NextRequest) {
         imageInputUrls: prepared.imageInputUrls,
         imageSize,
         quality: imageQuality,
+        aspectRatio,
       });
     } catch (err) {
       console.error("[image/edit] model call failed:", err);
