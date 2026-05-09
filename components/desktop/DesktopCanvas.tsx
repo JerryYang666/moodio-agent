@@ -32,7 +32,9 @@ import {
   Crop,
   Eraser,
   Scissors,
+  History,
 } from "lucide-react";
+import AssetHistoryPopover from "./assets/AssetHistoryPopover";
 import ImageEditOverlay, {
   type ImageEditMode,
 } from "./image-edit-overlay";
@@ -143,6 +145,21 @@ interface DesktopCanvasProps {
     editType: string;
   }) => void;
   onImageEditCancel?: () => void;
+  /**
+   * Desktop ID — used by in-canvas UI (e.g. edit-history popover) that needs
+   * to make scoped API calls without threading the route param through every
+   * sub-component.
+   */
+  desktopId?: string;
+  /**
+   * Restore a past image version for an image asset. Routed through the same
+   * imagePatch flow as forward edits so Cmd/Ctrl+Z can walk back.
+   */
+  onImageHistoryRestore?: (args: {
+    assetId: string;
+    imageId: string;
+    imageUrl: string;
+  }) => void;
 }
 
 interface ContextMenuState {
@@ -236,6 +253,8 @@ export default function DesktopCanvas({
   imageEditState,
   onImageEditCommit,
   onImageEditCancel,
+  desktopId,
+  onImageHistoryRestore,
 }: DesktopCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const isPanning = useRef(false);
@@ -400,6 +419,13 @@ export default function DesktopCanvas({
 
   // Context menu
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
+
+  // Image edit-history popover (opened via right-click menu on image assets)
+  const [historyPopover, setHistoryPopover] = useState<{
+    assetId: string;
+    x: number;
+    y: number;
+  } | null>(null);
 
   const visibleAssets = useMemo(() => {
     if (!containerRef.current) return assets;
@@ -1420,6 +1446,29 @@ export default function DesktopCanvas({
           ) : (
             /* Single-select context menu: z-index + delete */
             <>
+              {contextAsset?.assetType === "image" &&
+                Array.isArray(
+                  (contextAsset.metadata as Record<string, unknown>)
+                    .imageHistory
+                ) &&
+                ((contextAsset.metadata as Record<string, unknown>)
+                  .imageHistory as unknown[]).length > 0 && (
+                  <button
+                    className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-default-100 transition-colors text-left"
+                    onClick={() => {
+                      if (!contextMenu) return;
+                      setHistoryPopover({
+                        assetId: contextAsset.id,
+                        x: contextMenu.x,
+                        y: contextMenu.y,
+                      });
+                      setContextMenu(null);
+                    }}
+                  >
+                    <History size={14} />
+                    {t("viewEditHistory")}
+                  </button>
+                )}
               {contextAsset && onAssetRename && (
                 <button
                   className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-default-100 transition-colors text-left"
@@ -1463,6 +1512,24 @@ export default function DesktopCanvas({
             </>
           )}
         </div>
+      )}
+
+      {/* Image edit-history popover */}
+      {historyPopover && desktopId && (
+        <AssetHistoryPopover
+          desktopId={desktopId}
+          assetId={historyPopover.assetId}
+          anchor={{ x: historyPopover.x, y: historyPopover.y }}
+          canRestore={canEdit && !!onImageHistoryRestore}
+          onClose={() => setHistoryPopover(null)}
+          onRestore={({ imageId, imageUrl }) => {
+            onImageHistoryRestore?.({
+              assetId: historyPopover.assetId,
+              imageId,
+              imageUrl,
+            });
+          }}
+        />
       )}
 
       {/* Inline rename input — appears below the asset being renamed */}

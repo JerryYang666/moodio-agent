@@ -661,6 +661,65 @@ export default function DesktopDetailPage({
     setImageEditState(null);
   }, []);
 
+  // Restore a past image version from the edit-history popover. Mirrors
+  // `handleImageEditCommit`: drops the restored imageId from history, appends
+  // the current imageId so the chain stays walkable, applies optimistically,
+  // and records forward/inverse so Cmd/Ctrl+Z undoes the restore.
+  const handleImageHistoryRestore = useCallback(
+    (args: { assetId: string; imageId: string; imageUrl: string }) => {
+      const { assetId, imageId: restoredImageId, imageUrl: restoredImageUrl } = args;
+      const asset = assetsRef.current.find((a) => a.id === assetId);
+      if (!asset || asset.assetType !== "image") return;
+      const meta = asset.metadata as Record<string, unknown>;
+      const prevImageId =
+        typeof meta.imageId === "string" ? meta.imageId : null;
+      const prevImageUrl = asset.imageUrl ?? null;
+      if (!prevImageId || prevImageId === restoredImageId) return;
+      const prevHistory: string[] = Array.isArray(meta.imageHistory)
+        ? (meta.imageHistory as unknown[]).filter(
+            (id): id is string => typeof id === "string"
+          )
+        : [];
+      // Remove the restored id from history (it's no longer "past"), then
+      // append the current id since it's now a prior version.
+      const nextHistory = [
+        ...prevHistory.filter((id) => id !== restoredImageId),
+        prevImageId,
+      ];
+
+      void applyAssetImagePatch(
+        historyDepsRef.current,
+        assetId,
+        restoredImageId,
+        restoredImageUrl,
+        nextHistory
+      );
+
+      history.record({
+        userId: user?.id ?? "",
+        label: { key: "editAssetImage" },
+        targetIds: [assetId],
+        forward: () =>
+          applyAssetImagePatch(
+            historyDepsRef.current,
+            assetId,
+            restoredImageId,
+            restoredImageUrl,
+            nextHistory
+          ),
+        inverse: () =>
+          applyAssetImagePatch(
+            historyDepsRef.current,
+            assetId,
+            prevImageId,
+            prevImageUrl,
+            prevHistory
+          ),
+      });
+    },
+    [history, user?.id]
+  );
+
   const handleAssetDelete = useCallback(
     (assetId: string) => {
       const asset = detail?.assets.find((a) => a.id === assetId);
@@ -1724,6 +1783,8 @@ export default function DesktopDetailPage({
           imageEditState={canEdit ? imageEditState : null}
           onImageEditCommit={canEdit ? handleImageEditCommit : undefined}
           onImageEditCancel={canEdit ? handleImageEditCancel : undefined}
+          desktopId={desktopId}
+          onImageHistoryRestore={canEdit ? handleImageHistoryRestore : undefined}
         />
         <DesktopToolbar
           camera={camera}
