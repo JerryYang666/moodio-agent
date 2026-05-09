@@ -335,15 +335,27 @@ function HistoryPreview({
   const [src, setSrc] = useState(mdUrl);
   const [loaded, setLoaded] = useState(false);
   const triedRef = useRef<Set<string>>(new Set([mdUrl]));
+  const imgRef = useRef<HTMLImageElement>(null);
   useEffect(() => {
     setLoaded(false);
     setSrc(mdUrl);
     triedRef.current = new Set([mdUrl]);
   }, [mdUrl]);
+  // When the image is already in the browser cache, the native `load` event
+  // can fire before React attaches our `onLoad` handler. The handler never
+  // runs and the spinner spins forever. Check `complete` after the src
+  // changes and flip `loaded` ourselves in that case.
+  useEffect(() => {
+    const img = imgRef.current;
+    if (img && img.complete && img.naturalWidth > 0) {
+      setLoaded(true);
+    }
+  }, [src]);
   return (
     <div className="relative w-full h-full flex items-center justify-center bg-default-50">
       {!loaded && <Spinner size="sm" />}
       <img
+        ref={imgRef}
         src={src}
         draggable={false}
         alt=""
