@@ -48,3 +48,5 @@ drizzle/
 
 # go build output
 realtime/moodio-realtime
+
+*.txt
