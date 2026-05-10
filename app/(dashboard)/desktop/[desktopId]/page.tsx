@@ -62,6 +62,9 @@ const DEFAULT_CAMERA: CameraState = { x: 0, y: 0, zoom: 1 };
 const VIEWPORT_SAVE_DEBOUNCE = 2000;
 const DEFAULT_CHAT_PANEL_WIDTH = 380;
 const COLLAPSED_CHAT_WIDTH = 48;
+// Max assets that can be added in one batch (picker, drop, or paste). Files
+// beyond the cap are counted as "skipped" in the post-add summary toast.
+const MAX_BATCH_ADD = 10;
 
 export default function DesktopDetailPage({
   params,
@@ -1395,39 +1398,54 @@ export default function DesktopDetailPage({
     [desktopId, t]
   );
 
+  // Build a POST payload for a single picked library asset. Returns null if
+  // the asset's type isn't supported on the desktop (e.g. public_* / element).
+  const buildPickedAssetPayload = (
+    asset: AssetSummary,
+    pos: { x: number; y: number }
+  ): Record<string, unknown> | null => {
+    const isVideo = asset.assetType === "video";
+    const isAudio = asset.assetType === "audio";
+    const isImage = !asset.assetType || asset.assetType === "image";
+    if (!isVideo && !isAudio && !isImage) return null;
+
+    const metadata: Record<string, unknown> = {
+      imageId: asset.imageId,
+      chatId: asset.chatId ?? undefined,
+      title:
+        asset.generationDetails?.title ||
+        (isAudio ? "Audio" : isVideo ? "Video" : "Image"),
+      prompt: asset.generationDetails?.prompt || "",
+      status: asset.generationDetails?.status || "generated",
+    };
+    if (isVideo && asset.assetId) metadata.videoId = asset.assetId;
+    if (isAudio && asset.assetId) metadata.audioId = asset.assetId;
+
+    const payload: Record<string, unknown> = {
+      assetType: isAudio ? "audio" : isVideo ? "video" : "image",
+      metadata,
+      posX: pos.x,
+      posY: pos.y,
+    };
+    if (isAudio) {
+      payload.width = 300;
+      payload.height = 200;
+    }
+    return payload;
+  };
+
   const handleAssetPickerSelect = useCallback(
     async (asset: AssetSummary) => {
-      const pos = addAssetPositionRef.current;
-      const isVideo = asset.assetType === "video";
-      const isAudio = asset.assetType === "audio";
+      const payload = buildPickedAssetPayload(asset, addAssetPositionRef.current);
+      if (!payload) {
+        addToast({ title: t("failedToAddAsset"), color: "danger" });
+        return;
+      }
       try {
-        const metadata: Record<string, unknown> = {
-          imageId: asset.imageId,
-          chatId: asset.chatId ?? undefined,
-          title: asset.generationDetails?.title || (isAudio ? "Audio" : isVideo ? "Video" : "Image"),
-          prompt: asset.generationDetails?.prompt || "",
-          status: asset.generationDetails?.status || "generated",
-        };
-        if (isVideo && asset.assetId) {
-          metadata.videoId = asset.assetId;
-        }
-        if (isAudio && asset.assetId) {
-          metadata.audioId = asset.assetId;
-        }
-        const assetPayload: Record<string, unknown> = {
-          assetType: isAudio ? "audio" : isVideo ? "video" : "image",
-          metadata,
-          posX: pos.x,
-          posY: pos.y,
-        };
-        if (isAudio) {
-          assetPayload.width = 300;
-          assetPayload.height = 200;
-        }
         const res = await fetch(`/api/desktop/${desktopId}/assets`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ assets: [assetPayload] }),
+          body: JSON.stringify({ assets: [payload] }),
         });
         if (!res.ok) throw new Error("Failed to add asset to desktop");
         const data = await res.json();
@@ -1441,12 +1459,83 @@ export default function DesktopDetailPage({
         addToast({ title: t("failedToAddAsset"), color: "danger" });
       }
     },
-    [desktopId]
+    [desktopId, t]
+  );
+
+  // Multi-select confirm from the asset picker. Lays the picks out in a
+  // 3-column grid anchored at the add-asset position, skipping any types the
+  // desktop can't render. Supported types are already enforced by the
+  // picker's acceptTypes filter, but the grid math and summary toast match
+  // the drop/paste flow for consistency.
+  const handleAssetPickerSelectMultiple = useCallback(
+    async (assets: AssetSummary[]) => {
+      const origin = addAssetPositionRef.current;
+      const capped = assets.slice(0, MAX_BATCH_ADD);
+      const overflow = Math.max(0, assets.length - MAX_BATCH_ADD);
+      const GRID_COLS = 3;
+      const CELL_W = 320;
+      const CELL_H = 320;
+
+      let skipped = overflow;
+      const payloads: Record<string, unknown>[] = [];
+      capped.forEach((asset, index) => {
+        const cell = {
+          x: origin.x + (index % GRID_COLS) * CELL_W,
+          y: origin.y + Math.floor(index / GRID_COLS) * CELL_H,
+        };
+        const payload = buildPickedAssetPayload(asset, cell);
+        if (payload) payloads.push(payload);
+        else skipped++;
+      });
+
+      if (payloads.length === 0) {
+        if (skipped > 0) {
+          addToast({
+            title: t("assetsAddedWithSkipped", { added: 0, skipped }),
+            color: "warning",
+          });
+        }
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/desktop/${desktopId}/assets`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ assets: payloads }),
+        });
+        if (!res.ok) throw new Error("Failed to add assets to desktop");
+        const data = await res.json();
+        window.dispatchEvent(
+          new CustomEvent("desktop-asset-added", {
+            detail: { assets: data.assets, desktopId },
+          })
+        );
+        if (skipped > 0) {
+          addToast({
+            title: t("assetsAddedWithSkipped", {
+              added: payloads.length,
+              skipped,
+            }),
+            color: "warning",
+          });
+        }
+      } catch (error) {
+        console.error("Failed to add picked assets to desktop:", error);
+        addToast({ title: t("failedToAddAsset"), color: "danger" });
+      }
+    },
+    [desktopId, t]
   );
 
   // Upload arbitrary files (image/video/audio) and place each as a new asset
-  // at the given world position. Shared by the asset-picker upload, the
-  // canvas drag-drop, and the paste-to-desktop flow.
+  // on the canvas. Shared by the asset-picker upload, the canvas drag-drop,
+  // and the paste-to-desktop flow.
+  //
+  // Up to MAX_BATCH_ADD files are accepted; any beyond the cap and any with
+  // unsupported MIME types are counted as skipped and summarized in a toast.
+  // When more than one file is added, they are laid out in a 3-column grid
+  // anchored at `position` (top-left), wrapping into as many rows as needed.
   //
   // To make the UI feel responsive even when the upload roundtrip takes a
   // while, we insert an ephemeral placeholder asset locally (using a blob
@@ -1455,8 +1544,48 @@ export default function DesktopDetailPage({
   // mirrors the existing __generating_table__ placeholder pattern. Files
   // are uploaded in parallel so multiple drops/pastes don't queue.
   const uploadFilesToDesktop = useCallback(
-    async (files: File[], position: { x: number; y: number }) => {
-      const uploadOne = async (file: File) => {
+    async (rawFiles: File[], position: { x: number; y: number }) => {
+      const allowedTypes = [
+        ...siteConfig.upload.allowedImageTypes,
+        ...siteConfig.upload.allowedVideoTypes,
+        ...siteConfig.upload.allowedAudioTypes,
+      ];
+
+      const supported: File[] = [];
+      let skipped = 0;
+      for (const file of rawFiles) {
+        if (allowedTypes.includes(file.type)) supported.push(file);
+        else skipped++;
+      }
+
+      // Enforce the 10-item-per-batch cap. Anything over the cap is counted
+      // as skipped so the summary toast can surface it.
+      const overflow = Math.max(0, supported.length - MAX_BATCH_ADD);
+      const files = supported.slice(0, MAX_BATCH_ADD);
+
+      if (files.length === 0) {
+        if (skipped > 0) {
+          addToast({
+            title: t("assetsAddedWithSkipped", { added: 0, skipped }),
+            color: "warning",
+          });
+        }
+        return;
+      }
+
+      // 3-column grid. The cell size is deliberately uniform so assets line
+      // up even when their underlying aspect ratios differ.
+      const GRID_COLS = 3;
+      const CELL_W = 320;
+      const CELL_H = 320;
+      const cellPosition = (index: number) => ({
+        x: position.x + (index % GRID_COLS) * CELL_W,
+        y: position.y + Math.floor(index / GRID_COLS) * CELL_H,
+      });
+
+      let addedCount = 0;
+      const uploadOne = async (file: File, index: number) => {
+        const cellPos = cellPosition(index);
         const isVideo = siteConfig.upload.allowedVideoTypes.includes(file.type);
         const isAudio = siteConfig.upload.allowedAudioTypes.includes(file.type);
         const blobUrl = URL.createObjectURL(file);
@@ -1496,8 +1625,8 @@ export default function DesktopDetailPage({
               // are absent and status is "processing".
               ? { videoId: null, imageId: null, title: file.name, prompt: "", status: "processing" }
               : { imageId: null, title: file.name, prompt: "", status: "uploading" },
-          posX: position.x,
-          posY: position.y,
+          posX: cellPos.x,
+          posY: cellPos.y,
           width: placeholderDims.w,
           height: placeholderDims.h,
           rotation: 0,
@@ -1531,8 +1660,8 @@ export default function DesktopDetailPage({
             assetPayload = {
               assetType: "audio",
               metadata: { audioId: result.data.audioId, title: file.name, status: "completed" },
-              posX: position.x,
-              posY: position.y,
+              posX: cellPos.x,
+              posY: cellPos.y,
               width: 300,
               height: 200,
             };
@@ -1552,8 +1681,8 @@ export default function DesktopDetailPage({
                 prompt: "",
                 status: "completed",
               },
-              posX: position.x,
-              posY: position.y,
+              posX: cellPos.x,
+              posY: cellPos.y,
             };
           } else {
             const result = await uploadImage(file);
@@ -1565,8 +1694,8 @@ export default function DesktopDetailPage({
             assetPayload = {
               assetType: "image",
               metadata: { imageId: result.data.imageId, title: file.name, prompt: "", status: "generated" },
-              posX: position.x,
-              posY: position.y,
+              posX: cellPos.x,
+              posY: cellPos.y,
               // Persist the dims we already computed so the real asset replaces
               // the placeholder at the same size (no resize jank).
               width: placeholderDims.w,
@@ -1591,6 +1720,7 @@ export default function DesktopDetailPage({
               detail: { assets: data.assets, desktopId },
             })
           );
+          addedCount++;
         } catch (error) {
           console.error("Failed to add uploaded asset to desktop:", error);
           addToast({ title: t("failedToAddAsset"), color: "danger" });
@@ -1598,7 +1728,20 @@ export default function DesktopDetailPage({
         }
       };
 
-      await Promise.all(files.map(uploadOne));
+      await Promise.all(files.map((f, i) => uploadOne(f, i)));
+
+      // Per-upload failure already surfaces its own error toast, so only show
+      // the batch summary when the skip/overflow count makes it informative.
+      const totalSkipped = skipped + overflow;
+      if (totalSkipped > 0 && addedCount > 0) {
+        addToast({
+          title: t("assetsAddedWithSkipped", {
+            added: addedCount,
+            skipped: totalSkipped,
+          }),
+          color: "warning",
+        });
+      }
     },
     [desktopId, t, applyRemoteEvent]
   );
@@ -1881,8 +2024,11 @@ export default function DesktopDetailPage({
         isOpen={isAssetPickerOpen}
         onOpenChange={toggleAssetPicker}
         onSelect={handleAssetPickerSelect}
+        onSelectMultiple={handleAssetPickerSelectMultiple}
         onUpload={handleAssetPickerUpload}
         acceptTypes={["image", "video", "audio"]}
+        multiSelect
+        maxSelectCount={MAX_BATCH_ADD}
       />
 
       {/* Paste destination chooser — shown when the user pastes files while

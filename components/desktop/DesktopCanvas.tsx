@@ -685,35 +685,18 @@ export default function DesktopCanvas({
         return;
       }
 
-      // External files (e.g. images/videos/audio dragged from the OS).
+      // External files (e.g. images/videos/audio dragged from the OS). Pass
+      // the raw file list through — the page-side handler filters unsupported
+      // types and caps the batch so it can surface a single summary toast.
       if (onExternalFileDrop && e.dataTransfer.files.length > 0) {
         e.preventDefault();
         e.stopPropagation();
-        const allowedTypes = [
-          ...siteConfig.upload.allowedImageTypes,
-          ...siteConfig.upload.allowedVideoTypes,
-          ...siteConfig.upload.allowedAudioTypes,
-        ];
-        const validFiles: File[] = [];
-        let hasInvalid = false;
-        for (const file of Array.from(e.dataTransfer.files)) {
-          if (allowedTypes.includes(file.type)) {
-            validFiles.push(file);
-          } else {
-            hasInvalid = true;
-          }
-        }
-        if (hasInvalid) {
-          addToast({ title: tChat("invalidImageType"), color: "warning" });
-        }
-        if (validFiles.length > 0) {
-          const world = screenToWorld(e.clientX, e.clientY);
-          onExternalFileDrop(validFiles, world);
-        }
+        const world = screenToWorld(e.clientX, e.clientY);
+        onExternalFileDrop(Array.from(e.dataTransfer.files), world);
         return;
       }
     },
-    [canEdit, onExternalImageDrop, onExternalTextDrop, onExternalShotlistDrop, onExternalVideoSuggestDrop, onExternalFileDrop, parseAiImageDropPayload, parseAiTextDropPayload, parseAiShotlistDropPayload, parseAiVideoSuggestDropPayload, screenToWorld, tChat]
+    [canEdit, onExternalImageDrop, onExternalTextDrop, onExternalShotlistDrop, onExternalVideoSuggestDrop, onExternalFileDrop, parseAiImageDropPayload, parseAiTextDropPayload, parseAiShotlistDropPayload, parseAiVideoSuggestDropPayload, screenToWorld]
   );
 
   const handlePointerDown = useCallback(
