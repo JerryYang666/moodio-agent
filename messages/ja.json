@@ -1738,7 +1738,11 @@
       "markRequired": "編集する領域を先にマークしてください。",
       "cropErrorEmpty": "切り抜き範囲を選択してください。",
       "insufficientCredits": "クレジットが不足しています。",
-      "errorTitle": "編集に失敗しました"
+      "errorTitle": "編集に失敗しました",
+      "aspectRatio": {
+        "label": "アスペクト比",
+        "matchSource": "元画像に合わせる"
+      }
     }
   },
   "legal": {

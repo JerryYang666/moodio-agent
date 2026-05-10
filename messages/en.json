@@ -922,7 +922,11 @@
       "markRequired": "Mark the area to edit before applying.",
       "cropErrorEmpty": "Please select a crop area before applying.",
       "insufficientCredits": "Not enough credits for this edit.",
-      "errorTitle": "Edit failed"
+      "errorTitle": "Edit failed",
+      "aspectRatio": {
+        "label": "Aspect ratio",
+        "matchSource": "Match source"
+      }
     }
   },
   "storyboard": {

@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Modal,
   ModalContent,
@@ -27,25 +21,17 @@ import {
   Trash2,
   CheckCircle2,
 } from "lucide-react";
-import ReactCrop, {
-  type Crop as ReactCropArea,
-  type PixelCrop,
-} from "react-image-crop";
+import ReactCrop from "react-image-crop";
 import "react-image-crop/dist/ReactCrop.css";
 
-import { uploadImage as uploadImageClient } from "@/lib/upload/client";
-import {
-  DEFAULT_MARK_COLOR,
-  DEFAULT_MARK_WIDTH,
-  MARK_COMPOSITE_ALPHA,
-  markColorNameFromHex,
-} from "@/lib/image/mark-config";
 import MarkControls from "./mark-controls";
+import AspectRatioSelector from "./aspect-ratio-selector";
 import MagicProgress from "@/components/desktop/magic-progress";
+import { useImageEdit } from "@/hooks/use-image-edit";
+import type { ImageEditMode, EditResult } from "@/lib/image/edit-pipeline";
 import type { DestinationPick } from "./destination-picker-modal";
 
-export type ChatImageEditMode = "redraw" | "crop" | "erase" | "cutout";
-type CutoutSubMode = "auto" | "manual";
+export type ChatImageEditMode = ImageEditMode;
 
 interface ImageEditModalProps {
   isOpen: boolean;
@@ -67,6 +53,9 @@ interface ImageEditModalProps {
  *   - Saves the result into a user-picked collection/folder (never replacing
  *     the source).
  *   - Stays open after completion to show the result; the user closes it.
+ *
+ * All brush/crop/submit state is owned by useImageEdit so behavior stays in
+ * sync with the desktop overlay.
  */
 export default function ImageEditModal({
   isOpen,
@@ -83,270 +72,8 @@ export default function ImageEditModal({
   const tModal = useTranslations("imageEditModal");
   const tCommon = useTranslations("common");
 
-  // Brush state (redraw / erase / cutout-manual).
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const imageRef = useRef<HTMLImageElement>(null);
-  const lastPointRef = useRef<{ x: number; y: number } | null>(null);
-  const [imageLoaded, setImageLoaded] = useState(false);
-  const [isDrawing, setIsDrawing] = useState(false);
-  const [hasDrawing, setHasDrawing] = useState(false);
-  const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
-  const [brushColor, setBrushColor] = useState<string>(DEFAULT_MARK_COLOR.value);
-  const [brushWidth, setBrushWidth] = useState<number>(DEFAULT_MARK_WIDTH.value);
-
-  const [crop, setCrop] = useState<ReactCropArea>();
-  const [completedCrop, setCompletedCrop] = useState<PixelCrop>();
-  const [cutoutSub, setCutoutSub] = useState<CutoutSubMode>("auto");
-
-  const [prompt, setPrompt] = useState("");
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
-
   // Result state — once set, modal switches to "done" view.
-  const [result, setResult] = useState<{
-    imageId: string;
-    imageUrl: string;
-  } | null>(null);
-
-
-  const usesBrush =
-    mode === "redraw" ||
-    mode === "erase" ||
-    (mode === "cutout" && cutoutSub === "manual");
-  const usesCrop = mode === "crop";
-
-  // Reset when the modal opens. Each flow starts clean.
-  useEffect(() => {
-    if (!isOpen) return;
-    setImageLoaded(false);
-    setIsDrawing(false);
-    setHasDrawing(false);
-    setCanvasSize({ width: 0, height: 0 });
-    setBrushColor(DEFAULT_MARK_COLOR.value);
-    setBrushWidth(DEFAULT_MARK_WIDTH.value);
-    setCrop(undefined);
-    setCompletedCrop(undefined);
-    setCutoutSub("auto");
-    setPrompt("");
-    setIsProcessing(false);
-    setErrorMsg(null);
-    setResult(null);
-  }, [isOpen]);
-
-  const initializeCanvas = useCallback(() => {
-    const canvas = canvasRef.current;
-    const image = imageRef.current;
-    if (!canvas || !image) return;
-    const rect = image.getBoundingClientRect();
-    canvas.width = rect.width;
-    canvas.height = rect.height;
-    setCanvasSize({ width: rect.width, height: rect.height });
-    const ctx = canvas.getContext("2d");
-    if (ctx) {
-      ctx.strokeStyle = brushColor;
-      ctx.lineWidth = brushWidth;
-      ctx.lineCap = "round";
-      ctx.lineJoin = "round";
-    }
-  }, [brushColor, brushWidth]);
-
-  useEffect(() => {
-    const ctx = canvasRef.current?.getContext("2d");
-    if (!ctx) return;
-    ctx.strokeStyle = brushColor;
-    ctx.lineWidth = brushWidth;
-  }, [brushColor, brushWidth]);
-
-  useEffect(() => {
-    if (!imageLoaded || !usesBrush) return;
-    requestAnimationFrame(() => initializeCanvas());
-  }, [imageLoaded, usesBrush, initializeCanvas]);
-
-  // Keep the brush canvas aligned to the image's rendered box. Covers window
-  // resizes *and* in-modal layout flips (e.g. controls moving from beside to
-  // below once the image's aspect ratio is known).
-  useEffect(() => {
-    if (!usesBrush || !imageLoaded) return;
-    const img = imageRef.current;
-    if (!img) return;
-    const ro = new ResizeObserver(() => {
-      requestAnimationFrame(() => {
-        initializeCanvas();
-        setHasDrawing(false);
-      });
-    });
-    ro.observe(img);
-    return () => ro.disconnect();
-  }, [usesBrush, imageLoaded, initializeCanvas]);
-
-  const getCanvasCoords = (
-    e:
-      | React.MouseEvent<HTMLCanvasElement>
-      | React.TouchEvent<HTMLCanvasElement>
-  ) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return null;
-    const rect = canvas.getBoundingClientRect();
-    let cx: number, cy: number;
-    if ("touches" in e) {
-      if (e.touches.length === 0) return null;
-      cx = e.touches[0].clientX;
-      cy = e.touches[0].clientY;
-    } else {
-      cx = e.clientX;
-      cy = e.clientY;
-    }
-    return { x: cx - rect.left, y: cy - rect.top };
-  };
-
-  const handlePointerDown = (
-    e:
-      | React.MouseEvent<HTMLCanvasElement>
-      | React.TouchEvent<HTMLCanvasElement>
-  ) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const point = getCanvasCoords(e);
-    if (!point) return;
-    setIsDrawing(true);
-    lastPointRef.current = point;
-    const ctx = canvasRef.current?.getContext("2d");
-    if (ctx) {
-      ctx.beginPath();
-      ctx.arc(point.x, point.y, brushWidth / 2, 0, Math.PI * 2);
-      ctx.fillStyle = brushColor;
-      ctx.fill();
-      setHasDrawing(true);
-    }
-  };
-
-  const handlePointerMove = (
-    e:
-      | React.MouseEvent<HTMLCanvasElement>
-      | React.TouchEvent<HTMLCanvasElement>
-  ) => {
-    if (!isDrawing) return;
-    e.preventDefault();
-    e.stopPropagation();
-    const point = getCanvasCoords(e);
-    if (!point || !lastPointRef.current) return;
-    const ctx = canvasRef.current?.getContext("2d");
-    if (ctx) {
-      ctx.beginPath();
-      ctx.moveTo(lastPointRef.current.x, lastPointRef.current.y);
-      ctx.lineTo(point.x, point.y);
-      ctx.stroke();
-      lastPointRef.current = point;
-      setHasDrawing(true);
-    }
-  };
-
-  const handlePointerUp = () => {
-    setIsDrawing(false);
-    lastPointRef.current = null;
-  };
-
-  const handleClearDrawing = () => {
-    const canvas = canvasRef.current;
-    const ctx = canvas?.getContext("2d");
-    if (ctx && canvas) {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      setHasDrawing(false);
-    }
-  };
-
-  const fetchOriginalImage = useCallback(async (): Promise<HTMLImageElement> => {
-    const res = await fetch(
-      `/api/image/proxy?imageId=${encodeURIComponent(sourceImageId)}`
-    );
-    if (!res.ok) throw new Error(`Failed to fetch original image: ${res.status}`);
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    try {
-      const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-        const i = new Image();
-        i.onload = () => resolve(i);
-        i.onerror = reject;
-        i.src = url;
-      });
-      return img;
-    } finally {
-      setTimeout(() => URL.revokeObjectURL(url), 0);
-    }
-  }, [sourceImageId]);
-
-  const composeMarkedImage = useCallback(async (): Promise<File> => {
-    const canvas = canvasRef.current;
-    if (!canvas) throw new Error("Brush canvas not ready");
-    const cleanImage = await fetchOriginalImage();
-
-    const out = document.createElement("canvas");
-    out.width = cleanImage.naturalWidth;
-    out.height = cleanImage.naturalHeight;
-    const ctx = out.getContext("2d");
-    if (!ctx) throw new Error("Failed to get output 2d context");
-    ctx.drawImage(cleanImage, 0, 0);
-    const scaleX = cleanImage.naturalWidth / canvasSize.width;
-    const scaleY = cleanImage.naturalHeight / canvasSize.height;
-    ctx.save();
-    ctx.scale(scaleX, scaleY);
-    ctx.globalAlpha = MARK_COMPOSITE_ALPHA;
-    ctx.drawImage(canvas, 0, 0);
-    ctx.restore();
-
-    const blob = await new Promise<Blob>((resolve, reject) => {
-      out.toBlob(
-        (b) => (b ? resolve(b) : reject(new Error("toBlob failed"))),
-        "image/png",
-        1.0
-      );
-    });
-    return new File([blob], `marked_${Date.now()}.png`, { type: "image/png" });
-  }, [canvasSize.height, canvasSize.width, fetchOriginalImage]);
-
-  // Unlike the desktop overlay, the crop <img> here lives inside a
-  // `{!isProcessing && usesCrop && ...}` branch, so it unmounts the moment
-  // we flip `isProcessing` on submit. That means imageRef.current is null
-  // by the time this runs — the caller must pass the rendered rect it
-  // captured *before* setIsProcessing(true). Falling back to natural
-  // dimensions produces a silently-broken crop anchored at top-left.
-  const composeCroppedImage = useCallback(
-    async (displayedRect: DOMRect | null): Promise<File> => {
-      if (
-        !completedCrop ||
-        completedCrop.width === 0 ||
-        completedCrop.height === 0
-      ) {
-        throw new Error("Please select a crop area");
-      }
-      const cleanImage = await fetchOriginalImage();
-      const dispW = displayedRect?.width || cleanImage.naturalWidth;
-      const dispH = displayedRect?.height || cleanImage.naturalHeight;
-      const sx = (completedCrop.x * cleanImage.naturalWidth) / dispW;
-      const sy = (completedCrop.y * cleanImage.naturalHeight) / dispH;
-      const sw = (completedCrop.width * cleanImage.naturalWidth) / dispW;
-      const sh = (completedCrop.height * cleanImage.naturalHeight) / dispH;
-
-      const out = document.createElement("canvas");
-      out.width = Math.max(1, Math.round(sw));
-      out.height = Math.max(1, Math.round(sh));
-      const ctx = out.getContext("2d");
-      if (!ctx) throw new Error("Failed to get output 2d context");
-      ctx.drawImage(cleanImage, sx, sy, sw, sh, 0, 0, out.width, out.height);
-
-      const blob = await new Promise<Blob>((resolve, reject) => {
-        out.toBlob(
-          (b) => (b ? resolve(b) : reject(new Error("toBlob failed"))),
-          "image/png",
-          1.0
-        );
-      });
-      return new File([blob], `cropped_${Date.now()}.png`, {
-        type: "image/png",
-      });
-    },
-    [completedCrop, fetchOriginalImage]
-  );
+  const [result, setResult] = useState<EditResult | null>(null);
 
   // Save the generated image into the chosen destination collection/folder.
   // Non-fatal if this fails: we still show the result, with a toast.
@@ -354,136 +81,63 @@ export default function ImageEditModal({
     try {
       const generationDetails = {
         title: sourceTitle || "",
-        prompt: mode === "redraw" ? prompt.trim() : `${mode} of ${sourceTitle || "image"}`,
+        prompt:
+          mode === "redraw"
+            ? edit.prompt.trim()
+            : `${mode} of ${sourceTitle || "image"}`,
         status: "generated" as const,
         imageUrl,
       };
-      const res = await fetch(`/api/collection/${destination.collectionId}/images`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          imageId,
-          chatId,
-          generationDetails,
-          folderId: destination.folderId,
-        }),
-      });
+      const res = await fetch(
+        `/api/collection/${destination.collectionId}/images`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            imageId,
+            chatId,
+            generationDetails,
+            folderId: destination.folderId,
+          }),
+        }
+      );
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error || "Failed to save to destination");
       }
-      return true;
     } catch (err: any) {
       addToast({
         title: tModal("errorTitle"),
         description: err?.message ?? "Failed to save",
         color: "danger",
       });
-      return false;
     }
   };
 
+  const edit = useImageEdit({
+    mode,
+    sourceImageId,
+    onSuccess: async ({ imageId, imageUrl }) => {
+      await saveResultToDestination(imageId, imageUrl);
+      setResult({ imageId, imageUrl });
+    },
+  });
+
+  // Reset everything when the modal opens. Each flow starts clean.
+  useEffect(() => {
+    if (!isOpen) return;
+    edit.reset();
+    setResult(null);
+    // We intentionally depend only on isOpen — reset is stable across state
+    // snapshots and including it in deps would re-run the reset mid-flow.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
+
   const handleSubmit = async () => {
-    setErrorMsg(null);
-
     try {
-      if (mode === "crop") {
-        if (
-          !completedCrop ||
-          completedCrop.width <= 0 ||
-          completedCrop.height <= 0
-        ) {
-          setErrorMsg(t("cropErrorEmpty"));
-          return;
-        }
-        // Must capture the rendered <img> rect BEFORE flipping isProcessing:
-        // the crop <img> is gated on `!isProcessing` and will unmount
-        // synchronously on the next render, taking imageRef.current with it.
-        const displayedRect =
-          imageRef.current?.getBoundingClientRect() ?? null;
-        setIsProcessing(true);
-        const file = await composeCroppedImage(displayedRect);
-        const upload = await uploadImageClient(file);
-        if (!upload.success) {
-          throw new Error(upload.error.message || "Upload failed");
-        }
-        await saveResultToDestination(upload.data.imageId, upload.data.imageUrl);
-        setResult({
-          imageId: upload.data.imageId,
-          imageUrl: upload.data.imageUrl,
-        });
-        setIsProcessing(false);
-        return;
-      }
-
-      if (mode === "redraw" && !prompt.trim()) {
-        setErrorMsg(t("promptRequired"));
-        return;
-      }
-
-      const requireMarking = usesBrush;
-      if (requireMarking && !hasDrawing) {
-        setErrorMsg(t("markRequired"));
-        return;
-      }
-
-      setIsProcessing(true);
-
-      let markedImageId: string | undefined;
-      if (requireMarking) {
-        const markedFile = await composeMarkedImage();
-        const upload = await uploadImageClient(markedFile, {
-          skipCollection: true,
-        });
-        if (!upload.success) {
-          throw new Error(upload.error.message || "Marked image upload failed");
-        }
-        markedImageId = upload.data.imageId;
-      }
-
-      const operation =
-        mode === "redraw"
-          ? "redraw"
-          : mode === "erase"
-            ? "erase"
-            : cutoutSub === "manual"
-              ? "cutout-manual"
-              : "cutout-auto";
-
-      const apiRes = await fetch("/api/image/edit", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          operation,
-          sourceImageId,
-          markedImageId,
-          prompt: mode === "redraw" ? prompt.trim() : undefined,
-          modelId: "nano-banana-2-fast",
-          markColor: requireMarking
-            ? markColorNameFromHex(brushColor)
-            : undefined,
-        }),
-      });
-      if (!apiRes.ok) {
-        const data = await apiRes.json().catch(() => ({}));
-        const code = data?.error || `HTTP ${apiRes.status}`;
-        throw new Error(code);
-      }
-      const data = await apiRes.json();
-      if (!data.imageId) throw new Error("No imageId in response");
-
-      await saveResultToDestination(data.imageId, data.imageUrl);
-      setResult({ imageId: data.imageId, imageUrl: data.imageUrl });
-      setIsProcessing(false);
+      await edit.submit();
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Unknown error";
-      console.error("[ImageEditModal] submit failed:", err);
-      if (msg === "INSUFFICIENT_CREDITS") {
-        setErrorMsg(t("insufficientCredits"));
-      } else {
-        setErrorMsg(msg);
-      }
-      setIsProcessing(false);
       addToast({
         title: t("errorTitle"),
         description: msg,
@@ -505,6 +159,15 @@ export default function ImageEditModal({
     if (mode === "erase") return tModal("titleErase");
     return tModal("titleCutout");
   }, [mode, tModal]);
+
+  const errorText = useMemo(() => {
+    if (!edit.errorKind) return null;
+    if (edit.errorKind === "promptRequired") return t("promptRequired");
+    if (edit.errorKind === "markRequired") return t("markRequired");
+    if (edit.errorKind === "cropErrorEmpty") return t("cropErrorEmpty");
+    if (edit.errorKind === "insufficientCredits") return t("insufficientCredits");
+    return edit.errorMessage;
+  }, [edit.errorKind, edit.errorMessage, t]);
 
   const TitleIcon =
     mode === "redraw"
@@ -529,7 +192,7 @@ export default function ImageEditModal({
       scrollBehavior="inside"
       isDismissable={false}
       isKeyboardDismissDisabled
-      hideCloseButton={isProcessing}
+      hideCloseButton={edit.isProcessing}
       classNames={{
         wrapper: "z-[75]",
         base: "max-h-[92dvh] md:!max-w-[92vw] md:w-[92vw]",
@@ -580,103 +243,94 @@ export default function ImageEditModal({
                 // clipped by a very wide source image. The image column uses
                 // min-w-0 so it yields space rather than pushing them out.
                 <div className="flex flex-col md:flex-row gap-4 items-stretch">
-                  {/* Image surface — hugs the image's natural aspect ratio,
-                      centered in its column. */}
                   <div className="flex-1 min-w-0 flex items-center justify-center">
                     <div className="relative inline-flex bg-black/5 overflow-hidden max-w-full">
-                      {!usesCrop && (
+                      {!edit.usesCrop && (
                         <img
-                          ref={imageRef}
+                          ref={edit.imageRef}
                           src={sourceImageUrl}
                           alt=""
                           className="block max-w-full max-h-[72vh] object-contain select-none"
-                          onLoad={() => setImageLoaded(true)}
+                          onLoad={() => edit.setImageLoaded(true)}
                           draggable={false}
                         />
                       )}
 
-                      {!isProcessing && usesBrush && imageLoaded && (
+                      {!edit.isProcessing && edit.usesBrush && edit.imageLoaded && (
                         <canvas
-                          ref={canvasRef}
+                          ref={edit.canvasRef}
                           className="absolute inset-0 cursor-crosshair touch-none"
                           style={{
-                            width: canvasSize.width,
-                            height: canvasSize.height,
+                            width: edit.canvasSize.width,
+                            height: edit.canvasSize.height,
                           }}
-                          onMouseDown={handlePointerDown}
-                          onMouseMove={handlePointerMove}
-                          onMouseUp={handlePointerUp}
-                          onMouseLeave={handlePointerUp}
-                          onTouchStart={handlePointerDown}
-                          onTouchMove={handlePointerMove}
-                          onTouchEnd={handlePointerUp}
+                          onMouseDown={edit.handlePointerDown}
+                          onMouseMove={edit.handlePointerMove}
+                          onMouseUp={edit.handlePointerUp}
+                          onMouseLeave={edit.handlePointerUp}
+                          onTouchStart={edit.handlePointerDown}
+                          onTouchMove={edit.handlePointerMove}
+                          onTouchEnd={edit.handlePointerUp}
                         />
                       )}
 
-                      {!isProcessing && usesCrop && (
+                      {!edit.isProcessing && edit.usesCrop && (
                         // react-image-crop pins its inner <img> to
                         // max-height:inherit, so any cap has to live on the
                         // <ReactCrop> element itself — otherwise the img
                         // renders at natural size and the modal body scrolls.
                         <ReactCrop
-                          crop={crop}
-                          onChange={(c) => setCrop(c)}
-                          onComplete={(c) => setCompletedCrop(c)}
+                          crop={edit.crop}
+                          onChange={(c) => edit.setCrop(c)}
+                          onComplete={(c) => edit.setCompletedCrop(c)}
                           style={{ maxHeight: "72vh", maxWidth: "100%" }}
                         >
                           <img
-                            ref={imageRef}
+                            ref={edit.imageRef}
                             src={sourceImageUrl}
                             alt=""
                             className="block max-w-full max-h-[72vh] object-contain select-none"
-                            onLoad={() => setImageLoaded(true)}
+                            onLoad={() => edit.setImageLoaded(true)}
                             draggable={false}
                           />
                         </ReactCrop>
                       )}
 
-                      {isProcessing && <MagicProgress statusText={statusText} />}
+                      {edit.isProcessing && (
+                        <MagicProgress statusText={statusText} />
+                      )}
                     </div>
                   </div>
 
                   {/* Controls pane — fixed width on md+, scrolls internally so
                       nothing gets clipped when the modal or image is tall. */}
                   <div className="w-full md:w-72 shrink-0 flex flex-col gap-3 md:max-h-[72vh] md:overflow-y-auto md:pr-1">
-                    {mode === "cutout" && !isProcessing && (
+                    {mode === "cutout" && !edit.isProcessing && (
                       <div className="flex gap-1 p-1 rounded-md bg-default-100">
-                        <button
-                          type="button"
-                          className={[
-                            "flex-1 px-2 py-1 rounded text-xs transition-colors",
-                            cutoutSub === "auto"
-                              ? "bg-background shadow"
-                              : "hover:bg-default-200",
-                          ].join(" ")}
-                          onClick={() => setCutoutSub("auto")}
-                        >
-                          {t("cutoutAuto")}
-                        </button>
-                        <button
-                          type="button"
-                          className={[
-                            "flex-1 px-2 py-1 rounded text-xs transition-colors",
-                            cutoutSub === "manual"
-                              ? "bg-background shadow"
-                              : "hover:bg-default-200",
-                          ].join(" ")}
-                          onClick={() => setCutoutSub("manual")}
-                        >
-                          {t("cutoutManual")}
-                        </button>
+                        {(["auto", "manual"] as const).map((sub) => (
+                          <button
+                            key={sub}
+                            type="button"
+                            className={[
+                              "flex-1 px-2 py-1 rounded text-xs transition-colors",
+                              edit.cutoutSub === sub
+                                ? "bg-background shadow"
+                                : "hover:bg-default-200",
+                            ].join(" ")}
+                            onClick={() => edit.setCutoutSub(sub)}
+                          >
+                            {t(sub === "auto" ? "cutoutAuto" : "cutoutManual")}
+                          </button>
+                        ))}
                       </div>
                     )}
 
-                    {mode === "redraw" && !isProcessing && (
+                    {mode === "redraw" && !edit.isProcessing && (
                       <Textarea
                         label={t("promptLabel")}
                         placeholder={t("promptPlaceholder")}
-                        value={prompt}
-                        onValueChange={setPrompt}
+                        value={edit.prompt}
+                        onValueChange={edit.setPrompt}
                         minRows={3}
                         maxRows={6}
                         isRequired
@@ -684,31 +338,38 @@ export default function ImageEditModal({
                       />
                     )}
 
-                    {!isProcessing && (
+                    {mode !== "crop" && !edit.isProcessing && (
+                      <AspectRatioSelector
+                        value={edit.aspectRatio}
+                        onChange={edit.setAspectRatio}
+                      />
+                    )}
+
+                    {!edit.isProcessing && (
                       <p className="text-xs text-default-500 leading-snug">
                         {mode === "redraw" && t("hintRedraw")}
                         {mode === "crop" && t("hintCrop")}
                         {mode === "erase" && t("hintErase")}
                         {mode === "cutout" &&
-                          (cutoutSub === "auto"
+                          (edit.cutoutSub === "auto"
                             ? t("hintCutoutAuto")
                             : t("hintCutoutManual"))}
                       </p>
                     )}
 
-                    {usesBrush && !isProcessing && (
+                    {edit.usesBrush && !edit.isProcessing && (
                       <div className="flex flex-col gap-2">
                         <MarkControls
-                          color={brushColor}
-                          width={brushWidth}
-                          onColorChange={setBrushColor}
-                          onWidthChange={setBrushWidth}
+                          color={edit.brushColor}
+                          width={edit.brushWidth}
+                          onColorChange={edit.setBrushColor}
+                          onWidthChange={edit.setBrushWidth}
                           className="bg-background"
                         />
                         <button
                           type="button"
-                          onClick={handleClearDrawing}
-                          disabled={!hasDrawing}
+                          onClick={edit.handleClearDrawing}
+                          disabled={!edit.hasDrawing}
                           className="flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs rounded-md bg-background border border-divider hover:bg-default-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                         >
                           <Trash2 size={13} />
@@ -717,9 +378,9 @@ export default function ImageEditModal({
                       </div>
                     )}
 
-                    {errorMsg && !isProcessing && (
+                    {errorText && !edit.isProcessing && (
                       <p className="text-xs text-danger leading-snug">
-                        {errorMsg}
+                        {errorText}
                       </p>
                     )}
                   </div>
@@ -737,20 +398,20 @@ export default function ImageEditModal({
                   <Button
                     variant="light"
                     onPress={handleClose}
-                    isDisabled={isProcessing}
+                    isDisabled={edit.isProcessing}
                   >
                     {tCommon("cancel")}
                   </Button>
                   <Button
                     color="primary"
                     onPress={handleSubmit}
-                    isLoading={isProcessing}
+                    isLoading={edit.isProcessing}
                     isDisabled={
-                      isProcessing ||
-                      (mode === "redraw" && !prompt.trim()) ||
-                      (usesBrush && !hasDrawing && imageLoaded)
+                      edit.isProcessing ||
+                      (mode === "redraw" && !edit.prompt.trim()) ||
+                      (edit.usesBrush && !edit.hasDrawing && edit.imageLoaded)
                     }
-                    startContent={!isProcessing && <Check size={14} />}
+                    startContent={!edit.isProcessing && <Check size={14} />}
                   >
                     {tModal("submit")}
                   </Button>

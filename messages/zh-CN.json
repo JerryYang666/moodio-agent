@@ -1738,7 +1738,11 @@
       "markRequired": "请先标记要编辑的区域。",
       "cropErrorEmpty": "请先选择裁切区域。",
       "insufficientCredits": "余额不足以完成此次编辑。",
-      "errorTitle": "编辑失败"
+      "errorTitle": "编辑失败",
+      "aspectRatio": {
+        "label": "宽高比",
+        "matchSource": "与原图一致"
+      }
     }
   },
   "legal": {
