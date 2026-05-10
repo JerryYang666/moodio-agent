@@ -175,6 +175,7 @@ export async function POST(
       .values({
         projectId: collection.projectId,
         collectionId,
+        folderId: folderId || null,
         imageId,
         assetId: resolvedAssetId,
         assetType: resolvedAssetType,
@@ -188,6 +189,8 @@ export async function POST(
       .update(collections)
       .set({ updatedAt: new Date() })
       .where(eq(collections.id, collectionId));
+
+    if (folderId) await touchFolder(folderId);
 
     // Research telemetry
     if (await isFeatureFlagEnabled(userId, "res_telemetry")) {
