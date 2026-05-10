@@ -160,6 +160,18 @@ interface DesktopCanvasProps {
     imageId: string;
     imageUrl: string;
   }) => void;
+  /**
+   * Fired when a user captures a frame from a paused video on the canvas.
+   * The image has already been uploaded; the page creates a new image asset
+   * positioned next to the source video.
+   */
+  onVideoFrameCaptured?: (args: {
+    sourceAsset: EnrichedDesktopAsset;
+    imageId: string;
+    imageUrl: string;
+    width: number;
+    height: number;
+  }) => void;
 }
 
 interface ContextMenuState {
@@ -255,6 +267,7 @@ export default function DesktopCanvas({
   onImageEditCancel,
   desktopId,
   onImageHistoryRestore,
+  onVideoFrameCaptured,
 }: DesktopCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const isPanning = useRef(false);
@@ -1276,6 +1289,7 @@ export default function DesktopCanvas({
                 onCellCommit={onCellCommit}
                 onTextCommit={onTextCommit}
                 onVideoSuggestCommit={onVideoSuggestCommit}
+                onVideoFrameCaptured={onVideoFrameCaptured}
               />
               </div>
               {/* Resize handles — visible when selected */}
@@ -1897,6 +1911,7 @@ function AssetCardContent({
   onCellCommit,
   onTextCommit,
   onVideoSuggestCommit,
+  onVideoFrameCaptured,
 }: {
   asset: EnrichedDesktopAsset;
   containerWidth: number;
@@ -1912,13 +1927,20 @@ function AssetCardContent({
   onCellCommit?: (assetId: string, rowId: string, colIndex: number, value: string) => void;
   onTextCommit?: (assetId: string, content: string) => void;
   onVideoSuggestCommit?: (assetId: string, updates: { title: string; videoIdea: string }) => void;
+  onVideoFrameCaptured?: (args: {
+    sourceAsset: EnrichedDesktopAsset;
+    imageId: string;
+    imageUrl: string;
+    width: number;
+    height: number;
+  }) => void;
 }) {
   switch (asset.assetType) {
     case "image":
     case "public_image":
       return <ImageAsset asset={asset} containerWidth={containerWidth} onImageLoad={onImageLoad} onFocusAsset={onFocusAsset} zoom={zoom} />;
     case "video":
-      return <VideoAsset asset={asset} containerWidth={containerWidth} playing={playing} onPlayToggle={onPlayToggle} onImageLoad={onImageLoad} onFocusAsset={onFocusAsset} zoom={zoom} />;
+      return <VideoAsset asset={asset} containerWidth={containerWidth} playing={playing} onPlayToggle={onPlayToggle} onImageLoad={onImageLoad} onFocusAsset={onFocusAsset} zoom={zoom} onFrameCaptured={onVideoFrameCaptured} />;
     case "public_video":
       return <PublicVideoAsset asset={asset} playing={playing} onPlayToggle={onPlayToggle} onImageLoad={onImageLoad} onFocusAsset={onFocusAsset} zoom={zoom} />;
     case "text": {

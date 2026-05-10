@@ -75,6 +75,7 @@ export default function DesktopDetailPage({
   const router = useRouter();
   const t = useTranslations("desktop");
   const tCommon = useTranslations("common");
+  const tVideo = useTranslations("video");
   const { user } = useAuth();
   const { track: trackResearch } = useResearchTelemetry();
   const {
@@ -883,6 +884,69 @@ export default function DesktopDetailPage({
       }
     },
     [removeAsset, sendEvent, detail?.assets, trackResearch, desktopId, history, user?.id]
+  );
+
+  // Frame-capture from a paused inline-playing video on the canvas. Places
+  // the new image asset immediately to the right of the source video, sized
+  // to match the video's rendered width so the pair reads as a single visual
+  // unit. The image has already been uploaded by VideoAsset by the time this
+  // fires; we only own the canvas-placement half of the flow.
+  const handleVideoFrameCaptured = useCallback(
+    async (args: {
+      sourceAsset: EnrichedDesktopAsset;
+      imageId: string;
+      imageUrl: string;
+      width: number;
+      height: number;
+    }) => {
+      const { sourceAsset, imageId, width: naturalW, height: naturalH } = args;
+      const sourceW = sourceAsset.width ?? 300;
+      const sourceH = sourceAsset.height ?? 300;
+      // Size the new image to fit the same height as the source video while
+      // preserving its own aspect ratio, so the pair lines up cleanly.
+      const aspect = naturalW > 0 && naturalH > 0 ? naturalW / naturalH : sourceW / sourceH;
+      const newH = sourceH;
+      const newW = Math.max(50, Math.round(newH * aspect));
+      const GAP = 16;
+      const posX = sourceAsset.posX + sourceW + GAP;
+      const posY = sourceAsset.posY;
+
+      try {
+        const res = await fetch(`/api/desktop/${desktopId}/assets`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            assets: [
+              {
+                assetType: "image",
+                metadata: {
+                  imageId,
+                  title: tVideo("frameCapture"),
+                  prompt: "",
+                  status: "generated",
+                  sourceAssetId: sourceAsset.id,
+                },
+                posX,
+                posY,
+                width: newW,
+                height: newH,
+              },
+            ],
+          }),
+        });
+        if (!res.ok) throw new Error("Failed to add frame capture to desktop");
+        const data = await res.json();
+        window.dispatchEvent(
+          new CustomEvent("desktop-asset-added", {
+            detail: { assets: data.assets, desktopId },
+          })
+        );
+      } catch (error) {
+        console.error("Failed to add frame capture to desktop:", error);
+        addToast({ title: t("failedToAddImage"), color: "danger" });
+      }
+    },
+    [desktopId, t, tVideo]
   );
 
   const handleExternalImageDrop = useCallback(
@@ -1956,6 +2020,7 @@ export default function DesktopDetailPage({
           onImageEditCancel={canEdit ? handleImageEditCancel : undefined}
           desktopId={desktopId}
           onImageHistoryRestore={canEdit ? handleImageHistoryRestore : undefined}
+          onVideoFrameCaptured={canEdit ? handleVideoFrameCaptured : undefined}
         />
         <DesktopToolbar
           camera={camera}
