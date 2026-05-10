@@ -57,6 +57,24 @@ const nanoBanana2: ImageModelConfig = {
 };
 
 /**
+ * Nano Banana Pro - Image generation + editing via KIE
+ */
+const nanoBananaPro: ImageModelConfig = {
+  id: "nano-banana-pro",
+  name: "Nano Banana Pro",
+  description: "Google Nano Banana Pro via KIE for text-to-image and image editing",
+  provider: "kie",
+  supports: {
+    generate: true,
+    edit: true,
+  },
+  providerModelIds: {
+    generate: "nano-banana-pro",
+    edit: "nano-banana-pro",
+  },
+};
+
+/**
  * Nano Banana 2 Fast - Image generation + editing via Google Gemini direct
  */
 const nanoBanana2Fast: ImageModelConfig = {
@@ -71,6 +89,24 @@ const nanoBanana2Fast: ImageModelConfig = {
   providerModelIds: {
     generate: "gemini-3.1-flash-image-preview",
     edit: "gemini-3.1-flash-image-preview",
+  },
+};
+
+/**
+ * Nano Banana Pro Fast - Image generation + editing via Google Gemini direct (Pro preview)
+ */
+const nanoBananaProFast: ImageModelConfig = {
+  id: "nano-banana-pro-fast",
+  name: "Nano Banana Pro Fast",
+  description: "Google Nano Banana Pro via Gemini direct for text-to-image and image editing",
+  provider: "google",
+  supports: {
+    generate: true,
+    edit: true,
+  },
+  providerModelIds: {
+    generate: "gemini-3-pro-image-preview",
+    edit: "gemini-3-pro-image-preview",
   },
 };
 
@@ -115,6 +151,8 @@ const gptImage2: ImageModelConfig = {
 export const IMAGE_MODELS: ImageModelConfig[] = [
   nanoBanana2,
   nanoBanana2Fast,
+  nanoBananaPro,
+  nanoBananaProFast,
   seedreamV45,
   gptImage2,
 ];

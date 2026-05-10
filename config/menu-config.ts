@@ -31,6 +31,8 @@ export const MENU_CONFIG = {
       options: {
         "nano-banana-2": { label: "Nano Banana 2" },
         "nano-banana-2-fast": { label: "Nano Banana 2 Fast" },
+        "nano-banana-pro": { label: "Nano Banana Pro" },
+        "nano-banana-pro-fast": { label: "Nano Banana Pro Fast" },
         "seedream-45": { label: "Seedream 4.5" },
         "gpt-image-2": { label: "GPT Image 2" },
         midjourney: { label: "Midjourney" },
@@ -131,6 +133,8 @@ export const MENU_CONFIG = {
           allowed: [
             "nano-banana-2",
             "nano-banana-2-fast",
+            "nano-banana-pro",
+            "nano-banana-pro-fast",
             "seedream-45",
             "gpt-image-2",
           ],
@@ -182,6 +186,8 @@ export const MENU_CONFIG = {
           allowed: [
             "nano-banana-2",
             "nano-banana-2-fast",
+            "nano-banana-pro",
+            "nano-banana-pro-fast",
             "seedream-45",
             "gpt-image-2",
           ],

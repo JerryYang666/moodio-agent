@@ -895,6 +895,8 @@
     "models": {
       "nano-banana-2": "Nano Banana 2",
       "nano-banana-2-fast": "Nano Banana 2 高速",
+      "nano-banana-pro": "Nano Banana Pro",
+      "nano-banana-pro-fast": "Nano Banana Pro 高速",
       "seedream-45": "Seedream 4.5",
       "gpt-image-2": "GPT Image 2",
       "midjourney": "Midjourney",
