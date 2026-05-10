@@ -53,7 +53,12 @@ export default function VideoAsset({
   const tVideo = useTranslations("video");
   const meta = asset.metadata as unknown as VideoAssetMeta;
   const src = asset.imageUrl;
-  const videoUrl = asset.videoUrl;
+  // Prefer the signed URL for playback so the `<video crossOrigin="anonymous">`
+  // frame-capture path stays untainted. Falls back to the normal videoUrl
+  // (e.g., during live updates that haven't refetched yet).
+  const signedVideoUrl = asset.signedVideoUrl;
+  const videoUrl = signedVideoUrl || asset.videoUrl;
+  const useCrossOrigin = !!signedVideoUrl;
   const genId = meta.generationId;
   const { generationStatuses } = useVideo();
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -179,6 +184,7 @@ export default function VideoAsset({
           loop={false}
           playsInline
           controls
+          crossOrigin={useCrossOrigin ? "anonymous" : undefined}
           className="w-full h-full object-contain bg-black"
           onEnded={handleVideoEnded}
           onPause={() => setIsVideoPaused(true)}

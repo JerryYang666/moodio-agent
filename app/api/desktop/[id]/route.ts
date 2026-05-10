@@ -13,7 +13,7 @@ import { getAccessToken } from "@/lib/auth/cookies";
 import { verifyAccessToken } from "@/lib/auth/jwt";
 import { eq, desc, inArray } from "drizzle-orm";
 import { getDesktopPermission } from "@/lib/desktop/permissions";
-import { getImageUrl, getVideoUrl, getThumbnailUrl } from "@/lib/storage/s3";
+import { getImageUrl, getVideoUrl, getSignedVideoUrl, getThumbnailUrl } from "@/lib/storage/s3";
 import { getContentUrl, getVideoUrl as getPublicVideoUrl } from "@/lib/config/video.config";
 import { getUserSetting } from "@/lib/user-settings/server";
 
@@ -131,6 +131,11 @@ export async function GET(
         thumbnailSmUrl: imageId ? getThumbnailUrl(imageId, "sm", cnMode) : null,
         thumbnailMdUrl: imageId ? getThumbnailUrl(imageId, "md", cnMode) : null,
         videoUrl: asset.assetType === "video" && videoId ? getVideoUrl(videoId, cnMode) : null,
+        // CORS-friendly signed URL for client-side frame capture.
+        signedVideoUrl:
+          asset.assetType === "video" && videoId
+            ? getSignedVideoUrl(videoId, undefined, cnMode)
+            : null,
         generationData,
       };
     });

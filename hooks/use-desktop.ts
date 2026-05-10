@@ -99,6 +99,7 @@ function mergeAsset<T extends DesktopAsset>(local: T, server: DesktopAsset): T {
   const s = server as Record<string, unknown>;
   const l = local as Record<string, unknown>;
   if (s.videoUrl == null && l.videoUrl != null) (merged as Record<string, unknown>).videoUrl = l.videoUrl;
+  if (s.signedVideoUrl == null && l.signedVideoUrl != null) (merged as Record<string, unknown>).signedVideoUrl = l.signedVideoUrl;
   if (s.generationData == null && l.generationData != null) (merged as Record<string, unknown>).generationData = l.generationData;
   if (s.imageUrl == null && l.imageUrl != null) (merged as Record<string, unknown>).imageUrl = l.imageUrl;
   return merged;

@@ -7,7 +7,7 @@ import { eq, desc, inArray, and } from "drizzle-orm";
 import { getDesktopPermission } from "@/lib/desktop/permissions";
 import { hasWriteAccess } from "@/lib/permissions";
 import { validateAssetMetadata } from "@/lib/desktop/types";
-import { getImageUrl, getVideoUrl, getAudioUrl, getThumbnailUrl } from "@/lib/storage/s3";
+import { getImageUrl, getVideoUrl, getSignedVideoUrl, getAudioUrl, getThumbnailUrl } from "@/lib/storage/s3";
 import { getContentUrl } from "@/lib/config/video.config";
 import { getUserSetting } from "@/lib/user-settings/server";
 
@@ -129,6 +129,10 @@ export async function GET(
         thumbnailSmUrl: imageId ? getThumbnailUrl(imageId, "sm", cnMode) : null,
         thumbnailMdUrl: imageId ? getThumbnailUrl(imageId, "md", cnMode) : null,
         videoUrl: asset.assetType === "video" && videoId ? getVideoUrl(videoId, cnMode) : null,
+        signedVideoUrl:
+          asset.assetType === "video" && videoId
+            ? getSignedVideoUrl(videoId, undefined, cnMode)
+            : null,
         generationData,
       };
     });
@@ -277,6 +281,10 @@ export async function POST(
         thumbnailSmUrl: imgId ? getThumbnailUrl(imgId, "sm", cnMode) : null,
         thumbnailMdUrl: imgId ? getThumbnailUrl(imgId, "md", cnMode) : null,
         videoUrl: asset.assetType === "video" && vidId ? getVideoUrl(vidId, cnMode) : null,
+        signedVideoUrl:
+          asset.assetType === "video" && vidId
+            ? getSignedVideoUrl(vidId, undefined, cnMode)
+            : null,
       };
     });
 
