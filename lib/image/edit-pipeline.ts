@@ -229,8 +229,8 @@ export async function callImageEditApi(body: {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      modelId: body.modelId ?? "nano-banana-2-fast",
       ...body,
+      modelId: body.modelId ?? "nano-banana-2-fast",
     }),
   });
   if (!apiRes.ok) {
