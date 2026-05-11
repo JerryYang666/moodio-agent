@@ -28,7 +28,11 @@ import {
   type RemoteEvent,
 } from "@/hooks/use-desktop-ws";
 import { useDesktopVideoSync } from "@/hooks/use-desktop-video-sync";
-import { setDesktopViewport, clearDesktopViewport } from "@/lib/desktop/types";
+import {
+  setDesktopViewport,
+  clearDesktopViewport,
+  findNonOverlappingPosition,
+} from "@/lib/desktop/types";
 import type { VideoAssetMeta } from "@/lib/desktop/types";
 import { useAuth } from "@/hooks/use-auth";
 import { TimelinePanel } from "@/components/timeline";
@@ -56,7 +60,10 @@ import {
   type ImageHistoryEntry,
   type ImageHistoryOperation,
 } from "@/lib/desktop/types";
-import type { ImageEditMode } from "@/components/desktop/image-edit-overlay";
+import type {
+  ImageEditMode,
+  ImageEditPlacement,
+} from "@/components/desktop/image-edit-overlay";
 
 const DEFAULT_CAMERA: CameraState = { x: 0, y: 0, zoom: 1 };
 const VIEWPORT_SAVE_DEBOUNCE = 2000;
@@ -604,7 +611,7 @@ export default function DesktopDetailPage({
   // overlay has produced a new imageId. Pushes the previous imageId onto
   // metadata.imageHistory and routes the swap through the undo/redo engine
   // so Cmd/Ctrl+Z walks back through prior versions.
-  const handleImageEditCommit = useCallback(
+  const handleImageEditCommitReplace = useCallback(
     (args: {
       assetId: string;
       newImageId: string;
@@ -687,12 +694,156 @@ export default function DesktopDetailPage({
     [history, user?.id]
   );
 
+  // "Save as new" variant: the source asset is untouched. A brand-new image
+  // asset is created next to the original with empty imageHistory — the new
+  // asset starts its own edit lineage from scratch, exactly like an asset
+  // the user just dropped onto the canvas. Undo (Cmd/Ctrl+Z) removes the
+  // new asset; redo re-adds it, mirroring the regular asset-creation path.
+  const handleImageEditCommitAsNew = useCallback(
+    async (args: {
+      assetId: string;
+      newImageId: string;
+      newImageUrl: string;
+      editType: string;
+    }) => {
+      const { assetId, newImageId, editType } = args;
+      const source = assetsRef.current.find((a) => a.id === assetId);
+      setImageEditState(null);
+      if (!source || source.assetType !== "image") return;
+
+      const sourceMeta = source.metadata as Record<string, unknown>;
+      const sourceW = source.width ?? 300;
+      const sourceH = source.height ?? 300;
+      const GAP = 16;
+
+      // Prefer the slot directly to the right; fall back via spiral if it's
+      // taken. We feed `findNonOverlappingPosition` the current asset rects
+      // so the result doesn't collide with anything — including the source.
+      const rects = assetsRef.current.map((a) => ({
+        x: a.posX,
+        y: a.posY,
+        w: a.width ?? 400,
+        h: a.height ?? 300,
+      }));
+      const { x: posX, y: posY } = findNonOverlappingPosition(
+        source.posX + sourceW + GAP,
+        source.posY,
+        sourceW,
+        sourceH,
+        rects
+      );
+
+      // Inherit title/prompt/chatId/aspectRatio for continuity but NOT
+      // imageHistory — the user explicitly asked for a fresh asset. The
+      // operation that produced this image (editType) is recorded as the
+      // initial prompt context so the new asset's own history begins here.
+      const nextMeta: Record<string, unknown> = {
+        imageId: newImageId,
+        status: "generated",
+      };
+      if (typeof sourceMeta.title === "string") nextMeta.title = sourceMeta.title;
+      if (typeof sourceMeta.prompt === "string") nextMeta.prompt = sourceMeta.prompt;
+      if (typeof sourceMeta.chatId === "string") nextMeta.chatId = sourceMeta.chatId;
+      if (typeof sourceMeta.aspectRatio === "string") {
+        nextMeta.aspectRatio = sourceMeta.aspectRatio;
+      }
+      nextMeta.createdByEdit = editType;
+      nextMeta.sourceAssetId = assetId;
+
+      try {
+        const res = await fetch(`/api/desktop/${desktopId}/assets`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            assets: [
+              {
+                assetType: "image",
+                metadata: nextMeta,
+                posX,
+                posY,
+                width: sourceW,
+                height: sourceH,
+              },
+            ],
+          }),
+        });
+        if (!res.ok) throw new Error("Failed to create new image asset");
+        const data = await res.json();
+        const created = (data.assets as EnrichedDesktopAsset[] | undefined)?.[0];
+        if (!created) throw new Error("Server returned no asset");
+
+        // Apply optimistically, broadcast, and record for undo — the same
+        // triple the normal asset-creation path performs.
+        applyRemoteEvent({ type: "asset_added", payload: { asset: created } });
+        sendEvent("asset_added", { asset: created });
+
+        const snapshot: EnrichedDesktopAsset = { ...created };
+        history.record({
+          userId: user?.id ?? "",
+          label: { key: "addAsset" },
+          targetIds: [created.id],
+          forward: () => applyAssetRestore(historyDepsRef.current, snapshot),
+          inverse: () => applyAssetRemove(historyDepsRef.current, created.id),
+        });
+
+        trackResearch({
+          chatId: typeof sourceMeta.chatId === "string" ? sourceMeta.chatId : undefined,
+          eventType: "canvas_item_added",
+          imageId: newImageId,
+          metadata: {
+            assetType: "image",
+            desktopId,
+            source: "image_edit_save_as_new",
+            editType,
+            sourceAssetId: assetId,
+          },
+        });
+      } catch (error) {
+        console.error("Failed to save edit as new asset:", error);
+        addToast({
+          title: t("imageEdit.errorTitle"),
+          description: t("failedToAddImage"),
+          color: "danger",
+        });
+      }
+    },
+    [
+      desktopId,
+      applyRemoteEvent,
+      sendEvent,
+      history,
+      user?.id,
+      trackResearch,
+      t,
+    ]
+  );
+
+  // Overlay dispatcher — routes each commit by placement. `"replace"`
+  // (default) swaps the source asset's imageId and preserves history;
+  // `"newAsset"` leaves the source alone and creates a fresh asset beside it.
+  const handleImageEditCommit = useCallback(
+    (args: {
+      assetId: string;
+      newImageId: string;
+      newImageUrl: string;
+      editType: string;
+      placement: ImageEditPlacement;
+    }) => {
+      if (args.placement === "newAsset") {
+        void handleImageEditCommitAsNew(args);
+      } else {
+        handleImageEditCommitReplace(args);
+      }
+    },
+    [handleImageEditCommitReplace, handleImageEditCommitAsNew]
+  );
+
   const handleImageEditCancel = useCallback(() => {
     setImageEditState(null);
   }, []);
 
   // Restore a past image version from the edit-history popover. Mirrors
-  // `handleImageEditCommit`: drops the restored imageId from history, appends
+  // `handleImageEditCommitReplace`: drops the restored imageId from history, appends
   // the current imageId so the chain stays walkable, applies optimistically,
   // and records forward/inverse so Cmd/Ctrl+Z undoes the restore.
   const handleImageHistoryRestore = useCallback(

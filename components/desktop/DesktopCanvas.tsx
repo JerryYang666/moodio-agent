@@ -38,6 +38,7 @@ import {
 import AssetHistoryPopover from "./assets/AssetHistoryPopover";
 import ImageEditOverlay, {
   type ImageEditMode,
+  type ImageEditPlacement,
 } from "./image-edit-overlay";
 import { motion, AnimatePresence } from "framer-motion";
 import { addToast } from "@heroui/toast";
@@ -144,6 +145,7 @@ interface DesktopCanvasProps {
     newImageId: string;
     newImageUrl: string;
     editType: string;
+    placement: ImageEditPlacement;
   }) => void;
   onImageEditCancel?: () => void;
   /**
@@ -1794,12 +1796,13 @@ export default function DesktopCanvas({
             sourceImageId={sourceImageId}
             sourceImageUrl={sourceImageUrl}
             screenRect={{ left, top, width, height }}
-            onCommit={({ newImageId, newImageUrl, editType }) =>
+            onCommit={({ newImageId, newImageUrl, editType, placement }) =>
               onImageEditCommit?.({
                 assetId: target.id,
                 newImageId,
                 newImageUrl,
                 editType,
+                placement,
               })
             }
             onCancel={() => onImageEditCancel?.()}

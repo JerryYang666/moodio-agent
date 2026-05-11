@@ -1,12 +1,20 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
-import { Button } from "@heroui/button";
+import { Button, ButtonGroup } from "@heroui/button";
+import {
+  Dropdown,
+  DropdownTrigger,
+  DropdownMenu,
+  DropdownItem,
+} from "@heroui/dropdown";
 import { Textarea } from "@heroui/input";
 import { addToast } from "@heroui/toast";
 import {
   Check,
+  ChevronDown,
+  Copy,
   Crop as CropIcon,
   Eraser,
   Orbit,
@@ -27,6 +35,33 @@ import type { ImageEditMode, CutoutSubMode } from "@/lib/image/edit-pipeline";
 
 export type { ImageEditMode, CutoutSubMode };
 
+/** Where the edit result lands.
+ *  - "replace": swap the source asset's imageId (default; keeps imageHistory).
+ *  - "newAsset": create a fresh image asset next to the original with no
+ *    inherited history; the original asset is untouched. */
+export type ImageEditPlacement = "replace" | "newAsset";
+
+const PLACEMENT_STORAGE_KEY = "moodio.imageEdit.lastPlacement";
+
+function readStoredPlacement(): ImageEditPlacement {
+  if (typeof window === "undefined") return "replace";
+  try {
+    const v = window.localStorage.getItem(PLACEMENT_STORAGE_KEY);
+    return v === "newAsset" ? "newAsset" : "replace";
+  } catch {
+    return "replace";
+  }
+}
+
+function writeStoredPlacement(p: ImageEditPlacement) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(PLACEMENT_STORAGE_KEY, p);
+  } catch {
+    // Ignore storage errors (private mode, quota, etc.).
+  }
+}
+
 interface ImageEditOverlayProps {
   /** Which operation. The modal swaps panes/controls based on this. */
   mode: ImageEditMode;
@@ -44,6 +79,7 @@ interface ImageEditOverlayProps {
     newImageId: string;
     newImageUrl: string;
     editType: string;
+    placement: ImageEditPlacement;
   }) => void;
   onCancel: () => void;
 }
@@ -68,11 +104,28 @@ export default function ImageEditOverlay({
   const t = useTranslations("desktop");
   const tCommon = useTranslations("common");
 
+  // Placement governs whether the edit replaces the source asset (keeping
+  // imageHistory) or lands as a brand-new asset next to the original. The
+  // UI surfaces both via a split-button; the primary action tracks the
+  // user's last choice so power users don't re-pick every time.
+  const [placement, setPlacement] = useState<ImageEditPlacement>(() =>
+    readStoredPlacement()
+  );
+  // Captured at submit time so the hook's onSuccess callback (which fires
+  // after an async model call) uses the choice that was active when the
+  // user clicked, not whatever the dropdown is on by the time it resolves.
+  const placementInFlightRef = useRef<ImageEditPlacement>("replace");
+
   const edit = useImageEdit({
     mode,
     sourceImageId,
     onSuccess: ({ imageId, imageUrl, editType }) => {
-      onCommit({ newImageId: imageId, newImageUrl: imageUrl, editType });
+      onCommit({
+        newImageId: imageId,
+        newImageUrl: imageUrl,
+        editType,
+        placement: placementInFlightRef.current,
+      });
     },
   });
 
@@ -93,7 +146,10 @@ export default function ImageEditOverlay({
     edit,
   ]);
 
-  const handleSubmit = async () => {
+  const submitWithPlacement = async (next: ImageEditPlacement) => {
+    placementInFlightRef.current = next;
+    setPlacement(next);
+    writeStoredPlacement(next);
     try {
       await edit.submit();
     } catch (err) {
@@ -339,20 +395,79 @@ export default function ImageEditOverlay({
           >
             {tCommon("cancel")}
           </Button>
-          <Button
-            size="sm"
-            color="primary"
-            onPress={handleSubmit}
-            isLoading={edit.isProcessing}
-            isDisabled={
+          {(() => {
+            const primaryDisabled =
               edit.isProcessing ||
               (mode === "redraw" && !edit.prompt.trim()) ||
-              (edit.usesBrush && !edit.hasDrawing && !edit.isProcessing && edit.imageLoaded)
-            }
-            startContent={!edit.isProcessing && <Check size={14} />}
-          >
-            {t("imageEdit.submit")}
-          </Button>
+              (edit.usesBrush &&
+                !edit.hasDrawing &&
+                !edit.isProcessing &&
+                edit.imageLoaded);
+            const primaryLabel =
+              placement === "newAsset"
+                ? t("imageEdit.submitSaveAsNew")
+                : t("imageEdit.submitReplace");
+            const primaryIcon = edit.isProcessing ? null : placement ===
+              "newAsset" ? (
+              <Copy size={14} />
+            ) : (
+              <Check size={14} />
+            );
+            return (
+              <ButtonGroup size="sm" color="primary">
+                <Button
+                  onPress={() => submitWithPlacement(placement)}
+                  isLoading={edit.isProcessing}
+                  isDisabled={primaryDisabled}
+                  startContent={primaryIcon}
+                >
+                  {primaryLabel}
+                </Button>
+                <Dropdown placement="top-end">
+                  <DropdownTrigger>
+                    <Button
+                      isIconOnly
+                      isDisabled={edit.isProcessing}
+                      aria-label={t("imageEdit.submitOptions")}
+                    >
+                      <ChevronDown size={14} />
+                    </Button>
+                  </DropdownTrigger>
+                  <DropdownMenu
+                    aria-label={t("imageEdit.submitOptions")}
+                    onAction={(key) => {
+                      const next: ImageEditPlacement =
+                        key === "newAsset" ? "newAsset" : "replace";
+                      if (primaryDisabled) {
+                        // User hasn't satisfied preconditions yet — just
+                        // remember the choice so the primary button label
+                        // updates; don't try to submit.
+                        setPlacement(next);
+                        writeStoredPlacement(next);
+                        return;
+                      }
+                      void submitWithPlacement(next);
+                    }}
+                  >
+                    <DropdownItem
+                      key="replace"
+                      description={t("imageEdit.submitReplaceDesc")}
+                      startContent={<Check size={14} />}
+                    >
+                      {t("imageEdit.submitReplace")}
+                    </DropdownItem>
+                    <DropdownItem
+                      key="newAsset"
+                      description={t("imageEdit.submitSaveAsNewDesc")}
+                      startContent={<Copy size={14} />}
+                    >
+                      {t("imageEdit.submitSaveAsNew")}
+                    </DropdownItem>
+                  </DropdownMenu>
+                </Dropdown>
+              </ButtonGroup>
+            );
+          })()}
         </div>
       </div>
 
