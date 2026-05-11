@@ -14,7 +14,7 @@ import { uploadVideo } from "@/lib/upload/video-client";
 
 type PickRequest =
   | { kind: "image"; slot: number }
-  | { kind: "image-new" }
+  | { kind: "image-new"; slotsRemaining: number }
   | { kind: "video" }
   | { kind: "voice" };
 
@@ -77,7 +77,10 @@ export default function ElementEditorController({
   const [subPickerMode, setSubPickerMode] = useState<
     "image" | "video" | "voice"
   >("image");
-  const [pickedAssetId, setPickedAssetId] = useState<string | null>(null);
+  // Only set when the current request is `image-new`; drives the picker's
+  // multi-select mode and caps selection at the number of empty slots.
+  const [subPickerMaxSelect, setSubPickerMaxSelect] = useState<number>(0);
+  const [pickedAssetIds, setPickedAssetIds] = useState<string[] | null>(null);
   const [imageUrlCache, setImageUrlCache] = useState<Record<string, string>>(
     initialImageUrls ?? {}
   );
@@ -112,12 +115,15 @@ export default function ElementEditorController({
           ? "voice"
           : "image"
     );
+    // Only `image-new` (append) uses multi-select. `image` (replace a specific
+    // slot) stays single-select since it targets exactly one slot.
+    setSubPickerMaxSelect(req.kind === "image-new" ? req.slotsRemaining : 0);
     setIsSubPickerOpen(true);
   }, []);
 
-  const consumePick = useCallback((id: string) => {
+  const consumePick = useCallback((ids: string[]) => {
     setIsSubPickerOpen(false);
-    setPickedAssetId(id);
+    setPickedAssetIds(ids);
   }, []);
 
   const handleSubPickerSelect = useCallback(
@@ -126,7 +132,7 @@ export default function ElementEditorController({
         const vid = asset.assetId || asset.imageId;
         const vurl = asset.videoUrl || asset.imageUrl;
         setVideoUrlCache((prev) => ({ ...prev, [vid]: vurl }));
-        consumePick(vid);
+        consumePick([vid]);
         return;
       }
       if (subPickerMode === "voice") {
@@ -151,7 +157,7 @@ export default function ElementEditorController({
             return;
           }
           const { voiceId } = (await res.json()) as { voiceId: string };
-          setPickedAssetId(voiceId);
+          setPickedAssetIds([voiceId]);
         } catch (e) {
           addToast({
             title:
@@ -164,7 +170,7 @@ export default function ElementEditorController({
         return;
       }
       setImageUrlCache((prev) => ({ ...prev, [asset.imageId]: asset.imageUrl }));
-      consumePick(asset.imageId);
+      consumePick([asset.imageId]);
     },
     [subPickerMode, consumePick, t]
   );
@@ -172,9 +178,18 @@ export default function ElementEditorController({
   const handleSubPickerSelectMultiple = useCallback(
     (assets: AssetSummary[]) => {
       if (assets.length === 0) return;
-      handleSubPickerSelect(assets[0]);
+      // Voice/video paths never enter multi-select mode (see
+      // `subPickerMaxSelect` wiring in handleRequestPick), so this only fires
+      // for `image-new`. Append all selected image ids; the modal caps to the
+      // slot count.
+      setImageUrlCache((prev) => {
+        const next = { ...prev };
+        for (const a of assets) next[a.imageId] = a.imageUrl;
+        return next;
+      });
+      consumePick(assets.map((a) => a.imageId));
     },
-    [handleSubPickerSelect]
+    [consumePick]
   );
 
   const handleSubmit = useCallback(
@@ -235,8 +250,8 @@ export default function ElementEditorController({
         onOpenChange={onOpenChange}
         initialElement={initialElement}
         onRequestPick={handleRequestPick}
-        pickedAssetId={pickedAssetId}
-        onPickedAssetConsumed={() => setPickedAssetId(null)}
+        pickedAssetIds={pickedAssetIds}
+        onPickedAssetConsumed={() => setPickedAssetIds(null)}
         resolveImageUrl={(id) => imageUrlCache[id]}
         resolveVideoUrl={(id) => videoUrlCache[id]}
         isCreatingVoice={isCreatingVoice}
@@ -283,7 +298,7 @@ export default function ElementEditorController({
                 return;
               }
               const { voiceId } = (await res.json()) as { voiceId: string };
-              setPickedAssetId(voiceId);
+              setPickedAssetIds([voiceId]);
             } else if (subPickerMode === "video") {
               const r = await uploadVideo(file);
               if (!r.success) {
@@ -294,7 +309,7 @@ export default function ElementEditorController({
                 ...prev,
                 [r.data.videoId]: r.data.videoUrl,
               }));
-              consumePick(r.data.videoId);
+              consumePick([r.data.videoId]);
             } else {
               const r = await uploadImage(file);
               if (!r.success) {
@@ -305,13 +320,16 @@ export default function ElementEditorController({
                 ...prev,
                 [r.data.imageId]: r.data.imageUrl,
               }));
-              consumePick(r.data.imageId);
+              consumePick([r.data.imageId]);
             }
           } finally {
             setIsCreatingVoice(false);
           }
         }}
-        multiSelect={false}
+        multiSelect={subPickerMaxSelect > 1}
+        maxSelectCount={
+          subPickerMaxSelect > 1 ? subPickerMaxSelect : undefined
+        }
         acceptTypes={
           subPickerMode === "video"
             ? ["video"]

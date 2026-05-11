@@ -30,7 +30,7 @@ export interface ElementEditorSubmitPayload {
 
 type PickRequest =
   | { kind: "image"; slot: number } // slot ∈ [0, MAX_IMAGES-1]; existing slot = replace
-  | { kind: "image-new" } // append new slot
+  | { kind: "image-new"; slotsRemaining: number } // append; controller uses slotsRemaining to cap multi-select
   | { kind: "video" }
   | { kind: "voice" };
 
@@ -51,12 +51,14 @@ interface ElementEditorModalProps {
   onRequestPick: (req: PickRequest) => void;
 
   /**
-   * Controlled from the parent: when set to a non-null string, the modal
-   * treats it as the resolved id from the outstanding pick request and clears
-   * the request. After consumption, the parent should reset this back to
-   * null.
+   * Controlled from the parent: when set to a non-empty array, the modal
+   * treats it as the resolved ids from the outstanding pick request and clears
+   * the request. For single-asset requests (image replace, video, voice) only
+   * the first id is consumed; for `image-new` all ids are appended up to the
+   * remaining slot count. After consumption, the parent should reset this
+   * back to null.
    */
-  pickedAssetId: string | null;
+  pickedAssetIds: string[] | null;
   onPickedAssetConsumed: () => void;
 
   /** Submit handler — POST (create) or PATCH (edit) should happen here. */
@@ -75,7 +77,7 @@ export default function ElementEditorModal({
   onOpenChange,
   initialElement,
   onRequestPick,
-  pickedAssetId,
+  pickedAssetIds,
   onPickedAssetConsumed,
   onSubmit,
   resolveImageUrl,
@@ -94,6 +96,8 @@ export default function ElementEditorModal({
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  const slotsRemaining = MAX_IMAGES - imageIds.length;
+
   // Reset form whenever the modal opens / the initial element changes.
   useEffect(() => {
     if (!isOpen) return;
@@ -107,28 +111,31 @@ export default function ElementEditorModal({
     setErrorMessage(null);
   }, [isOpen, initialElement]);
 
-  // Consume a picked asset from the parent.
+  // Consume picked assets from the parent.
   useEffect(() => {
-    if (!pickedAssetId || !pendingPick) return;
+    if (!pickedAssetIds || pickedAssetIds.length === 0 || !pendingPick) return;
 
+    const firstId = pickedAssetIds[0];
     if (pendingPick.kind === "image") {
       setImageIds((prev) => {
         const next = [...prev];
-        next[pendingPick.slot] = pickedAssetId;
+        next[pendingPick.slot] = firstId;
         return next;
       });
     } else if (pendingPick.kind === "image-new") {
-      setImageIds((prev) =>
-        prev.length >= MAX_IMAGES ? prev : [...prev, pickedAssetId]
-      );
+      setImageIds((prev) => {
+        const room = MAX_IMAGES - prev.length;
+        if (room <= 0) return prev;
+        return [...prev, ...pickedAssetIds.slice(0, room)];
+      });
     } else if (pendingPick.kind === "video") {
-      setVideoId(pickedAssetId);
+      setVideoId(firstId);
     } else if (pendingPick.kind === "voice") {
-      setVoiceId(pickedAssetId);
+      setVoiceId(firstId);
     }
     setPendingPick(null);
     onPickedAssetConsumed();
-  }, [pickedAssetId, pendingPick, onPickedAssetConsumed]);
+  }, [pickedAssetIds, pendingPick, onPickedAssetConsumed]);
 
   const requestPick = useCallback(
     (req: PickRequest) => {
@@ -239,7 +246,9 @@ export default function ElementEditorModal({
                   size="sm"
                   variant="flat"
                   startContent={<ImagePlus size={14} />}
-                  onPress={() => requestPick({ kind: "image-new" })}
+                  onPress={() =>
+                    requestPick({ kind: "image-new", slotsRemaining })
+                  }
                   isDisabled={isSaving}
                   className="h-7 min-w-0 px-2 text-xs"
                 >
@@ -293,7 +302,9 @@ export default function ElementEditorModal({
                     ) : (
                       <button
                         className="w-full h-full flex items-center justify-center text-default-400 hover:text-default-500 hover:bg-default-200 transition-colors"
-                        onClick={() => requestPick({ kind: "image-new" })}
+                        onClick={() =>
+                          requestPick({ kind: "image-new", slotsRemaining })
+                        }
                         disabled={isSaving || imageIds.length >= MAX_IMAGES}
                         aria-label={t("addImage")}
                       >
