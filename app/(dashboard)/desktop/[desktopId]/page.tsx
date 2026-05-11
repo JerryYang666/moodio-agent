@@ -10,6 +10,9 @@ import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, useDisclosure
 import { addToast } from "@heroui/toast";
 import { ArrowLeft, Share2, Pencil, Wifi, WifiOff, Bot, LayoutDashboard } from "lucide-react";
 import AssetPickerModal, { type AssetSummary } from "@/components/chat/asset-picker-modal";
+import DestinationPickerModal, {
+  type DestinationPick,
+} from "@/components/chat/destination-picker-modal";
 import { uploadImage } from "@/lib/upload/client";
 import { uploadVideo } from "@/lib/upload/video-client";
 import { uploadAudio } from "@/lib/upload/audio-client";
@@ -1570,6 +1573,82 @@ export default function DesktopDetailPage({
     [addTimelineClip]
   );
 
+  // Save-to-collection state (right-click menu + floating action bar)
+  const [saveToCollectionIds, setSaveToCollectionIds] = useState<string[] | null>(null);
+  const handleSaveToCollectionRequest = useCallback((ids: string[]) => {
+    if (ids.length === 0) return;
+    setSaveToCollectionIds(ids);
+  }, []);
+  const handleSaveToCollectionConfirm = useCallback(
+    async (pick: DestinationPick) => {
+      const ids = saveToCollectionIds;
+      setSaveToCollectionIds(null);
+      if (!ids || ids.length === 0) return;
+      try {
+        const res = await fetch(
+          `/api/desktop/${desktopId}/assets/save-to-collection`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              assetIds: ids,
+              collectionId: pick.collectionId,
+              folderId: pick.folderId,
+            }),
+          }
+        );
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(data?.error || "Failed to save to collection");
+        }
+        const savedCount = Array.isArray(data.saved) ? data.saved.length : 0;
+        const duplicateCount = Array.isArray(data.duplicates)
+          ? data.duplicates.length
+          : 0;
+        const skippedCount = Array.isArray(data.skipped)
+          ? data.skipped.length
+          : 0;
+
+        if (savedCount > 0) {
+          const suffix =
+            duplicateCount || skippedCount
+              ? ` (${[
+                  duplicateCount ? `${duplicateCount} already there` : null,
+                  skippedCount ? `${skippedCount} skipped` : null,
+                ]
+                  .filter(Boolean)
+                  .join(", ")})`
+              : "";
+          addToast({
+            title: `Saved ${savedCount} to ${pick.collectionName}${suffix}`,
+            color: "success",
+          });
+        } else if (duplicateCount > 0 && skippedCount === 0) {
+          addToast({
+            title: `Already in ${pick.collectionName}`,
+            color: "warning",
+          });
+        } else {
+          addToast({
+            title: "Nothing to save",
+            description:
+              skippedCount > 0
+                ? "Selected assets can't be saved to a collection."
+                : undefined,
+            color: "warning",
+          });
+        }
+      } catch (err) {
+        addToast({
+          title: "Failed to save",
+          description: err instanceof Error ? err.message : undefined,
+          color: "danger",
+        });
+      }
+    },
+    [desktopId, saveToCollectionIds]
+  );
+
   // Asset picker state for right-click "Add Asset"
   const [isAssetPickerOpen, setIsAssetPickerOpen] = useState(false);
   const toggleAssetPicker = useCallback(() => setIsAssetPickerOpen((v) => !v), []);
@@ -2159,6 +2238,7 @@ export default function DesktopDetailPage({
           onVideoSuggestCommit={canEdit ? handleVideoSuggestCommit : undefined}
           onZIndexChange={canEdit ? handleZIndexChange : undefined}
           onSendToTimeline={canEdit ? handleSendToTimeline : undefined}
+          onSaveToCollection={handleSaveToCollectionRequest}
           onExternalImageDrop={canEdit ? handleExternalImageDrop : undefined}
           onExternalTextDrop={canEdit ? handleExternalTextDrop : undefined}
           onExternalShotlistDrop={canEdit ? handleExternalShotlistDrop : undefined}
@@ -2234,6 +2314,13 @@ export default function DesktopDetailPage({
         ownerId={desktop.userId}
         shares={shares}
         share={shareModal}
+      />
+
+      {/* Destination picker for "Save to collection…" (right-click menu + floating action bar) */}
+      <DestinationPickerModal
+        isOpen={saveToCollectionIds !== null}
+        onOpenChange={() => setSaveToCollectionIds(null)}
+        onConfirm={handleSaveToCollectionConfirm}
       />
 
       {/* Asset Picker for right-click "Add Asset" */}

@@ -73,7 +73,13 @@ interface DesktopCanvasProps {
   onAssetOpen?: (asset: EnrichedDesktopAsset) => void;
   onAssetClick?: (asset: EnrichedDesktopAsset) => void;
   playingAssetId?: string | null;
-  onCopyToCollection?: (asset: EnrichedDesktopAsset) => void;
+  /**
+   * Save one or more desktop assets into a collection / folder. Wired to
+   * both the right-click menu ("Save to collection…") and the floating
+   * action bar; the page opens a destination picker and then POSTs to
+   * /api/desktop/[id]/assets/save-to-collection with these asset IDs.
+   */
+  onSaveToCollection?: (assetIds: string[]) => void;
   onSendToTimeline?: (asset: EnrichedDesktopAsset) => void;
   onZIndexChange?: (assetId: string, delta: number) => void;
   sendEvent?: (type: string, payload: Record<string, unknown>) => void;
@@ -191,6 +197,27 @@ function isAiImageStatus(
   return value === "loading" || value === "generated" || value === "error";
 }
 
+/** Asset types the save-to-collection endpoint accepts. Text / link / table /
+ * video_suggest aren't backed by persistable library assets. Videos still
+ * generating (no `videoId`) can't be saved either — gate those at the call
+ * site. */
+const SAVABLE_ASSET_TYPES = new Set([
+  "image",
+  "video",
+  "audio",
+  "public_image",
+  "public_video",
+]);
+
+function isSavableAsset(asset: DesktopAsset): boolean {
+  if (!SAVABLE_ASSET_TYPES.has(asset.assetType)) return false;
+  if (asset.assetType === "video") {
+    const meta = asset.metadata as Record<string, unknown>;
+    return typeof meta.videoId === "string" && !!meta.videoId;
+  }
+  return true;
+}
+
 function userIdToColor(userId: string): string {
   let hash = 0;
   for (let i = 0; i < userId.length; i++) {
@@ -245,7 +272,7 @@ export default function DesktopCanvas({
   onOpenChat,
   onAssetClick,
   playingAssetId,
-  onCopyToCollection,
+  onSaveToCollection,
   onSendToTimeline,
   onZIndexChange,
   sendEvent,
@@ -1440,14 +1467,35 @@ export default function DesktopCanvas({
               )}
             </>
           ) : selectedIds.size > 1 ? (
-            /* Multi-select context menu: only delete option */
-            <button
-              className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-danger-50 text-danger transition-colors text-left"
-              onClick={handleDeleteSelected}
-            >
-              <Trash2 size={14} />
-              {t("deleteAllSelected", { count: selectedIds.size })}
-            </button>
+            /* Multi-select context menu: save-to-collection + delete */
+            <>
+              {onSaveToCollection && (() => {
+                const savableIds = Array.from(selectedIds).filter((id) => {
+                  const a = assets.find((x) => x.id === id);
+                  return a ? isSavableAsset(a) : false;
+                });
+                if (savableIds.length === 0) return null;
+                return (
+                  <button
+                    className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-default-100 transition-colors text-left"
+                    onClick={() => {
+                      onSaveToCollection(savableIds);
+                      setContextMenu(null);
+                    }}
+                  >
+                    <FolderPlus size={14} />
+                    {t("copyToCollection")}
+                  </button>
+                );
+              })()}
+              <button
+                className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-danger-50 text-danger transition-colors text-left"
+                onClick={handleDeleteSelected}
+              >
+                <Trash2 size={14} />
+                {t("deleteAllSelected", { count: selectedIds.size })}
+              </button>
+            </>
           ) : (
             /* Single-select context menu: z-index + delete */
             <>
@@ -1481,6 +1529,18 @@ export default function DesktopCanvas({
                 >
                   <Pencil size={14} />
                   {t("rename")}
+                </button>
+              )}
+              {contextAsset && onSaveToCollection && isSavableAsset(contextAsset) && (
+                <button
+                  className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-default-100 transition-colors text-left"
+                  onClick={() => {
+                    onSaveToCollection([contextAsset.id]);
+                    setContextMenu(null);
+                  }}
+                >
+                  <FolderPlus size={14} />
+                  {t("copyToCollection")}
                 </button>
               )}
               {contextAsset && onZIndexChange && (
@@ -1749,10 +1809,10 @@ export default function DesktopCanvas({
                 {t("sendToChat")}
               </button>
             )}
-            {singleSelectedAsset && onCopyToCollection && (
+            {singleSelectedAsset && onSaveToCollection && (
               <button
                 className="flex items-center gap-1.5 px-2 py-1 text-xs hover:bg-default-100 rounded-md transition-colors whitespace-nowrap"
-                onClick={() => onCopyToCollection(singleSelectedAsset)}
+                onClick={() => onSaveToCollection([singleSelectedAsset.id])}
                 title={t("copyToCollection")}
               >
                 <FolderPlus size={13} />
