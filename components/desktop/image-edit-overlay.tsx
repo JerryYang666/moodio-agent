@@ -133,17 +133,27 @@ export default function ImageEditOverlay({
   // (zoom/pan resizing the displayed image). The hook's internal
   // ResizeObserver usually handles this, but the desktop also drives size
   // through `screenRect` props — force an explicit re-init on that change.
+  //
+  // Destructure the fields we read so `edit` (which changes identity on every
+  // hook state update) can't land in the deps array. Including it caused an
+  // init-loop: initializeCanvas → setCanvasSize (new object each call) →
+  // `edit` ref changes → effect re-runs → RAF re-inits → canvas cleared
+  // every frame, which made the pen appear to not draw at all.
+  const {
+    usesBrush: editUsesBrush,
+    imageLoaded: editImageLoaded,
+    initializeCanvas: editInitializeCanvas,
+  } = edit;
   useEffect(() => {
-    if (!edit.usesBrush || !edit.imageLoaded) return;
-    const raf = requestAnimationFrame(() => edit.initializeCanvas());
+    if (!editUsesBrush || !editImageLoaded) return;
+    const raf = requestAnimationFrame(() => editInitializeCanvas());
     return () => cancelAnimationFrame(raf);
   }, [
     screenRect.width,
     screenRect.height,
-    edit.usesBrush,
-    edit.imageLoaded,
-    edit.initializeCanvas,
-    edit,
+    editUsesBrush,
+    editImageLoaded,
+    editInitializeCanvas,
   ]);
 
   const submitWithPlacement = async (next: ImageEditPlacement) => {
