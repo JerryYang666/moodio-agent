@@ -142,9 +142,19 @@ export function useImageEdit(options: UseImageEditOptions): UseImageEdit {
   const imageRef = useRef<HTMLImageElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const lastPointRef = useRef<{ x: number; y: number } | null>(null);
+  // Mid-stroke flag — kept in a ref so handler closures can't go stale and
+  // so toggling it doesn't trigger re-renders that rebuild the memo object.
+  const isDrawingRef = useRef(false);
+  // Stash the caller's onSuccess so `submit` can call the latest version
+  // without taking a dep on it. Otherwise every parent render creates a new
+  // onSuccess → new submit → new `edit` memo identity, which cascades and
+  // has already bitten us once (the canvas init-loop).
+  const onSuccessRef = useRef(onSuccess);
+  useEffect(() => {
+    onSuccessRef.current = onSuccess;
+  }, [onSuccess]);
 
   const [imageLoaded, setImageLoaded] = useState(false);
-  const [isDrawing, setIsDrawing] = useState(false);
   const [hasDrawing, setHasDrawing] = useState(false);
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
   const [brushColor, setBrushColor] = useState<string>(DEFAULT_MARK_COLOR.value);
@@ -250,61 +260,73 @@ export function useImageEdit(options: UseImageEditOptions): UseImageEdit {
     return { x: cx - rect.left, y: cy - rect.top };
   };
 
-  const handlePointerDown = (
-    e:
-      | React.MouseEvent<HTMLCanvasElement>
-      | React.TouchEvent<HTMLCanvasElement>
-  ) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const point = getCanvasCoords(e);
-    if (!point) return;
-    setIsDrawing(true);
-    lastPointRef.current = point;
-    const ctx = canvasRef.current?.getContext("2d");
-    if (ctx) {
-      ctx.beginPath();
-      ctx.arc(point.x, point.y, brushWidth / 2, 0, Math.PI * 2);
-      ctx.fillStyle = brushColor;
-      ctx.fill();
-      setHasDrawing(true);
-    }
-  };
-
-  const handlePointerMove = (
-    e:
-      | React.MouseEvent<HTMLCanvasElement>
-      | React.TouchEvent<HTMLCanvasElement>
-  ) => {
-    if (!isDrawing) return;
-    e.preventDefault();
-    e.stopPropagation();
-    const point = getCanvasCoords(e);
-    if (!point || !lastPointRef.current) return;
-    const ctx = canvasRef.current?.getContext("2d");
-    if (ctx) {
-      ctx.beginPath();
-      ctx.moveTo(lastPointRef.current.x, lastPointRef.current.y);
-      ctx.lineTo(point.x, point.y);
-      ctx.stroke();
+  // Handlers are memoized so the returned `edit` object stays referentially
+  // stable across renders (unless brush settings change). The mid-stroke
+  // state lives in `isDrawingRef` specifically so handlePointerMove doesn't
+  // close over a stale boolean — the previous implementation only worked
+  // because handlePointerDown also flipped `hasDrawing`, incidentally
+  // rebuilding the memo. That's fragile; a ref makes it explicit.
+  const handlePointerDown = useCallback(
+    (
+      e:
+        | React.MouseEvent<HTMLCanvasElement>
+        | React.TouchEvent<HTMLCanvasElement>
+    ) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const point = getCanvasCoords(e);
+      if (!point) return;
+      isDrawingRef.current = true;
       lastPointRef.current = point;
-      setHasDrawing(true);
-    }
-  };
+      const ctx = canvasRef.current?.getContext("2d");
+      if (ctx) {
+        ctx.beginPath();
+        ctx.arc(point.x, point.y, brushWidth / 2, 0, Math.PI * 2);
+        ctx.fillStyle = brushColor;
+        ctx.fill();
+        setHasDrawing(true);
+      }
+    },
+    [brushColor, brushWidth]
+  );
 
-  const handlePointerUp = () => {
-    setIsDrawing(false);
+  const handlePointerMove = useCallback(
+    (
+      e:
+        | React.MouseEvent<HTMLCanvasElement>
+        | React.TouchEvent<HTMLCanvasElement>
+    ) => {
+      if (!isDrawingRef.current) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const point = getCanvasCoords(e);
+      if (!point || !lastPointRef.current) return;
+      const ctx = canvasRef.current?.getContext("2d");
+      if (ctx) {
+        ctx.beginPath();
+        ctx.moveTo(lastPointRef.current.x, lastPointRef.current.y);
+        ctx.lineTo(point.x, point.y);
+        ctx.stroke();
+        lastPointRef.current = point;
+        setHasDrawing(true);
+      }
+    },
+    []
+  );
+
+  const handlePointerUp = useCallback(() => {
+    isDrawingRef.current = false;
     lastPointRef.current = null;
-  };
+  }, []);
 
-  const handleClearDrawing = () => {
+  const handleClearDrawing = useCallback(() => {
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext("2d");
     if (ctx && canvas) {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       setHasDrawing(false);
     }
-  };
+  }, []);
 
   const submit = useCallback(async () => {
     setErrorKind(null);
@@ -333,7 +355,7 @@ export function useImageEdit(options: UseImageEditOptions): UseImageEdit {
           displayedRect,
         });
         const uploaded = await uploadCroppedImage(file);
-        await onSuccess({ ...uploaded, editType: "crop" });
+        await onSuccessRef.current({ ...uploaded, editType: "crop" });
         setIsProcessing(false);
         return;
       }
@@ -353,7 +375,7 @@ export function useImageEdit(options: UseImageEditOptions): UseImageEdit {
           verticalAngle,
           zoom,
         });
-        await onSuccess({ ...result, editType: "angles" });
+        await onSuccessRef.current({ ...result, editType: "angles" });
         setIsProcessing(false);
         return;
       }
@@ -409,7 +431,7 @@ export function useImageEdit(options: UseImageEditOptions): UseImageEdit {
         aspectRatio: ratio,
       });
 
-      await onSuccess({ ...result, editType });
+      await onSuccessRef.current({ ...result, editType });
       setIsProcessing(false);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Unknown error";
@@ -428,7 +450,6 @@ export function useImageEdit(options: UseImageEditOptions): UseImageEdit {
     mode,
     completedCrop,
     sourceImageId,
-    onSuccess,
     prompt,
     usesBrush,
     hasDrawing,
@@ -444,7 +465,8 @@ export function useImageEdit(options: UseImageEditOptions): UseImageEdit {
 
   const reset = useCallback(() => {
     setImageLoaded(false);
-    setIsDrawing(false);
+    isDrawingRef.current = false;
+    lastPointRef.current = null;
     setHasDrawing(false);
     setCanvasSize({ width: 0, height: 0 });
     setBrushColor(DEFAULT_MARK_COLOR.value);
@@ -505,9 +527,6 @@ export function useImageEdit(options: UseImageEditOptions): UseImageEdit {
       submit,
       reset,
     }),
-    // Note: handlers read from refs/state via closure; re-creating them per
-    // render is cheap and keeps this object shape stable per state snapshot.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [
       usesBrush,
       usesCrop,
@@ -529,6 +548,10 @@ export function useImageEdit(options: UseImageEditOptions): UseImageEdit {
       errorKind,
       errorMessage,
       initializeCanvas,
+      handlePointerDown,
+      handlePointerMove,
+      handlePointerUp,
+      handleClearDrawing,
       submit,
       reset,
     ]

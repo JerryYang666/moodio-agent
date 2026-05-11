@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Button, ButtonGroup } from "@heroui/button";
 import {
@@ -129,32 +129,12 @@ export default function ImageEditOverlay({
     },
   });
 
-  // Re-initialize the brush canvas when the asset's rendered rect changes
-  // (zoom/pan resizing the displayed image). The hook's internal
-  // ResizeObserver usually handles this, but the desktop also drives size
-  // through `screenRect` props — force an explicit re-init on that change.
-  //
-  // Destructure the fields we read so `edit` (which changes identity on every
-  // hook state update) can't land in the deps array. Including it caused an
-  // init-loop: initializeCanvas → setCanvasSize (new object each call) →
-  // `edit` ref changes → effect re-runs → RAF re-inits → canvas cleared
-  // every frame, which made the pen appear to not draw at all.
-  const {
-    usesBrush: editUsesBrush,
-    imageLoaded: editImageLoaded,
-    initializeCanvas: editInitializeCanvas,
-  } = edit;
-  useEffect(() => {
-    if (!editUsesBrush || !editImageLoaded) return;
-    const raf = requestAnimationFrame(() => editInitializeCanvas());
-    return () => cancelAnimationFrame(raf);
-  }, [
-    screenRect.width,
-    screenRect.height,
-    editUsesBrush,
-    editImageLoaded,
-    editInitializeCanvas,
-  ]);
+  // No explicit re-init effect for screenRect changes: the <img> inside the
+  // overlay is sized `w-full h-full` against a container whose dimensions
+  // come from screenRect, so any zoom/pan change resizes the <img> and the
+  // hook's ResizeObserver (observing imageRef) handles re-initialization
+  // on the same animation frame. An earlier duplicate effect here caused a
+  // render-loop via the `edit` dep and has been removed.
 
   const submitWithPlacement = async (next: ImageEditPlacement) => {
     placementInFlightRef.current = next;
@@ -412,7 +392,11 @@ export default function ImageEditOverlay({
               (edit.usesBrush &&
                 !edit.hasDrawing &&
                 !edit.isProcessing &&
-                edit.imageLoaded);
+                edit.imageLoaded) ||
+              (edit.usesCrop &&
+                (!edit.completedCrop ||
+                  edit.completedCrop.width <= 0 ||
+                  edit.completedCrop.height <= 0));
             const primaryLabel =
               placement === "newAsset"
                 ? t("imageEdit.submitSaveAsNew")

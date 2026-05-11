@@ -118,6 +118,11 @@ export default function ImageEditModal({
     }
   };
 
+  // Inline onSuccess is safe: useImageEdit keeps this in a ref and doesn't
+  // depend on it in `submit`, so a fresh closure here doesn't churn the
+  // returned `edit` memo identity. saveResultToDestination needs fresh
+  // closures (it reads `edit.prompt` etc.) so wrapping this in useCallback
+  // here would actually introduce stale-closure bugs.
   const edit = useImageEdit({
     mode,
     sourceImageId,
@@ -441,7 +446,11 @@ export default function ImageEditModal({
                     isDisabled={
                       edit.isProcessing ||
                       (mode === "redraw" && !edit.prompt.trim()) ||
-                      (edit.usesBrush && !edit.hasDrawing && edit.imageLoaded)
+                      (edit.usesBrush && !edit.hasDrawing && edit.imageLoaded) ||
+                      (edit.usesCrop &&
+                        (!edit.completedCrop ||
+                          edit.completedCrop.width <= 0 ||
+                          edit.completedCrop.height <= 0))
                     }
                     startContent={!edit.isProcessing && <Check size={14} />}
                   >
