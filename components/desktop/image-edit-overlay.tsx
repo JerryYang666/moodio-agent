@@ -148,12 +148,17 @@ export default function ImageEditOverlay({
   // rect (12px gap); the bottom pane sits below it. They share screen-space
   // with the canvas container so they pan/zoom with the asset.
   const RIGHT_GAP = 12;
+  // Angles mode renders the cube preview + 3 sliders + prompt + hint + footer,
+  // which is tall — ~440px comfortably. Other modes fit in a shorter box. The
+  // pane itself scrolls internally so the footer buttons never escape; cap at
+  // the viewport so it can't run off the bottom either.
+  const MIN_PANE_HEIGHT = mode === "angles" ? 440 : 280;
   const sidePaneStyle: React.CSSProperties = {
     position: "absolute",
     left: screenRect.left + screenRect.width + RIGHT_GAP,
     top: screenRect.top,
     width: 280,
-    maxHeight: Math.max(screenRect.height, 280),
+    maxHeight: `min(calc(100vh - ${screenRect.top + RIGHT_GAP}px), ${Math.max(screenRect.height, MIN_PANE_HEIGHT)}px)`,
   };
   const bottomPaneStyle: React.CSSProperties = {
     position: "absolute",
@@ -228,11 +233,15 @@ export default function ImageEditOverlay({
         {edit.isProcessing && <MagicProgress statusText={statusText} />}
       </div>
 
-      {/* Right-side pane (header, prompt, sub-modes, aspect ratio, errors). */}
+      {/* Right-side pane (header, prompt, sub-modes, aspect ratio, errors).
+          Body scrolls internally so the footer buttons stay pinned inside
+          the pane even when content (e.g. angles cube + 3 sliders + prompt)
+          overflows the available vertical space. */}
       <div
         style={sidePaneStyle}
-        className="rounded-lg bg-background border border-divider shadow-lg p-3 flex flex-col gap-3 pointer-events-auto"
+        className="rounded-lg bg-background border border-divider shadow-lg flex flex-col pointer-events-auto overflow-hidden"
       >
+        <div className="flex-1 min-h-0 overflow-y-auto p-3 flex flex-col gap-3">
         <div className="flex items-center gap-2 text-sm font-medium">
           <TitleIcon size={16} />
           <span>{titleText}</span>
@@ -318,8 +327,9 @@ export default function ImageEditOverlay({
         {errorText && !edit.isProcessing && (
           <p className="text-xs text-danger leading-snug">{errorText}</p>
         )}
+        </div>
 
-        <div className="flex gap-2 mt-auto">
+        <div className="flex gap-2 p-3 pt-2 border-t border-divider/60 bg-background">
           <Button
             size="sm"
             variant="flat"

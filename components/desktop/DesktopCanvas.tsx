@@ -465,6 +465,11 @@ export default function DesktopCanvas({
 
   const handleWheel = useCallback(
     (e: WheelEvent) => {
+      // While an image-edit overlay is open, let wheel events bubble to the
+      // overlay's own scroll container (long-form panes like "angles" need
+      // to scroll their sliders + prompt). Hijacking the wheel for canvas
+      // zoom here fights the overlay's internal scrolling.
+      if (imageEditState) return;
       e.preventDefault();
       const rect = containerRef.current?.getBoundingClientRect();
       if (!rect) return;
@@ -482,7 +487,7 @@ export default function DesktopCanvas({
         zoom: newZoom,
       });
     },
-    [camera, onCameraChange]
+    [camera, onCameraChange, imageEditState]
   );
 
   // Attach wheel listener with { passive: false } so preventDefault() works
