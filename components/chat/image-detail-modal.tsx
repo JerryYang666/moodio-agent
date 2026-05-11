@@ -39,6 +39,7 @@ import {
   Crop as CropIcon,
   Eraser,
   Scissors,
+  Orbit,
 } from "lucide-react";
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useTranslations } from "next-intl";
@@ -518,6 +519,8 @@ export default function ImageDetailModal({
                                         startEditFlow("erase");
                                       } else if (key === "edit-cutout") {
                                         startEditFlow("cutout");
+                                      } else if (key === "edit-angles") {
+                                        startEditFlow("angles");
                                       }
                                     }}
                                   >
@@ -562,6 +565,12 @@ export default function ImageDetailModal({
                                         startContent={<Scissors size={16} />}
                                       >
                                         {tMenu("editCutout")}
+                                      </DropdownItem>
+                                      <DropdownItem
+                                        key="edit-angles"
+                                        startContent={<Orbit size={16} />}
+                                      >
+                                        {tMenu("editAngles")}
                                       </DropdownItem>
                                     </DropdownSection>
                                     <DropdownSection
@@ -791,6 +800,8 @@ export default function ImageDetailModal({
                                         startEditFlow("erase");
                                       } else if (key === "edit-cutout") {
                                         startEditFlow("cutout");
+                                      } else if (key === "edit-angles") {
+                                        startEditFlow("angles");
                                       }
                                     }}
                                   >
@@ -835,6 +846,12 @@ export default function ImageDetailModal({
                                         startContent={<Scissors size={16} />}
                                       >
                                         {tMenu("editCutout")}
+                                      </DropdownItem>
+                                      <DropdownItem
+                                        key="edit-angles"
+                                        startContent={<Orbit size={16} />}
+                                      >
+                                        {tMenu("editAngles")}
                                       </DropdownItem>
                                     </DropdownSection>
                                     <DropdownSection

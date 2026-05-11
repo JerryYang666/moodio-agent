@@ -16,6 +16,7 @@ import {
   Check,
   Crop as CropIcon,
   Eraser,
+  Orbit,
   Paintbrush,
   Scissors,
   Trash2,
@@ -26,6 +27,7 @@ import "react-image-crop/dist/ReactCrop.css";
 
 import MarkControls from "./mark-controls";
 import AspectRatioSelector from "./aspect-ratio-selector";
+import AngleControls from "./angle-controls";
 import MagicProgress from "@/components/desktop/magic-progress";
 import { useImageEdit } from "@/hooks/use-image-edit";
 import type { ImageEditMode, EditResult } from "@/lib/image/edit-pipeline";
@@ -84,7 +86,9 @@ export default function ImageEditModal({
         prompt:
           mode === "redraw"
             ? edit.prompt.trim()
-            : `${mode} of ${sourceTitle || "image"}`,
+            : mode === "angles"
+              ? `New angle of ${sourceTitle || "image"}${edit.prompt.trim() ? ` — ${edit.prompt.trim()}` : ""}`
+              : `${mode} of ${sourceTitle || "image"}`,
         status: "generated" as const,
         imageUrl,
       };
@@ -150,6 +154,7 @@ export default function ImageEditModal({
     if (mode === "redraw") return t("statusRedraw");
     if (mode === "erase") return t("statusErase");
     if (mode === "cutout") return t("statusCutout");
+    if (mode === "angles") return t("statusAngles");
     return t("statusGeneric");
   }, [mode, t]);
 
@@ -157,6 +162,7 @@ export default function ImageEditModal({
     if (mode === "redraw") return tModal("titleRedraw");
     if (mode === "crop") return tModal("titleCrop");
     if (mode === "erase") return tModal("titleErase");
+    if (mode === "angles") return tModal("titleAngles");
     return tModal("titleCutout");
   }, [mode, tModal]);
 
@@ -176,7 +182,9 @@ export default function ImageEditModal({
         ? CropIcon
         : mode === "erase"
           ? Eraser
-          : Scissors;
+          : mode === "angles"
+            ? Orbit
+            : Scissors;
 
   const handleClose = () => {
     onClose();
@@ -338,7 +346,30 @@ export default function ImageEditModal({
                       />
                     )}
 
-                    {mode !== "crop" && !edit.isProcessing && (
+                    {mode === "angles" && !edit.isProcessing && (
+                      <>
+                        <AngleControls
+                          horizontalAngle={edit.horizontalAngle}
+                          verticalAngle={edit.verticalAngle}
+                          zoom={edit.zoom}
+                          onHorizontalChange={edit.setHorizontalAngle}
+                          onVerticalChange={edit.setVerticalAngle}
+                          onZoomChange={edit.setZoom}
+                          onReset={edit.resetAngles}
+                        />
+                        <Textarea
+                          label={t("anglesPromptLabel")}
+                          placeholder={t("anglesPromptPlaceholder")}
+                          value={edit.prompt}
+                          onValueChange={edit.setPrompt}
+                          minRows={2}
+                          maxRows={4}
+                          classNames={{ input: "text-sm" }}
+                        />
+                      </>
+                    )}
+
+                    {mode !== "crop" && mode !== "angles" && !edit.isProcessing && (
                       <AspectRatioSelector
                         value={edit.aspectRatio}
                         onChange={edit.setAspectRatio}
@@ -350,6 +381,7 @@ export default function ImageEditModal({
                         {mode === "redraw" && t("hintRedraw")}
                         {mode === "crop" && t("hintCrop")}
                         {mode === "erase" && t("hintErase")}
+                        {mode === "angles" && t("hintAngles")}
                         {mode === "cutout" &&
                           (edit.cutoutSub === "auto"
                             ? t("hintCutoutAuto")

@@ -634,6 +634,7 @@ export default function DesktopDetailPage({
           case "cutout-auto":
           case "cutout-manual":
           case "crop":
+          case "angles":
           case "restore":
             return editType;
           default:

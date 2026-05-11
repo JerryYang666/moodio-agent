@@ -5,7 +5,11 @@ import {
 } from "./models";
 import { ImageEditInput, ImageGenerationInput, ImageResult } from "./types";
 import { generateWithGemini, editWithGemini } from "./providers/google";
-import { generateWithSeedream, editWithSeedream } from "./providers/fal";
+import {
+  generateWithSeedream,
+  editWithSeedream,
+  editWithQwenMultipleAngles,
+} from "./providers/fal";
 import { generateWithKie, editWithKie } from "./providers/kie";
 import { generateWithOpenAI, editWithOpenAI } from "./providers/openai";
 
@@ -70,6 +74,15 @@ export async function editImageWithModel(
         ...(await editWithGemini(model.providerModelIds.edit, input)),
       };
     case "fal":
+      if (model.id === "qwen-image-edit-angles") {
+        return {
+          modelId: model.id,
+          ...(await editWithQwenMultipleAngles(
+            model.providerModelIds.edit,
+            input
+          )),
+        };
+      }
       return {
         modelId: model.id,
         ...(await editWithSeedream(model.providerModelIds.edit, input)),

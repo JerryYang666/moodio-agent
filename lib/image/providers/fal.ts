@@ -106,3 +106,58 @@ export async function editWithSeedream(
     },
   };
 }
+
+function clamp(n: number, min: number, max: number): number {
+  if (Number.isNaN(n)) return min;
+  return Math.min(max, Math.max(min, n));
+}
+
+export async function editWithQwenMultipleAngles(
+  modelId: string,
+  input: ImageEditInput
+): Promise<ImageProviderResult> {
+  const imageIds = input.imageIds || [];
+  if (imageIds.length === 0) {
+    throw new Error("Qwen multiple-angles edit requires imageIds");
+  }
+
+  const imageUrls = imageIds.map((id) => getSignedImageUrl(id));
+  const horizontalAngle = clamp(input.horizontalAngle ?? 0, 0, 360);
+  const verticalAngle = clamp(input.verticalAngle ?? 0, -30, 90);
+  const zoom = clamp(input.zoom ?? 5, 0, 10);
+  const additionalPrompt =
+    typeof input.additionalPrompt === "string" && input.additionalPrompt.trim()
+      ? input.additionalPrompt.trim()
+      : undefined;
+
+  const result = await fal.subscribe(modelId, {
+    input: {
+      image_urls: imageUrls,
+      horizontal_angle: horizontalAngle,
+      vertical_angle: verticalAngle,
+      zoom,
+      ...(additionalPrompt ? { additional_prompt: additionalPrompt } : {}),
+      num_images: 1,
+      output_format: "png",
+      enable_safety_checker: true,
+    },
+  });
+
+  const imageUrl = result?.data?.images?.[0]?.url;
+  if (!imageUrl) {
+    throw new Error("No image URL in Qwen multiple-angles response");
+  }
+
+  const downloaded = await downloadFromUrlWithType(imageUrl);
+
+  return {
+    imageBuffer: downloaded.buffer,
+    contentType: downloaded.contentType,
+    provider: "fal",
+    providerModelId: modelId,
+    response: {
+      images: [{ url: imageUrl }],
+      seed: result?.data?.seed,
+    },
+  };
+}

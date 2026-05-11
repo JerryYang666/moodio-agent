@@ -26,7 +26,8 @@ export type ImageEditOperation =
   | "redraw"
   | "erase"
   | "cutout-auto"
-  | "cutout-manual";
+  | "cutout-manual"
+  | "angles";
 
 const VALID_MARK_COLORS = ["red", "blue", "green", "yellow", "magenta"] as const;
 type MarkColorName = (typeof VALID_MARK_COLORS)[number];
@@ -105,6 +106,17 @@ export async function POST(req: NextRequest) {
     const markColor: MarkColorName = VALID_MARK_COLORS.includes(body.markColor)
       ? (body.markColor as MarkColorName)
       : "red";
+    // Qwen Multiple Angles params — only consumed when operation === "angles".
+    // Clamp rather than error on out-of-range so UI sliders don't need to
+    // know about every model-side bound.
+    const clampNum = (v: unknown, min: number, max: number, fallback: number) => {
+      const n = typeof v === "number" ? v : Number(v);
+      if (!Number.isFinite(n)) return fallback;
+      return Math.min(max, Math.max(min, n));
+    };
+    const horizontalAngle = clampNum(body.horizontalAngle, 0, 360, 0);
+    const verticalAngle = clampNum(body.verticalAngle, -30, 90, 0);
+    const zoom = clampNum(body.zoom, 0, 10, 5);
     // Caller passes a pre-snapped aspect ratio (client computes it from the
     // source image's natural dimensions). Validate against the model's
     // supported list and drop anything else — providers fall back to "auto".
@@ -118,7 +130,8 @@ export async function POST(req: NextRequest) {
       operation !== "redraw" &&
       operation !== "erase" &&
       operation !== "cutout-auto" &&
-      operation !== "cutout-manual"
+      operation !== "cutout-manual" &&
+      operation !== "angles"
     ) {
       return NextResponse.json(
         { error: "Invalid or missing operation" },
@@ -170,6 +183,12 @@ export async function POST(req: NextRequest) {
       }
       inputImageId = markedImageId;
       prompt = buildCutoutManualPrompt(markColor);
+    } else if (operation === "angles") {
+      // No marking, no required prompt — the qwen model reads the input
+      // image plus the explicit angle/zoom params. userPrompt (if any) is
+      // forwarded as additional_prompt.
+      inputImageId = sourceImageId;
+      prompt = userPrompt;
     } else {
       // cutout-auto: no user marking, so markColor doesn't apply.
       inputImageId = sourceImageId;
@@ -202,6 +221,14 @@ export async function POST(req: NextRequest) {
         imageSize,
         quality: imageQuality,
         aspectRatio,
+        ...(operation === "angles"
+          ? {
+              horizontalAngle,
+              verticalAngle,
+              zoom,
+              additionalPrompt: userPrompt || undefined,
+            }
+          : {}),
       });
     } catch (err) {
       console.error("[image/edit] model call failed:", err);

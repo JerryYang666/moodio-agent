@@ -39,6 +39,15 @@ export interface ImageEditInput {
   userAspectRatio?: string;
   imageSize?: ImageSize;
   quality?: ImageQuality;
+  /**
+   * Camera-angle params consumed only by the Qwen Multiple Angles editor.
+   * Other providers ignore these.
+   */
+  horizontalAngle?: number;
+  verticalAngle?: number;
+  zoom?: number;
+  /** Optional free-text hint appended to the model's built-in prompt. */
+  additionalPrompt?: string;
 }
 
 export interface ImageProviderResult {

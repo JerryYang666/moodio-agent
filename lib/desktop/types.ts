@@ -4,6 +4,7 @@ export type ImageHistoryOperation =
   | "cutout-auto"
   | "cutout-manual"
   | "crop"
+  | "angles"
   | "restore";
 
 export type ImageHistoryEntry = {

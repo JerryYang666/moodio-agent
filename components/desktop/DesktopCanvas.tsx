@@ -32,6 +32,7 @@ import {
   Crop,
   Eraser,
   Scissors,
+  Orbit,
   History,
 } from "lucide-react";
 import AssetHistoryPopover from "./assets/AssetHistoryPopover";
@@ -1624,6 +1625,7 @@ export default function DesktopCanvas({
                 { mode: "crop" as const, Icon: Crop, labelKey: "crop" as const },
                 { mode: "erase" as const, Icon: Eraser, labelKey: "erase" as const },
                 { mode: "cutout" as const, Icon: Scissors, labelKey: "cutout" as const },
+                { mode: "angles" as const, Icon: Orbit, labelKey: "angles" as const },
               ]).map(({ mode, Icon, labelKey }) => (
                 <button
                   key={mode}

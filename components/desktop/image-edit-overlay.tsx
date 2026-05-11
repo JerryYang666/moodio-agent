@@ -9,6 +9,7 @@ import {
   Check,
   Crop as CropIcon,
   Eraser,
+  Orbit,
   Paintbrush,
   Scissors,
   X,
@@ -19,6 +20,7 @@ import "react-image-crop/dist/ReactCrop.css";
 
 import MarkControls from "@/components/chat/mark-controls";
 import AspectRatioSelector from "@/components/chat/aspect-ratio-selector";
+import AngleControls from "@/components/chat/angle-controls";
 import MagicProgress from "./magic-progress";
 import { useImageEdit } from "@/hooks/use-image-edit";
 import type { ImageEditMode, CutoutSubMode } from "@/lib/image/edit-pipeline";
@@ -109,6 +111,7 @@ export default function ImageEditOverlay({
     if (mode === "redraw") return t("imageEdit.statusRedraw");
     if (mode === "erase") return t("imageEdit.statusErase");
     if (mode === "cutout") return t("imageEdit.statusCutout");
+    if (mode === "angles") return t("imageEdit.statusAngles");
     return t("imageEdit.statusGeneric");
   }, [mode, t]);
 
@@ -116,6 +119,7 @@ export default function ImageEditOverlay({
     if (mode === "redraw") return t("imageEdit.titleRedraw");
     if (mode === "crop") return t("imageEdit.titleCrop");
     if (mode === "erase") return t("imageEdit.titleErase");
+    if (mode === "angles") return t("imageEdit.titleAngles");
     return t("imageEdit.titleCutout");
   }, [mode, t]);
 
@@ -136,7 +140,9 @@ export default function ImageEditOverlay({
         ? CropIcon
         : mode === "erase"
           ? Eraser
-          : Scissors;
+          : mode === "angles"
+            ? Orbit
+            : Scissors;
 
   // Side-pane positioning. The right pane sits to the right of the asset
   // rect (12px gap); the bottom pane sits below it. They share screen-space
@@ -265,8 +271,31 @@ export default function ImageEditOverlay({
           />
         )}
 
-        {/* Aspect ratio — applies to every AI op (not crop). */}
-        {mode !== "crop" && !edit.isProcessing && (
+        {mode === "angles" && !edit.isProcessing && (
+          <>
+            <AngleControls
+              horizontalAngle={edit.horizontalAngle}
+              verticalAngle={edit.verticalAngle}
+              zoom={edit.zoom}
+              onHorizontalChange={edit.setHorizontalAngle}
+              onVerticalChange={edit.setVerticalAngle}
+              onZoomChange={edit.setZoom}
+              onReset={edit.resetAngles}
+            />
+            <Textarea
+              label={t("imageEdit.anglesPromptLabel")}
+              placeholder={t("imageEdit.anglesPromptPlaceholder")}
+              value={edit.prompt}
+              onValueChange={edit.setPrompt}
+              minRows={2}
+              maxRows={4}
+              classNames={{ input: "text-sm" }}
+            />
+          </>
+        )}
+
+        {/* Aspect ratio — applies to every AI op (not crop, not angles). */}
+        {mode !== "crop" && mode !== "angles" && !edit.isProcessing && (
           <AspectRatioSelector
             value={edit.aspectRatio}
             onChange={edit.setAspectRatio}
@@ -278,6 +307,7 @@ export default function ImageEditOverlay({
             {mode === "redraw" && t("imageEdit.hintRedraw")}
             {mode === "crop" && t("imageEdit.hintCrop")}
             {mode === "erase" && t("imageEdit.hintErase")}
+            {mode === "angles" && t("imageEdit.hintAngles")}
             {mode === "cutout" &&
               (edit.cutoutSub === "auto"
                 ? t("imageEdit.hintCutoutAuto")

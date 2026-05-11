@@ -47,6 +47,7 @@ import {
   Crop as CropIcon,
   Eraser,
   Scissors,
+  Orbit,
 } from "lucide-react";
 
 interface ImageWithMenuProps {
@@ -397,6 +398,8 @@ export default function ImageWithMenu({
                   startEditFlow("erase");
                 } else if (key === "edit-cutout") {
                   startEditFlow("cutout");
+                } else if (key === "edit-angles") {
+                  startEditFlow("angles");
                 }
               }}
             >
@@ -441,6 +444,12 @@ export default function ImageWithMenu({
                   startContent={<Scissors size={16} />}
                 >
                   {tMenu("editCutout")}
+                </DropdownItem>
+                <DropdownItem
+                  key="edit-angles"
+                  startContent={<Orbit size={16} />}
+                >
+                  {tMenu("editAngles")}
                 </DropdownItem>
               </DropdownSection>
               <DropdownSection title={tMenu("addToCollection")} showDivider>

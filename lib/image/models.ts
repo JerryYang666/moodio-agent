@@ -130,6 +130,27 @@ const seedreamV45: ImageModelConfig = {
 };
 
 /**
+ * Qwen Image Edit 2511 - Multiple Angles edit-only model (Fal).
+ *
+ * Not exposed in the model picker; dispatched internally by the "angles"
+ * image-edit operation.
+ */
+const qwenImageEditAngles: ImageModelConfig = {
+  id: "qwen-image-edit-angles",
+  name: "Qwen Image Edit – Angles",
+  description:
+    "Qwen Image Edit 2511 Multiple Angles via Fal — re-renders an image from a different camera angle",
+  provider: "fal",
+  supports: {
+    generate: false,
+    edit: true,
+  },
+  providerModelIds: {
+    edit: "fal-ai/qwen-image-edit-2511-multiple-angles",
+  },
+};
+
+/**
  * OpenAI GPT Image 2 - Image generation + editing via OpenAI Images API
  */
 const gptImage2: ImageModelConfig = {
@@ -155,6 +176,7 @@ export const IMAGE_MODELS: ImageModelConfig[] = [
   nanoBananaProFast,
   seedreamV45,
   gptImage2,
+  qwenImageEditAngles,
 ];
 
 export const DEFAULT_IMAGE_MODEL_ID = nanoBanana2.id;

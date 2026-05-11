@@ -17,13 +17,19 @@ import {
 } from "@/lib/image/aspect-ratio";
 import type { PixelCrop } from "react-image-crop";
 
-export type ImageEditMode = "redraw" | "crop" | "erase" | "cutout";
+export type ImageEditMode =
+  | "redraw"
+  | "crop"
+  | "erase"
+  | "cutout"
+  | "angles";
 export type CutoutSubMode = "auto" | "manual";
 export type ImageEditOperation =
   | "redraw"
   | "erase"
   | "cutout-auto"
-  | "cutout-manual";
+  | "cutout-manual"
+  | "angles";
 
 /**
  * Curated aspect ratio options shown to the user. Matches
@@ -67,6 +73,7 @@ export function resolveOperation(
 ): ImageEditOperation {
   if (mode === "redraw") return "redraw";
   if (mode === "erase") return "erase";
+  if (mode === "angles") return "angles";
   return cutoutSub === "manual" ? "cutout-manual" : "cutout-auto";
 }
 
@@ -213,6 +220,10 @@ export async function callImageEditApi(body: {
   modelId?: string;
   markColor: MarkColorName | undefined;
   aspectRatio: SupportedAspectRatio | undefined;
+  /** Qwen Multiple Angles params — only sent/used when operation === "angles". */
+  horizontalAngle?: number;
+  verticalAngle?: number;
+  zoom?: number;
 }): Promise<EditResult> {
   const apiRes = await fetch("/api/image/edit", {
     method: "POST",

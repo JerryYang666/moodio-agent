@@ -64,6 +64,7 @@ export interface UseImageEdit {
   // Derived flags the UI branches on.
   usesBrush: boolean;
   usesCrop: boolean;
+  usesAngles: boolean;
 
   // Image-load state.
   imageLoaded: boolean;
@@ -94,6 +95,15 @@ export interface UseImageEdit {
   // Aspect ratio choice.
   aspectRatio: AspectRatioChoice;
   setAspectRatio: (v: AspectRatioChoice) => void;
+
+  // Camera-angle state — only read when mode === "angles".
+  horizontalAngle: number;
+  verticalAngle: number;
+  zoom: number;
+  setHorizontalAngle: (v: number) => void;
+  setVerticalAngle: (v: number) => void;
+  setZoom: (v: number) => void;
+  resetAngles: () => void;
 
   // Flow state.
   isProcessing: boolean;
@@ -148,6 +158,16 @@ export function useImageEdit(options: UseImageEditOptions): UseImageEdit {
     DEFAULT_ASPECT_RATIO_CHOICE
   );
 
+  const [horizontalAngle, setHorizontalAngle] = useState<number>(0);
+  const [verticalAngle, setVerticalAngle] = useState<number>(0);
+  const [zoom, setZoom] = useState<number>(5);
+
+  const resetAngles = useCallback(() => {
+    setHorizontalAngle(0);
+    setVerticalAngle(0);
+    setZoom(5);
+  }, []);
+
   const [isProcessing, setIsProcessing] = useState(false);
   const [errorKind, setErrorKind] = useState<SubmitErrorKind | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -157,6 +177,7 @@ export function useImageEdit(options: UseImageEditOptions): UseImageEdit {
     mode === "erase" ||
     (mode === "cutout" && cutoutSub === "manual");
   const usesCrop = mode === "crop";
+  const usesAngles = mode === "angles";
 
   const initializeCanvas = useCallback(() => {
     const canvas = canvasRef.current;
@@ -317,6 +338,26 @@ export function useImageEdit(options: UseImageEditOptions): UseImageEdit {
         return;
       }
 
+      // ---- Angles (AI, no brush/crop, optional prompt) ----
+      if (mode === "angles") {
+        setIsProcessing(true);
+        const result = await callImageEditApi({
+          operation: "angles",
+          sourceImageId,
+          markedImageId: undefined,
+          prompt: prompt.trim() ? prompt.trim() : undefined,
+          modelId: "qwen-image-edit-angles",
+          markColor: undefined,
+          aspectRatio: undefined,
+          horizontalAngle,
+          verticalAngle,
+          zoom,
+        });
+        await onSuccess({ ...result, editType: "angles" });
+        setIsProcessing(false);
+        return;
+      }
+
       // ---- Redraw / Erase / Cutout (AI) ----
       if (mode === "redraw" && !prompt.trim()) {
         setErrorKind("promptRequired");
@@ -396,6 +437,9 @@ export function useImageEdit(options: UseImageEditOptions): UseImageEdit {
     aspectRatio,
     modelId,
     brushColor,
+    horizontalAngle,
+    verticalAngle,
+    zoom,
   ]);
 
   const reset = useCallback(() => {
@@ -410,6 +454,9 @@ export function useImageEdit(options: UseImageEditOptions): UseImageEdit {
     setCutoutSub("auto");
     setPrompt("");
     setAspectRatio(DEFAULT_ASPECT_RATIO_CHOICE);
+    setHorizontalAngle(0);
+    setVerticalAngle(0);
+    setZoom(5);
     setIsProcessing(false);
     setErrorKind(null);
     setErrorMessage(null);
@@ -421,6 +468,7 @@ export function useImageEdit(options: UseImageEditOptions): UseImageEdit {
       canvasRef,
       usesBrush,
       usesCrop,
+      usesAngles,
       imageLoaded,
       setImageLoaded,
       canvasSize,
@@ -439,6 +487,13 @@ export function useImageEdit(options: UseImageEditOptions): UseImageEdit {
       setPrompt,
       aspectRatio,
       setAspectRatio,
+      horizontalAngle,
+      verticalAngle,
+      zoom,
+      setHorizontalAngle,
+      setVerticalAngle,
+      setZoom,
+      resetAngles,
       isProcessing,
       errorKind,
       errorMessage,
@@ -456,6 +511,7 @@ export function useImageEdit(options: UseImageEditOptions): UseImageEdit {
     [
       usesBrush,
       usesCrop,
+      usesAngles,
       imageLoaded,
       canvasSize,
       brushColor,
@@ -466,6 +522,9 @@ export function useImageEdit(options: UseImageEditOptions): UseImageEdit {
       cutoutSub,
       prompt,
       aspectRatio,
+      horizontalAngle,
+      verticalAngle,
+      zoom,
       isProcessing,
       errorKind,
       errorMessage,
