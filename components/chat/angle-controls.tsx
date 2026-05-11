@@ -59,7 +59,7 @@ function CubePreview({
     transformStyle: "preserve-3d",
     // scale3d (not scale) so Z also scales — otherwise rotated faces flatten
     // along the viewing axis and the cube appears squeezed when zooming.
-    transform: `translate(-50%, -50%) rotateX(${verticalAngle}deg) rotateY(${horizontalAngle}deg) scale3d(${scale}, ${scale}, ${scale})`,
+    transform: `translate(-50%, -50%) rotateX(${-verticalAngle}deg) rotateY(${-horizontalAngle}deg) scale3d(${scale}, ${scale}, ${scale})`,
     transition: "transform 80ms linear",
   };
 
