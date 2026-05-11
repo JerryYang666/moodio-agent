@@ -106,7 +106,13 @@ export const siteConfig = {
     uploadTimeoutMs: 120_000,
     allowedImageTypes: ["image/jpeg", "image/png", "image/gif", "image/webp"],
     allowedVideoTypes: ["video/mp4", "video/webm", "video/quicktime", "video/x-msvideo"],
-    allowedAudioTypes: ["audio/mpeg", "audio/wav"],
+    allowedAudioTypes: [
+      "audio/mpeg",
+      "audio/mp3",
+      "audio/wav",
+      "audio/wave",
+      "audio/x-wav",
+    ],
     presignedUrlExpiresIn: 300, // 5 minutes in seconds
   },
 };

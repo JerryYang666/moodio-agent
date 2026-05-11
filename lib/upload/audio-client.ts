@@ -14,6 +14,21 @@ export type AudioUploadOutcome =
   | { success: true; data: AudioUploadResult }
   | { success: false; error: AudioUploadError };
 
+// Safari reports WAV as audio/x-wav (sometimes audio/wave) and MP3 as audio/mp3;
+// normalize to canonical MIME so everything downstream (S3 Content-Type, FAL) sees
+// the same value regardless of browser.
+export function normalizeAudioMime(file: File): string {
+  const type = (file.type || "").toLowerCase();
+  if (type === "audio/x-wav" || type === "audio/wave") return "audio/wav";
+  if (type === "audio/mp3") return "audio/mpeg";
+  if (!type) {
+    const ext = file.name.split(".").pop()?.toLowerCase();
+    if (ext === "wav") return "audio/wav";
+    if (ext === "mp3") return "audio/mpeg";
+  }
+  return type;
+}
+
 export function validateAudioFile(file: File): AudioUploadError | null {
   const maxSize = siteConfig.upload.maxFileSizeMB * 1024 * 1024;
   const allowedTypes = siteConfig.upload.allowedAudioTypes;
@@ -25,7 +40,8 @@ export function validateAudioFile(file: File): AudioUploadError | null {
     };
   }
 
-  if (!allowedTypes.includes(file.type)) {
+  const effectiveType = normalizeAudioMime(file);
+  if (!allowedTypes.includes(effectiveType)) {
     return {
       code: "INVALID_TYPE",
       message: "Invalid file type. Supported: MP3, WAV",
@@ -45,12 +61,14 @@ export async function uploadAudio(file: File, options?: AudioUploadOptions): Pro
     return { success: false, error: validationError };
   }
 
+  const contentType = normalizeAudioMime(file);
+
   try {
     const presignResponse = await fetch("/api/audio/upload/presign", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        contentType: file.type,
+        contentType,
         contentLength: file.size,
       }),
     });
@@ -71,7 +89,7 @@ export async function uploadAudio(file: File, options?: AudioUploadOptions): Pro
     const uploadResponse = await fetch(uploadUrl, {
       method: "PUT",
       headers: {
-        "Content-Type": file.type,
+        "Content-Type": contentType,
         "Content-Length": file.size.toString(),
       },
       body: file,
