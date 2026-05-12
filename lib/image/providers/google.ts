@@ -51,7 +51,6 @@ export async function generateWithGemini(
         googleSearch: {
           searchTypes: {
             webSearch: {},
-            imageSearch: {}
           }
         }
       }],
@@ -132,7 +131,6 @@ export async function editWithGemini(
         googleSearch: {
           searchTypes: {
             webSearch: {},
-            imageSearch: {}
           }
         }
       }],
