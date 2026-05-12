@@ -527,20 +527,44 @@ export default function FolderPage({
   };
 
   const handleVideoDownload = async (asset: AssetItem) => {
-    if (!asset.videoUrl) return;
+    if (!asset.assetId) return;
     try {
-      const response = await fetch(asset.videoUrl);
+      const filename = asset.generationDetails?.title || `video-${asset.assetId}`;
+      const downloadUrl = `/api/video/${encodeURIComponent(asset.assetId)}/download?filename=${encodeURIComponent(filename)}`;
+      const response = await fetch(downloadUrl);
+      if (!response.ok) throw new Error("Download failed");
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `video-${asset.assetId}.mp4`;
+      a.download = "";
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
     } catch (e) {
-      console.error("Download error:", e);
+      console.error("Video download error:", e);
+    }
+  };
+
+  const handleImageAssetDownload = async (asset: AssetItem) => {
+    if (!asset.imageId) return;
+    try {
+      const filename = asset.generationDetails?.title || `image-${asset.imageId}`;
+      const downloadUrl = `/api/image/${encodeURIComponent(asset.imageId)}/download?filename=${encodeURIComponent(filename)}`;
+      const response = await fetch(downloadUrl);
+      if (!response.ok) throw new Error("Download failed");
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "";
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (e) {
+      console.error("Image download error:", e);
     }
   };
 
@@ -1243,6 +1267,13 @@ export default function FolderPage({
                       router.push(`/chat/${a.chatId}?${params.toString()}`);
                     }}
                     onRemove={confirmRemoveAsset}
+                    onDownload={(a) => {
+                      if (a.assetType === "video") {
+                        handleVideoDownload(a);
+                      } else if (a.assetType === "image") {
+                        handleImageAssetDownload(a);
+                      }
+                    }}
                     labels={{
                       video: tCollections("video"),
                       element: t("element"),
@@ -1253,6 +1284,7 @@ export default function FolderPage({
                       sendToDesktop: "Send to Desktop",
                       goToChat: tCollections("goToChat"),
                       remove: t("removeFromFolder"),
+                      download: tCommon("download"),
                     }}
                   />
                 ))}

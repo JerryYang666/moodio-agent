@@ -24,6 +24,7 @@ import {
   Check,
   Star,
   Layers,
+  Download,
   Video as VideoIcon,
 } from "lucide-react";
 import AudioPlayer from "@/components/audio-player";
@@ -40,6 +41,7 @@ export interface AssetCardLabels {
   sendToDesktop: string;
   goToChat: string;
   remove: string;
+  download?: string;
 }
 
 export interface AssetCardProps {
@@ -59,6 +61,7 @@ export interface AssetCardProps {
   onDesktop: (asset: AssetItem) => void;
   onChat?: (asset: AssetItem) => void;
   onRemove: (asset: AssetItem) => void;
+  onDownload?: (asset: AssetItem) => void;
   labels: AssetCardLabels;
 }
 
@@ -79,8 +82,13 @@ export default function AssetCard({
   onDesktop,
   onChat,
   onRemove,
+  onDownload,
   labels,
 }: AssetCardProps) {
+  const isDownloadable =
+    onDownload !== undefined &&
+    labels.download !== undefined &&
+    (asset.assetType === "image" || asset.assetType === "video");
   const preview =
     hoveredRating?.assetId === asset.id ? hoveredRating.star : null;
 
@@ -344,6 +352,15 @@ export default function AssetCard({
                     onPress={() => onChat?.(asset)}
                   >
                     {labels.goToChat}
+                  </DropdownItem>
+                ) : null}
+                {isDownloadable ? (
+                  <DropdownItem
+                    key="download"
+                    startContent={<Download size={16} />}
+                    onPress={() => onDownload?.(asset)}
+                  >
+                    {labels.download}
                   </DropdownItem>
                 ) : null}
                 <DropdownItem
