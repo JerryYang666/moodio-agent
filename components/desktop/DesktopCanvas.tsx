@@ -46,7 +46,9 @@ import { siteConfig } from "@/config/site";
 
 const MIN_ZOOM = 0.1;
 const MAX_ZOOM = 5;
-const ZOOM_SENSITIVITY = 0.005;
+const MOUSE_WHEEL_ZOOM_SENSITIVITY = 0.01;
+const TRACKPAD_PINCH_ZOOM_SENSITIVITY = 0.03;
+const PAN_SENSITIVITY = 2.0;
 const DEFAULT_ASSET_WIDTH = 300;
 const MIN_ASSET_SIZE = 50;
 const CULL_PADDING = 200;
@@ -304,6 +306,18 @@ export default function DesktopCanvas({
   const panStart = useRef({ x: 0, y: 0 });
   const cameraAtPanStart = useRef({ x: 0, y: 0 });
 
+  // Mirror the latest camera + callback into refs so the wheel handler can
+  // stay stable across renders. Recreating the handler on every camera change
+  // causes the `wheel` listener to re-attach, and high-frequency trackpad
+  // events then fire against stale closures — producing visible shake and
+  // tripping React's "Maximum update depth exceeded" guard.
+  const cameraStateRef = useRef(camera);
+  cameraStateRef.current = camera;
+  const onCameraChangeRef = useRef(onCameraChange);
+  onCameraChangeRef.current = onCameraChange;
+  const imageEditStateRef = useRef(imageEditState);
+  imageEditStateRef.current = imageEditState;
+
   const [draggingAssetId, setDraggingAssetId] = useState<string | null>(null);
   const dragOffset = useRef({ x: 0, y: 0 });
   const [dragPos, setDragPos] = useState<{ x: number; y: number } | null>(null);
@@ -492,40 +506,64 @@ export default function DesktopCanvas({
     });
   }, [assets, camera, naturalDims]);
 
-  const handleWheel = useCallback(
-    (e: WheelEvent) => {
-      // While an image-edit overlay is open, let wheel events bubble to the
-      // overlay's own scroll container (long-form panes like "angles" need
-      // to scroll their sliders + prompt). Hijacking the wheel for canvas
-      // zoom here fights the overlay's internal scrolling.
-      if (imageEditState) return;
-      e.preventDefault();
-      const rect = containerRef.current?.getBoundingClientRect();
-      if (!rect) return;
-
-      const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
-
-      const delta = -e.deltaY * ZOOM_SENSITIVITY;
-      const newZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, camera.zoom * (1 + delta)));
-      const scale = newZoom / camera.zoom;
-
-      onCameraChange({
-        x: mouseX - (mouseX - camera.x) * scale,
-        y: mouseY - (mouseY - camera.y) * scale,
-        zoom: newZoom,
-      });
-    },
-    [camera, onCameraChange, imageEditState]
-  );
-
-  // Attach wheel listener with { passive: false } so preventDefault() works
+  // Attach wheel listener once and read live state from refs. This keeps the
+  // listener identity stable so it doesn't re-bind on every camera update,
+  // which previously caused stale-closure oscillation during trackpad pan.
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      // While an image-edit overlay is open, let wheel events bubble to the
+      // overlay's own scroll container (long-form panes like "angles" need
+      // to scroll their sliders + prompt).
+      if (imageEditStateRef.current) return;
+      e.preventDefault();
+      const rect = el.getBoundingClientRect();
+      const cam = cameraStateRef.current;
+
+      // Heuristic: a real mouse wheel emits integer deltaY in coarse steps
+      // (usually ±100 / ±120) with no horizontal component. Trackpad swipes
+      // emit fractional deltas and frequently include deltaX. Treat the
+      // former as zoom to match the Google-Maps / mouse convention, and
+      // the latter as pan.
+      const isMouseWheel =
+        e.deltaX === 0 &&
+        e.deltaMode === 0 &&
+        Number.isInteger(e.deltaY) &&
+        Math.abs(e.deltaY) >= 40;
+
+      // Trackpad pinch-to-zoom arrives as a wheel event with ctrlKey synthesized
+      // by the browser. Plain two-finger swipe has ctrlKey=false and pans.
+      if (e.ctrlKey || isMouseWheel) {
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+
+        const zoomSensitivity = isMouseWheel
+          ? MOUSE_WHEEL_ZOOM_SENSITIVITY
+          : TRACKPAD_PINCH_ZOOM_SENSITIVITY;
+        const delta = -e.deltaY * zoomSensitivity;
+        const newZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, cam.zoom * (1 + delta)));
+        const scale = newZoom / cam.zoom;
+
+        onCameraChangeRef.current({
+          x: mouseX - (mouseX - cam.x) * scale,
+          y: mouseY - (mouseY - cam.y) * scale,
+          zoom: newZoom,
+        });
+        return;
+      }
+
+      onCameraChangeRef.current({
+        x: cam.x - e.deltaX * PAN_SENSITIVITY,
+        y: cam.y - e.deltaY * PAN_SENSITIVITY,
+        zoom: cam.zoom,
+      });
+    };
+
     el.addEventListener("wheel", handleWheel, { passive: false });
     return () => el.removeEventListener("wheel", handleWheel);
-  }, [handleWheel]);
+  }, []);
 
   const screenToWorld = useCallback(
     (clientX: number, clientY: number) => {
