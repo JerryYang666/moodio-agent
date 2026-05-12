@@ -1154,6 +1154,36 @@ export default function DesktopCanvas({
     setContextMenu(null);
   }, [selectedIds, onAssetDelete, onAssetBatchDelete]);
 
+  // Delete/Backspace deletes the current selection. Single selection routes
+  // through onAssetDelete; multi-selection routes through onAssetBatchDelete
+  // so the whole group undoes in one Ctrl/Cmd+Z.
+  useEffect(() => {
+    if (!canEdit) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key !== "Delete" && e.key !== "Backspace") return;
+      if (selectedIds.size === 0) return;
+      if (contextMenu || renamingAssetId || imageEditStateRef.current) return;
+      const target = e.target;
+      if (target instanceof HTMLElement) {
+        const tag = target.tagName;
+        if (tag === "INPUT" || tag === "TEXTAREA") return;
+        if (target.isContentEditable) return;
+        if (target.closest('[contenteditable="true"], [contenteditable=""]')) return;
+      }
+      const ids = Array.from(selectedIds);
+      if (ids.some((id) => inFlightEditsRef.current?.has(id))) return;
+      e.preventDefault();
+      if (ids.length > 1 && onAssetBatchDelete) {
+        onAssetBatchDelete(ids);
+      } else if (onAssetDelete) {
+        ids.forEach((id) => onAssetDelete(id));
+      }
+      setSelectedIds(new Set());
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [canEdit, selectedIds, contextMenu, renamingAssetId, onAssetDelete, onAssetBatchDelete]);
+
   const startRename = useCallback(
     (asset: EnrichedDesktopAsset) => {
       const meta = asset.metadata as Record<string, unknown>;
