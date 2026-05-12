@@ -3533,7 +3533,17 @@ export default function ChatInterface({
     // In video mode with text-to-video models (no imageParams), pending images
     // are irrelevant — references come from videoParams.media_references instead.
     const isTextToVideoMode = menuState.mode === "video" && !videoModelHasImageParams;
-    const currentPendingImages = isTextToVideoMode ? [] : [...pendingImages];
+    // When an image has been marked, drop the original — the marked version (semi-transparent
+    // overlay composited onto the original) already contains everything the model needs.
+    const rawPendingImages = isTextToVideoMode ? [] : [...pendingImages];
+    const markedFromIds = new Set(
+      rawPendingImages
+        .map((img) => img.markedFromImageId)
+        .filter((id): id is string => !!id)
+    );
+    const currentPendingImages = rawPendingImages.filter(
+      (img) => !markedFromIds.has(img.imageId)
+    );
     const currentPendingVideos = [...pendingVideos];
     const currentPendingAudios = [...pendingAudios];
     const currentMediaRefs = isTextToVideoMode
