@@ -942,6 +942,9 @@
       "cropErrorEmpty": "Please select a crop area before applying.",
       "insufficientCredits": "Not enough credits for this edit.",
       "errorTitle": "Edit failed",
+      "failedTitle": "Edit failed",
+      "retry": "Retry",
+      "inProgress": "Edit in progress…",
       "aspectRatio": {
         "label": "Aspect ratio",
         "matchSource": "Match source"

@@ -40,6 +40,10 @@ import ImageEditOverlay, {
   type ImageEditMode,
   type ImageEditPlacement,
 } from "./image-edit-overlay";
+import MagicProgress from "./magic-progress";
+import type { PreparedEditLaunch } from "@/hooks/use-image-edit";
+
+type ImageEditLaunchPayload = PreparedEditLaunch["apiPayload"];
 import { motion, AnimatePresence } from "framer-motion";
 import { addToast } from "@heroui/toast";
 import { siteConfig } from "@/config/site";
@@ -155,6 +159,27 @@ interface DesktopCanvasProps {
     editType: string;
     placement: ImageEditPlacement;
   }) => void;
+  /**
+   * AI edit ops (redraw / erase / cutout / angles) are handed off to the
+   * page so the overlay can close immediately and the canvas stays
+   * interactive while the model runs. The page fires the model call in the
+   * background, renders a per-asset shimmer via `inFlightEdits`, and routes
+   * success through `onImageEditCommit`.
+   */
+  onImageEditLaunch?: (args: {
+    assetId: string;
+    mode: ImageEditMode;
+    apiPayload: ImageEditLaunchPayload;
+    editType: string;
+    placement: ImageEditPlacement;
+  }) => void;
+  /**
+   * Assets with an AI edit currently running. The canvas renders a
+   * `MagicProgress` shimmer pinned to each target's rect, and blocks
+   * drag/resize/rename/delete/z-order and further edit kicks for those
+   * assets until the in-flight edit resolves.
+   */
+  inFlightEdits?: Map<string, { mode: ImageEditMode }>;
   onImageEditCancel?: () => void;
   /**
    * Desktop ID — used by in-canvas UI (e.g. edit-history popover) that needs
@@ -296,6 +321,8 @@ export default function DesktopCanvas({
   onExternalFileDrop,
   imageEditState,
   onImageEditCommit,
+  onImageEditLaunch,
+  inFlightEdits,
   onImageEditCancel,
   desktopId,
   onImageHistoryRestore,
@@ -317,6 +344,11 @@ export default function DesktopCanvas({
   onCameraChangeRef.current = onCameraChange;
   const imageEditStateRef = useRef(imageEditState);
   imageEditStateRef.current = imageEditState;
+  // Mirror into a ref so pointer / keyboard callbacks can read the current
+  // in-flight set without a re-render dep cascade. Used to block drag /
+  // resize / context-menu edits for assets with a model call running.
+  const inFlightEditsRef = useRef(inFlightEdits);
+  inFlightEditsRef.current = inFlightEdits;
 
   const [draggingAssetId, setDraggingAssetId] = useState<string | null>(null);
   const dragOffset = useRef({ x: 0, y: 0 });
@@ -449,6 +481,7 @@ export default function DesktopCanvas({
   const handleResizePointerDown = useCallback(
     (e: React.PointerEvent, asset: DesktopAsset, handle: string) => {
       if (!canEdit) return;
+      if (inFlightEditsRef.current?.has(asset.id)) return;
       e.stopPropagation();
       e.preventDefault();
       const dims = getAssetDimensions(asset, naturalDims.get(asset.id));
@@ -1034,6 +1067,10 @@ export default function DesktopCanvas({
     (e: React.PointerEvent, asset: DesktopAsset) => {
       if (!canEdit) return;
       if (e.button !== 0) return;
+      // Lock drag/selection on assets with an AI edit running. The shimmer
+      // is pinned to the asset's rect so moving the asset would desync the
+      // visual from where the edit actually lands.
+      if (inFlightEditsRef.current?.has(asset.id)) return;
       e.stopPropagation();
       e.preventDefault(); // prevent native image drag
       setContextMenu(null);
@@ -1365,8 +1402,10 @@ export default function DesktopCanvas({
                 onVideoFrameCaptured={onVideoFrameCaptured}
               />
               </div>
-              {/* Resize handles — visible when selected */}
-              {canEdit && (isSelected || isResizing) && (
+              {/* Resize handles — visible when selected. Hidden for assets
+                  with an AI edit in flight (drag/resize is locked during
+                  that window to keep the shimmer synced to the rect). */}
+              {canEdit && (isSelected || isResizing) && !inFlightEdits?.has(asset.id) && (
                 <>
                   {(["nw", "ne", "sw", "se"] as const).map((corner) => {
                     const isTop = corner.startsWith("n");
@@ -1534,86 +1573,104 @@ export default function DesktopCanvas({
                 {t("deleteAllSelected", { count: selectedIds.size })}
               </button>
             </>
-          ) : (
-            /* Single-select context menu: z-index + delete */
-            <>
-              {contextAsset?.assetType === "image" &&
-                Array.isArray(
-                  (contextAsset.metadata as Record<string, unknown>)
-                    .imageHistory
-                ) &&
-                ((contextAsset.metadata as Record<string, unknown>)
-                  .imageHistory as unknown[]).length > 0 && (
+          ) : (() => {
+            // Assets with an AI edit running are locked for mutation: the
+            // shimmer is pinned to the current rect, the result will
+            // replace or spawn next to the current imageId, and renaming /
+            // deleting / reordering mid-flight would leave the user in an
+            // inconsistent state. View Edit History is still allowed (it's
+            // read-only).
+            const isContextInFlight =
+              contextAsset != null &&
+              (inFlightEdits?.has(contextAsset.id) ?? false);
+            return (
+              /* Single-select context menu: z-index + delete */
+              <>
+                {contextAsset?.assetType === "image" &&
+                  Array.isArray(
+                    (contextAsset.metadata as Record<string, unknown>)
+                      .imageHistory
+                  ) &&
+                  ((contextAsset.metadata as Record<string, unknown>)
+                    .imageHistory as unknown[]).length > 0 && (
+                    <button
+                      className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-default-100 transition-colors text-left"
+                      onClick={() => {
+                        if (!contextMenu) return;
+                        setHistoryPopover({
+                          assetId: contextAsset.id,
+                          x: contextMenu.x,
+                          y: contextMenu.y,
+                        });
+                        setContextMenu(null);
+                      }}
+                    >
+                      <History size={14} />
+                      {t("viewEditHistory")}
+                    </button>
+                  )}
+                {contextAsset && onAssetRename && !isContextInFlight && (
                   <button
                     className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-default-100 transition-colors text-left"
-                    onClick={() => {
-                      if (!contextMenu) return;
-                      setHistoryPopover({
-                        assetId: contextAsset.id,
-                        x: contextMenu.x,
-                        y: contextMenu.y,
-                      });
-                      setContextMenu(null);
-                    }}
+                    onClick={() => startRename(contextAsset as EnrichedDesktopAsset)}
                   >
-                    <History size={14} />
-                    {t("viewEditHistory")}
+                    <Pencil size={14} />
+                    {t("rename")}
                   </button>
                 )}
-              {contextAsset && onAssetRename && (
-                <button
-                  className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-default-100 transition-colors text-left"
-                  onClick={() => startRename(contextAsset as EnrichedDesktopAsset)}
-                >
-                  <Pencil size={14} />
-                  {t("rename")}
-                </button>
-              )}
-              {contextAsset && onSaveToCollection && isSavableAsset(contextAsset) && (
-                <button
-                  className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-default-100 transition-colors text-left"
-                  onClick={() => {
-                    onSaveToCollection([contextAsset.id]);
-                    setContextMenu(null);
-                  }}
-                >
-                  <FolderPlus size={14} />
-                  {t("copyToCollection")}
-                </button>
-              )}
-              {contextAsset && onZIndexChange && (
-                <>
+                {contextAsset && onSaveToCollection && isSavableAsset(contextAsset) && !isContextInFlight && (
                   <button
                     className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-default-100 transition-colors text-left"
                     onClick={() => {
-                      onZIndexChange(contextAsset.id, 10);
+                      onSaveToCollection([contextAsset.id]);
                       setContextMenu(null);
                     }}
                   >
-                    <ArrowUp size={14} />
-                    {t("bringForward")}
+                    <FolderPlus size={14} />
+                    {t("copyToCollection")}
                   </button>
+                )}
+                {contextAsset && onZIndexChange && !isContextInFlight && (
+                  <>
+                    <button
+                      className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-default-100 transition-colors text-left"
+                      onClick={() => {
+                        onZIndexChange(contextAsset.id, 10);
+                        setContextMenu(null);
+                      }}
+                    >
+                      <ArrowUp size={14} />
+                      {t("bringForward")}
+                    </button>
+                    <button
+                      className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-default-100 transition-colors text-left"
+                      onClick={() => {
+                        onZIndexChange(contextAsset.id, -10);
+                        setContextMenu(null);
+                      }}
+                    >
+                      <ArrowDown size={14} />
+                      {t("sendBackward")}
+                    </button>
+                  </>
+                )}
+                {!isContextInFlight && (
                   <button
-                    className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-default-100 transition-colors text-left"
-                    onClick={() => {
-                      onZIndexChange(contextAsset.id, -10);
-                      setContextMenu(null);
-                    }}
+                    className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-danger-50 text-danger transition-colors text-left"
+                    onClick={handleDeleteSelected}
                   >
-                    <ArrowDown size={14} />
-                    {t("sendBackward")}
+                    <Trash2 size={14} />
+                    {t("delete")}
                   </button>
-                </>
-              )}
-              <button
-                className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-danger-50 text-danger transition-colors text-left"
-                onClick={handleDeleteSelected}
-              >
-                <Trash2 size={14} />
-                {t("delete")}
-              </button>
-            </>
-          )}
+                )}
+                {isContextInFlight && (
+                  <div className="px-3 py-2 text-xs text-default-500 italic">
+                    {t("imageEdit.inProgress")}
+                  </div>
+                )}
+              </>
+            );
+          })()}
         </div>
       )}
 
@@ -1731,11 +1788,20 @@ export default function DesktopCanvas({
                 { mode: "erase" as const, Icon: Eraser, labelKey: "erase" as const },
                 { mode: "cutout" as const, Icon: Scissors, labelKey: "cutout" as const },
                 { mode: "angles" as const, Icon: Orbit, labelKey: "angles" as const },
-              ]).map(({ mode, Icon, labelKey }) => (
+              ]).map(({ mode, Icon, labelKey }) => {
+                // Block kicking a second edit on an asset that already has
+                // one in flight. The asset-level moodio-image-edit listener
+                // also guards this, but disabling the button surfaces the
+                // state to the user instead of swallowing the click silently.
+                const isInFlight =
+                  inFlightEdits?.has(floatingBarImageInfo.assetId) ?? false;
+                return (
                 <button
                   key={mode}
-                  className="flex items-center gap-1.5 px-2 py-1 text-xs hover:bg-default-100 rounded-md transition-colors whitespace-nowrap"
+                  disabled={isInFlight}
+                  className="flex items-center gap-1.5 px-2 py-1 text-xs hover:bg-default-100 rounded-md transition-colors whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed"
                   onClick={() => {
+                    if (isInFlight) return;
                     if (singleSelectedAsset) {
                       // Reserve space for the overlay's right + bottom
                       // panes so they stay inside the visible canvas
@@ -1758,12 +1824,13 @@ export default function DesktopCanvas({
                       })
                     );
                   }}
-                  title={t(labelKey)}
+                  title={isInFlight ? t("imageEdit.inProgress") : t(labelKey)}
                 >
                   <Icon size={13} />
                   {t(labelKey)}
                 </button>
-              ))}
+                );
+              })}
             {floatingBarVideoInfo?.videoId && floatingBarVideoInfo.url && (
               <button
                 className="flex items-center gap-1.5 px-2 py-1 text-xs hover:bg-default-100 rounded-md transition-colors whitespace-nowrap"
@@ -1903,10 +1970,55 @@ export default function DesktopCanvas({
                 placement,
               })
             }
+            onLaunch={({ apiPayload, editType, placement }) =>
+              onImageEditLaunch?.({
+                assetId: target.id,
+                mode: imageEditState.mode,
+                apiPayload,
+                editType,
+                placement,
+              })
+            }
             onCancel={() => onImageEditCancel?.()}
           />
         );
       })()}
+
+      {/* Per-asset in-flight shimmer. Rendered for every asset with an AI
+          edit currently running in the background (the overlay has already
+          closed, so the user can keep working on the canvas). Pinned to the
+          asset's live screen rect so it tracks pan/zoom and drag/resize —
+          although drag/resize are blocked for in-flight assets. */}
+      {inFlightEdits &&
+        inFlightEdits.size > 0 &&
+        Array.from(inFlightEdits.entries()).map(([assetId, { mode }]) => {
+          const target = assets.find((a) => a.id === assetId);
+          if (!target || target.assetType !== "image") return null;
+          const dims = getAssetDimensions(target, naturalDims.get(target.id));
+          const left = target.posX * camera.zoom + camera.x;
+          const top = target.posY * camera.zoom + camera.y;
+          const width = dims.w * camera.zoom;
+          const height = dims.h * camera.zoom;
+          const statusText =
+            mode === "redraw"
+              ? t("imageEdit.statusRedraw")
+              : mode === "erase"
+                ? t("imageEdit.statusErase")
+                : mode === "cutout"
+                  ? t("imageEdit.statusCutout")
+                  : mode === "angles"
+                    ? t("imageEdit.statusAngles")
+                    : t("imageEdit.statusGeneric");
+          return (
+            <div
+              key={assetId}
+              className="absolute pointer-events-none z-30"
+              style={{ left, top, width, height }}
+            >
+              <MagicProgress statusText={statusText} />
+            </div>
+          );
+        })}
 
       {/* Selection count indicator with batch send-to-chat */}
       {selectedIds.size > 1 && (() => {

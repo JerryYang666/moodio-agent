@@ -42,6 +42,31 @@ export type SubmitErrorKind =
   | "insufficientCredits"
   | "other";
 
+/**
+ * Payload produced by `prepareSubmit` for AI ops (redraw / erase / cutout /
+ * angles). The caller fires `callImageEditApi(apiPayload)` in the background
+ * so the overlay can unmount the moment prepare resolves — letting the user
+ * keep interacting with the canvas while the model runs.
+ */
+export interface PreparedEditLaunch {
+  kind: "launch";
+  apiPayload: Parameters<typeof callImageEditApi>[0];
+  editType: string;
+}
+
+/**
+ * Payload produced by `prepareSubmit` for crop, which is a client-side
+ * compose + upload with no model round-trip. The result is final; the caller
+ * commits it immediately (no in-flight shimmer needed).
+ */
+export interface PreparedEditImmediate {
+  kind: "immediate";
+  result: EditResult;
+  editType: string;
+}
+
+export type PreparedEdit = PreparedEditLaunch | PreparedEditImmediate;
+
 export interface UseImageEditOptions {
   mode: ImageEditMode;
   sourceImageId: string;
@@ -123,8 +148,21 @@ export interface UseImageEdit {
   handlePointerUp: () => void;
   handleClearDrawing: () => void;
 
-  // Submit.
+  // Submit — runs prepare + execute in sequence. The modal keeps
+  // `isProcessing` true through the model call, so the caller's shimmer
+  // stays visible inside the modal. Used by the chat image-edit modal.
   submit: () => Promise<void>;
+
+  // Prepare-only submit. Validates inputs and, for brush/crop modes,
+  // composes and uploads the client-side intermediate. Returns a payload
+  // describing what to do next:
+  //   - `{kind: "launch", apiPayload}` → the caller fires the model call
+  //     in the background and closes the overlay immediately.
+  //   - `{kind: "immediate", result}` → crop only; the result is final.
+  // Returns null if validation failed (errorKind/errorMessage set).
+  // Used by the desktop in-canvas overlay so the canvas can remain
+  // interactive while the model runs.
+  prepareSubmit: () => Promise<PreparedEdit | null>;
 
   // Full reset — used when a modal reopens for a fresh run.
   reset: () => void;
@@ -328,12 +366,18 @@ export function useImageEdit(options: UseImageEditOptions): UseImageEdit {
     }
   }, []);
 
-  const submit = useCallback(async () => {
+  // Prepare runs validation + any client-side compose/upload step. For crop
+  // the result is final (no model call); for AI ops the returned payload is
+  // what the caller will hand to `callImageEditApi`. Keeping prepare
+  // separate from the model call lets the desktop overlay close the moment
+  // prepare resolves while the canvas keeps its own per-asset shimmer.
+  const prepareSubmit = useCallback(async (): Promise<PreparedEdit | null> => {
     setErrorKind(null);
     setErrorMessage(null);
 
     try {
-      // ---- Crop: client-side only ----
+      // ---- Crop: client-side only. Compose + upload happens here; the
+      // result is final, no model call to defer. ----
       if (mode === "crop") {
         if (
           !completedCrop ||
@@ -341,7 +385,7 @@ export function useImageEdit(options: UseImageEditOptions): UseImageEdit {
           completedCrop.height <= 0
         ) {
           setErrorKind("cropErrorEmpty");
-          return;
+          return null;
         }
         // Capture the displayed <img> rect BEFORE flipping isProcessing: in
         // some UIs the crop <img> unmounts synchronously once processing
@@ -355,43 +399,45 @@ export function useImageEdit(options: UseImageEditOptions): UseImageEdit {
           displayedRect,
         });
         const uploaded = await uploadCroppedImage(file);
-        await onSuccessRef.current({ ...uploaded, editType: "crop" });
         setIsProcessing(false);
-        return;
+        return { kind: "immediate", result: uploaded, editType: "crop" };
       }
 
       // ---- Angles (AI, no brush/crop, optional prompt) ----
       if (mode === "angles") {
-        setIsProcessing(true);
-        const result = await callImageEditApi({
-          operation: "angles",
-          sourceImageId,
-          markedImageId: undefined,
-          prompt: prompt.trim() ? prompt.trim() : undefined,
-          modelId: "qwen-image-edit-angles",
-          markColor: undefined,
-          aspectRatio: undefined,
-          horizontalAngle,
-          verticalAngle,
-          zoom,
-        });
-        await onSuccessRef.current({ ...result, editType: "angles" });
-        setIsProcessing(false);
-        return;
+        return {
+          kind: "launch",
+          apiPayload: {
+            operation: "angles",
+            sourceImageId,
+            markedImageId: undefined,
+            prompt: prompt.trim() ? prompt.trim() : undefined,
+            modelId: "qwen-image-edit-angles",
+            markColor: undefined,
+            aspectRatio: undefined,
+            horizontalAngle,
+            verticalAngle,
+            zoom,
+          },
+          editType: "angles",
+        };
       }
 
       // ---- Redraw / Erase / Cutout (AI) ----
       if (mode === "redraw" && !prompt.trim()) {
         setErrorKind("promptRequired");
-        return;
+        return null;
       }
 
       const requireMarking = usesBrush;
       if (requireMarking && !hasDrawing) {
         setErrorKind("markRequired");
-        return;
+        return null;
       }
 
+      // Brush-mode: compose + upload the marked image before returning. This
+      // MUST happen while the <canvas> is still mounted, which means before
+      // the overlay closes in the desktop flow.
       setIsProcessing(true);
 
       let markedImageId: string | undefined;
@@ -419,23 +465,25 @@ export function useImageEdit(options: UseImageEditOptions): UseImageEdit {
             )
           : undefined;
 
-      const result = await callImageEditApi({
-        operation,
-        sourceImageId,
-        markedImageId,
-        prompt: mode === "redraw" ? prompt.trim() : undefined,
-        modelId,
-        markColor: requireMarking
-          ? markColorNameFromHex(brushColor)
-          : undefined,
-        aspectRatio: ratio,
-      });
-
-      await onSuccessRef.current({ ...result, editType });
       setIsProcessing(false);
+      return {
+        kind: "launch",
+        apiPayload: {
+          operation,
+          sourceImageId,
+          markedImageId,
+          prompt: mode === "redraw" ? prompt.trim() : undefined,
+          modelId,
+          markColor: requireMarking
+            ? markColorNameFromHex(brushColor)
+            : undefined,
+          aspectRatio: ratio,
+        },
+        editType,
+      };
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Unknown error";
-      console.error("[useImageEdit] submit failed:", err);
+      console.error("[useImageEdit] prepareSubmit failed:", err);
       setIsProcessing(false);
       if (msg === "INSUFFICIENT_CREDITS") {
         setErrorKind("insufficientCredits");
@@ -462,6 +510,40 @@ export function useImageEdit(options: UseImageEditOptions): UseImageEdit {
     verticalAngle,
     zoom,
   ]);
+
+  // Full submit: prepare, then execute. Used by the chat modal, which keeps
+  // the modal open and shows its own shimmer until the model resolves.
+  const submit = useCallback(async () => {
+    try {
+      const prepared = await prepareSubmit();
+      if (!prepared) return; // validation failure; errorKind already set
+
+      if (prepared.kind === "immediate") {
+        await onSuccessRef.current({
+          ...prepared.result,
+          editType: prepared.editType,
+        });
+        return;
+      }
+
+      setIsProcessing(true);
+      const result = await callImageEditApi(prepared.apiPayload);
+      await onSuccessRef.current({ ...result, editType: prepared.editType });
+      setIsProcessing(false);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Unknown error";
+      console.error("[useImageEdit] submit failed:", err);
+      setIsProcessing(false);
+      if (msg === "INSUFFICIENT_CREDITS") {
+        setErrorKind("insufficientCredits");
+        setErrorMessage(null);
+      } else {
+        setErrorKind("other");
+        setErrorMessage(msg);
+      }
+      throw err;
+    }
+  }, [prepareSubmit]);
 
   const reset = useCallback(() => {
     setImageLoaded(false);
@@ -525,6 +607,7 @@ export function useImageEdit(options: UseImageEditOptions): UseImageEdit {
       handlePointerUp,
       handleClearDrawing,
       submit,
+      prepareSubmit,
       reset,
     }),
     [
@@ -553,6 +636,7 @@ export function useImageEdit(options: UseImageEditOptions): UseImageEdit {
       handlePointerUp,
       handleClearDrawing,
       submit,
+      prepareSubmit,
       reset,
     ]
   );

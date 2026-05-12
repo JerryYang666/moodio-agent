@@ -1762,6 +1762,9 @@
       "cropErrorEmpty": "请先选择裁切区域。",
       "insufficientCredits": "余额不足以完成此次编辑。",
       "errorTitle": "编辑失败",
+      "failedTitle": "编辑失败",
+      "retry": "重试",
+      "inProgress": "编辑进行中…",
       "aspectRatio": {
         "label": "宽高比",
         "matchSource": "与原图一致"

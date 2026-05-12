@@ -30,7 +30,7 @@ import MarkControls from "@/components/chat/mark-controls";
 import AspectRatioSelector from "@/components/chat/aspect-ratio-selector";
 import AngleControls from "@/components/chat/angle-controls";
 import MagicProgress from "./magic-progress";
-import { useImageEdit } from "@/hooks/use-image-edit";
+import { useImageEdit, type PreparedEditLaunch } from "@/hooks/use-image-edit";
 import type { ImageEditMode, CutoutSubMode } from "@/lib/image/edit-pipeline";
 
 export type { ImageEditMode, CutoutSubMode };
@@ -75,9 +75,21 @@ interface ImageEditOverlayProps {
   /** Asset's screen-space rect in CSS pixels relative to the canvas
    *  container (already projected through camera transform by the parent). */
   screenRect: { left: number; top: number; width: number; height: number };
+  /** Crop commits inline (no model call) and lands through this handler. */
   onCommit: (args: {
     newImageId: string;
     newImageUrl: string;
+    editType: string;
+    placement: ImageEditPlacement;
+  }) => void;
+  /**
+   * AI ops (redraw/erase/cutout/angles) resolve asynchronously after the
+   * overlay closes. The overlay hands the prepared API payload to the
+   * parent, which fires the model call in the background and renders an
+   * in-flight shimmer on the canvas while the user keeps working.
+   */
+  onLaunch: (args: {
+    apiPayload: PreparedEditLaunch["apiPayload"];
     editType: string;
     placement: ImageEditPlacement;
   }) => void;
@@ -99,6 +111,7 @@ export default function ImageEditOverlay({
   sourceImageUrl,
   screenRect,
   onCommit,
+  onLaunch,
   onCancel,
 }: ImageEditOverlayProps) {
   const t = useTranslations("desktop");
@@ -116,17 +129,15 @@ export default function ImageEditOverlay({
   // user clicked, not whatever the dropdown is on by the time it resolves.
   const placementInFlightRef = useRef<ImageEditPlacement>("replace");
 
+  // Desktop overlay never takes the full `submit` path — it calls
+  // `prepareSubmit` directly and hands AI ops off to the parent so the
+  // canvas can stay interactive while the model runs. The onSuccess callback
+  // only fires for the crop path (via the legacy `submit`), and we don't
+  // reach it here. Kept as a no-op so the hook's type contract is satisfied.
   const edit = useImageEdit({
     mode,
     sourceImageId,
-    onSuccess: ({ imageId, imageUrl, editType }) => {
-      onCommit({
-        newImageId: imageId,
-        newImageUrl: imageUrl,
-        editType,
-        placement: placementInFlightRef.current,
-      });
-    },
+    onSuccess: () => {},
   });
 
   // No explicit re-init effect for screenRect changes: the <img> inside the
@@ -141,7 +152,26 @@ export default function ImageEditOverlay({
     setPlacement(next);
     writeStoredPlacement(next);
     try {
-      await edit.submit();
+      const prepared = await edit.prepareSubmit();
+      if (!prepared) return; // validation failure; errorKind already set
+      if (prepared.kind === "immediate") {
+        // Crop: result is final, commit inline and close the overlay.
+        onCommit({
+          newImageId: prepared.result.imageId,
+          newImageUrl: prepared.result.imageUrl,
+          editType: prepared.editType,
+          placement: next,
+        });
+        return;
+      }
+      // AI op: hand the payload off to the parent, which fires the model
+      // call in the background. Parent is responsible for closing the
+      // overlay and showing the canvas-side shimmer.
+      onLaunch({
+        apiPayload: prepared.apiPayload,
+        editType: prepared.editType,
+        placement: next,
+      });
     } catch (err) {
       // Already surfaced via errorKind/errorMessage; also toast.
       const msg = err instanceof Error ? err.message : "Unknown error";

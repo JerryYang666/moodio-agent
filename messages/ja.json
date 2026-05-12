@@ -1762,6 +1762,9 @@
       "cropErrorEmpty": "切り抜き範囲を選択してください。",
       "insufficientCredits": "クレジットが不足しています。",
       "errorTitle": "編集に失敗しました",
+      "failedTitle": "編集に失敗しました",
+      "retry": "再試行",
+      "inProgress": "編集中…",
       "aspectRatio": {
         "label": "アスペクト比",
         "matchSource": "元画像に合わせる"

@@ -1762,6 +1762,9 @@
       "cropErrorEmpty": "자를 영역을 선택해 주세요.",
       "insufficientCredits": "크레딧이 부족합니다.",
       "errorTitle": "편집 실패",
+      "failedTitle": "편집 실패",
+      "retry": "재시도",
+      "inProgress": "편집 진행 중…",
       "aspectRatio": {
         "label": "가로세로 비율",
         "matchSource": "원본과 동일"

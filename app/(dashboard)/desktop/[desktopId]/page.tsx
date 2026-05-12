@@ -67,6 +67,8 @@ import type {
   ImageEditMode,
   ImageEditPlacement,
 } from "@/components/desktop/image-edit-overlay";
+import { callImageEditApi } from "@/lib/image/edit-pipeline";
+import type { PreparedEditLaunch } from "@/hooks/use-image-edit";
 
 const DEFAULT_CAMERA: CameraState = { x: 0, y: 0, zoom: 1 };
 const VIEWPORT_SAVE_DEBOUNCE = 2000;
@@ -291,6 +293,20 @@ export default function DesktopDetailPage({
     assetId: string;
     mode: ImageEditMode;
   } | null>(null);
+  // Assets with an AI edit running in the background. The overlay closes
+  // the moment `prepareSubmit` resolves so the user can keep working on the
+  // canvas; we render a per-asset shimmer (DesktopCanvas → MagicProgress)
+  // for every entry here, and block same-asset re-edits / drag / resize /
+  // rename / delete / z-order until the edit lands. Keyed by assetId so
+  // edits on different assets run in parallel.
+  const [inFlightEdits, setInFlightEdits] = useState<
+    Map<string, { mode: ImageEditMode }>
+  >(new Map());
+  // Same data, mirrored into a ref so the event listener installed once
+  // (for `moodio-image-edit`) can short-circuit same-asset edits without
+  // rebinding on every state change.
+  const inFlightEditsRef = useRef(inFlightEdits);
+  inFlightEditsRef.current = inFlightEdits;
   const viewportSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cameraRef = useRef(camera);
   cameraRef.current = camera;
@@ -469,6 +485,11 @@ export default function DesktopDetailPage({
       const mode: ImageEditMode | undefined = detail?.mode;
       const assetId: string | undefined = detail?.assetId;
       if (!mode || !assetId) return;
+      // Block a second edit on the same asset while one is already
+      // running. The floating bar hides these buttons for in-flight
+      // assets; this is a belt-and-suspenders guard for retry toasts and
+      // other callers that dispatch directly.
+      if (inFlightEditsRef.current.has(assetId)) return;
       setImageEditState({ assetId, mode });
     };
     window.addEventListener("moodio-image-edit", handler);
@@ -844,6 +865,90 @@ export default function DesktopDetailPage({
   const handleImageEditCancel = useCallback(() => {
     setImageEditState(null);
   }, []);
+
+  // Launch an AI edit (redraw / erase / cutout / angles) in the background.
+  // The overlay has already closed (prepareSubmit resolved); we register the
+  // asset as in-flight, fire the model call, and commit the result through
+  // the same replace/newAsset handlers a synchronous submit would have
+  // used. On failure, a toast with a "Retry" action re-opens a fresh
+  // overlay for the same asset + mode (no marks/prompt preserved).
+  const handleImageEditLaunch = useCallback(
+    (args: {
+      assetId: string;
+      mode: ImageEditMode;
+      apiPayload: PreparedEditLaunch["apiPayload"];
+      editType: string;
+      placement: ImageEditPlacement;
+    }) => {
+      const { assetId, mode, apiPayload, editType, placement } = args;
+      // Close the overlay and mark this asset as in-flight. Edits on
+      // different assets can run in parallel, so we add rather than replace.
+      setImageEditState(null);
+      setInFlightEdits((prev) => {
+        const next = new Map(prev);
+        next.set(assetId, { mode });
+        return next;
+      });
+
+      const clearInFlight = () => {
+        setInFlightEdits((prev) => {
+          if (!prev.has(assetId)) return prev;
+          const next = new Map(prev);
+          next.delete(assetId);
+          return next;
+        });
+      };
+
+      void (async () => {
+        try {
+          const result = await callImageEditApi(apiPayload);
+          clearInFlight();
+          // Route through the existing commit dispatcher so replace vs
+          // save-as-new, undo/redo, broadcast, and telemetry all behave
+          // identically to a synchronous submit.
+          handleImageEditCommit({
+            assetId,
+            newImageId: result.imageId,
+            newImageUrl: result.imageUrl,
+            editType,
+            placement,
+          });
+        } catch (err) {
+          clearInFlight();
+          const msg = err instanceof Error ? err.message : "Unknown error";
+          const description =
+            msg === "INSUFFICIENT_CREDITS"
+              ? t("imageEdit.insufficientCredits")
+              : msg;
+          addToast({
+            title: t("imageEdit.failedTitle"),
+            description,
+            color: "danger",
+            // Retry re-opens a fresh overlay for the same asset + mode via
+            // the existing moodio-image-edit event pipeline. Brush marks,
+            // prompt text, and other per-run state are intentionally not
+            // preserved — the user decided that on confirm.
+            endContent: (
+              <Button
+                size="sm"
+                variant="flat"
+                onPress={() => {
+                  window.dispatchEvent(
+                    new CustomEvent("moodio-image-edit", {
+                      detail: { mode, assetId },
+                    })
+                  );
+                }}
+              >
+                {t("imageEdit.retry")}
+              </Button>
+            ),
+          });
+        }
+      })();
+    },
+    [handleImageEditCommit, t]
+  );
 
   // Restore a past image version from the edit-history popover. Mirrors
   // `handleImageEditCommitReplace`: drops the restored imageId from history, appends
@@ -2249,6 +2354,8 @@ export default function DesktopDetailPage({
           onExternalFileDrop={canEdit ? handleExternalFileDrop : undefined}
           imageEditState={canEdit ? imageEditState : null}
           onImageEditCommit={canEdit ? handleImageEditCommit : undefined}
+          onImageEditLaunch={canEdit ? handleImageEditLaunch : undefined}
+          inFlightEdits={inFlightEdits}
           onImageEditCancel={canEdit ? handleImageEditCancel : undefined}
           desktopId={desktopId}
           onImageHistoryRestore={canEdit ? handleImageHistoryRestore : undefined}
