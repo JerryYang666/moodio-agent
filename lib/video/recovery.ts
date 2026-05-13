@@ -224,6 +224,49 @@ export async function recoverGeneration(generation: {
 }
 
 /**
+ * TEMPORARY: poll every active ksyun generation on each list fetch.
+ *
+ * ksyun's webhook is not yet delivering callbacks reliably, so until they
+ * ship it we reconcile by querying their status endpoint ourselves every
+ * time the user loads their generations. Runs non-blocking via waitUntil
+ * from /api/video/generations. Remove once ksyun confirms webhook is live.
+ */
+export async function pollActiveKsyunGenerations(userId?: string): Promise<{
+  polled: number;
+  recovered: number;
+  stillProcessing: number;
+  failed: number;
+}> {
+  const conditions = [
+    inArray(videoGenerations.status, ["pending", "processing"]),
+    eq(videoGenerations.provider, "ksyun"),
+  ];
+  if (userId) {
+    conditions.push(eq(videoGenerations.userId, userId));
+  }
+
+  const gens = await db
+    .select()
+    .from(videoGenerations)
+    .where(and(...conditions));
+
+  const results = { polled: gens.length, recovered: 0, stillProcessing: 0, failed: 0 };
+  if (gens.length === 0) return results;
+
+  console.log(`[Ksyun Poll] Checking ${gens.length} active ksyun generation(s)`);
+
+  for (const gen of gens) {
+    if (!gen.providerRequestId) continue;
+    const result = await recoverGeneration(gen);
+    if (result.status === "in_progress") results.stillProcessing++;
+    else if (result.status === "completed") results.recovered++;
+    else results.failed++;
+  }
+
+  return results;
+}
+
+/**
  * Check and recover all stale generations for a user
  * Returns the number of generations recovered
  */

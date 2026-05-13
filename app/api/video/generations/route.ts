@@ -5,7 +5,10 @@ import { db } from "@/lib/db";
 import { videoGenerations } from "@/lib/db/schema";
 import { eq, desc } from "drizzle-orm";
 import { getImageUrl, getVideoUrl, getSignedVideoUrl } from "@/lib/storage/s3";
-import { checkAndRecoverStaleGenerations } from "@/lib/video/recovery";
+import {
+  checkAndRecoverStaleGenerations,
+  pollActiveKsyunGenerations,
+} from "@/lib/video/recovery";
 import { resolveUpscaledVideos } from "@/lib/video/upscale-utils";
 import { waitUntil } from "@vercel/functions";
 
@@ -45,6 +48,14 @@ export async function GET(request: NextRequest) {
   waitUntil(
     checkAndRecoverStaleGenerations(payload.userId).catch((err) => {
       console.error("[Video Generations] Background recovery error:", err);
+    })
+  );
+
+  // TEMP: poll active ksyun generations on every list fetch until their
+  // webhook is live. Non-blocking. Remove once ksyun callbacks are reliable.
+  waitUntil(
+    pollActiveKsyunGenerations(payload.userId).catch((err) => {
+      console.error("[Video Generations] Ksyun poll error:", err);
     })
   );
 
