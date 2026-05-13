@@ -10,9 +10,11 @@ import {
 } from "@heroui/modal";
 import { Button } from "@heroui/button";
 import { Textarea } from "@heroui/input";
+import { Spinner } from "@heroui/spinner";
 import { addToast } from "@heroui/toast";
 import { useTranslations } from "next-intl";
 import {
+  Bean,
   Check,
   Crop as CropIcon,
   Eraser,
@@ -141,6 +143,47 @@ export default function ImageEditModal({
     // snapshots and including it in deps would re-run the reset mid-flow.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
+
+  // Cost preview for the submit button. Crop is client-side only and free;
+  // the AI ops all hit /api/image/edit, which defaults to imageSize="2k"
+  // (resolution=2) and quality="auto" for this flow. Angles uses its own
+  // model id; everything else falls back to the client default nano-banana-2-fast.
+  const costModelId = useMemo(() => {
+    if (mode === "crop") return null;
+    if (mode === "angles") return "qwen-image-edit-angles";
+    return "nano-banana-2-fast";
+  }, [mode]);
+
+  const [cost, setCost] = useState<number | null>(null);
+  const [costLoading, setCostLoading] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen || !costModelId) {
+      setCost(null);
+      return;
+    }
+    let cancelled = false;
+    setCostLoading(true);
+    const params = new URLSearchParams({
+      modelId: costModelId,
+      resolution: "2",
+    });
+    fetch(`/api/image/cost?${params.toString()}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (cancelled || !data) return;
+        if (typeof data.cost === "number") setCost(data.cost);
+      })
+      .catch((err) => {
+        console.error("[image-edit-modal] cost fetch failed:", err);
+      })
+      .finally(() => {
+        if (!cancelled) setCostLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, costModelId]);
 
   const handleSubmit = async () => {
     try {
@@ -453,6 +496,18 @@ export default function ImageEditModal({
                           edit.completedCrop.height <= 0))
                     }
                     startContent={!edit.isProcessing && <Check size={14} />}
+                    endContent={
+                      !edit.isProcessing && costModelId ? (
+                        costLoading ? (
+                          <Spinner size="sm" />
+                        ) : cost !== null && cost > 0 ? (
+                          <span className="flex items-center gap-0.5 font-semibold">
+                            <Bean size={14} />
+                            {cost.toLocaleString()}
+                          </span>
+                        ) : null
+                      ) : null
+                    }
                   >
                     {tModal("submit")}
                   </Button>
