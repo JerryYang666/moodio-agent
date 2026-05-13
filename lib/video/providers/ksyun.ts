@@ -49,13 +49,18 @@ interface KsyunTaskData {
 /**
  * Shape returned by GET /{model}/v1/videos/omni-video/{task_id}.
  *
- * NOTE: This is NOT what ksyun's docs describe (the docs show the enveloped
- * {code, data:{task_status, task_result:{videos:[{url}]}}} form used for element
- * tasks). The real video-task query endpoint returns a flat, camelCased shape
- * that we discovered by probing. The video URL lives inside
- * `videoGenerateTaskOutput.mediaBasicInfos[]` — we accept a couple of likely
- * key spellings (`url`, `mediaUrl`, `resourceUrl`) since we haven't seen a
- * real success response yet.
+ * Two forms are observed in practice at any state (in-flight OR terminal):
+ *
+ * 1. Flat/camelCased form:
+ *    { taskId, type, status: RUNNING|SUCCEED|FAILED|...,
+ *      videoGenerateTaskInfo: { status, errMsg, unitPrice,
+ *        videoGenerateTaskOutput: { mediaBasicInfos: [{ mediaUrl, mediaDuration }] } } }
+ *    NOTE: `videoGenerateTaskOutput` is nested INSIDE `videoGenerateTaskInfo`.
+ *
+ * 2. Enveloped snake_case form:
+ *    { code: 0, message, data: { task_id, task_status, task_info, task_result } }
+ *
+ * We accept both and normalize on parse.
  */
 type KsyunVideoTaskStatus =
   | "PENDING"
@@ -63,6 +68,7 @@ type KsyunVideoTaskStatus =
   | "PROCESSING"
   | "RUNNING"
   | "SUCCEEDED"
+  | "SUCCEED"
   | "FAILED";
 
 interface KsyunMediaBasicInfo {
@@ -70,6 +76,11 @@ interface KsyunMediaBasicInfo {
   mediaUrl?: string;
   resourceUrl?: string;
   duration?: string | number;
+  mediaDuration?: string | number;
+}
+
+interface KsyunVideoTaskOutput {
+  mediaBasicInfos?: KsyunMediaBasicInfo[];
 }
 
 interface KsyunVideoTaskResponse {
@@ -81,10 +92,11 @@ interface KsyunVideoTaskResponse {
     status?: string;
     errMsg?: string;
     unitPrice?: number;
+    // Real responses nest the output here.
+    videoGenerateTaskOutput?: KsyunVideoTaskOutput;
   };
-  videoGenerateTaskOutput?: {
-    mediaBasicInfos?: KsyunMediaBasicInfo[];
-  };
+  // Kept for backward-compat / defensive parsing if ksyun ever returns it flat.
+  videoGenerateTaskOutput?: KsyunVideoTaskOutput;
 }
 
 // ---------------------------------------------------------------------------
@@ -324,8 +336,11 @@ function mapKsyunVideoStatus(
 function parseVideoResult(
   task: KsyunVideoTaskResponse
 ): VideoGenerationResult | null {
-  const info = task.videoGenerateTaskOutput?.mediaBasicInfos?.[0];
-  const url = info?.url ?? info?.mediaUrl ?? info?.resourceUrl;
+  const output =
+    task.videoGenerateTaskInfo?.videoGenerateTaskOutput ??
+    task.videoGenerateTaskOutput;
+  const info = output?.mediaBasicInfos?.[0];
+  const url = info?.mediaUrl ?? info?.url ?? info?.resourceUrl;
   if (!url) return null;
   return { video: { url }, seed: 0 };
 }
@@ -569,7 +584,20 @@ export class KsyunVideoProvider implements VideoProviderClient {
       );
     }
 
-    // Real task responses are flat with a top-level `taskId`.
+    // Enveloped form: {code:0, message, data:{task_id, task_status, ...}}.
+    // Unwrap into our flat task shape so mapKsyunVideoStatus handles it.
+    if (json?.data && (json.data.task_id || json.data.task_status)) {
+      return {
+        taskId: json.data.task_id,
+        status: json.data.task_status,
+        videoGenerateTaskInfo: {
+          status: json.data.task_status,
+          errMsg: json.data.task_status_msg,
+        },
+      } as KsyunVideoTaskResponse;
+    }
+
+    // Flat form with top-level `taskId` / `status`.
     if (!json?.taskId && !json?.status) {
       throw new Error(
         `ksyun queryTask returned unexpected shape: ${rawText.slice(0, 500)}`

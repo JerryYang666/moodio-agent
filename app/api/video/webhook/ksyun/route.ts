@@ -23,6 +23,16 @@ import { waitUntil } from "@vercel/functions";
  * We don't know which form ksyun will actually POST here, so we accept both.
  * The raw request body is always logged so we can confirm which arrived.
  */
+interface KsyunMediaBasicInfo {
+  url?: string;
+  mediaUrl?: string;
+  resourceUrl?: string;
+}
+
+interface KsyunTaskOutput {
+  mediaBasicInfos?: KsyunMediaBasicInfo[];
+}
+
 interface KsyunCallbackPayload {
   task_id?: string;
   taskId?: string;
@@ -35,14 +45,10 @@ interface KsyunCallbackPayload {
   videoGenerateTaskInfo?: {
     status?: string;
     errMsg?: string;
+    videoGenerateTaskOutput?: KsyunTaskOutput;
   };
-  videoGenerateTaskOutput?: {
-    mediaBasicInfos?: Array<{
-      url?: string;
-      mediaUrl?: string;
-      resourceUrl?: string;
-    }>;
-  };
+  // Defensive: ksyun may also place the output at the top level.
+  videoGenerateTaskOutput?: KsyunTaskOutput;
 }
 
 type NormalizedStatus = "in_queue" | "in_progress" | "completed" | "failed";
@@ -70,8 +76,11 @@ function normalizeStatus(raw: string | undefined): NormalizedStatus | null {
 function extractVideoUrl(payload: KsyunCallbackPayload): string | undefined {
   const fromEnvelope = payload.task_result?.videos?.[0]?.url;
   if (fromEnvelope) return fromEnvelope;
-  const info = payload.videoGenerateTaskOutput?.mediaBasicInfos?.[0];
-  return info?.url ?? info?.mediaUrl ?? info?.resourceUrl;
+  const output =
+    payload.videoGenerateTaskInfo?.videoGenerateTaskOutput ??
+    payload.videoGenerateTaskOutput;
+  const info = output?.mediaBasicInfos?.[0];
+  return info?.mediaUrl ?? info?.url ?? info?.resourceUrl;
 }
 
 function extractErrorMessage(payload: KsyunCallbackPayload): string {
