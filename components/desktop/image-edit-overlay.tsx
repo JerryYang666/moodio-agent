@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Button, ButtonGroup } from "@heroui/button";
 import {
@@ -10,8 +10,10 @@ import {
   DropdownItem,
 } from "@heroui/dropdown";
 import { Textarea } from "@heroui/input";
+import { Spinner } from "@heroui/spinner";
 import { addToast } from "@heroui/toast";
 import {
+  Bean,
   Check,
   ChevronDown,
   Copy,
@@ -139,6 +141,48 @@ export default function ImageEditOverlay({
     sourceImageId,
     onSuccess: () => {},
   });
+
+  // Cost preview for the confirm button. Crop is client-side only and free;
+  // every other mode hits /api/image/edit and bills credits, so fetch the
+  // estimate for the model that prepareSubmit will actually call. The route
+  // defaults imageSize to "2k" (resolution=2) and imageQuality to "auto", so
+  // we mirror those here.
+  const costModelId = useMemo(() => {
+    if (mode === "crop") return null;
+    if (mode === "angles") return "qwen-image-edit-angles";
+    return "nano-banana-2-fast";
+  }, [mode]);
+
+  const [cost, setCost] = useState<number | null>(null);
+  const [costLoading, setCostLoading] = useState(false);
+
+  useEffect(() => {
+    if (!costModelId) {
+      setCost(null);
+      return;
+    }
+    let cancelled = false;
+    setCostLoading(true);
+    const params = new URLSearchParams({
+      modelId: costModelId,
+      resolution: "2",
+    });
+    fetch(`/api/image/cost?${params.toString()}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (cancelled || !data) return;
+        if (typeof data.cost === "number") setCost(data.cost);
+      })
+      .catch((err) => {
+        console.error("[image-edit-overlay] cost fetch failed:", err);
+      })
+      .finally(() => {
+        if (!cancelled) setCostLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [costModelId]);
 
   // No explicit re-init effect for screenRect changes: the <img> inside the
   // overlay is sized `w-full h-full` against a container whose dimensions
@@ -437,6 +481,7 @@ export default function ImageEditOverlay({
             ) : (
               <Check size={14} />
             );
+            const showCost = costModelId !== null && !edit.isProcessing;
             return (
               <ButtonGroup size="sm" color="primary">
                 <Button
@@ -444,6 +489,18 @@ export default function ImageEditOverlay({
                   isLoading={edit.isProcessing}
                   isDisabled={primaryDisabled}
                   startContent={primaryIcon}
+                  endContent={
+                    showCost ? (
+                      costLoading ? (
+                        <Spinner size="sm" />
+                      ) : cost !== null && cost > 0 ? (
+                        <span className="flex items-center gap-0.5 font-semibold">
+                          <Bean size={14} />
+                          {cost.toLocaleString()}
+                        </span>
+                      ) : null
+                    ) : null
+                  }
                 >
                   {primaryLabel}
                 </Button>
