@@ -100,34 +100,29 @@ export default function DirectVideoCard({
   useEffect(() => {
     if (!part.generationId) return;
 
-    const unsubscribe = onGenerationUpdate((generationId, status) => {
+    const unsubscribe = onGenerationUpdate((generationId, gen) => {
       if (generationId !== part.generationId) return;
+      if (!onStatusUpdate) return;
 
-      if (status === "completed" && onStatusUpdate) {
-        fetch(`/api/video/generations/${generationId}`)
-          .then((res) => res.json())
-          .then((data) => {
-            const gen = data.generation;
-            onStatusUpdate({
-              status: "completed",
-              videoId: gen?.videoId,
-              videoUrl: gen?.videoUrl,
-              signedVideoUrl: gen?.signedVideoUrl,
-              thumbnailImageId: gen?.thumbnailImageId,
-              thumbnailUrl: gen?.thumbnailUrl || part.thumbnailUrl,
-              seed: gen?.seed,
-              completedAt: gen?.completedAt,
-              provider: gen?.provider,
-              providerRequestId: gen?.providerRequestId,
-            });
-          })
-          .catch(() => {
-            onStatusUpdate({ status: "completed" });
-          });
-      } else if (status === "failed" && onStatusUpdate) {
+      if (gen.status === "completed") {
+        onStatusUpdate({
+          status: "completed",
+          videoId: gen.videoId ?? undefined,
+          videoUrl: gen.videoUrl ?? undefined,
+          signedVideoUrl: gen.signedVideoUrl ?? undefined,
+          thumbnailImageId: gen.thumbnailImageId ?? undefined,
+          thumbnailUrl: gen.thumbnailUrl || part.thumbnailUrl,
+          seed: gen.seed ?? undefined,
+          completedAt: gen.completedAt ?? undefined,
+          provider: gen.provider ?? undefined,
+          providerRequestId: gen.providerRequestId ?? undefined,
+        });
+      } else if (gen.status === "failed") {
         onStatusUpdate({
           status: "failed",
-          error: "Video generation failed",
+          error: gen.error ?? "Video generation failed",
+          provider: gen.provider ?? undefined,
+          providerRequestId: gen.providerRequestId ?? undefined,
         });
       }
     });

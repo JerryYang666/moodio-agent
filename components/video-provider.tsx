@@ -16,17 +16,25 @@ import { getUserFriendlyErrorKey } from "@/lib/video/error-classify";
 
 export type VideoGenerationStatus = "pending" | "processing" | "completed" | "failed";
 
-interface VideoGeneration {
+export interface VideoGeneration {
   id: string;
   status: VideoGenerationStatus;
   thumbnailUrl: string | null;
   params: Record<string, any>;
   error?: string | null;
+  videoId?: string | null;
+  videoUrl?: string | null;
+  signedVideoUrl?: string | null;
+  thumbnailImageId?: string | null;
+  seed?: number | null;
+  completedAt?: string | null;
+  provider?: string | null;
+  providerRequestId?: string | null;
 }
 
 type GenerationUpdateListener = (
   generationId: string,
-  status: VideoGenerationStatus
+  generation: VideoGeneration
 ) => void;
 
 interface VideoContextType {
@@ -149,7 +157,7 @@ export function VideoProvider({ children }: { children: React.ReactNode }) {
               // Notify all listeners
               for (const listener of Array.from(listenersRef.current)) {
                 try {
-                  listener(generationId, generation.status);
+                  listener(generationId, generation);
                 } catch (e) {
                   console.error("Error in generation update listener:", e);
                 }

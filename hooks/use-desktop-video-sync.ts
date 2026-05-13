@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useCallback } from "react";
-import { useVideo, type VideoGenerationStatus } from "@/components/video-provider";
+import { useVideo, type VideoGeneration } from "@/components/video-provider";
 import type { VideoAssetMeta } from "@/lib/desktop/types";
 import type { RemoteEvent } from "@/hooks/use-desktop-ws";
 
@@ -112,14 +112,14 @@ export function useDesktopVideoSync({
   //    refresh the desktop so the asset updates.
   // ---------------------------------------------------------------
   useEffect(() => {
-    return onGenerationUpdate((generationId: string, status: VideoGenerationStatus) => {
+    return onGenerationUpdate((generationId: string, gen: VideoGeneration) => {
       ownedPollingRef.current.delete(generationId);
       remotePollingRef.current.delete(generationId);
 
-      if (status === "completed" || status === "failed") {
+      if (gen.status === "completed" || gen.status === "failed") {
         sendEventRef.current("video_generation_updated", {
           generationId,
-          status,
+          status: gen.status,
         });
         fetchDetailRef.current();
       }
