@@ -47,6 +47,12 @@ const STATIC_ALLOWED_HOSTS: readonly string[] = [
   "storage.googleapis.com",
   // ByteDance / Volcengine (Seedream / Seedance)
   "volces.com",
+  // Kingsoft Cloud (ksyun) / Kling — kling-v3-omni returns videos on
+  // rotating CDN hosts with signed query params. Observed so far:
+  //   - v4-fdl.kechuangai.com
+  //   - cdn-media.hunyuan.tencent.com
+  "kechuangai.com",
+  "hunyuan.tencent.com",
 ];
 
 function getOwnCdnHosts(): string[] {

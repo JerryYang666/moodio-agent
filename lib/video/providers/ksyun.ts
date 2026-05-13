@@ -584,15 +584,23 @@ export class KsyunVideoProvider implements VideoProviderClient {
       );
     }
 
-    // Enveloped form: {code:0, message, data:{task_id, task_status, ...}}.
-    // Unwrap into our flat task shape so mapKsyunVideoStatus handles it.
+    // Enveloped form: {code:0, message, data:{task_id, task_status, task_result?, ...}}.
+    // Unwrap into our flat task shape, promoting task_result.videos[0].url into
+    // videoGenerateTaskInfo.videoGenerateTaskOutput so parseVideoResult finds it.
     if (json?.data && (json.data.task_id || json.data.task_status)) {
+      const videos = json.data.task_result?.videos;
+      const firstVideoUrl: string | undefined = Array.isArray(videos)
+        ? videos[0]?.url
+        : undefined;
       return {
         taskId: json.data.task_id,
         status: json.data.task_status,
         videoGenerateTaskInfo: {
           status: json.data.task_status,
           errMsg: json.data.task_status_msg,
+          videoGenerateTaskOutput: firstVideoUrl
+            ? { mediaBasicInfos: [{ url: firstVideoUrl }] }
+            : undefined,
         },
       } as KsyunVideoTaskResponse;
     }
