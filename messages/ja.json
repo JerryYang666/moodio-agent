@@ -1658,7 +1658,6 @@
     "deleteAllSelected": "選択した {count} 件をすべて削除",
     "moveModeTooltip": "キャンバスを移動（ドラッグ）",
     "selectModeTooltip": "アセットを選択（ドラッグ）",
-    "toToggle": "切り替え",
     "liveSyncActive": "ライブ同期が有効",
     "liveSyncUnavailable": "ライブ同期が利用できません — 10秒ごとに更新",
     "reconnecting": "ライブ同期に再接続中…",

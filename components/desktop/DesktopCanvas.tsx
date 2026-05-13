@@ -1186,12 +1186,12 @@ export default function DesktopCanvas({
     return () => window.removeEventListener("keydown", handler);
   }, [canEdit, selectedIds, contextMenu, renamingAssetId, onAssetDelete, onAssetBatchDelete]);
 
-  // Ctrl/Cmd+D toggles between move (pan) and select (marquee) modes.
+  // V selects (marquee), H switches to move (pan) — industry standard (Figma, Photoshop).
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key !== "d" && e.key !== "D") return;
-      if (!(e.ctrlKey || e.metaKey)) return;
-      if (e.altKey || e.shiftKey) return;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      const key = e.key.toLowerCase();
+      if (key !== "v" && key !== "h") return;
       if (renamingAssetId || imageEditStateRef.current) return;
       const target = e.target;
       if (target instanceof HTMLElement) {
@@ -1201,11 +1201,11 @@ export default function DesktopCanvas({
         if (target.closest('[contenteditable="true"], [contenteditable=""]')) return;
       }
       e.preventDefault();
-      onCanvasModeChange(canvasMode === "move" ? "select" : "move");
+      onCanvasModeChange(key === "v" ? "select" : "move");
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [canvasMode, onCanvasModeChange, renamingAssetId]);
+  }, [onCanvasModeChange, renamingAssetId]);
 
   const startRename = useCallback(
     (asset: EnrichedDesktopAsset) => {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef } from "react";
 import { useTranslations } from "next-intl";
 import { Button } from "@heroui/button";
 import { Kbd } from "@heroui/kbd";
@@ -32,10 +32,6 @@ export default function DesktopToolbar({
 }: DesktopToolbarProps) {
   const t = useTranslations("desktop");
   const toolbarRef = useRef<HTMLDivElement>(null);
-  const [isMac, setIsMac] = useState(false);
-  useEffect(() => {
-    setIsMac(/Mac|iPhone|iPad|iPod/.test(navigator.platform));
-  }, []);
 
   /** Get the actual canvas container dimensions (not the full window). */
   const getContainerSize = () => {
@@ -121,8 +117,7 @@ export default function DesktopToolbar({
             <span>
               {canvasMode === "move" ? t("moveModeTooltip") : t("selectModeTooltip")}
             </span>
-            <Kbd keys={isMac ? ["command"] : ["ctrl"]}>D</Kbd>
-            <span className="text-xs text-default-500">{t("toToggle")}</span>
+            <Kbd>{canvasMode === "move" ? "H" : "V"}</Kbd>
           </div>
         }
         closeDelay={0}

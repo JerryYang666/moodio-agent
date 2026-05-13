@@ -1658,7 +1658,6 @@
     "deleteAllSelected": "删除全部 {count} 个选中项",
     "moveModeTooltip": "移动画布（拖动）",
     "selectModeTooltip": "选择资产（拖动）",
-    "toToggle": "切换",
     "liveSyncActive": "实时同步已激活",
     "liveSyncUnavailable": "实时同步不可用 — 每 10 秒更新一次",
     "reconnecting": "正在重新连接实时同步…",

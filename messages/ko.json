@@ -1658,7 +1658,6 @@
     "deleteAllSelected": "선택한 {count}개 모두 삭제",
     "moveModeTooltip": "캔버스 이동 (드래그)",
     "selectModeTooltip": "에셋 선택 (드래그)",
-    "toToggle": "전환",
     "liveSyncActive": "실시간 동기화 활성",
     "liveSyncUnavailable": "실시간 동기화 사용 불가 — 10초마다 업데이트",
     "reconnecting": "실시간 동기화에 재연결 중…",
