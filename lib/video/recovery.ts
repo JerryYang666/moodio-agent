@@ -237,6 +237,10 @@ export async function pollActiveKsyunGenerations(userId?: string): Promise<{
   stillProcessing: number;
   failed: number;
 }> {
+  console.log(
+    `[Ksyun Poll] Invoked (userId=${userId ?? "<all>"})`
+  );
+
   const conditions = [
     inArray(videoGenerations.status, ["pending", "processing"]),
     eq(videoGenerations.provider, "ksyun"),
@@ -251,17 +255,33 @@ export async function pollActiveKsyunGenerations(userId?: string): Promise<{
     .where(and(...conditions));
 
   const results = { polled: gens.length, recovered: 0, stillProcessing: 0, failed: 0 };
+
+  console.log(
+    `[Ksyun Poll] DB matched ${gens.length} row(s) with provider='ksyun' AND status IN ('pending','processing')`
+  );
+
   if (gens.length === 0) return results;
 
-  console.log(`[Ksyun Poll] Checking ${gens.length} active ksyun generation(s)`);
-
   for (const gen of gens) {
-    if (!gen.providerRequestId) continue;
+    console.log(
+      `[Ksyun Poll] -> generation ${gen.id} status=${gen.status} requestId=${gen.providerRequestId ?? "<null>"} providerModelId=${gen.providerModelId ?? "<null>"} createdAt=${gen.createdAt.toISOString()}`
+    );
+    if (!gen.providerRequestId) {
+      console.log(`[Ksyun Poll] -> generation ${gen.id} skipped: no providerRequestId`);
+      continue;
+    }
     const result = await recoverGeneration(gen);
+    console.log(
+      `[Ksyun Poll] -> generation ${gen.id} result: recovered=${result.recovered} status=${result.status}${result.error ? ` error=${result.error}` : ""}`
+    );
     if (result.status === "in_progress") results.stillProcessing++;
     else if (result.status === "completed") results.recovered++;
     else results.failed++;
   }
+
+  console.log(
+    `[Ksyun Poll] Done: polled=${results.polled} recovered=${results.recovered} stillProcessing=${results.stillProcessing} failed=${results.failed}`
+  );
 
   return results;
 }
