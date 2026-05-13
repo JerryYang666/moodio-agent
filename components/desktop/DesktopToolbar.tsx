@@ -1,8 +1,9 @@
 "use client";
 
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Button } from "@heroui/button";
+import { Kbd } from "@heroui/kbd";
 import { Tooltip } from "@heroui/tooltip";
 import { ZoomIn, ZoomOut, Maximize, Hand, MousePointer2 } from "lucide-react";
 import type { CameraState } from "@/hooks/use-desktop";
@@ -31,6 +32,10 @@ export default function DesktopToolbar({
 }: DesktopToolbarProps) {
   const t = useTranslations("desktop");
   const toolbarRef = useRef<HTMLDivElement>(null);
+  const [isMac, setIsMac] = useState(false);
+  useEffect(() => {
+    setIsMac(/Mac|iPhone|iPad|iPod/.test(navigator.platform));
+  }, []);
 
   /** Get the actual canvas container dimensions (not the full window). */
   const getContainerSize = () => {
@@ -111,7 +116,15 @@ export default function DesktopToolbar({
   return (
     <div ref={toolbarRef} className="absolute bottom-4 right-4 flex items-center gap-1 bg-background/80 backdrop-blur-sm rounded-xl border border-divider p-1 shadow-sm z-10">
       <Tooltip
-        content={canvasMode === "move" ? t("moveModeTooltip") : t("selectModeTooltip")}
+        content={
+          <div className="flex items-center gap-2">
+            <span>
+              {canvasMode === "move" ? t("moveModeTooltip") : t("selectModeTooltip")}
+            </span>
+            <Kbd keys={isMac ? ["command"] : ["ctrl"]}>D</Kbd>
+            <span className="text-xs text-default-500">{t("toToggle")}</span>
+          </div>
+        }
         closeDelay={0}
       >
         <Button

@@ -838,6 +838,7 @@
     "deleteAllSelected": "Delete all {count} selected",
     "moveModeTooltip": "Move canvas (drag)",
     "selectModeTooltip": "Select assets (drag)",
+    "toToggle": "to toggle",
     "liveSyncActive": "Live sync active",
     "liveSyncUnavailable": "Live sync unavailable — updates every 10s",
     "reconnecting": "Reconnecting to live sync…",

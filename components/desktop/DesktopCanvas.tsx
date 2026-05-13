@@ -63,6 +63,7 @@ interface DesktopCanvasProps {
   camera: CameraState;
   permission: Permission;
   canvasMode: CanvasMode;
+  onCanvasModeChange: (mode: CanvasMode) => void;
   onCameraChange: (camera: CameraState) => void;
   onAssetMove: (assetId: string, posX: number, posY: number) => void;
   onAssetBatchMove?: (moves: Array<{ id: string; posX: number; posY: number }>) => void;
@@ -290,6 +291,7 @@ export default function DesktopCanvas({
   camera,
   permission,
   canvasMode,
+  onCanvasModeChange,
   onCameraChange,
   onAssetMove,
   onAssetBatchMove,
@@ -1183,6 +1185,27 @@ export default function DesktopCanvas({
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [canEdit, selectedIds, contextMenu, renamingAssetId, onAssetDelete, onAssetBatchDelete]);
+
+  // Ctrl/Cmd+D toggles between move (pan) and select (marquee) modes.
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key !== "d" && e.key !== "D") return;
+      if (!(e.ctrlKey || e.metaKey)) return;
+      if (e.altKey || e.shiftKey) return;
+      if (renamingAssetId || imageEditStateRef.current) return;
+      const target = e.target;
+      if (target instanceof HTMLElement) {
+        const tag = target.tagName;
+        if (tag === "INPUT" || tag === "TEXTAREA") return;
+        if (target.isContentEditable) return;
+        if (target.closest('[contenteditable="true"], [contenteditable=""]')) return;
+      }
+      e.preventDefault();
+      onCanvasModeChange(canvasMode === "move" ? "select" : "move");
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [canvasMode, onCanvasModeChange, renamingAssetId]);
 
   const startRename = useCallback(
     (asset: EnrichedDesktopAsset) => {

@@ -2323,6 +2323,7 @@ export default function DesktopDetailPage({
           camera={camera}
           permission={desktop.permission}
           canvasMode={canvasMode}
+          onCanvasModeChange={setCanvasMode}
           onCameraChange={handleCameraChange}
           onAssetMove={handleAssetMove}
           onAssetBatchMove={handleAssetBatchMove}
