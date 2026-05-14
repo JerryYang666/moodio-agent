@@ -76,28 +76,20 @@ export const DEFAULT_CROP_ASPECT_CHOICE: CropAspectChoice = "free";
 /**
  * Resolve a CropAspectChoice into the numeric `aspect` value that
  * <ReactCrop> consumes. Returns undefined for "free" (no constraint).
- *
- * `rotated` indicates whether the displayed image is rotated by an odd
- * multiple of 90° — in that case the visible width/height are swapped, so
- * the apparent aspect needs to be inverted to match what the user sees.
  */
 export function resolveCropAspectRatio(
   choice: CropAspectChoice,
   naturalWidth: number,
-  naturalHeight: number,
-  rotated: boolean
+  naturalHeight: number
 ): number | undefined {
   if (choice === "free") return undefined;
-  let ratio: number;
   if (choice === "source") {
     if (!naturalWidth || !naturalHeight) return undefined;
-    ratio = naturalWidth / naturalHeight;
-  } else {
-    const [w, h] = choice.split(":").map(Number);
-    if (!w || !h) return undefined;
-    ratio = w / h;
+    return naturalWidth / naturalHeight;
   }
-  return rotated ? 1 / ratio : ratio;
+  const [w, h] = choice.split(":").map(Number);
+  if (!w || !h) return undefined;
+  return w / h;
 }
 
 /**
@@ -206,16 +198,13 @@ export async function composeMarkedImage(args: {
  * any state flip that unmounts it — falling back to natural dimensions
  * silently produces a broken crop anchored at top-left.
  *
- * When `rotation`/`flipX`/`flipY` are set, the source is first rendered
- * onto an intermediate canvas with those transforms applied (so its
- * bounding box matches what the user saw in the cropper), then the
- * completedCrop is mapped into that intermediate canvas in natural pixels.
+ * `flipX`/`flipY` mirror the displayed image (the user saw the flipped
+ * image when picking the crop, so we bake the same flip into the output).
  */
 export async function composeCroppedImage(args: {
   sourceImageId: string;
   completedCrop: PixelCrop;
   displayedRect: DOMRect | null;
-  rotation?: number;
   flipX?: boolean;
   flipY?: boolean;
 }): Promise<File> {
@@ -223,7 +212,6 @@ export async function composeCroppedImage(args: {
     sourceImageId,
     completedCrop,
     displayedRect,
-    rotation = 0,
     flipX = false,
     flipY = false,
   } = args;
@@ -236,35 +224,29 @@ export async function composeCroppedImage(args: {
   }
   const cleanImage = await fetchOriginalImage(sourceImageId);
 
-  // Build the intermediate canvas that mirrors what <ReactCrop> displayed:
-  // the source image rotated + flipped, fit to its rotated bounding box.
-  const theta = (rotation * Math.PI) / 180;
+  // Bake the flips into an intermediate canvas the size of the source.
   const W = cleanImage.naturalWidth;
   const H = cleanImage.naturalHeight;
-  const cos = Math.abs(Math.cos(theta));
-  const sin = Math.abs(Math.sin(theta));
-  const bbW = Math.max(1, Math.round(W * cos + H * sin));
-  const bbH = Math.max(1, Math.round(W * sin + H * cos));
 
   const interim = document.createElement("canvas");
-  interim.width = bbW;
-  interim.height = bbH;
+  interim.width = W;
+  interim.height = H;
   const ictx = interim.getContext("2d");
   if (!ictx) throw new Error("Failed to get interim 2d context");
   ictx.save();
-  ictx.translate(bbW / 2, bbH / 2);
-  ictx.rotate(theta);
+  ictx.translate(W / 2, H / 2);
   ictx.scale(flipX ? -1 : 1, flipY ? -1 : 1);
   ictx.drawImage(cleanImage, -W / 2, -H / 2);
   ictx.restore();
 
-  // completedCrop is in displayed-pixel space of the rotated bounding box.
-  const dispW = displayedRect?.width || bbW;
-  const dispH = displayedRect?.height || bbH;
-  const sx = (completedCrop.x * bbW) / dispW;
-  const sy = (completedCrop.y * bbH) / dispH;
-  const sw = (completedCrop.width * bbW) / dispW;
-  const sh = (completedCrop.height * bbH) / dispH;
+  // Map the completedCrop (displayed pixels of the static image) to source
+  // natural-pixel coords.
+  const dispW = displayedRect?.width || W;
+  const dispH = displayedRect?.height || H;
+  const sx = (completedCrop.x * W) / dispW;
+  const sy = (completedCrop.y * H) / dispH;
+  const sw = (completedCrop.width * W) / dispW;
+  const sh = (completedCrop.height * H) / dispH;
 
   const out = document.createElement("canvas");
   out.width = Math.max(1, Math.round(sw));
