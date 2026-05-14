@@ -866,6 +866,155 @@ export default function DesktopDetailPage({
     setImageEditState(null);
   }, []);
 
+  // Grid-split commit: every tile becomes its own image asset arranged in
+  // the same grid pattern the user picked, anchored at the source's
+  // position. The source asset is left untouched (no "replace" path).
+  const handleImageEditCommitSplit = useCallback(
+    async (args: {
+      assetId: string;
+      tiles: Array<{ imageId: string; imageUrl: string }>;
+      rows: number;
+      cols: number;
+      editType: string;
+    }) => {
+      const { assetId, tiles, rows, cols, editType } = args;
+      const source = assetsRef.current.find((a) => a.id === assetId);
+      setImageEditState(null);
+      if (!source || source.assetType !== "image") return;
+      if (tiles.length === 0) return;
+
+      const sourceMeta = source.metadata as Record<string, unknown>;
+      const sourceW = source.width ?? 300;
+      const sourceH = source.height ?? 300;
+      const GAP = 12;
+      // Lay tiles next to the source, preserving the user's grid layout.
+      // Each tile takes (sourceW / cols) × (sourceH / rows) display space so
+      // the resulting cluster occupies roughly the same footprint as the
+      // original — give or take the gap allowance.
+      const tileW = Math.max(40, Math.floor((sourceW - GAP * (cols - 1)) / cols));
+      const tileH = Math.max(40, Math.floor((sourceH - GAP * (rows - 1)) / rows));
+
+      // Anchor: right of the source so the user sees the new cluster as a
+      // direct outgrowth. If that collides we let the placer spiral out.
+      const rects = assetsRef.current.map((a) => ({
+        x: a.posX,
+        y: a.posY,
+        w: a.width ?? 400,
+        h: a.height ?? 300,
+      }));
+      const clusterW = tileW * cols + GAP * (cols - 1);
+      const clusterH = tileH * rows + GAP * (rows - 1);
+      const { x: clusterX, y: clusterY } = findNonOverlappingPosition(
+        source.posX + sourceW + GAP,
+        source.posY,
+        clusterW,
+        clusterH,
+        rects
+      );
+
+      const newAssets = tiles.map((tile, idx) => {
+        const r = Math.floor(idx / cols);
+        const c = idx % cols;
+        const nextMeta: Record<string, unknown> = {
+          imageId: tile.imageId,
+          status: "generated",
+        };
+        if (typeof sourceMeta.title === "string") {
+          nextMeta.title = `${sourceMeta.title} · ${r + 1}×${c + 1}`;
+        }
+        if (typeof sourceMeta.chatId === "string") nextMeta.chatId = sourceMeta.chatId;
+        nextMeta.createdByEdit = editType;
+        nextMeta.sourceAssetId = assetId;
+        return {
+          assetType: "image" as const,
+          metadata: nextMeta,
+          posX: clusterX + c * (tileW + GAP),
+          posY: clusterY + r * (tileH + GAP),
+          width: tileW,
+          height: tileH,
+        };
+      });
+
+      try {
+        const res = await fetch(`/api/desktop/${desktopId}/assets`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ assets: newAssets }),
+        });
+        if (!res.ok) throw new Error("Failed to create split assets");
+        const data = await res.json();
+        const created =
+          (data.assets as EnrichedDesktopAsset[] | undefined) ?? [];
+        for (const asset of created) {
+          applyRemoteEvent({ type: "asset_added", payload: { asset } });
+          sendEvent("asset_added", { asset });
+        }
+        if (created.length > 0) {
+          const snapshots = created.map((a) => ({ ...a }));
+          const createdIds = created.map((a) => a.id);
+          history.record({
+            userId: user?.id ?? "",
+            label: { key: "addAsset" },
+            targetIds: createdIds,
+            forward: async () => {
+              // Apply all snapshots; surface the first failure (if any) so
+              // history can render the right error. Per-tile partial restores
+              // are acceptable since each is independent.
+              const results = await Promise.all(
+                snapshots.map((snap) =>
+                  applyAssetRestore(historyDepsRef.current, snap)
+                )
+              );
+              return results.find((r) => !r.ok) ?? results[0]!;
+            },
+            inverse: async () => {
+              const results = await Promise.all(
+                createdIds.map((id) =>
+                  applyAssetRemove(historyDepsRef.current, id)
+                )
+              );
+              return results.find((r) => !r.ok) ?? results[0]!;
+            },
+          });
+        }
+
+        for (const tile of tiles) {
+          trackResearch({
+            chatId:
+              typeof sourceMeta.chatId === "string"
+                ? sourceMeta.chatId
+                : undefined,
+            eventType: "canvas_item_added",
+            imageId: tile.imageId,
+            metadata: {
+              assetType: "image",
+              desktopId,
+              source: "image_edit_split",
+              editType,
+              sourceAssetId: assetId,
+            },
+          });
+        }
+      } catch (error) {
+        console.error("Failed to commit split tiles:", error);
+        addToast({
+          title: t("imageEdit.errorTitle"),
+          description: t("failedToAddImage"),
+          color: "danger",
+        });
+      }
+    },
+    [
+      desktopId,
+      applyRemoteEvent,
+      sendEvent,
+      history,
+      user?.id,
+      trackResearch,
+      t,
+    ]
+  );
+
   // Launch an AI edit (redraw / erase / cutout / angles) in the background.
   // The overlay has already closed (prepareSubmit resolved); we register the
   // asset as in-flight, fire the model call, and commit the result through
@@ -2355,6 +2504,7 @@ export default function DesktopDetailPage({
           onExternalFileDrop={canEdit ? handleExternalFileDrop : undefined}
           imageEditState={canEdit ? imageEditState : null}
           onImageEditCommit={canEdit ? handleImageEditCommit : undefined}
+          onImageEditCommitSplit={canEdit ? handleImageEditCommitSplit : undefined}
           onImageEditLaunch={canEdit ? handleImageEditLaunch : undefined}
           inFlightEdits={inFlightEdits}
           onImageEditCancel={canEdit ? handleImageEditCancel : undefined}

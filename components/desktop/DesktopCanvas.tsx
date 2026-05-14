@@ -33,6 +33,7 @@ import {
   Eraser,
   Scissors,
   Orbit,
+  Grid3X3,
   History,
 } from "lucide-react";
 import AssetHistoryPopover from "./assets/AssetHistoryPopover";
@@ -159,6 +160,20 @@ interface DesktopCanvasProps {
     newImageUrl: string;
     editType: string;
     placement: ImageEditPlacement;
+  }) => void;
+  /**
+   * Grid-split commit: the user sliced one image into N×M tiles, each of
+   * which becomes its own asset laid out adjacent to the source in the same
+   * grid arrangement. Routed separately from the single-result commit
+   * because there's no "replace" semantics and the layout step needs the
+   * rows/cols dims.
+   */
+  onImageEditCommitSplit?: (args: {
+    assetId: string;
+    tiles: Array<{ imageId: string; imageUrl: string }>;
+    rows: number;
+    cols: number;
+    editType: string;
   }) => void;
   /**
    * AI edit ops (redraw / erase / cutout / angles) are handed off to the
@@ -323,6 +338,7 @@ export default function DesktopCanvas({
   onExternalFileDrop,
   imageEditState,
   onImageEditCommit,
+  onImageEditCommitSplit,
   onImageEditLaunch,
   inFlightEdits,
   onImageEditCancel,
@@ -1841,6 +1857,7 @@ export default function DesktopCanvas({
                 { mode: "erase" as const, Icon: Eraser, labelKey: "erase" as const },
                 { mode: "cutout" as const, Icon: Scissors, labelKey: "cutout" as const },
                 { mode: "angles" as const, Icon: Orbit, labelKey: "angles" as const },
+                { mode: "split" as const, Icon: Grid3X3, labelKey: "split" as const },
               ]).map(({ mode, Icon, labelKey }) => {
                 // Block kicking a second edit on an asset that already has
                 // one in flight. The asset-level moodio-image-edit listener
@@ -2021,6 +2038,15 @@ export default function DesktopCanvas({
                 newImageUrl,
                 editType,
                 placement,
+              })
+            }
+            onCommitSplit={({ tiles, rows, cols, editType }) =>
+              onImageEditCommitSplit?.({
+                assetId: target.id,
+                tiles,
+                rows,
+                cols,
+                editType,
               })
             }
             onLaunch={({ apiPayload, editType, placement }) =>

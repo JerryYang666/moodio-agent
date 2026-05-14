@@ -40,6 +40,7 @@ import {
   Eraser,
   Scissors,
   Orbit,
+  Grid3X3 as GridIcon,
 } from "lucide-react";
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useTranslations } from "next-intl";
@@ -521,6 +522,8 @@ export default function ImageDetailModal({
                                         startEditFlow("cutout");
                                       } else if (key === "edit-angles") {
                                         startEditFlow("angles");
+                                      } else if (key === "edit-split") {
+                                        startEditFlow("split");
                                       }
                                     }}
                                   >
@@ -571,6 +574,12 @@ export default function ImageDetailModal({
                                         startContent={<Orbit size={16} />}
                                       >
                                         {tMenu("editAngles")}
+                                      </DropdownItem>
+                                      <DropdownItem
+                                        key="edit-split"
+                                        startContent={<GridIcon size={16} />}
+                                      >
+                                        {tMenu("editSplit")}
                                       </DropdownItem>
                                     </DropdownSection>
                                     <DropdownSection
@@ -802,6 +811,8 @@ export default function ImageDetailModal({
                                         startEditFlow("cutout");
                                       } else if (key === "edit-angles") {
                                         startEditFlow("angles");
+                                      } else if (key === "edit-split") {
+                                        startEditFlow("split");
                                       }
                                     }}
                                   >
@@ -852,6 +863,12 @@ export default function ImageDetailModal({
                                         startContent={<Orbit size={16} />}
                                       >
                                         {tMenu("editAngles")}
+                                      </DropdownItem>
+                                      <DropdownItem
+                                        key="edit-split"
+                                        startContent={<GridIcon size={16} />}
+                                      >
+                                        {tMenu("editSplit")}
                                       </DropdownItem>
                                     </DropdownSection>
                                     <DropdownSection

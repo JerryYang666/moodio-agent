@@ -22,7 +22,8 @@ export type ImageEditMode =
   | "crop"
   | "erase"
   | "cutout"
-  | "angles";
+  | "angles"
+  | "split";
 export type CutoutSubMode = "auto" | "manual";
 export type ImageEditOperation =
   | "redraw"
@@ -194,12 +195,22 @@ export async function composeMarkedImage(args: {
 
 /**
  * Crop the original-resolution image using a completedCrop in displayed-pixel
- * space. `displayedRect` MUST be captured from the rendered <img> *before*
- * any state flip that unmounts it — falling back to natural dimensions
- * silently produces a broken crop anchored at top-left.
+ * space.
  *
- * `flipX`/`flipY` mirror the displayed image (the user saw the flipped
- * image when picking the crop, so we bake the same flip into the output).
+ * `displayedRect` is the rendered crop wrapper's bounding box (in CSS px).
+ * When rotation is zero, this is just the <img>; when rotation is non-zero,
+ * the wrapper is sized to the rotated bbox and the inner <img> is the
+ * un-rotated image painted on top, so the crop coords are in wrapper space.
+ * Either way the wrapper preserves the rotated-bbox aspect ratio, so the
+ * crop coords scale uniformly into natural-pixel space.
+ *
+ * `flipX`/`flipY` mirror the source horizontally / vertically. Flips are
+ * applied to the SOURCE before rotation so the user always sees rotation
+ * around the on-screen center regardless of flip parity.
+ *
+ * `rotationDeg` is the angle the IMAGE is rotated by — the crop selection
+ * itself is axis-aligned in wrapper space. The output canvas is the same
+ * axis-aligned rectangle the user saw, at the source's natural pixel scale.
  */
 export async function composeCroppedImage(args: {
   sourceImageId: string;
@@ -207,6 +218,7 @@ export async function composeCroppedImage(args: {
   displayedRect: DOMRect | null;
   flipX?: boolean;
   flipY?: boolean;
+  rotationDeg?: number;
 }): Promise<File> {
   const {
     sourceImageId,
@@ -214,6 +226,7 @@ export async function composeCroppedImage(args: {
     displayedRect,
     flipX = false,
     flipY = false,
+    rotationDeg = 0,
   } = args;
   if (
     !completedCrop ||
@@ -239,21 +252,53 @@ export async function composeCroppedImage(args: {
   ictx.drawImage(cleanImage, -W / 2, -H / 2);
   ictx.restore();
 
-  // Map the completedCrop (displayed pixels of the static image) to source
-  // natural-pixel coords.
-  const dispW = displayedRect?.width || W;
-  const dispH = displayedRect?.height || H;
-  const sx = (completedCrop.x * W) / dispW;
-  const sy = (completedCrop.y * H) / dispH;
-  const sw = (completedCrop.width * W) / dispW;
-  const sh = (completedCrop.height * H) / dispH;
+  // Wrapper displayed dimensions (rotated bbox at the user's screen scale).
+  // Fall back to natural rotated-bbox dims if the rect wasn't captured.
+  const rad = (rotationDeg * Math.PI) / 180;
+  const absCos = Math.abs(Math.cos(rad));
+  const absSin = Math.abs(Math.sin(rad));
+  const naturalBboxW = W * absCos + H * absSin;
+  const naturalBboxH = W * absSin + H * absCos;
+  const dispWrapW = displayedRect?.width || naturalBboxW;
+  const dispWrapH = displayedRect?.height || naturalBboxH;
 
+  // Same uniform scale on X and Y (object-contain / aspect-preserving fit).
+  // Picking the X scale is fine — it must equal the Y scale by construction.
+  const scaleDispToNat = naturalBboxW / dispWrapW;
+
+  // Crop top-left + dims in natural wrapper coords. We need the top-left,
+  // NOT the center, for the output translate so source pixels at the bbox
+  // center land at (bboxW/2 - cropX, bboxH/2 - cropY) — which is the
+  // position of the bbox center within the cropped output rect.
+  const cropNatX = completedCrop.x * scaleDispToNat;
+  const cropNatY = completedCrop.y * scaleDispToNat;
+  const cropNatW = completedCrop.width * scaleDispToNat;
+  const cropNatH = completedCrop.height * scaleDispToNat;
+
+  const outW = Math.max(1, Math.round(cropNatW));
+  const outH = Math.max(1, Math.round(cropNatH));
   const out = document.createElement("canvas");
-  out.width = Math.max(1, Math.round(sw));
-  out.height = Math.max(1, Math.round(sh));
+  out.width = outW;
+  out.height = outH;
   const ctx = out.getContext("2d");
   if (!ctx) throw new Error("Failed to get output 2d context");
-  ctx.drawImage(interim, sx, sy, sw, sh, 0, 0, out.width, out.height);
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+
+  // Canvas transforms accumulate; drawImage at (i, j) ends up at
+  //   T_a * R * T_b * (i, j)
+  // where:
+  //   T_b = translate(-W/2, -H/2)  — brings source center to current origin
+  //   R   = rotate(θ)              — same rotation the user saw on screen
+  //   T_a = translate(bboxW/2 - cropX, bboxH/2 - cropY)
+  //                                — shifts to output coords, where the bbox
+  //                                  center lives at (bboxW/2 - cropX, ...)
+  ctx.save();
+  ctx.translate(naturalBboxW / 2 - cropNatX, naturalBboxH / 2 - cropNatY);
+  ctx.rotate(rad);
+  ctx.translate(-W / 2, -H / 2);
+  ctx.drawImage(interim, 0, 0);
+  ctx.restore();
 
   const blob = await new Promise<Blob>((resolve, reject) => {
     out.toBlob(
@@ -263,6 +308,66 @@ export async function composeCroppedImage(args: {
     );
   });
   return new File([blob], `cropped_${Date.now()}.png`, { type: "image/png" });
+}
+
+/**
+ * Grid-split: chop the source image into rows × cols tiles along the user's
+ * fractional cut positions, returning one File per tile in row-major order.
+ * The user picks cut positions in normalized [0,1] coords against the natural
+ * source dimensions; both arrays must already be sorted ascending and trimmed
+ * to the open interval (so we never produce zero-width / zero-height tiles).
+ *
+ * `verticalCuts` define column boundaries (x positions); their count plus one
+ * is the number of output columns. `horizontalCuts` define row boundaries.
+ * A 3×3 grid uses two cuts in each direction.
+ */
+export async function composeGridSplit(args: {
+  sourceImageId: string;
+  verticalCuts: number[];
+  horizontalCuts: number[];
+}): Promise<File[]> {
+  const { sourceImageId, verticalCuts, horizontalCuts } = args;
+  const source = await fetchOriginalImage(sourceImageId);
+  const W = source.naturalWidth;
+  const H = source.naturalHeight;
+
+  const xs = [0, ...verticalCuts.map((v) => Math.round(v * W)), W];
+  const ys = [0, ...horizontalCuts.map((v) => Math.round(v * H)), H];
+
+  const files: File[] = [];
+  let index = 0;
+  for (let r = 0; r < ys.length - 1; r++) {
+    const y0 = ys[r];
+    const y1 = ys[r + 1];
+    const tileH = Math.max(1, y1 - y0);
+    for (let c = 0; c < xs.length - 1; c++) {
+      const x0 = xs[c];
+      const x1 = xs[c + 1];
+      const tileW = Math.max(1, x1 - x0);
+      const canvas = document.createElement("canvas");
+      canvas.width = tileW;
+      canvas.height = tileH;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) throw new Error("Failed to get tile 2d context");
+      ctx.drawImage(source, x0, y0, tileW, tileH, 0, 0, tileW, tileH);
+      const blob = await new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob(
+          (b) => (b ? resolve(b) : reject(new Error("toBlob failed"))),
+          "image/png",
+          1.0
+        );
+      });
+      files.push(
+        new File(
+          [blob],
+          `split_${r}_${c}_${Date.now()}_${index}.png`,
+          { type: "image/png" }
+        )
+      );
+      index++;
+    }
+  }
+  return files;
 }
 
 /**

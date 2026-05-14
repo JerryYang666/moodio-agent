@@ -48,6 +48,7 @@ import {
   Eraser,
   Scissors,
   Orbit,
+  Grid3X3 as GridIcon,
 } from "lucide-react";
 
 interface ImageWithMenuProps {
@@ -400,6 +401,8 @@ export default function ImageWithMenu({
                   startEditFlow("cutout");
                 } else if (key === "edit-angles") {
                   startEditFlow("angles");
+                } else if (key === "edit-split") {
+                  startEditFlow("split");
                 }
               }}
             >
@@ -450,6 +453,12 @@ export default function ImageWithMenu({
                   startContent={<Orbit size={16} />}
                 >
                   {tMenu("editAngles")}
+                </DropdownItem>
+                <DropdownItem
+                  key="edit-split"
+                  startContent={<GridIcon size={16} />}
+                >
+                  {tMenu("editSplit")}
                 </DropdownItem>
               </DropdownSection>
               <DropdownSection title={tMenu("addToCollection")} showDivider>
