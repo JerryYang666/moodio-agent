@@ -101,11 +101,3 @@
 .ProseMirror:has(> p.is-editor-empty:only-child) {
   overflow: hidden !important;
 }
-
-/* Crop tool: rotate the selection rectangle (not the image). The tilt
-   angle is supplied per-instance via a --crop-tilt CSS variable on the
-   <ReactCrop> root. The image inside react-image-crop is never rotated. */
-.crop-tilted .ReactCrop__crop-selection {
-  transform: rotate(var(--crop-tilt, 0deg));
-  transform-origin: center center;
-}

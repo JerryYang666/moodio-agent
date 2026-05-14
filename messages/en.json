@@ -951,7 +951,6 @@
         "free": "Free"
       },
       "cropTransform": {
-        "tilt": "Tilt crop",
         "flipHorizontal": "Flip horizontal",
         "flipVertical": "Flip vertical",
         "reset": "Reset"

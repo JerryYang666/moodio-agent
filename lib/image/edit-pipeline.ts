@@ -200,18 +200,11 @@ export async function composeMarkedImage(args: {
  *
  * `flipX`/`flipY` mirror the displayed image (the user saw the flipped
  * image when picking the crop, so we bake the same flip into the output).
- *
- * `rotation` is the angle of the *crop selection rectangle* around its own
- * center (in degrees). The image itself is never rotated — only the
- * selection is tilted in the UI. To extract the content under a tilted
- * selection we map the rectangular output canvas back through the inverse
- * rotation around the crop center.
  */
 export async function composeCroppedImage(args: {
   sourceImageId: string;
   completedCrop: PixelCrop;
   displayedRect: DOMRect | null;
-  rotation?: number;
   flipX?: boolean;
   flipY?: boolean;
 }): Promise<File> {
@@ -219,7 +212,6 @@ export async function composeCroppedImage(args: {
     sourceImageId,
     completedCrop,
     displayedRect,
-    rotation = 0,
     flipX = false,
     flipY = false,
   } = args;
@@ -232,8 +224,7 @@ export async function composeCroppedImage(args: {
   }
   const cleanImage = await fetchOriginalImage(sourceImageId);
 
-  // Bake the flips into an intermediate canvas the size of the source (no
-  // rotation here — only flips, since the image was static in the UI).
+  // Bake the flips into an intermediate canvas the size of the source.
   const W = cleanImage.naturalWidth;
   const H = cleanImage.naturalHeight;
 
@@ -252,30 +243,17 @@ export async function composeCroppedImage(args: {
   // natural-pixel coords.
   const dispW = displayedRect?.width || W;
   const dispH = displayedRect?.height || H;
-  const scaleX = W / dispW;
-  const scaleY = H / dispH;
-  const sw = completedCrop.width * scaleX;
-  const sh = completedCrop.height * scaleY;
-  const cropCenterX = (completedCrop.x + completedCrop.width / 2) * scaleX;
-  const cropCenterY = (completedCrop.y + completedCrop.height / 2) * scaleY;
+  const sx = (completedCrop.x * W) / dispW;
+  const sy = (completedCrop.y * H) / dispH;
+  const sw = (completedCrop.width * W) / dispW;
+  const sh = (completedCrop.height * H) / dispH;
 
   const out = document.createElement("canvas");
   out.width = Math.max(1, Math.round(sw));
   out.height = Math.max(1, Math.round(sh));
   const ctx = out.getContext("2d");
   if (!ctx) throw new Error("Failed to get output 2d context");
-
-  // Output canvas = the axis-aligned cropped rectangle. To pull content from
-  // the tilted selection in the source, we rotate the source by -θ around
-  // the crop center while drawing it, so the tilted region ends up
-  // axis-aligned in the output.
-  const theta = (rotation * Math.PI) / 180;
-  ctx.save();
-  ctx.translate(out.width / 2, out.height / 2);
-  ctx.rotate(-theta);
-  ctx.translate(-cropCenterX, -cropCenterY);
-  ctx.drawImage(interim, 0, 0);
-  ctx.restore();
+  ctx.drawImage(interim, sx, sy, sw, sh, 0, 0, out.width, out.height);
 
   const blob = await new Promise<Blob>((resolve, reject) => {
     out.toBlob(

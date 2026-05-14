@@ -270,9 +270,7 @@ export default function ImageEditOverlay({
             ? Orbit
             : Scissors;
 
-  // Crop transforms: the image itself stays still; only the crop SELECTION
-  // rotates (via CSS on .ReactCrop__crop-selection — see the .crop-tilted
-  // rule in globals.css). Flips apply to the <img> directly.
+  // Crop tool: the image stays static; flips are applied to the <img>.
   const cropImageStyle = useMemo<React.CSSProperties | undefined>(() => {
     if (mode !== "crop") return undefined;
     if (!edit.cropFlipX && !edit.cropFlipY) return undefined;
@@ -280,11 +278,6 @@ export default function ImageEditOverlay({
     const sy = edit.cropFlipY ? -1 : 1;
     return { transform: `scale(${sx}, ${sy})` };
   }, [mode, edit.cropFlipX, edit.cropFlipY]);
-
-  const cropTiltStyle = useMemo<React.CSSProperties | undefined>(() => {
-    if (mode !== "crop") return undefined;
-    return { "--crop-tilt": `${edit.cropTilt}deg` } as React.CSSProperties;
-  }, [mode, edit.cropTilt]);
 
   const cropAspectValue = useMemo<number | undefined>(() => {
     if (mode !== "crop") return undefined;
@@ -370,17 +363,15 @@ export default function ImageEditOverlay({
         )}
 
         {!edit.isProcessing && edit.usesCrop && (
-          // The image stays still; only the crop SELECTION rotates (via the
-          // `crop-tilted` class + --crop-tilt CSS variable — see globals.css).
-          // Flips are applied to the <img> via cropImageStyle.
+          // The image stays static. Flips are applied to the <img> via
+          // cropImageStyle.
           <div className="absolute inset-0">
             <ReactCrop
               crop={edit.crop}
               onChange={(c) => edit.setCrop(c)}
               onComplete={(c) => edit.setCompletedCrop(c)}
               aspect={cropAspectValue}
-              className="crop-tilted absolute inset-0"
-              style={cropTiltStyle}
+              className="absolute inset-0"
             >
               <img
                 ref={edit.imageRef}
@@ -483,10 +474,8 @@ export default function ImageEditOverlay({
               onChange={edit.setCropAspect}
             />
             <CropTransformControls
-              tilt={edit.cropTilt}
               flipX={edit.cropFlipX}
               flipY={edit.cropFlipY}
-              onTiltChange={edit.setCropTilt}
               onToggleFlipX={edit.toggleCropFlipX}
               onToggleFlipY={edit.toggleCropFlipY}
               onReset={edit.resetCropTransforms}

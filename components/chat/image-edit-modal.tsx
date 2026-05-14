@@ -240,9 +240,7 @@ export default function ImageEditModal({
             ? Orbit
             : Scissors;
 
-  // Crop tool transforms: the image itself stays still; only the crop
-  // SELECTION rotates (via CSS on .ReactCrop__crop-selection — see the
-  // .crop-tilted rule in globals.css). Flips apply to the <img> directly.
+  // Crop tool: the image stays static; flips are applied to the <img>.
   const cropImageStyle = useMemo<React.CSSProperties | undefined>(() => {
     if (mode !== "crop") return undefined;
     if (!edit.cropFlipX && !edit.cropFlipY) return undefined;
@@ -250,11 +248,6 @@ export default function ImageEditModal({
     const sy = edit.cropFlipY ? -1 : 1;
     return { transform: `scale(${sx}, ${sy})` };
   }, [mode, edit.cropFlipX, edit.cropFlipY]);
-
-  const cropTiltStyle = useMemo<React.CSSProperties | undefined>(() => {
-    if (mode !== "crop") return undefined;
-    return { "--crop-tilt": `${edit.cropTilt}deg` } as React.CSSProperties;
-  }, [mode, edit.cropTilt]);
 
   const cropAspectValue = useMemo<number | undefined>(() => {
     if (mode !== "crop") return undefined;
@@ -366,21 +359,12 @@ export default function ImageEditModal({
                         // max-height:inherit, so any cap has to live on the
                         // <ReactCrop> element itself — otherwise the img
                         // renders at natural size and the modal body scrolls.
-                        // The `crop-tilted` class + --crop-tilt CSS variable
-                        // rotate the selection rectangle around its center
-                        // (see globals.css). The image itself is never
-                        // rotated; only flips are applied via cropImageStyle.
                         <ReactCrop
                           crop={edit.crop}
                           onChange={(c) => edit.setCrop(c)}
                           onComplete={(c) => edit.setCompletedCrop(c)}
                           aspect={cropAspectValue}
-                          className="crop-tilted"
-                          style={{
-                            maxHeight: "72vh",
-                            maxWidth: "100%",
-                            ...cropTiltStyle,
-                          }}
+                          style={{ maxHeight: "72vh", maxWidth: "100%" }}
                         >
                           <img
                             ref={edit.imageRef}
@@ -473,10 +457,8 @@ export default function ImageEditModal({
                           onChange={edit.setCropAspect}
                         />
                         <CropTransformControls
-                          tilt={edit.cropTilt}
                           flipX={edit.cropFlipX}
                           flipY={edit.cropFlipY}
-                          onTiltChange={edit.setCropTilt}
                           onToggleFlipX={edit.toggleCropFlipX}
                           onToggleFlipY={edit.toggleCropFlipY}
                           onReset={edit.resetCropTransforms}

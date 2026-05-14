@@ -1771,7 +1771,6 @@
         "free": "자유"
       },
       "cropTransform": {
-        "tilt": "자르기 영역 기울이기",
         "flipHorizontal": "좌우 반전",
         "flipVertical": "상하 반전",
         "reset": "초기화"

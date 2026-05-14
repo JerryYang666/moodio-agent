@@ -1771,7 +1771,6 @@
         "free": "自由"
       },
       "cropTransform": {
-        "tilt": "傾斜裁剪框",
         "flipHorizontal": "水平翻轉",
         "flipVertical": "垂直翻轉",
         "reset": "重置"

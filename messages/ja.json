@@ -1771,7 +1771,6 @@
         "free": "自由"
       },
       "cropTransform": {
-        "tilt": "切り抜き枠を傾ける",
         "flipHorizontal": "左右反転",
         "flipVertical": "上下反転",
         "reset": "リセット"
