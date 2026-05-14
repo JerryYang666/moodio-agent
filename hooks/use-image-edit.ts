@@ -190,16 +190,15 @@ export interface UseImageEdit {
   toggleCropFlipY: () => void;
   resetCropTransforms: () => void;
 
-  // Crop rotation (degrees). The IMAGE rotates around its center; the crop
-  // selection stays axis-aligned in screen space. `cropRotationStep` snaps to
-  // 90° turns via the rotate-left / rotate-right buttons; `cropRotationFine`
-  // is the slider in [-45, 45]; the actual applied rotation is the sum.
-  cropRotationStep: number;
+  // Crop rotation in degrees, [-45, 45]. The IMAGE rotates around its center;
+  // the crop selection stays axis-aligned in screen space.
   cropRotationFine: number;
   setCropRotationFine: (v: number) => void;
-  rotateCropLeft90: () => void;
-  rotateCropRight90: () => void;
-  /** Total rotation in degrees (step + fine), normalized for downstream math. */
+  /**
+   * Same as `cropRotationFine` today, kept as a separate getter so the few
+   * callers that need "the angle to bake into the output" can read one name
+   * regardless of whether we ever add coarse rotation back in.
+   */
   cropRotationTotal: number;
 
   // Grid-split state (mode === "split"). Cuts are fractions in (0,1).
@@ -310,8 +309,6 @@ export function useImageEdit(options: UseImageEditOptions): UseImageEdit {
   );
   const [cropFlipX, setCropFlipX] = useState<boolean>(false);
   const [cropFlipY, setCropFlipY] = useState<boolean>(false);
-  // 90°-step accumulator + fine slider; total rotation is the sum.
-  const [cropRotationStep, setCropRotationStep] = useState<number>(0);
   const [cropRotationFine, setCropRotationFineState] = useState<number>(0);
 
   const [gridConfig, setGridConfigState] = useState<GridSplitConfig>(() =>
@@ -346,7 +343,6 @@ export function useImageEdit(options: UseImageEditOptions): UseImageEdit {
   const resetCropTransforms = useCallback(() => {
     setCropFlipX(false);
     setCropFlipY(false);
-    setCropRotationStep(0);
     setCropRotationFineState(0);
     // Rotation/flip changes can leave a stale selection floating in the empty
     // corners of the rotated bbox. Clear so the user re-picks against the
@@ -355,35 +351,15 @@ export function useImageEdit(options: UseImageEditOptions): UseImageEdit {
     setCompletedCrop(undefined);
   }, []);
 
-  // Setting fine rotation also clears the selection — same reasoning as
-  // resetCropTransforms. We do NOT clear on step rotations (90° turns) so
-  // far as we know the user wants to keep adjusting; but 90° turns dramatically
-  // change geometry too, so play it safe and clear there as well.
+  // Setting rotation also clears the selection — the previous crop's coords
+  // are relative to the old rotated bbox and would silently be wrong.
   const setCropRotationFine = useCallback((v: number) => {
     setCropRotationFineState(v);
     setCrop(undefined);
     setCompletedCrop(undefined);
   }, []);
 
-  const rotateCropLeft90 = useCallback(() => {
-    setCropRotationStep((v) => v - 90);
-    setCrop(undefined);
-    setCompletedCrop(undefined);
-  }, []);
-
-  const rotateCropRight90 = useCallback(() => {
-    setCropRotationStep((v) => v + 90);
-    setCrop(undefined);
-    setCompletedCrop(undefined);
-  }, []);
-
-  // Normalize to [-180, 180] for downstream math + display. Avoids ever
-  // accumulating arbitrarily large totals after many 90° clicks.
-  const cropRotationTotal = useMemo(() => {
-    const raw = cropRotationStep + cropRotationFine;
-    const mod = ((raw + 180) % 360 + 360) % 360 - 180;
-    return mod;
-  }, [cropRotationStep, cropRotationFine]);
+  const cropRotationTotal = cropRotationFine;
 
   const setGridConfig = useCallback((next: GridSplitConfig) => {
     setGridConfigState(next);
@@ -809,7 +785,6 @@ export function useImageEdit(options: UseImageEditOptions): UseImageEdit {
     setCropAspectState(DEFAULT_CROP_ASPECT_CHOICE);
     setCropFlipX(false);
     setCropFlipY(false);
-    setCropRotationStep(0);
     setCropRotationFineState(0);
     setGridConfigState(presetGrid(DEFAULT_GRID_PRESET));
     setHorizontalAngle(0);
@@ -854,11 +829,8 @@ export function useImageEdit(options: UseImageEditOptions): UseImageEdit {
       toggleCropFlipX,
       toggleCropFlipY,
       resetCropTransforms,
-      cropRotationStep,
       cropRotationFine,
       setCropRotationFine,
-      rotateCropLeft90,
-      rotateCropRight90,
       cropRotationTotal,
       gridConfig,
       setGridConfig,
@@ -904,11 +876,8 @@ export function useImageEdit(options: UseImageEditOptions): UseImageEdit {
       toggleCropFlipX,
       toggleCropFlipY,
       resetCropTransforms,
-      cropRotationStep,
       cropRotationFine,
       setCropRotationFine,
-      rotateCropLeft90,
-      rotateCropRight90,
       cropRotationTotal,
       gridConfig,
       setGridConfig,

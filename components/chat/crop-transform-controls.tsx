@@ -1,13 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import {
-  FlipHorizontal2,
-  FlipVertical2,
-  RotateCcw,
-  RotateCw,
-  Undo2,
-} from "lucide-react";
+import { FlipHorizontal2, FlipVertical2, Undo2 } from "lucide-react";
 import { Slider } from "@heroui/slider";
 
 interface CropTransformControlsProps {
@@ -17,19 +11,14 @@ interface CropTransformControlsProps {
   onToggleFlipY: () => void;
   rotationFine: number;
   onRotationFineChange: (v: number) => void;
-  onRotateLeft90: () => void;
-  onRotateRight90: () => void;
-  /** Sum of the 90° step and the fine slider, shown next to the slider. */
-  rotationTotal: number;
   onReset: () => void;
   className?: string;
 }
 
 /**
  * Transform controls for the crop tool: horizontal/vertical flip toggles,
- * 90° rotate left/right buttons, a fine-tilt slider in [-45, +45]°, and a
- * reset button. Shared by the chat modal and the desktop in-canvas overlay
- * so behavior can't drift.
+ * a tilt slider in [-45, +45]°, and a reset button. Shared by the chat
+ * modal and the desktop in-canvas overlay so behavior can't drift.
  */
 export default function CropTransformControls({
   flipX,
@@ -38,9 +27,6 @@ export default function CropTransformControls({
   onToggleFlipY,
   rotationFine,
   onRotationFineChange,
-  onRotateLeft90,
-  onRotateRight90,
-  rotationTotal,
   onReset,
   className,
 }: CropTransformControlsProps) {
@@ -76,24 +62,6 @@ export default function CropTransformControls({
         </button>
         <button
           type="button"
-          onClick={onRotateLeft90}
-          aria-label={t("rotateLeft")}
-          title={t("rotateLeft")}
-          className={iconBtn + " bg-background"}
-        >
-          <RotateCcw size={15} />
-        </button>
-        <button
-          type="button"
-          onClick={onRotateRight90}
-          aria-label={t("rotateRight")}
-          title={t("rotateRight")}
-          className={iconBtn + " bg-background"}
-        >
-          <RotateCw size={15} />
-        </button>
-        <button
-          type="button"
           onClick={onReset}
           className="ml-auto flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-md bg-background border border-divider hover:bg-default-100 transition-colors"
         >
@@ -117,7 +85,7 @@ export default function CropTransformControls({
           marks={[{ value: 0, label: "0°" }]}
           renderValue={() => (
             <span className="text-xs tabular-nums text-default-500">
-              {Math.round(rotationTotal)}°
+              {Math.round(rotationFine)}°
             </span>
           )}
         />

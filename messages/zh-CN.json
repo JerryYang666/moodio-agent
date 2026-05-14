@@ -1745,7 +1745,7 @@
       "anglesZoomLabel": "缩放",
       "anglesReset": "重置视角",
       "hintRedraw": "用红色笔标记要修改的区域,然后描述变化。",
-      "hintCrop": "拖动手柄设置裁切区域。可旋转、翻转或微调倾斜。",
+      "hintCrop": "拖动手柄设置裁切区域。可翻转或调整倾斜。",
       "hintErase": "用红色笔标记要移除的内容。",
       "hintCutoutAuto": "我们会自动识别主体并移除背景。",
       "hintCutoutManual": "用红色笔标记要抠出的主体。",
@@ -1782,9 +1782,7 @@
       "cropTransform": {
         "flipHorizontal": "水平翻转",
         "flipVertical": "垂直翻转",
-        "rotateLeft": "向左旋转 90°",
-        "rotateRight": "向右旋转 90°",
-        "tilt": "微调倾斜",
+        "tilt": "倾斜",
         "reset": "重置"
       },
       "gridSplit": {

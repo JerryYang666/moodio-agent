@@ -235,6 +235,9 @@ export default function RotatedCropSurface({
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
+          // Solid backdrop so the canvas asset rendered below the overlay
+          // doesn't bleed through the empty corners of the rotated bbox.
+          background: "#000",
         }
       : {
           // Host wraps to the envelope's pixel dims; parent ResizeObserver
@@ -242,6 +245,7 @@ export default function RotatedCropSurface({
           display: "inline-flex",
           alignItems: "center",
           justifyContent: "center",
+          background: "#000",
         };
 
   const envelopeStyle: React.CSSProperties = sizing
@@ -281,7 +285,7 @@ export default function RotatedCropSurface({
             ...envelopeStyle,
             position: "relative",
             overflow: "hidden",
-            background: "rgba(0, 0, 0, 0.05)",
+            background: "#000",
           }}
         >
           <img

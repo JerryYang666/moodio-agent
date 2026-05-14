@@ -1745,7 +1745,7 @@
       "anglesZoomLabel": "줌",
       "anglesReset": "앵글 초기화",
       "hintRedraw": "빨간 브러시로 변경할 영역을 표시한 뒤 변경 내용을 입력하세요.",
-      "hintCrop": "핸들을 드래그하여 자를 영역을 설정하세요. 회전, 반전, 기울기를 조정할 수 있습니다.",
+      "hintCrop": "핸들을 드래그하여 자를 영역을 설정하세요. 반전과 기울기를 조정할 수 있습니다.",
       "hintErase": "지울 부분을 빨간 브러시로 표시하세요.",
       "hintCutoutAuto": "메인 피사체를 자동으로 감지하여 배경을 제거합니다.",
       "hintCutoutManual": "추출할 피사체를 빨간 브러시로 표시하세요.",
@@ -1782,8 +1782,6 @@
       "cropTransform": {
         "flipHorizontal": "좌우 반전",
         "flipVertical": "상하 반전",
-        "rotateLeft": "왼쪽으로 90° 회전",
-        "rotateRight": "오른쪽으로 90° 회전",
         "tilt": "기울기",
         "reset": "초기화"
       },

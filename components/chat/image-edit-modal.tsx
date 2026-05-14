@@ -577,9 +577,6 @@ export default function ImageEditModal({
                           onToggleFlipY={edit.toggleCropFlipY}
                           rotationFine={edit.cropRotationFine}
                           onRotationFineChange={edit.setCropRotationFine}
-                          onRotateLeft90={edit.rotateCropLeft90}
-                          onRotateRight90={edit.rotateCropRight90}
-                          rotationTotal={edit.cropRotationTotal}
                           onReset={edit.resetCropTransforms}
                         />
                       </>

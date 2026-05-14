@@ -922,7 +922,7 @@
       "anglesZoomLabel": "Zoom",
       "anglesReset": "Reset angles",
       "hintRedraw": "Mark the area to change with the red brush, then describe the change.",
-      "hintCrop": "Drag the handles to set the crop area. Rotate, flip, or tilt to fine-tune.",
+      "hintCrop": "Drag the handles to set the crop area. Flip or tilt to fine-tune.",
       "hintErase": "Mark the content you want removed with the red brush.",
       "hintCutoutAuto": "We'll automatically detect the main subject and remove the background.",
       "hintCutoutManual": "Mark the subject to extract with the red brush.",
@@ -959,8 +959,6 @@
       "cropTransform": {
         "flipHorizontal": "Flip horizontal",
         "flipVertical": "Flip vertical",
-        "rotateLeft": "Rotate 90° left",
-        "rotateRight": "Rotate 90° right",
         "tilt": "Tilt",
         "reset": "Reset"
       },
