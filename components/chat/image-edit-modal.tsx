@@ -240,20 +240,57 @@ export default function ImageEditModal({
             ? Orbit
             : Scissors;
 
-  // Crop-tool transform (CSS) and aspect ratio for <ReactCrop>. react-image-crop
-  // measures the child via getBoundingClientRect, which returns the rotated
-  // AABB, so applying the transform directly on the inner <img> is sufficient
-  // — the crop UI follows the visible bbox.
-  const cropImageStyle = useMemo<React.CSSProperties | undefined>(() => {
-    if (mode !== "crop") return undefined;
+  // Crop layout: wrap the <img> in a container sized to the *rotated bbox*
+  // (in natural pixels via aspect-ratio) so that
+  //   1) <ReactCrop> measures the rotated bbox and constrains the crop
+  //      selection to the visible image — without this, the crop area can
+  //      drift into the empty corners that appear at non-90° angles.
+  //   2) The wrapper's solid background + overflow:hidden masks anything
+  //      rendered behind the modal (e.g. layered asset thumbnails).
+  // The inner <img> is positioned absolutely, sized to its natural fraction
+  // of the bbox, and transformed via translate-rotate-scale so its visual
+  // exactly inscribes the wrapper.
+  const cropLayout = useMemo(() => {
+    if (mode !== "crop") return null;
+    const img = edit.imageRef.current;
+    const nw = img?.naturalWidth || 0;
+    const nh = img?.naturalHeight || 0;
+    if (!nw || !nh) return null;
+    const theta = (edit.cropRotationTotal * Math.PI) / 180;
+    const cos = Math.abs(Math.cos(theta));
+    const sin = Math.abs(Math.sin(theta));
+    const bboxW = nw * cos + nh * sin;
+    const bboxH = nw * sin + nh * cos;
     const sx = edit.cropFlipX ? -1 : 1;
     const sy = edit.cropFlipY ? -1 : 1;
     return {
-      transform: `rotate(${edit.cropRotationTotal}deg) scale(${sx}, ${sy})`,
-      transformOrigin: "center",
+      wrapperStyle: {
+        position: "relative",
+        overflow: "hidden",
+        // Explicit intrinsic dims so the wrapper has a size to scale from
+        // (an aspect-ratio-only box collapses when its only children are
+        // absolutely positioned). The aspect-ratio keeps proportions when
+        // maxWidth/maxHeight fire and clamp one dimension.
+        width: `${bboxW}px`,
+        height: `${bboxH}px`,
+        aspectRatio: `${bboxW} / ${bboxH}`,
+        maxWidth: "100%",
+        maxHeight: "72vh",
+      } as React.CSSProperties,
+      imgStyle: {
+        position: "absolute",
+        top: "50%",
+        left: "50%",
+        width: `${(nw / bboxW) * 100}%`,
+        height: `${(nh / bboxH) * 100}%`,
+        transform: `translate(-50%, -50%) rotate(${edit.cropRotationTotal}deg) scale(${sx}, ${sy})`,
+        transformOrigin: "center",
+      } as React.CSSProperties,
     };
   }, [
     mode,
+    edit.imageLoaded,
+    edit.imageRef,
     edit.cropRotationTotal,
     edit.cropFlipX,
     edit.cropFlipY,
@@ -383,15 +420,30 @@ export default function ImageEditModal({
                           aspect={cropAspectValue}
                           style={{ maxHeight: "72vh", maxWidth: "100%" }}
                         >
-                          <img
-                            ref={edit.imageRef}
-                            src={sourceImageUrl}
-                            alt=""
-                            className="block max-w-full max-h-[72vh] object-contain select-none"
-                            style={cropImageStyle}
-                            onLoad={() => edit.setImageLoaded(true)}
-                            draggable={false}
-                          />
+                          {cropLayout ? (
+                            <div className="bg-background" style={cropLayout.wrapperStyle}>
+                              <img
+                                ref={edit.imageRef}
+                                src={sourceImageUrl}
+                                alt=""
+                                className="select-none"
+                                style={cropLayout.imgStyle}
+                                onLoad={() => edit.setImageLoaded(true)}
+                                draggable={false}
+                              />
+                            </div>
+                          ) : (
+                            // Pre-load fallback: same plain <img> as before so
+                            // the onLoad fires and cropLayout can compute.
+                            <img
+                              ref={edit.imageRef}
+                              src={sourceImageUrl}
+                              alt=""
+                              className="block max-w-full max-h-[72vh] object-contain select-none"
+                              onLoad={() => edit.setImageLoaded(true)}
+                              draggable={false}
+                            />
+                          )}
                         </ReactCrop>
                       )}
 

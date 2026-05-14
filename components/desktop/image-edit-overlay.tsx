@@ -270,19 +270,57 @@ export default function ImageEditOverlay({
             ? Orbit
             : Scissors;
 
-  // CSS transform applied to the crop tool's <img> for rotate + flip.
-  // ReactCrop's overlay measures the inner <img>'s getBoundingClientRect, so
-  // applying the transform here is enough — the crop UI follows the visible
-  // bbox.
-  const cropImageStyle = useMemo<React.CSSProperties | undefined>(() => {
-    if (mode !== "crop") return undefined;
+  // Crop layout: a wrapper sized to the rotated bbox (via aspect-ratio in
+  // natural pixels) so <ReactCrop> measures the visible image and constrains
+  // the crop selection to it, and so a solid background can mask the asset
+  // thumbnail rendered by the canvas behind the overlay. The inner <img> is
+  // positioned absolutely and transformed so its rotated visual inscribes
+  // the wrapper exactly.
+  const cropLayout = useMemo(() => {
+    if (mode !== "crop") return null;
+    const img = edit.imageRef.current;
+    const nw = img?.naturalWidth || 0;
+    const nh = img?.naturalHeight || 0;
+    if (!nw || !nh) return null;
+    const theta = (edit.cropRotationTotal * Math.PI) / 180;
+    const cos = Math.abs(Math.cos(theta));
+    const sin = Math.abs(Math.sin(theta));
+    const bboxW = nw * cos + nh * sin;
+    const bboxH = nw * sin + nh * cos;
     const sx = edit.cropFlipX ? -1 : 1;
     const sy = edit.cropFlipY ? -1 : 1;
     return {
-      transform: `rotate(${edit.cropRotationTotal}deg) scale(${sx}, ${sy})`,
-      transformOrigin: "center",
+      wrapperStyle: {
+        position: "relative",
+        overflow: "hidden",
+        // Explicit intrinsic dims so the wrapper has a size to scale from
+        // (an aspect-ratio-only box collapses when its only children are
+        // absolutely positioned). The aspect-ratio keeps proportions when
+        // maxWidth/maxHeight fire and clamp one dimension.
+        width: `${bboxW}px`,
+        height: `${bboxH}px`,
+        aspectRatio: `${bboxW} / ${bboxH}`,
+        maxWidth: "100%",
+        maxHeight: "100%",
+      } as React.CSSProperties,
+      imgStyle: {
+        position: "absolute",
+        top: "50%",
+        left: "50%",
+        width: `${(nw / bboxW) * 100}%`,
+        height: `${(nh / bboxH) * 100}%`,
+        transform: `translate(-50%, -50%) rotate(${edit.cropRotationTotal}deg) scale(${sx}, ${sy})`,
+        transformOrigin: "center",
+      } as React.CSSProperties,
     };
-  }, [mode, edit.cropRotationTotal, edit.cropFlipX, edit.cropFlipY]);
+  }, [
+    mode,
+    edit.imageLoaded,
+    edit.imageRef,
+    edit.cropRotationTotal,
+    edit.cropFlipX,
+    edit.cropFlipY,
+  ]);
 
   const cropAspectValue = useMemo<number | undefined>(() => {
     if (mode !== "crop") return undefined;
@@ -370,23 +408,41 @@ export default function ImageEditOverlay({
         )}
 
         {!edit.isProcessing && edit.usesCrop && (
-          <div className="absolute inset-0">
+          // Solid bg-background covers the asset thumbnail rendered by the
+          // canvas behind this overlay, so a rotated crop image doesn't
+          // reveal a second un-rotated copy at its empty corners. The flex
+          // container centers <ReactCrop> within the asset rect; the wrapper
+          // div inside is sized to the rotated bbox aspect ratio so the
+          // crop selection naturally constrains to the visible image.
+          <div className="absolute inset-0 bg-background flex items-center justify-center">
             <ReactCrop
               crop={edit.crop}
               onChange={(c) => edit.setCrop(c)}
               onComplete={(c) => edit.setCompletedCrop(c)}
               aspect={cropAspectValue}
-              className="absolute inset-0"
             >
-              <img
-                ref={edit.imageRef}
-                src={sourceImageUrl}
-                alt=""
-                className="w-full h-full object-contain select-none"
-                style={cropImageStyle}
-                onLoad={() => edit.setImageLoaded(true)}
-                draggable={false}
-              />
+              {cropLayout ? (
+                <div className="bg-background" style={cropLayout.wrapperStyle}>
+                  <img
+                    ref={edit.imageRef}
+                    src={sourceImageUrl}
+                    alt=""
+                    className="select-none"
+                    style={cropLayout.imgStyle}
+                    onLoad={() => edit.setImageLoaded(true)}
+                    draggable={false}
+                  />
+                </div>
+              ) : (
+                <img
+                  ref={edit.imageRef}
+                  src={sourceImageUrl}
+                  alt=""
+                  className="w-full h-full object-contain select-none"
+                  onLoad={() => edit.setImageLoaded(true)}
+                  draggable={false}
+                />
+              )}
             </ReactCrop>
           </div>
         )}
