@@ -708,7 +708,8 @@
     "error": "エラー",
     "duplicateName": "同じ名前のコレクションがこのプロジェクトに既に存在します",
     "createFailed": "コレクションの作成に失敗しました",
-    "renameFailed": "コレクションの名前変更に失敗しました"
+    "renameFailed": "コレクションの名前変更に失敗しました",
+    "deleteFailed": "コレクションの削除に失敗しました"
   },
   "storyboard": {
     "title": "ストーリーボード",

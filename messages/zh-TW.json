@@ -708,7 +708,8 @@
     "error": "錯誤",
     "duplicateName": "此專案中已存在同名的收藏集",
     "createFailed": "建立收藏集失敗",
-    "renameFailed": "重新命名收藏集失敗"
+    "renameFailed": "重新命名收藏集失敗",
+    "deleteFailed": "刪除收藏集失敗"
   },
   "storyboard": {
     "title": "分鏡腳本",

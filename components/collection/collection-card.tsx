@@ -10,7 +10,7 @@ import {
   DropdownMenu,
   DropdownItem,
 } from "@heroui/dropdown";
-import { Folder, MoreVertical, Pencil, Tags } from "lucide-react";
+import { Folder, MoreVertical, Pencil, Tags, Trash2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import CollectionTags from "@/components/collection/collection-tags";
 
@@ -31,6 +31,7 @@ type CollectionCardProps = {
   showPermissionChips?: boolean;
   onRename?: () => void;
   onEditTags?: () => void;
+  onDelete?: () => void;
 };
 
 export default function CollectionCard({
@@ -40,11 +41,12 @@ export default function CollectionCard({
   showPermissionChips = false,
   onRename,
   onEditTags,
+  onDelete,
 }: CollectionCardProps) {
   const tCommon = useTranslations("common");
   const tCollections = useTranslations("collections");
 
-  const showMenu = !!(onRename || onEditTags);
+  const showMenu = !!(onRename || onEditTags || onDelete);
 
   return (
     <Card
@@ -117,6 +119,17 @@ export default function CollectionCard({
                     onPress={onEditTags}
                   >
                     {tCollections("editTags")}
+                  </DropdownItem>
+                ) : null}
+                {onDelete ? (
+                  <DropdownItem
+                    key="delete"
+                    className="text-danger"
+                    color="danger"
+                    startContent={<Trash2 size={16} />}
+                    onPress={onDelete}
+                  >
+                    {tCommon("delete")}
                   </DropdownItem>
                 ) : null}
               </DropdownMenu>

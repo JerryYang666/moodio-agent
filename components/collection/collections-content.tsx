@@ -36,6 +36,7 @@ export default function CollectionsContent({ showHeader = true }: CollectionsCon
     createCollection,
     renameCollection,
     updateCollectionTags,
+    deleteCollection,
     getDefaultCollectionName,
   } = useCollections();
   const { isOpen, onOpen, onOpenChange } = useDisclosure();
@@ -48,6 +49,11 @@ export default function CollectionsContent({ showHeader = true }: CollectionsCon
     isOpen: isEditTagsOpen,
     onOpen: onEditTagsOpen,
     onOpenChange: onEditTagsOpenChange,
+  } = useDisclosure();
+  const {
+    isOpen: isDeleteOpen,
+    onOpen: onDeleteOpen,
+    onOpenChange: onDeleteOpenChange,
   } = useDisclosure();
   const [newCollectionName, setNewCollectionName] = useState("");
   const [newCollectionTags, setNewCollectionTags] = useState<TagValue[]>([]);
@@ -64,6 +70,11 @@ export default function CollectionsContent({ showHeader = true }: CollectionsCon
   } | null>(null);
   const [editTagsValue, setEditTagsValue] = useState<TagValue[]>([]);
   const [isSavingTags, setIsSavingTags] = useState(false);
+  const [collectionToDelete, setCollectionToDelete] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Tag filter state
   const [selectedFilterTags, setSelectedFilterTags] = useState<string[]>([]);
@@ -144,6 +155,26 @@ export default function CollectionsContent({ showHeader = true }: CollectionsCon
       addToast({ title: t("error"), description: message, color: "danger" });
     } finally {
       setIsRenaming(false);
+    }
+  };
+
+  const handleDeleteCollection = async () => {
+    if (!collectionToDelete) return;
+    setIsDeleting(true);
+    try {
+      const success = await deleteCollection(collectionToDelete.id);
+      if (success) {
+        onDeleteOpenChange();
+        setCollectionToDelete(null);
+      } else {
+        addToast({
+          title: t("error"),
+          description: t("deleteFailed"),
+          color: "danger",
+        });
+      }
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -281,6 +312,14 @@ export default function CollectionsContent({ showHeader = true }: CollectionsCon
                     }
                   : undefined
               }
+              onDelete={
+                collection.isOwner
+                  ? () => {
+                      setCollectionToDelete(collection);
+                      onDeleteOpen();
+                    }
+                  : undefined
+              }
             />
           ))}
         </div>
@@ -359,6 +398,32 @@ export default function CollectionsContent({ showHeader = true }: CollectionsCon
                   isDisabled={!renameValue.trim()}
                 >
                   {tCommon("rename")}
+                </Button>
+              </ModalFooter>
+            </>
+          )}
+        </ModalContent>
+      </Modal>
+
+      {/* Delete Collection Modal */}
+      <Modal isOpen={isDeleteOpen} onOpenChange={onDeleteOpenChange}>
+        <ModalContent>
+          {(onClose) => (
+            <>
+              <ModalHeader>{t("deleteCollection")}</ModalHeader>
+              <ModalBody>
+                <p>{t("deleteCollectionConfirm")}</p>
+              </ModalBody>
+              <ModalFooter>
+                <Button variant="light" onPress={onClose}>
+                  {tCommon("cancel")}
+                </Button>
+                <Button
+                  color="danger"
+                  onPress={handleDeleteCollection}
+                  isLoading={isDeleting}
+                >
+                  {tCommon("delete")}
                 </Button>
               </ModalFooter>
             </>

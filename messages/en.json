@@ -708,7 +708,8 @@
     "error": "Error",
     "duplicateName": "A collection with this name already exists in the project",
     "createFailed": "Failed to create collection",
-    "renameFailed": "Failed to rename collection"
+    "renameFailed": "Failed to rename collection",
+    "deleteFailed": "Failed to delete collection"
   },
   "folders": {
     "title": "Folders",

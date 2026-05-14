@@ -26,6 +26,7 @@ import ShareModal from "@/components/share-modal";
 import {
   useCreateCollectionMutation,
   useRenameCollectionMutation,
+  useDeleteCollectionMutation,
 } from "@/lib/redux/services/next-api";
 import CollectionCard from "@/components/collection/collection-card";
 import TagInput, { type TagValue } from "@/components/collection/tag-input";
@@ -126,6 +127,8 @@ export default function ProjectDetailPage({
     useCreateCollectionMutation();
   const [renameCollectionMutation, { isLoading: isRenamingCollection }] =
     useRenameCollectionMutation();
+  const [deleteCollectionMutation, { isLoading: isDeletingCollection }] =
+    useDeleteCollectionMutation();
 
   const {
     isOpen: isEditTagsOpen,
@@ -133,9 +136,16 @@ export default function ProjectDetailPage({
     onOpenChange: onEditTagsOpenChange,
   } = useDisclosure();
 
+  const {
+    isOpen: isDeleteCollectionOpen,
+    onOpen: onDeleteCollectionOpen,
+    onOpenChange: onDeleteCollectionOpenChange,
+  } = useDisclosure();
+
   const [collectionToEditTags, setCollectionToEditTags] = useState<Collection | null>(null);
   const [editTagsValue, setEditTagsValue] = useState<TagValue[]>([]);
   const [isSavingTags, setIsSavingTags] = useState(false);
+  const [collectionToDelete, setCollectionToDelete] = useState<Collection | null>(null);
   const [selectedFilterTags, setSelectedFilterTags] = useState<string[]>([]);
 
   const [selectedImage, setSelectedImage] = useState<ImageInfo | null>(null);
@@ -205,6 +215,23 @@ export default function ProjectDetailPage({
     } catch (e: any) {
       const msg = e?.status === 409 ? tCollections("duplicateName") : tCollections("renameFailed");
       addToast({ title: tCollections("error"), description: msg, color: "danger" });
+    }
+  };
+
+  const handleDeleteCollection = async () => {
+    if (!collectionToDelete) return;
+    try {
+      await deleteCollectionMutation(collectionToDelete.id).unwrap();
+      setCollections((prev) => prev.filter((c) => c.id !== collectionToDelete.id));
+      onDeleteCollectionOpenChange();
+      setCollectionToDelete(null);
+    } catch (e) {
+      console.error("Error deleting collection:", e);
+      addToast({
+        title: tCollections("error"),
+        description: tCollections("deleteFailed"),
+        color: "danger",
+      });
     }
   };
 
@@ -477,6 +504,10 @@ export default function ProjectDetailPage({
                   );
                   onEditTagsOpen();
                 }}
+                onDelete={() => {
+                  setCollectionToDelete(collection);
+                  onDeleteCollectionOpen();
+                }}
               />
             ))}
           </div>
@@ -548,6 +579,32 @@ export default function ProjectDetailPage({
                   isDisabled={!renameCollectionValue.trim()}
                 >
                   {tCommon("rename")}
+                </Button>
+              </ModalFooter>
+            </>
+          )}
+        </ModalContent>
+      </Modal>
+
+      {/* Delete Collection Modal */}
+      <Modal isOpen={isDeleteCollectionOpen} onOpenChange={onDeleteCollectionOpenChange}>
+        <ModalContent>
+          {(onClose) => (
+            <>
+              <ModalHeader>{tCollections("deleteCollection")}</ModalHeader>
+              <ModalBody>
+                <p>{tCollections("deleteCollectionConfirm")}</p>
+              </ModalBody>
+              <ModalFooter>
+                <Button variant="light" onPress={onClose}>
+                  {tCommon("cancel")}
+                </Button>
+                <Button
+                  color="danger"
+                  onPress={handleDeleteCollection}
+                  isLoading={isDeletingCollection}
+                >
+                  {tCommon("delete")}
                 </Button>
               </ModalFooter>
             </>

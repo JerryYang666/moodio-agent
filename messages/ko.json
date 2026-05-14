@@ -708,7 +708,8 @@
     "error": "오류",
     "duplicateName": "이 프로젝트에 같은 이름의 컬렉션이 이미 존재합니다",
     "createFailed": "컬렉션 생성에 실패했습니다",
-    "renameFailed": "컬렉션 이름 변경에 실패했습니다"
+    "renameFailed": "컬렉션 이름 변경에 실패했습니다",
+    "deleteFailed": "컬렉션 삭제에 실패했습니다"
   },
   "storyboard": {
     "title": "스토리보드",
