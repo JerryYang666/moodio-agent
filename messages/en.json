@@ -947,7 +947,16 @@
       "inProgress": "Edit in progress…",
       "aspectRatio": {
         "label": "Aspect ratio",
-        "matchSource": "Match source"
+        "matchSource": "Match source",
+        "free": "Free"
+      },
+      "cropTransform": {
+        "rotateLeft": "Rotate left 90°",
+        "rotateRight": "Rotate right 90°",
+        "fineAngle": "Fine angle",
+        "flipHorizontal": "Flip horizontal",
+        "flipVertical": "Flip vertical",
+        "reset": "Reset"
       }
     }
   },

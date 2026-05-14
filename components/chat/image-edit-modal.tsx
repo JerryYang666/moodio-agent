@@ -29,10 +29,16 @@ import "react-image-crop/dist/ReactCrop.css";
 
 import MarkControls from "./mark-controls";
 import AspectRatioSelector from "./aspect-ratio-selector";
+import CropAspectRatioSelector from "./crop-aspect-ratio-selector";
+import CropTransformControls from "./crop-transform-controls";
 import AngleControls from "./angle-controls";
 import MagicProgress from "@/components/desktop/magic-progress";
 import { useImageEdit } from "@/hooks/use-image-edit";
-import type { ImageEditMode, EditResult } from "@/lib/image/edit-pipeline";
+import {
+  resolveCropAspectRatio,
+  type ImageEditMode,
+  type EditResult,
+} from "@/lib/image/edit-pipeline";
 import type { DestinationPick } from "./destination-picker-modal";
 
 export type ChatImageEditMode = ImageEditMode;
@@ -234,6 +240,41 @@ export default function ImageEditModal({
             ? Orbit
             : Scissors;
 
+  // Crop-tool transform (CSS) and aspect ratio for <ReactCrop>. react-image-crop
+  // measures the child via getBoundingClientRect, which returns the rotated
+  // AABB, so applying the transform directly on the inner <img> is sufficient
+  // — the crop UI follows the visible bbox.
+  const cropImageStyle = useMemo<React.CSSProperties | undefined>(() => {
+    if (mode !== "crop") return undefined;
+    const sx = edit.cropFlipX ? -1 : 1;
+    const sy = edit.cropFlipY ? -1 : 1;
+    return {
+      transform: `rotate(${edit.cropRotationTotal}deg) scale(${sx}, ${sy})`,
+      transformOrigin: "center",
+    };
+  }, [
+    mode,
+    edit.cropRotationTotal,
+    edit.cropFlipX,
+    edit.cropFlipY,
+  ]);
+
+  const cropAspectValue = useMemo<number | undefined>(() => {
+    if (mode !== "crop") return undefined;
+    const img = edit.imageRef.current;
+    const w = img?.naturalWidth ?? 0;
+    const h = img?.naturalHeight ?? 0;
+    const rotated = edit.cropRotationStep % 180 !== 0;
+    return resolveCropAspectRatio(edit.cropAspect, w, h, rotated);
+    // imageLoaded forces a recompute once natural dims are known.
+  }, [
+    mode,
+    edit.cropAspect,
+    edit.cropRotationStep,
+    edit.imageLoaded,
+    edit.imageRef,
+  ]);
+
   const handleClose = () => {
     onClose();
     onOpenChange();
@@ -339,6 +380,7 @@ export default function ImageEditModal({
                           crop={edit.crop}
                           onChange={(c) => edit.setCrop(c)}
                           onComplete={(c) => edit.setCompletedCrop(c)}
+                          aspect={cropAspectValue}
                           style={{ maxHeight: "72vh", maxWidth: "100%" }}
                         >
                           <img
@@ -346,6 +388,7 @@ export default function ImageEditModal({
                             src={sourceImageUrl}
                             alt=""
                             className="block max-w-full max-h-[72vh] object-contain select-none"
+                            style={cropImageStyle}
                             onLoad={() => edit.setImageLoaded(true)}
                             draggable={false}
                           />
@@ -422,6 +465,27 @@ export default function ImageEditModal({
                         value={edit.aspectRatio}
                         onChange={edit.setAspectRatio}
                       />
+                    )}
+
+                    {mode === "crop" && !edit.isProcessing && (
+                      <>
+                        <CropAspectRatioSelector
+                          value={edit.cropAspect}
+                          onChange={edit.setCropAspect}
+                        />
+                        <CropTransformControls
+                          rotationFine={edit.cropRotationFine}
+                          rotationTotal={edit.cropRotationTotal}
+                          flipX={edit.cropFlipX}
+                          flipY={edit.cropFlipY}
+                          onRotateLeft={edit.rotateLeft90}
+                          onRotateRight={edit.rotateRight90}
+                          onFineChange={edit.setCropRotationFine}
+                          onToggleFlipX={edit.toggleCropFlipX}
+                          onToggleFlipY={edit.toggleCropFlipY}
+                          onReset={edit.resetCropTransforms}
+                        />
+                      </>
                     )}
 
                     {!edit.isProcessing && (

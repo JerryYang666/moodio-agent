@@ -1767,7 +1767,16 @@
       "inProgress": "編集中…",
       "aspectRatio": {
         "label": "アスペクト比",
-        "matchSource": "元画像に合わせる"
+        "matchSource": "元画像に合わせる",
+        "free": "自由"
+      },
+      "cropTransform": {
+        "rotateLeft": "左に 90° 回転",
+        "rotateRight": "右に 90° 回転",
+        "fineAngle": "微調整角度",
+        "flipHorizontal": "左右反転",
+        "flipVertical": "上下反転",
+        "reset": "リセット"
       }
     }
   },
