@@ -19,6 +19,7 @@ import {
   Copy,
   Crop as CropIcon,
   Eraser,
+  Grid3X3,
   Orbit,
   Paintbrush,
   Scissors,
@@ -33,6 +34,9 @@ import AspectRatioSelector from "@/components/chat/aspect-ratio-selector";
 import CropAspectRatioSelector from "@/components/chat/crop-aspect-ratio-selector";
 import CropTransformControls from "@/components/chat/crop-transform-controls";
 import AngleControls from "@/components/chat/angle-controls";
+import RotatedCropSurface from "@/components/chat/rotated-crop-surface";
+import GridSplitControls from "@/components/chat/grid-split-controls";
+import GridSplitOverlay from "@/components/chat/grid-split-overlay";
 import MagicProgress from "./magic-progress";
 import { useImageEdit, type PreparedEditLaunch } from "@/hooks/use-image-edit";
 import {
@@ -91,6 +95,19 @@ interface ImageEditOverlayProps {
     placement: ImageEditPlacement;
   }) => void;
   /**
+   * Grid-split commits inline like crop, but produces N×M tiles at once.
+   * The handler is responsible for laying each tile out as a fresh asset
+   * adjacent to the source; rows/cols arrive so the caller can preserve
+   * the grid layout the user picked. Placement is irrelevant for split
+   * (we never "replace" with multiple assets) and is omitted.
+   */
+  onCommitSplit: (args: {
+    tiles: Array<{ imageId: string; imageUrl: string }>;
+    rows: number;
+    cols: number;
+    editType: string;
+  }) => void;
+  /**
    * AI ops (redraw/erase/cutout/angles) resolve asynchronously after the
    * overlay closes. The overlay hands the prepared API payload to the
    * parent, which fires the model call in the background and renders an
@@ -119,6 +136,7 @@ export default function ImageEditOverlay({
   sourceImageUrl,
   screenRect,
   onCommit,
+  onCommitSplit,
   onLaunch,
   onCancel,
 }: ImageEditOverlayProps) {
@@ -154,7 +172,7 @@ export default function ImageEditOverlay({
   // defaults imageSize to "2k" (resolution=2) and imageQuality to "auto", so
   // we mirror those here.
   const costModelId = useMemo(() => {
-    if (mode === "crop") return null;
+    if (mode === "crop" || mode === "split") return null;
     if (mode === "angles") return "qwen-image-edit-angles";
     return "nano-banana-2-fast";
   }, [mode]);
@@ -214,6 +232,17 @@ export default function ImageEditOverlay({
         });
         return;
       }
+      if (prepared.kind === "split") {
+        // Grid split: lay every tile down beside the source. Placement is
+        // ignored; "replace original with N images" doesn't make sense.
+        onCommitSplit({
+          tiles: prepared.results,
+          rows: prepared.rows,
+          cols: prepared.cols,
+          editType: prepared.editType,
+        });
+        return;
+      }
       // AI op: hand the payload off to the parent, which fires the model
       // call in the background. Parent is responsible for closing the
       // overlay and showing the canvas-side shimmer.
@@ -238,6 +267,7 @@ export default function ImageEditOverlay({
     if (mode === "erase") return t("imageEdit.statusErase");
     if (mode === "cutout") return t("imageEdit.statusCutout");
     if (mode === "angles") return t("imageEdit.statusAngles");
+    if (mode === "split") return t("imageEdit.statusSplit");
     return t("imageEdit.statusGeneric");
   }, [mode, t]);
 
@@ -246,6 +276,7 @@ export default function ImageEditOverlay({
     if (mode === "crop") return t("imageEdit.titleCrop");
     if (mode === "erase") return t("imageEdit.titleErase");
     if (mode === "angles") return t("imageEdit.titleAngles");
+    if (mode === "split") return t("imageEdit.titleSplit");
     return t("imageEdit.titleCutout");
   }, [mode, t]);
 
@@ -254,6 +285,7 @@ export default function ImageEditOverlay({
     if (edit.errorKind === "promptRequired") return t("imageEdit.promptRequired");
     if (edit.errorKind === "markRequired") return t("imageEdit.markRequired");
     if (edit.errorKind === "cropErrorEmpty") return t("imageEdit.cropErrorEmpty");
+    if (edit.errorKind === "gridEmpty") return t("imageEdit.gridEmpty");
     if (edit.errorKind === "insufficientCredits")
       return t("imageEdit.insufficientCredits");
     return edit.errorMessage;
@@ -268,7 +300,9 @@ export default function ImageEditOverlay({
           ? Eraser
           : mode === "angles"
             ? Orbit
-            : Scissors;
+            : mode === "split"
+              ? Grid3X3
+              : Scissors;
 
   // Crop tool: the image stays static; flips are applied to the <img>.
   const cropImageStyle = useMemo<React.CSSProperties | undefined>(() => {
@@ -291,6 +325,8 @@ export default function ImageEditOverlay({
     edit.imageLoaded,
     edit.imageRef,
   ]);
+
+  const usesRotatedCrop = mode === "crop" && edit.cropRotationTotal !== 0;
 
   // Side-pane positioning. The right pane sits to the right of the asset
   // rect (12px gap); the bottom pane sits below it. They share screen-space
@@ -333,7 +369,7 @@ export default function ImageEditOverlay({
           height: screenRect.height,
         }}
       >
-        {!edit.usesCrop && (
+        {!edit.usesCrop && !edit.usesGrid && (
           <img
             ref={edit.imageRef}
             src={sourceImageUrl}
@@ -342,6 +378,27 @@ export default function ImageEditOverlay({
             onLoad={() => edit.setImageLoaded(true)}
             draggable={false}
           />
+        )}
+
+        {edit.usesGrid && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="relative max-w-full max-h-full">
+              <img
+                ref={edit.imageRef}
+                src={sourceImageUrl}
+                alt=""
+                className="max-w-full max-h-full object-contain select-none"
+                onLoad={() => edit.setImageLoaded(true)}
+                draggable={false}
+              />
+              {!edit.isProcessing && (
+                <GridSplitOverlay
+                  config={edit.gridConfig}
+                  onChange={edit.setGridConfig}
+                />
+              )}
+            </div>
+          </div>
         )}
 
         {!edit.isProcessing && edit.usesBrush && edit.imageLoaded && (
@@ -362,9 +419,8 @@ export default function ImageEditOverlay({
           />
         )}
 
-        {!edit.isProcessing && edit.usesCrop && (
-          // The image stays static. Flips are applied to the <img> via
-          // cropImageStyle.
+        {!edit.isProcessing && edit.usesCrop && !usesRotatedCrop && (
+          // 0° fast path. Flips are applied to the <img> via cropImageStyle.
           <div className="absolute inset-0">
             <ReactCrop
               crop={edit.crop}
@@ -374,7 +430,10 @@ export default function ImageEditOverlay({
               className="absolute inset-0"
             >
               <img
-                ref={edit.imageRef}
+                ref={(el) => {
+                  edit.imageRef.current = el;
+                  edit.cropContainerRef.current = el;
+                }}
                 src={sourceImageUrl}
                 alt=""
                 className="w-full h-full object-contain select-none"
@@ -384,6 +443,23 @@ export default function ImageEditOverlay({
               />
             </ReactCrop>
           </div>
+        )}
+
+        {!edit.isProcessing && edit.usesCrop && usesRotatedCrop && (
+          <RotatedCropSurface
+            src={sourceImageUrl}
+            rotationDeg={edit.cropRotationTotal}
+            flipX={edit.cropFlipX}
+            flipY={edit.cropFlipY}
+            aspect={cropAspectValue}
+            crop={edit.crop}
+            onCropChange={(c) => edit.setCrop(c)}
+            onCropComplete={(c) => edit.setCompletedCrop(c)}
+            imageRef={edit.imageRef}
+            cropContainerRef={edit.cropContainerRef}
+            onImageLoad={() => edit.setImageLoaded(true)}
+            layout="overlay"
+          />
         )}
 
         {edit.isProcessing && <MagicProgress statusText={statusText} />}
@@ -478,9 +554,18 @@ export default function ImageEditOverlay({
               flipY={edit.cropFlipY}
               onToggleFlipX={edit.toggleCropFlipX}
               onToggleFlipY={edit.toggleCropFlipY}
+              rotationFine={edit.cropRotationFine}
+              onRotationFineChange={edit.setCropRotationFine}
               onReset={edit.resetCropTransforms}
             />
           </>
+        )}
+
+        {mode === "split" && !edit.isProcessing && (
+          <GridSplitControls
+            config={edit.gridConfig}
+            onChange={edit.setGridConfig}
+          />
         )}
 
         {!edit.isProcessing && (
@@ -489,6 +574,7 @@ export default function ImageEditOverlay({
             {mode === "crop" && t("imageEdit.hintCrop")}
             {mode === "erase" && t("imageEdit.hintErase")}
             {mode === "angles" && t("imageEdit.hintAngles")}
+            {mode === "split" && t("imageEdit.hintSplit")}
             {mode === "cutout" &&
               (edit.cutoutSub === "auto"
                 ? t("imageEdit.hintCutoutAuto")
@@ -523,6 +609,24 @@ export default function ImageEditOverlay({
                 (!edit.completedCrop ||
                   edit.completedCrop.width <= 0 ||
                   edit.completedCrop.height <= 0));
+            // Split always lays N×M tiles next to the source — the
+            // replace/save-as-new split-button is meaningless here.
+            if (mode === "split") {
+              return (
+                <Button
+                  size="sm"
+                  color="primary"
+                  onPress={() => submitWithPlacement("newAsset")}
+                  isLoading={edit.isProcessing}
+                  isDisabled={edit.isProcessing}
+                  startContent={
+                    edit.isProcessing ? null : <Grid3X3 size={14} />
+                  }
+                >
+                  {t("imageEdit.submitSplit")}
+                </Button>
+              );
+            }
             const primaryLabel =
               placement === "newAsset"
                 ? t("imageEdit.submitSaveAsNew")

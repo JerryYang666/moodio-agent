@@ -21,6 +21,7 @@ import {
   DEFAULT_CROP_ASPECT_CHOICE,
   callImageEditApi,
   composeCroppedImage,
+  composeGridSplit,
   composeMarkedImage,
   markColorNameFromHex,
   resolveAspectRatio,
@@ -53,8 +54,39 @@ export type SubmitErrorKind =
   | "promptRequired"
   | "markRequired"
   | "cropErrorEmpty"
+  | "gridEmpty"
   | "insufficientCredits"
   | "other";
+
+/**
+ * Grid-split configuration. `verticalCuts` / `horizontalCuts` are fractional
+ * positions in (0,1) along the source's natural width / height — count of
+ * tiles = (verticalCuts.length + 1) × (horizontalCuts.length + 1). Preset
+ * helpers below evenly distribute cuts; the user can drag individual cuts
+ * to lopsided positions and we keep that mid-flight even after another preset
+ * tweak.
+ */
+export interface GridSplitConfig {
+  verticalCuts: number[];
+  horizontalCuts: number[];
+}
+
+export type GridPreset = 2 | 3 | 4 | 5;
+
+export function evenCuts(n: number): number[] {
+  // n cuts → n+1 tiles; positions 1/(n+1), 2/(n+1), ...
+  const out: number[] = [];
+  const step = 1 / (n + 1);
+  for (let i = 1; i <= n; i++) out.push(i * step);
+  return out;
+}
+
+export function presetGrid(preset: GridPreset): GridSplitConfig {
+  const cuts = evenCuts(preset - 1);
+  return { verticalCuts: cuts.slice(), horizontalCuts: cuts.slice() };
+}
+
+const DEFAULT_GRID_PRESET: GridPreset = 3;
 
 /**
  * Payload produced by `prepareSubmit` for AI ops (redraw / erase / cutout /
@@ -79,7 +111,25 @@ export interface PreparedEditImmediate {
   editType: string;
 }
 
-export type PreparedEdit = PreparedEditLaunch | PreparedEditImmediate;
+/**
+ * Payload produced by `prepareSubmit` for grid-split: a single source image
+ * was sliced into N×M tiles client-side, each uploaded as its own asset.
+ * Tiles are returned in row-major order so the caller can lay them out in a
+ * grid that matches what the user saw. Like `immediate` there's no model
+ * round-trip — the caller commits everything inline.
+ */
+export interface PreparedEditSplit {
+  kind: "split";
+  results: EditResult[];
+  rows: number;
+  cols: number;
+  editType: string;
+}
+
+export type PreparedEdit =
+  | PreparedEditLaunch
+  | PreparedEditImmediate
+  | PreparedEditSplit;
 
 export interface UseImageEditOptions {
   mode: ImageEditMode;
@@ -99,11 +149,16 @@ export interface UseImageEdit {
   // Refs the UI must wire up to the <img> and <canvas>.
   imageRef: RefObject<HTMLImageElement | null>;
   canvasRef: RefObject<HTMLCanvasElement | null>;
+  // The element that hosts the crop selection — usually the <img> itself,
+  // but in the rotated-crop case the wrapper sized to the rotated bbox.
+  // Compose reads its bounding rect to scale crop coords into source pixels.
+  cropContainerRef: RefObject<HTMLElement | null>;
 
   // Derived flags the UI branches on.
   usesBrush: boolean;
   usesCrop: boolean;
   usesAngles: boolean;
+  usesGrid: boolean;
 
   // Image-load state.
   imageLoaded: boolean;
@@ -134,6 +189,22 @@ export interface UseImageEdit {
   toggleCropFlipX: () => void;
   toggleCropFlipY: () => void;
   resetCropTransforms: () => void;
+
+  // Crop rotation in degrees, [-45, 45]. The IMAGE rotates around its center;
+  // the crop selection stays axis-aligned in screen space.
+  cropRotationFine: number;
+  setCropRotationFine: (v: number) => void;
+  /**
+   * Same as `cropRotationFine` today, kept as a separate getter so the few
+   * callers that need "the angle to bake into the output" can read one name
+   * regardless of whether we ever add coarse rotation back in.
+   */
+  cropRotationTotal: number;
+
+  // Grid-split state (mode === "split"). Cuts are fractions in (0,1).
+  gridConfig: GridSplitConfig;
+  setGridConfig: (next: GridSplitConfig) => void;
+  applyGridPreset: (preset: GridPreset) => void;
 
   // Cutout sub-mode.
   cutoutSub: CutoutSubMode;
@@ -205,6 +276,7 @@ export function useImageEdit(options: UseImageEditOptions): UseImageEdit {
 
   const imageRef = useRef<HTMLImageElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const cropContainerRef = useRef<HTMLElement | null>(null);
   const lastPointRef = useRef<{ x: number; y: number } | null>(null);
   // Mid-stroke flag — kept in a ref so handler closures can't go stale and
   // so toggling it doesn't trigger re-renders that rebuild the memo object.
@@ -237,6 +309,11 @@ export function useImageEdit(options: UseImageEditOptions): UseImageEdit {
   );
   const [cropFlipX, setCropFlipX] = useState<boolean>(false);
   const [cropFlipY, setCropFlipY] = useState<boolean>(false);
+  const [cropRotationFine, setCropRotationFineState] = useState<number>(0);
+
+  const [gridConfig, setGridConfigState] = useState<GridSplitConfig>(() =>
+    presetGrid(DEFAULT_GRID_PRESET)
+  );
 
   // Changing the aspect ratio invalidates the previous selection (a fresh
   // ratio should re-center a new selection), so clear the crop on change.
@@ -266,6 +343,29 @@ export function useImageEdit(options: UseImageEditOptions): UseImageEdit {
   const resetCropTransforms = useCallback(() => {
     setCropFlipX(false);
     setCropFlipY(false);
+    setCropRotationFineState(0);
+    // Rotation/flip changes can leave a stale selection floating in the empty
+    // corners of the rotated bbox. Clear so the user re-picks against the
+    // new geometry.
+    setCrop(undefined);
+    setCompletedCrop(undefined);
+  }, []);
+
+  // Setting rotation also clears the selection — the previous crop's coords
+  // are relative to the old rotated bbox and would silently be wrong.
+  const setCropRotationFine = useCallback((v: number) => {
+    setCropRotationFineState(v);
+    setCrop(undefined);
+    setCompletedCrop(undefined);
+  }, []);
+
+  const cropRotationTotal = cropRotationFine;
+
+  const setGridConfig = useCallback((next: GridSplitConfig) => {
+    setGridConfigState(next);
+  }, []);
+  const applyGridPreset = useCallback((preset: GridPreset) => {
+    setGridConfigState(presetGrid(preset));
   }, []);
 
   const [horizontalAngle, setHorizontalAngle] = useState<number>(0);
@@ -288,6 +388,7 @@ export function useImageEdit(options: UseImageEditOptions): UseImageEdit {
     (mode === "cutout" && cutoutSub === "manual");
   const usesCrop = mode === "crop";
   const usesAngles = mode === "angles";
+  const usesGrid = mode === "split";
 
   const initializeCanvas = useCallback(() => {
     const canvas = canvasRef.current;
@@ -449,11 +550,14 @@ export function useImageEdit(options: UseImageEditOptions): UseImageEdit {
           setErrorKind("cropErrorEmpty");
           return null;
         }
-        // Capture the displayed <img> rect BEFORE flipping isProcessing: in
-        // some UIs the crop <img> unmounts synchronously once processing
-        // starts, taking imageRef.current with it.
+        // Capture the rendered crop container rect — for the rotated case the
+        // wrapper sized to the rotated bbox, otherwise the inner <img>. The
+        // ReactCrop child element is the source of truth for crop coords, and
+        // `cropContainerRef` points at whatever element that is.
         const displayedRect =
-          imageRef.current?.getBoundingClientRect() ?? null;
+          cropContainerRef.current?.getBoundingClientRect() ??
+          imageRef.current?.getBoundingClientRect() ??
+          null;
         setIsProcessing(true);
         const file = await composeCroppedImage({
           sourceImageId,
@@ -461,10 +565,49 @@ export function useImageEdit(options: UseImageEditOptions): UseImageEdit {
           displayedRect,
           flipX: cropFlipX,
           flipY: cropFlipY,
+          rotationDeg: cropRotationTotal,
         });
         const uploaded = await uploadCroppedImage(file);
         setIsProcessing(false);
         return { kind: "immediate", result: uploaded, editType: "crop" };
+      }
+
+      // ---- Grid split: client-side only, produces N×M tiles. ----
+      if (mode === "split") {
+        const cols = gridConfig.verticalCuts.length + 1;
+        const rows = gridConfig.horizontalCuts.length + 1;
+        if (rows < 1 || cols < 1) {
+          setErrorKind("gridEmpty");
+          return null;
+        }
+        setIsProcessing(true);
+        const files = await composeGridSplit({
+          sourceImageId,
+          verticalCuts: gridConfig.verticalCuts,
+          horizontalCuts: gridConfig.horizontalCuts,
+        });
+        // Upload sequentially-ish: kicking N×M presign requests in parallel
+        // works in theory but stresses the upload pipeline on large grids
+        // (5×5 = 25). Parallelism of ~4 keeps it snappy without flooding.
+        const PARALLEL = 4;
+        const results: EditResult[] = new Array(files.length);
+        let cursor = 0;
+        const workers = Array.from({ length: PARALLEL }, async () => {
+          while (true) {
+            const idx = cursor++;
+            if (idx >= files.length) return;
+            results[idx] = await uploadCroppedImage(files[idx]);
+          }
+        });
+        await Promise.all(workers);
+        setIsProcessing(false);
+        return {
+          kind: "split",
+          results,
+          rows,
+          cols,
+          editType: "split",
+        };
       }
 
       // ---- Angles (AI, no brush/crop, optional prompt) ----
@@ -575,6 +718,8 @@ export function useImageEdit(options: UseImageEditOptions): UseImageEdit {
     zoom,
     cropFlipX,
     cropFlipY,
+    cropRotationTotal,
+    gridConfig,
   ]);
 
   // Full submit: prepare, then execute. Used by the chat modal, which keeps
@@ -589,6 +734,19 @@ export function useImageEdit(options: UseImageEditOptions): UseImageEdit {
           ...prepared.result,
           editType: prepared.editType,
         });
+        return;
+      }
+
+      if (prepared.kind === "split") {
+        // chat-modal path: fire the user-supplied onSuccess once per tile so
+        // each tile lands in the destination collection. Desktop overlay
+        // bypasses this via `prepareSubmit` directly.
+        for (const result of prepared.results) {
+          await onSuccessRef.current({
+            ...result,
+            editType: prepared.editType,
+          });
+        }
         return;
       }
 
@@ -627,6 +785,8 @@ export function useImageEdit(options: UseImageEditOptions): UseImageEdit {
     setCropAspectState(DEFAULT_CROP_ASPECT_CHOICE);
     setCropFlipX(false);
     setCropFlipY(false);
+    setCropRotationFineState(0);
+    setGridConfigState(presetGrid(DEFAULT_GRID_PRESET));
     setHorizontalAngle(0);
     setVerticalAngle(0);
     setZoom(5);
@@ -639,9 +799,11 @@ export function useImageEdit(options: UseImageEditOptions): UseImageEdit {
     () => ({
       imageRef,
       canvasRef,
+      cropContainerRef,
       usesBrush,
       usesCrop,
       usesAngles,
+      usesGrid,
       imageLoaded,
       setImageLoaded,
       canvasSize,
@@ -667,6 +829,12 @@ export function useImageEdit(options: UseImageEditOptions): UseImageEdit {
       toggleCropFlipX,
       toggleCropFlipY,
       resetCropTransforms,
+      cropRotationFine,
+      setCropRotationFine,
+      cropRotationTotal,
+      gridConfig,
+      setGridConfig,
+      applyGridPreset,
       horizontalAngle,
       verticalAngle,
       zoom,
@@ -690,6 +858,7 @@ export function useImageEdit(options: UseImageEditOptions): UseImageEdit {
       usesBrush,
       usesCrop,
       usesAngles,
+      usesGrid,
       imageLoaded,
       canvasSize,
       brushColor,
@@ -707,6 +876,12 @@ export function useImageEdit(options: UseImageEditOptions): UseImageEdit {
       toggleCropFlipX,
       toggleCropFlipY,
       resetCropTransforms,
+      cropRotationFine,
+      setCropRotationFine,
+      cropRotationTotal,
+      gridConfig,
+      setGridConfig,
+      applyGridPreset,
       horizontalAngle,
       verticalAngle,
       zoom,

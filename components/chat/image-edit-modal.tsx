@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Modal,
   ModalContent,
@@ -18,6 +18,7 @@ import {
   Check,
   Crop as CropIcon,
   Eraser,
+  Grid3X3,
   Orbit,
   Paintbrush,
   Scissors,
@@ -32,6 +33,9 @@ import AspectRatioSelector from "./aspect-ratio-selector";
 import CropAspectRatioSelector from "./crop-aspect-ratio-selector";
 import CropTransformControls from "./crop-transform-controls";
 import AngleControls from "./angle-controls";
+import RotatedCropSurface from "./rotated-crop-surface";
+import GridSplitControls from "./grid-split-controls";
+import GridSplitOverlay from "./grid-split-overlay";
 import MagicProgress from "@/components/desktop/magic-progress";
 import { useImageEdit } from "@/hooks/use-image-edit";
 import {
@@ -82,12 +86,24 @@ export default function ImageEditModal({
   const tModal = useTranslations("imageEditModal");
   const tCommon = useTranslations("common");
 
-  // Result state — once set, modal switches to "done" view.
+  // Result state. Single-image flows set `result`; split mode collects
+  // `splitResults` and flips into the done view via `splitDone`.
   const [result, setResult] = useState<EditResult | null>(null);
+  const [splitResults, setSplitResults] = useState<EditResult[]>([]);
+  const [splitDone, setSplitDone] = useState(false);
+  // Refs the saveResultToDestination closure reads to associate each split
+  // tile with its row/col in the destination payload.
+  const splitTileCounter = useRef(0);
 
   // Save the generated image into the chosen destination collection/folder.
   // Non-fatal if this fails: we still show the result, with a toast.
-  const saveResultToDestination = async (imageId: string, imageUrl: string) => {
+  // `tileIndex` only matters for split mode where it disambiguates tile
+  // titles; other modes pass 0.
+  const saveResultToDestination = async (
+    imageId: string,
+    imageUrl: string,
+    tileIndex: number
+  ) => {
     try {
       const generationDetails = {
         title: sourceTitle || "",
@@ -96,7 +112,9 @@ export default function ImageEditModal({
             ? edit.prompt.trim()
             : mode === "angles"
               ? `New angle of ${sourceTitle || "image"}${edit.prompt.trim() ? ` — ${edit.prompt.trim()}` : ""}`
-              : `${mode} of ${sourceTitle || "image"}`,
+              : mode === "split"
+                ? `Tile ${tileIndex + 1} of ${sourceTitle || "image"}`
+                : `${mode} of ${sourceTitle || "image"}`,
         status: "generated" as const,
         imageUrl,
       };
@@ -134,8 +152,17 @@ export default function ImageEditModal({
   const edit = useImageEdit({
     mode,
     sourceImageId,
-    onSuccess: async ({ imageId, imageUrl }) => {
-      await saveResultToDestination(imageId, imageUrl);
+    onSuccess: async ({ imageId, imageUrl, editType }) => {
+      if (editType === "split") {
+        // submit() fires onSuccess once per tile. Save each into the
+        // destination as it arrives so partial failures don't lose the
+        // ones we already produced.
+        const tileIndex = splitTileCounter.current++;
+        await saveResultToDestination(imageId, imageUrl, tileIndex);
+        setSplitResults((prev) => [...prev, { imageId, imageUrl }]);
+        return;
+      }
+      await saveResultToDestination(imageId, imageUrl, 0);
       setResult({ imageId, imageUrl });
     },
   });
@@ -145,17 +172,21 @@ export default function ImageEditModal({
     if (!isOpen) return;
     edit.reset();
     setResult(null);
+    setSplitResults([]);
+    setSplitDone(false);
+    splitTileCounter.current = 0;
     // We intentionally depend only on isOpen — reset is stable across state
     // snapshots and including it in deps would re-run the reset mid-flow.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
-  // Cost preview for the submit button. Crop is client-side only and free;
-  // the AI ops all hit /api/image/edit, which defaults to imageSize="2k"
-  // (resolution=2) and quality="auto" for this flow. Angles uses its own
-  // model id; everything else falls back to the client default nano-banana-2-fast.
+  // Cost preview for the submit button. Crop + split are client-side only
+  // and free; the AI ops all hit /api/image/edit, which defaults to
+  // imageSize="2k" (resolution=2) and quality="auto" for this flow. Angles
+  // uses its own model id; everything else falls back to the client default
+  // nano-banana-2-fast.
   const costModelId = useMemo(() => {
-    if (mode === "crop") return null;
+    if (mode === "crop" || mode === "split") return null;
     if (mode === "angles") return "qwen-image-edit-angles";
     return "nano-banana-2-fast";
   }, [mode]);
@@ -193,7 +224,13 @@ export default function ImageEditModal({
 
   const handleSubmit = async () => {
     try {
+      // Reset split counters before each attempt so retries don't carry stale
+      // tile indices into the destination title.
+      splitTileCounter.current = 0;
+      setSplitResults([]);
+      setSplitDone(false);
       await edit.submit();
+      if (mode === "split") setSplitDone(true);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Unknown error";
       addToast({
@@ -209,6 +246,7 @@ export default function ImageEditModal({
     if (mode === "erase") return t("statusErase");
     if (mode === "cutout") return t("statusCutout");
     if (mode === "angles") return t("statusAngles");
+    if (mode === "split") return t("statusSplit");
     return t("statusGeneric");
   }, [mode, t]);
 
@@ -217,6 +255,7 @@ export default function ImageEditModal({
     if (mode === "crop") return tModal("titleCrop");
     if (mode === "erase") return tModal("titleErase");
     if (mode === "angles") return tModal("titleAngles");
+    if (mode === "split") return tModal("titleSplit");
     return tModal("titleCutout");
   }, [mode, tModal]);
 
@@ -225,6 +264,7 @@ export default function ImageEditModal({
     if (edit.errorKind === "promptRequired") return t("promptRequired");
     if (edit.errorKind === "markRequired") return t("markRequired");
     if (edit.errorKind === "cropErrorEmpty") return t("cropErrorEmpty");
+    if (edit.errorKind === "gridEmpty") return t("gridEmpty");
     if (edit.errorKind === "insufficientCredits") return t("insufficientCredits");
     return edit.errorMessage;
   }, [edit.errorKind, edit.errorMessage, t]);
@@ -238,9 +278,13 @@ export default function ImageEditModal({
           ? Eraser
           : mode === "angles"
             ? Orbit
-            : Scissors;
+            : mode === "split"
+              ? Grid3X3
+              : Scissors;
 
-  // Crop tool: the image stays static; flips are applied to the <img>.
+  // Static-image crop path (rotation === 0): flips are baked into the <img>
+  // via CSS transform. With rotation, the RotatedCropSurface owns the
+  // transform internally so this style isn't applied.
   const cropImageStyle = useMemo<React.CSSProperties | undefined>(() => {
     if (mode !== "crop") return undefined;
     if (!edit.cropFlipX && !edit.cropFlipY) return undefined;
@@ -257,6 +301,13 @@ export default function ImageEditModal({
     return resolveCropAspectRatio(edit.cropAspect, w, h);
     // imageLoaded forces a recompute once natural dims are known.
   }, [mode, edit.cropAspect, edit.imageLoaded, edit.imageRef]);
+
+  // Anything non-zero (slider tilt or 90° step) takes the rotated rendering
+  // path. The 0° fast-path is preserved so unrotated edits behave exactly
+  // like before, in particular wrt ReactCrop's measurement.
+  const usesRotatedCrop = mode === "crop" && edit.cropRotationTotal !== 0;
+
+  const showDoneView = result !== null || (mode === "split" && splitDone);
 
   const handleClose = () => {
     onClose();
@@ -277,7 +328,7 @@ export default function ImageEditModal({
         wrapper: "z-[75]",
         base: "max-h-[92dvh] md:!max-w-[92vw] md:w-[92vw]",
       }}
-      onClose={result ? onClose : undefined}
+      onClose={showDoneView ? onClose : undefined}
     >
       <ModalContent>
         {() => (
@@ -294,13 +345,17 @@ export default function ImageEditModal({
             </ModalHeader>
 
             <ModalBody className="pb-2">
-              {result ? (
+              {showDoneView ? (
                 // --- DONE STATE ---
                 <div className="flex flex-col items-center gap-3">
                   <div className="flex items-center gap-2 text-success">
                     <CheckCircle2 size={20} />
                     <span className="font-medium">
-                      {tModal("savedHeading")}
+                      {mode === "split"
+                        ? tModal("savedHeadingSplit", {
+                            count: splitResults.length,
+                          })
+                        : tModal("savedHeading")}
                     </span>
                   </div>
                   <p className="text-sm text-default-600">
@@ -309,11 +364,31 @@ export default function ImageEditModal({
                     })}
                   </p>
                   <div className="w-full flex items-center justify-center bg-black/5 rounded-lg p-2">
-                    <img
-                      src={result.imageUrl}
-                      alt={sourceTitle || "Result"}
-                      className="max-h-[72vh] object-contain rounded-md"
-                    />
+                    {mode === "split" ? (
+                      <div
+                        className="grid gap-1 max-h-[72vh] overflow-auto"
+                        style={{
+                          gridTemplateColumns: `repeat(${edit.gridConfig.verticalCuts.length + 1}, minmax(0, 1fr))`,
+                          width: "fit-content",
+                          maxWidth: "100%",
+                        }}
+                      >
+                        {splitResults.map((r) => (
+                          <img
+                            key={r.imageId}
+                            src={r.imageUrl}
+                            alt=""
+                            className="block min-w-0 max-w-full object-contain rounded-sm"
+                          />
+                        ))}
+                      </div>
+                    ) : result ? (
+                      <img
+                        src={result.imageUrl}
+                        alt={sourceTitle || "Result"}
+                        className="max-h-[72vh] object-contain rounded-md"
+                      />
+                    ) : null}
                   </div>
                 </div>
               ) : (
@@ -325,7 +400,7 @@ export default function ImageEditModal({
                 <div className="flex flex-col md:flex-row gap-4 items-stretch">
                   <div className="flex-1 min-w-0 flex items-center justify-center">
                     <div className="relative inline-flex bg-black/5 overflow-hidden max-w-full">
-                      {!edit.usesCrop && (
+                      {!edit.usesCrop && !edit.usesGrid && (
                         <img
                           ref={edit.imageRef}
                           src={sourceImageUrl}
@@ -334,6 +409,25 @@ export default function ImageEditModal({
                           onLoad={() => edit.setImageLoaded(true)}
                           draggable={false}
                         />
+                      )}
+
+                      {edit.usesGrid && (
+                        <div className="relative">
+                          <img
+                            ref={edit.imageRef}
+                            src={sourceImageUrl}
+                            alt=""
+                            className="block max-w-full max-h-[72vh] object-contain select-none"
+                            onLoad={() => edit.setImageLoaded(true)}
+                            draggable={false}
+                          />
+                          {!edit.isProcessing && (
+                            <GridSplitOverlay
+                              config={edit.gridConfig}
+                              onChange={edit.setGridConfig}
+                            />
+                          )}
+                        </div>
                       )}
 
                       {!edit.isProcessing && edit.usesBrush && edit.imageLoaded && (
@@ -354,11 +448,11 @@ export default function ImageEditModal({
                         />
                       )}
 
-                      {!edit.isProcessing && edit.usesCrop && (
-                        // react-image-crop pins its inner <img> to
-                        // max-height:inherit, so any cap has to live on the
-                        // <ReactCrop> element itself — otherwise the img
-                        // renders at natural size and the modal body scrolls.
+                      {!edit.isProcessing && edit.usesCrop && !usesRotatedCrop && (
+                        // 0° fast path: image is static, flips applied to
+                        // <img>. ReactCrop's max-h has to live on the
+                        // <ReactCrop> element — its inner <img> is pinned to
+                        // max-height:inherit, otherwise the modal scrolls.
                         <ReactCrop
                           crop={edit.crop}
                           onChange={(c) => edit.setCrop(c)}
@@ -367,7 +461,10 @@ export default function ImageEditModal({
                           style={{ maxHeight: "72vh", maxWidth: "100%" }}
                         >
                           <img
-                            ref={edit.imageRef}
+                            ref={(el) => {
+                              edit.imageRef.current = el;
+                              edit.cropContainerRef.current = el;
+                            }}
                             src={sourceImageUrl}
                             alt=""
                             className="block max-w-full max-h-[72vh] object-contain select-none"
@@ -376,6 +473,23 @@ export default function ImageEditModal({
                             draggable={false}
                           />
                         </ReactCrop>
+                      )}
+
+                      {!edit.isProcessing && edit.usesCrop && usesRotatedCrop && (
+                        <RotatedCropSurface
+                          src={sourceImageUrl}
+                          rotationDeg={edit.cropRotationTotal}
+                          flipX={edit.cropFlipX}
+                          flipY={edit.cropFlipY}
+                          aspect={cropAspectValue}
+                          crop={edit.crop}
+                          onCropChange={(c) => edit.setCrop(c)}
+                          onCropComplete={(c) => edit.setCompletedCrop(c)}
+                          imageRef={edit.imageRef}
+                          cropContainerRef={edit.cropContainerRef}
+                          onImageLoad={() => edit.setImageLoaded(true)}
+                          layout="modal"
+                        />
                       )}
 
                       {edit.isProcessing && (
@@ -461,9 +575,18 @@ export default function ImageEditModal({
                           flipY={edit.cropFlipY}
                           onToggleFlipX={edit.toggleCropFlipX}
                           onToggleFlipY={edit.toggleCropFlipY}
+                          rotationFine={edit.cropRotationFine}
+                          onRotationFineChange={edit.setCropRotationFine}
                           onReset={edit.resetCropTransforms}
                         />
                       </>
+                    )}
+
+                    {mode === "split" && !edit.isProcessing && (
+                      <GridSplitControls
+                        config={edit.gridConfig}
+                        onChange={edit.setGridConfig}
+                      />
                     )}
 
                     {!edit.isProcessing && (
@@ -472,6 +595,7 @@ export default function ImageEditModal({
                         {mode === "crop" && t("hintCrop")}
                         {mode === "erase" && t("hintErase")}
                         {mode === "angles" && t("hintAngles")}
+                        {mode === "split" && t("hintSplit")}
                         {mode === "cutout" &&
                           (edit.cutoutSub === "auto"
                             ? t("hintCutoutAuto")
@@ -511,7 +635,7 @@ export default function ImageEditModal({
             </ModalBody>
 
             <ModalFooter>
-              {result ? (
+              {showDoneView ? (
                 <Button color="primary" onPress={handleClose}>
                   {tModal("close")}
                 </Button>
