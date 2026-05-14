@@ -317,6 +317,7 @@ function mapKsyunVideoStatus(
   status: string | undefined
 ): "in_queue" | "in_progress" | "completed" | "failed" {
   switch ((status ?? "").toUpperCase()) {
+    case "SUBMITTED":
     case "PENDING":
     case "QUEUED":
       return "in_queue";
@@ -328,8 +329,11 @@ function mapKsyunVideoStatus(
     case "SUCCEED":
       return "completed";
     case "FAILED":
-    default:
       return "failed";
+    default:
+      // Unknown statuses: assume the task is still alive rather than marking
+      // it failed, so newly-added ksyun states don't kill in-flight jobs.
+      return "in_progress";
   }
 }
 
