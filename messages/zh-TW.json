@@ -1771,9 +1771,7 @@
         "free": "自由"
       },
       "cropTransform": {
-        "rotateLeft": "向左旋轉 90°",
-        "rotateRight": "向右旋轉 90°",
-        "fineAngle": "微調角度",
+        "tilt": "傾斜裁剪框",
         "flipHorizontal": "水平翻轉",
         "flipVertical": "垂直翻轉",
         "reset": "重置"

@@ -2,22 +2,13 @@
 
 import { Slider } from "@heroui/slider";
 import { useTranslations } from "next-intl";
-import {
-  RotateCcw,
-  RotateCw,
-  FlipHorizontal2,
-  FlipVertical2,
-  Undo2,
-} from "lucide-react";
+import { FlipHorizontal2, FlipVertical2, Undo2 } from "lucide-react";
 
 interface CropTransformControlsProps {
-  rotationFine: number;
-  rotationTotal: number;
+  tilt: number;
   flipX: boolean;
   flipY: boolean;
-  onRotateLeft: () => void;
-  onRotateRight: () => void;
-  onFineChange: (deg: number) => void;
+  onTiltChange: (deg: number) => void;
   onToggleFlipX: () => void;
   onToggleFlipY: () => void;
   onReset: () => void;
@@ -25,19 +16,17 @@ interface CropTransformControlsProps {
 }
 
 /**
- * Free-transform controls for the crop tool: 90° rotation buttons, a fine
- * angle slider (-45..+45), horizontal / vertical flip toggles, and a reset
- * button. Same component is rendered in the chat modal and the desktop
- * in-canvas overlay so behavior can't drift.
+ * Transform controls for the crop tool: a tilt slider (-45..+45) that
+ * rotates the crop SELECTION around its center (the image stays still),
+ * horizontal / vertical flip toggles for the image, and a reset button.
+ * Same component is rendered by the chat modal and the desktop in-canvas
+ * overlay so behavior can't drift.
  */
 export default function CropTransformControls({
-  rotationFine,
-  rotationTotal,
+  tilt,
   flipX,
   flipY,
-  onRotateLeft,
-  onRotateRight,
-  onFineChange,
+  onTiltChange,
   onToggleFlipX,
   onToggleFlipY,
   onReset,
@@ -50,48 +39,24 @@ export default function CropTransformControls({
   const toggleBtn = (active: boolean) =>
     `${iconBtn} ${active ? "bg-primary/15 text-primary border-primary/40" : "bg-background"}`;
 
-  const handleFine = (val: number | number[]) => {
+  const handleTilt = (val: number | number[]) => {
     const n = Array.isArray(val) ? val[0] : val;
-    if (typeof n === "number") onFineChange(n);
+    if (typeof n === "number") onTiltChange(n);
   };
 
   return (
     <div className={`flex flex-col gap-3 ${className ?? ""}`}>
-      <div className="flex items-center justify-between gap-2">
-        <button
-          type="button"
-          onClick={onRotateLeft}
-          aria-label={t("rotateLeft")}
-          title={t("rotateLeft")}
-          className={`${iconBtn} bg-background`}
-        >
-          <RotateCcw size={15} />
-        </button>
-        <span className="text-xs text-default-500 tabular-nums">
-          {Math.round(rotationTotal)}°
-        </span>
-        <button
-          type="button"
-          onClick={onRotateRight}
-          aria-label={t("rotateRight")}
-          title={t("rotateRight")}
-          className={`${iconBtn} bg-background`}
-        >
-          <RotateCw size={15} />
-        </button>
-      </div>
-
       <Slider
-        label={t("fineAngle")}
+        label={t("tilt")}
         size="sm"
         step={1}
         minValue={-45}
         maxValue={45}
-        value={rotationFine}
-        onChange={handleFine}
+        value={tilt}
+        onChange={handleTilt}
         getValue={(v) => `${Array.isArray(v) ? v[0] : v}°`}
         classNames={{ label: "text-xs text-default-500" }}
-        aria-label={t("fineAngle")}
+        aria-label={t("tilt")}
       />
 
       <div className="flex items-center gap-2">
@@ -124,7 +89,6 @@ export default function CropTransformControls({
           {t("reset")}
         </button>
       </div>
-
     </div>
   );
 }

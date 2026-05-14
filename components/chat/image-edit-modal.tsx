@@ -240,77 +240,30 @@ export default function ImageEditModal({
             ? Orbit
             : Scissors;
 
-  // Crop layout: wrap the <img> in a container sized to the *rotated bbox*
-  // (in natural pixels via aspect-ratio) so that
-  //   1) <ReactCrop> measures the rotated bbox and constrains the crop
-  //      selection to the visible image — without this, the crop area can
-  //      drift into the empty corners that appear at non-90° angles.
-  //   2) The wrapper's solid background + overflow:hidden masks anything
-  //      rendered behind the modal (e.g. layered asset thumbnails).
-  // The inner <img> is positioned absolutely, sized to its natural fraction
-  // of the bbox, and transformed via translate-rotate-scale so its visual
-  // exactly inscribes the wrapper.
-  const cropLayout = useMemo(() => {
-    if (mode !== "crop") return null;
-    const img = edit.imageRef.current;
-    const nw = img?.naturalWidth || 0;
-    const nh = img?.naturalHeight || 0;
-    if (!nw || !nh) return null;
-    const theta = (edit.cropRotationTotal * Math.PI) / 180;
-    const cos = Math.abs(Math.cos(theta));
-    const sin = Math.abs(Math.sin(theta));
-    const bboxW = nw * cos + nh * sin;
-    const bboxH = nw * sin + nh * cos;
+  // Crop tool transforms: the image itself stays still; only the crop
+  // SELECTION rotates (via CSS on .ReactCrop__crop-selection — see the
+  // .crop-tilted rule in globals.css). Flips apply to the <img> directly.
+  const cropImageStyle = useMemo<React.CSSProperties | undefined>(() => {
+    if (mode !== "crop") return undefined;
+    if (!edit.cropFlipX && !edit.cropFlipY) return undefined;
     const sx = edit.cropFlipX ? -1 : 1;
     const sy = edit.cropFlipY ? -1 : 1;
-    return {
-      wrapperStyle: {
-        position: "relative",
-        overflow: "hidden",
-        // Explicit intrinsic dims so the wrapper has a size to scale from
-        // (an aspect-ratio-only box collapses when its only children are
-        // absolutely positioned). The aspect-ratio keeps proportions when
-        // maxWidth/maxHeight fire and clamp one dimension.
-        width: `${bboxW}px`,
-        height: `${bboxH}px`,
-        aspectRatio: `${bboxW} / ${bboxH}`,
-        maxWidth: "100%",
-        maxHeight: "72vh",
-      } as React.CSSProperties,
-      imgStyle: {
-        position: "absolute",
-        top: "50%",
-        left: "50%",
-        width: `${(nw / bboxW) * 100}%`,
-        height: `${(nh / bboxH) * 100}%`,
-        transform: `translate(-50%, -50%) rotate(${edit.cropRotationTotal}deg) scale(${sx}, ${sy})`,
-        transformOrigin: "center",
-      } as React.CSSProperties,
-    };
-  }, [
-    mode,
-    edit.imageLoaded,
-    edit.imageRef,
-    edit.cropRotationTotal,
-    edit.cropFlipX,
-    edit.cropFlipY,
-  ]);
+    return { transform: `scale(${sx}, ${sy})` };
+  }, [mode, edit.cropFlipX, edit.cropFlipY]);
+
+  const cropTiltStyle = useMemo<React.CSSProperties | undefined>(() => {
+    if (mode !== "crop") return undefined;
+    return { "--crop-tilt": `${edit.cropTilt}deg` } as React.CSSProperties;
+  }, [mode, edit.cropTilt]);
 
   const cropAspectValue = useMemo<number | undefined>(() => {
     if (mode !== "crop") return undefined;
     const img = edit.imageRef.current;
     const w = img?.naturalWidth ?? 0;
     const h = img?.naturalHeight ?? 0;
-    const rotated = edit.cropRotationStep % 180 !== 0;
-    return resolveCropAspectRatio(edit.cropAspect, w, h, rotated);
+    return resolveCropAspectRatio(edit.cropAspect, w, h);
     // imageLoaded forces a recompute once natural dims are known.
-  }, [
-    mode,
-    edit.cropAspect,
-    edit.cropRotationStep,
-    edit.imageLoaded,
-    edit.imageRef,
-  ]);
+  }, [mode, edit.cropAspect, edit.imageLoaded, edit.imageRef]);
 
   const handleClose = () => {
     onClose();
@@ -413,37 +366,31 @@ export default function ImageEditModal({
                         // max-height:inherit, so any cap has to live on the
                         // <ReactCrop> element itself — otherwise the img
                         // renders at natural size and the modal body scrolls.
+                        // The `crop-tilted` class + --crop-tilt CSS variable
+                        // rotate the selection rectangle around its center
+                        // (see globals.css). The image itself is never
+                        // rotated; only flips are applied via cropImageStyle.
                         <ReactCrop
                           crop={edit.crop}
                           onChange={(c) => edit.setCrop(c)}
                           onComplete={(c) => edit.setCompletedCrop(c)}
                           aspect={cropAspectValue}
-                          style={{ maxHeight: "72vh", maxWidth: "100%" }}
+                          className="crop-tilted"
+                          style={{
+                            maxHeight: "72vh",
+                            maxWidth: "100%",
+                            ...cropTiltStyle,
+                          }}
                         >
-                          {cropLayout ? (
-                            <div className="bg-background" style={cropLayout.wrapperStyle}>
-                              <img
-                                ref={edit.imageRef}
-                                src={sourceImageUrl}
-                                alt=""
-                                className="select-none"
-                                style={cropLayout.imgStyle}
-                                onLoad={() => edit.setImageLoaded(true)}
-                                draggable={false}
-                              />
-                            </div>
-                          ) : (
-                            // Pre-load fallback: same plain <img> as before so
-                            // the onLoad fires and cropLayout can compute.
-                            <img
-                              ref={edit.imageRef}
-                              src={sourceImageUrl}
-                              alt=""
-                              className="block max-w-full max-h-[72vh] object-contain select-none"
-                              onLoad={() => edit.setImageLoaded(true)}
-                              draggable={false}
-                            />
-                          )}
+                          <img
+                            ref={edit.imageRef}
+                            src={sourceImageUrl}
+                            alt=""
+                            className="block max-w-full max-h-[72vh] object-contain select-none"
+                            style={cropImageStyle}
+                            onLoad={() => edit.setImageLoaded(true)}
+                            draggable={false}
+                          />
                         </ReactCrop>
                       )}
 
@@ -526,13 +473,10 @@ export default function ImageEditModal({
                           onChange={edit.setCropAspect}
                         />
                         <CropTransformControls
-                          rotationFine={edit.cropRotationFine}
-                          rotationTotal={edit.cropRotationTotal}
+                          tilt={edit.cropTilt}
                           flipX={edit.cropFlipX}
                           flipY={edit.cropFlipY}
-                          onRotateLeft={edit.rotateLeft90}
-                          onRotateRight={edit.rotateRight90}
-                          onFineChange={edit.setCropRotationFine}
+                          onTiltChange={edit.setCropTilt}
                           onToggleFlipX={edit.toggleCropFlipX}
                           onToggleFlipY={edit.toggleCropFlipY}
                           onReset={edit.resetCropTransforms}

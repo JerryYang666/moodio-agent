@@ -128,17 +128,13 @@ export interface UseImageEdit {
   cropAspect: CropAspectChoice;
   setCropAspect: (v: CropAspectChoice) => void;
 
-  // Crop transform: 90° step + fine slider (-45..+45) compose into total
-  // rotation; flipX / flipY mirror the displayed image. Total rotation is
-  // derived as (step + fine + 360) % 360.
-  cropRotationStep: 0 | 90 | 180 | 270;
-  cropRotationFine: number;
-  cropRotationTotal: number;
+  // Crop transform: a tilt angle (-45..+45) that rotates the crop SELECTION
+  // around its center (the image itself stays static). flipX / flipY mirror
+  // the displayed image.
+  cropTilt: number;
   cropFlipX: boolean;
   cropFlipY: boolean;
-  rotateLeft90: () => void;
-  rotateRight90: () => void;
-  setCropRotationFine: (deg: number) => void;
+  setCropTilt: (deg: number) => void;
   toggleCropFlipX: () => void;
   toggleCropFlipY: () => void;
   resetCropTransforms: () => void;
@@ -243,19 +239,15 @@ export function useImageEdit(options: UseImageEditOptions): UseImageEdit {
   const [cropAspect, setCropAspectState] = useState<CropAspectChoice>(
     DEFAULT_CROP_ASPECT_CHOICE
   );
-  const [cropRotationStep, setCropRotationStep] = useState<0 | 90 | 180 | 270>(
-    0
-  );
-  const [cropRotationFine, setCropRotationFineState] = useState<number>(0);
+  const [cropTilt, setCropTiltState] = useState<number>(0);
   const [cropFlipX, setCropFlipX] = useState<boolean>(false);
   const [cropFlipY, setCropFlipY] = useState<boolean>(false);
 
-  const cropRotationTotal =
-    (cropRotationStep + cropRotationFine + 360) % 360;
-
-  // Any change to aspect / rotation / flip invalidates the previous crop
-  // rect (its coordinates no longer match what the user sees), so we clear
-  // it and let ReactCrop re-center a fresh selection.
+  // Changing the aspect ratio invalidates the previous selection (a fresh
+  // ratio should re-center a new selection), so clear the crop on change.
+  // Tilt and flips deliberately leave the selection alone — tilting the
+  // crop box around its existing center is the whole point, and flipping
+  // mirrors the image without resizing the selection.
   const clearCropSelection = useCallback(() => {
     setCrop(undefined);
     setCompletedCrop(undefined);
@@ -269,46 +261,24 @@ export function useImageEdit(options: UseImageEditOptions): UseImageEdit {
     [clearCropSelection]
   );
 
-  const rotateLeft90 = useCallback(() => {
-    setCropRotationStep(
-      (prev) => (((prev - 90 + 360) % 360) as 0 | 90 | 180 | 270)
-    );
-    clearCropSelection();
-  }, [clearCropSelection]);
-
-  const rotateRight90 = useCallback(() => {
-    setCropRotationStep(
-      (prev) => (((prev + 90) % 360) as 0 | 90 | 180 | 270)
-    );
-    clearCropSelection();
-  }, [clearCropSelection]);
-
-  const setCropRotationFine = useCallback(
-    (deg: number) => {
-      const clamped = Math.max(-45, Math.min(45, deg));
-      setCropRotationFineState(clamped);
-      clearCropSelection();
-    },
-    [clearCropSelection]
-  );
+  const setCropTilt = useCallback((deg: number) => {
+    const clamped = Math.max(-45, Math.min(45, deg));
+    setCropTiltState(clamped);
+  }, []);
 
   const toggleCropFlipX = useCallback(() => {
     setCropFlipX((v) => !v);
-    clearCropSelection();
-  }, [clearCropSelection]);
+  }, []);
 
   const toggleCropFlipY = useCallback(() => {
     setCropFlipY((v) => !v);
-    clearCropSelection();
-  }, [clearCropSelection]);
+  }, []);
 
   const resetCropTransforms = useCallback(() => {
-    setCropRotationStep(0);
-    setCropRotationFineState(0);
+    setCropTiltState(0);
     setCropFlipX(false);
     setCropFlipY(false);
-    clearCropSelection();
-  }, [clearCropSelection]);
+  }, []);
 
   const [horizontalAngle, setHorizontalAngle] = useState<number>(0);
   const [verticalAngle, setVerticalAngle] = useState<number>(0);
@@ -501,7 +471,7 @@ export function useImageEdit(options: UseImageEditOptions): UseImageEdit {
           sourceImageId,
           completedCrop,
           displayedRect,
-          rotation: cropRotationTotal,
+          rotation: cropTilt,
           flipX: cropFlipX,
           flipY: cropFlipY,
         });
@@ -616,7 +586,7 @@ export function useImageEdit(options: UseImageEditOptions): UseImageEdit {
     horizontalAngle,
     verticalAngle,
     zoom,
-    cropRotationTotal,
+    cropTilt,
     cropFlipX,
     cropFlipY,
   ]);
@@ -669,8 +639,7 @@ export function useImageEdit(options: UseImageEditOptions): UseImageEdit {
     setPrompt("");
     setAspectRatio(DEFAULT_ASPECT_RATIO_CHOICE);
     setCropAspectState(DEFAULT_CROP_ASPECT_CHOICE);
-    setCropRotationStep(0);
-    setCropRotationFineState(0);
+    setCropTiltState(0);
     setCropFlipX(false);
     setCropFlipY(false);
     setHorizontalAngle(0);
@@ -708,14 +677,10 @@ export function useImageEdit(options: UseImageEditOptions): UseImageEdit {
       setAspectRatio,
       cropAspect,
       setCropAspect,
-      cropRotationStep,
-      cropRotationFine,
-      cropRotationTotal,
+      cropTilt,
       cropFlipX,
       cropFlipY,
-      rotateLeft90,
-      rotateRight90,
-      setCropRotationFine,
+      setCropTilt,
       toggleCropFlipX,
       toggleCropFlipY,
       resetCropTransforms,
@@ -754,14 +719,10 @@ export function useImageEdit(options: UseImageEditOptions): UseImageEdit {
       aspectRatio,
       cropAspect,
       setCropAspect,
-      cropRotationStep,
-      cropRotationFine,
-      cropRotationTotal,
+      cropTilt,
       cropFlipX,
       cropFlipY,
-      rotateLeft90,
-      rotateRight90,
-      setCropRotationFine,
+      setCropTilt,
       toggleCropFlipX,
       toggleCropFlipY,
       resetCropTransforms,
