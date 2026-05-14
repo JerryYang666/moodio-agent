@@ -120,28 +120,24 @@ export default function RotatedCropSurface({
     const { w: nw, h: nh } = natural;
     if (!nw || !nh) return null;
     const bbox = rotatedBboxSize(nw, nh, rotationDeg);
-    // Available area depends on the host. For the modal we cap at 72vh in
-    // CSS pixels (computed once layout knows the viewport); for the overlay
-    // we use the host's actual dims (asset rect).
+    // Available width comes from the host (the column / asset rect we
+    // observed). Available HEIGHT is layout-specific:
+    //   - modal: always 72vh, matching the 0° fast path's max-h. The
+    //     ancestor we observe is a flex column whose measured height is
+    //     dominated by the short right-side controls pane, not the actual
+    //     vertical budget for the image. Using its height would shrink the
+    //     envelope dramatically the moment rotation flips this on.
+    //   - overlay: the asset rect's height, since the overlay is pinned to
+    //     a fixed pixel rect and has no separate vertical budget.
     let availW = hostSize.w;
     let availH =
       layout === "modal"
-        ? Math.min(
-            hostSize.h > 0 ? hostSize.h : Number.POSITIVE_INFINITY,
-            typeof window === "undefined"
-              ? Number.POSITIVE_INFINITY
-              : (window.innerHeight * MODAL_MAX_VH) / 100
-          )
-        : hostSize.h;
-    // Modal's host may not have a determinate height (inline-flex parent);
-    // in that case fall back to the 72vh cap alone.
-    if (!Number.isFinite(availH) || availH <= 0) {
-      availH =
-        typeof window === "undefined"
+        ? typeof window === "undefined"
           ? 600
-          : (window.innerHeight * MODAL_MAX_VH) / 100;
-    }
+          : (window.innerHeight * MODAL_MAX_VH) / 100
+        : hostSize.h;
     if (!availW || availW <= 0) availW = 1;
+    if (!availH || availH <= 0) availH = 1;
     const scale = Math.min(availW / bbox.width, availH / bbox.height);
     const envW = bbox.width * scale;
     const envH = bbox.height * scale;
