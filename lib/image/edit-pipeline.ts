@@ -51,6 +51,56 @@ export type AspectRatioChoice = "source" | (typeof ASPECT_RATIO_OPTIONS)[number]
 export const DEFAULT_ASPECT_RATIO_CHOICE: AspectRatioChoice = "source";
 
 /**
+ * Aspect-ratio options shown specifically in the crop tool. Same curated
+ * numeric set as the AI flow, plus a "free" option for unconstrained drag.
+ * Kept separate from ASPECT_RATIO_OPTIONS because "free" maps to undefined
+ * (no constraint) rather than a SupportedAspectRatio sent to the model.
+ */
+export const CROP_ASPECT_RATIO_OPTIONS = [
+  "1:1",
+  "4:3",
+  "3:4",
+  "16:9",
+  "9:16",
+  "3:2",
+  "2:3",
+] as const;
+
+export type CropAspectChoice =
+  | "free"
+  | "source"
+  | (typeof CROP_ASPECT_RATIO_OPTIONS)[number];
+
+export const DEFAULT_CROP_ASPECT_CHOICE: CropAspectChoice = "free";
+
+/**
+ * Resolve a CropAspectChoice into the numeric `aspect` value that
+ * <ReactCrop> consumes. Returns undefined for "free" (no constraint).
+ *
+ * `rotated` indicates whether the displayed image is rotated by an odd
+ * multiple of 90° — in that case the visible width/height are swapped, so
+ * the apparent aspect needs to be inverted to match what the user sees.
+ */
+export function resolveCropAspectRatio(
+  choice: CropAspectChoice,
+  naturalWidth: number,
+  naturalHeight: number,
+  rotated: boolean
+): number | undefined {
+  if (choice === "free") return undefined;
+  let ratio: number;
+  if (choice === "source") {
+    if (!naturalWidth || !naturalHeight) return undefined;
+    ratio = naturalWidth / naturalHeight;
+  } else {
+    const [w, h] = choice.split(":").map(Number);
+    if (!w || !h) return undefined;
+    ratio = w / h;
+  }
+  return rotated ? 1 / ratio : ratio;
+}
+
+/**
  * Resolve the aspect ratio to send to the edit endpoint. "source" snaps the
  * image's natural dimensions to the closest supported ratio (preserves
  * shape); an explicit choice is passed through as-is. Returns undefined if
@@ -155,13 +205,28 @@ export async function composeMarkedImage(args: {
  * space. `displayedRect` MUST be captured from the rendered <img> *before*
  * any state flip that unmounts it — falling back to natural dimensions
  * silently produces a broken crop anchored at top-left.
+ *
+ * When `rotation`/`flipX`/`flipY` are set, the source is first rendered
+ * onto an intermediate canvas with those transforms applied (so its
+ * bounding box matches what the user saw in the cropper), then the
+ * completedCrop is mapped into that intermediate canvas in natural pixels.
  */
 export async function composeCroppedImage(args: {
   sourceImageId: string;
   completedCrop: PixelCrop;
   displayedRect: DOMRect | null;
+  rotation?: number;
+  flipX?: boolean;
+  flipY?: boolean;
 }): Promise<File> {
-  const { sourceImageId, completedCrop, displayedRect } = args;
+  const {
+    sourceImageId,
+    completedCrop,
+    displayedRect,
+    rotation = 0,
+    flipX = false,
+    flipY = false,
+  } = args;
   if (
     !completedCrop ||
     completedCrop.width === 0 ||
@@ -170,19 +235,43 @@ export async function composeCroppedImage(args: {
     throw new Error("Please select a crop area");
   }
   const cleanImage = await fetchOriginalImage(sourceImageId);
-  const dispW = displayedRect?.width || cleanImage.naturalWidth;
-  const dispH = displayedRect?.height || cleanImage.naturalHeight;
-  const sx = (completedCrop.x * cleanImage.naturalWidth) / dispW;
-  const sy = (completedCrop.y * cleanImage.naturalHeight) / dispH;
-  const sw = (completedCrop.width * cleanImage.naturalWidth) / dispW;
-  const sh = (completedCrop.height * cleanImage.naturalHeight) / dispH;
+
+  // Build the intermediate canvas that mirrors what <ReactCrop> displayed:
+  // the source image rotated + flipped, fit to its rotated bounding box.
+  const theta = (rotation * Math.PI) / 180;
+  const W = cleanImage.naturalWidth;
+  const H = cleanImage.naturalHeight;
+  const cos = Math.abs(Math.cos(theta));
+  const sin = Math.abs(Math.sin(theta));
+  const bbW = Math.max(1, Math.round(W * cos + H * sin));
+  const bbH = Math.max(1, Math.round(W * sin + H * cos));
+
+  const interim = document.createElement("canvas");
+  interim.width = bbW;
+  interim.height = bbH;
+  const ictx = interim.getContext("2d");
+  if (!ictx) throw new Error("Failed to get interim 2d context");
+  ictx.save();
+  ictx.translate(bbW / 2, bbH / 2);
+  ictx.rotate(theta);
+  ictx.scale(flipX ? -1 : 1, flipY ? -1 : 1);
+  ictx.drawImage(cleanImage, -W / 2, -H / 2);
+  ictx.restore();
+
+  // completedCrop is in displayed-pixel space of the rotated bounding box.
+  const dispW = displayedRect?.width || bbW;
+  const dispH = displayedRect?.height || bbH;
+  const sx = (completedCrop.x * bbW) / dispW;
+  const sy = (completedCrop.y * bbH) / dispH;
+  const sw = (completedCrop.width * bbW) / dispW;
+  const sh = (completedCrop.height * bbH) / dispH;
 
   const out = document.createElement("canvas");
   out.width = Math.max(1, Math.round(sw));
   out.height = Math.max(1, Math.round(sh));
   const ctx = out.getContext("2d");
   if (!ctx) throw new Error("Failed to get output 2d context");
-  ctx.drawImage(cleanImage, sx, sy, sw, sh, 0, 0, out.width, out.height);
+  ctx.drawImage(interim, sx, sy, sw, sh, 0, 0, out.width, out.height);
 
   const blob = await new Promise<Blob>((resolve, reject) => {
     out.toBlob(

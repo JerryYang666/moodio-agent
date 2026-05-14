@@ -30,10 +30,16 @@ import "react-image-crop/dist/ReactCrop.css";
 
 import MarkControls from "@/components/chat/mark-controls";
 import AspectRatioSelector from "@/components/chat/aspect-ratio-selector";
+import CropAspectRatioSelector from "@/components/chat/crop-aspect-ratio-selector";
+import CropTransformControls from "@/components/chat/crop-transform-controls";
 import AngleControls from "@/components/chat/angle-controls";
 import MagicProgress from "./magic-progress";
 import { useImageEdit, type PreparedEditLaunch } from "@/hooks/use-image-edit";
-import type { ImageEditMode, CutoutSubMode } from "@/lib/image/edit-pipeline";
+import {
+  resolveCropAspectRatio,
+  type ImageEditMode,
+  type CutoutSubMode,
+} from "@/lib/image/edit-pipeline";
 
 export type { ImageEditMode, CutoutSubMode };
 
@@ -264,6 +270,35 @@ export default function ImageEditOverlay({
             ? Orbit
             : Scissors;
 
+  // CSS transform applied to the crop tool's <img> for rotate + flip.
+  // ReactCrop's overlay measures the inner <img>'s getBoundingClientRect, so
+  // applying the transform here is enough — the crop UI follows the visible
+  // bbox.
+  const cropImageStyle = useMemo<React.CSSProperties | undefined>(() => {
+    if (mode !== "crop") return undefined;
+    const sx = edit.cropFlipX ? -1 : 1;
+    const sy = edit.cropFlipY ? -1 : 1;
+    return {
+      transform: `rotate(${edit.cropRotationTotal}deg) scale(${sx}, ${sy})`,
+      transformOrigin: "center",
+    };
+  }, [mode, edit.cropRotationTotal, edit.cropFlipX, edit.cropFlipY]);
+
+  const cropAspectValue = useMemo<number | undefined>(() => {
+    if (mode !== "crop") return undefined;
+    const img = edit.imageRef.current;
+    const w = img?.naturalWidth ?? 0;
+    const h = img?.naturalHeight ?? 0;
+    const rotated = edit.cropRotationStep % 180 !== 0;
+    return resolveCropAspectRatio(edit.cropAspect, w, h, rotated);
+  }, [
+    mode,
+    edit.cropAspect,
+    edit.cropRotationStep,
+    edit.imageLoaded,
+    edit.imageRef,
+  ]);
+
   // Side-pane positioning. The right pane sits to the right of the asset
   // rect (12px gap); the bottom pane sits below it. They share screen-space
   // with the canvas container so they pan/zoom with the asset.
@@ -305,14 +340,16 @@ export default function ImageEditOverlay({
           height: screenRect.height,
         }}
       >
-        <img
-          ref={edit.imageRef}
-          src={sourceImageUrl}
-          alt=""
-          className="w-full h-full object-contain select-none"
-          onLoad={() => edit.setImageLoaded(true)}
-          draggable={false}
-        />
+        {!edit.usesCrop && (
+          <img
+            ref={edit.imageRef}
+            src={sourceImageUrl}
+            alt=""
+            className="w-full h-full object-contain select-none"
+            onLoad={() => edit.setImageLoaded(true)}
+            draggable={false}
+          />
+        )}
 
         {!edit.isProcessing && edit.usesBrush && edit.imageLoaded && (
           <canvas
@@ -332,18 +369,22 @@ export default function ImageEditOverlay({
           />
         )}
 
-        {!edit.isProcessing && edit.usesCrop && edit.imageLoaded && (
+        {!edit.isProcessing && edit.usesCrop && (
           <div className="absolute inset-0">
             <ReactCrop
               crop={edit.crop}
               onChange={(c) => edit.setCrop(c)}
               onComplete={(c) => edit.setCompletedCrop(c)}
+              aspect={cropAspectValue}
               className="absolute inset-0"
             >
               <img
+                ref={edit.imageRef}
                 src={sourceImageUrl}
                 alt=""
                 className="w-full h-full object-contain select-none"
+                style={cropImageStyle}
+                onLoad={() => edit.setImageLoaded(true)}
                 draggable={false}
               />
             </ReactCrop>
@@ -429,6 +470,27 @@ export default function ImageEditOverlay({
             value={edit.aspectRatio}
             onChange={edit.setAspectRatio}
           />
+        )}
+
+        {mode === "crop" && !edit.isProcessing && (
+          <>
+            <CropAspectRatioSelector
+              value={edit.cropAspect}
+              onChange={edit.setCropAspect}
+            />
+            <CropTransformControls
+              rotationFine={edit.cropRotationFine}
+              rotationTotal={edit.cropRotationTotal}
+              flipX={edit.cropFlipX}
+              flipY={edit.cropFlipY}
+              onRotateLeft={edit.rotateLeft90}
+              onRotateRight={edit.rotateRight90}
+              onFineChange={edit.setCropRotationFine}
+              onToggleFlipX={edit.toggleCropFlipX}
+              onToggleFlipY={edit.toggleCropFlipY}
+              onReset={edit.resetCropTransforms}
+            />
+          </>
         )}
 
         {!edit.isProcessing && (
