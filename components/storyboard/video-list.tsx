@@ -155,6 +155,7 @@ export default function VideoList({ refreshTrigger, onRestore }: VideoListProps)
   const [selectedVideo, setSelectedVideo] = useState<VideoGeneration | null>(
     null
   );
+  const [checkingId, setCheckingId] = useState<string | null>(null);
 
   // View mode state (all videos vs by collection)
   const [viewMode, setViewMode] = useState<ViewMode>("all");
@@ -364,6 +365,58 @@ export default function VideoList({ refreshTrigger, onRestore }: VideoListProps)
       document.body.removeChild(a);
     } catch (e) {
       console.error("Download error:", e);
+    }
+  };
+
+  // Kingsoft Cloud (ksyun) callbacks are unreliable; the background poll can
+  // miss, leaving these stuck in "processing". Let the owner force a reconcile.
+  const handleCheckResult = async (
+    e: React.MouseEvent,
+    gen: VideoGeneration
+  ) => {
+    e.stopPropagation();
+    if (checkingId) return;
+    setCheckingId(gen.id);
+    try {
+      const res = await fetch(`/api/video/generations/${gen.id}/check`, {
+        method: "POST",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        addToast({
+          title: t("checkResult"),
+          description: data.error || t("checkError"),
+          color: "danger",
+        });
+      } else if (data.status === "completed") {
+        addToast({
+          title: t("checkResult"),
+          description: t("checkCompleted"),
+          color: "success",
+        });
+      } else if (data.status === "failed") {
+        addToast({
+          title: t("checkResult"),
+          description: data.error || t("checkFailed"),
+          color: "danger",
+        });
+      } else {
+        addToast({
+          title: t("checkResult"),
+          description: t("checkStillProcessing"),
+          color: "default",
+        });
+      }
+      await fetchGenerations();
+    } catch (err) {
+      console.error("Error checking generation result:", err);
+      addToast({
+        title: t("checkResult"),
+        description: t("checkError"),
+        color: "danger",
+      });
+    } finally {
+      setCheckingId(null);
     }
   };
 
@@ -861,6 +914,30 @@ export default function VideoList({ refreshTrigger, onRestore }: VideoListProps)
                           )}
                         </div>
                       )}
+
+                      {/* Manual result check — Kingsoft Cloud (ksyun) only,
+                          since its webhook callbacks are unreliable */}
+                      {(gen.status === "pending" ||
+                        gen.status === "processing") &&
+                        gen.provider === "ksyun" && (
+                          <div className="absolute top-2 right-2 z-10">
+                            <Button
+                              size="sm"
+                              variant="solid"
+                              color="primary"
+                              isLoading={checkingId === gen.id}
+                              startContent={
+                                checkingId === gen.id ? null : (
+                                  <RefreshCw size={14} />
+                                )
+                              }
+                              className="bg-background/80 backdrop-blur-sm"
+                              onClick={(e) => handleCheckResult(e, gen)}
+                            >
+                              {t("checkResult")}
+                            </Button>
+                          </div>
+                        )}
                     </div>
                   ))}
                 </div>
