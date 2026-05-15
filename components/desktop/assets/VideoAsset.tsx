@@ -4,7 +4,7 @@ import { useRef, useCallback, useState, useEffect } from "react";
 import { useTranslations } from "next-intl";
 import type { VideoAssetMeta } from "@/lib/desktop/types";
 import type { EnrichedDesktopAsset } from "./types";
-import { Play, Pause, Loader2, Clock, AlertCircle, Video, Maximize2, Camera } from "lucide-react";
+import { Play, Pause, Loader2, Clock, AlertCircle, Video, Maximize2, Scan, Camera } from "lucide-react";
 import { addToast } from "@heroui/toast";
 import { useVideo } from "@/components/video-provider";
 import FakeProgressBar from "@/components/video/fake-progress-bar";
@@ -24,6 +24,7 @@ interface VideoAssetProps {
     naturalHeight: number
   ) => void;
   onFocusAsset?: (asset: EnrichedDesktopAsset) => void;
+  onPreviewAsset?: (asset: EnrichedDesktopAsset) => void;
   zoom: number;
   /**
    * Called after the user clicks "Capture Frame" on a paused playing video.
@@ -46,6 +47,7 @@ export default function VideoAsset({
   onPlayToggle,
   onImageLoad,
   onFocusAsset,
+  onPreviewAsset,
   zoom,
   onFrameCaptured,
 }: VideoAssetProps) {
@@ -271,21 +273,40 @@ export default function VideoAsset({
         )}
       </div>
 
-      {/* Focus button — top-right */}
-      {onFocusAsset && (
-        <button
-          type="button"
-          className="absolute top-0 right-0 z-10 w-7 h-7 rounded-full bg-black/60 flex items-center justify-center backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity"
+      {/* Preview + focus buttons — top-right */}
+      {(onPreviewAsset || onFocusAsset) && (
+        <div
+          className="absolute top-0 right-0 z-10 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
           style={{ transform: `scale(${1 / zoom})`, transformOrigin: "top right", margin: `${8 / zoom}px` }}
           onPointerDown={(e) => e.stopPropagation()}
-          onClick={(e) => {
-            e.stopPropagation();
-            onFocusAsset(asset);
-          }}
-          title="Focus on asset"
         >
-          <Maximize2 size={13} className="text-white" />
-        </button>
+          {onPreviewAsset && (
+            <button
+              type="button"
+              className="w-7 h-7 rounded-full bg-black/60 flex items-center justify-center backdrop-blur-sm hover:bg-black/80 transition-colors"
+              onClick={(e) => {
+                e.stopPropagation();
+                onPreviewAsset(asset);
+              }}
+              title="View fullscreen"
+            >
+              <Maximize2 size={13} className="text-white" />
+            </button>
+          )}
+          {onFocusAsset && (
+            <button
+              type="button"
+              className="w-7 h-7 rounded-full bg-black/60 flex items-center justify-center backdrop-blur-sm hover:bg-black/80 transition-colors"
+              onClick={(e) => {
+                e.stopPropagation();
+                onFocusAsset(asset);
+              }}
+              title="Focus on asset"
+            >
+              <Scan size={13} className="text-white" />
+            </button>
+          )}
+        </div>
       )}
 
       {/* Play button overlay on hover — completed only */}

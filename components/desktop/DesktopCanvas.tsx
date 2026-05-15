@@ -10,6 +10,7 @@ import { aspectRatioDimensions } from "@/lib/desktop/types";
 import { ImageAsset, VideoAsset, TextAsset, LinkAsset, VideoSuggestAsset, AudioAsset } from "./assets";
 import PublicVideoAsset from "./assets/PublicVideoAsset";
 import TableAsset from "./assets/TableAsset";
+import CanvasMediaPreview from "./assets/CanvasMediaPreview";
 import { hasWriteAccess, type Permission } from "@/lib/permissions";
 import { MAX_PENDING_IMAGES } from "@/components/chat/pending-image-types";
 import type { CanvasMode } from "./DesktopToolbar";
@@ -480,6 +481,13 @@ export default function DesktopCanvas({
     },
     [naturalDims, onCameraChange]
   );
+
+  const [previewAsset, setPreviewAsset] = useState<EnrichedDesktopAsset | null>(
+    null
+  );
+  const handlePreviewAsset = useCallback((asset: EnrichedDesktopAsset) => {
+    setPreviewAsset(asset);
+  }, []);
 
   // Padding reserved when auto-focusing for an image-edit operation,
   // so the asset + the overlay's right pane (prompt / submit / etc.)
@@ -1460,6 +1468,7 @@ export default function DesktopCanvas({
                 onPlayToggle={onAssetClick ? () => onAssetClick(asset) : undefined}
                 onImageLoad={handleImageLoad}
                 onFocusAsset={handleFocusAsset}
+                onPreviewAsset={handlePreviewAsset}
                 zoom={camera.zoom}
                 sendEvent={sendEvent}
                 cellLocks={cellLocks}
@@ -2191,6 +2200,11 @@ export default function DesktopCanvas({
         )}
       </AnimatePresence>
 
+      <CanvasMediaPreview
+        asset={previewAsset}
+        onClose={() => setPreviewAsset(null)}
+      />
+
     </div>
   );
 }
@@ -2202,6 +2216,7 @@ function AssetCardContent({
   onPlayToggle,
   onImageLoad,
   onFocusAsset,
+  onPreviewAsset,
   zoom,
   sendEvent,
   cellLocks,
@@ -2218,6 +2233,7 @@ function AssetCardContent({
   onPlayToggle?: () => void;
   onImageLoad: (assetId: string, naturalWidth: number, naturalHeight: number) => void;
   onFocusAsset?: (asset: EnrichedDesktopAsset) => void;
+  onPreviewAsset?: (asset: EnrichedDesktopAsset) => void;
   zoom: number;
   sendEvent?: (type: string, payload: Record<string, unknown>) => void;
   cellLocks?: Map<string, { userId: string; sessionId: string; firstName: string }>;
@@ -2237,11 +2253,11 @@ function AssetCardContent({
   switch (asset.assetType) {
     case "image":
     case "public_image":
-      return <ImageAsset asset={asset} containerWidth={containerWidth} onImageLoad={onImageLoad} onFocusAsset={onFocusAsset} zoom={zoom} />;
+      return <ImageAsset asset={asset} containerWidth={containerWidth} onImageLoad={onImageLoad} onFocusAsset={onFocusAsset} onPreviewAsset={onPreviewAsset} zoom={zoom} />;
     case "video":
-      return <VideoAsset asset={asset} containerWidth={containerWidth} playing={playing} onPlayToggle={onPlayToggle} onImageLoad={onImageLoad} onFocusAsset={onFocusAsset} zoom={zoom} onFrameCaptured={onVideoFrameCaptured} />;
+      return <VideoAsset asset={asset} containerWidth={containerWidth} playing={playing} onPlayToggle={onPlayToggle} onImageLoad={onImageLoad} onFocusAsset={onFocusAsset} onPreviewAsset={onPreviewAsset} zoom={zoom} onFrameCaptured={onVideoFrameCaptured} />;
     case "public_video":
-      return <PublicVideoAsset asset={asset} playing={playing} onPlayToggle={onPlayToggle} onImageLoad={onImageLoad} onFocusAsset={onFocusAsset} zoom={zoom} />;
+      return <PublicVideoAsset asset={asset} playing={playing} onPlayToggle={onPlayToggle} onImageLoad={onImageLoad} onFocusAsset={onFocusAsset} onPreviewAsset={onPreviewAsset} zoom={zoom} />;
     case "text": {
       const textLock = textLocks?.get(asset.id);
       const isTextLockedByOther = !!textLock && textLock.userId !== currentUserId;

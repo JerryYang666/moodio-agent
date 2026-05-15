@@ -4,7 +4,7 @@ import { useRef, useEffect } from "react";
 import { useTranslations } from "next-intl";
 import type { AudioAssetMeta } from "@/lib/desktop/types";
 import type { EnrichedDesktopAsset } from "./types";
-import { Play, Pause, Music, Maximize2 } from "lucide-react";
+import { Play, Pause, Music, Scan } from "lucide-react";
 
 interface AudioAssetProps {
   asset: EnrichedDesktopAsset;
@@ -78,7 +78,7 @@ export default function AudioAsset({
           }}
           title="Focus on asset"
         >
-          <Maximize2 size={13} className="text-white" />
+          <Scan size={13} className="text-white" />
         </button>
       )}
 
