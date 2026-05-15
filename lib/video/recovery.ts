@@ -287,6 +287,61 @@ export async function pollActiveKsyunGenerations(userId?: string): Promise<{
 }
 
 /**
+ * TEMPORARY: poll a single ksyun generation by id.
+ *
+ * The per-card frontend poller hits GET /api/video/generations/[id] every
+ * few seconds, but that route does no reconcile — so a watched ksyun video
+ * never resolves there until the ksyun webhook is live. This scopes the poll
+ * to just the requested row (not the user's whole active set) since this
+ * endpoint is called far more frequently than the list endpoint.
+ *
+ * Scoped to the owning user so a guessed id can't trigger a poll on someone
+ * else's generation. Remove once ksyun confirms webhook is live.
+ */
+export async function pollKsyunGenerationById(
+  generationId: string,
+  userId?: string
+): Promise<{ polled: boolean; recovered: boolean; status: string }> {
+  const [gen] = await db
+    .select()
+    .from(videoGenerations)
+    .where(eq(videoGenerations.id, generationId))
+    .limit(1);
+
+  if (!gen) {
+    return { polled: false, recovered: false, status: "not_found" };
+  }
+
+  if (userId && gen.userId !== userId) {
+    return { polled: false, recovered: false, status: "not_owner" };
+  }
+
+  if (gen.provider !== "ksyun") {
+    return { polled: false, recovered: false, status: "not_ksyun" };
+  }
+
+  if (gen.status !== "pending" && gen.status !== "processing") {
+    return { polled: false, recovered: false, status: gen.status };
+  }
+
+  console.log(
+    `[Ksyun Poll By Id] generation ${gen.id} status=${gen.status} requestId=${gen.providerRequestId ?? "<null>"} providerModelId=${gen.providerModelId ?? "<null>"} createdAt=${gen.createdAt.toISOString()}`
+  );
+
+  if (!gen.providerRequestId) {
+    console.log(`[Ksyun Poll By Id] generation ${gen.id} skipped: no providerRequestId`);
+    return { polled: false, recovered: false, status: "no_request_id" };
+  }
+
+  const result = await recoverGeneration(gen);
+  console.log(
+    `[Ksyun Poll By Id] generation ${gen.id} result: recovered=${result.recovered} status=${result.status}${result.error ? ` error=${result.error}` : ""}`
+  );
+
+  return { polled: true, recovered: result.recovered, status: result.status };
+}
+
+/**
  * Check and recover all stale generations for a user
  * Returns the number of generations recovered
  */
