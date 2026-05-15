@@ -6,6 +6,8 @@ import { videoGenerations, teamMembers } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getImageUrl, getVideoUrl, getSignedVideoUrl } from "@/lib/storage/s3";
 import { resolveUpscaledVideos } from "@/lib/video/upscale-utils";
+import { pollKsyunGenerationById } from "@/lib/video/recovery";
+import { waitUntil } from "@vercel/functions";
 
 /**
  * GET /api/video/generations/[id]
@@ -29,6 +31,16 @@ export async function GET(
   }
 
   const { id } = await params;
+
+  // TEMP: the per-card frontend poller hits this endpoint (not the list
+  // endpoint) every few seconds, so reconcile the requested ksyun generation
+  // here too until their webhook is live. Scoped to this single row and the
+  // owning user. Non-blocking. Remove once ksyun callbacks are reliable.
+  waitUntil(
+    pollKsyunGenerationById(id, payload.userId).catch((err) => {
+      console.error("[Video Generation] Ksyun poll error:", err);
+    })
+  );
 
   try {
     const [generation] = await db
