@@ -72,6 +72,7 @@ export default function VideoManagementPage() {
   const [selectedGeneration, setSelectedGeneration] =
     useState<AdminVideoGeneration | null>(null);
   const [recoveringId, setRecoveringId] = useState<string | null>(null);
+  const [checkingId, setCheckingId] = useState<string | null>(null);
 
   // Filters
   const [filterValue, setFilterValue] = useState("");
@@ -217,6 +218,54 @@ export default function VideoManagementPage() {
     },
     []
   );
+
+  // ksyun (Kingsoft Cloud) callbacks are unreliable; the background poll can
+  // miss, leaving these stuck in pending/processing. Force a reconcile.
+  const handleCheckResult = useCallback(async (generationId: string) => {
+    setCheckingId(generationId);
+    try {
+      const result = await api.post(
+        `/api/admin/video-generations/${generationId}/check`
+      );
+
+      if (result.status === "completed") {
+        addToast({
+          title: "Video ready",
+          description: "Provider returned the video and it was marked completed.",
+          color: "success",
+        });
+        await fetchGenerations();
+        setSelectedGeneration(null);
+      } else if (result.status === "failed") {
+        addToast({
+          title: "Generation failed",
+          description:
+            result.error || "Provider reports the generation failed.",
+          color: "danger",
+        });
+        await fetchGenerations();
+      } else {
+        addToast({
+          title: "Still processing",
+          description:
+            "Provider reports the task is still running. Try again in a moment.",
+          color: "warning",
+        });
+      }
+    } catch (error: any) {
+      const message =
+        error?.response?.data?.error ||
+        error?.message ||
+        "Status check request failed";
+      addToast({
+        title: "Check failed",
+        description: message,
+        color: "danger",
+      });
+    } finally {
+      setCheckingId(null);
+    }
+  }, []);
 
   if (authLoading) {
     return <Spinner size="lg" className="flex justify-center mt-10" />;
@@ -421,6 +470,24 @@ export default function VideoManagementPage() {
                             Recover
                           </Button>
                         )}
+                        {item.provider === "ksyun" &&
+                          (item.status === "pending" ||
+                            item.status === "processing") && (
+                            <Button
+                              size="sm"
+                              variant="light"
+                              color="primary"
+                              isLoading={checkingId === item.id}
+                              startContent={
+                                checkingId === item.id ? null : (
+                                  <RefreshCw size={14} />
+                                )
+                              }
+                              onPress={() => handleCheckResult(item.id)}
+                            >
+                              Check result
+                            </Button>
+                          )}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -534,6 +601,19 @@ export default function VideoManagementPage() {
                       onPress={() => handleRecover(selectedGeneration.id)}
                     >
                       Manual Recover
+                    </Button>
+                  )}
+                {selectedGeneration?.provider === "ksyun" &&
+                  (selectedGeneration.status === "pending" ||
+                    selectedGeneration.status === "processing") && (
+                    <Button
+                      color="primary"
+                      variant="flat"
+                      startContent={<RefreshCw size={16} />}
+                      isLoading={checkingId === selectedGeneration.id}
+                      onPress={() => handleCheckResult(selectedGeneration.id)}
+                    >
+                      Check result
                     </Button>
                   )}
                 {selectedGeneration?.videoUrl && (
