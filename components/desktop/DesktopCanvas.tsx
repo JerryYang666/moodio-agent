@@ -36,6 +36,8 @@ import {
   Orbit,
   Grid3X3,
   History,
+  Download,
+  ChevronDown,
 } from "lucide-react";
 import AssetHistoryPopover from "./assets/AssetHistoryPopover";
 import ImageEditOverlay, {
@@ -48,6 +50,17 @@ import type { PreparedEditLaunch } from "@/hooks/use-image-edit";
 type ImageEditLaunchPayload = PreparedEditLaunch["apiPayload"];
 import { motion, AnimatePresence } from "framer-motion";
 import { addToast } from "@heroui/toast";
+import {
+  Dropdown,
+  DropdownTrigger,
+  DropdownMenu,
+  DropdownItem,
+} from "@heroui/dropdown";
+import {
+  bulkDownloadAssets,
+  type ImageDownloadFormat,
+  type BulkDownloadAsset,
+} from "@/lib/bulk-download";
 import { siteConfig } from "@/config/site";
 
 const MIN_ZOOM = 0.1;
@@ -260,6 +273,67 @@ function isSavableAsset(asset: DesktopAsset): boolean {
     return typeof meta.videoId === "string" && !!meta.videoId;
   }
   return true;
+}
+
+/* Canvas asset types that map cleanly onto the shared bulk-download engine
+ * (lib/bulk-download.ts). public_image / public_video use a storageKey /
+ * public-CDN model the engine doesn't speak, so they're intentionally
+ * excluded; non-media tiles (text/table/link/video_suggest) have nothing to
+ * download. */
+const DOWNLOADABLE_ASSET_TYPES = new Set(["image", "video", "audio"]);
+
+/** Resolve the canonical videoId for a video tile (generationData wins, then
+ * metadata). Returns null when neither is available (e.g. still generating). */
+function getVideoDownloadId(asset: EnrichedDesktopAsset): string | null {
+  const meta = asset.metadata as Record<string, unknown>;
+  const fromGen = asset.generationData?.videoId;
+  const fromMeta =
+    typeof meta.videoId === "string" && meta.videoId ? meta.videoId : null;
+  return fromGen || fromMeta || null;
+}
+
+function isDownloadableAsset(asset: EnrichedDesktopAsset): boolean {
+  if (!DOWNLOADABLE_ASSET_TYPES.has(asset.assetType)) return false;
+  const meta = asset.metadata as Record<string, unknown>;
+  if (asset.assetType === "image") {
+    return typeof meta.imageId === "string" && !!meta.imageId;
+  }
+  if (asset.assetType === "video") {
+    return getVideoDownloadId(asset) !== null;
+  }
+  // audio
+  return typeof meta.audioId === "string" && !!meta.audioId;
+}
+
+/** Map an enriched canvas asset onto the minimal shape consumed by
+ * {@link bulkDownloadAssets}. Returns null for non-downloadable tiles so
+ * callers can simply filter them out. */
+function desktopAssetToBulkDownloadAsset(
+  asset: EnrichedDesktopAsset
+): BulkDownloadAsset | null {
+  if (!isDownloadableAsset(asset)) return null;
+  const meta = asset.metadata as Record<string, unknown>;
+  const title =
+    typeof meta.title === "string" && meta.title ? meta.title : undefined;
+  if (asset.assetType === "image") {
+    return {
+      assetType: "image",
+      imageId: meta.imageId as string,
+      generationDetails: { title },
+    };
+  }
+  if (asset.assetType === "video") {
+    return {
+      assetType: "video",
+      assetId: getVideoDownloadId(asset) as string,
+      generationDetails: { title },
+    };
+  }
+  return {
+    assetType: "audio",
+    assetId: meta.audioId as string,
+    generationDetails: { title },
+  };
 }
 
 function userIdToColor(userId: string): string {
@@ -535,6 +609,7 @@ export default function DesktopCanvas({
 
   // Context menu
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
+  const [isBulkDownloading, setIsBulkDownloading] = useState(false);
 
   // Image edit-history popover (opened via right-click menu on image assets)
   const [historyPopover, setHistoryPopover] = useState<{
@@ -1180,6 +1255,51 @@ export default function DesktopCanvas({
     setContextMenu(null);
   }, [selectedIds, onAssetDelete, onAssetBatchDelete]);
 
+  // Format options mirror the asset-page batch download
+  // (collection/[collectionId]/page.tsx). "original" => no conversion.
+  const DOWNLOAD_FORMATS = useMemo(
+    () => [
+      { key: "original", label: t("bulkDownloadOriginal") },
+      { key: "png", label: "PNG" },
+      { key: "jpeg", label: "JPEG" },
+      { key: "webp", label: "WebP" },
+    ],
+    [t]
+  );
+
+  const handleCanvasDownload = useCallback(
+    async (ids: string[], formatKey?: string) => {
+      const mapped = ids
+        .map((id) => assets.find((a) => a.id === id))
+        .filter((a): a is EnrichedDesktopAsset => !!a)
+        .map((a) => desktopAssetToBulkDownloadAsset(a))
+        .filter((a): a is BulkDownloadAsset => a !== null);
+      setContextMenu(null);
+      if (mapped.length === 0) {
+        addToast({ title: t("nothingDownloadable"), color: "warning" });
+        return;
+      }
+      const imageFormat: ImageDownloadFormat | undefined =
+        formatKey === "png" || formatKey === "jpeg" || formatKey === "webp"
+          ? formatKey
+          : undefined;
+      setIsBulkDownloading(true);
+      try {
+        await bulkDownloadAssets(mapped, "canvas.zip", { imageFormat });
+        addToast({
+          title: t("bulkDownloaded"),
+          description: t("bulkDownloadedDesc", { count: mapped.length }),
+          color: "success",
+        });
+      } catch {
+        addToast({ title: t("failedToBulkDownload"), color: "danger" });
+      } finally {
+        setIsBulkDownloading(false);
+      }
+    },
+    [assets, t]
+  );
+
   // Delete/Backspace deletes the current selection. Single selection routes
   // through onAssetDelete; multi-selection routes through onAssetBatchDelete
   // so the whole group undoes in one Ctrl/Cmd+Z.
@@ -1643,6 +1763,36 @@ export default function DesktopCanvas({
                   </button>
                 );
               })()}
+              {Array.from(selectedIds).some((id) => {
+                const a = assets.find((x) => x.id === id);
+                return a ? isDownloadableAsset(a) : false;
+              }) && (
+                <Dropdown placement="right-start">
+                  <DropdownTrigger>
+                    <button
+                      className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-default-100 transition-colors text-left"
+                      disabled={isBulkDownloading}
+                    >
+                      <Download size={14} />
+                      {t("bulkDownload")}
+                      <ChevronDown size={12} className="ml-auto" />
+                    </button>
+                  </DropdownTrigger>
+                  <DropdownMenu
+                    aria-label={t("bulkDownloadFormatLabel")}
+                    onAction={(key) =>
+                      handleCanvasDownload(
+                        Array.from(selectedIds),
+                        String(key)
+                      )
+                    }
+                  >
+                    {DOWNLOAD_FORMATS.map((opt) => (
+                      <DropdownItem key={opt.key}>{opt.label}</DropdownItem>
+                    ))}
+                  </DropdownMenu>
+                </Dropdown>
+              )}
               <button
                 className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-danger-50 text-danger transition-colors text-left"
                 onClick={handleDeleteSelected}
@@ -1707,6 +1857,30 @@ export default function DesktopCanvas({
                     <FolderPlus size={14} />
                     {t("copyToCollection")}
                   </button>
+                )}
+                {contextAsset && isDownloadableAsset(contextAsset) && (
+                  <Dropdown placement="right-start">
+                    <DropdownTrigger>
+                      <button
+                        className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-default-100 transition-colors text-left"
+                        disabled={isBulkDownloading}
+                      >
+                        <Download size={14} />
+                        {t("bulkDownload")}
+                        <ChevronDown size={12} className="ml-auto" />
+                      </button>
+                    </DropdownTrigger>
+                    <DropdownMenu
+                      aria-label={t("bulkDownloadFormatLabel")}
+                      onAction={(key) =>
+                        handleCanvasDownload([contextAsset.id], String(key))
+                      }
+                    >
+                      {DOWNLOAD_FORMATS.map((opt) => (
+                        <DropdownItem key={opt.key}>{opt.label}</DropdownItem>
+                      ))}
+                    </DropdownMenu>
+                  </Dropdown>
                 )}
                 {contextAsset && onZIndexChange && !isContextInFlight && (
                   <>
@@ -1823,6 +1997,34 @@ export default function DesktopCanvas({
             }}
             onPointerDown={(e) => e.stopPropagation()}
           >
+            {isDownloadableAsset(singleSelectedAsset) && (
+              <Dropdown placement="bottom">
+                <DropdownTrigger>
+                  <button
+                    className="flex items-center gap-1.5 px-2 py-1 text-xs hover:bg-default-100 rounded-md transition-colors whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed"
+                    disabled={isBulkDownloading}
+                    title={t("bulkDownload")}
+                  >
+                    <Download size={13} />
+                    {t("bulkDownload")}
+                    <ChevronDown size={11} />
+                  </button>
+                </DropdownTrigger>
+                <DropdownMenu
+                  aria-label={t("bulkDownloadFormatLabel")}
+                  onAction={(key) =>
+                    handleCanvasDownload(
+                      [singleSelectedAsset.id],
+                      String(key)
+                    )
+                  }
+                >
+                  {DOWNLOAD_FORMATS.map((opt) => (
+                    <DropdownItem key={opt.key}>{opt.label}</DropdownItem>
+                  ))}
+                </DropdownMenu>
+              </Dropdown>
+            )}
             {floatingBarChatId && onOpenChat && (
               <button
                 className="flex items-center gap-1.5 px-2 py-1 text-xs hover:bg-default-100 rounded-md transition-colors whitespace-nowrap"
@@ -2167,6 +2369,30 @@ export default function DesktopCanvas({
                 <SendHorizontal size={11} />
                 {t("sendAllToChat")}
               </button>
+            )}
+            {selectedAssets.some(isDownloadableAsset) && (
+              <Dropdown placement="bottom">
+                <DropdownTrigger>
+                  <button
+                    className="flex items-center gap-1 px-2 py-0.5 bg-primary-foreground/20 hover:bg-primary-foreground/30 rounded-full transition-colors whitespace-nowrap disabled:opacity-50"
+                    disabled={isBulkDownloading}
+                  >
+                    <Download size={11} />
+                    {t("bulkDownload")}
+                    <ChevronDown size={10} />
+                  </button>
+                </DropdownTrigger>
+                <DropdownMenu
+                  aria-label={t("bulkDownloadFormatLabel")}
+                  onAction={(key) =>
+                    handleCanvasDownload(Array.from(selectedIds), String(key))
+                  }
+                >
+                  {DOWNLOAD_FORMATS.map((opt) => (
+                    <DropdownItem key={opt.key}>{opt.label}</DropdownItem>
+                  ))}
+                </DropdownMenu>
+              </Dropdown>
             )}
           </div>
         );
