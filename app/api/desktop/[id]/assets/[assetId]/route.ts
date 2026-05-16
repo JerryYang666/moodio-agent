@@ -9,6 +9,7 @@ import { hasWriteAccess } from "@/lib/permissions";
 import { getImageUrl, getVideoUrl, getSignedVideoUrl, getAudioUrl, getThumbnailUrl } from "@/lib/storage/s3";
 import { getContentUrl } from "@/lib/config/video.config";
 import { getUserSetting } from "@/lib/user-settings/server";
+import { REVIEW_STATUSES, type ReviewStatus } from "@/lib/desktop/types";
 
 function enrichAsset(
   asset: typeof desktopAssets.$inferSelect,
@@ -276,6 +277,64 @@ export async function PATCH(
       const [updated] = await db
         .update(desktopAssets)
         .set({ metadata: patchedMetadata })
+        .where(and(eq(desktopAssets.id, assetId), eq(desktopAssets.desktopId, id)))
+        .returning();
+
+      if (!updated) {
+        return NextResponse.json({ error: "Asset not found" }, { status: 404 });
+      }
+
+      return NextResponse.json({ asset: enrichAsset(updated, cnMode) });
+    }
+
+    // Review-status patch (collaboration tag). Server-side read-modify-write
+    // so concurrent metadata edits aren't clobbered. The setter identity is
+    // derived from the verified token — never trusted from the request body.
+    if (body.reviewStatusPatch && typeof body.reviewStatusPatch === "object") {
+      const raw = (body.reviewStatusPatch as { reviewStatus?: unknown })
+        .reviewStatus;
+      const clearing = raw === null;
+      if (
+        !clearing &&
+        (typeof raw !== "string" ||
+          !REVIEW_STATUSES.includes(raw as ReviewStatus))
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              "reviewStatusPatch.reviewStatus must be one of approved | pending | rejected | needs_review, or null to clear",
+          },
+          { status: 400 }
+        );
+      }
+
+      const [existing] = await db
+        .select()
+        .from(desktopAssets)
+        .where(and(eq(desktopAssets.id, assetId), eq(desktopAssets.desktopId, id)));
+
+      if (!existing) {
+        return NextResponse.json({ error: "Asset not found" }, { status: 404 });
+      }
+
+      const meta = { ...(existing.metadata as Record<string, unknown>) };
+      if (clearing) {
+        delete meta.reviewStatus;
+        delete meta.reviewStatusBy;
+        delete meta.reviewStatusAt;
+      } else {
+        const setBy =
+          [payload.firstName, payload.lastName].filter(Boolean).join(" ") ||
+          payload.email ||
+          "Unknown";
+        meta.reviewStatus = raw as ReviewStatus;
+        meta.reviewStatusBy = setBy;
+        meta.reviewStatusAt = Date.now();
+      }
+
+      const [updated] = await db
+        .update(desktopAssets)
+        .set({ metadata: meta })
         .where(and(eq(desktopAssets.id, assetId), eq(desktopAssets.desktopId, id)))
         .returning();
 

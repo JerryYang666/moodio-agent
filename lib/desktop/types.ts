@@ -17,7 +17,55 @@ export type ImageHistoryEntry = {
   timestamp?: number;
 };
 
-export type ImageAssetMeta = {
+/**
+ * Collaboration review tag applied to a canvas asset. Stored under the
+ * `reviewStatus` metadata key — deliberately distinct from `status`, which
+ * already holds generation/edit state on several asset types.
+ */
+export type ReviewStatus = "approved" | "pending" | "rejected" | "needs_review";
+
+export const REVIEW_STATUSES: ReviewStatus[] = [
+  "approved",
+  "pending",
+  "rejected",
+  "needs_review",
+];
+
+/** Fields written alongside `reviewStatus` recording who set it and when. */
+export type ReviewMeta = {
+  reviewStatus?: ReviewStatus;
+  /** Display name of the setter ("First Last") or their email. Stored
+   * directly so the canvas never has to resolve a user id at render time. */
+  reviewStatusBy?: string;
+  /** Epoch ms when the status was last set. */
+  reviewStatusAt?: number;
+};
+
+/**
+ * Safely read and validate the review tag off an asset's metadata.
+ * Returns `null` when no valid tag is set.
+ */
+export function getReviewInfo(asset: {
+  metadata: unknown;
+}): { status: ReviewStatus; by: string | null; at: number | null } | null {
+  const m = asset.metadata;
+  if (!m || typeof m !== "object") return null;
+  const r = m as Record<string, unknown>;
+  const status = r.reviewStatus;
+  if (
+    typeof status !== "string" ||
+    !REVIEW_STATUSES.includes(status as ReviewStatus)
+  ) {
+    return null;
+  }
+  return {
+    status: status as ReviewStatus,
+    by: typeof r.reviewStatusBy === "string" ? r.reviewStatusBy : null,
+    at: typeof r.reviewStatusAt === "number" ? r.reviewStatusAt : null,
+  };
+}
+
+export type ImageAssetMeta = ReviewMeta & {
   imageId: string;
   chatId?: string;
   messageTimestamp?: number;
@@ -87,7 +135,7 @@ export function aspectRatioDimensions(
   return { w: targetWidth, h: Math.round(targetWidth * (rh / rw)) };
 }
 
-export type VideoAssetMeta = {
+export type VideoAssetMeta = ReviewMeta & {
   imageId: string;
   videoId?: string;
   generationId?: string; // Links to videoGenerations table as canonical record
@@ -100,7 +148,7 @@ export type VideoAssetMeta = {
   modelId?: string;
 };
 
-export type PublicVideoAssetMeta = {
+export type PublicVideoAssetMeta = ReviewMeta & {
   storageKey: string;
   contentUuid: string;
   title?: string;
@@ -108,7 +156,7 @@ export type PublicVideoAssetMeta = {
   height?: number;
 };
 
-export type PublicImageAssetMeta = {
+export type PublicImageAssetMeta = ReviewMeta & {
   storageKey: string;
   contentUuid: string;
   title?: string;
@@ -116,7 +164,7 @@ export type PublicImageAssetMeta = {
   height?: number;
 };
 
-export type AudioAssetMeta = {
+export type AudioAssetMeta = ReviewMeta & {
   audioId: string;
   chatId?: string;
   messageTimestamp?: number;
@@ -125,7 +173,7 @@ export type AudioAssetMeta = {
   duration?: number;
 };
 
-export type TextAssetMeta = {
+export type TextAssetMeta = ReviewMeta & {
   content: string;
   fontSize?: number;
   color?: string;
@@ -133,7 +181,7 @@ export type TextAssetMeta = {
   messageTimestamp?: number;
 };
 
-export type LinkAssetMeta = {
+export type LinkAssetMeta = ReviewMeta & {
   url: string;
   title?: string;
   thumbnailUrl?: string;
@@ -148,7 +196,7 @@ export type TableRow = {
   cells: TableCell[];
 };
 
-export type TableAssetMeta = {
+export type TableAssetMeta = ReviewMeta & {
   title: string;
   columns: string[];
   rows: TableRow[];
@@ -157,7 +205,7 @@ export type TableAssetMeta = {
   status?: "streaming" | "complete";
 };
 
-export type VideoSuggestAssetMeta = {
+export type VideoSuggestAssetMeta = ReviewMeta & {
   imageId: string;
   chatId?: string;
   title: string;
