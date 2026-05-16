@@ -228,6 +228,7 @@
     "addImage": "画像を追加",
     "recordVoice": "音声を録音",
     "send": "送信",
+    "stopGenerating": "生成を停止",
     "preview": "プレビュー",
     "selectedAsset": "選択されたアセット",
     "precisionEditing": "精密編集",

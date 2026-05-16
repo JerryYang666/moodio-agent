@@ -228,6 +228,7 @@
     "addImage": "이미지 추가",
     "recordVoice": "음성 녹음",
     "send": "보내기",
+    "stopGenerating": "생성 중지",
     "preview": "미리보기",
     "selectedAsset": "선택된 애셋",
     "precisionEditing": "정밀 편집",

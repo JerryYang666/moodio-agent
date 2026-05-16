@@ -228,6 +228,7 @@
     "addImage": "Add image",
     "recordVoice": "Record voice",
     "send": "Send",
+    "stopGenerating": "Stop generating",
     "preview": "Preview",
     "selectedAsset": "Selected asset",
     "precisionEditing": "Precision Editing",
