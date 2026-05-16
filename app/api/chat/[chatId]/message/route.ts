@@ -140,14 +140,19 @@ const applyImageSelections = (
 async function postProcessMessages(opts: {
   chatId: string;
   chat: { name: string | null };
-  history: Message[];
+  cnMode: boolean;
   userMessage: Message;
   assistantMessages: Message[];
   imageSources: ImageSourceEntry[];
   userId: string;
-  persistentAssets?: PersistentAssets;
 }) {
-  const { chatId, chat, history, userMessage, assistantMessages, imageSources, userId, persistentAssets } = opts;
+  const { chatId, chat, cnMode, userMessage, assistantMessages, imageSources, userId } = opts;
+
+  // Re-read the latest persisted history immediately before writing rather
+  // than using the snapshot taken at request start. Generation can run for
+  // minutes; appending to a stale snapshot and overwriting the whole object
+  // would drop any other turn that completed in the meantime.
+  const { messages: history, persistentAssets } = await getChatHistory(chatId, cnMode);
 
   const historyWithSelections = applyImageSelections(history, imageSources);
   const updatedHistory = [...historyWithSelections, userMessage, ...assistantMessages];
@@ -862,12 +867,11 @@ export async function POST(
             await postProcessMessages({
               chatId,
               chat,
-              history,
+              cnMode,
               userMessage,
               assistantMessages: [assistantMessage],
               imageSources,
               userId: payload.userId,
-              persistentAssets,
             });
           })
           .catch((err) => {
@@ -1192,12 +1196,11 @@ export async function POST(
             await postProcessMessages({
               chatId,
               chat,
-              history,
+              cnMode,
               userMessage,
               assistantMessages: [assistantMessage],
               imageSources,
               userId: payload.userId,
-              persistentAssets,
             });
           })
           .catch((err) => {
@@ -1291,12 +1294,11 @@ export async function POST(
           await postProcessMessages({
             chatId,
             chat,
-            history,
+            cnMode,
             userMessage,
             assistantMessages: messagesToSave,
             imageSources,
             userId: payload.userId,
-            persistentAssets,
           });
         })
         .catch((err) => {

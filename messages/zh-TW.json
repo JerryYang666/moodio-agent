@@ -228,6 +228,7 @@
     "addImage": "新增圖片",
     "recordVoice": "錄製語音",
     "send": "傳送",
+    "stopGenerating": "停止生成",
     "preview": "預覽",
     "selectedAsset": "已選擇的素材",
     "precisionEditing": "精準編輯",
