@@ -36,7 +36,7 @@ import {
   clearDesktopViewport,
   findNonOverlappingPosition,
 } from "@/lib/desktop/types";
-import type { VideoAssetMeta } from "@/lib/desktop/types";
+import type { VideoAssetMeta, ReviewStatus } from "@/lib/desktop/types";
 import { useAuth } from "@/hooks/use-auth";
 import { TimelinePanel } from "@/components/timeline";
 import { useTimeline } from "@/hooks/use-timeline";
@@ -285,6 +285,11 @@ export default function DesktopDetailPage({
 
   const [camera, setCamera] = useState<CameraState>(DEFAULT_CAMERA);
   const [canvasMode, setCanvasMode] = useState<CanvasMode>("move");
+  // Empty set = show all. Otherwise only assets whose review status (or
+  // "untagged") is in the set stay highlighted; the rest are dimmed.
+  const [reviewFilter, setReviewFilter] = useState<
+    Set<ReviewStatus | "untagged">
+  >(new Set());
 
   // In-canvas image-edit overlay (重绘 / 裁切 / 擦除 / 抠图). Set by the
   // `moodio-image-edit` listener below; cleared when the user submits or
@@ -1689,6 +1694,70 @@ export default function DesktopDetailPage({
     [desktopId, detail?.assets, applyRemoteEvent, sendEvent]
   );
 
+  const handleAssetReviewStatusChange = useCallback(
+    async (assetId: string, status: ReviewStatus | null) => {
+      const name =
+        [user?.firstName, user?.lastName].filter(Boolean).join(" ") ||
+        user?.email ||
+        undefined;
+      const meta =
+        status === null
+          ? {
+              reviewStatus: null,
+              reviewStatusBy: null,
+              reviewStatusAt: null,
+            }
+          : {
+              reviewStatus: status,
+              reviewStatusBy: name,
+              reviewStatusAt: Date.now(),
+            };
+
+      // Optimistic local update + broadcast to collaborators.
+      applyRemoteEvent({
+        type: "asset_updated",
+        payload: { assetId, metadata: meta },
+      });
+      sendEvent("asset_updated", { assetId, metadata: meta });
+
+      try {
+        const res = await fetch(
+          `/api/desktop/${desktopId}/assets/${assetId}`,
+          {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              reviewStatusPatch: { reviewStatus: status },
+            }),
+          }
+        );
+        if (res.ok) {
+          // Reconcile from the server-authoritative setter/timestamp.
+          const data = await res.json();
+          const m = data?.asset?.metadata as Record<string, unknown> | undefined;
+          if (m) {
+            const authoritative = {
+              reviewStatus: m.reviewStatus,
+              reviewStatusBy: m.reviewStatusBy,
+              reviewStatusAt: m.reviewStatusAt,
+            };
+            applyRemoteEvent({
+              type: "asset_updated",
+              payload: { assetId, metadata: authoritative },
+            });
+            sendEvent("asset_updated", {
+              assetId,
+              metadata: authoritative,
+            });
+          }
+        }
+      } catch (error) {
+        console.error("Failed to update review status:", error);
+      }
+    },
+    [desktopId, applyRemoteEvent, sendEvent, user?.firstName, user?.lastName, user?.email]
+  );
+
   const handleOpenChat = useCallback(
     (chatId: string, messageTimestamp?: number) => {
       // Open the chat in the side panel instead of navigating away
@@ -2501,6 +2570,10 @@ export default function DesktopDetailPage({
           onAddAssetAtPosition={canEdit ? handleAddAssetAtPosition : undefined}
           onAddTextAtPosition={canEdit ? handleAddTextAtPosition : undefined}
           onAssetRename={canEdit ? handleAssetRename : undefined}
+          onAssetReviewStatusChange={
+            canEdit ? handleAssetReviewStatusChange : undefined
+          }
+          reviewFilter={reviewFilter}
           onExternalFileDrop={canEdit ? handleExternalFileDrop : undefined}
           imageEditState={canEdit ? imageEditState : null}
           onImageEditCommit={canEdit ? handleImageEditCommit : undefined}
@@ -2518,6 +2591,8 @@ export default function DesktopDetailPage({
           onCameraChange={handleCameraChange}
           canvasMode={canvasMode}
           onCanvasModeChange={setCanvasMode}
+          reviewFilter={reviewFilter}
+          onReviewFilterChange={setReviewFilter}
         />
       </div>
 

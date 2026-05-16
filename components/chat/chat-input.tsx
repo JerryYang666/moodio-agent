@@ -73,6 +73,7 @@ interface ChatInputProps {
   input: string;
   onInputChange: (value: string) => void;
   onSend: () => void;
+  onStop: () => void;
   isSending: boolean;
   isRecording: boolean;
   isTranscribing: boolean;
@@ -198,6 +199,7 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
   input,
   onInputChange,
   onSend,
+  onStop,
   isSending,
   isRecording,
   isTranscribing,
@@ -1647,7 +1649,18 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput({
               }
               isDisabled={!hasUploadingImages && !klingElementsInvalid && !mediaRefVideoOverCap}
             >
-              {menuState.mode === "video" ? (
+              {isSending ? (
+                <Button
+                  key="stop-generation"
+                  isIconOnly
+                  color="danger"
+                  aria-label={t("chat.stopGenerating")}
+                  onPress={onStop}
+                  className="shrink-0"
+                >
+                  <Square size={20} />
+                </Button>
+              ) : menuState.mode === "video" ? (
                 <Button
                   key="send-video"
                   color="warning"

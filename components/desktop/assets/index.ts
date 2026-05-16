@@ -5,4 +5,5 @@ export { default as LinkAsset } from "./LinkAsset";
 export { default as TableAsset } from "./TableAsset";
 export { default as VideoSuggestAsset } from "./VideoSuggestAsset";
 export { default as AudioAsset } from "./AudioAsset";
+export { AssetReviewTag, AssetReviewTagMenu } from "./AssetReviewTag";
 export type { EnrichedDesktopAsset } from "./types";

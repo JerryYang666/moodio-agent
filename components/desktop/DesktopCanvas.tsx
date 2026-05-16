@@ -6,8 +6,9 @@ import type { DesktopAsset } from "@/lib/db/schema";
 import type { CameraState } from "@/hooks/use-desktop";
 import type { RemoteCursor } from "@/hooks/use-desktop-ws";
 import type { EnrichedDesktopAsset } from "./assets";
-import { aspectRatioDimensions } from "@/lib/desktop/types";
+import { aspectRatioDimensions, getReviewInfo, REVIEW_STATUSES, type ReviewStatus } from "@/lib/desktop/types";
 import { ImageAsset, VideoAsset, TextAsset, LinkAsset, VideoSuggestAsset, AudioAsset } from "./assets";
+import { AssetReviewTag, AssetReviewTagMenu, getReviewStatusIcon } from "./assets/AssetReviewTag";
 import PublicVideoAsset from "./assets/PublicVideoAsset";
 import TableAsset from "./assets/TableAsset";
 import CanvasMediaPreview from "./assets/CanvasMediaPreview";
@@ -38,6 +39,7 @@ import {
   History,
   Download,
   ChevronDown,
+  X,
 } from "lucide-react";
 import AssetHistoryPopover from "./assets/AssetHistoryPopover";
 import ImageEditOverlay, {
@@ -153,6 +155,19 @@ interface DesktopCanvasProps {
   onAddAssetAtPosition?: (worldPos: { x: number; y: number }) => void;
   onAddTextAtPosition?: (worldPos: { x: number; y: number }) => void;
   onAssetRename?: (assetId: string, newTitle: string) => void;
+  /**
+   * Set/clear the collaboration review tag on an asset. `null` clears it.
+   * Undefined for viewers (read-only).
+   */
+  onAssetReviewStatusChange?: (
+    assetId: string,
+    status: ReviewStatus | null
+  ) => void;
+  /**
+   * Active review-status filter. Empty set = show everything; otherwise
+   * assets whose status (or "untagged") is not in the set are dimmed.
+   */
+  reviewFilter?: Set<ReviewStatus | "untagged">;
   /**
    * Called when external files (images/videos/audio) are dropped onto the
    * canvas from outside the browser. Receives the dropped files and the
@@ -410,6 +425,8 @@ export default function DesktopCanvas({
   onAddAssetAtPosition,
   onAddTextAtPosition,
   onAssetRename,
+  onAssetReviewStatusChange,
+  reviewFilter,
   onExternalFileDrop,
   imageEditState,
   onImageEditCommit,
@@ -1550,6 +1567,24 @@ export default function DesktopCanvas({
 
           const handleSize = Math.max(8, 8 / camera.zoom);
 
+          const reviewInfo = getReviewInfo(asset);
+          // Review-status filter: when active, assets that don't match are
+          // dimmed (not unmounted) so spatial/collab context is preserved.
+          const dimmedByFilter =
+            !!reviewFilter &&
+            reviewFilter.size > 0 &&
+            !reviewFilter.has(reviewInfo ? reviewInfo.status : "untagged");
+          // The generation badge on a *processing* video also sits top-left;
+          // offset the review tag down so they don't overlap.
+          const reviewTagOffsetY =
+            asset.assetType === "video" &&
+            ((asset as EnrichedDesktopAsset).generationData?.status ===
+              "processing" ||
+              (asset as EnrichedDesktopAsset).generationData?.status ===
+                "pending")
+              ? 26
+              : 0;
+
           return (
             <div
               key={asset.id}
@@ -1574,7 +1609,9 @@ export default function DesktopCanvas({
                     : remoteSelectorsForAsset?.length
                       ? "ring-offset-2 ring-offset-background"
                       : "border border-divider"
-                } ${isDragging ? "opacity-80 shadow-xl" : ""}`}
+                } ${isDragging ? "opacity-80 shadow-xl" : ""} ${
+                  dimmedByFilter ? "opacity-30" : ""
+                } transition-opacity`}
                 style={
                   remoteSelectorsForAsset?.length && !isSelected
                     ? { boxShadow: `0 0 0 ${2 / camera.zoom}px ${userIdToColor(remoteSelectorsForAsset[0].userId)}` }
@@ -1600,6 +1637,39 @@ export default function DesktopCanvas({
                 onVideoFrameCaptured={onVideoFrameCaptured}
               />
               </div>
+              {/* Review tag — upper-left corner. Visible to everyone once
+                  set; collaborators can change it via the dropdown. Scaled
+                  inversely with zoom so it stays legible. */}
+              {reviewInfo && (
+                <div
+                  className="absolute z-20"
+                  style={{
+                    top: 6 + reviewTagOffsetY / camera.zoom,
+                    left: 6,
+                    transform: `scale(${1 / camera.zoom})`,
+                    transformOrigin: "top left",
+                  }}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onContextMenu={(e) => e.stopPropagation()}
+                >
+                  {canEdit && onAssetReviewStatusChange ? (
+                    <AssetReviewTagMenu
+                      status={reviewInfo.status}
+                      by={reviewInfo.by}
+                      at={reviewInfo.at}
+                      onChange={(s) =>
+                        onAssetReviewStatusChange(asset.id, s)
+                      }
+                    />
+                  ) : (
+                    <AssetReviewTag
+                      status={reviewInfo.status}
+                      by={reviewInfo.by}
+                      at={reviewInfo.at}
+                    />
+                  )}
+                </div>
+              )}
               {/* Resize handles — visible when selected. Hidden for assets
                   with an AI edit in flight (drag/resize is locked during
                   that window to keep the shimmer synced to the rect). */}
@@ -1846,6 +1916,51 @@ export default function DesktopCanvas({
                     {t("rename")}
                   </button>
                 )}
+                {contextAsset && onAssetReviewStatusChange && !isContextInFlight && (() => {
+                  const current = getReviewInfo(contextAsset)?.status ?? null;
+                  const labelKey: Record<ReviewStatus, string> = {
+                    approved: "reviewStatusApproved",
+                    pending: "reviewStatusPending",
+                    rejected: "reviewStatusRejected",
+                    needs_review: "reviewStatusNeedsReview",
+                  };
+                  return (
+                    <>
+                      <div className="border-t border-divider my-1" />
+                      <div className="px-3 py-1 text-[11px] font-medium text-default-500">
+                        {t("reviewStatus")}
+                      </div>
+                      {REVIEW_STATUSES.map((s) => (
+                        <button
+                          key={s}
+                          className={`flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-default-100 transition-colors text-left ${
+                            current === s ? "font-medium" : ""
+                          }`}
+                          onClick={() => {
+                            onAssetReviewStatusChange(contextAsset.id, s);
+                            setContextMenu(null);
+                          }}
+                        >
+                          {getReviewStatusIcon(s, 14)}
+                          {t(labelKey[s])}
+                        </button>
+                      ))}
+                      {current && (
+                        <button
+                          className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-danger-50 text-danger transition-colors text-left"
+                          onClick={() => {
+                            onAssetReviewStatusChange(contextAsset.id, null);
+                            setContextMenu(null);
+                          }}
+                        >
+                          <X size={14} />
+                          {t("reviewStatusClear")}
+                        </button>
+                      )}
+                      <div className="border-t border-divider my-1" />
+                    </>
+                  );
+                })()}
                 {contextAsset && onSaveToCollection && isSavableAsset(contextAsset) && !isContextInFlight && (
                   <button
                     className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-default-100 transition-colors text-left"

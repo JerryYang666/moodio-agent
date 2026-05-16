@@ -3468,6 +3468,15 @@ export default function ChatInterface({
     }
   };
 
+  // Stop listening to the in-progress SSE stream. The backend keeps running
+  // and persists its result normally; this only detaches the client. The
+  // read loop breaks on cancel() and its finally block resets streaming state.
+  const handleStopGeneration = () => {
+    streamReaderRef.current?.cancel().catch(() => {
+      // already cancelled / errored
+    });
+  };
+
   const handleSend = async () => {
     // Clear post-message suggestions, ask-user questions, and image suggestions when sending
     setPostMessageSuggestions([]);
@@ -5549,6 +5558,7 @@ export default function ChatInterface({
           input={input}
           onInputChange={setInput}
           onSend={handleSend}
+          onStop={handleStopGeneration}
           isSending={isSending}
           isRecording={isRecording}
           isTranscribing={isTranscribing}

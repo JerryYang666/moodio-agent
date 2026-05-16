@@ -5,11 +5,31 @@ import { useTranslations } from "next-intl";
 import { Button } from "@heroui/button";
 import { Kbd } from "@heroui/kbd";
 import { Tooltip } from "@heroui/tooltip";
-import { ZoomIn, ZoomOut, Maximize, Hand, MousePointer2 } from "lucide-react";
+import {
+  Dropdown,
+  DropdownTrigger,
+  DropdownMenu,
+  DropdownItem,
+} from "@heroui/dropdown";
+import { ZoomIn, ZoomOut, Maximize, Hand, MousePointer2, Filter } from "lucide-react";
 import type { CameraState } from "@/hooks/use-desktop";
 import type { DesktopAsset } from "@/lib/db/schema";
+import { REVIEW_STATUSES, type ReviewStatus } from "@/lib/desktop/types";
+import {
+  getReviewStatusIcon,
+} from "@/components/desktop/assets/AssetReviewTag";
 
 export type CanvasMode = "move" | "select";
+
+export type ReviewFilterKey = ReviewStatus | "untagged";
+const REVIEW_FILTER_KEYS: ReviewFilterKey[] = [...REVIEW_STATUSES, "untagged"];
+const REVIEW_FILTER_LABEL_KEY: Record<ReviewFilterKey, string> = {
+  approved: "reviewStatusApproved",
+  pending: "reviewStatusPending",
+  rejected: "reviewStatusRejected",
+  needs_review: "reviewStatusNeedsReview",
+  untagged: "filterUntagged",
+};
 
 const MIN_ZOOM = 0.1;
 const MAX_ZOOM = 5;
@@ -21,6 +41,8 @@ interface DesktopToolbarProps {
   onCameraChange: (camera: CameraState) => void;
   canvasMode: CanvasMode;
   onCanvasModeChange: (mode: CanvasMode) => void;
+  reviewFilter: Set<ReviewFilterKey>;
+  onReviewFilterChange: (next: Set<ReviewFilterKey>) => void;
 }
 
 export default function DesktopToolbar({
@@ -29,6 +51,8 @@ export default function DesktopToolbar({
   onCameraChange,
   canvasMode,
   onCanvasModeChange,
+  reviewFilter,
+  onReviewFilterChange,
 }: DesktopToolbarProps) {
   const t = useTranslations("desktop");
   const toolbarRef = useRef<HTMLDivElement>(null);
@@ -111,6 +135,51 @@ export default function DesktopToolbar({
 
   return (
     <div ref={toolbarRef} className="absolute bottom-4 right-4 flex items-center gap-1 bg-background/80 backdrop-blur-sm rounded-xl border border-divider p-1 shadow-sm z-10">
+      <Dropdown placement="top-end">
+        <DropdownTrigger>
+          <Button
+            isIconOnly
+            size="sm"
+            variant="flat"
+            color={reviewFilter.size > 0 ? "primary" : "default"}
+            aria-label={t("filterByStatus")}
+            title={t("filterByStatus")}
+          >
+            <Filter size={16} />
+          </Button>
+        </DropdownTrigger>
+        <DropdownMenu
+          aria-label={t("filterByStatus")}
+          closeOnSelect={false}
+          selectionMode="multiple"
+          selectedKeys={reviewFilter}
+          onSelectionChange={(keys) => {
+            if (keys === "all") {
+              onReviewFilterChange(new Set(REVIEW_FILTER_KEYS));
+            } else {
+              onReviewFilterChange(
+                new Set(Array.from(keys) as ReviewFilterKey[])
+              );
+            }
+          }}
+        >
+          {REVIEW_FILTER_KEYS.map((key) => (
+            <DropdownItem
+              key={key}
+              startContent={
+                key === "untagged"
+                  ? undefined
+                  : getReviewStatusIcon(key as ReviewStatus, 16)
+              }
+            >
+              {t(REVIEW_FILTER_LABEL_KEY[key])}
+            </DropdownItem>
+          ))}
+        </DropdownMenu>
+      </Dropdown>
+
+      <div className="w-px h-5 bg-divider mx-0.5" />
+
       <Tooltip
         content={
           <div className="flex items-center gap-2">
